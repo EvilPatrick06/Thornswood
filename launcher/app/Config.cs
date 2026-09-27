@@ -136,6 +136,16 @@ namespace Thornswood
 
         [DataMember] public string Theme = "Forge";
 
+        // A theme the person builds for themselves on the Settings page, kept
+        // as flat name/hex pairs so the serializer stays as plain as the rest
+        // of this file: "Bg","#100D0A","Panel","#171310", and so on for the
+        // sixteen colour names in Themes.cs. Null or too short to hold a pair
+        // means none has been made, and "Custom" is not offered. CustomLight
+        // is the same choice a built-in theme makes with its Light flag, so
+        // anything that draws its own graphics can pick a side.
+        [DataMember] public string[] CustomColors = null;
+        [DataMember] public bool CustomLight = false;
+
         /*
           Which build this install follows. Empty is the main build, the one
           everybody plays on. "dev" is the second launcher, installed beside

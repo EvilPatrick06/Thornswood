@@ -27,6 +27,30 @@ Skyrim the way it was.
 4. Press **Connect Discord** on the launcher's front page. Your browser opens,
    you say yes, and it closes itself. You never do this again.
 
+<a id='defender'></a>
+
+## Why does Windows or Defender warn about the installer?
+
+The Alpha installer is not code-signed yet. Two things follow from that, and
+neither is a virus finding.
+
+Windows SmartScreen soft-blocks a download it does not recognise, with a blue
+**Windows protected your PC** box. Defender's machine-learning engines flag
+generic unsigned downloaders like ours on sight, whatever is inside them. Both
+are reacting to the file being new and unsigned, not to anything in it.
+
+If SmartScreen stops it, press **More info** and then **Run anyway**. That is
+all it takes.
+
+Do not turn Defender off and do not add an exclusion for the installer. You do
+not need to, and it is not worth doing for one file. Check the file instead:
+every build's SHA-256 is printed on the [Downloads](/downloads) page next to the
+button, with a link to its VirusTotal report on that same hash, so you can see
+what the file is before you run it.
+
+The real fix is code signing, which is being worked on. Once the installer is
+signed the warning goes on its own, and none of this is needed.
+
 ## Starting it after that
 
 Open Thornswood from the desktop shortcut. Not Skyrim, not Steam, not SKSE.

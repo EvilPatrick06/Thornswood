@@ -109,9 +109,15 @@ namespace Thornswood
                          txtSaveNote, txtSaveCount, txtLogCount, txtDisplayNote,
                          txtReadyTitle, txtReadyNote;
         static Ellipse dotServer, dotVerify, dotReady;
-        static StackPanel statusList, modList, themeRow, pathRows, helpList,
+        static StackPanel statusList, modList, themeRow, themeEditor, pathRows, helpList,
                           newsList, saveList, logList, statRow, displayModeRow,
-                          firstRunCard, quickKeysCard, quickKeys;
+                          firstRunCard, quickKeysCard, quickKeys, galleryCard;
+        static Image galleryImage; static TextBlock galleryBy;
+        // The pictures /api/public is showing and where the card is in turning
+        // through them. Null until the feed has answered with at least one.
+        static List<Gallery.Shot> galleryShots;
+        static int galleryAt = -1;
+        static DispatcherTimer galleryTimer;
         static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
         static CheckBox chkMusic; static Slider sldMusic; static TextBlock txtMusic;
@@ -121,9 +127,8 @@ namespace Thornswood
         static Button btnVoiceTest;
         static TextBlock txtVoiceState;
         static Button btnUninstall, btnServerStart, btnServerStop;
-        static Button btnDevInstall, btnDevRemove;
-        static TextBlock txtBrandSmall, txtBrandBig, txtDevState;
-        static StackPanel pnlDev;
+        static Button btnServerMain, btnServerDev;
+        static TextBlock txtBrandSmall, txtBrandBig, txtServerPick, noteServerPick;
         static TextBlock txtServerState;
         static Border updateBar, mineCard;
         static Border downgradeBar;
@@ -265,9 +270,10 @@ namespace Thornswood
             win = (Window)XamlReader.Parse(xaml);
 
             Bind();
-            Themes.Apply(win, cfg.Theme);
+            Themes.Apply(win, Themes.Resolve(cfg));
             Wire();
             BuildThemeRow();
+            BuildThemeEditor();
             BuildDisplay();
             BuildChat();
             BuildStatRow();
@@ -431,6 +437,7 @@ namespace Thornswood
             HealClientBackground();
             AutoDisplayOnce();
             StartPing();
+            StartGallery();
             if (Updater.Enabled(cfg))
                 ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
             else
@@ -581,7 +588,8 @@ namespace Thornswood
             txtReadyTitle = F<TextBlock>("TxtReadyTitle"); txtReadyNote = F<TextBlock>("TxtReadyNote");
             mineCard = F<Border>("MineCard");
             statusList = F<StackPanel>("StatusList"); modList = F<StackPanel>("ModList");
-            themeRow = F<StackPanel>("ThemeRow"); pathRows = F<StackPanel>("PathRows");
+            themeRow = F<StackPanel>("ThemeRow"); themeEditor = F<StackPanel>("ThemeEditor");
+            pathRows = F<StackPanel>("PathRows");
             helpList = F<StackPanel>("HelpList");
             boxSearch = F<TextBox>("BoxSearch"); boxAddress = F<TextBox>("BoxAddress"); boxPort = F<TextBox>("BoxPort");
             btnShowServer = F<Button>("BtnShowServer");
@@ -600,8 +608,8 @@ namespace Thornswood
             btnOpenLog = F<Button>("BtnOpenLog"); btnOpenSaves = F<Button>("BtnOpenSaves");
             btnRepair = F<Button>("BtnRepair"); btnRestore = F<Button>("BtnRestore");
             btnIcons = F<Button>("BtnIcons");
-            btnDevInstall = F<Button>("BtnDevInstall"); btnDevRemove = F<Button>("BtnDevRemove");
-            txtDevState = F<TextBlock>("TxtDevState"); pnlDev = F<StackPanel>("PnlDev");
+            btnServerMain = F<Button>("BtnServerMain"); btnServerDev = F<Button>("BtnServerDev");
+            txtServerPick = F<TextBlock>("TxtServerPick"); noteServerPick = F<TextBlock>("NoteServerPick");
             txtBrandSmall = F<TextBlock>("TxtBrandSmall"); txtBrandBig = F<TextBlock>("TxtBrandBig");
             btnUninstall = F<Button>("BtnUninstall"); chkKeepSaves = F<CheckBox>("ChkKeepSaves");
             chkDeleteMods = F<CheckBox>("ChkDeleteMods");
@@ -619,6 +627,9 @@ namespace Thornswood
             quickKeysCard = F<StackPanel>("QuickKeysCard");
             quickKeys = F<StackPanel>("QuickKeys");
             btnAllControls = F<Button>("BtnAllControls");
+            galleryCard = F<StackPanel>("GalleryCard");
+            galleryImage = F<Image>("GalleryImage");
+            galleryBy = F<TextBlock>("GalleryBy");
 
             // Same order as the PageXxx constants above, and as PageTitles.
             navButtons = new Button[] {
@@ -836,6 +847,10 @@ namespace Thornswood
             else if (i == PageControls) BuildControls();
             else if (i == PageLogs) BuildLogs();
             else if (i == PageDiag) BuildDiag();
+
+            // The gallery turns only on the Play page, so a page change starts
+            // or stops it, the way the title video follows what is on screen.
+            GalleryDecide();
         }
 
         /// <summary>
@@ -1054,6 +1069,101 @@ namespace Thornswood
             txtMusic.Text = v == 0 ? "silent" : v + "%";
         }
 
+        /// <summary>
+        /// The pictures the site is showing, turned through on the Play page.
+        ///
+        /// Read only: Gallery.Load asks /api/public, the same public feed the
+        /// front page reads, and the site keeps the queue and chooses what goes
+        /// into the gallery. The launcher shows what is already public and sends
+        /// nothing.
+        ///
+        /// The list is fetched once on a pool thread at start up. The card stays
+        /// hidden until the first picture has loaded, so a site that is down, or
+        /// a build shown before anybody has sent a picture, leaves the page
+        /// exactly as it was. It fails the way the online count and the roster
+        /// do: quietly, with nothing said.
+        /// </summary>
+        static void StartGallery()
+        {
+            if (galleryCard == null) return;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                // Load fails to an empty list on its own, so nothing here throws
+                // and there is no catch to swallow: the same shape as AskOnline.
+                List<Gallery.Shot> shots = Gallery.Load();
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    galleryShots = (shots != null && shots.Count > 0) ? shots : null;
+                    galleryAt = -1;
+                    if (galleryShots == null) return;
+
+                    if (galleryTimer == null)
+                    {
+                        galleryTimer = new DispatcherTimer();
+                        galleryTimer.Interval = TimeSpan.FromSeconds(7);
+                        galleryTimer.Tick += delegate { ShowNextShot(); };
+                        // Turn only while somebody can see it: off the Play
+                        // page, minimised or in game it stands still, the way
+                        // the menu music and the title video do.
+                        win.StateChanged += delegate { GalleryDecide(); };
+                    }
+                    ShowNextShot();
+                    GalleryDecide();
+                }));
+            });
+        }
+
+        /// <summary>
+        /// Turns to the next picture. Its image is fetched on a pool thread the
+        /// first time it is shown and kept after that; a picture that will not
+        /// load leaves the one before it up and the next tick turns past it.
+        /// </summary>
+        static void ShowNextShot()
+        {
+            if (galleryShots == null || galleryShots.Count == 0) return;
+            galleryAt = (galleryAt + 1) % galleryShots.Count;
+            Gallery.Shot shot = galleryShots[galleryAt];
+
+            if (shot.Image != null) { ShowShot(shot); return; }
+
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                // Fetch returns null rather than throwing, so there is no catch
+                // to swallow here either. A picture that will not load leaves
+                // the one before it up and the next tick turns past it.
+                BitmapImage bi = Gallery.Fetch(shot);
+                if (bi == null) return;
+                win.Dispatcher.BeginInvoke(new Action(delegate { ShowShot(shot); }));
+            });
+        }
+
+        static void ShowShot(Gallery.Shot shot)
+        {
+            if (shot == null || shot.Image == null) return;
+            if (galleryImage != null) galleryImage.Source = shot.Image;
+            if (galleryBy != null)
+                galleryBy.Text = (shot.By != null && shot.By.Length > 0)
+                    ? "By " + shot.By + ", from the world"
+                    : "From the world";
+            if (galleryCard != null && galleryCard.Visibility != Visibility.Visible)
+                galleryCard.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Runs the rotation only when the Play page is up, the window is not
+        /// minimised and no game is running, so nothing is fetched or turned
+        /// behind a page nobody is looking at.
+        /// </summary>
+        static void GalleryDecide()
+        {
+            if (galleryTimer == null || galleryShots == null) return;
+            bool seen = pages != null && pages[PagePlay] != null &&
+                        pages[PagePlay].IsVisible &&
+                        win.WindowState != WindowState.Minimized && !playing;
+            if (seen) { if (!galleryTimer.IsEnabled) galleryTimer.Start(); }
+            else { if (galleryTimer.IsEnabled) galleryTimer.Stop(); }
+        }
+
         static void Wire()
         {
             // The Play page names the server rather than addressing it. See the
@@ -1072,7 +1182,7 @@ namespace Thornswood
                 if (txtBrandBig != null) txtBrandBig.Text = "ThornsWood Dev";
                 try { win.Title = "Thornswood Dev"; } catch { }
             }
-            DrawDevBuild();
+            DrawServerPick();
             boxSearch.Text = SearchHint;
             boxSearch.Foreground = Res("Faint");
 
@@ -1263,34 +1373,8 @@ namespace Thornswood
             {
                 btnUninstall.Click += delegate { DoUninstall(); };
             }
-            btnDevInstall.Click += delegate
-            {
-                if (DevBuild.Installed)
-                {
-                    try
-                    {
-                        Process.Start(new ProcessStartInfo(DevBuild.Exe) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(DevBuild.Exe) });
-                        Log("Opened the dev build.");
-                    }
-                    catch (Exception ex) { Log("Could not open the dev build: " + ex.Message); }
-                }
-                else
-                {
-                    try { Log(DevBuild.Install(cfg)); }
-                    catch (Exception ex) { Log("Could not install the dev build: " + ex.Message); }
-                }
-                DrawDevBuild();
-            };
-            btnDevRemove.Click += delegate
-            {
-                var r = MessageBox.Show(
-                    "Remove the dev build?\n\nThe second launcher and its folder go. Characters on the dev server stay on the server, and this build is not touched.",
-                    "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                if (r != MessageBoxResult.Yes) return;
-                try { Log(DevBuild.Remove()); }
-                catch (Exception ex) { Log("Could not remove the dev build: " + ex.Message); }
-                DrawDevBuild();
-            };
+            if (btnServerDev != null) btnServerDev.Click += delegate { SwitchToDev(); };
+            if (btnServerMain != null) btnServerMain.Click += delegate { SwitchToMain(); };
 
             btnOpenSaveFolder.Click += delegate { Open(Files.SaveDir); };
             btnOpenLogFolder.Click += delegate { Open(Files.SkseLogDir); };
@@ -1589,6 +1673,7 @@ namespace Thornswood
                 inPlayTicks = 0;
                 MusicDecide();
                 headerVideoDecide();
+                GalleryDecide();
                 // An update was seen during the session and they quit before
                 // the five minutes were up. The clock goes, the fact does not:
                 // it is fetched now, the same as it would have been had the
@@ -2901,55 +2986,169 @@ namespace Thornswood
             themeRow.Children.Add(wrap);
 
             foreach (Theme t in Themes.All)
+                AddThemeButton(wrap, t);
+
+            // The theme the person built themselves sits after the built-ins,
+            // once there is one to sit there. Picking it puts their colours
+            // back without retyping them; the editor below is only for making
+            // or changing them.
+            if (Themes.HasCustom(cfg.CustomColors))
+                AddThemeButton(wrap, Themes.Custom(cfg.CustomColors, cfg.CustomLight));
+
+            Theme cur = Themes.Resolve(cfg);
+            txtThemeNote.Text = cur.Name + ". " + cur.Note;
+        }
+
+        static void AddThemeButton(WrapPanel wrap, Theme t)
+        {
+            Theme captured = t;
+            bool on = string.Equals(t.Name, cfg.Theme, StringComparison.OrdinalIgnoreCase);
+
+            var sw = new Border();
+            sw.Width = 15; sw.Height = 15;
+            sw.CornerRadius = new CornerRadius(2);
+            sw.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(t.Swatch));
+            sw.Margin = new Thickness(0, 0, 10, 0);
+            sw.VerticalAlignment = VerticalAlignment.Center;
+
+            var label = new TextBlock();
+            label.Text = t.Name;
+            label.VerticalAlignment = VerticalAlignment.Center;
+            label.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+
+            var sp = new StackPanel();
+            sp.Orientation = Orientation.Horizontal;
+            sp.Children.Add(sw);
+            sp.Children.Add(label);
+
+            var b = new Button();
+            b.Content = sp;
+            b.Style = (Style)win.Resources["Ghost"];
+            b.Margin = new Thickness(0, 0, 9, 9);
+            b.Padding = new Thickness(12, 9, 16, 9);
+            b.MinWidth = 148;
+            b.HorizontalContentAlignment = HorizontalAlignment.Left;
+            if (on) b.Background = Res("CardHover");
+            b.Click += delegate
             {
-                Theme captured = t;
-                bool on = string.Equals(t.Name, cfg.Theme, StringComparison.OrdinalIgnoreCase);
+                cfg.Theme = captured.Name;
+                cfg.Save(Paths.CfgFile);
+                Themes.Apply(win, Themes.Resolve(cfg));
+                Redraw();
+                Log("Theme set to " + captured.Name + ".");
+            };
+            wrap.Children.Add(b);
+        }
 
-                var sw = new Border();
-                sw.Width = 15; sw.Height = 15;
-                sw.CornerRadius = new CornerRadius(2);
-                sw.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(t.Swatch));
-                sw.Margin = new Thickness(0, 0, 10, 0);
-                sw.VerticalAlignment = VerticalAlignment.Center;
+        // The boxes the editor draws, kept so their text can be read back when
+        // the person presses Use these colours. Rebuilt whenever the editor is.
+        static readonly Dictionary<string, TextBox> themeBoxes = new Dictionary<string, TextBox>();
+        static CheckBox themeLightBox;
 
-                var label = new TextBlock();
-                label.Text = t.Name;
-                label.VerticalAlignment = VerticalAlignment.Center;
-                label.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+        // The make-your-own editor, under the swatch row. It fills its boxes
+        // from whatever theme is on right now, so the way to start from a
+        // built-in is to pick it above first and then change what you want.
+        static void BuildThemeEditor()
+        {
+            if (themeEditor == null) return;
+            themeEditor.Children.Clear();
+            themeBoxes.Clear();
 
-                var sp = new StackPanel();
-                sp.Orientation = Orientation.Horizontal;
-                sp.Children.Add(sw);
-                sp.Children.Add(label);
+            Theme cur = Themes.Resolve(cfg);
 
-                var b = new Button();
-                b.Content = sp;
-                b.Style = (Style)win.Resources["Ghost"];
-                b.Margin = new Thickness(0, 0, 9, 9);
-                b.Padding = new Thickness(12, 9, 16, 9);
-                b.MinWidth = 148;
-                b.HorizontalContentAlignment = HorizontalAlignment.Left;
-                if (on) b.Background = Res("CardHover");
-                b.Click += delegate
+            var head = new TextBlock();
+            head.Text = "Make your own";
+            head.FontFamily = new FontFamily("Constantia, Georgia");
+            head.FontSize = 13;
+            head.Foreground = Res("Faint");
+            head.Margin = new Thickness(0, 2, 0, 8);
+            themeEditor.Children.Add(head);
+
+            var blurb = new TextBlock();
+            blurb.Text = "Pick a theme above to start from, change any colour to a hex value like #C8763A, "
+                       + "then press Use these colours. The two soft ones put the opacity first, so "
+                       + "#3CC8763A is that accent at low opacity.";
+            blurb.FontSize = 11.5; blurb.Foreground = Res("Faint");
+            blurb.TextWrapping = TextWrapping.Wrap; blurb.LineHeight = 17;
+            blurb.Margin = new Thickness(0, 0, 0, 12);
+            themeEditor.Children.Add(blurb);
+
+            var grid = new WrapPanel();
+            foreach (string name in Themes.Names)
+            {
+                string val;
+                cur.Colors.TryGetValue(name, out val);
+
+                var col = new StackPanel();
+                col.Width = 152;
+                col.Margin = new Thickness(0, 0, 14, 12);
+
+                var l = new TextBlock();
+                l.Text = name;
+                l.FontSize = 11.5; l.Foreground = Res("Muted");
+                l.Margin = new Thickness(2, 0, 0, 4);
+                col.Children.Add(l);
+
+                var box = new TextBox();
+                box.Text = val == null ? "" : val;
+                box.Style = (Style)win.Resources["Field"];
+                box.FontFamily = new FontFamily("Cascadia Mono, Consolas");
+                col.Children.Add(box);
+
+                themeBoxes[name] = box;
+                grid.Children.Add(col);
+            }
+            themeEditor.Children.Add(grid);
+
+            themeLightBox = new CheckBox();
+            themeLightBox.Content = "This is a light theme, so the launcher shades its own graphics for a light background";
+            themeLightBox.IsChecked = cur.Light;
+            themeLightBox.Margin = new Thickness(2, 2, 0, 14);
+            themeEditor.Children.Add(themeLightBox);
+
+            var apply = new Button();
+            apply.Content = "Use these colours";
+            apply.Style = (Style)win.Resources["Solid"];
+            apply.HorizontalAlignment = HorizontalAlignment.Left;
+            apply.Click += delegate { ApplyCustomTheme(); };
+            themeEditor.Children.Add(apply);
+        }
+
+        static void ApplyCustomTheme()
+        {
+            var pairs = new List<string>();
+            foreach (string name in Themes.Names)
+            {
+                TextBox box;
+                if (!themeBoxes.TryGetValue(name, out box)) continue;
+                string hex = (box.Text == null ? "" : box.Text).Trim();
+
+                bool good = false;
+                try { ColorConverter.ConvertFromString(hex); good = true; }
+                catch (Exception ex) { Swallow.Note("ApplyCustomTheme, reading " + name, ex); }
+                if (!good)
                 {
-                    cfg.Theme = captured.Name;
-                    cfg.Save(Paths.CfgFile);
-                    Themes.Apply(win, captured.Name);
-                    Redraw();
-                    Log("Theme set to " + captured.Name + ".");
-                };
-                wrap.Children.Add(b);
+                    Log("The colour for " + name + " is not a hex value. Use something like #C8763A. Nothing changed.");
+                    return;
+                }
+                pairs.Add(name);
+                pairs.Add(hex);
             }
 
-            Theme cur = Themes.Find(cfg.Theme);
-            txtThemeNote.Text = cur.Name + ". " + cur.Note;
+            cfg.CustomColors = pairs.ToArray();
+            cfg.CustomLight = themeLightBox != null && themeLightBox.IsChecked == true;
+            cfg.Theme = Themes.CustomName;
+            cfg.Save(Paths.CfgFile);
+            Themes.Apply(win, Themes.Resolve(cfg));
+            Redraw();
+            Log("Your own theme is on. Change the colours any time, or pick another theme to leave it.");
         }
 
         // Everything that paints itself from the theme brushes rather than
         // binding to them. Called after a theme change, and nowhere else.
         static void Redraw()
         {
-            BuildThemeRow(); BuildModList(); DrawStatus(); BuildPathRows(); BuildHelp();
+            BuildThemeRow(); BuildThemeEditor(); BuildModList(); DrawStatus(); BuildPathRows(); BuildHelp();
             BuildStatRow(); BuildNews(); BuildLogs(); BuildDisplay(); BuildChat();
             BuildServer(); BuildInstalled(); BuildControls(); BuildDiag(); RefreshDiscord();
             boxSearch.Foreground = Res(boxSearch.Text == SearchHint ? "Faint" : "Ink");
@@ -3050,23 +3249,26 @@ namespace Thornswood
 
             quickKeys.Children.Clear();
 
-            // Read out of the real files rather than typed here. The old list
-            // was five hardcoded lines and it went stale the moment the build
-            // moved off Skyrim Together: it was still offering an F2 party menu
-            // that no longer exists and a trade key belonging to a mod that had
-            // been removed. A row now appears only if its binding is really
-            // there, and it shows the key it is really bound to.
+            // Read out of the real files rather than typed here. A hardcoded
+            // list went stale the moment the build moved off Skyrim Together:
+            // it was still offering an F2 party menu that no longer exists and
+            // a trade key belonging to a mod that had been removed. A row now
+            // appears only if its binding is really there, and it shows the key
+            // it is really bound to.
+            //
+            // The five that matter first for somebody joining the server: the
+            // emote wheel, and the four keys that only make sense here, trade,
+            // party, friend and journal. All are Thornswood's own, in
+            // Thornswood.ini, so each shows the key it is really bound to and
+            // the fuller Controls page below carries the rest.
             List<Keys.Binding> keys;
             try { keys = Keys.All(); } catch { keys = new List<Keys.Binding>(); }
 
-            AddKeyFor(keys, "emotewheel", "The emote wheel");
-            AddKeyFor(keys, "emotestop",  "Stand up out of an idle");
-            AddKeyFor(keys, "menu",       "Mod settings");
-            AddKeyFor(keys, "lock",       "Lock on to what you are aiming at");
-            AddKeyFor(keys, "search",     "Search your inventory");
-
-            // Not from a file: Skyrim's own, and the same on every install.
-            AddKey("E / R", "Take one item, or the lot, at a container");
+            AddKeyFor(keys, "emotewheel", "The emote wheel of gestures and animations, seen by everyone near you.");
+            AddKeyFor(keys, "tradewith",  "Offer a trade to whoever you are looking at.");
+            AddKeyFor(keys, "party",      "Your friends, who is online, and your party.");
+            AddKeyFor(keys, "friendkey",  "Add or remove the friend you are looking at.");
+            AddKeyFor(keys, "journal",    "Your journals, their pages, and sharing them.");
         }
 
         static void AddKeyFor(List<Keys.Binding> all, string id, string what)
@@ -3767,29 +3969,154 @@ namespace Thornswood
         // The probe waits on a socket, so it does not run on the thread that
         // draws. A settings page that freezes for most of a second every time
         // it is opened is worse than one that fills in a moment later.
-        /// <summary>The dev build card on Settings: what is installed and what the buttons do.</summary>
-        static void DrawDevBuild()
+        /// <summary>
+        /// The server selector on the Play page (#605): which server this build
+        /// joins, main or dev, and the buttons to switch. The two servers are two
+        /// launcher installs; the dev build is a second launcher in its own folder.
+        /// The button that is the build you are on is drawn greyed as the current
+        /// one, and the other switches: to dev by opening or installing the dev
+        /// build, to main by opening the main launcher beside it.
+        /// </summary>
+        static void DrawServerPick()
         {
-            if (btnDevInstall == null || btnDevRemove == null || txtDevState == null) return;
-            // The card is for the roles the dev build is for. It shows once
-            // the site has said yes at a check in, or when a dev build is
-            // already installed here, and on the dev build itself.
-            bool allowed = cfg.IsDev || Discord.DevAllowed || DevBuild.Installed;
-            if (pnlDev != null) pnlDev.Visibility = allowed ? Visibility.Visible : Visibility.Collapsed;
-            if (!allowed) return;
+            if (btnServerMain == null || btnServerDev == null || txtServerPick == null) return;
             if (cfg.IsDev)
             {
-                txtDevState.Text = "This is the dev build. It follows the dev branch and joins the dev server on port " + cfg.ServerPort + ". The main build is the one you installed first, and it is not touched from here.";
-                btnDevInstall.Visibility = Visibility.Collapsed;
-                btnDevRemove.Visibility = Visibility.Collapsed;
+                txtServerPick.Text = "You are on the dev build. It joins the dev server on port " + cfg.ServerPort + ".";
+                if (noteServerPick != null)
+                    noteServerPick.Text = "The main build is the one you installed first, and it is not touched from here. Switch back to it to play on the main server.";
+                btnServerDev.IsEnabled = false;
+                btnServerDev.Content = "Dev server";
+                btnServerMain.IsEnabled = true;
+                btnServerMain.Content = "Switch to the main server";
                 return;
             }
+            txtServerPick.Text = "You are on the main server.";
             bool have = DevBuild.Installed;
-            btnDevInstall.Content = have ? "Open the dev build" : "Install the dev build";
-            btnDevRemove.Visibility = have ? Visibility.Visible : Visibility.Collapsed;
-            txtDevState.Text = have
-                ? "Installed at " + DevBuild.Root + ". It has its own Start menu entry, Thornswood Dev, and updates itself from the dev branch."
-                : "Not installed. Installing copies this launcher into " + DevBuild.Root + " and opens it. Nothing about this build changes.";
+            if (noteServerPick != null)
+                noteServerPick.Text = have
+                    ? "The dev build is installed at " + DevBuild.Root + ". Switch to it to test on the dev server; this build is not touched."
+                    : "The dev build is a second launcher for testing on the dev server. Staff roles only; the launcher checks your Discord roles before it installs it.";
+            btnServerMain.IsEnabled = false;
+            btnServerMain.Content = "Main server";
+            btnServerDev.IsEnabled = true;
+            btnServerDev.Content = have ? "Open the dev build" : "Switch to the dev server";
+        }
+
+        /// <summary>
+        /// Switch to the dev server from the Play page. If the dev build is
+        /// already installed it is opened. If it is not, the site is asked
+        /// whether this account's Discord roles allow the dev build, and only a
+        /// yes offers the install. Kept off the window's thread for the check.
+        /// </summary>
+        static void SwitchToDev()
+        {
+            if (cfg.IsDev) return;
+
+            if (DevBuild.Installed)
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(DevBuild.Exe) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(DevBuild.Exe) });
+                    Log("Opened the dev build.");
+                }
+                catch (Exception ex) { Log("Could not open the dev build: " + ex.Message); }
+                return;
+            }
+
+            // The role check is the site asking Discord about this account, so
+            // there has to be an account to ask about first.
+            if (!Discord.Linked)
+            {
+                MessageBox.Show(win,
+                    "Connect Discord on the Play page first. The launcher checks your Discord roles before it installs the dev build.",
+                    "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            Log("Checking whether your Discord roles allow the dev build...");
+            if (btnServerDev != null) btnServerDev.IsEnabled = false;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                Standing st;
+                try { st = Discord.Join(); }
+                catch (Exception ex)
+                {
+                    st = new Standing();
+                    st.Ok = false;
+                    st.Why = "offline";
+                    st.Message = "Could not reach thornswood.net: " + ex.Message;
+                }
+
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    try
+                    {
+                        // Discord.Join has already written dev-allowed.txt when the
+                        // answer carried the flag, so DrawServerPick in the finally
+                        // reflects the fresh answer either way.
+                        if (st.Why == "offline" || st.Why == "could not ask Discord")
+                        {
+                            MessageBox.Show(win,
+                                "Could not reach thornswood.net to check your roles just now. Try again in a minute.",
+                                "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+                        if (st.Why == "link")
+                        {
+                            MessageBox.Show(win,
+                                "Connect Discord on the Play page first, then try again.",
+                                "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
+                            return;
+                        }
+                        if (!st.Dev)
+                        {
+                            MessageBox.Show(win,
+                                "The dev build is for the staff roles: Owner, Dev, Gamemaster, Moderator and Loremaster. Your account does not have one; ask Patrick if you need it.",
+                                "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+
+                        var r = MessageBox.Show(win,
+                            "Your roles allow the dev build. Install it?\n\nIt copies this launcher into " + DevBuild.Root +
+                            " and opens it. It follows the dev branch and joins the dev server; this build is not touched.",
+                            "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                        if (r != MessageBoxResult.Yes) return;
+                        try { Log(DevBuild.Install(cfg)); }
+                        catch (Exception ex) { Log("Could not install the dev build: " + ex.Message); }
+                    }
+                    finally
+                    {
+                        if (btnServerDev != null) btnServerDev.IsEnabled = true;
+                        DrawServerPick();
+                    }
+                }));
+            });
+        }
+
+        /// <summary>
+        /// Switch back to the main server from the dev build: open the main
+        /// launcher beside this one. Never installs or touches the main build,
+        /// only opens what is already there.
+        /// </summary>
+        static void SwitchToMain()
+        {
+            if (!cfg.IsDev) return;
+            if (DevBuild.MainInstalled)
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(DevBuild.MainExe) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(DevBuild.MainExe) });
+                    Log("Opened the main build.");
+                }
+                catch (Exception ex) { Log("Could not open the main build: " + ex.Message); }
+            }
+            else
+            {
+                MessageBox.Show(win,
+                    "The main build is not at " + DevBuild.MainRoot + ". Install it again from thornswood.net.",
+                    "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         static void DoUninstall()
@@ -4015,7 +4342,7 @@ namespace Thornswood
                 {
                     var r = MessageBox.Show(
                         "The server at " + cfg.ServerAddress + " is not answering.\n\n" +
-                        "Starting anyway gives you a long wait, a black screen and then single player: " +
+                        "Starting anyway gives you a long wait, a black screen and then Skyrim on your own: " +
                         "no character creation, and nothing anyone else can see.\n\nStart the game anyway?",
                         "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                     if (r != MessageBoxResult.Yes) { Log("Not starting. The server is not answering."); return false; }
@@ -4181,6 +4508,7 @@ namespace Thornswood
                 playing = true;
                 MusicDecide();
                 headerVideoDecide();
+                GalleryDecide();
                 btnPlay.IsEnabled = false;
                 btnPlay.Content = "RUNNING";
                 btnQuitGame.Visibility = Visibility.Visible;
@@ -4281,6 +4609,7 @@ namespace Thornswood
                 Keep.TakeNote();
                 playing = false;
                 headerVideoDecide();
+                GalleryDecide();
                 btnPlay.Content = "PLAY";
                 DrawStatus();
 
@@ -4408,7 +4737,7 @@ namespace Thornswood
                         btnPlay.IsEnabled = true;
                         RefreshDiscord();
                         DrawStatus();
-                        DrawDevBuild();
+                        DrawServerPick();
                     });
                 return;
             }

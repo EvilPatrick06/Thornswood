@@ -80,7 +80,7 @@ the exe (`launcher/app/Paths.cs:42`):
 | `Thornswood\Game` | Thornswood's own Skyrim, built by the launcher from the Steam copy and what Vortex deployed; big files are hard links, anything rewritten in place is a copy | `Paths.cs:44`, DEVELOPING.md "One Skyrim of its own" |
 | `Thornswood\Profile` | `launcher.log`, `applied.txt` (packs already in), `Packs\*.files` (what each pack wrote), `Default` (reference plugin list), `Keep` | `Paths.cs:54-66` |
 | `Thornswood\config.json` | The launcher's settings. Server address, ports, update repo and branch; several are overwritten from the feed (see FEED.md) | `Paths.cs:66`, `Config.cs:133-147` |
-| `Thornswood-DevBuild\` | The dev build: same exe, `Channel` and `UpdateBranch` set to `dev`, server port 7787, voice port 7789, voice address with `-dev` on the end. Installed from the main launcher's Settings; Owner and Dev roles only | `DevBuild.cs:26-27,49-52,100-104` |
+| `Thornswood-DevBuild\` | The dev build: same exe, `Channel` and `UpdateBranch` set to `dev`, server port 7787, voice port 7789, voice address with `-dev` on the end. Installed from the main launcher's Play page Server card; staff roles only | `DevBuild.cs:26-27,49-52,126-130` |
 
 With no `Game` folder the launcher reads the Steam copy (`Paths.cs:51`), but
 Play will not start from it (DEVELOPING.md:32).

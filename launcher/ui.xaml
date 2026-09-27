@@ -144,6 +144,13 @@
                 <Setter TargetName="b" Property="Background" Value="{DynamicResource Card}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
               </Trigger>
+              <!-- Keyboard focus is drawn the same as hover, so a person
+                   moving through the chrome buttons with Tab can see where
+                   they are (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="b" Property="Background" Value="{DynamicResource Card}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+              </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -173,6 +180,12 @@
                 <Setter TargetName="bar" Property="Fill" Value="{DynamicResource Accent}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
+              </Trigger>
+              <!-- Tabbing to a nav item lights its accent bar, so keyboard
+                   focus is as plain to see as the page it is on (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="bar" Property="Fill" Value="{DynamicResource Accent}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -207,6 +220,11 @@
                 <Setter TargetName="b" Property="Background" Value="{DynamicResource CardHover}"/>
                 <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource Accent}"/>
               </Trigger>
+              <!-- Keyboard focus lights the accent border, the same edge
+                   hover gives, so a Tab lands somewhere a person can see (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+              </Trigger>
               <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4"/></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -224,6 +242,9 @@
             <Border Background="Transparent" Padding="0,2"><ContentPresenter/></Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource Accent}"/></Trigger>
+              <!-- A link in focus reads in the accent, so Tab shows it the
+                   same way the pointer does (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="Foreground" Value="{DynamicResource Accent}"/></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -244,10 +265,16 @@
             <Grid>
               <Border x:Name="b" Background="{DynamicResource Accent}" CornerRadius="2"/>
               <Rectangle Height="1" VerticalAlignment="Top" Margin="1,1,1,0" Fill="#33FFFFFF"/>
+              <!-- The focus ring sits on top of the accent fill, drawn in the
+                   ink that reads on it, and shows only when the button is
+                   reached by keyboard (#602). -->
+              <Rectangle x:Name="ring" RadiusX="2" RadiusY="2" Margin="3" Visibility="Collapsed"
+                         Stroke="{DynamicResource AccentInk}" StrokeThickness="1.5" StrokeDashArray="2 2"/>
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="b" Property="Opacity" Value="0.88"/></Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ring" Property="Visibility" Value="Visible"/></Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="b" Property="Background" Value="{DynamicResource Card}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Faint}"/>
@@ -267,11 +294,18 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="sb" Background="{DynamicResource Accent}" CornerRadius="2">
-              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
-            </Border>
+            <Grid>
+              <Border x:Name="sb" Background="{DynamicResource Accent}" CornerRadius="2">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+              </Border>
+              <!-- Shown only on keyboard focus, in the ink that reads on the
+                   accent fill, so Tab lands somewhere visible (#602). -->
+              <Rectangle x:Name="ring" RadiusX="2" RadiusY="2" Margin="3" Visibility="Collapsed"
+                         Stroke="{DynamicResource AccentInk}" StrokeThickness="1.5" StrokeDashArray="2 2"/>
+            </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="sb" Property="Opacity" Value="0.86"/></Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ring" Property="Visibility" Value="Visible"/></Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="sb" Property="Background" Value="{DynamicResource Card}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Faint}"/>
@@ -377,6 +411,12 @@
                 <Setter TargetName="tick" Property="Visibility" Value="Visible"/>
               </Trigger>
               <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="box" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+              </Trigger>
+              <!-- Keyboard focus lights the box edge, the same as hover, so a
+                   person tabbing through the settings can see the tick they
+                   are about to toggle (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True">
                 <Setter TargetName="box" Property="BorderBrush" Value="{DynamicResource Accent}"/>
               </Trigger>
             </ControlTemplate.Triggers>
@@ -666,10 +706,37 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
+                  <!-- The server selector (#605). Which server this build joins,
+                       main or dev, and the buttons to switch. The two servers are
+                       two launcher installs: the dev build is a second launcher in
+                       its own folder. Switching to dev opens it when it is already
+                       here, or checks the person's Discord roles and offers to
+                       install it only when they may. Moved off Settings, where the
+                       old dev-build card used to live. -->
+                  <StackPanel x:Name="ServerPickCard">
+                    <TextBlock Text="Server" Style="{StaticResource Eyebrow}"/>
+                    <Border Style="{StaticResource Slab}">
+                      <StackPanel>
+                        <TextBlock x:Name="TxtServerPick" Style="{StaticResource Body}"
+                                   Text="You are on the main server."/>
+                        <TextBlock x:Name="NoteServerPick" Style="{StaticResource Small}"
+                                   Foreground="{DynamicResource Muted}" TextWrapping="Wrap"
+                                   Margin="0,6,0,0"
+                                   Text="The dev build is a second launcher for testing on the dev server. Staff roles only; the launcher checks your Discord roles before it installs it."/>
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                          <Button x:Name="BtnServerMain" Style="{StaticResource Ghost}"
+                                  Content="Main server" Margin="0,0,8,0"/>
+                          <Button x:Name="BtnServerDev" Style="{StaticResource Ghost}"
+                                  Content="Switch to the dev server"/>
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+
                   <!-- Discord is the door. The launcher asks the site who you are
                        every time you press Play, so this has to be linked before
                        the game will start. -->
-                  <StackPanel x:Name="DiscordCard">
+                  <StackPanel x:Name="DiscordCard" Margin="0,0,0,26">
                     <TextBlock Text="Your account" Style="{StaticResource Eyebrow}"/>
                     <Border Style="{StaticResource Slab}">
                       <StackPanel>
@@ -709,11 +776,31 @@
 
                   <StackPanel x:Name="QuickKeysCard" Visibility="Collapsed">
                     <TextBlock Text="In game" Style="{StaticResource Eyebrow}"/>
-                    <Border Style="{StaticResource Slab}" Padding="18,14">
+                    <Border Style="{StaticResource Slab}" Padding="18,16">
                       <StackPanel x:Name="QuickKeys"/>
                     </Border>
                     <Button x:Name="BtnAllControls" Style="{StaticResource Link}" Content="All of the controls"
-                            HorizontalAlignment="Left" Margin="1,10,0,0"/>
+                            HorizontalAlignment="Left" Margin="0,10,0,0"/>
+                  </StackPanel>
+
+                  <!-- From the world: the pictures thornswood.net is showing, each
+                       taken by somebody playing, turned through one at a time. Read
+                       only. The site keeps the queue and the staff choose what goes
+                       into the gallery; this shows what /api/public already serves
+                       and sends nothing. Filled by StartGallery in Shell.cs, hidden
+                       until the first picture has loaded (#603). -->
+                  <StackPanel x:Name="GalleryCard" Margin="0,26,0,0" Visibility="Collapsed">
+                    <TextBlock Text="From the world" Style="{StaticResource Eyebrow}"/>
+                    <Border Style="{StaticResource Slab}" Padding="0">
+                      <StackPanel>
+                        <Border Height="150" ClipToBounds="True">
+                          <Image x:Name="GalleryImage" Stretch="UniformToFill"
+                                 RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Border>
+                        <TextBlock x:Name="GalleryBy" Style="{StaticResource Small}"
+                                   TextWrapping="Wrap" Margin="16,10,16,13"/>
+                      </StackPanel>
+                    </Border>
                   </StackPanel>
                 </StackPanel>
               </Grid>
@@ -1094,7 +1181,8 @@
 
                 <TextBlock Text="Appearance" Style="{StaticResource Eyebrow}"/>
                 <StackPanel x:Name="ThemeRow" Margin="0,0,0,6"/>
-                <TextBlock x:Name="TxtThemeNote" Style="{StaticResource Small}" Margin="0,0,0,30"/>
+                <TextBlock x:Name="TxtThemeNote" Style="{StaticResource Small}" Margin="0,0,0,18"/>
+                <StackPanel x:Name="ThemeEditor" Margin="0,0,0,30"/>
 
                 <TextBlock Text="Music" Style="{StaticResource Eyebrow}"/>
                 <StackPanel Margin="0,0,0,30">
@@ -1196,17 +1284,9 @@
                     <!-- Repair, Restore Windows folders and Refresh the shortcut icon
                          moved to Diagnostics, Scan and Fix (#607). -->
 
-                    <StackPanel x:Name="PnlDev">
-                      <TextBlock Style="{StaticResource H2}" Text="The dev build"/>
-                      <TextBlock Style="{StaticResource Body}" Text="A second launcher beside this one, in its own folder with its own Start menu entry. It gets new changes first and joins the dev server, so things get broken there instead of here. Same Skyrim, same mods; each launcher puts its own files back before it plays. Characters on the dev server are separate, and they are throwaway. The Owner and Dev roles only."/>
-                      <TextBlock x:Name="TxtDevState" Style="{StaticResource Small}" Margin="0,8,0,0"/>
-                      <StackPanel Orientation="Horizontal" Margin="0,13,0,0">
-                        <Button x:Name="BtnDevInstall" Style="{StaticResource Ghost}" Content="Install the dev build" Margin="0,0,8,0"/>
-                        <Button x:Name="BtnDevRemove" Style="{StaticResource Ghost}" Content="Remove the dev build"/>
-                      </StackPanel>
-
-                      <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
-                    </StackPanel>
+                    <!-- The dev-build card moved to the Server selector on the Play
+                         page (#605). Choosing the dev server there installs or opens
+                         the dev build, after the same Discord role check. -->
 
                     <TextBlock Style="{StaticResource H2}" Text="Uninstall ThornsWood"/>
                     <TextBlock Style="{StaticResource Body}" Text="Puts your Windows Skyrim folders back, then deletes this build and the launcher with it. Your own Skyrim in Steam is never touched: this is a separate copy and Steam does not know it exists. There is no undo, and the whole thing has to be downloaded again afterwards."/>

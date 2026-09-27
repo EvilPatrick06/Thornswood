@@ -809,6 +809,87 @@ if ($LASTEXITCODE -ne 0) {
     Die 'Sync-Client.ps1 refused. Rebuild the client, run .\scripts\release\New-ClientBuildRecord.ps1, and Ship again.'
 }
 
+# HOW FAR BEHIND the public installer is: the zip on disk against the releases
+# the feed lists. Asked twice, and the two answers differ on purpose. Before
+# publishing, the gate just below reads it to refuse a main release that would
+# leave an already-behind installer further behind. After publishing, the
+# closing note reads it again, by which point version.json carries this
+# release's pack (a dry run puts it back), so a fresh installer that was current
+# now reads as one behind. Reading the zip and the feed each time keeps both
+# answers true to the disk rather than to a value cached before the publish.
+#
+# Staged out of the play install since 22 September: one folder per install
+# root under the dev tree, the same shape Publish-Update and Package-Thornswood
+# use, so the three agree on one answer. -DistRoot moves the lot. The old
+# $Root\_dist is still read when it is the only one there, so a machine that has
+# not published since the move still finds its installer.
+function Measure-Installer {
+    $distDir = Join-Path (Join-Path $DistRoot (Split-Path -Leaf $Root.TrimEnd('\'))) '_dist'
+    $z = Join-Path $distDir 'Thornswood-Setup.zip'
+    if (-not (Test-Path -LiteralPath $z)) {
+        $wasZip = Join-Path $Root '_dist\Thornswood-Setup.zip'
+        if (Test-Path -LiteralPath $wasZip) { $z = $wasZip }
+    }
+    $have = Test-Path $z
+    $count = 0
+    $when = [datetime]::MinValue
+    if ($have) {
+        $when = (Get-Item $z).LastWriteTime
+        $vf = Join-Path $ReleaseDir 'version.json'
+        if (Test-Path $vf) {
+            $doc = Get-Content $vf -Raw | ConvertFrom-Json
+            if ($doc.PSObject.Properties['packs'] -and $doc.packs) {
+                $seen = @{}
+                foreach ($p in @($doc.packs)) {
+                    # ids are yyyyMMdd-HHmm, with -1 -2 -3 on the split ones, and
+                    # three parts of one release are still one release.
+                    $stamp = "$($p.id)"
+                    if ($stamp.Length -lt 13) { continue }
+                    $stamp = $stamp.Substring(0, 13)
+                    if ($seen.ContainsKey($stamp)) { continue }
+                    $seen[$stamp] = $true
+                    $t = [datetime]::MinValue
+                    if ([datetime]::TryParseExact($stamp, 'yyyyMMdd-HHmm', $null, 'None', [ref]$t)) {
+                        if ($t -gt $when) { $count++ }
+                    }
+                }
+            }
+        }
+    }
+    return [pscustomobject]@{ DistDir = $distDir; Zip = $z; HaveZip = $have; Behind = $count; ZipTime = $when }
+}
+
+# ---------------------------------------------------- the installer gate
+# A MAIN RELEASE REFUSES TO GO OUT WHILE THE PUBLIC INSTALLER IS BEHIND, and
+# this is the whole of that rule. Every main Ship adds a pack the installer does
+# not carry, so an already-stale Thornswood-Setup.zip only gets staler, and a
+# new person installing from it sits through the whole pile on first launch. The
+# closing note has counted this for a long time and warned; a warning on the one
+# screen nobody rereads let the installer drift release after release.
+#
+# BEFORE PUBLISH, on purpose. A refusal after the pack is on the feed would
+# leave a release out with #news, the site and the server never told, which is
+# the half-published state the -Package failure note further down calls worse
+# than an installer one release behind. Here nothing has shipped yet, so the
+# operator rebuilds and runs again with everything intact.
+#
+# -Package is the way through: it rebuilds the installer after this release, so
+# the two go out together, and a release that carries -Package is not refused
+# for behind because the rebuild is coming. A dev release never refuses: it does
+# not touch the installer, and its closing note still warns. A hotfix never
+# refuses either: it is the live build plus one urgent fix, and holding it for a
+# twenty-minute installer rebuild is the opposite of what a hotfix is for.
+if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
+    $ins = Measure-Installer
+    if ($ins.HaveZip -and $ins.Behind -gt 0) {
+        Unbump 'the installer is behind and nothing here was going to rebuild it'
+        Die (("Thornswood-Setup.zip is {0} release{1} behind, built {2:d MMM HH:mm}, and a main release would leave it further behind. " -f `
+                 $ins.Behind, $(if ($ins.Behind -eq 1) { '' } else { 's' }), $ins.ZipTime) +
+             'Anyone installing from it would sit through all of those on first launch. Rebuild it as part of this ' +
+             'release by adding -Package, or run .\scripts\release\Package-Thornswood.ps1 first, then Ship.')
+    }
+}
+
 # ------------------------------------------------------------ publish
 Head 'Publishing'
 # A hashtable, not an array. Splatting an array passes everything positionally,
@@ -929,50 +1010,23 @@ if (-not $DryRun -and -not $ModsOnly) {
 }
 
 <#
-  How far behind the installer is, worked out before anything can exit.
+  How far behind the installer is now, worked out before anything can exit.
 
   This used to sit below the early return further down, so the one run that
   most needed it never printed: ship something, get told nothing changed,
   leave, and the package quietly stays another release behind. A count that
   only appears on the runs where it is least urgent is not a warning.
-#>
-# Staged out of the play install since 22 September: one folder per install
-# root under the dev tree, the same shape Publish-Update and
-# Package-Thornswood use, so the three agree on one answer. -DistRoot moves
-# the lot. The old $Root\_dist is still read when it is the only one there, so
-# a machine that has not published since the move still finds its installer.
-$DistDir = Join-Path (Join-Path $DistRoot (Split-Path -Leaf $Root.TrimEnd('\'))) '_dist'
-$zip = Join-Path $DistDir 'Thornswood-Setup.zip'
-if (-not (Test-Path -LiteralPath $zip)) {
-    $wasZip = Join-Path $Root '_dist\Thornswood-Setup.zip'
-    if (Test-Path -LiteralPath $wasZip) { $zip = $wasZip }
-}
-$behind = 0
-$haveZip = Test-Path $zip
 
-if ($haveZip) {
-    $zipTime = (Get-Item $zip).LastWriteTime
-    $vf = Join-Path $ReleaseDir 'version.json'
-    if (Test-Path $vf) {
-        $doc = Get-Content $vf -Raw | ConvertFrom-Json
-        if ($doc.PSObject.Properties['packs'] -and $doc.packs) {
-            $seen = @{}
-            foreach ($p in @($doc.packs)) {
-                # ids are yyyyMMdd-HHmm, with -1 -2 -3 on the split ones, and
-                # three parts of one release are still one release.
-                $stamp = "$($p.id)"
-                if ($stamp.Length -lt 13) { continue }
-                $stamp = $stamp.Substring(0, 13)
-                if ($seen.ContainsKey($stamp)) { continue }
-                $seen[$stamp] = $true
-                $when = [datetime]::MinValue
-                if ([datetime]::TryParseExact($stamp, 'yyyyMMdd-HHmm', $null, 'None', [ref]$when)) {
-                    if ($when -gt $zipTime) { $behind++ }
-                }
-            }
-        }
-    }
-}
+  Measure-Installer is the same reading the gate above the publish took, run
+  again because version.json has moved: by now it carries this release's pack
+  (a dry run put it back), so a fresh installer reads as one behind, which is
+  what the closing note says.
+#>
+$ins = Measure-Installer
+$DistDir = $ins.DistDir
+$haveZip = $ins.HaveZip
+$behind = $ins.Behind
+$zipTime = $ins.ZipTime
 
 function Show-Installer {
     if (-not $haveZip) {

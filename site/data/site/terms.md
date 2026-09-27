@@ -91,7 +91,7 @@ and Thornswood never sees a card. Cancelling is done at Patreon.
 ## No promises about it working
 
 This is said plainly rather than in capital letters: Thornswood is provided as
-it is. It is in closed playtest. The server goes down, characters can be lost,
+it is. It is in alpha. The server goes down, characters can be lost,
 a wipe may be needed, and the whole thing may stop one day. Nothing here is
 guaranteed to be available, correct, or to keep your character safe, and
 neither the project nor the people running it owe you anything if it is not.
