@@ -717,6 +717,14 @@ const UPMETA = path.join(UP, 'uploads.json');
 // waiting for an admin to approve or reject, and is never public.
 const GALLERY = path.join(DATA, 'gallery.json');
 const GPENDING = path.join(DATA, 'gallery-pending.json');
+/* Serialise gallery-pending.json writes. The site form can POST several files
+   back to back; without this, two read-modify-write callbacks can drop one. */
+let galleryPendingWrite = Promise.resolve();
+function withGalleryPending(fn) {
+  const run = galleryPendingWrite.then(() => fn());
+  galleryPendingWrite = run.catch(() => {});
+  return run;
+}
 // Reports against approved shots. Same deploy rule as the queue: starts [],
 // and Deploy-Docs only sends it when the VPS is missing it.
 const GREPORTS = path.join(DATA, 'gallery-reports.json');
@@ -2762,6 +2770,11 @@ async function handle(req, res) {
     goes on gallery-pending.json. Nothing here touches gallery.json: a submission
     is not public until an admin approves it, and /api/public and /shot read only
     gallery.json, so a pending shot is not reachable by either.
+
+    The site may send several pictures from one form (multi-select or drop). Each
+    file is still one POST to this door, body = the file, so the launcher ticket
+    path and the single-file path stay the same. A short queue serialises the
+    pending.json write so two rapid submits cannot drop an entry.
   */
   if (p === '/api/gallery/submit' && req.method === 'POST') {
     // Who is asking. A hub member, or a launcher ticket verified the way the
@@ -2804,12 +2817,14 @@ async function handle(req, res) {
       meta[name] = { orig: asked, by: by, note: note, at: Date.now() };
       putJson(UPMETA, meta);
 
-      const pending = jsonFile(GPENDING, []);
-      const entry = { name: name, by: by, note: note, at: Date.now(), from: from };
-      if (discordId) entry.discordId = discordId;
-      pending.push(entry);
-      putJson(GPENDING, pending);
-      sendJson(res, 200, { ok: true, name: name });
+      withGalleryPending(() => {
+        const pending = jsonFile(GPENDING, []);
+        const entry = { name: name, by: by, note: note, at: Date.now(), from: from };
+        if (discordId) entry.discordId = discordId;
+        pending.push(entry);
+        putJson(GPENDING, pending);
+        sendJson(res, 200, { ok: true, name: name });
+      });
     });
   }
 
