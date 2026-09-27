@@ -14,6 +14,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
 
 // What Windows reads off this exe before anybody runs it. csc gives an exe no
 // version resource at all unless these are set, so UAC's prompt, SmartScreen's
@@ -133,8 +134,10 @@ namespace SkyrimTogetherSetup
         // This defaulted to the pre-rename name, so the folder the setup window
         // offered and the folder the script expected were two different places,
         // and the one a person read was the old project's name.
+        // C: is only where it starts when Skyrim cannot be found: Run replaces
+        // this with Skyrim's own drive when Steam says where that is.
         static string installRoot = @"C:\Thornswood";
-        static TextBlock txtRoot, txtRoom;
+        static TextBlock txtRoot, txtRoom, txtSkyrim;
         static WrapPanel driveRow;
         static Button btnPick;
         static bool running;
@@ -162,6 +165,163 @@ namespace SkyrimTogetherSetup
             return cachedPayload;
         }
 
+        // ------------------------------------------------------- Skyrim's drive
+        //
+        // The launcher builds Thornswood its own game folder out of the Steam
+        // copy of Skyrim, most of it as hard links so the collection is not on
+        // the disk twice, and a hard link cannot cross a drive. So an install
+        // on a different drive from Skyrim is an install that cannot play:
+        // OwnGame.WhyNot names it and Play stops there. This window offered
+        // every fixed drive with no hint which one that was, and C:\Thornswood
+        // by default, so somebody who keeps games on D: found out after the
+        // whole install. Issue #473.
+        //
+        // The walk is the launcher's, kept in step with launcher\app\Steam.cs
+        // (Path_, Libraries, SkyrimCopies): Steam's own folder out of the
+        // registry, then every path in config\libraryfolders.vdf, and the
+        // first library holding steamapps\common\Skyrim Special Edition with
+        // SkyrimSE.exe in it is the answer. The executable rather than the
+        // folder, because uninstalling leaves the folder behind with the saves
+        // and the screenshots still in it.
+        //
+        // Nothing here is a refusal. It steers, and says plainly what a
+        // different drive costs, because whether the launcher may fall back to
+        // copies instead is not this program's to decide.
+        static string skyrimPath;
+
+        /// <summary>Where Steam's copy of Skyrim Special Edition is, or "".</summary>
+        static string SkyrimPath()
+        {
+            if (skyrimPath != null) return skyrimPath;
+            skyrimPath = "";
+            const string tail = "steamapps\\common\\Skyrim Special Edition";
+            foreach (string lib in SteamLibraries())
+            {
+                try
+                {
+                    string game = Path.Combine(lib, tail);
+                    if (!File.Exists(Path.Combine(game, "SkyrimSE.exe"))) continue;
+                    skyrimPath = game;
+                    break;
+                }
+                catch { }
+            }
+            return skyrimPath;
+        }
+
+        /// <summary>The drive Skyrim is on, as "D:\", or "" when it was not found.</summary>
+        static string SkyrimDrive()
+        {
+            string game = SkyrimPath();
+            if (game.Length == 0) return "";
+            try { return Path.GetPathRoot(game); }
+            catch { return ""; }
+        }
+
+        /// <summary>Where Steam itself is installed, or "".</summary>
+        static string SteamPath()
+        {
+            foreach (string key in new string[] {
+                @"Software\Valve\Steam", @"Software\Wow6432Node\Valve\Steam" })
+            {
+                try
+                {
+                    using (RegistryKey k = Registry.CurrentUser.OpenSubKey(key))
+                    {
+                        if (k == null) continue;
+                        object v = k.GetValue("SteamPath");
+                        if (v == null) continue;
+                        string p = Convert.ToString(v).Replace('/', '\\');
+                        if (p.Length > 0 && Directory.Exists(p)) return p;
+                    }
+                }
+                catch { }
+            }
+            try
+            {
+                using (RegistryKey k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Wow6432Node\Valve\Steam"))
+                {
+                    if (k != null)
+                    {
+                        object v = k.GetValue("InstallPath");
+                        if (v != null)
+                        {
+                            string p = Convert.ToString(v);
+                            if (p.Length > 0 && Directory.Exists(p)) return p;
+                        }
+                    }
+                }
+            }
+            catch { }
+            return "";
+        }
+
+        /// <summary>
+        /// Every Steam library on this machine: Steam's own folder first, then
+        /// each path in config\libraryfolders.vdf, in the order Steam lists
+        /// them. Anybody with a second drive has more than one.
+        /// </summary>
+        static List<string> SteamLibraries()
+        {
+            var roots = new List<string>();
+            string root = "";
+            try { root = SteamPath(); } catch { }
+            if (root.Length == 0) return roots;
+            roots.Add(root);
+
+            try
+            {
+                string vdf = Path.Combine(root, "config\\libraryfolders.vdf");
+                if (File.Exists(vdf))
+                {
+                    foreach (string raw in File.ReadAllLines(vdf))
+                    {
+                        string[] parts = Quoted(raw.Trim());
+                        if (parts.Length < 2) continue;
+                        if (parts[0].ToLowerInvariant() != "path") continue;
+                        // Valve escapes the separator in this file.
+                        string p = parts[1].Replace("\\\\", "\\");
+                        if (p.Length > 0) roots.Add(p);
+                    }
+                }
+            }
+            catch { }
+            return roots;
+        }
+
+        // Everything between pairs of double quotes on one line. Valve's key
+        // value text, read by hand rather than properly, because the only
+        // question asked of it here is which paths are libraries.
+        static string[] Quoted(string line)
+        {
+            var found = new List<string>();
+            var sb = new StringBuilder();
+            bool inside = false;
+            foreach (char c in line)
+            {
+                if (c == '"')
+                {
+                    if (inside) { found.Add(sb.ToString()); sb.Length = 0; }
+                    inside = !inside;
+                    continue;
+                }
+                if (inside) sb.Append(c);
+            }
+            return found.ToArray();
+        }
+
+        static bool SameDrive(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
+            return string.Equals(a.TrimEnd('\\'), b.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>"D:" rather than "D:\", for the middle of a sentence.</summary>
+        static string Letter(string driveRoot)
+        {
+            return driveRoot == null ? "" : driveRoot.TrimEnd('\\');
+        }
+
         /// <summary>How much room the whole install wants, from the size of the payload.</summary>
         static long Needed(long payloadBytes)
         {
@@ -176,6 +336,8 @@ namespace SkyrimTogetherSetup
             driveRow.Children.Clear();
             DriveInfo[] all;
             try { all = DriveInfo.GetDrives(); } catch { return; }
+
+            string sky = SkyrimDrive();
 
             foreach (DriveInfo d in all)
             {
@@ -203,6 +365,19 @@ namespace SkyrimTogetherSetup
                 var sp = new StackPanel();
                 sp.Children.Add(letter);
                 sp.Children.Add(room);
+
+                // The one drive this install can work on gets said so on the
+                // button itself, not only in the line underneath, because the
+                // buttons are what a person reads before pressing one.
+                if (SameDrive(d.Name, sky))
+                {
+                    var mark = new TextBlock();
+                    mark.Text = "Skyrim is here";
+                    mark.FontSize = 11;
+                    mark.Foreground = B("#C8763A");
+                    mark.Margin = new Thickness(0, 2, 0, 0);
+                    sp.Children.Add(mark);
+                }
 
                 var b = new Button();
                 b.Content = sp;
@@ -238,6 +413,8 @@ namespace SkyrimTogetherSetup
                 b.BorderBrush = B(on ? "#C8763A" : "#2C251D");
             }
 
+            SaySkyrim(root);
+
             long free = -1;
             try { free = new DriveInfo(root).AvailableFreeSpace; } catch { }
 
@@ -270,6 +447,54 @@ namespace SkyrimTogetherSetup
                                ". Everything is unpacked on the same drive, so nothing lands on C: unless you choose it.";
                 txtRoom.Foreground = B("#66594A");
             }
+        }
+
+        /// <summary>
+        /// Says where Skyrim is against where this is about to install, under
+        /// the drive buttons. A different drive is said in full, in the colour
+        /// the window uses for something that will not work, because it is the
+        /// one choice here that cannot be undone with a button afterwards.
+        /// </summary>
+        static void SaySkyrim(string root)
+        {
+            if (txtSkyrim == null) return;
+            string sky = SkyrimDrive();
+
+            if (sky.Length == 0)
+            {
+                txtSkyrim.Text = "Steam's copy of Skyrim Special Edition was not found on this PC, so this cannot " +
+                                 "say which drive it is on. Thornswood has to go on the same drive as Skyrim, " +
+                                 "because it builds its game folder out of your Steam copy with hard links and a " +
+                                 "link cannot cross a drive.";
+                txtSkyrim.Foreground = B("#8A7A5E");
+                return;
+            }
+
+            // A path with no drive root to read is not a drive to warn about,
+            // but Skyrim's is still worth naming.
+            if (string.IsNullOrEmpty(root))
+            {
+                txtSkyrim.Text = "Skyrim is on " + Letter(sky) + ", and Thornswood has to go on that same drive. " +
+                                 "It builds its game folder out of your Steam copy with hard links, and a link " +
+                                 "cannot cross a drive.";
+                txtSkyrim.Foreground = B("#8A7A5E");
+                return;
+            }
+
+            if (SameDrive(sky, root))
+            {
+                txtSkyrim.Text = "Skyrim is on " + Letter(sky) + ", which is this drive. Thornswood builds its game " +
+                                 "folder out of your Steam copy with hard links, which take no extra space, and that " +
+                                 "only works on one drive.";
+                txtSkyrim.Foreground = B("#66594A");
+                return;
+            }
+
+            txtSkyrim.Text = "Skyrim is on " + Letter(sky) + " and this would put Thornswood on " + Letter(root) +
+                             ". Thornswood has to share Skyrim's drive: it builds a game folder of its own out of " +
+                             "your Steam copy with hard links, and a link cannot cross a drive. Installed here, the " +
+                             "launcher cannot build that folder and will not let you play. Pick " + Letter(sky) + ".";
+            txtSkyrim.Foreground = B("#BC5039");
         }
 
         static void PickFolder()
@@ -436,7 +661,7 @@ namespace SkyrimTogetherSetup
         <TextBlock x:Name=""TxtBody""
                    Foreground=""{StaticResource Muted}"" FontSize=""13"" LineHeight=""21""
                    TextWrapping=""Wrap""
-                   Text=""This puts in the launcher, the script extender and Thornswood's own content. The launcher then builds a game folder of its own from the Skyrim you already have on Steam, most of it as hard links that take no extra space, and leaves your own Skyrim alone.&#10;&#10;The mods themselves come from a collection on Nexus. Vortex installs them into a profile of their own, so switching back to your usual profile and running Purge Mods leaves your Skyrim where you started. The launcher has the link and walks you through it.&#10;&#10;Nothing of Bethesda's is renamed or deleted. You need Steam running and Skyrim on build 1.6.1170.""/>
+                   Text=""This puts the launcher, the script extender and Thornswood's own content into a folder of its own. It does not install into the Skyrim you already have on Steam, and that copy is left as it is.&#10;&#10;Thornswood runs from its own game folder. The launcher builds it out of your Steam copy and what Vortex has deployed there, most of it as hard links that take no extra space, and copies of the few files other programs rewrite. Hard links only work inside one drive, so Thornswood goes on the same drive as Skyrim.&#10;&#10;The mods themselves come from a collection on Nexus. Vortex installs them into a profile of their own, so switching back to your usual profile and running Purge Mods leaves your Skyrim where you started. The launcher has the link and walks you through it.&#10;&#10;Nothing of Bethesda's is renamed or deleted. You need Steam running and Skyrim on build 1.6.1170.""/>
 
         <Border Grid.Row=""1"" Margin=""0,20,0,0"" Padding=""17,14"" CornerRadius=""2""
                 Background=""{StaticResource Card}"" BorderBrush=""{StaticResource Line}"" BorderThickness=""1"">
@@ -459,8 +684,10 @@ namespace SkyrimTogetherSetup
                       Foreground=""{StaticResource Ink}""/>
             </Grid>
             <WrapPanel x:Name=""DriveRow"" Margin=""0,13,0,0""/>
+            <TextBlock x:Name=""TxtSkyrim"" Foreground=""{StaticResource Faint}"" FontSize=""11.5""
+                       TextWrapping=""Wrap"" LineHeight=""18"" Margin=""0,11,0,0""/>
             <TextBlock x:Name=""TxtRoom"" Foreground=""{StaticResource Faint}"" FontSize=""11.5""
-                       TextWrapping=""Wrap"" Margin=""0,11,0,0""/>
+                       TextWrapping=""Wrap"" Margin=""0,8,0,0""/>
           </StackPanel>
         </Border>
 
@@ -529,11 +756,25 @@ namespace SkyrimTogetherSetup
             btnClose = (Button)win.FindName("BtnClose");
             foundBox = (Border)win.FindName("FoundBox");
 
-            txtRoot  = (TextBlock)win.FindName("TxtRoot");
-            txtRoom  = (TextBlock)win.FindName("TxtRoom");
-            driveRow = (WrapPanel)win.FindName("DriveRow");
-            btnPick  = (Button)win.FindName("BtnPick");
+            txtRoot   = (TextBlock)win.FindName("TxtRoot");
+            txtRoom   = (TextBlock)win.FindName("TxtRoom");
+            txtSkyrim = (TextBlock)win.FindName("TxtSkyrim");
+            driveRow  = (WrapPanel)win.FindName("DriveRow");
+            btnPick   = (Button)win.FindName("BtnPick");
             btnPick.Click += delegate { PickFolder(); };
+
+            // Start on the drive Skyrim is on. It is the only drive this
+            // install can play from, and it is not something a person can put
+            // right with a button afterwards: it is a reinstall, or moving a
+            // Steam library. C:\Thornswood stays the answer when there is no
+            // Steam copy to find.
+            string sky = SkyrimDrive();
+            if (sky.Length > 0)
+            {
+                try { installRoot = Path.Combine(sky, "Thornswood").TrimEnd('\\'); }
+                catch { }
+            }
+
             BuildDrives();
             SetRoot(installRoot);
 
@@ -867,6 +1108,26 @@ namespace SkyrimTogetherSetup
             try
             {
                 string root = Path.GetPathRoot(installRoot);
+
+                // Said once more on the way out, because the line under the
+                // drive buttons can be scrolled past and this is the last
+                // moment it costs nothing. It asks rather than refuses:
+                // whether the launcher may build the folder some other way on
+                // a second drive is a decision for Patrick and Djinn, not for
+                // the installer to take by blocking it here (issue #473).
+                string sky = SkyrimDrive();
+                if (sky.Length > 0 && !SameDrive(sky, root))
+                {
+                    if (MessageBox.Show("Skyrim is on " + Letter(sky) + " and this would install Thornswood on " +
+                                        Letter(root) + ".\n\nThornswood builds a game folder of its own out of your " +
+                                        "Steam copy of Skyrim, with hard links, and a link cannot cross a drive. On " +
+                                        Letter(root) + " the launcher cannot build that folder, and it will not let " +
+                                        "you play until Thornswood and Skyrim are on one drive.\n\nNo goes back so you " +
+                                        "can pick " + Letter(sky) + ". Yes installs on " + Letter(root) + " anyway.",
+                                        "Thornswood Setup", MessageBoxButton.YesNo,
+                                        MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                }
+
                 Payload check = FindPayload();
                 long free = new DriveInfo(root).AvailableFreeSpace;
                 // With nothing to measure yet, budget for the payload this
