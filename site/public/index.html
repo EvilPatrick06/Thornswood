@@ -468,6 +468,10 @@ tr.adder .plus{color:var(--faint);font-size:16px;line-height:38px}
   border:1px solid var(--line);display:grid;place-items:center}
 .thumb img{width:100%;height:100%;object-fit:cover}
 .thumb.kind{font:600 12px var(--mono);color:var(--dim);letter-spacing:.06em}
+.file.compact{gap:10px;padding:8px 11px;margin-bottom:7px}
+.file.compact .nm{font-size:13px}
+.file.compact .meta{font-size:12px;margin-top:1px}
+.thumb.sm{width:48px;height:40px;border-radius:5px}
 .empty{color:var(--dim);padding:26px;border:1px dashed var(--line);border-radius:9px;
   text-align:center}
 
@@ -586,7 +590,7 @@ var BOARDKEYS = []; /* hub no longer edits issue boards (#433 trim) */
 var isBoard = function (k) { return BOARDKEYS.indexOf(k) >= 0; };
 
 var ABOUT = {
-  uploads:     'Staff approve shots waiting for the public gallery. Send and browse pictures on /gallery.',
+  uploads:     'Staff approve the queue and remove live gallery shots. Send and browse pictures on /gallery.',
   inbox:       'Bugs and ideas sent in from the public report page.',
   linked:      'Everybody who has linked a Discord account to a copy of the game.',
   sessions:    'One card a person, newest first by when they last played. ' +
@@ -2134,14 +2138,19 @@ function drawNews() {
 
 /* ------------------------------------------------------------- uploads -- */
 /*
-  Hub Gallery is staff pending-queue only. Uploads and the public send form live
-  on /gallery (and the launcher); bug and idea reports live in Inbox.
+  Hub Gallery is staff tools: pending approve/reject queue, plus a compact live
+  cleanup list (small thumbs + Delete). Public send/browse stays on /gallery.
 */
 function drawUploads() {
   var out = head() +
-    (S.me.dev || S.me.admin ? '<div id="galqueue"></div>' : '');
+    (S.me.dev || S.me.admin
+      ? '<div id="galqueue"></div><div id="gallive"></div>'
+      : '');
   el('page').innerHTML = out;
-  if (S.me.dev || S.me.admin) loadGalleryQueue();
+  if (S.me.dev || S.me.admin) {
+    loadGalleryQueue();
+    loadGalleryLive();
+  }
 }
 
 /* The pending gallery, staff (access.dev) only, on the Gallery page rather
@@ -2178,7 +2187,7 @@ function loadGalleryQueue() {
         b.disabled = true; b.textContent = 'approving';
         api('/api/gallery/approve', { method:'POST', headers:{ 'content-type':'application/json' },
             body: JSON.stringify({ name: b.dataset.galok }) })
-          .then(function () { loadGalleryQueue(); });
+          .then(function () { loadGalleryQueue(); loadGalleryLive(); });
       };
     });
     each(box, '[data-galno]', function (b) {
@@ -2189,6 +2198,47 @@ function loadGalleryQueue() {
         api('/api/gallery/reject', { method:'POST', headers:{ 'content-type':'application/json' },
             body: JSON.stringify({ name: b.dataset.galno, deleteFile: drop }) })
           .then(function () { loadGalleryQueue(); });
+      };
+    });
+  }).catch(function () { });
+}
+
+/* Live (approved) gallery, staff cleanup tool: small thumbs + Delete, not a
+   public gallery view. Uses /api/public for the same set /gallery shows, and
+   DELETE /api/gallery/approved to take one off. Pending queue stays above. */
+function loadGalleryLive() {
+  var box = el('gallive');
+  if (!box) return;
+  api('/api/public').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+    if (!el('gallive')) return;
+    box = el('gallive');
+    var q = (d && d.gallery) || [];
+    var out = '<div class="section-label">Live gallery' +
+      (q.length ? ' &middot; ' + q.length : '') +
+      '</div>';
+    out += '<p class="lede" style="margin:0 0 12px">Approved shots on /gallery. Delete removes one from the live set (cleanup after a report).</p>';
+    if (!q.length) {
+      out += '<div class="empty">No live gallery shots.</div>';
+    } else {
+      q.forEach(function (g) {
+        var href = g.url || ('/shot/' + encodeURIComponent(g.name));
+        out += '<div class="file compact">' +
+          '<a class="thumb sm" href="' + esc(href) + '" target="_blank"><img src="' + esc(href) + '" alt="" loading="lazy"></a>' +
+          '<div class="who"><div class="nm">' + esc(g.name) + '</div>' +
+          '<div class="meta">' + (g.by ? esc(g.by) : 'no by') + '</div></div>' +
+          '<button class="btn" data-galdel="' + esc(g.name) + '">Delete</button>' +
+        '</div>';
+      });
+    }
+    box.innerHTML = out;
+    each(box, '[data-galdel]', function (b) {
+      b.onclick = function () {
+        if (!confirm('Delete ' + b.dataset.galdel + ' from the live gallery?')) return;
+        var drop = confirm('Also delete the uploaded file? Cancel keeps the file on disk, only takes it off the gallery.');
+        b.disabled = true; b.textContent = 'deleting';
+        api('/api/gallery/approved', { method:'DELETE', headers:{ 'content-type':'application/json' },
+            body: JSON.stringify({ name: b.dataset.galdel, deleteFile: drop }) })
+          .then(function () { loadGalleryLive(); });
       };
     });
   }).catch(function () { });
