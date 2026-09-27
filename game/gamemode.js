@@ -22896,8 +22896,23 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           Ten seconds is left alone deliberately: there is nothing anybody can
           do with ten seconds that they could not do with thirty, and it would
           land on top of the thirty second banner.
+
+          AND NOT IN UPDATE MODE, WHERE THE SERVER KICKS NOBODY. Issue #610, a
+          tester whose launcher was already up to date: "The game still had the
+          big warning for game kicking me for an update even though my launcher
+          was already up to date and it never kicked me (Which was correct). It
+          should only show in the text chat if I have already updated my
+          launcher at this point." He is right. In update mode clearTheServer
+          disconnects no one; whether your game closes is your launcher's call,
+          and a launcher already holding this pack does nothing to you. The
+          server cannot tell from here whose launcher still needs it, so the
+          one warning it can give everybody without lying is the chat line,
+          which already says "unless your launcher already has it". The banner
+          cannot be made true for one person and false for the next, so update
+          mode is left to chat and the banner is kept for restart mode, the one
+          that actually puts the whole room out.
         */
-        if (m === 60 || m === 30) {
+        if ((m === 60 || m === 30) && restart.mode !== 'update') {
           alertAll(onScreen(m), 'bad', m === 30 ? 12000 : 9000);
         }
         break;
