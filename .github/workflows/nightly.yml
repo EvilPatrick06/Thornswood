@@ -233,6 +233,20 @@ jobs:
           .\scripts\dev\Check-Secrets.ps1 -Binary $built
           exit $LASTEXITCODE
 
+      - name: Check the installer's version resource
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          # Until the installer is signed (#390, held) the Win32 version
+          # resource is the only thing UAC, SmartScreen and the anti-virus
+          # heuristics read off Thornswood-Setup.exe, and a blank one is part of
+          # why VirusTotal marks the file at all. Bootstrap.cs and Build-Launcher
+          # stamp it (#666, #671); this reads it back off the stub csc just built,
+          # so a blank, generic or stale one is caught here rather than as a fresh
+          # VirusTotal detection after it ships.
+          .\tests\test-setup-version.ps1 -NoPause
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=installer/setup/Bootstrap.cs::the setup exe has no honest version resource, see the lines above'; exit 1 }
+
       - name: Keep the exe from this build
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
