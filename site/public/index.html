@@ -470,18 +470,6 @@ tr.adder .plus{color:var(--faint);font-size:16px;line-height:38px}
 .thumb.kind{font:600 12px var(--mono);color:var(--dim);letter-spacing:.06em}
 .empty{color:var(--dim);padding:26px;border:1px dashed var(--line);border-radius:9px;
   text-align:center}
-.drop{border:1.5px dashed var(--line2);border-radius:11px;padding:26px 20px;text-align:center;
-  background:var(--panel);margin-bottom:16px}
-.drop.over{border-color:var(--gold);background:#1F2519}
-.drop .big{font:600 18px var(--sans);margin-bottom:4px}
-.drop .link{color:var(--gold);cursor:pointer;text-decoration:underline}
-.who-row{display:flex;gap:9px;justify-content:center;margin-top:15px;flex-wrap:wrap}
-.who-row input{flex:0 1 220px;padding:8px 11px;background:var(--ink);color:var(--text);
-  border:1px solid var(--line);border-radius:6px;font:13.5px var(--sans)}
-.who-row input:focus{outline:none;border-color:var(--gold-dim)}
-#queue .row{display:flex;justify-content:space-between;gap:12px;padding:8px 12px;
-  background:var(--raised);border:1px solid var(--line);border-radius:7px;margin-bottom:6px;
-  font-size:13px}
 
 /* -------------------------------------------------------------- report -- */
 .form{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:20px}
@@ -598,7 +586,7 @@ var BOARDKEYS = []; /* hub no longer edits issue boards (#433 trim) */
 var isBoard = function (k) { return BOARDKEYS.indexOf(k) >= 0; };
 
 var ABOUT = {
-  uploads:     'Gallery queue, reports, and files people sent in. Approve shots onto the public gallery here.',
+  uploads:     'Staff approve shots waiting for the public gallery. Send and browse pictures on /gallery.',
   inbox:       'Bugs and ideas sent in from the public report page.',
   linked:      'Everybody who has linked a Discord account to a copy of the game.',
   sessions:    'One card a person, newest first by when they last played. ' +
@@ -1617,7 +1605,7 @@ function countFor(k) {
       .filter(function (l) { return /^##\s+test\b/i.test(l); }).length;
     return total ? done + ' of ' + total + ' marked' : 'nothing to test yet';
   }
-  if (k === 'uploads') return S.uploads.length ? S.uploads.length + ' files' : 'gallery queue';
+  if (k === 'uploads') return 'see /gallery';
   if (k === 'news')    return (S.news.news || []).length + ' releases';
   if (k === 'report')  return 'takes a minute';
   if (k === 'help')    return 'read me first';
@@ -2136,12 +2124,6 @@ function drawNews() {
 }
 
 /* ----------------------------------------------------------- downloads -- */
-function size(b) {
-  if (b > 1073741824) return (b / 1073741824).toFixed(1) + ' GB';
-  if (b > 1048576) return (b / 1048576).toFixed(0) + ' MB';
-  if (b > 1024) return (b / 1024).toFixed(0) + ' KB';
-  return b + ' B';
-}
 
 /*
   The downloads page used to live here too, behind the sign in, which was
@@ -2152,69 +2134,20 @@ function size(b) {
 
 /* ------------------------------------------------------------- uploads -- */
 /*
-  Sent raw with the name in the address rather than as a form, because a form
-  means writing a multipart parser and this needs no dependencies.
+  Hub Gallery used to host a raw file drop, an uploaded-files list, and gallery
+  reports. Uploads and the public send form live on /gallery (and the launcher);
+  bug and idea reports live in Inbox. Staff still approve the pending gallery
+  queue here.
 */
 function drawUploads() {
   var out = head() +
-    (S.me.dev || S.me.admin ? '<div id="galqueue"></div><div id="galreports"></div>' : '') +
-    '<div class="drop" id="drop">' +
-      '<div class="big">Drop files here</div>' +
-      '<div class="said">or <span class="link" id="pick">choose them</span>. ' +
-      'Up to 200 MB each.</div>' +
-      '<input type="file" id="fileinput" multiple hidden>' +
-      '<div class="who-row">' +
-        '<input id="upwho" placeholder="your name" value="' + esc(remember('who')) + '">' +
-        '<input id="upnote" placeholder="what is it (optional)">' +
-      '</div>' +
-    '</div><div id="queue"></div>';
-
-  if (!S.uploads.length) {
-    out += '<div class="empty">Nothing uploaded yet.</div>';
-  } else {
-    out += '<div class="section-label">' + S.uploads.length + ' file' +
-           (S.uploads.length === 1 ? '' : 's') + '</div>';
-    S.uploads.forEach(function (u) {
-      var href = '/up/' + encodeURIComponent(u.name);
-      out += '<div class="file">' +
-        (u.image
-          ? '<a class="thumb" href="' + href + '" target="_blank"><img src="' + href +
-            '" alt="" loading="lazy"></a>'
-          : '<div class="thumb kind">' +
-            esc((u.orig.split('.').pop() || '?').slice(0, 4).toUpperCase()) + '</div>') +
-        '<div class="who"><div class="nm">' + esc(u.orig) + '</div>' +
-        '<div class="meta">' + (u.by ? esc(u.by) + '  &middot;  ' : '') + size(u.size) +
-          '  &middot;  ' + new Date(u.at).toLocaleString() +
-          (u.note ? '<br>' + esc(u.note) : '') + '</div></div>' +
-        '<a class="get ghost" href="' + href + '" target="_blank">Open</a>' +
-        '<a class="get" href="' + href + '?dl=1">Download</a>' +
-        (S.me.admin ? '<button class="btn" data-drop="' + esc(u.name) + '">Remove</button>' : '') +
-      '</div>';
-    });
-  }
+    '<div class="empty">' +
+      '<p>Approved pictures live on the public <a href="/gallery">Gallery</a>. ' +
+      'Send one in there or from the launcher.</p>' +
+      '<p>Bug and idea reports go to <a href="' + PATHS.inbox + '">Inbox</a>.</p>' +
+    '</div>' +
+    (S.me.dev || S.me.admin ? '<div id="galqueue"></div>' : '');
   el('page').innerHTML = out;
-
-  var input = el('fileinput'), drop = el('drop');
-  el('pick').onclick = function () { input.click(); };
-  input.onchange = function () { sendAll(input.files); input.value = ''; };
-  ['dragenter','dragover'].forEach(function (ev) {
-    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); });
-  });
-  ['dragleave','drop'].forEach(function (ev) {
-    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); });
-  });
-  drop.addEventListener('drop', function (e) {
-    if (e.dataTransfer && e.dataTransfer.files) sendAll(e.dataTransfer.files);
-  });
-  each(el('page'), '[data-drop]', function (b) {
-    b.onclick = function () {
-      if (!confirm('Remove ' + b.dataset.drop + ' for good?')) return;
-      b.disabled = true; b.textContent = 'removing';
-      api('/api/upload/' + encodeURIComponent(b.dataset.drop), { method:'DELETE' })
-        .then(refresh).then(draw);
-    };
-  });
-
   if (S.me.dev || S.me.admin) loadGalleryQueue();
 }
 
@@ -2266,69 +2199,6 @@ function loadGalleryQueue() {
       };
     });
   }).catch(function () { });
-  loadGalleryReports();
-}
-
-function loadGalleryReports() {
-  var box = el('galreports');
-  if (!box) return;
-  api('/api/gallery/reports').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
-    if (!el('galreports')) return;
-    box = el('galreports');
-    var q = (d && d.reports) || [];
-    var out = '<div class="section-label">Gallery reports' + (q.length ? ' &middot; ' + q.length : '') + '</div>';
-    if (!q.length) {
-      out += '<div class="empty">No open reports.</div>';
-    } else {
-      q.slice().reverse().forEach(function (r) {
-        out += '<div class="file">' +
-          '<div class="who"><div class="nm">' + esc(r.name) + '</div>' +
-          '<div class="meta">' + (r.why ? esc(r.why) + '  &middot;  ' : '') +
-            'from ' + esc(r.from || '?') + '  &middot;  ' + new Date(r.at).toLocaleString() +
-          '</div></div>' +
-          '<button class="btn" data-galdismiss="' + esc(r.id) + '">Dismiss</button>' +
-        '</div>';
-      });
-    }
-    box.innerHTML = out;
-    each(box, '[data-galdismiss]', function (b) {
-      b.onclick = function () {
-        b.disabled = true; b.textContent = 'dismissing';
-        api('/api/gallery/report/dismiss', { method:'POST', headers:{ 'content-type':'application/json' },
-            body: JSON.stringify({ id: b.dataset.galdismiss }) })
-          .then(function () { loadGalleryReports(); });
-      };
-    });
-  }).catch(function () { });
-}
-
-function sendAll(list) {
-  var files = Array.prototype.slice.call(list || []);
-  if (!files.length) return;
-  var whoName = (el('upwho') || {}).value || '';
-  var note = (el('upnote') || {}).value || '';
-  if (whoName) remember('who', whoName);
-
-  el('queue').innerHTML = files.map(function (f, i) {
-    return '<div class="row"><span>' + esc(f.name) + '</span>' +
-           '<span class="said" id="qs' + i + '">waiting</span></div>';
-  }).join('');
-
-  var next = function (i) {
-    if (i >= files.length) return refresh().then(draw);
-    var f = files[i], tag = el('qs' + i);
-    tag.textContent = 'sending ' + size(f.size);
-    api('/api/upload?name=' + encodeURIComponent(f.name) +
-        '&by=' + encodeURIComponent(whoName) + '&note=' + encodeURIComponent(note),
-        { method:'POST', body:f })
-      .then(function (r) {
-        tag.textContent = r.ok ? 'done' : 'failed';
-        if (!r.ok) tag.style.color = 'var(--fail)';
-        next(i + 1);
-      })
-      .catch(function () { tag.textContent = 'failed'; next(i + 1); });
-  };
-  next(0);
 }
 
 /* -------------------------------------------------------------- report -- */
@@ -2345,7 +2215,7 @@ function drawReport() {
         ? 'Doors in Whiterun will not open' : 'Add Cloaks of Skyrim') + '">' +
       '<label for="rd">What happened, and what you were doing</label>' +
       '<textarea id="rd" placeholder="' + (reportKind === 'bug'
-        ? 'Where you were, what you pressed, what you expected, what happened instead. If you have a screenshot or a log, put it on the Gallery page and say so here.'
+        ? 'Where you were, what you pressed, what you expected, what happened instead. If you have a screenshot or a log, send it on the public Gallery and say so here.'
         : 'What it would add, and a Nexus link if it is a mod.') + '"></textarea>' +
       '<label for="rw">Your name</label>' +
       '<input id="rw" value="' + esc(remember('who')) + '" placeholder="so we know who to ask">' +
@@ -2378,7 +2248,7 @@ function drawReport() {
         '<div class="form" style="text-align:center">' +
         '<h3 style="font:600 20px Spectral,Georgia,serif;margin:6px 0 8px;color:var(--gold)">Sent</h3>' +
         '<p class="said">It is in front of whoever is fixing things. If you have a ' +
-        'screenshot or a log, the <a href="/uploads">Gallery</a> page takes those.</p>' +
+        'screenshot or a log, the public <a href="/gallery">Gallery</a> takes those.</p>' +
         '<div class="formfoot" style="justify-content:center">' +
         '<button class="btn" id="another">Send another</button></div></div>';
       el('another').onclick = function () { drawReport(); };
