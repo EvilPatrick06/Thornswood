@@ -270,18 +270,27 @@ namespace Thornswood
                 try { said = make ? OwnGame.Make(c, say) : OwnGame.Refresh(c, say); }
                 catch (Exception ex) { fail = ex.Message; }
 
-                // Same light-flag step Fix runs. Refresh can bring Vortex's
-                // unflagged staging copy of a MustBeLight plugin (CBBE.esp and
-                // the rest) over a Separated flagged copy, or place a fresh
-                // one that never had the ESL bit. Ending green means applying
-                // FlagLight here so Mod list does not go red after Bring it
-                // up to date from Vortex. Then re-Run Verify so LastIssues
-                // matches the folder we just finished.
+                // Same light-flag and load-order steps Fix runs. Refresh can
+                // bring Vortex's unflagged staging copy of a MustBeLight
+                // plugin (CBBE.esp and the rest) over a Separated flagged
+                // copy, or place a fresh one that never had the ESL bit.
+                // SettleSettings on a full Refresh used to lay Golden's
+                // plugins.txt over Live, which put Thornswood-Content.esp out
+                // of the server's order (Gavin: Mod list red at position 21
+                // after "already matches"). FlagLight then PutInServerOrder
+                // (the same write Scan and Fix uses) so Mod list stays green.
+                // Verify.Run follows; when Refresh already matched, skip the
+                // Bytes CRC pass so finishing is not held on hashing every
+                // plugin, and skip Run entirely when nothing changed and a
+                // server-aware LastIssues is already shared.
                 if (fail == null)
                 {
+                    bool already = said != null
+                        && said.IndexOf("already matches what Vortex has deployed", StringComparison.Ordinal) >= 0;
+                    int flagged = 0, ordered = 0;
                     try
                     {
-                        int flagged = Checks.FlagLight(Verify.MustBeLight(c), say);
+                        flagged = Checks.FlagLight(Verify.MustBeLight(c), say);
                         if (flagged > 0)
                             say("Flagged " + flagged + " plugin" + (flagged == 1 ? "" : "s") +
                                 " light so the load order matches the server after the Vortex update.");
@@ -291,8 +300,22 @@ namespace Thornswood
                         Swallow.Note("ShellOwnGame.StartOwnGame, FlagLight after Vortex bring-up-to-date", ex);
                         say("Could not flag light plugins after the Vortex update (" + ex.Message.TrimEnd('.') + "). Press Fix on Diagnostics if Mod list goes red.");
                     }
-                    try { Verify.Run(c); }
-                    catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, Verify after Vortex bring-up-to-date", ex); }
+                    try
+                    {
+                        ordered = Verify.PutInServerOrder(c, say);
+                    }
+                    catch (Exception ex)
+                    {
+                        Swallow.Note("ShellOwnGame.StartOwnGame, PutInServerOrder after Vortex bring-up-to-date", ex);
+                        say("Could not put the plugin list into the server's order after the Vortex update (" + ex.Message.TrimEnd('.') + "). Press Fix on Diagnostics if Mod list goes red.");
+                    }
+                    bool needVerify = !already || flagged > 0 || ordered > 0
+                        || !Verify.LastUsedServer || Verify.LastIssues == null;
+                    if (needVerify)
+                    {
+                        try { Verify.Run(c, !already); }
+                        catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, Verify after Vortex bring-up-to-date", ex); }
+                    }
                 }
 
                 // The firewall rule for the game's browser, written here
@@ -362,8 +385,9 @@ namespace Thornswood
                                 return;
                             }
                             // LastIssues was refreshed on the pool thread after
-                            // FlagLight; paint Scan and Fix and Ready from it
-                            // so the card does not stay on the pre-Vortex state.
+                            // FlagLight and PutInServerOrder; paint Scan and Fix
+                            // and Ready from it so the card does not stay on the
+                            // pre-Vortex state.
                             if (Verify.LastUsedServer && Verify.LastIssues != null)
                                 ShowVerify(Verify.LastIssues, false);
                         }

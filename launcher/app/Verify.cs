@@ -81,7 +81,15 @@ namespace Thornswood
         /// that, the way the game judges it (see LoadOrder), and so are the
         /// bytes of every plugin; see Bytes.
         /// </summary>
-        public static List<Issue> Run(Config cfg)
+        public static List<Issue> Run(Config cfg) { return Run(cfg, true); }
+
+        /// <param name="checkBytes">
+        /// False skips the per-plugin CRC pass (Bytes). Bring it up to date from
+        /// Vortex uses that when Refresh reported the folder already matched, so
+        /// the finish path is not held on hashing every plugin after a no-op.
+        /// Names, order, missing files and light flags are still judged.
+        /// </param>
+        public static List<Issue> Run(Config cfg, bool checkBytes)
         {
             var issues = new List<Issue>();
             Expected = 0;
@@ -282,8 +290,13 @@ namespace Thornswood
             }
 
             // Bytes, not names. Everything above compares names, and a machine
-            // can pass every line of it and still be red in the game.
-            try { issues.AddRange(Bytes(cfg)); } catch { }
+            // can pass every line of it and still be red in the game. Skipped
+            // when the caller already knows the plugin files did not change
+            // (Bring it up to date after an already-matched Refresh).
+            if (checkBytes)
+            {
+                try { issues.AddRange(Bytes(cfg)); } catch { }
+            }
 
             // Only a server-aware Run is remembered as the shared truth. A
             // local-only Run(null) from Checks.All must not overwrite a Scan,
@@ -545,7 +558,7 @@ namespace Thornswood
         /// or a changed newline is enough for the game to read the list as
         /// something else. Returns 1 when the file was rewritten.
         /// </summary>
-        static int PutInServerOrder(Config cfg, Action<string> say)
+        public static int PutInServerOrder(Config cfg, Action<string> say)
         {
             ServerMod[] mods = null;
             try { mods = Manifest(cfg); } catch { }
