@@ -1434,6 +1434,13 @@ function noteTrouble(row, found) {
     const list = jsonFile(TROUBLE_FILE, []);
     const all = Array.isArray(list) ? list : [];
     if (all.some(t => t && t.session === row.session)) return;
+    /* start and end are the session's own window, in the same unix ms the
+       row was stamped with. at is when the logs arrived. They are kept apart
+       because a backlog uploaded by a newer launcher lands long after the
+       session ended: a 401 held Patrick's 23 September logs until 14:09 the
+       next day, and the alert read as a fresh crash. With the session's start
+       named and the arrival called out when it is later than the end, a late
+       upload no longer looks like a new failure (issue #532). */
     all.push({
       session: row.session,
       who: String(row.who),
@@ -1441,6 +1448,8 @@ function noteTrouble(row, found) {
       channel: String(row.channel || ''),
       profile: Number(row.profile) || 0,
       version: String(row.version || ''),
+      start: Number(row.start) || 0,
+      end: Number(row.end) || 0,
       at: Date.now(),
       why: found.why,
       file: found.file,
