@@ -25,12 +25,31 @@ Confirmed with Website. Signing / `ExpectedSigner` is still **off**.
   live URL above; `Channel` or `UpdateBranch` `dev` → dev URL
   (`Config.cs`, `Updater.Check`). Host allowlist already includes
   `thornswood.net`.
+- **Conditional, since #445.** `Updater.FromSite` keeps the last document it
+  read with the `ETag` the site sent, sends `If-None-Match` on the next check,
+  and reads a 304 as that same document. The site answers the tag it issued
+  with 304 and no body (`site/server.js`, the `/feed/version.json` route). The
+  launcher asks every thirty seconds while the game runs, and the document is
+  about ninety kilobytes, so that is roughly ten megabytes an hour per launcher
+  saved without slowing the check down. The tag and the document are held in
+  memory, never in `config.json`: a tag without the document it belongs to
+  would ask, be told nothing had changed, and have nothing to read.
+  `Cache-Control` stays `no-cache`, which means ask every time, so a release is
+  still seen inside the server's five minute window.
 - **Fallback / rollback.** If the site feed fails (or `UpdateFeedUrl` is
   empty), `Updater.Check` falls back to the GitHub Contents API on
   `UpdateRepo`/`UpdateBranch` (`EvilPatrick06/Thornswood-Releases`). Do **not**
   delete that repository yet — it stays hot for rollback until the cutover
   sticks. Publishers still upload release assets there; `-HostAssetUrls` on
   `Publish-Update.ps1` only rewrites the urls written into `version.json`.
+- **The fallback waits, since #445.** That fallback is the request with a quota
+  on it, so it is taken at most once every five minutes (`Updater.GithubRest`).
+  Before that, a site feed that missed sent every thirty second check to
+  GitHub: 120 Contents API calls an hour against an allowance of 60 per
+  address, so one site hiccup spent the hour in half of it. The site is still
+  asked every thirty seconds. While the fallback is resting, the site's failure
+  is what the caller gets, which reads as no answer rather than as no update,
+  so the in-play countdown clock is left where it is.
 - **Announce a move.** The feed field `updateFeedUrl` works like `updateRepo`:
   publish the new URL under the old feed first, then move. Shell saves it
   quietly into `config.json`.
@@ -42,7 +61,17 @@ Confirmed with Website. Signing / `ExpectedSigner` is still **off**.
   with `Accept: application/vnd.github.raw`, no token unless the config holds
   one. With no token, GitHub allows sixty of these an hour per address; a 403
   or 429 is reported as a rate limit, not a fault. While the game is running
-  the launcher checks every 30 seconds (`Shell.cs`).
+  the launcher checks every 30 seconds (`Shell.cs`). An `ETag` buys nothing
+  here: GitHub only makes a 304 free to a request carrying an `Authorization`
+  header, and these carry none, which is the other reason the feed moved.
+- **What the log says.** One line per feed address, written once and again if
+  it changes: `Update checks read <url>.` (`Shell.OnVersionDoc`). A line naming
+  `thornswood.net` is the proof the checks are off the quota; one naming
+  `api.github.com` says the site feed is missing and the fallback is carrying
+  it. A check that could not be made at all while the game runs writes one line
+  a session with what came back (`Shell.CheckUpdatesInPlay`); until #445 that
+  catch was empty, so a launcher that had spent the hour's sixty requests left
+  no trace anywhere.
 - **Parsing.** `VersionDoc.Parse` with the .NET `DataContractJsonSerializer`.
   A byte order mark is skipped. A value of the wrong JSON type can make the
   serializer throw, and then the whole document is unread and every launcher
@@ -114,6 +143,12 @@ application id (`Config.cs:160-164`).
 }
 ```
 
+Those `api.github.com/.../releases/assets/<id>` addresses are what the
+publisher wrote before #445. They still work and are left alone; the site feed
+at `https://thornswood.net/feed/version.json` serves the same packs as
+`/feed/assets/<sha256>`, and a release published from now on writes the browser
+download address on the GitHub side.
+
 The dev feed (branch `dev`, commit 12f71c8) has the same shape with
 `serverPort` `"7787"`, `voicePort` `"7789"`, `voiceUrl`
 `"https://thornswood.net/voice-dev"`, `launcherVersion` `"1.1.95.11"`,
@@ -132,7 +167,7 @@ launcher.
 | Field | Type | Written by | Read by | If wrong or missing |
 | --- | --- | --- | --- | --- |
 | `launcherVersion` | string, dotted numbers | `Publish-Update.ps1:1251`, from `Version` in `launcher/app/Updater.cs:13` or Ship's dev number | `Shell.cs:4610`, `Updater.IsNewer` (`Updater.cs:87-108`) | Offered only when higher, part by part. Equal or lower offers nothing. A number that does not parse is offered whenever it differs. Not saved. |
-| `launcherUrl` | string, https | `Publish-Update.ps1:1252`, the release asset API address | `Updater.SelfUpdate` (`Updater.cs:945-948`) | Empty: no launcher update is offered (`Shell.cs:4610-4611`). Must pass the host list below. |
+| `launcherUrl` | string, https | `Publish-Update.ps1`, the asset's browser download address since #445 (the `api.github.com` asset id address only when gh named no browser one) | `Updater.SelfUpdate` (`Updater.cs:945-948`) | Empty: no launcher update is offered (`Shell.cs:4610-4611`). Must pass the host list below. |
 | `launcherSha256` | string, 64 hex | `Publish-Update.ps1:1253` | `Updater.Download` (`Updater.cs:436-448`) | Empty: download refused. Mismatch: file deleted, update fails. |
 | `serverAddress` | string | `Publish-Update.ps1:1316-1321` from config `ServerAddress`; `Set-Server.ps1:97`; `Set-Vps.ps1` | `Shell.cs:4548` | Saved. A change stops Ship unless `-MoveServer` (`Publish-Update.ps1:1289-1303`); the dev channel skips that check. Wrong: everybody connects to the wrong box. |
 | `serverPort` | string | as above, `ServerPort` | `Shell.cs:4550` | Saved. Must be a string; the launcher field is a string. |
@@ -159,7 +194,7 @@ launcher.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | `yyyyMMdd-HHmm`, `-dev` added on the dev channel, `-<part>` added when a release is split to stay under GitHub's 2 GiB asset limit (`Publish-Update.ps1:762,768-804`). Compared case-insensitively with `applied.txt`. An empty id is never offered. |
-| `url` | string | A GitHub release asset in the feed's `updateRepo`, **or** a thornswood.net host asset under `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>` (`Feed-Rules.ps1`). Empty: the launcher skips it and writes it off as applied. A url that answers 404 fails the whole update and Play stays off. |
+| `url` | string | A GitHub release asset in the feed's `updateRepo`, **or** a thornswood.net host asset under `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>` (`Feed-Rules.ps1`). A GitHub one is written as the browser download address, `https://github.com/<owner>/<name>/releases/download/<tag>/<file>`, since #445: it hands over the same bytes as the `api.github.com` asset id address and counts against no quota. Empty: the launcher skips it and writes it off as applied. A url that answers 404 fails the whole update and Play stays off. |
 | `sha256` | string, 64 hex | Mandatory; checked after download (`Updater.cs:436-448`). |
 | `notes` | string | The whole Ship note, first line first. The update card shows it (`Shell.cs:4669-4670`). |
 | `name`, `bytes` | string, number | Optional packs only: the Add-ons tab shows them (`Config.cs:354-360`). Publish-Pack also writes `notes` as a file count. |
@@ -212,6 +247,12 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
   one refuses the download (`Updater.cs:428-451`).
 - **Signature.** `ExpectedSigner` is empty, so the launcher exe's signature is
   not checked yet (`Updater.cs:881-901`).
+- **Quota.** Nothing a launcher fetches spends the sixty anonymous
+  `api.github.com` requests an hour any more (#445): the feed is on
+  thornswood.net, its assets are too, and a GitHub asset url written from now
+  on is the browser download address, which redirects to the asset CDN and
+  counts against nothing. Packs already on the feed keep the addresses they
+  were published with; `Repair-Manifest.ps1` is what takes an old one off.
 - **Publish side.** `Feed-Rules.ps1` refuses a new pack whose url is neither a
   release asset in `updateRepo` nor a thornswood.net feed asset under
   `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>`. Pass `-HostAssetUrls`

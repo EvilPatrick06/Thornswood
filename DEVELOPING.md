@@ -440,8 +440,12 @@ than build an installer around any other.
 
 **Links, not copies.** Big files (archives, textures, meshes, plugins) are hard
 links to Vortex's copies, so a collection is not on the disk twice; this needs
-the folders on the same drive as the Skyrim Vortex deploys into. A hard link is
-the same file under a second name, so anything written into one in place lands
+the folders on the same drive as the Skyrim Vortex deploys into. When they are
+not on one drive the folder cannot be made, and `OwnGame.OneDriveOnly` says so
+by naming both ways out and their paths: install Thornswood on Skyrim's drive,
+which lands in `<drive>\Thornswood`, or move the Steam library to Thornswood's
+drive in Steam, Settings, Storage. A hard link is the same file under a second
+name, so anything written into one in place lands
 in every folder that links it. So these are always copied: the game's root
 files, `Data\Platform`, `Data\NirnLabUIPlatform`, `Data\SKSE`, `Data\MCM`,
 `Data\Video`, settings, script and program files, and the vanilla masters. The

@@ -10,14 +10,17 @@
   without a token. Fresh installs only survive it because the installer seeds
   applied.txt. Entry 198 on the To Do List. Feed-Rules.ps1 holds the rule.
 
-  Four things are checked, all against scratch files:
+  Five things are checked, all against scratch files:
     the rule itself, in Feed-Rules.ps1;
     the block of Publish-Update.ps1 that adds packs to the feed, run on its own
       between its markers, so a pack uploaded anywhere else is refused and the
       feed is left as it was;
     that Publish-Update refuses the wrong repository before it uploads;
     Repair-Manifest.ps1 end to end, in a child PowerShell, on a scratch feed
-      and a scratch applied.txt.
+      and a scratch applied.txt;
+    and where Repair-Manifest looks for applied.txt when it is not given one,
+      which is the install Publish-Update.ps1's Find-Root finds rather than
+      C:\Thornswood every time.
   When the releases clone is on this machine, a COPY of its version.json is
   repaired too, to measure what the repair would do to the live feed. The
   clone and the live applied.txt are never written.
@@ -231,6 +234,56 @@ $doc = Feed
 $r = Run-Append $doc @() $false
 Yes 'a release with no packs still warns and adds nothing' (($r -eq 'ok') -and ((Ids $doc.packs) -eq 'old1,old2,new1') -and (($script:said -join "`n") -like '*2 pack(s)*'))
 
+# ------------------------------------------------------------ Publish-Update, the asset urls
+Write-Host ''
+Write-Host 'Publish-Update writing the asset urls'
+
+# Entry 236 / #445. A launcher with no token shares sixty api.github.com
+# requests an hour with everything else on its address, and the update checks
+# need them, so a new asset goes into the feed by its browser download address,
+# which counts against nothing. The api.github.com asset id address stays as
+# the fallback for an asset gh did not name a browser one for.
+$urlFrom = $pubSrc.IndexOf('# ==== thornswood asset urls ====')
+$urlTo   = $pubSrc.IndexOf('# ==== end thornswood asset urls ====')
+Yes 'the asset url block is marked in Publish-Update.ps1' (($urlFrom -ge 0) -and ($urlTo -gt $urlFrom))
+$urlBlock = ''
+if ($urlFrom -ge 0 -and $urlTo -gt $urlFrom) { $urlBlock = $pubSrc.Substring($urlFrom, $urlTo - $urlFrom) }
+
+function Dl([string]$repo, [string]$tag, [string]$name) { return "https://github.com/$repo/releases/download/$tag/$name" }
+function Asset([string]$name, [string]$id, $browser) {
+    $o = [pscustomobject]@{ id = $id; name = $name }
+    if ($null -ne $browser) { $o | Add-Member -NotePropertyName browser_download_url -NotePropertyValue $browser }
+    return $o
+}
+# The block on its own, with the variables Publish-Update has by the time it
+# runs: the release's assets as gh listed them, and the things whose urls it
+# fills in.
+function Run-Urls($relAssets) {
+    $Repo = $pub
+    $exeUrl = ''
+    $clientRel = [pscustomobject]@{ name = 'client-runtime.zip'; url = ''; sha256 = ('2' * 64) }
+    $chunks = @((Chunk 'N1' ''), (Chunk 'N2' ''))
+    if (-not $urlBlock) { return $null }
+    Invoke-Expression $urlBlock
+    return [pscustomobject]@{ Exe = $exeUrl; Client = $clientRel.url; Packs = @($chunks | ForEach-Object { [string]$_.Url }) }
+}
+
+$dlExe    = Dl $pub '20260927-0508' 'Thornswood.exe'
+$dlClient = Dl $pub '20260927-0508' 'client-runtime.zip'
+$dlPack   = Dl $pub '20260927-0508' 'pack-N1.zip'
+$u = Run-Urls @(
+    (Asset 'Thornswood.exe' '900' $dlExe),
+    (Asset 'client-runtime.zip' '901' $dlClient),
+    (Asset 'pack-N1.zip' '902' $dlPack),
+    (Asset 'pack-N2.zip' '903' $null))
+Yes 'the launcher goes into the feed by its browser download address' ($u.Exe -eq $dlExe)
+Yes 'so does the client runtime' ($u.Client -eq $dlClient)
+Yes 'and so does a pack' ($u.Packs[0] -eq $dlPack)
+Yes 'none of the three spends a GitHub API request' (-not (($u.Exe + $u.Client + $u.Packs[0]) -like '*api.github.com*'))
+Yes 'an asset gh named no browser address for keeps the api one' ($u.Packs[1] -eq (Api $pub '903'))
+Yes 'a browser download address is one a launcher may download' (Test-FeedPackUrl $dlPack $pub)
+Yes 'and one in another repository still is not' (-not (Test-FeedPackUrl (Dl $priv '20260927-0508' 'pack-N1.zip') $pub))
+
 # ------------------------------------------------------------ Publish-Update, before uploading
 Write-Host ''
 Write-Host 'Publish-Update before it uploads'
@@ -336,6 +389,89 @@ try {
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# --------------------------------------------- where applied.txt is looked for
+#
+# The repair settles the dead pack ids in this machine's applied.txt as well,
+# or the launcher here keeps the update card up until the repaired feed comes
+# back down. It used to reach for C:\Thornswood and nothing else, so on a
+# machine whose launcher is on another drive it wrote nothing and said nothing.
+# It now finds the install the way Publish-Update.ps1 does, and the two
+# functions are held identical here rather than left to drift apart.
+#
+# Find-Root is lifted out of each script by the parser and driven with
+# Test-Path and Get-PSDrive shadowed, so nothing is read off this machine and
+# the answer does not depend on which drives it has.
+Write-Host ''
+Write-Host 'where applied.txt is looked for'
+
+$pubUpd = Join-Path $here '..\scripts\release\Publish-Update.ps1'
+function Get-Fn([string]$path, [string]$name) {
+    $t = $null; $e = $null
+    $a = [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $path).Path, [ref]$t, [ref]$e)
+    $hit = @($a.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name }, $true))
+    if ($hit.Count -ne 1) { return '' }
+    return $hit[0].Extent.Text
+}
+function Get-Ast([string]$path) {
+    $t = $null; $e = $null
+    return [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $path).Path, [ref]$t, [ref]$e)
+}
+$repairFind = Get-Fn $repair 'Find-Root'
+$publishFind = Get-Fn $pubUpd 'Find-Root'
+Yes 'Repair-Manifest.ps1 has a Find-Root' ($repairFind -ne '')
+Yes 'Publish-Update.ps1 still has the one it is copied from' ($publishFind -ne '')
+function Flat([string]$s) { return (($s -replace '\s+', ' ').Trim()) }
+Yes 'and the two are the same function, word for word' (($repairFind -ne '') -and ((Flat $repairFind) -eq (Flat $publishFind)))
+
+# No install path is written into the script any more outside that function.
+# By the parser, over string literals only, so the paragraph above Find-Root
+# that explains the rule in words is not mistaken for one.
+if ($repairFind -ne '') {
+    $rast = Get-Ast $repair
+    $fn = @($rast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Find-Root' }, $true))[0]
+    $roots = @($rast.FindAll({
+        param($n)
+        ($n -is [System.Management.Automation.Language.StringConstantExpressionAst] -or
+         $n -is [System.Management.Automation.Language.ExpandableStringExpressionAst]) -and
+        ($n.Value -match '(?i)^[a-z]:\\Thornswood')
+    }, $true))
+    $outside = @($roots | Where-Object { $_.Extent.StartOffset -lt $fn.Extent.StartOffset -or $_.Extent.EndOffset -gt $fn.Extent.EndOffset })
+    Yes 'no install folder is written into the script outside Find-Root' ($outside.Count -eq 0)
+    foreach ($o in $outside) { Write-Host ("      line {0}: {1}" -f $o.Extent.StartLineNumber, $o.Extent.Text) }
+
+    $rsrc = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $repair).Path)
+    $rest = $rsrc.Replace($repairFind, '')
+    Yes 'the default applied.txt is built from it, plus -DevBuild on the dev channel' (
+        ($rest -match '\$root = Find-Root') -and ($rest -match "'-DevBuild'") -and ($rest -match "Profile.applied\.txt"))
+}
+
+# Runs the lifted Find-Root against made up drives. Test-Path answers only for
+# the paths given, so a launcher is where this says it is and nowhere else.
+# Get-PSDrive gives the drives asked for, and Join-Path joins with a backslash
+# whatever this machine's separator is, because Join-Path on Linux refuses a
+# path on a drive called C. So the answers below are the same in the cloud and
+# on the VPS, and none of them is read off the machine running this.
+function Run-FindRoot([string]$text, [string[]]$has, [string[]]$roots) {
+    $head = @'
+param($has, $roots)
+function Test-Path { param([string]$LiteralPath) return ($has -contains $LiteralPath) }
+function Get-PSDrive { param([string]$PSProvider) return @($roots | ForEach-Object { [pscustomobject]@{ Root = $_ } }) }
+function Join-Path { param([string]$Path, [string]$ChildPath) return ($Path.TrimEnd('\', '/') + '\' + $ChildPath) }
+'@
+    return [string](& ([scriptblock]::Create($head + "`n" + $text + "`nFind-Root")) $has $roots)
+}
+if ($repairFind -ne '') {
+    $onC = 'C:\Thornswood'
+    $onD = 'D:\Thornswood'
+    $drives = @('C:\', 'D:\', '/')
+
+    Yes 'the launcher on C: is found first' ((Run-FindRoot $repairFind @($onC + '\Launcher\Thornswood.exe') $drives) -eq $onC)
+    Yes 'a launcher on another drive is found when C: has none' ((Run-FindRoot $repairFind @($onD + '\Launcher\Thornswood.exe') $drives) -eq $onD)
+    Yes 'no launcher anywhere falls back to C:, so the message names a real place' ((Run-FindRoot $repairFind @() $drives) -eq $onC)
+    Yes 'a drive whose root is not a letter is not tried' ((Run-FindRoot $repairFind @('\Thornswood\Launcher\Thornswood.exe') @('/')) -eq $onC)
+    Yes 'Publish-Update answers the same, on the same drives' ((Run-FindRoot $publishFind @($onD + '\Launcher\Thornswood.exe') $drives) -eq $onD)
 }
 
 Write-Host ''

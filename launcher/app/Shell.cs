@@ -92,6 +92,15 @@ namespace Thornswood
         static bool closedForUpdate = false;
         static bool installWhenSeen = false;
         static int inPlayTicks = 0;
+        // Said once in launcher.log, not every thirty seconds: which feed the
+        // checks read, and the first in play check that could not be made.
+        // Both were invisible before (#445): the address was nowhere in the
+        // log, and the in play catch was empty, so a launcher that had spent
+        // the hour's sixty anonymous GitHub requests looked exactly like one
+        // that had checked and found nothing.
+        static string feedSaid = "";
+        static bool inPlayFailSaid;
+        static bool notChangedSaid;
         static int modTab;   // 0 server plugins, 1 script extender, 2 your own, 3 add-ons
         static Border addonsCard;
         // Ids being installed or removed right now, so a second click on the
@@ -122,6 +131,17 @@ namespace Thornswood
         static List<Gallery.Shot> galleryShots;
         static int galleryAt = -1;
         static DispatcherTimer galleryTimer;
+        // Report, and the way to the site's own staff page (#731). galleryWho
+        // is what /api/gallery/who answered at start up, null until it has;
+        // galleryReporting is the picture an open report is about, held so the
+        // report goes to that one even if the card has turned since.
+        static Button btnGalleryReport, btnGalleryManage,
+                      btnGalleryReportSend, btnGalleryReportCancel;
+        static FrameworkElement galleryReportRow;
+        static TextBox boxGalleryWhy;
+        static TextBlock txtGallerySaid;
+        static Gallery.Who galleryWho;
+        static Gallery.Shot galleryReporting;
         static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
         static CheckBox chkMusic; static Slider sldMusic; static TextBlock txtMusic;
@@ -661,6 +681,13 @@ namespace Thornswood
             galleryCard = F<FrameworkElement>("GalleryCard");
             galleryImage = F<Image>("GalleryImage");
             galleryBy = F<TextBlock>("GalleryBy");
+            btnGalleryReport = F<Button>("BtnGalleryReport");
+            btnGalleryManage = F<Button>("BtnGalleryManage");
+            galleryReportRow = F<FrameworkElement>("GalleryReportRow");
+            boxGalleryWhy = F<TextBox>("BoxGalleryWhy");
+            btnGalleryReportSend = F<Button>("BtnGalleryReportSend");
+            btnGalleryReportCancel = F<Button>("BtnGalleryReportCancel");
+            txtGallerySaid = F<TextBlock>("TxtGallerySaid");
 
             // Same order as the PageXxx constants above, and as PageTitles.
             navButtons = new Button[] {
@@ -825,6 +852,12 @@ namespace Thornswood
                 if (buttonDiscord != null) buttonDiscord.Content = "Connect Discord";
                 ClearDiscordAvatar();
             }
+            // Linking or unlinking is what decides whether the gallery card can
+            // offer Report, and whether the site's last word made this account
+            // staff. A report half written under the account that has just gone
+            // is closed rather than sent under the new one.
+            if (GalleryReportOpen && !Discord.Linked) CloseGalleryReport();
+            PaintGalleryTools();
         }
 
         /// <summary>Empty circle while unlinked, or while a picture is still loading.</summary>
@@ -928,6 +961,17 @@ namespace Thornswood
             txtStatus.Text = m;
             try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + m + Environment.NewLine); }
             catch { }
+        }
+
+        /// <summary>
+        /// One line in launcher.log and nothing on the status line, for
+        /// something whoever reads a report needs and whoever is playing does
+        /// not. Safe from any thread, which Log is not: Log writes to a control.
+        /// </summary>
+        static void LogOnly(string m)
+        {
+            try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + m + Environment.NewLine); }
+            catch { /* the log is the only place this line could have gone */ }
         }
 
         // ------------------------------------------------------------- pages
@@ -1175,27 +1219,38 @@ namespace Thornswood
         /// <summary>
         /// The pictures the site is showing, turned through on the Play page.
         ///
-        /// Read only: Gallery.Load asks /api/public, the same public feed the
-        /// front page reads, and the site keeps the queue and chooses what goes
-        /// into the gallery. The launcher shows what is already public and sends
-        /// nothing.
+        /// Gallery.Load asks /api/public, the same public feed the front page
+        /// reads, and the site keeps the queue and chooses what goes into the
+        /// gallery. The launcher shows what is already public. The one thing it
+        /// sends is a report on the picture on the card (#731), over the same
+        /// signed ticket the door uses; approving, rejecting and taking an
+        /// approved picture down are the site's doors and want a browser sign
+        /// in, so BtnGalleryManage opens the site page for staff rather than
+        /// pretending to do it from here.
         ///
-        /// The list is fetched once on a pool thread at start up. The card stays
-        /// hidden until the first picture has loaded, so a site that is down, or
-        /// a build shown before anybody has sent a picture, leaves the page
-        /// exactly as it was. It fails the way the online count and the roster
-        /// do: quietly, with nothing said.
+        /// The list is fetched once on a pool thread at start up, and
+        /// /api/gallery/who is asked in the same trip, only to find out whether
+        /// this site has the gallery doors at all: a site older than them has
+        /// no address to report to and the button stays hidden.
+        ///
+        /// The card stays hidden until the first picture has loaded, so a site
+        /// that is down, or a build shown before anybody has sent a picture,
+        /// leaves the page exactly as it was. It fails the way the online count
+        /// and the roster do: quietly, with nothing said.
         /// </summary>
         static void StartGallery()
         {
             if (galleryCard == null) return;
             ThreadPool.QueueUserWorkItem(delegate
             {
-                // Load fails to an empty list on its own, so nothing here throws
-                // and there is no catch to swallow: the same shape as AskOnline.
+                // Load fails to an empty list on its own, and AskWho to an
+                // unanswered Who, so nothing here throws and there is no catch
+                // to swallow: the same shape as AskOnline.
                 List<Gallery.Shot> shots = Gallery.Load();
+                Gallery.Who who = Gallery.AskWho();
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
+                    galleryWho = who;
                     galleryShots = (shots != null && shots.Count > 0) ? shots : null;
                     galleryAt = -1;
                     if (galleryShots == null) return;
@@ -1212,6 +1267,141 @@ namespace Thornswood
                     }
                     ShowNextShot();
                     GalleryDecide();
+                }));
+            });
+        }
+
+        /// <summary>
+        /// The picture the card is showing, or null before the first one.
+        /// </summary>
+        static Gallery.Shot CurrentShot()
+        {
+            if (galleryShots == null || galleryAt < 0 || galleryAt >= galleryShots.Count) return null;
+            return galleryShots[galleryAt];
+        }
+
+        /// <summary>
+        /// True when the site's last word on this Discord account was that it
+        /// is staff: the access.dev roles, which is the same set the site calls
+        /// staff at /api/gallery/who.
+        ///
+        /// Read from the door rather than from who, because who only knows
+        /// browser sessions and the launcher has none. Door.Last is this
+        /// session's answer when Play has been pressed; Discord.DevAllowed is
+        /// the last answer written down, which is what there is before the
+        /// first check in of a session.
+        /// </summary>
+        static bool GalleryStaff()
+        {
+            if (!Discord.Linked) return false;
+            if (Door.Last != null && Door.Last.Dev) return true;
+            return Discord.DevAllowed;
+        }
+
+        /// <summary>
+        /// Which of the two buttons under the picture apply right now. Report
+        /// for anybody whose copy is linked, once the site has shown it has the
+        /// gallery doors and the picture on the card has a name to report;
+        /// Manage on the site for staff.
+        /// </summary>
+        static void PaintGalleryTools()
+        {
+            bool doors = galleryWho != null && galleryWho.Answered;
+            Gallery.Shot shot = CurrentShot();
+            bool named = shot != null && shot.Name != null && shot.Name.Length > 0;
+
+            if (btnGalleryReport != null)
+                btnGalleryReport.Visibility = (doors && named && Discord.Linked && !GalleryReportOpen)
+                    ? Visibility.Visible : Visibility.Collapsed;
+            if (btnGalleryManage != null)
+                btnGalleryManage.Visibility = (doors && GalleryStaff())
+                    ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        static bool GalleryReportOpen
+        {
+            get { return galleryReportRow != null && galleryReportRow.Visibility == Visibility.Visible; }
+        }
+
+        /// <summary>
+        /// One line under the picture, or nothing when there is nothing to say.
+        /// </summary>
+        static void SayGallery(string line)
+        {
+            if (txtGallerySaid == null) return;
+            if (string.IsNullOrEmpty(line))
+            {
+                txtGallerySaid.Text = "";
+                txtGallerySaid.Visibility = Visibility.Collapsed;
+                return;
+            }
+            txtGallerySaid.Text = line;
+            txtGallerySaid.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Opens the box for saying what is wrong with the picture on the card,
+        /// and holds the rotation where it is so the picture cannot change
+        /// under somebody halfway through writing.
+        /// </summary>
+        static void OpenGalleryReport()
+        {
+            Gallery.Shot shot = CurrentShot();
+            if (shot == null || shot.Name == null || shot.Name.Length == 0) return;
+            if (!Discord.Linked)
+            {
+                SayGallery("Connect Discord first, so the site knows who is reporting this.");
+                return;
+            }
+
+            galleryReporting = shot;
+            SayGallery("Say what is wrong with this picture. Staff read it; nothing comes off the gallery until one of them takes it off.");
+            if (boxGalleryWhy != null) boxGalleryWhy.Text = "";
+            if (galleryReportRow != null) galleryReportRow.Visibility = Visibility.Visible;
+            PaintGalleryTools();
+            GalleryDecide();
+            if (boxGalleryWhy != null) boxGalleryWhy.Focus();
+        }
+
+        static void CloseGalleryReport()
+        {
+            galleryReporting = null;
+            if (galleryReportRow != null) galleryReportRow.Visibility = Visibility.Collapsed;
+            if (boxGalleryWhy != null) boxGalleryWhy.Text = "";
+            if (btnGalleryReportSend != null) btnGalleryReportSend.IsEnabled = true;
+            PaintGalleryTools();
+            GalleryDecide();
+        }
+
+        /// <summary>
+        /// Sends the report the box holds. The picture stays up either way:
+        /// the report goes to staff, and only staff take one down.
+        /// </summary>
+        static void SendGalleryReport()
+        {
+            Gallery.Shot shot = galleryReporting;
+            if (shot == null) { CloseGalleryReport(); return; }
+
+            string name = shot.Name;
+            string why = boxGalleryWhy == null ? "" : boxGalleryWhy.Text;
+            if (btnGalleryReportSend != null) btnGalleryReportSend.IsEnabled = false;
+            SayGallery("Sending that to staff...");
+
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string bad = Gallery.Report(name, why);
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (bad.Length == 0)
+                    {
+                        CloseGalleryReport();
+                        SayGallery("Sent. Staff will look at it; the picture stays up until one of them takes it down.");
+                    }
+                    else
+                    {
+                        if (btnGalleryReportSend != null) btnGalleryReportSend.IsEnabled = true;
+                        SayGallery(bad);
+                    }
                 }));
             });
         }
@@ -1256,19 +1446,25 @@ namespace Thornswood
                     : "From the world";
             if (galleryCard != null && galleryCard.Visibility != Visibility.Visible)
                 galleryCard.Visibility = Visibility.Visible;
+            // What was said about the picture before belongs to that picture.
+            SayGallery("");
+            PaintGalleryTools();
         }
 
         /// <summary>
         /// Runs the rotation only when the Play page is up, the window is not
-        /// minimised and no game is running, so nothing is fetched or turned
-        /// behind a page nobody is looking at.
+        /// minimised, no game is running and nobody is part way through
+        /// reporting the picture that is up, so nothing is fetched or turned
+        /// behind a page nobody is looking at, and the picture a report is
+        /// about cannot change under whoever is writing it.
         /// </summary>
         static void GalleryDecide()
         {
             if (galleryTimer == null || galleryShots == null) return;
             bool seen = pages != null && pages[PagePlay] != null &&
                         pages[PagePlay].IsVisible &&
-                        win.WindowState != WindowState.Minimized && !playing;
+                        win.WindowState != WindowState.Minimized && !playing &&
+                        !GalleryReportOpen;
             if (seen) { if (!galleryTimer.IsEnabled) galleryTimer.Start(); }
             else { if (galleryTimer.IsEnabled) galleryTimer.Stop(); }
         }
@@ -1593,6 +1789,27 @@ namespace Thornswood
             };
 
             btnAllControls.Click += delegate { ShowPage(PageControls); };
+
+            // The gallery card's two buttons (#731). Report writes to the site
+            // over this copy's own ticket; Manage on the site opens the page
+            // where staff approve the queue and take an approved picture down,
+            // because those doors read a browser sign in and the launcher has
+            // none to give them.
+            if (btnGalleryReport != null) btnGalleryReport.Click += delegate { OpenGalleryReport(); };
+            if (btnGalleryReportCancel != null) btnGalleryReportCancel.Click += delegate { CloseGalleryReport(); };
+            if (btnGalleryReportSend != null) btnGalleryReportSend.Click += delegate { SendGalleryReport(); };
+            if (boxGalleryWhy != null)
+                boxGalleryWhy.KeyDown += delegate (object s, KeyEventArgs e)
+                {
+                    if (e.Key == Key.Enter) { e.Handled = true; SendGalleryReport(); }
+                    else if (e.Key == Key.Escape) { e.Handled = true; CloseGalleryReport(); }
+                };
+            if (btnGalleryManage != null)
+                btnGalleryManage.Click += delegate
+                {
+                    SayGallery("Opening the gallery page on thornswood.net. Sign in there with Discord to approve what is waiting or take a picture down.");
+                    Open(Gallery.StaffPage);
+                };
 
             WirePages();
             WireOwnGame();
@@ -5359,6 +5576,18 @@ namespace Thornswood
         {
             checkFailed = false;
             pendingDoc = v;
+
+            // Where the answer came from, once, and again if it ever changes.
+            // A line in launcher.log naming thornswood.net is what says the
+            // checks are off the GitHub Contents API and its sixty anonymous
+            // requests an hour, and a line naming api.github.com is what says
+            // the site feed is missing and the fallback is carrying it (#445).
+            if (feedSaid != Updater.LastFeedUrl)
+            {
+                feedSaid = Updater.LastFeedUrl;
+                LogOnly("Update checks read " + feedSaid + ".");
+            }
+
             bool install = installWhenSeen;
             installWhenSeen = false;
 
@@ -5536,6 +5765,16 @@ namespace Thornswood
                     if (v != null)
                     {
                         failed = false;
+                        // Once a session, so launcher.log can show the feed's
+                        // ETag doing its job: a check that cost a few bytes and
+                        // one that downloaded the whole ninety kilobyte
+                        // document look identical from the outside (#445).
+                        if (Updater.LastNotModified && !notChangedSaid)
+                        {
+                            notChangedSaid = true;
+                            LogOnly("The update feed answered that nothing has changed, so this check cost " +
+                                    "a few bytes instead of the whole feed. This is said once a session.");
+                        }
                         List<Pack> packs = Updater.Pending(v);
                         bool newLauncher = Updater.IsNewer(v.launcherVersion, Updater.Version)
                                            && !string.IsNullOrEmpty(v.launcherUrl);
@@ -5546,7 +5785,25 @@ namespace Thornswood
                         what = string.Join(", ", parts.ToArray());
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    // Once a session, in launcher.log only (#445). This catch
+                    // was empty, so a launcher that had spent the hour's sixty
+                    // anonymous GitHub requests left no line anywhere and
+                    // looked exactly like one that had checked and found
+                    // nothing: a search of launcher.log for the rate limit
+                    // wording found nothing on any machine. Every thirty
+                    // seconds would be a hundred and twenty lines an hour, so
+                    // the first one is the one that is kept, and the clock is
+                    // left alone either way by the failed flag above.
+                    if (!inPlayFailSaid)
+                    {
+                        inPlayFailSaid = true;
+                        LogOnly("The update check could not be made while the game runs, reading " +
+                                Updater.LastFeedUrl + ". It runs again in thirty seconds, and this " +
+                                "is said once a session. What came back: " + ex.Message);
+                    }
+                }
                 try
                 {
                     win.Dispatcher.BeginInvoke(new Action(delegate

@@ -42,8 +42,9 @@ param(
     [switch]$NoPause
     ,[ValidateSet('main', 'dev')][string]$Channel = 'main'
     # The applied.txt settled on this machine. Left out, it is the install for
-    # the channel. The harness points it at a scratch file, because the live
-    # one is never touched to test anything.
+    # the channel, found the way Publish-Update.ps1 finds it rather than
+    # assumed to be on C:. The harness points it at a scratch file, because the
+    # live one is never touched to test anything.
     ,[string]$AppliedFile
 )
 
@@ -57,6 +58,28 @@ if (-not $RepoDir) {
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
+
+# ---- where the launcher is installed ----------------------------------------
+#
+# The same rule as Find-Root in Publish-Update.ps1, kept identical so the
+# applied.txt settled below is the one the launcher on this machine reads.
+# C:\Thornswood on most machines; when C: has no launcher, every fixed drive is
+# tried for <drive>:\Thornswood\Launcher\Thornswood.exe, because a second
+# developer may have installed on another drive. Until this it was always C:,
+# so on that machine the repair wrote nothing, the dead pack ids were never
+# marked as seen, and the launcher kept the update card up until the repaired
+# feed came back down. The dev build is the main root plus -DevBuild, on the
+# same drive; that is where the main launcher's Settings page installs it
+# (DevBuild.cs). -AppliedFile still wins.
+function Find-Root {
+    $first = 'C:\Thornswood'
+    if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
+    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
+        $cand = Join-Path $d.Root 'Thornswood'
+        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
+    }
+    return $first
+}
 
 . (Join-Path $Here 'Feed-Rules.ps1')
 
@@ -113,7 +136,9 @@ foreach ($why in @($split.Drop | ForEach-Object { $_.Why } | Sort-Object -Unique
 # would keep the update card up until the repaired file comes back down.
 $applied = $AppliedFile
 if (-not $applied) {
-    $applied = Join-Path $(if ($Channel -eq 'dev') { 'C:\Thornswood-DevBuild' } else { 'C:\Thornswood' }) 'Profile\applied.txt'
+    $root = Find-Root
+    if ($Channel -eq 'dev') { $root = $root + '-DevBuild' }
+    $applied = Join-Path $root 'Profile\applied.txt'
 }
 if ($DryRun) {
     Head 'Dry run'

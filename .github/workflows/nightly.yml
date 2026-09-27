@@ -9,6 +9,10 @@
 #   GitHub    pull requests open more than two days and branches other than
 #             main, which CONTRIBUTING.md says are merged or closed
 #
+# Every action here is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives: a tag is a moving pointer, and this
+# runs on the VPS beside the live server.
+#
 # Any failure opens an issue on the board, or adds to the one already open,
 # with a link to the run; the last lines of the harness step name every
 # harness that failed and the ten slowest. Runs at 03:00 Mountain (09:00
@@ -31,7 +35,7 @@ jobs:
     runs-on: [self-hosted, Windows, thornswood-vps]
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Scan the tree for secrets
         if: ${{ !cancelled() }}
@@ -235,7 +239,7 @@ jobs:
 
       - name: Keep the exe from this build
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: Thornswood.exe
           path: ${{ runner.temp }}/Thornswood/Launcher/Thornswood.exe

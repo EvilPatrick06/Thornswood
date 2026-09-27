@@ -20,14 +20,23 @@
   meshes, sounds, weather and shaders are invisible to that check and are why
   this is safe at all. A pack with a plugin in it is refused and nothing is
   uploaded.
+
+  THE OTHER RULE, checked the same way: every pack written into version.json
+  has to be one a launcher can download, by Feed-Rules.ps1. The releases clone
+  is pulled before the file is edited, so these packs land on top of whatever
+  another machine has just published rather than on a copy git push would then
+  refuse.
 #>
 [CmdletBinding()]
 param(
     [string]$Only,
     [switch]$DryRun,
     [string]$Root = 'C:\Thornswood',
-    # The clone of the public releases repo that holds version.json.
-    [string]$ReleaseDir = 'C:\Users\evilp\Downloads\Thornswood-Releases',
+    # The clone of the public releases repo that holds version.json. Empty means
+    # look beside this repository for Thornswood-Releases (same guess as
+    # Set-Collection / Publish-News), so a second machine is not stuck on
+    # Patrick's Downloads path.
+    [string]$ReleaseDir,
     [string]$Repo = 'EvilPatrick06/Thornswood-Releases',
     [switch]$NoPause
 )
@@ -35,10 +44,23 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
+if (-not $ReleaseDir) {
+    $guess = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
+    if (-not (Test-Path (Join-Path $guess '.git'))) {
+        throw "No Thornswood-Releases clone at $guess. Clone it there (git clone https://github.com/EvilPatrick06/Thornswood-Releases), or pass -ReleaseDir."
+    }
+    $ReleaseDir = $guess
+}
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
+
+# Which pack urls a launcher can actually download. The Add-ons tab fetches an
+# optional pack through the same Updater code as a required one, so the rule
+# Publish-Update.ps1 holds required packs to is the rule here too.
+. (Join-Path $Here 'Feed-Rules.ps1')
 
 Write-Host ''
 Write-Host '  THORNSWOOD  -  optional packs' -ForegroundColor White
@@ -188,11 +210,45 @@ foreach ($b in $built) {
 
 # --------------------------------------------------------- version.json ---
 Head 'version.json'
+# ==== thornswood pack feed ====
+# tests\test-pack-feed.ps1 runs this block on its own, against scratch clones.
+# If the markers move, it stops rather than quietly testing nothing.
 $vf = Join-Path $ReleaseDir 'version.json'
 if (-not (Test-Path -LiteralPath $vf)) { Die "No version.json in $ReleaseDir." }
 
+# Pulled before it is edited, the way Publish-Update.ps1 does it. Two people
+# can publish from two machines, and these packs have to be added on top of
+# whatever the other one just published rather than on top of a copy from
+# yesterday: git push refuses that copy, and the zips are then up with nothing
+# offering them. A pull that fails stops here, before the file is read.
+if (Test-Path -LiteralPath (Join-Path $ReleaseDir '.git')) {
+    $old = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $pulled = & git -C $ReleaseDir pull --rebase --quiet 2>&1
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    if ($rc -ne 0) {
+        Write-Host ($pulled | Out-String) -ForegroundColor Red
+        Die "Could not pull the release feed in $ReleaseDir. version.json has not been touched. Sort the clone out and run this again; the zips are already up, so the same run puts them on the feed."
+    }
+}
+
 $raw = [IO.File]::ReadAllText($vf) -replace '^\uFEFF', ''
 $doc = $raw | ConvertFrom-Json
+
+# Nobody is offered a pack they cannot fetch. Feed-Rules.ps1 has the rule and
+# says why: a launcher reads this feed and downloads every pack from the url
+# the feed gives, so an asset anywhere but the repository the feed names as
+# updateRepo, or the thornswood.net feed path, answers 404 on the Add-ons tab.
+# -Repo pointed anywhere else is the way that happens.
+$feedRepo = Get-FeedRepo $doc
+$offFeed = @($built | Where-Object { -not (Test-FeedPackUrl $_.Url $feedRepo) })
+if ($offFeed.Count) {
+    foreach ($o in $offFeed) { Say ("  {0}.zip is at {1}" -f $o.Id, $o.Url) 'Red' }
+    Die ("Launchers read this feed from $feedRepo and cannot download a pack from anywhere else, so version.json has not been touched. " +
+         "The zips are up and nobody has been offered them. Publish again with -Repo $feedRepo.")
+}
+# ==== end thornswood pack feed ====
 
 $optional = @()
 if ($doc.PSObject.Properties['optional'] -and $doc.optional) { $optional = @($doc.optional) }

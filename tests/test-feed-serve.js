@@ -8,6 +8,10 @@
   the same Range resume as /file/. It lifts those routes and rangeReply out
   of site\server.js by text and serves them from a real node http server on
   a loopback port against files in a temp folder.
+
+  Since #445 version.json also carries an ETag and answers 304 to a launcher
+  that already holds that copy, because every launcher asks for it every
+  thirty seconds in a session.
 */
 const fs = require('fs');
 const path = require('path');
@@ -116,6 +120,30 @@ async function main() {
   yes('version.json holds the rewritten launcherUrl',
       /thornswood\.net\/feed\/assets\//.test(v.body.toString('utf8')));
 
+  // #445: the launcher asks every thirty seconds in a session, so an unchanged
+  // feed must cost a 304 and no body rather than ninety kilobytes.
+  yes('version.json carries an ETag', !!v.h['etag']);
+  const again = await ask('GET', '/feed/version.json', { 'If-None-Match': v.h['etag'] });
+  yes('the same ETag back is answered 304', again.code === 304);
+  yes('and the 304 carries no body', again.body.length === 0);
+  yes('the 304 still says no-cache, so the next check still asks',
+      again.h['cache-control'] === 'no-cache');
+  const other = await ask('GET', '/feed/version.json', { 'If-None-Match': '"not-the-one"' });
+  yes('a stale ETag gets the whole document', other.code === 200 && other.body.equals(v.body));
+
+  // The one risk in answering 304: a shipped release hidden behind a tag that
+  // did not move. The tag is size and modified time, so a written feed changes
+  // it and the launcher holding the old one is given the new document.
+  const shipped = JSON.stringify({
+    launcherUrl: 'https://thornswood.net/feed/assets/' + SHA,
+    launcherVersion: '1.1.102'
+  });
+  fs.writeFileSync(path.join(ROOT, 'feed', 'version.json'), shipped);
+  const after = await ask('GET', '/feed/version.json', { 'If-None-Match': v.h['etag'] });
+  yes('a feed written since is 200 and not 304', after.code === 200);
+  yes('with the new document', after.body.toString('utf8') === shipped);
+  yes('and a new ETag', !!after.h['etag'] && after.h['etag'] !== v.h['etag']);
+
   const missing = await ask('GET', '/feed/assets/' + 'b'.repeat(64));
   yes('a missing asset is 404', missing.code === 404);
 
@@ -141,6 +169,14 @@ async function main() {
 
   const da = await ask('GET', '/feed-dev/assets/' + SHA);
   yes('GET /feed-dev/assets/<sha256> is 200', da.code === 200);
+
+  // Who the ETag above is for, so it is not taken out again as unused: the
+  // launcher asks with the tag of the copy it holds and reads a 304 as the
+  // document it already has (#445, launcher\app\Updater.cs FromSite).
+  const updater = fs.readFileSync(path.join(__dirname, '..', 'launcher', 'app', 'Updater.cs'), 'utf8');
+  yes('the launcher asks with If-None-Match', /If-None-Match/.test(updater));
+  yes('and reads 304 as the copy it already has',
+      /StatusCode\s*==\s*304/.test(updater) && /have\.Doc/.test(updater));
 
   server.close();
   try { fs.rmSync(ROOT, { recursive: true, force: true }); } catch (e) { }
