@@ -29,10 +29,26 @@ yes('footer Community links to /gallery',
 yes('home has gallery slideshow shell', /id="galleryShow"/.test(home));
 yes('home has See the gallery link', /See the gallery/.test(home));
 yes('landing build starts a rotating slideshow',
-    /setInterval\(function \(\) \{ go\(\(i \+ 1\) % shots\.length\); \}, 5000\)/.test(home));
+    /setInterval\(function \(\) \{ go\(\(i \+ 1\) % shots\.length\); \}, 5000\)/.test(home) &&
+    /function startFlip\(\)/.test(home));
 yes('slideshow respects reduced motion',
     /prefers-reduced-motion: reduce/.test(home) &&
-    /if \(!reduce && shots\.length > 1\)/.test(home));
+    /if \(reduce \|\| paused \|\| shots\.length < 2\) return/.test(home));
+yes('slideshow has themed prev next arrows',
+    /gal-nav gal-prev/.test(home) && /gal-nav gal-next/.test(home) &&
+    /\.gal-show \.gal-nav\{[^}]*border:1px solid var\(--gold\)/.test(home) &&
+    /aria-label', 'Previous picture'/.test(home) &&
+    /aria-label', 'Next picture'/.test(home));
+yes('slideshow pauses on hover and arrow use',
+    /mouseenter/.test(home) && /mouseleave/.test(home) &&
+    /function userStep\(n\)/.test(home) && /stopFlip\(\)/.test(home));
+yes('slideshow fills wrap width without max-height shrink',
+    /aspect-ratio:16\/9;width:100%/.test(home) &&
+    !/gal-show\{[^}]*max-height:480px/.test(home));
+yes('site wraps are wider and centered',
+    /\.wrap\{width:min\(1480px/.test(home) &&
+    /\.page \.wrap\{width:min\(1120px/.test(home) &&
+    /margin-inline:auto/.test(home));
 
 yes('gal-box uses stone panel, not iron slab',
     /\.gal-box\{[^}]*background:var\(--stone\)/.test(home));
