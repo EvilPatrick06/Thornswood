@@ -24,7 +24,7 @@ $script:LoadOrderMasters = 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthF
 
   Vortex names the collection's own mod folder for it:
 
-      %APPDATA%\Vortex\skyrimse\mods\collection_ombo2a_2_2026-09-15T21-08-00Z
+      %APPDATA%\Vortex\skyrimse\mods\collection_7essxf_1_2026-09-26T00-00-00Z
                                                 slug  ^ revision
 
   The same rule as Checks.CollectionRevision in the launcher, and it is here
@@ -142,7 +142,7 @@ function Get-CollectionState([string]$Url) {
     }
 }
 
-# "ombo2a" out of https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a
+# "7essxf" out of https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf
 function Get-CollectionSlug([string]$Url) {
     if (-not $Url) { return '' }
     $at = $Url.LastIndexOf('/collections/', [StringComparison]::OrdinalIgnoreCase)

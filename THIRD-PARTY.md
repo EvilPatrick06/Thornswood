@@ -32,7 +32,7 @@ or the build check goes red.
 - **Game packs and the installer payload**: every file in the game folder that
   the collection did not provide and Ship-Rules.ps1 does not hold back.
 - **Nexus Mods**, through the collection
-  (https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a).
+  (https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf).
   Most of what Vortex installs from it is other people's mods, under their own
   terms. Two of them are Thornswood's own uploads, by EvilPatrick06, and
   Vortex installs both for everybody who installs the collection: Thornswood
@@ -240,8 +240,11 @@ the source is".
 
 Nexus Mods mod 192001,
 https://www.nexusmods.com/skyrimspecialedition/mods/192001, by EvilPatrick06.
-Revision 5 of the collection carries version 1.1.0, file 809365. Its three
-files, read in Vortex's copy on 24 September:
+The rebuilt collection (`7essxf`) carries version 1.2 of this mod. The per-file
+measurements below were last read in Vortex's copy on 24 September against
+version 1.1.0 (file 809365); they have to be re-read on the shipping machine
+once it has the `7essxf` collection installed, since the 1.2 upload changes the
+plugin. Its three files, as read on 24 September:
 
 - `Thornswood-Content.esp`, Thornswood's own plugin, 141,234 bytes, sha256
   `3b3ecb3bda4b97e312df10a61191cdd2949286007ab03a948b323d4a749af2ae`.

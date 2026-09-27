@@ -72,11 +72,11 @@ function slugFrom(url) {
 
 // ---- the slug --------------------------------------------------------------
 yes('the slug comes out of a collection address',
-    slugFrom('https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a') === 'ombo2a');
+    slugFrom('https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf') === '7essxf');
 yes('a trailing slash does not become part of it',
-    slugFrom('https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a/') === 'ombo2a');
+    slugFrom('https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf/') === '7essxf');
 yes('a query string does not become part of it',
-    slugFrom('https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a?tab=mods') === 'ombo2a');
+    slugFrom('https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf?tab=mods') === '7essxf');
 yes('an address that is not a collection gives nothing',
     slugFrom('https://www.nexusmods.com/skyrimspecialedition/mods/12345') === '');
 yes('an empty address gives nothing', slugFrom('') === '');
@@ -85,35 +85,35 @@ yes('an empty address gives nothing', slugFrom('') === '');
 yes('a slug with punctuation in it is refused', slugFrom('https://x/collections/../../evil') === '');
 
 // ---- the revision ----------------------------------------------------------
-const real = ['collection_ombo2a_2_2026-09-15T21-08-00Z'];
-yes('the real folder on this machine reads as revision 2', revisionFrom(real, 'ombo2a') === 2);
+const real = ['collection_7essxf_1_2026-09-26T00-00-00Z'];
+yes('the real folder on this machine reads as revision 1', revisionFrom(real, '7essxf') === 1);
 
 yes('the newest wins when an upgrade leaves the old one behind',
     revisionFrom([
-      'collection_ombo2a_2_2026-09-15T21-08-00Z',
-      'collection_ombo2a_4_2026-09-22T10-00-00Z',
-      'collection_ombo2a_3_2026-09-19T10-00-00Z'
-    ], 'ombo2a') === 4);
+      'collection_7essxf_2_2026-09-15T21-08-00Z',
+      'collection_7essxf_4_2026-09-22T10-00-00Z',
+      'collection_7essxf_3_2026-09-19T10-00-00Z'
+    ], '7essxf') === 4);
 
 yes('double figures beat single figures, rather than sorting as text',
     revisionFrom([
-      'collection_ombo2a_9_2026-09-15T21-08-00Z',
-      'collection_ombo2a_10_2026-09-22T10-00-00Z'
-    ], 'ombo2a') === 10);
+      'collection_7essxf_9_2026-09-15T21-08-00Z',
+      'collection_7essxf_10_2026-09-22T10-00-00Z'
+    ], '7essxf') === 10);
 
 yes('another collection in the same folder is ignored',
     revisionFrom([
-      'collection_ombo2a_2_2026-09-15T21-08-00Z',
+      'collection_7essxf_2_2026-09-15T21-08-00Z',
       'collection_somebodyelse_99_2026-09-22T10-00-00Z'
-    ], 'ombo2a') === 2);
+    ], '7essxf') === 2);
 
 yes('an ordinary mod folder is ignored',
-    revisionFrom(['SunHelm Survival-39414-3-1-4-1661703641'], 'ombo2a') === 0);
-yes('vortex_collection_* is not a revision', revisionFrom(['vortex_collection_qUAAu3jC3'], 'ombo2a') === 0);
-yes('nothing installed reads as 0, which means say nothing', revisionFrom([], 'ombo2a') === 0);
-yes('a name with no revision part reads as 0', revisionFrom(['collection_ombo2a_'], 'ombo2a') === 0);
+    revisionFrom(['SunHelm Survival-39414-3-1-4-1661703641'], '7essxf') === 0);
+yes('vortex_collection_* is not a revision', revisionFrom(['vortex_collection_qUAAu3jC3'], '7essxf') === 0);
+yes('nothing installed reads as 0, which means say nothing', revisionFrom([], '7essxf') === 0);
+yes('a name with no revision part reads as 0', revisionFrom(['collection_7essxf_'], '7essxf') === 0);
 yes('a name whose revision is not a number reads as 0',
-    revisionFrom(['collection_ombo2a_two_2026-09-15T21-08-00Z'], 'ombo2a') === 0);
+    revisionFrom(['collection_7essxf_two_2026-09-15T21-08-00Z'], '7essxf') === 0);
 
 // ---- the three copies must agree ------------------------------------------
 /*

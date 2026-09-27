@@ -87,7 +87,7 @@ Play will not start from it (DEVELOPING.md:32).
 
 **Vortex and the Nexus collection.** The mods come from the Nexus collection
 (`collectionUrl` in the feed,
-`https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a`).
+`https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf`).
 Vortex deploys it into the Steam copy, or into whatever folder Vortex manages;
 the launcher finds that folder (`OwnGame.DeploysInto`) and builds `Game` from
 the Steam copy's game plus exactly the files Vortex's record lists.
