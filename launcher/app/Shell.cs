@@ -237,7 +237,7 @@ namespace Thornswood
                             "every Thornswood.exe, then start it again.",
                             "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Shell.Main", ex); }
                     return;
                 }
 
@@ -254,7 +254,7 @@ namespace Thornswood
                             DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") +
                             "  COULD NOT START: " + ex.ToString() + Environment.NewLine);
                     }
-                    catch { }
+                    catch (Exception logEx) { Swallow.Note("Shell.Main, append", logEx); }
                     MessageBox.Show(ex.ToString(), "Thornswood could not start",
                                     MessageBoxButton.OK, MessageBoxImage.Error);
                 }
@@ -341,11 +341,11 @@ namespace Thornswood
             // And put Thornswood in Installed apps, or bring the entry up to
             // date. Done here rather than in the installer so that every
             // install that already exists gets one on its next launch.
-            try { Register.Ensure(cfg); } catch { }
+            try { Register.Ensure(cfg); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
 
             // So the session report can run the readiness checks against the
             // same config this launcher is using, without reaching in here.
-            try { Discord.UseConfig(cfg); } catch { }
+            try { Discord.UseConfig(cfg); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
 
             // Logs from a session that ended without sending them, sent now.
             // On a pool thread so nothing waits on the site, and BEFORE Play
@@ -354,13 +354,13 @@ namespace Thornswood
             // nothing left to send. A crash that took the launcher down with
             // it is exactly the session somebody wants to read afterwards,
             // and it was the one that was always lost.
-            try { ThreadPool.QueueUserWorkItem(delegate { try { Discord.SendPendingLogs(); } catch { } }); } catch { }
+            try { ThreadPool.QueueUserWorkItem(delegate { try { Discord.SendPendingLogs(); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); } }); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
 
             // The client settings file, made here if this install has none.
             // Nothing ships it, the client does not create it, and without it
             // a character cannot be chosen. From startup, so the log says so
             // before Play or a character choice can trip over its absence.
-            try { AutoJoin.Ensure(Log); } catch { }
+            try { AutoJoin.Ensure(Log); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
 
             // A launcher killed mid-session and opened again finds the game
             // still up. Taking the redirect off now would send the rest of
@@ -379,7 +379,7 @@ namespace Thornswood
                 btnPlay.Content = "RUNNING";
                 Log("Skyrim is still running, so this session is taken over rather than pulled apart under it. Your Windows folders stay pointed at this build until the game closes.");
                 int holding = 0;
-                try { holding = Hold.Take(PresenceLog); } catch { }
+                try { holding = Hold.Take(PresenceLog); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); }
                 if (holding > 0) Log("Holding " + holding + " of " + cfg.BuildName + "'s game files again, so nothing else can change them under the running game.");
             }
             else
@@ -387,9 +387,9 @@ namespace Thornswood
                 if (Swap.Restore()) Log("Cleaned up a redirect left behind by a crash.");
                 Keep.TakeNote();
             }
-            try { string leak = Leaks.Clean(cfg); if (leak != null) Log(leak); } catch { }
-            try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch { }
-            try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch { }
+            try { string leak = Leaks.Clean(cfg); if (leak != null) Log(leak); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
+            try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
+            try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             // Steam's Updates setting for the Skyrim the downgrade looks after, read only (SteamUpdates).
             try { if (!Downgrade.Needed(cfg) && !Downgrade.SourceNeeded(cfg)) { string upd = SteamUpdates.Report(Downgrade.Target(cfg)); if (upd != null) Log(upd); } } catch (Exception ex) { Swallow.Note("Shell.Run, reading Steam's Updates setting", ex); }
             {
@@ -426,7 +426,7 @@ namespace Thornswood
             ThreadPool.QueueUserWorkItem(delegate
             {
                 int moved = 0;
-                try { moved = Icons.Ensure(); } catch { }
+                try { moved = Icons.Ensure(); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
                 if (moved > 0)
                     win.Dispatcher.BeginInvoke((Action)delegate { Log("Shortcut icon brought up to date."); });
             });
@@ -443,15 +443,15 @@ namespace Thornswood
                 int named = Files.FixPresetNames();
                 if (named > 0) Log("Put " + named + " class name" + (named == 1 ? "" : "s") + " back to the right spelling.");
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             // Off the window's thread. Ending a stuck game waits on it, and at
             // this point the window has not even been shown yet.
             ThreadPool.QueueUserWorkItem(delegate
             {
                 string said = null;
-                try { said = ClearLeftovers(); } catch { }
+                try { said = ClearLeftovers(); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
                 if (string.IsNullOrEmpty(said)) return;
-                try { win.Dispatcher.BeginInvoke((Action)delegate { Log(said); DrawStatus(); }); } catch { }
+                try { win.Dispatcher.BeginInvoke((Action)delegate { Log(said); DrawStatus(); }); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             });
 
             // The installer unpacks into Thornswood-setup at the root of the
@@ -463,7 +463,7 @@ namespace Thornswood
             ThreadPool.QueueUserWorkItem(delegate
             {
                 long freed = 0;
-                try { freed = Uninstall.DropScratch(null); } catch { }
+                try { freed = Uninstall.DropScratch(null); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
                 if (freed <= 0) return;
                 try
                 {
@@ -473,7 +473,7 @@ namespace Thornswood
                             " MB the installer left behind on your drive.");
                     });
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             });
 
             // Scan asks the server for its plugin list. The server having a bad
@@ -567,7 +567,7 @@ namespace Thornswood
             */
             var app = new Application();
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
-            app.Exit += delegate { Voice.Stop(); try { Presence.Stop(); } catch { } try { Hold.Release(); } catch { } };
+            app.Exit += delegate { Voice.Stop(); try { Presence.Stop(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } try { Hold.Release(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } };
 
             // A fault on the launcher's own thread used to take the window
             // down with no line in the log, or leave it standing and deaf.
@@ -577,8 +577,8 @@ namespace Thornswood
             app.DispatcherUnhandledException += delegate (object faultSender,
                 System.Windows.Threading.DispatcherUnhandledExceptionEventArgs fault)
             {
-                try { Log("Fault on the launcher's own thread: " + fault.Exception.GetType().Name + ": " + fault.Exception.Message); } catch { }
-                try { File.AppendAllText(Paths.LogFile, fault.Exception.ToString() + Environment.NewLine); } catch { }
+                try { Log("Fault on the launcher's own thread: " + fault.Exception.GetType().Name + ": " + fault.Exception.Message); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
+                try { File.AppendAllText(Paths.LogFile, fault.Exception.ToString() + Environment.NewLine); } catch (Exception ex) { Swallow.Note("Shell.Run, append", ex); }
                 // IL offsets let a pdb kept on the shipping machine map a
                 // customer's report to a source line without shipping symbols
                 // (issue #462). StackTrace(..., false) skips file/line lookup
@@ -634,7 +634,7 @@ namespace Thornswood
                 win.Left = work.Left + Math.Max(0, (work.Width - w) / 2);
                 win.Top = work.Top + Math.Max(0, (work.Height - h) / 2);
             }
-            catch { }   // a bad monitor layout is not worth refusing to start over
+            catch (Exception ex) { Swallow.Note("Shell.CentreOnMainScreen", ex); }   // a bad monitor layout is not worth refusing to start over
         }
 
         static T F<T>(string name) where T : class { return win.FindName(name) as T; }
@@ -1031,7 +1031,7 @@ namespace Thornswood
             lastLogged = m;
             txtStatus.Text = m;
             try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + m + Environment.NewLine); }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Shell.Log, append", ex); }
         }
 
         /// <summary>
@@ -1141,7 +1141,7 @@ namespace Thornswood
                 gone = true;
                 layer.Visibility = Visibility.Collapsed;
                 layer.Background = null;
-                try { if (player != null) { player.Clock = null; player.Close(); } } catch { }
+                try { if (player != null) { player.Clock = null; player.Close(); } } catch (Exception ex) { Swallow.Note("Shell.StartHeaderVideo, dispose", ex); }
                 Stamp("Title band: the video did not play (" + why + "), the still picture stays");
             };
             Action decide = delegate
@@ -1279,7 +1279,7 @@ namespace Thornswood
             bool want = cfg != null && cfg.MusicOn && cfg.MusicVolume > 0 && !playing
                 && win != null && win.WindowState != WindowState.Minimized;
             double vol = cfg == null ? 0 : Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
-            try { MenuMusic.Decide(want, vol); } catch { }
+            try { MenuMusic.Decide(want, vol); } catch (Exception ex) { Swallow.Note("Shell.MusicDecide", ex); }
         }
 
         static void MusicLabel()
@@ -2103,7 +2103,7 @@ namespace Thornswood
                         ico.Handle, Int32Rect.Empty,
                         System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
             }
 
             // The landscape behind the title travels the same way. Without it
@@ -2126,7 +2126,7 @@ namespace Thornswood
                     win.WindowState = win.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
                     return;
                 }
-                try { win.DragMove(); } catch { }
+                try { win.DragMove(); } catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
             };
 
             // With WindowChrome a maximized window hangs past the screen by its
@@ -2212,7 +2212,7 @@ namespace Thornswood
                     if (r != MessageBoxResult.Yes) return;
                     try { Log(DevBuild.RemoveSelf()); }
                     catch (Exception ex) { Log("Could not remove the dev build: " + ex.Message); return; }
-                    try { Voice.Stop(); } catch { }
+                    try { Voice.Stop(); } catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
                     Application.Current.Shutdown();
                 };
             }
@@ -2278,7 +2278,7 @@ namespace Thornswood
             chkLockRes.Click += delegate
             {
                 cfg.LockResolution = chkLockRes.IsChecked == true;
-                try { cfg.Save(Paths.CfgFile); } catch { }
+                try { cfg.Save(Paths.CfgFile); } catch (Exception ex) { Swallow.Note("Shell.Wire, cfg save", ex); }
                 Log(cfg.LockResolution
                     ? "Resolution locked. Play will leave it exactly as you set it."
                     : "Resolution unlocked. Play will match it to your screen.");
@@ -2333,7 +2333,7 @@ namespace Thornswood
             };
             btnOpenMine.Click += delegate
             {
-                try { System.IO.Directory.CreateDirectory(Paths.Personal); } catch { }
+                try { System.IO.Directory.CreateDirectory(Paths.Personal); } catch (Exception ex) { Swallow.Note("Shell.Wire, mkdir", ex); }
                 Open(Paths.Personal);
             };
             btnRefreshMine.Click += delegate { BuildModList(); };
@@ -2419,7 +2419,7 @@ namespace Thornswood
                     // A machine that installed rather than updated has nothing
                     // kept, so there is nothing to put back until this runs.
                     int seeded = 0;
-                    try { seeded = Keep.Seed(); } catch { }
+                    try { seeded = Keep.Seed(); } catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
                     if (seeded > 0) did.Add("kept a copy of " + seeded + " of this build's file" + (seeded == 1 ? "" : "s"));
 
                     // The one that matters: our Data\Platform files back from
@@ -2436,21 +2436,21 @@ namespace Thornswood
                         string ini = ThornIni.Ensure();
                         if (!string.IsNullOrEmpty(ini)) Log(ini);
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
 
                     try
                     {
                         int rules = Enforce.Apply();
                         if (rules > 0) did.Add(rules + " mod setting" + (rules == 1 ? "" : "s"));
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
 
                     try
                     {
                         int names = Files.FixPresetNames();
                         if (names > 0) did.Add(names + " class preset name" + (names == 1 ? "" : "s"));
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
 
                     Log(did.Count > 0
                         ? "Repair put right: " + string.Join(", ", did.ToArray()) + "."
@@ -2506,8 +2506,8 @@ namespace Thornswood
                 }
                 if (timer != null) timer.Stop();
                 Swap.Restore();
-                try { Hold.Release(); } catch { }
-                if (!playing) { try { Keep.Unpark(); } catch { } }
+                try { Hold.Release(); } catch (Exception ex) { Swallow.Note("Shell.Wire, dispose", ex); }
+                if (!playing) { try { Keep.Unpark(); } catch (Exception ex) { Swallow.Note("Shell.Wire", ex); } }
                 if (cfg.StopServerOnExit && SkyMp.Stop()) Log("Stopped the server.");
             };
 
@@ -2545,8 +2545,8 @@ namespace Thornswood
                 // with nothing on screen to say so.
                 if (updateSeenAt != DateTime.MinValue) closedForUpdate = true;
                 updateSeenAt = DateTime.MinValue;
-                try { Presence.Stop(); } catch { }
-                try { Hold.Release(); } catch { }
+                try { Presence.Stop(); } catch (Exception ex) { Swallow.Note("Shell.Wire, dispose", ex); }
+                try { Hold.Release(); } catch (Exception ex) { Swallow.Note("Shell.Wire, dispose", ex); }
                 Keep.TakeNote();
                 Swap.Restore();
                 {
@@ -2564,14 +2564,14 @@ namespace Thornswood
                 bool endedForUpdate = closedForUpdate;
                 ThreadPool.QueueUserWorkItem(delegate
                 {
-                    try { Discord.SessionEnd(playedAs, ranFor, endedForUpdate ? "update" : "quit"); } catch { }
+                    try { Discord.SessionEnd(playedAs, ranFor, endedForUpdate ? "update" : "quit"); } catch (Exception ex) { Swallow.Note("Shell.Wire, dispose", ex); }
                     // Then the logs, on the same thread so they go after the
                     // row they attach to exists. This is the only moment they
                     // can be collected: the game truncates its own logs under
                     // Data\Platform at every game start, so anything not taken
                     // now is gone. Until 22 September every report began by
                     // asking the person to go and find four files themselves.
-                    try { Discord.SessionLogs(); } catch { }
+                    try { Discord.SessionLogs(); } catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
                 });
                 // Against the character, not just the install. Skyrim keeps its
                 // own play time inside the save, and under SkyMP the character
@@ -2579,7 +2579,7 @@ namespace Thornswood
                 // so the launcher is the only thing in a position to count.
                 // The character is whoever the menu's choice file named this
                 // session; 0 when it never did, and then nothing is counted.
-                try { Chars.AddPlaytime(chosenId, DateTime.Now - playStartedAt); } catch { }
+                try { Chars.AddPlaytime(chosenId, DateTime.Now - playStartedAt); } catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
                 BuildStatRow();
                 btnPlay.Content = "PLAY";
                 btnQuitGame.Visibility = Visibility.Collapsed;
@@ -2601,7 +2601,7 @@ namespace Thornswood
                 ThreadPool.QueueUserWorkItem(delegate
                 {
                     int broke = 0;
-                    try { foreach (Issue i in Verify.Run(cfg)) if (i.Blocking) broke++; } catch { }
+                    try { foreach (Issue i in Verify.Run(cfg)) if (i.Blocking) broke++; } catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
                     if (broke == 0) return;
                     try
                     {
@@ -2611,7 +2611,7 @@ namespace Thornswood
                                 (broke == 1 ? " problem" : " problems") + ". Mods, then Fix.");
                         }));
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
                 });
 
                 // Shut Play before the window comes back, not after. Nothing
@@ -2760,7 +2760,7 @@ namespace Thornswood
                 catch { continue; }
                 if ((DateTime.Now - started).TotalSeconds < seconds) { young = true; break; }
             }
-            foreach (Process p in ps) { try { p.Dispose(); } catch { } }
+            foreach (Process p in ps) { try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Shell.JustStarted, dispose", ex); } }
             return young;
         }
 
@@ -3105,7 +3105,7 @@ namespace Thornswood
             };
             Downgrade.Start(cfg,
                 PresenceLog,
-                delegate (string s) { try { win.Dispatcher.BeginInvoke(new Action(delegate { txtDowngradeNote.Text = s; })); } catch { } },
+                delegate (string s) { try { win.Dispatcher.BeginInvoke(new Action(delegate { txtDowngradeNote.Text = s; })); } catch (Exception ex) { Swallow.Note("Shell.RunDowngrade", ex); } },
                 delegate (bool ok)
                 {
                     try
@@ -3121,7 +3121,7 @@ namespace Thornswood
                             if (ok) AskToHoldSteamUpdates();
                         }));
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Shell.RunDowngrade, own game source", ex); }
                 });
         }
 
@@ -3404,7 +3404,7 @@ namespace Thornswood
                     total++; index++;
                     if (filter.Length > 0 && name.ToLowerInvariant().IndexOf(filter) < 0) continue;
                     long kb = 0;
-                    try { kb = new FileInfo(f).Length / 1024; } catch { }
+                    try { kb = new FileInfo(f).Length / 1024; } catch (Exception ex) { Swallow.Note("Shell.BuildModList, leaf", ex); }
                     // C# 4 captures the loop variable itself, so the path has to
                     // be copied before a handler can be trusted with it.
                     string dll = f;
@@ -3435,7 +3435,7 @@ namespace Thornswood
                     total++; index++;
                     if (filter.Length > 0 && rel.ToLowerInvariant().IndexOf(filter) < 0) continue;
                     long kb = 0;
-                    try { kb = new FileInfo(f).Length / 1024; } catch { }
+                    try { kb = new FileInfo(f).Length / 1024; } catch (Exception ex) { Swallow.Note("Shell.BuildModList", ex); }
                     string full = f;
                     string relName = rel;
                     modList.Children.Add(ModRow(index, rel, !bad,
@@ -3710,7 +3710,7 @@ namespace Thornswood
                 if (win.Dispatcher.CheckAccess()) Log(m);
                 else win.Dispatcher.BeginInvoke(new Action(delegate { Log(m); }));
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Shell.SafeLog", ex); }
         }
 
         // Plugin and DLL rows go to the mod's own page. Anything the catalogue
@@ -4624,7 +4624,7 @@ namespace Thornswood
             // Written before anything else is attempted, so a failure below
             // cannot turn this into something that runs on every start.
             cfg.DisplaySet = true;
-            try { cfg.Save(Paths.CfgFile); } catch { }
+            try { cfg.Save(Paths.CfgFile); } catch (Exception ex) { Swallow.Note("Shell.AutoDisplayOnce, cfg save", ex); }
 
             // Somebody who has already played has settings of their own by now,
             // whether they chose them or not, and this is not the moment to
@@ -4954,7 +4954,7 @@ namespace Thornswood
                 bool up = false;
                 try
                 {
-                    try { System.Net.ServicePointManager.SecurityProtocol |= (System.Net.SecurityProtocolType)3072; } catch { }
+                    try { System.Net.ServicePointManager.SecurityProtocol |= (System.Net.SecurityProtocolType)3072; } catch (Exception ex) { Swallow.Note("Shell.DrawVoiceState", ex); }
                     var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(where + "/health");
                     req.Method = "GET";
                     req.Timeout = 4000;
@@ -4962,7 +4962,7 @@ namespace Thornswood
                     using (var resp = (System.Net.HttpWebResponse)req.GetResponse())
                         up = resp.StatusCode == System.Net.HttpStatusCode.OK;
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Shell.DrawVoiceState", ex); }
 
                 bool fUp = up;
                 win.Dispatcher.BeginInvoke(new Action(delegate
@@ -4977,14 +4977,14 @@ namespace Thornswood
                                 if (b.Id == "ptt") keys = "  Hold " + b.Value + " to talk.";
                             }
                         }
-                        catch { }
+                        catch (Exception ex) { Swallow.Note("Shell.DrawVoiceState", ex); }
 
                         // where is still used to probe /health; do not show the URL (#797).
                         txtVoiceState.Text = fUp
                             ? ("Running. It starts inside the game on its own." + keys)
                             : ("Not answering, so nobody will hear anybody. It is not installed on the server, or not running.");
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Shell.DrawVoiceState", ex); }
                 }));
             });
         }
@@ -5274,7 +5274,7 @@ namespace Thornswood
                 foreach (string sc in Uninstall.Scratch())
                     goes.AppendLine("    " + sc + "   (what the installer left behind)");
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Shell.DoUninstall", ex); }
 
             // The dev build is a second install in a folder of its own, beside
             // this one, with its own launcher and its own game folder. Nothing
@@ -5290,7 +5290,7 @@ namespace Thornswood
                     stays.AppendLine("    the dev build at " + DevBuild.Root +
                                      "   (its own launcher uninstalls it)");
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Shell.DoUninstall", ex); }
 
             stays.AppendLine("    Windows' own Skyrim settings and saves");
 
@@ -5356,7 +5356,7 @@ namespace Thornswood
                     ours = SkyMp.Ours() != null;
                     if (local && dir != null) node = SkyMp.NodeExe() != null;
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Shell.DrawServerState", ex); }
 
                 bool fLocal = local, fUp = up, fOurs = ours, fNode = node;
                 string fDir = dir;
@@ -5380,7 +5380,7 @@ namespace Thornswood
                         btnServerStart.IsEnabled = fLocal && !fUp;
                         btnServerStop.IsEnabled = fOurs;
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Shell.DrawServerState", ex); }
                 }));
             });
         }
@@ -5540,13 +5540,13 @@ namespace Thornswood
                 // has to be told a name, and the name cannot ship with the
                 // build because everybody owns a different microphone, so it
                 // is read off this machine and written into this machine's ini.
-                try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch { }
+                try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch (Exception ex) { Swallow.Note("Shell.Play", ex); }
                 try
                 {
                     string mic = Mics.Apply(cfg);
                     if (!string.IsNullOrEmpty(mic)) Log("Microphone: " + mic);
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Shell.Play", ex); }
 
                 if (!EnsureServer()) return;
 
@@ -5563,7 +5563,7 @@ namespace Thornswood
                 // launcher opened mid-session rewrote them under the game once
                 // (16 Sep, 19:08); it cannot now. See Hold.
                 int holding = 0;
-                try { holding = Hold.Take(PresenceLog); } catch { }
+                try { holding = Hold.Take(PresenceLog); } catch (Exception ex) { Swallow.Note("Shell.Play, dispose", ex); }
                 if (holding > 0) Log("Holding " + holding + " of " + cfg.BuildName + "'s game files while the game runs, so nothing else can change them under it.");
 
                 Log("Pointing Skyrim settings and saves at this build.");
@@ -5621,12 +5621,12 @@ namespace Thornswood
                     ids.Sort(StringComparer.Ordinal);
                     if (ids.Count > 0) onPack = "pack " + ids[ids.Count - 1];
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Shell.Play", ex); }
                 // The display mode rides along because Skyrim itself is known to
                 // go down on alt tab in exclusive fullscreen, and a crash report
                 // with no crash log needs this line to say which mode it was.
                 string mode = "";
-                try { mode = ", " + Display.Mode.ToLowerInvariant(); } catch { }
+                try { mode = ", " + Display.Mode.ToLowerInvariant(); } catch (Exception ex) { Swallow.Note("Shell.Play", ex); }
                 Log("Starting the game on launcher " + Updater.Version + ", " + onPack + mode + ".");
 
                 // The site keeps a log of who played, when, and on which
@@ -5636,20 +5636,20 @@ namespace Thornswood
                 // wrapped, so a site that is down changes nothing about
                 // playing. No character is picked yet: the menu does that, and
                 // the end carries whoever was chosen.
-                try { Discord.NewSession(); } catch { }
+                try { Discord.NewSession(); } catch (Exception ex) { Swallow.Note("Shell.Play, dispose", ex); }
                 int startedAs = chosenId;
                 ThreadPool.QueueUserWorkItem(delegate
                 {
-                    try { Discord.SessionStart(startedAs); } catch { }
+                    try { Discord.SessionStart(startedAs); } catch (Exception ex) { Swallow.Note("Shell.Play", ex); }
                 });
 
                 // "Playing Thornswood" in Discord, with the headcount and the
                 // Download and Discord buttons, for as long as the game runs.
                 // Off this thread entirely; a Discord that is not running is
                 // simply nothing said.
-                try { Presence.Start(cfg, PresenceLog); } catch { }
+                try { Presence.Start(cfg, PresenceLog); } catch (Exception ex) { Swallow.Note("Shell.Play", ex); }
 
-                try { File.WriteAllText(Paths.PlayedFile, DateTime.Now.ToString("o")); } catch { }
+                try { File.WriteAllText(Paths.PlayedFile, DateTime.Now.ToString("o")); } catch (Exception ex) { Swallow.Note("Shell.Play, write", ex); }
                 playStartedAt = DateTime.Now;
                 Stats.StartedPlaying();
                 BuildStatRow();
@@ -5666,9 +5666,9 @@ namespace Thornswood
                 Log("Failed to start: " + reason);
 
                 Swap.Restore();
-                try { Hold.Release(); } catch { }
-                try { Keep.Unpark(); } catch { }
-                try { Presence.Stop(); } catch { }
+                try { Hold.Release(); } catch (Exception releaseEx) { Swallow.Note("Shell.Play, Hold.Release", releaseEx); }
+                try { Keep.Unpark(); } catch (Exception unparkEx) { Swallow.Note("Shell.Play, Keep.Unpark", unparkEx); }
+                try { Presence.Stop(); } catch (Exception stopEx) { Swallow.Note("Shell.Play, Presence.Stop", stopEx); }
                 Keep.TakeNote();
                 playing = false;
                 headerVideoDecide();
@@ -5700,7 +5700,7 @@ namespace Thornswood
                         MessageBox.Show(win, reason, "Thornswood could not start",
                                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
-                    catch { }
+                    catch (Exception boxEx) { Swallow.Note("Shell.Play, start failed box", boxEx); }
                 }
             }
         }
@@ -5712,7 +5712,7 @@ namespace Thornswood
         /// <summary>Presence speaks from its own thread; the log lives on this one.</summary>
         static void PresenceLog(string m)
         {
-            try { win.Dispatcher.BeginInvoke(new Action(delegate { Log(m); })); } catch { }
+            try { win.Dispatcher.BeginInvoke(new Action(delegate { Log(m); })); } catch (Exception ex) { Swallow.Note("Shell.PresenceLog", ex); }
         }
 
         static void AskOnline()
@@ -5724,8 +5724,8 @@ namespace Thornswood
             {
                 Online.Count c = null;
                 Online.Count other = null;
-                try { c = Online.Ask(cfg); } catch { }
-                try { other = Online.AskOther(cfg); } catch { }
+                try { c = Online.Ask(cfg); } catch (Exception ex) { Swallow.Note("Shell.AskOnline", ex); }
+                try { other = Online.AskOther(cfg); } catch (Exception ex) { Swallow.Note("Shell.AskOnline", ex); }
                 Online.Count got = c;
                 Online.Count gotOther = other;
                 win.Dispatcher.BeginInvoke(new Action(delegate
@@ -5748,7 +5748,7 @@ namespace Thornswood
                     PaintServerChip();
                     if (playing && got != null)
                     {
-                        try { Presence.Update(got.Known ? got.Now : -1, got.Max); } catch { }
+                        try { Presence.Update(got.Known ? got.Now : -1, got.Max); } catch (Exception ex) { Swallow.Note("Shell.AskOnline", ex); }
                     }
                 }));
             });
@@ -5974,7 +5974,7 @@ namespace Thornswood
             Log("chose character " + id);
             ThreadPool.QueueUserWorkItem(delegate
             {
-                try { Voice.Reconfigure(id); } catch { }
+                try { Voice.Reconfigure(id); } catch (Exception ex) { Swallow.Note("Shell.PollChoice", ex); }
                 CheckIn(id);
             });
         }
