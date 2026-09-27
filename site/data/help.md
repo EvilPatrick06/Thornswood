@@ -31,33 +31,19 @@ Skyrim the way it was.
 
 ## Why does Windows or Defender warn about the installer?
 
-The Alpha installer is not code-signed yet. Two things follow from that, and
-neither is a virus finding.
+The installer is Authenticode-signed as **Gavin Knotts** (Azure Artifact
+Signing). Most of the time Windows lets it through without a fuss.
 
-Windows SmartScreen soft-blocks a download it does not recognise, with a blue
-**Windows protected your PC** box. Defender's machine-learning engines flag
-generic unsigned downloaders like ours on sight, whatever is inside them. Both
-are reacting to the file being new and unsigned, not to anything in it.
-
-If SmartScreen stops it, press **More info** and then **Run anyway**. That is
-all it takes.
+Brand-new downloads can still get a soft block from SmartScreen once in a
+while. Reputation follows the file hash, and a fresh build has none yet, so
+Windows may show a blue **Windows protected your PC** box even though the
+publisher is signed. If that happens, press **More info** and then **Run
+anyway**. The publisher should show as **Gavin Knotts**, not Unknown.
 
 Do not turn Defender off and do not add an exclusion for the installer. You do
 not need to, and it is not worth doing for one file. Check the file instead:
 every build's SHA-256 is printed on the [Downloads](/downloads) page next to the
-button, so you can compare it with the file you have before you run it. When a
-build has been sent to VirusTotal, that page links its report on the same hash;
-until then it says there is no report yet rather than pointing you at an empty
-one. Builds over VirusTotal's 650 MB upload cap cannot be sent there, and the
-Downloads page says so rather than implying a report is still coming.
-
-The real fix is code signing, which is being worked on. Once the installer is
-signed the warning goes on its own, and none of this is needed.
-
-Setup may also show as **Thornswood Setup** with publisher **Unknown** in the
-User Account Control prompt. That is the same unsigned state as the Defender
-line above, not a different problem, and it clears with Authenticode signing
-(#390).
+button, so you can compare it with the file you have before you run it.
 
 ## Starting it after that
 
