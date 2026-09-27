@@ -94,18 +94,22 @@
 # number was raised. Behaviour of Config.Save / Swap.Restore / Hold.Release /
 # Keep.Unpark is still log-only; stop-swallowing remains later work. Giant
 # files (Shell, Voice, Icons, Checks, ...) are left for later slices.
+#
+# Issue #461 next4 slice, 27 Sep. Converted every empty catch in the eight-
+# and nine-count files: Diag, Hold, Pages and Verify. That is 33 fewer
+# silent catches, 279 down to 246. Files that reached zero are dropped
+# from this list (an unlisted file is allowed none). No baseline number
+# was raised. Behaviour of Config.Save / Swap.Restore / Hold.Release /
+# Keep.Unpark is still log-only; stop-swallowing remains later work. Giant
+# files (Shell, Voice, Icons, Checks, ...) are left for later slices.
 Chars.cs 18
 Checks.cs 20
-Diag.cs 9
 Discord.cs 12
 Downgrade.cs 11
-Hold.cs 8
 Icons.cs 21
 Keep.cs 12
 OwnGame.cs 18
-Pages.cs 8
 Shell.cs 76
 Uninstall.cs 16
 Updater.cs 20
-Verify.cs 8
 Voice.cs 22
