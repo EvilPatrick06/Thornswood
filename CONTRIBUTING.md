@@ -186,11 +186,10 @@ the team before code; nobody settles it alone, and a Claude never does.
   Because nothing enforces it, it has to be kept by hand: on 25 Sep 35 pull
   requests were merged with their VPS build red and 18 with no build at all,
   and main went red with them. Wait for `Launcher builds` to say pass before
-  merging, every time, including your own and including a Claude's. The one
-  setting still left on is "require branches to be up to date", with no check
-  listed; Patrick turns it off with
-  `gh api -X DELETE repos/EvilPatrick06/Thornswood/branches/main/protection/required_status_checks`
-  (a Claude session was refused doing it, 27 Sep).
+  merging, every time, including your own and including a Claude's. The last
+  GitHub setting, "require branches to be up to date" with no check listed,
+  was removed on 27 Sep at Patrick's word ("we use the VPS's build checker"),
+  so GitHub requires nothing at all now.
   What changed on 23 Sep, since 22 Sep: the review requirement was one
   approving review, which Patrick could not give himself and had to override
   with `--admin` on every one of his own pull requests, and it is now zero.
