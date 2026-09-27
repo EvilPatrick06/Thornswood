@@ -445,7 +445,7 @@ if ($shipClientFiles.Count -gt 0) {
         Say '  scripts\release\Sync-Client.ps1 to put the recorded build in place, then package again.' 'Red'
         Say '  Shipping without them gives every new tester a Play button that will not press.' 'Red'
         Write-Host ''
-        throw 'the client runtime is incomplete, so this installer was not built'
+        Die 'the client runtime is incomplete, so this installer was not built'
     }
 }
 if ($machineCount) { Say ("  {0:n0} of this machine's own files, other servers' files and sign in tokens left out" -f $machineCount) 'DarkGray' }
