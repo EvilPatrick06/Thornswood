@@ -776,13 +776,12 @@ function withGalleryPending(fn) {
 // Reports against approved shots. Same deploy rule as the queue: starts [],
 // and Deploy-Docs only sends it when the VPS is missing it.
 const GREPORTS = path.join(DATA, 'gallery-reports.json');
-// What the gallery accepts and how big. Images and short screen recordings
-// (mp4, webm). /shot honours a byte range the same way public/ and /file do,
-// so Safari and iOS can play a recording once it is approved. Cap stays 25 MB
-// for now: a longer recording needs a separate decision on size, not a silent
-// raise here. The launcher AllowExt must match this list.
+// What the gallery accepts and how big. Images and screen recordings (mp4,
+// webm). /shot honours a byte range the same way public/ and /file do, so
+// Safari and iOS can play an approved recording. Cap is 100 MB for
+// recordings. The launcher AllowExt must match this list.
 const GALLERY_ALLOW = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.mp4', '.webm'];
-const GALLERY_CAP = 25 * 1024 * 1024;
+const GALLERY_CAP = 100 * 1024 * 1024;
 const KIND = {
   '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.gif':'image/gif',
   '.webp':'image/webp', '.bmp':'image/bmp',

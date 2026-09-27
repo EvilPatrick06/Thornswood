@@ -289,8 +289,7 @@ namespace Thornswood
         ///
         /// "" when the site took it, and a sentence to show the person when it
         /// did not. Allowed kinds match the site's GALLERY_ALLOW: png, jpg,
-        /// jpeg, webp, gif, mp4, webm. Cap stays 25 MB until recordings that
-        /// need more get their own decision.
+        /// jpeg, webp, gif, mp4, webm. Cap is 100 MB to match the site.
         /// </summary>
         public static string Submit(string path, string by, string note)
         {
@@ -306,9 +305,9 @@ namespace Thornswood
             if (Array.IndexOf(AllowExt, ext) < 0)
                 return "That kind of file is not allowed. Send a png, jpg, jpeg, webp, gif, mp4 or webm.";
 
-            // Cap matches the site's GALLERY_CAP (25 MB). Cut here so a huge
+            // Cap matches the site's GALLERY_CAP (100 MB). Cut here so a huge
             // file is refused before the bytes leave the machine.
-            const long Cap = 25L * 1024L * 1024L;
+            const long Cap = 100L * 1024L * 1024L;
             long len;
             try { len = new FileInfo(path).Length; }
             catch (Exception ex)
@@ -317,7 +316,7 @@ namespace Thornswood
                 return "Could not read that file.";
             }
             if (len <= 0) return "That file is empty.";
-            if (len > Cap) return "That file is over 25 MB.";
+            if (len > Cap) return "That file is over 100 MB.";
 
             byte[] data;
             try { data = File.ReadAllBytes(path); }
@@ -356,7 +355,7 @@ namespace Thornswood
 
             if (code == 401) return "The site would not take this copy's Discord link. Connect Discord again and try once more.";
             if (code == 403) return "That Discord account is not allowed to send pictures.";
-            if (code == 413) return "That file is over 25 MB.";
+            if (code == 413) return "That file is over 100 MB.";
             if (code == 415) return "That kind of file is not allowed. Send a png, jpg, jpeg, webp, gif, mp4 or webm.";
             return "The site answered " + code + ", so the picture was not kept.";
         }
@@ -438,7 +437,8 @@ namespace Thornswood
         /// </summary>
         public static string Reject(string name)
         {
-            return Staff("POST", "/api/gallery/reject", name, "reject that picture");
+            // Pending delete shares DELETE /api/gallery/approved (#774); no Reject door.
+            return Staff("DELETE", "/api/gallery/approved", name, "delete that picture");
         }
 
         /// <summary>

@@ -82,7 +82,6 @@ yes('the site serves GET /api/gallery/who',
 const staffDoors = [
   ["p === '/api/gallery/pending' && req.method === 'GET'", '/api/gallery/pending'],
   ["p === '/api/gallery/approve' && req.method === 'POST'", '/api/gallery/approve'],
-  ["p === '/api/gallery/reject' && req.method === 'POST'", '/api/gallery/reject'],
   ["p === '/api/gallery/approved' && req.method === 'DELETE'", '/api/gallery/approved'],
   ["p === '/api/gallery/reports' && req.method === 'GET'", '/api/gallery/reports'],
   ["p === '/api/gallery/report/dismiss' && req.method === 'POST'", '/api/gallery/report/dismiss']
@@ -136,8 +135,8 @@ yes('Submit allowlist matches the site images and recordings',
 
 yes('Gallery.Approve hits /api/gallery/approve',
     /Staff\("POST", "\/api\/gallery\/approve"/.test(GALLERY));
-yes('Gallery.Reject hits /api/gallery/reject',
-    /Staff\("POST", "\/api\/gallery\/reject"/.test(GALLERY));
+yes('Gallery.Reject DELETEs /api/gallery/approved for pending',
+    /Staff\("DELETE", "\/api\/gallery\/approved"/.test(GALLERY));
 yes('Gallery.TakeDown DELETEs /api/gallery/approved',
     /Staff\("DELETE", "\/api\/gallery\/approved"/.test(GALLERY));
 yes('Gallery.Queue GETs /api/gallery/pending',
