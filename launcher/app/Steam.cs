@@ -41,8 +41,8 @@ namespace Thornswood
         {
             if (cached != null) return cached;
             cached = "";
-            try { cached = FromRegistry(); } catch { }
-            if (cached.Length == 0) { try { cached = FromLoginUsers(); } catch { } }
+            try { cached = FromRegistry(); } catch (Exception ex) { Swallow.Note("Steam.Id, FromRegistry", ex); }
+            if (cached.Length == 0) { try { cached = FromLoginUsers(); } catch (Exception ex) { Swallow.Note("Steam.Id, FromLoginUsers", ex); } }
             return cached;
         }
 
@@ -72,7 +72,7 @@ namespace Thornswood
                         if (p.Length > 0 && Directory.Exists(p)) return p;
                     }
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Steam.Path_, CurrentUser registry", ex); }
             }
             try
             {
@@ -89,7 +89,7 @@ namespace Thornswood
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Steam.Path_, LocalMachine registry", ex); }
             return "";
         }
 
@@ -156,7 +156,7 @@ namespace Thornswood
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Steam.Libraries, reading libraryfolders.vdf", ex); }
             return roots;
         }
 
@@ -179,7 +179,7 @@ namespace Thornswood
                     foreach (string c in copies) if (Same(c, g)) seen = true;
                     if (!seen) copies.Add(g);
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Steam.SkyrimCopies, checking one library", ex); }
             }
             return copies;
         }

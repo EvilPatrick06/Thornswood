@@ -119,7 +119,7 @@ namespace Thornswood
                         offer = OwnGame.WhyNot(c, src) == null;
                     }
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("ShellOwnGame.OwnGameAtStart, NeedsRefresh or offer", ex); }
                 if (!refresh && !offer) return;
                 try
                 {
@@ -129,7 +129,7 @@ namespace Thornswood
                         else AskOwnGame(true);
                     });
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("ShellOwnGame.OwnGameAtStart, BeginInvoke", ex); }
             });
         }
 
@@ -198,7 +198,7 @@ namespace Thornswood
                 MessageBox.Show(win, msg, "Thornswood", MessageBoxButton.OK,
                                 MessageBoxImage.Warning);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("ShellOwnGame.OwnGameRequired, MessageBox", ex); }
             return false;
         }
 
@@ -271,7 +271,7 @@ namespace Thornswood
                 string said = null, fail = null;
                 Action<string> say = delegate(string m)
                 {
-                    try { win.Dispatcher.BeginInvoke((Action)delegate { Log(m); }); } catch { }
+                    try { win.Dispatcher.BeginInvoke((Action)delegate { Log(m); }); } catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, say BeginInvoke", ex); }
                 };
                 try { said = make ? OwnGame.Make(c, say) : OwnGame.Refresh(c, say); }
                 catch (Exception ex) { fail = ex.Message; }
@@ -368,7 +368,7 @@ namespace Thornswood
                             if (!string.IsNullOrEmpty(fw)) say(fw);
                         }
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, Firewall.Ensure", ex); }
                 }
 
                 try
@@ -401,7 +401,7 @@ namespace Thornswood
                         DrawOwnGame();
                     });
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, finish BeginInvoke", ex); }
             });
         }
 
