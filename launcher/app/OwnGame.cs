@@ -100,7 +100,7 @@ namespace Thornswood
 
         public static void Decline()
         {
-            try { Directory.CreateDirectory(Dir); File.WriteAllText(DeclinedFile, DateTime.Now.ToString("o")); } catch { }
+            try { Directory.CreateDirectory(Dir); File.WriteAllText(DeclinedFile, DateTime.Now.ToString("o")); } catch (Exception ex) { Swallow.Note("OwnGame.Decline, write", ex); }
         }
 
         /// <summary>
@@ -691,7 +691,7 @@ namespace Thornswood
                     string dest = Path.Combine(Folder, kv.Key);
                     if (File.Exists(dest)) { DropName(dest); removed++; }
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("OwnGame.Refresh, drop removed", ex); }
             }
 
             File.WriteAllLines(FilesList, lines.ToArray());
@@ -901,7 +901,7 @@ namespace Thornswood
                     if (first || !File.Exists(dest)) File.Copy(shipped, dest, true);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("OwnGame.SettleSettings, copy shipped ini", ex); }
 
             // Vortex's Thornswood profile list, for Publish-Update on a machine
             // that ships (#557). Windows' live plugins.txt follows whichever
@@ -948,7 +948,7 @@ namespace Thornswood
                     if (File.Exists(from) && !File.Exists(to)) File.Copy(from, to, false);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("OwnGame.SettleSettings, copy profile list", ex); }
 
             // Under the collection a character's saves were linked into Windows'
             // own save folder, and the link stayed there between sessions, so
@@ -963,7 +963,7 @@ namespace Thornswood
                     Directory.CreateDirectory(saves);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("OwnGame.SettleSettings, create dir", ex); }
         }
 
         // ------------------------------------------------------------ writes
@@ -981,7 +981,7 @@ namespace Thornswood
             {
                 if (File.Exists(path) && Links(path) > 1) File.Delete(path);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("OwnGame.Unshare, delete", ex); }
         }
 
         /// <summary>
@@ -1000,7 +1000,7 @@ namespace Thornswood
                 File.Delete(path);
                 File.Move(own, path);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("OwnGame.Separate, move", ex); }
         }
 
         /// <summary>
@@ -1048,7 +1048,7 @@ namespace Thornswood
             {
                 if (File.Exists(path) && Links(path) > 1) File.Delete(path);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("OwnGame.Detach, delete", ex); }
         }
 
         static int Links(string path)
@@ -1665,7 +1665,7 @@ namespace Thornswood
                     foreach (string f in Directory.GetFiles(dir, "vortex.deployment*.json"))
                         newest = Math.Max(newest, File.GetLastWriteTimeUtc(f).Ticks);
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("OwnGame.DeploymentStamp", ex); }
             }
             return newest;
         }
@@ -1711,7 +1711,7 @@ namespace Thornswood
                     if (long.TryParse(line.Substring(key.Length + 1), out v)) return v;
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("OwnGame.Recorded, reading stamp", ex); }
             return -1;
         }
 
@@ -1732,7 +1732,7 @@ namespace Thornswood
                     d[p[4]] = r;
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("OwnGame.ReadFiles", ex); }
             return d;
         }
 
@@ -1760,8 +1760,8 @@ namespace Thornswood
                     }
                 }
             }
-            catch { }
-            try { foreach (string rel in Keep.Held()) set.Add(rel); } catch { }
+            catch (Exception ex) { Swallow.Note("OwnGame.Owned", ex); }
+            try { foreach (string rel in Keep.Held()) set.Add(rel); } catch (Exception ex) { Swallow.Note("OwnGame.Owned, Keep.Held", ex); }
             try
             {
                 string list = Path.Combine(Paths.ProfileDir, "installed-into-game.txt");
@@ -1772,7 +1772,7 @@ namespace Thornswood
                         if (rel.Length > 0 && !deployed.Contains(rel)) set.Add(rel);
                     }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("OwnGame.Owned, installed-into-game list", ex); }
             return set;
         }
 
@@ -1790,7 +1790,7 @@ namespace Thornswood
                     if (s.StartsWith("*") && s.Length > 1) l.Add(s.Substring(1));
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("OwnGame.ShippedPlugins, reading plugins.txt", ex); }
             return l;
         }
 
@@ -1818,7 +1818,7 @@ namespace Thornswood
                         stack.Push(sub);
                     }
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("OwnGame.Walk, directories", ex); }
                 try
                 {
                     foreach (string f in Directory.GetFiles(dir))
@@ -1833,10 +1833,10 @@ namespace Thornswood
                             found.Ticks = fi.LastWriteTimeUtc.Ticks;
                             l.Add(found);
                         }
-                        catch { }
+                        catch (Exception ex) { Swallow.Note("OwnGame.Walk, file info", ex); }
                     }
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("OwnGame.Walk, files", ex); }
             }
             return l;
         }
