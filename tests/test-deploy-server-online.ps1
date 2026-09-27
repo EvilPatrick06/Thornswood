@@ -1,15 +1,17 @@
-<#
+﻿<#
   test-deploy-server-online.ps1
 
   Deploy-Server.ps1 treats a server with nothing listening as nobody online,
   and removes a leftover restart.json when it stops. Issue #524: the live
-  half of the same two gaps Deploy-DevGamemode closed.
+  half of the same two gaps Deploy-DevGamemode closed. Issue #520 keeps the
+  same OnlineNow listen check and puts the warn/refuse path beside it.
 
-  HOW. OnlineNow is taken out of the deploy and driven with Remote replaced
-  by a local run against a temp folder, with a real UDP socket on loopback
-  standing in for the server, and with none. StopOurs is taken out of the
-  swap block and run against the same temp folder, with everything in it
-  that stops a task or a process replaced by a stand-in.
+  HOW. The live warning block (Read-LiveOnline / Get-LiveOnline / OnlineNow)
+  is taken out of the deploy and driven with Remote replaced by a local run
+  against a temp folder, with a real UDP socket on loopback standing in for
+  the server, and with none. StopOurs is taken out of the swap block and run
+  against the same temp folder, with everything in it that stops a task or
+  a process replaced by a stand-in.
 
   Never connects to the VPS.
 #>
@@ -43,20 +45,21 @@ $src = Get-Content -LiteralPath $deployPath -Raw
 Yes 'OnlineNow asks whether anything is on the game port' (
     $src -match 'function OnlineNow' -and $src -match 'Get-NetUDPEndpoint -EA Stop')
 Yes 'OnlineNow zeroes the count when nothing is listening' (
-    $src -match 'if \(-not `\$up\) \{ 0 \}')
+    $src -match "if \(-not ``\`$up\) \{ 'ONLINE 0' \}" -or
+    $src -match "if \(-not ``\$up\) \{ 'ONLINE 0' \}" -or
+    ($src -match "if \(-not ``\`$up\)" -and $src -match "'ONLINE 0'"))
 Yes 'StopOurs removes a leftover restart.json' (
     $src -match "removed a restart\.json the old process never read")
 Yes 'tools\Deploy-Server.ps1 still forwards to scripts\deploy' (
     (Test-Path -LiteralPath $shimPath) -and
     ((Get-Content -LiteralPath $shimPath -Raw) -match 'scripts\\deploy\\Deploy-Server\.ps1'))
 
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($deployPath, [ref]$null, [ref]$null)
-$onlineAst = @($ast.FindAll({
-    param($n)
-    $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'OnlineNow'
-}, $true))
-Yes 'Deploy-Server.ps1 defines OnlineNow once' ($onlineAst.Count -eq 1)
-if ($onlineAst.Count -ne 1) { Done }
+$open  = '# ==== thornswood live deploy warning ===='
+$close = '# ==== end thornswood live deploy warning ===='
+$a = $src.IndexOf($open)
+$b = $src.IndexOf($close)
+Yes 'Deploy-Server.ps1 carries the live warning block between its markers' ($a -ge 0 -and $b -gt $a)
+if (-not ($a -ge 0 -and $b -gt $a)) { Done }
 
 $winPs = 'powershell'
 if (-not (Get-Command powershell -ErrorAction SilentlyContinue)) { $winPs = 'pwsh' }
@@ -67,8 +70,6 @@ function RunHere($text) {
 }
 function Remote($text) { return RunHere $text }
 
-Invoke-Expression $onlineAst[0].Extent.Text
-
 $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-online-' + [Guid]::NewGuid().ToString('N'))
 $box = Join-Path $work 'Thornswood-Server'
 $boxData = Join-Path $box 'data'
@@ -77,6 +78,19 @@ $Root = $box.Replace('\', '/')
 $settings = Join-Path $box 'server-settings.json'
 $online = Join-Path $boxData 'online.json'
 $udp = $null
+
+# Reload the block so '$Root' inside the remote here-string captures the temp path.
+# Get-LiveOnline closes over $Root when the remote script is built at call time
+# (single-quoted here-string uses '$Root' which expands when Get-LiveOnline runs).
+# Actually looking at the code: Remote @" ... '$Root' ... "@ - double-quote here-string
+# so $Root expands when Get-LiveOnline is *defined*? No - the function body is parsed
+# when Invoke-Expression runs, and @" "@ expands $Root at that moment.
+# So we must Invoke-Expression AFTER setting $Root to the temp box.
+Remove-Item Function:Read-LiveOnline -ErrorAction SilentlyContinue
+Remove-Item Function:Get-LiveOnline -ErrorAction SilentlyContinue
+Remove-Item Function:OnlineNow -ErrorAction SilentlyContinue
+Remove-Item Function:Warn-LiveRoom -ErrorAction SilentlyContinue
+Invoke-Expression $src.Substring($a, $b - $a)
 
 try {
     if (-not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
@@ -93,6 +107,10 @@ try {
         [IO.File]::WriteAllText($online, '{"now":3,"at":1790000000000,"restarting":false}')
         $n = OnlineNow
         Yes "a server on its port gives the online.json count (got $n)" ($n -eq 3)
+
+        $room = Get-LiveOnline
+        Yes 'Get-LiveOnline names the data folder the gamemode uses' (
+            $room.Data -replace '\\','/' -match '/data$')
 
         Remove-Item -LiteralPath $online -Force
         $n = OnlineNow
@@ -113,15 +131,18 @@ try {
         [IO.File]::WriteAllText($settings, ((@{ port = $upPort; dataDir = $elsewhere } | ConvertTo-Json -Compress)))
         $n = OnlineNow
         Yes 'a dataDir written as a full path is read where it points' ($n -eq 5)
+        $room = Get-LiveOnline
+        Yes 'and Get-LiveOnline reports that same full data path' (
+            ($room.Data -replace '\\','/') -eq ($elsewhere -replace '\\','/'))
     }
 
-    $a = $src.IndexOf('# ==== deploy-server remote blocks ====')
-    $b = $src.IndexOf('# ==== end deploy-server remote blocks ====')
-    Yes 'the remote blocks are still between their markers' ($a -ge 0 -and $b -gt $a)
-    if ($a -ge 0 -and $b -gt $a) {
+    $a2 = $src.IndexOf('# ==== deploy-server remote blocks ====')
+    $b2 = $src.IndexOf('# ==== end deploy-server remote blocks ====')
+    Yes 'the remote blocks are still between their markers' ($a2 -ge 0 -and $b2 -gt $a2)
+    if ($a2 -ge 0 -and $b2 -gt $a2) {
         $checkBlock = $null
         $swapBlock = $null
-        Invoke-Expression $src.Substring($a, $b - $a)
+        Invoke-Expression $src.Substring($a2, $b2 - $a2)
         Yes 'the swap block defines StopOurs' ($swapBlock -match 'function StopOurs')
 
         $standIns = "function Stop-ScheduledTask { }`r`n" +
@@ -169,3 +190,4 @@ finally {
 }
 
 Done
+

@@ -31,6 +31,13 @@
   start, and form ids will be wrong for every plugin after the first ESL. It is
   here for narrowing down a load failure, not for playing on.
 
+  This script does not stop the live server and does not talk to the VPS. It
+  only writes into the local build tree. People who are on live are counted and
+  warned by Deploy-Server.ps1 before that one stops anything (OnlineNow, the
+  listen check, Request-Restart, and -Minutes / -Mode / -Why / -Now). That is
+  the live half of issue #520. online.json carries a count and no names, so the
+  warning says how many are on, not who.
+
 #>
 param(
     [string]$Gamemode,
