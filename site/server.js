@@ -776,17 +776,16 @@ function withGalleryPending(fn) {
 // Reports against approved shots. Same deploy rule as the queue: starts [],
 // and Deploy-Docs only sends it when the VPS is missing it.
 const GREPORTS = path.join(DATA, 'gallery-reports.json');
-// What the gallery accepts and how big. Images first, on purpose: /shot serves
-// with a plain Content-Length and no range, which a browser needs before it
-// will play an mp4, so video waits until /shot honours a range (noted on #603).
-// 25 MB rather than the 200 MB /api/upload takes for logs: a screenshot that
-// big is a mistake, and a smaller cap is a smaller thing for the launcher's
-// door to hand a stranger who verified with a ticket.
-const GALLERY_ALLOW = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
-const GALLERY_CAP = 25 * 1024 * 1024;
+// What the gallery accepts and how big. Images and screen recordings (mp4,
+// webm). /shot honours a byte range the same way public/ and /file do, so
+// Safari and iOS can play an approved recording. Cap is 100 MB for
+// recordings. The launcher AllowExt must match this list.
+const GALLERY_ALLOW = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.mp4', '.webm'];
+const GALLERY_CAP = 100 * 1024 * 1024;
 const KIND = {
   '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.gif':'image/gif',
   '.webp':'image/webp', '.bmp':'image/bmp',
+  '.mp4':'video/mp4', '.webm':'video/webm',
   '.txt':'text/plain; charset=utf-8', '.log':'text/plain; charset=utf-8',
   '.json':'text/plain; charset=utf-8', '.ini':'text/plain; charset=utf-8',
   '.md':'text/plain; charset=utf-8', '.cfg':'text/plain; charset=utf-8'
@@ -2658,12 +2657,18 @@ async function handle(req, res) {
       return send(res, 404, 'no such picture', 'text/plain');
     }
     const st = fs.statSync(file);
-    res.writeHead(200, {
-      'Content-Type': KIND[path.extname(file).toLowerCase()] || 'application/octet-stream',
-      'Content-Length': st.size,
-      'Cache-Control': 'public, max-age=86400',
-      'X-Content-Type-Options': 'nosniff'
-    });
+    const shotKind = {
+      'content-type': KIND[path.extname(file).toLowerCase()] || 'application/octet-stream',
+      'cache-control': 'public, max-age=86400',
+      'x-content-type-options': 'nosniff'
+    };
+    // Byte range when asked: a recording will not play in Safari/iOS without it,
+    // the same reason public/ and /file already call rangeReply.
+    if (rangeReply(req, res, file, st.size, shotKind, head)) return;
+    res.writeHead(200, Object.assign({}, shotKind, {
+      'content-length': st.size,
+      'accept-ranges': 'bytes'
+    }));
     if (head) return res.end();
     return fs.createReadStream(file).pipe(res);
   }
