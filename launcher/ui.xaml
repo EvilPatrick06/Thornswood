@@ -667,7 +667,9 @@
                     </Rectangle.OpacityMask>
                   </Rectangle>
                 </Grid>
-                <Grid Margin="36,26,36,24">
+                <!-- MinHeight keeps the animated strip at full emblem-era height
+                     (~84 emblem + 26/24 margins) after the title/logo were collapsed. -->
+                <Grid Margin="36,26,36,24" MinHeight="134">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -695,41 +697,55 @@
               </Grid>
             </Border>
 
-            <!-- No ScrollViewer on Play: the page fits the normal launcher window. Other pages keep theirs. -->
-            <Grid Grid.Row="1" Margin="36,28,36,10">
+            <!-- No ScrollViewer on Play: the page fits the normal launcher window. Other pages keep theirs.
+                 Gallery fills the large empty centre; compact Ready sits on the right where Server used to. -->
+            <Grid Grid.Row="1" Margin="36,20,36,10">
                 <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="1.9*" MinWidth="330"/>
-                  <ColumnDefinition Width="30"/>
-                  <ColumnDefinition Width="1*" MinWidth="290"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="28"/>
+                  <ColumnDefinition Width="250"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0">
-                  <TextBlock Text="Ready to launch" Style="{StaticResource Eyebrow}"/>
-                  <!-- The full checklist and Scan and Fix live on the Diagnostics
-                       page now (#607). This is the one line summary of it; Recheck
-                       below runs the whole lot and updates it in place, so it does
-                       not flash or re-say itself when nothing has changed. -->
-                  <Border Style="{StaticResource Slab}" Padding="20,17">
+                <!-- From the world: fills the big middle of Play. Read only. Filled by
+                     StartGallery in Shell.cs, hidden until the first picture has loaded (#603). -->
+                <Grid x:Name="GalleryCard" Grid.Column="0" Visibility="Collapsed">
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                  </Grid.RowDefinitions>
+                  <TextBlock Grid.Row="0" Text="From the world" Style="{StaticResource Eyebrow}"/>
+                  <Border Grid.Row="1" Style="{StaticResource Slab}" Padding="0" ClipToBounds="True">
+                    <Image x:Name="GalleryImage" Stretch="UniformToFill"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                  </Border>
+                  <TextBlock x:Name="GalleryBy" Grid.Row="2" Style="{StaticResource Small}"
+                             TextWrapping="Wrap" Margin="2,8,2,0"/>
+                </Grid>
+
+                <StackPanel Grid.Column="2" VerticalAlignment="Top">
+                  <!-- Compact Ready: smaller card in the old Server column, not a wide centre strip. -->
+                  <TextBlock Text="Ready" Style="{StaticResource Eyebrow}"/>
+                  <Border Style="{StaticResource Slab}" Padding="14,11">
                     <Grid>
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                       </Grid.ColumnDefinitions>
-                      <Ellipse x:Name="DotReady" Grid.Column="0" Width="10" Height="10" Fill="{DynamicResource Faint}"
-                               VerticalAlignment="Center" Margin="0,0,15,0"/>
-                      <TextBlock x:Name="TxtReadyTitle" Grid.Column="1" Style="{StaticResource H2}" Text="Checking..."
-                                 VerticalAlignment="Center"/>
+                      <Ellipse x:Name="DotReady" Grid.Column="0" Width="8" Height="8" Fill="{DynamicResource Faint}"
+                               VerticalAlignment="Center" Margin="0,0,10,0"/>
+                      <TextBlock x:Name="TxtReadyTitle" Grid.Column="1" Text="Checking..."
+                                 FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Ink}"
+                                 TextWrapping="Wrap" VerticalAlignment="Center"/>
                       <!-- Kept collapsed; Shell still looks it up. Subtitle under the ready line is gone. -->
                       <TextBlock x:Name="TxtReadyNote" Visibility="Collapsed"/>
                       <Button x:Name="BtnCheckDiagnostics" Grid.Column="2" Style="{StaticResource Ghost}"
-                              Content="Diagnostics" Margin="14,0,0,0" VerticalAlignment="Center"
+                              Content="Diagnostics" Margin="8,0,0,0" VerticalAlignment="Center" Padding="8,4"
                               Visibility="Collapsed"/>
                     </Grid>
                   </Border>
-                </StackPanel>
 
-                <StackPanel Grid.Column="2">
                   <!-- This card told a new person to name the character after
                        themselves and to save before connecting, both left over
                        from Skyrim Together. The name is what everybody sees over
@@ -739,42 +755,23 @@
                        same name rule in its Joining items, and
                        tools/test-first-run-words.js keeps the two saying the same
                        thing. -->
-                  <StackPanel x:Name="FirstRunCard">
+                  <StackPanel x:Name="FirstRunCard" Margin="0,18,0,0">
                     <TextBlock Text="First time" Style="{StaticResource Eyebrow}"/>
-                    <Border Style="{StaticResource Slab}">
+                    <Border Style="{StaticResource Slab}" Padding="14,12">
                       <StackPanel>
-                        <TextBlock Style="{StaticResource Body}" Text="Give your character a name that belongs in Skyrim: a first name and a family name or a byname, and not your own. That name is what other people see above your head, and it cannot be changed later without a new character."/>
+                        <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap"
+                                   Text="Give your character a name that belongs in Skyrim: a first name and a family name or a byname, and not your own. That name is what other people see above your head, and it cannot be changed later without a new character."/>
                       </StackPanel>
                     </Border>
                   </StackPanel>
 
-                  <StackPanel x:Name="QuickKeysCard" Visibility="Collapsed">
+                  <StackPanel x:Name="QuickKeysCard" Visibility="Collapsed" Margin="0,18,0,0">
                     <TextBlock Text="In game" Style="{StaticResource Eyebrow}"/>
-                    <Border Style="{StaticResource Slab}" Padding="18,16">
+                    <Border Style="{StaticResource Slab}" Padding="14,12">
                       <StackPanel x:Name="QuickKeys"/>
                     </Border>
                     <Button x:Name="BtnAllControls" Style="{StaticResource Link}" Content="All of the controls"
-                            HorizontalAlignment="Left" Margin="0,10,0,0"/>
-                  </StackPanel>
-
-                  <!-- From the world: the pictures thornswood.net is showing, each
-                       taken by somebody playing, turned through one at a time. Read
-                       only. The site keeps the queue and the staff choose what goes
-                       into the gallery; this shows what /api/public already serves
-                       and sends nothing. Filled by StartGallery in Shell.cs, hidden
-                       until the first picture has loaded (#603). -->
-                  <StackPanel x:Name="GalleryCard" Margin="0,26,0,0" Visibility="Collapsed">
-                    <TextBlock Text="From the world" Style="{StaticResource Eyebrow}"/>
-                    <Border Style="{StaticResource Slab}" Padding="0">
-                      <StackPanel>
-                        <Border Height="150" ClipToBounds="True">
-                          <Image x:Name="GalleryImage" Stretch="UniformToFill"
-                                 RenderOptions.BitmapScalingMode="HighQuality"/>
-                        </Border>
-                        <TextBlock x:Name="GalleryBy" Style="{StaticResource Small}"
-                                   TextWrapping="Wrap" Margin="16,10,16,13"/>
-                      </StackPanel>
-                    </Border>
+                            HorizontalAlignment="Left" Margin="0,8,0,0"/>
                   </StackPanel>
                 </StackPanel>
             </Grid>
@@ -860,7 +857,9 @@
                                  VerticalAlignment="Center" Foreground="{DynamicResource Muted}"/>
                     </Grid>
                   </Button>
-                  <Popup x:Name="ServerPickPopup" Placement="Bottom"
+                  <!-- Placement Top keeps the list inside the launcher window (chip sits on the bottom row).
+                       Exactly two rows: Main and Dev, each with status dot + ms + awake. -->
+                  <Popup x:Name="ServerPickPopup" Placement="Top"
                          PlacementTarget="{Binding ElementName=BtnServerPick}"
                          StaysOpen="False" AllowsTransparency="True">
                     <Border Background="{DynamicResource Card}" BorderBrush="{DynamicResource Line}"
@@ -870,6 +869,8 @@
                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,0,0,2"
                                 Padding="10,8">
                           <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="DotServerMain" Width="7" Height="7"
+                                     Fill="{DynamicResource Faint}" VerticalAlignment="Center" Margin="0,0,9,0"/>
                             <TextBlock Text="Main" VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtServerMainMeta" Margin="12,0,0,0" VerticalAlignment="Center"
                                        Foreground="{DynamicResource Muted}" FontSize="11"/>
@@ -879,6 +880,8 @@
                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                                 Padding="10,8">
                           <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="DotServerDev" Width="7" Height="7"
+                                     Fill="{DynamicResource Faint}" VerticalAlignment="Center" Margin="0,0,9,0"/>
                             <TextBlock Text="Dev" VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtServerDevMeta" Margin="12,0,0,0" VerticalAlignment="Center"
                                        Foreground="{DynamicResource Muted}" FontSize="11"/>
