@@ -1083,6 +1083,37 @@ if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
     }
 }
 
+
+# ------------------------------------------------------------ publish sign gate
+# Site and feed only. Local Build-Launcher may print "not signing" and leave an
+# unsigned exe on disk; that must not reach Releases or the host feed.
+# CONTRIBUTING: only a signing machine may Ship, dev included. Soft skip is for
+# build machines, not for publish.
+. (Join-Path $Here 'Assert-PublishSigned.ps1')
+$signCfg = Join-Path $Here '..\..\tools\signing.json'
+$signWhy = Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir
+if ($signWhy) {
+    Unbump 'this machine cannot sign'
+    Die $signWhy
+}
+if (-not $ModsOnly) {
+    $pubExe = Get-LauncherExe (Join-Path $Root 'Launcher')
+    try {
+        $expectWho = Get-ExpectedSignerFragment -RepoRoot $RepoDir
+    } catch {
+        Unbump 'ExpectedSigner could not be read'
+        Die ($_.Exception.Message + ' Nothing was published.')
+    }
+    $signWhy = Get-PublishSignRefusal -Path $pubExe -ExpectedSigner $expectWho
+    if ($signWhy) {
+        Unbump 'the launcher is not signed for publish'
+        Die $signWhy
+    }
+    Say ("  publish sign gate: $(Split-Path -Leaf $pubExe) Authenticode Valid, ExpectedSigner $expectWho") 'Green'
+} else {
+    Say '  publish sign gate: signing.json ready (mods-only; launcher tip not published)' 'DarkGray'
+}
+
 # ------------------------------------------------------------ publish
 Head 'Publishing'
 # A hashtable, not an array. Splatting an array passes everything positionally,
