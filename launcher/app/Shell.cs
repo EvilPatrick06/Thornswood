@@ -586,7 +586,7 @@ namespace Thornswood
                     }
                     File.AppendAllText(Paths.LogFile, il.ToString());
                 }
-                catch { }
+                catch (Exception ilEx) { Swallow.Note("Shell.DispatcherUnhandledException, IL offsets", ilEx); }
                 fault.Handled = true;
             };
             StartStallWatch();
