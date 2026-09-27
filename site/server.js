@@ -965,7 +965,7 @@ function rangeReply(req, res, file, size, headers, head) {
     'content-range': 'bytes ' + start + '-' + end + '/' + size,
     'content-length': (end - start) + 1,
     'accept-ranges': 'bytes',
-    'cache-control': 'no-store',
+    'cache-control': headers['cache-control'] || 'no-store',
     'x-content-type-options': 'nosniff'
   }));
   if (head) { res.end(); return true; }
@@ -2658,6 +2658,47 @@ async function handle(req, res) {
     return fs.createReadStream(file).pipe(res);
   }
 
+  // --------------------------------------------------------------- ship feed
+  // Anonymous version.json and content-addressed packs for the launcher.
+  // Live at /feed/, preclear at /feed-dev/. Assets are named by lowercase
+  // sha256 only so a path cannot walk outside the folder. #649.
+  const feedVer = p.match(/^\/(feed(?:-dev)?)\/version\.json$/);
+  if (feedVer && req.method === 'GET') {
+    const dir = path.join(ROOT, feedVer[1]);
+    const file = path.join(dir, 'version.json');
+    if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
+      return send(res, 404, 'no such file', 'text/plain');
+    }
+    return send(res, 200, fs.readFileSync(file), 'application/json; charset=utf-8',
+      { 'Cache-Control': 'no-cache' });
+  }
+
+  const feedAsset = p.match(/^\/(feed(?:-dev)?)\/assets\/([0-9a-f]{64})$/);
+  if (feedAsset && req.method === 'GET') {
+    const dir = path.join(ROOT, feedAsset[1], 'assets');
+    const file = path.join(dir, feedAsset[2]);
+    if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
+      return send(res, 404, 'no such file', 'text/plain');
+    }
+    const st = fs.statSync(file);
+    /* Same Range resume as /file/: packs are tens of megabytes and a drop
+       must carry on. Cache-Control is long and immutable because the name
+       is the bytes; a new pack is a new name. */
+    const kind = {
+      'content-type': 'application/octet-stream',
+      'etag': '"' + st.size.toString(16) + '-' + Math.floor(st.mtimeMs).toString(16) + '"',
+      'last-modified': new Date(st.mtimeMs).toUTCString(),
+      'cache-control': 'public, max-age=31536000, immutable'
+    };
+    if (rangeReply(req, res, file, st.size, kind, head)) return;
+    res.writeHead(200, Object.assign({}, kind, {
+      'content-length': st.size,
+      'accept-ranges': 'bytes',
+      'x-content-type-options': 'nosniff'
+    }));
+    if (head) return res.end();
+    return fs.createReadStream(file).pipe(res);
+  }
   // --------------------------------------------------------------- uploads
   const up = p.match(/^\/up\/([A-Za-z0-9._ -]+)$/);
   if (up && req.method === 'GET') {
