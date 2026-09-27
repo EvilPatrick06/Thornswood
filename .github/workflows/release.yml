@@ -98,7 +98,7 @@ jobs:
           $out = Join-Path $env:RUNNER_TEMP 'release'
           $exe = Join-Path $out 'Thornswood.exe'
           $sums = Join-Path $out 'SHA256SUMS'
-          $notes = "Launcher exe for $tag, built on a clean runner and verified by SHA256SUMS. Ship downloads this and checks the checksum instead of compiling the shipped binary (issue #457)."
+          $notes = "Launcher exe for $tag, built on a clean runner and verified by SHA256SUMS. Ship downloads this and checks the checksum instead of compiling the shipped binary (issue #457).`n`nSource for the SkyMP files Thornswood ships: https://thornswood.net/credits#source"
           # A draft: a person promotes it, and Ship reads a draft's assets. If a
           # run for this tag already made the release, upload into it instead,
           # the same fallback Publish-Update.ps1 uses.
