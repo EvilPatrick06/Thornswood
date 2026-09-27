@@ -195,7 +195,7 @@ namespace Thornswood
             };
 
             string profile = Path.Combine(Paths.ProfileDir, "MusicBrowser");
-            try { Directory.CreateDirectory(profile); } catch { }
+            try { Directory.CreateDirectory(profile); } catch (Exception ex) { Swallow.Note("MenuMusic.CreateProfile", ex); }
 
             Microsoft.Web.WebView2.Core.CoreWebView2EnvironmentOptions opts = null;
             try
