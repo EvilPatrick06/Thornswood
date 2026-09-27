@@ -6,7 +6,8 @@
                                          baseline's own format
 
   Counts the silent catches in the launcher, file by file, and fails when any
-  file has more than scripts\dev\swallow-baseline.txt allows.
+  file has more than scripts\dev\swallow-baseline.txt allows, or fewer than it
+  allows with its line not yet lowered.
 
   WHY. Entry 239 on the To Do List. Measured on 24 Sep: 386 of the 618 catch
   clauses in launcher\app\*.cs had nothing between their braces, so a failure in
@@ -26,11 +27,19 @@
   logged, say why in a comment inside the braces. Raising a number in the
   baseline is a decision for Patrick, not a fix.
 
-  WHEN A NUMBER GOES DOWN it says so and still passes. Lower that file's line
-  in the baseline in the same pull request, so it cannot creep back up.
+  WHEN A NUMBER GOES DOWN this is red too, until that file's line in the
+  baseline is lowered to what the file now holds. Issue #756. A fall used to
+  print a yellow line and pass, which meant the lowering the rule asks for
+  could be left for somebody else: Checks.cs and Verify.cs each sat a catch
+  above their real count from #706 and #709 until the two lines were found by
+  eye and lowered in #753. Red puts the lowering in the pull request that made
+  the count fall, where it belongs, and the number cannot creep back up.
+  Lowering a line is not a decision anybody has to take: the file already
+  holds fewer, and -List prints the numbers in the baseline's own format.
 
-  Read only. Exits 1 when any file rose or the baseline cannot be read, and 0
-  otherwise. build.yml runs it on every pull request.
+  Read only. Exits 1 when any file rose, when a file fell and its line has not
+  been lowered, or when the baseline cannot be read, and 0 otherwise.
+  build.yml runs it on every pull request.
 #>
 [CmdletBinding()]
 param(
@@ -116,13 +125,19 @@ foreach ($name in @($found.Keys | Sort-Object)) {
     }
   } elseif ($now -lt $may) {
     $fell++
-    Say ("  down  {0} is at {1} and the baseline says {2}. Lower its line in swallow-baseline.txt to {1}." -f $name, $now, $may) 'Yellow'
+    Say ("  DOWN  {0} is at {1} and the baseline says {2}. Lower its line in swallow-baseline.txt to {1}." -f $name, $now, $may) 'Red'
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+      Write-Host ("::error file={0}::{1} is at {2} and swallow-baseline.txt allows {3}. Lower its line to {2} in this pull request." -f $paths[$name], $name, $now, $may)
+    }
   }
 }
 foreach ($name in @($allowed.Keys | Sort-Object)) {
   if (-not $found.ContainsKey($name) -and $allowed[$name] -gt 0) {
     $fell++
-    Say ("  gone  {0} is in the baseline and not in {1}. Take its line out." -f $name, $AppDir) 'Yellow'
+    Say ("  GONE  {0} is in the baseline and not in {1}. Take its line out." -f $name, $AppDir) 'Red'
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+      Write-Host ("::error file={0}::{1} is in swallow-baseline.txt and not in the launcher any more. Take its line out in this pull request." -f $Baseline, $name)
+    }
   }
 }
 
@@ -131,8 +146,12 @@ Say ("  {0} silent catches in {1} source files; the baseline allows {2}." -f $to
 if ($rose) {
   Say ("  {0} file(s) have more than the baseline allows. Log the new catch with" -f $rose) 'Red'
   Say '  Swallow.Note, or say why in a comment inside its braces.' 'Red'
-  exit 1
 }
-if ($fell) { Say '  Nothing rose. Lower the baseline where it says so above.' 'Green' }
-else { Say '  Nothing rose, and the baseline matches.' 'Green' }
+if ($fell) {
+  Say ("  {0} line(s) in the baseline stand above what the launcher holds. Put them" -f $fell) 'Red'
+  Say '  right in this pull request, where the count fell: .\scripts\dev\Check-Swallow.ps1 -List' 'Red'
+  Say '  prints every number in the baseline''s own format.' 'Red'
+}
+if ($rose -or $fell) { exit 1 }
+Say '  Nothing rose, and the baseline matches.' 'Green'
 exit 0

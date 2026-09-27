@@ -10,6 +10,12 @@ the VPS or to GitHub unless it says so at the top (`test-branch-rules.js
 on the VPS each night and open an issue when one fails; on a pull request,
 run the ones your change touches yourself.
 
+One of them runs on every pull request as well, in the build check
+(`.github/workflows/build.yml`): `test-ownership.js`, added there by issue
+#752 because a secret file reached main with no row on `docs\OWNERSHIP.md`
+and nothing said so for days. It takes a tenth of a second. The rest are
+minutes together, which is why they are nightly.
+
 The voice service's own harnesses stay beside it in `voice\`, and the bot's in
 `bot\`, because they are run from there.
 
