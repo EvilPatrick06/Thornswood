@@ -31,19 +31,17 @@ Skyrim the way it was.
 
 ## Why does Windows or Defender warn about the installer?
 
-The installer is Authenticode-signed as **Gavin Knotts** (Azure Artifact
-Signing). Most of the time Windows lets it through without a fuss.
+The installer is Authenticode-signed (Azure Artifact Signing). Most of the
+time Windows lets it through without a fuss.
 
-Brand-new downloads can still get a soft block from SmartScreen once in a
-while. Reputation follows the file hash, and a fresh build has none yet, so
-Windows may show a blue **Windows protected your PC** box even though the
-publisher is signed. If that happens, press **More info** and then **Run
-anyway**. The publisher should show as **Gavin Knotts**, not Unknown.
+A brand-new build can still get a soft SmartScreen ask once in a while,
+because reputation follows the file hash and a fresh hash has none yet. If
+Windows shows a blue **Windows protected your PC** box, press **More info**
+and then **Run anyway**. The publisher should not show as Unknown.
 
-Do not turn Defender off and do not add an exclusion for the installer. You do
-not need to, and it is not worth doing for one file. Check the file instead:
-every build's SHA-256 is printed on the [Downloads](/downloads) page next to the
-button, so you can compare it with the file you have before you run it.
+Do not turn Defender off and do not add an exclusion for the installer. Check
+the file instead: every build's SHA-256 is printed on the
+[Downloads](/downloads) page next to the button.
 
 ## Starting it after that
 
