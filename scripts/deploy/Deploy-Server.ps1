@@ -14,6 +14,10 @@
   Use -Mode restart when the server really is going down for a while. That one
   counts down properly and clears the room before touching anything.
 
+
+  A server that is not listening has nobody on it, whatever online.json says.
+  And the stop removes any restart.json the old process never read, so the
+  next one does not find it and count down on its own.
   The load order goes up with its paths rewritten to the VPS plugin folder,
   and any plugin it names that the box does not have goes up with it. The
   file in the build keeps this machine's paths; only the copy sent changes.
@@ -108,11 +112,37 @@ function OnlineNow {
   # The gamemode rewrites online.json whenever the number moves. No file, or an
   # unreadable one, is treated as nobody home rather than as a reason to stop:
   # this is a courtesy check, not a gate.
+  #
+  # Nothing on the game port is nobody on, whatever online.json says. The
+  # gamemode writes that file only when the count moves, so a killed or
+  # crashed process leaves its last count behind. Measured in review on
+  # 24 September: the live half of the same gap Deploy-DevGamemode closed.
+  # When the box cannot list its ports the count is kept, which errs toward
+  # a warning.
   $out = Remote @"
+`$root = '$Root'.Replace('/','\')
+`$port = 0
+`$d = 'data'
 try {
-  `$j = Get-Content '$Root/data/online.json'.Replace('/','\') -Raw -EA Stop | ConvertFrom-Json
-  `$j.now
-} catch { 0 }
+  `$s = Get-Content (Join-Path `$root 'server-settings.json') -Raw -EA Stop | ConvertFrom-Json
+  `$port = [int]`$s.port
+  if (`$s.dataDir) { `$d = [string]`$s.dataDir }
+} catch { }
+`$up = `$true
+if (`$port -gt 0) {
+  try {
+    `$u = @(Get-NetUDPEndpoint -EA Stop | Where-Object { `$_.LocalPort -eq `$port })
+    `$up = (`$u.Count -gt 0)
+  } catch { }
+}
+if (-not `$up) { 0 }
+else {
+  try {
+    `$j = Get-Content (Join-Path ([IO.Path]::Combine(`$root, `$d)) 'online.json') -Raw -EA Stop | ConvertFrom-Json
+    if (`$null -eq `$j -or `$null -eq `$j.now) { throw 'no count' }
+    `$j.now
+  } catch { 0 }
+}
 "@
   $n = 0
   foreach ($line in $out) {
@@ -251,6 +281,23 @@ function StopOurs {
   }
   for ($i = 0; $i -lt 20 -and (Held); $i++) { Start-Sleep -Milliseconds 500 }
   Start-Sleep -Seconds 2
+  # Once the process is gone, so is any restart.json it never read. The
+  # gamemode deletes that file when it reads it, and a process that is down,
+  # or whose gamemode failed at load, never does. The next one to start then
+  # finds it within a tick and a half and counts down on its own: under
+  # -Mode notice a "Pushing a server update in 1 minute" with nothing behind
+  # it, and under -Mode restart a kick a minute after boot with no restart
+  # behind it. Same gap Deploy-DevGamemode closed on 24 September.
+  $d = 'data'
+  try {
+    $s = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json
+    if ($s.dataDir) { $d = [string]$s.dataDir }
+  } catch { }
+  $rq = Join-Path ([IO.Path]::Combine($Root, $d)) 'restart.json'
+  if (Test-Path -LiteralPath $rq) {
+    try { Remove-Item -LiteralPath $rq -Force -EA Stop; 'removed a restart.json the old process never read' }
+    catch { 'COULD NOT REMOVE ' + $rq + ', so the new process will count down on its own: ' + $_.Exception.Message }
+  }
 }
 
 # Both ports, from the box itself. UDP alone is not enough: the resources port
