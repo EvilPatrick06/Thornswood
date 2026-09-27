@@ -10,16 +10,30 @@ namespace Thornswood
 {
     /// <summary>
     /// The pictures thornswood.net is showing from the world, read here so the
-    /// Play page can turn through them one at a time.
+    /// Play page can turn through them one at a time, and the one door this
+    /// end may write through: reporting a picture that should not be up.
     ///
-    /// Read only. The site keeps the queue and the staff choose what goes into
-    /// gallery.json; this end asks /api/public, the same public feed the front
-    /// page reads, and shows what is already public. Nothing here sends,
-    /// approves or writes anything back, so a launcher cannot put a picture up.
+    /// The site still keeps the queue and staff still choose what goes into
+    /// gallery.json. Rotation asks /api/public, the same public feed the front
+    /// page reads, so a launcher shows only what is already public and cannot
+    /// put a picture up.
+    ///
+    /// WHAT THE LAUNCHER MAY DO AT THE SITE, AND WHY IT IS ONLY THIS (#731).
+    /// The gallery doors that came with the site's #675 read who is asking
+    /// out of who(req) in site\server.js, which is the twa Discord cookie a
+    /// browser gets from /auth/discord/callback and nothing else. Two of them,
+    /// /api/gallery/submit and /api/gallery/report, take the launcher's signed
+    /// ticket in the query instead, verified the way /api/play/join verifies
+    /// it. So Report goes over the ticket from here, and approve, reject and
+    /// the delete of an approved shot stay on the site, where the person's
+    /// cookie is: the launcher never sees one, and forging a staff answer at
+    /// this end would be a second door into the same list.
     ///
     /// Everything fails quietly. A site that is down, a picture that will not
     /// load, an empty list: each leaves the card hidden with nothing said, the
-    /// same way the online count and the roster do.
+    /// same way the online count and the roster do. The one thing that does
+    /// speak is Report, because somebody pressed a button and is owed an
+    /// answer.
     /// </summary>
     static class Gallery
     {
@@ -32,8 +46,39 @@ namespace Thornswood
             public BitmapImage Image;        // null until Fetch has loaded it
         }
 
+        /// <summary>
+        /// What /api/gallery/who says, for whoever is asking.
+        ///
+        /// Answered is the useful one here: a site older than the gallery
+        /// doors has no such address and says nothing, and the Play page hides
+        /// Report rather than offering a button that cannot work. The rest is
+        /// the site's word about a BROWSER session, so from the launcher, which
+        /// carries no cookie, Signed and Staff read false however the person is
+        /// signed in elsewhere. Who the launcher is acting for is its ticket,
+        /// and whether that ticket is staff is the dev flag /api/play/join
+        /// already hands back (Standing.Dev), which is the same access.dev set
+        /// the site calls staff.
+        /// </summary>
+        public class Who
+        {
+            public bool Answered;
+            public bool Signed;
+            public bool CanSubmit;
+            public bool Staff;
+            public bool Admin;
+            public string Name = "";
+        }
+
         // The public document. Same host the door and the roster already ask.
         static string Feed { get { return Discord.Site + "/api/public"; } }
+
+        /// <summary>
+        /// The site page where staff look through the queue, approve or reject
+        /// what is waiting, and take an approved picture back down. The browser
+        /// is signed in to Discord there, so that page can call the doors this
+        /// end cannot.
+        /// </summary>
+        public static string StaffPage { get { return Discord.Site + "/uploads"; } }
 
         /// <summary>
         /// Blocking. Call it off the UI thread. The pictures the site is
@@ -102,6 +147,79 @@ namespace Thornswood
                 return bi;
             }
             catch { return null; }
+        }
+
+        /// <summary>
+        /// Blocking. Call it off the UI thread. What the site says the caller
+        /// may do on the gallery, or an unanswered Who when the address is not
+        /// there or the site could not be reached.
+        /// </summary>
+        public static Who AskWho()
+        {
+            var w = new Who();
+            string text = GetText(Discord.Site + "/api/gallery/who", 5000);
+            // A site without the gallery doors answers 404, which GetText
+            // brings back as "". Anything else must at least carry the fields
+            // before it is read as an answer.
+            if (text.IndexOf("\"signed\"", StringComparison.Ordinal) < 0) return w;
+            w.Answered = true;
+            w.Signed = Flag(text, "signed");
+            w.CanSubmit = Flag(text, "canSubmit");
+            w.Staff = Flag(text, "staff");
+            w.Admin = Flag(text, "admin");
+            w.Name = Str(text, "name");
+            return w;
+        }
+
+        /// <summary>
+        /// Blocking. Call it off the UI thread. Reports one approved picture to
+        /// staff, over the same signed ticket the door uses at /api/play/join.
+        /// "" when the site took it, and a sentence to show the person when it
+        /// did not.
+        ///
+        /// Nothing comes down here: the report sits in gallery-reports.json for
+        /// staff to look at, and the picture stays on the gallery until one of
+        /// them takes it off at the site.
+        /// </summary>
+        public static string Report(string name, string why)
+        {
+            if (name == null || name.Trim().Length == 0)
+                return "There is no picture on the card to report.";
+            if (!Discord.Linked)
+                return "Connect Discord first, so the site knows who is reporting this.";
+
+            string reason = why == null ? "" : why.Trim();
+            // The site keeps the first 500 characters and drops the rest, so
+            // the cut happens here rather than surprising anybody later.
+            if (reason.Length > 500) reason = reason.Substring(0, 500);
+
+            string url = Discord.Site + "/api/gallery/report?ticket=" +
+                         Uri.EscapeDataString(Discord.Ticket);
+            string body = "{\"name\":\"" + Discord.Escape(name.Trim()) + "\"" +
+                          ",\"why\":\"" + Discord.Escape(reason) + "\"}";
+
+            string reply = "";
+            int code;
+            try { code = Discord.PostJson(url, body, out reply); }
+            catch (Exception ex)
+            {
+                Swallow.Note("Gallery.Report", ex);
+                return "Could not reach thornswood.net to send that report.";
+            }
+
+            if (code == 200) return "";
+            if (code == 0) return "Could not reach thornswood.net to send that report.";
+
+            // The site says why on every refusal it means. Its own words are
+            // better than anything invented here, so they are what is shown.
+            string said = Str(reply, "error");
+            if (said.Length == 0) said = Str(reply, "message");
+            if (said.Length > 0) return said;
+
+            if (code == 401) return "The site would not take this copy's Discord link. Connect Discord again and try once more.";
+            if (code == 403) return "That Discord account is not allowed to report pictures.";
+            if (code == 404) return "That picture is not on the gallery any more.";
+            return "The site answered " + code + ", so the report was not kept.";
         }
 
         /// <summary>
@@ -204,6 +322,16 @@ namespace Thornswood
                     .Replace("\\\"", "\"")
                     .Replace("\\/", "/")
                     .Replace("\\\\", "\\");
+        }
+
+        /// <summary>
+        /// One true or false field out of a flat document. Anything that is
+        /// not the word true reads as false, so a field the site stops sending
+        /// is a no rather than a yes.
+        /// </summary>
+        static bool Flag(string json, string key)
+        {
+            return Regex.IsMatch(json, "\"" + key + "\"\\s*:\\s*true");
         }
     }
 }
