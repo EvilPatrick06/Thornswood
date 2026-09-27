@@ -196,7 +196,7 @@ namespace Thornswood
             // after an update, which is when blank icons show up.
             if (!force)
             {
-                try { if (File.Exists(exe + ".old")) force = true; } catch { }
+                try { if (File.Exists(exe + ".old")) force = true; } catch { /* .old gone mid-check: treat as ordinary start */ }
             }
 
             int changed = 0;
@@ -326,8 +326,8 @@ namespace Thornswood
                 // One .lnk at a time first: ASSOCCHANGED alone leaves blank
                 // shortcut icons after a self-update on some machines.
                 foreach (string lnk in touchedLinks)
-                    try { SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATHW | SHCNF_FLUSH, lnk, null); } catch { }
-                try { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero); } catch { }
+                    try { SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATHW | SHCNF_FLUSH, lnk, null); } catch { /* shell notify is best-effort */ }
+                try { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero); } catch { /* shell notify is best-effort */ }
                 // Same soft ask Install-Launcher uses before it ever kills Explorer.
                 AskIconCache();
             }
@@ -477,7 +477,7 @@ namespace Thornswood
                 if (!File.Exists(ie4)) return;
                 Run(ie4, "-show", 8000);
             }
-            catch { }
+            catch { /* ie4uinit missing or refused: Ensure already notified each .lnk */ }
         }
 
         static void Run(string file, string args, int waitMs)

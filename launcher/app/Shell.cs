@@ -534,7 +534,7 @@ namespace Thornswood
                     // usually runs while .old is still there; if it raced after
                     // Settle, this second pass still forces the shortcut redraw.
                     bool afterUpdate = false;
-                    try { afterUpdate = File.Exists(SelfSwap.OldOf(self)); } catch { }
+                    try { afterUpdate = File.Exists(SelfSwap.OldOf(self)); } catch { /* path unreadable: skip the second icon pass */ }
                     string said = null;
                     try { said = SelfSwap.Settle(self); } catch (Exception ex) { Swallow.Note("Shell.Run, clearing the copy the self update kept", ex); }
                     if (afterUpdate)
