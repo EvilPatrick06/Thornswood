@@ -900,8 +900,13 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
     function sum(f) {
       var h = f && /^[0-9a-f]{64}$/.test(f.sha256 || '') ? f.sha256 : '';
       if (!h) return '';
-      return '<br>SHA-256 <span style="overflow-wrap:anywhere">' + h + '</span> · ' +
-             '<a href="https://www.virustotal.com/gui/file/' + h + '" target="_blank" ' +
+      // Three lines, not four. The label rides on the same line as the hash
+      // (a non-breaking space keeps SHA-256 from being orphaned above it, the
+      // way it read before), the hash wraps within itself if the column is
+      // narrow, and the VirusTotal link stands alone on its own line rather
+      // than trailing the hash's last row after a middot.
+      return '<br>SHA-256&nbsp;<span style="overflow-wrap:anywhere">' + h + '</span>' +
+             '<br><a href="https://www.virustotal.com/gui/file/' + h + '" target="_blank" ' +
              'rel="noopener">VirusTotal report</a>';
     }
     // hidden is the payload: on the site because the installer fetches it,
