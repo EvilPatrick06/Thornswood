@@ -34,7 +34,7 @@ namespace Thornswood
         // send somebody to the collection, because that is exactly the
         // state somebody installing for the first time is in.
         public const string Collection =
-            "https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a";
+            "https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf";
 
         // Where a server on this machine lives, when the address above is this
         // machine. Blank means look in the usual two places.

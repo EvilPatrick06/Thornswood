@@ -103,7 +103,7 @@ $revision = 0
 if (-not $Collection) {
   $url = ''
   try { $url = [string](Get-Content -LiteralPath (Join-Path $Root 'config.json') -Raw | ConvertFrom-Json).CollectionUrl } catch { }
-  if (-not $url) { $url = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a' }
+  if (-not $url) { $url = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf' }
   $slug = Get-CollectionSlug $url
   $revision = Get-CollectionRevision $slug
   if ($revision -le 0) {
