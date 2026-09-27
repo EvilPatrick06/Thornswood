@@ -104,6 +104,11 @@ function Get-CollectionRevision([string]$Slug) {
   The length byte is [\x00-\x1F], a bounded class rather than a wildcard, for
   the reason Get-CollectionNewest gives: a wildcard would step over a quote
   and read a number out of a neighbouring key.
+
+  When those two attributes are missing (the ship PC after Set-Collection:
+  a locally authored vortex_collection_* with no subscriber install metadata),
+  fall back through newestFileId to collections###revisions###<id> for the
+  same slug. That is the shape live state.v2 actually has for 7essxf on One.
 #>
 function Get-CollectionRevisionFromState([string]$Slug) {
     if (-not $Slug) { return 0 }
@@ -128,6 +133,71 @@ function Get-CollectionRevisionFromState([string]$Slug) {
     }
     $best = 0
     foreach ($id in $mine) { if ($rev.ContainsKey($id) -and $rev[$id] -gt $best) { $best = $rev[$id] } }
+    if ($best -gt 0) { return $best }
+
+    # Authoring / own-collection shape (ship PC after Set-Collection): Vortex
+    # does not write collectionSlug or revisionNumber on the local
+    # vortex_collection_* mod. It does write newestFileId (the
+    # collections###revisions id) and newestVersion, and the revisions table
+    # carries the slug and the revisionNumber. Tie them the same way
+    # Get-CollectionNewest already ties revisions to a slug, but only count a
+    # revision that an installed collection mod actually points at so a
+    # second collection on the machine cannot inflate Have.
+    $revSlugRe = 'collections###revisions###([^#]+)###info###collection###slug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
+    $fileIdRe = 'mods###skyrimse###([^#]+)###attributes###newestFileId[\x00-\x1F]{1,4}(\d+)'
+    $verRe = 'mods###skyrimse###([^#]+)###attributes###newestVersion[\x00-\x1F]{1,4}"(\d+)"'
+    $revIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $fileIdMods = [Collections.Generic.Dictionary[string, Collections.Generic.List[string]]]::new([StringComparer]::Ordinal)
+    $modVer = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::Ordinal)
+    $files = @(Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)
+    foreach ($f in $files) {
+        try {
+            $txt = Get-VortexStateText $f.FullName
+            foreach ($m in [regex]::Matches($txt, $revSlugRe)) { [void]$revIds.Add($m.Groups[1].Value) }
+            foreach ($m in [regex]::Matches($txt, $fileIdRe)) {
+                $fid = $m.Groups[2].Value
+                if (-not $fileIdMods.ContainsKey($fid)) {
+                    $fileIdMods[$fid] = New-Object Collections.Generic.List[string]
+                }
+                if (-not $fileIdMods[$fid].Contains($m.Groups[1].Value)) {
+                    [void]$fileIdMods[$fid].Add($m.Groups[1].Value)
+                }
+            }
+            foreach ($m in [regex]::Matches($txt, $verRe)) {
+                $n = 0
+                if ([int]::TryParse($m.Groups[2].Value, [ref]$n)) {
+                    $id = $m.Groups[1].Value
+                    if (-not $modVer.ContainsKey($id) -or $n -gt $modVer[$id]) { $modVer[$id] = $n }
+                }
+            }
+        } catch { }
+    }
+    if ($revIds.Count -eq 0) { return 0 }
+    $revNum = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::Ordinal)
+    foreach ($f in $files) {
+        try {
+            $txt = Get-VortexStateText $f.FullName
+            foreach ($rid in $revIds) {
+                foreach ($m in [regex]::Matches($txt, ('collections###revisions###' + [regex]::Escape($rid) + '###info###revisionNumber[\x00-\x1F]{1,4}(\d+)'))) {
+                    $n = 0
+                    if ([int]::TryParse($m.Groups[1].Value, [ref]$n)) {
+                        if (-not $revNum.ContainsKey($rid) -or $n -gt $revNum[$rid]) { $revNum[$rid] = $n }
+                    }
+                }
+            }
+        } catch { }
+    }
+    foreach ($rid in $revIds) {
+        if (-not $fileIdMods.ContainsKey($rid)) { continue }
+        $n = 0
+        if ($revNum.ContainsKey($rid)) { $n = $revNum[$rid] }
+        if ($n -le 0) {
+            foreach ($mid in $fileIdMods[$rid]) {
+                if ($modVer.ContainsKey($mid) -and $modVer[$mid] -gt $n) { $n = $modVer[$mid] }
+            }
+        }
+        if ($n -gt $best) { $best = $n }
+    }
     return $best
 }
 
@@ -166,10 +236,34 @@ function Get-CollectionModIds([string]$Slug) {
     if (-not (Test-Path -LiteralPath $st)) { return , [string[]]$ids.ToArray() }
     $slugRe = 'mods###skyrimse###([^#]+)###attributes###collectionSlug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
     $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    foreach ($f in (Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)) {
+    $files = @(Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)
+    foreach ($f in $files) {
         try {
             $txt = Get-VortexStateText $f.FullName
             foreach ($m in [regex]::Matches($txt, $slugRe)) {
+                if ($seen.Add($m.Groups[1].Value)) { [void]$ids.Add($m.Groups[1].Value) }
+            }
+        } catch { }
+    }
+    if ($ids.Count -gt 0) { return , [string[]]$ids.ToArray() }
+
+    # Same authoring shape as Get-CollectionRevisionFromState: map slug to
+    # collections###revisions id, then to the mod whose newestFileId is that id.
+    $revSlugRe = 'collections###revisions###([^#]+)###info###collection###slug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
+    $fileIdRe = 'mods###skyrimse###([^#]+)###attributes###newestFileId[\x00-\x1F]{1,4}(\d+)'
+    $revIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($f in $files) {
+        try {
+            $txt = Get-VortexStateText $f.FullName
+            foreach ($m in [regex]::Matches($txt, $revSlugRe)) { [void]$revIds.Add($m.Groups[1].Value) }
+        } catch { }
+    }
+    if ($revIds.Count -eq 0) { return , [string[]]$ids.ToArray() }
+    foreach ($f in $files) {
+        try {
+            $txt = Get-VortexStateText $f.FullName
+            foreach ($m in [regex]::Matches($txt, $fileIdRe)) {
+                if (-not $revIds.Contains($m.Groups[2].Value)) { continue }
                 if ($seen.Add($m.Groups[1].Value)) { [void]$ids.Add($m.Groups[1].Value) }
             }
         } catch { }
