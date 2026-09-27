@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.IO;
 using System.Runtime.Serialization;
@@ -133,6 +133,15 @@ namespace Thornswood
         [DataMember] public string UpdateRepo = "";    // "owner/name"
         [DataMember] public string UpdateToken = "";   // read-only fine-grained PAT
         [DataMember] public string UpdateBranch = "main";
+
+        // Direct https URL for version.json on the site feed (#649). Empty
+        // means fall back to the GitHub Contents API on UpdateRepo (kept hot
+        // as rollback via Thornswood-Releases). Defaults in AfterLoad:
+        // main -> https://thornswood.net/feed/version.json ; Channel or
+        // UpdateBranch "dev" -> https://thornswood.net/feed-dev/version.json.
+        // The feed can announce a move the way updateRepo announces a rename
+        // by shipping updateFeedUrl under the old URL first.
+        [DataMember] public string UpdateFeedUrl = "";
 
         [DataMember] public string Theme = "Forge";
 
@@ -288,6 +297,16 @@ namespace Thornswood
             if (string.IsNullOrEmpty(UpdateRepo)) UpdateRepo = "EvilPatrick06/Thornswood-Releases";
             if (UpdateToken == null) UpdateToken = "";
             if (string.IsNullOrEmpty(UpdateBranch)) UpdateBranch = "main";
+            // Site feed first (#649). GitHub Contents API on UpdateRepo stays
+            // as the fallback when the site does not answer.
+            if (string.IsNullOrEmpty(UpdateFeedUrl))
+            {
+                bool feedDev = string.Equals(Channel, "dev", StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(UpdateBranch, "dev", StringComparison.OrdinalIgnoreCase);
+                UpdateFeedUrl = feedDev
+                    ? "https://thornswood.net/feed-dev/version.json"
+                    : "https://thornswood.net/feed/version.json";
+            }
             if (string.IsNullOrEmpty(Theme)) Theme = "Forge";
             if (Channel == null) Channel = "";
             if (string.IsNullOrEmpty(DiscordAppId)) DiscordAppId = "1549251507361292418";
@@ -516,6 +535,13 @@ namespace Thornswood
         // pointing at the new, then rename. Every stale copy reads it once and
         // finds its way home.
         [DataMember] public string updateRepo = "";
+
+        // Where version.json itself lives, when that is a direct https URL on
+        // the site rather than the GitHub Contents API. Same announce-a-rename
+        // pattern as updateRepo (#649): publish the new URL under the old feed
+        // first, then move. Null/empty on older feeds means keep whatever the
+        // launcher already has (including the AfterLoad default).
+        [DataMember] public string updateFeedUrl = "";
         [DataMember] public string voicePort = "";
 
         /// <summary>
