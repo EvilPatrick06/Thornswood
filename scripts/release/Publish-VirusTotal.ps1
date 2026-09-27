@@ -78,6 +78,12 @@
   connection. This runs after the file is published, so a slow upload holds
   up nothing anybody is waiting for.
 
+.PARAMETER OutcomePath
+  Optional path for a small name=value outcome file the caller can read.
+  status is sent, already-has or skipped. skipReason, when status is skipped,
+  is one of no-key, over-650mb or upload-failed (stable tokens for Website).
+  Ship does not pass this; Publish-Installer does.
+
 .EXAMPLE
   .\Publish-VirusTotal.ps1 -Path .\Thornswood-Setup.exe
 
@@ -92,7 +98,11 @@ param(
     [string]$Path,
     [string]$Sha256,
     [string]$Api = 'https://www.virustotal.com/api/v3',
-    [int]$TimeoutMinutes = 30
+    [int]$TimeoutMinutes = 30,
+    # Where this run writes a small name=value outcome the caller can read.
+    # Optional: Ship and a lone run do not pass it. Publish-Installer does, so
+    # it can mark the tip exe in files.json without parsing the printed line.
+    [string]$OutcomePath
 )
 
 Set-StrictMode -Version Latest
@@ -117,9 +127,40 @@ function Clean([string]$text) {
     return $text
 }
 
+# Small structured outcome for a caller that needs more than the printed
+# line. name=value, not JSON: Windows PowerShell's ConvertFrom-Json turns an
+# ISO-8601 stamp into a DateTime, and ConvertTo-Json then drops the Z.
+function Write-Outcome(
+    [string]$Status,
+    [string]$Sha = '',
+    [string]$ReportUrl = '',
+    [string]$SkipReason = ''
+) {
+    if (-not $OutcomePath) { return }
+    $lines = @(
+        ('status=' + $Status),
+        ('sha256=' + $Sha),
+        ('reportUrl=' + $ReportUrl),
+        ('skipReason=' + $SkipReason)
+    )
+    $dir = Split-Path -Parent $OutcomePath
+    if ($dir -and -not (Test-Path -LiteralPath $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    [IO.File]::WriteAllLines($OutcomePath, $lines, (New-Object Text.UTF8Encoding($false)))
+}
+
 # Every way out. One line, then exit 0, because nothing here may stop a
-# release that is already published.
-function Stop-Here([string]$line) {
+# release that is already published. Soft-skip reasons written for a caller
+# are the stable tokens Website #740 reads: no-key, over-650mb, upload-failed.
+function Stop-Here(
+    [string]$line,
+    [string]$Status = 'skipped',
+    [string]$Sha = '',
+    [string]$ReportUrl = '',
+    [string]$SkipReason = 'upload-failed'
+) {
+    Write-Outcome -Status $Status -Sha $Sha -ReportUrl $ReportUrl -SkipReason $SkipReason
     Say ('  VirusTotal: ' + $line) 'Yellow'
     exit 0
 }
@@ -136,12 +177,12 @@ function Get-Why($err) { return (Clean $err.Exception.GetBaseException().Message
 $script:key = ([string]$env:VT_API_KEY).Trim()
 if (-not $script:key) {
     # The normal case on every machine but the one that ships.
-    Stop-Here 'skipped (VT_API_KEY not set)'
+    Stop-Here 'skipped (VT_API_KEY not set)' -SkipReason 'no-key'
 }
 
 # ------------------------------------------------------------------ the file
 if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
-    Stop-Here ('skipped (no file at ' + $Path + ')')
+    Stop-Here ('skipped (no file at ' + $Path + ')') -SkipReason 'upload-failed'
 }
 $file = Get-Item -LiteralPath $Path
 $mb = '{0:N1} MB' -f ($file.Length / 1MB)
@@ -259,22 +300,27 @@ try {
 }
 catch {
     Stop-Here ('not sent (' + (Get-Why $_) + '). ' + $report +
-               ' says item not found until it is.')
+               ' says item not found until it is.') -Sha $sha -ReportUrl $report -SkipReason 'upload-failed'
 }
 if ($have.Code -eq 200) {
+    Write-Outcome -Status 'already-has' -Sha $sha -ReportUrl $report
     Say ('  VirusTotal: already has this build: ' + $report) 'Green'
     exit 0
 }
 if ($have.Code -ne 404) {
     $why = Get-Refusal $have
-    if ($why) { Stop-Here ('not sent (' + $why + '). ' + $report + ' says item not found until it is.') }
+    if ($why) {
+        Stop-Here ('not sent (' + $why + '). ' + $report + ' says item not found until it is.') `
+            -Sha $sha -ReportUrl $report -SkipReason 'upload-failed'
+    }
 }
 
 # ------------------------------------------------------------------ the size
 if ($file.Length -gt $UrlCap) {
     Stop-Here ('not sent (' + $mb + ', and VirusTotal takes files up to ' +
                ('{0:N0} MB' -f ($UrlCap / 1MB)) + '). ' + $report +
-               ' says item not found until this build is sent by hand.')
+               ' says item not found until this build is sent by hand.') `
+        -Sha $sha -ReportUrl $report -SkipReason 'over-650mb'
 }
 
 $url = $Api.TrimEnd('/') + '/files'
@@ -286,14 +332,17 @@ if ($file.Length -gt $PlainCap) {
     }
     catch {
         Stop-Here ('not sent (' + (Get-Why $_) + '). ' + $report +
-                   ' says item not found until it is.')
+                   ' says item not found until it is.') -Sha $sha -ReportUrl $report -SkipReason 'upload-failed'
     }
     $why = Get-Refusal $ticket
-    if ($why) { Stop-Here ('not sent (' + $why + '). ' + $report + ' says item not found until it is.') }
+    if ($why) {
+        Stop-Here ('not sent (' + $why + '). ' + $report + ' says item not found until it is.') `
+            -Sha $sha -ReportUrl $report -SkipReason 'upload-failed'
+    }
     $url = [string](Get-Field $ticket.Json 'data')
     if (-not $url) {
         Stop-Here ('not sent (VirusTotal gave no upload address). ' + $report +
-                   ' says item not found until it is.')
+                   ' says item not found until it is.') -Sha $sha -ReportUrl $report -SkipReason 'upload-failed'
     }
 }
 
@@ -304,13 +353,17 @@ try {
 }
 catch {
     Stop-Here ('not sent (' + (Get-Why $_) + '). ' + $report +
-               ' says item not found until it is.')
+               ' says item not found until it is.') -Sha $sha -ReportUrl $report -SkipReason 'upload-failed'
 }
 $why = Get-Refusal $sent
-if ($why) { Stop-Here ('not sent (' + $why + '). ' + $report + ' says item not found until it is.') }
+if ($why) {
+    Stop-Here ('not sent (' + $why + '). ' + $report + ' says item not found until it is.') `
+        -Sha $sha -ReportUrl $report -SkipReason 'upload-failed'
+}
 
 # The reply carries the analysis id. It is not read: the report address is
 # built from the hash of the file on this disk, it works as soon as the file
 # is accepted, and the engines finish in their own time.
+Write-Outcome -Status 'sent' -Sha $sha -ReportUrl $report
 Say ('  VirusTotal: sent ' + $mb + '. The report appears at ' + $report + ' within a few minutes.') 'Green'
 exit 0

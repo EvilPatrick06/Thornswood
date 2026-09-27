@@ -29,6 +29,14 @@
 
   and that the key never appears in anything printed, on any of those paths.
 
+  It also checks the small name=value outcome file Publish-VirusTotal writes
+  when -OutcomePath is set, and the end-to-end mark Publish-Installer applies
+  to a tip exe entry in files.json: sent / already-has set vtUrl and
+  vtSubmittedAt (UTC ...Z) with no vtSkipReason; over-650mb and no-key set
+  vtSkipReason and neither link field. The mark is applied by running the
+  same remote script body locally against a scratch files.json, so nothing
+  here talks to a real VPS or to VirusTotal.
+
   WHY IT IS SAFE TO RUN ANYWHERE. It never reaches VirusTotal. Every case
   points the script at -Api on 127.0.0.1, either at a port where nothing is
   listening or at a stand-in that answers the calls VirusTotal's API v3
@@ -429,6 +437,229 @@ try {
     Yes '  and nothing was sent' (@($r.Seen | Where-Object { $_ -match '^POST' }).Count -eq 0)
     NoKey '  ' $r
 
+    # ===================================== outcome file + files.json mark
+
+    function Read-Outcome([string]$p) {
+        $o = @{ status = ''; sha256 = ''; reportUrl = ''; skipReason = '' }
+        if (-not (Test-Path -LiteralPath $p)) { return [pscustomobject]$o }
+        foreach ($line in [IO.File]::ReadAllLines($p)) {
+            if ($line -match '^(?i)status=(.*)$') { $o.status = $Matches[1].Trim() }
+            elseif ($line -match '^(?i)sha256=(.*)$') { $o.sha256 = $Matches[1].Trim() }
+            elseif ($line -match '^(?i)reportUrl=(.*)$') { $o.reportUrl = $Matches[1].Trim() }
+            elseif ($line -match '^(?i)skipReason=(.*)$') { $o.skipReason = $Matches[1].Trim() }
+        }
+        return [pscustomobject]$o
+    }
+
+    # Same remote mark body Publish-Installer sends over ssh, run here against
+    # a scratch files.json. No ssh, no VPS. Mark fields arrive as name=value
+    # lines (base64), never as JSON, so vtSubmittedAt stays a string with Z.
+    function Invoke-MarkLocal([string]$filesJson, [string]$exeName, [string]$markText) {
+        $markB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($markText))
+        $fjEsc = $filesJson.Replace("'", "''")
+        $nameEsc = $exeName.Replace("'", "''")
+        $script = @"
+`$f = '$fjEsc'
+`$all = @{}
+try {
+  (Get-Content `$f -Raw | ConvertFrom-Json).PSObject.Properties |
+    ForEach-Object { `$all[`$_.Name] = `$_.Value }
+} catch { throw 'files.json unread' }
+`$name = '$nameEsc'
+if (-not `$all.ContainsKey(`$name)) { throw 'no tip exe entry' }
+`$entry = `$all[`$name]
+`$raw = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$markB64'))
+`$mark = @{}
+foreach (`$line in (`$raw -split [char]10)) {
+  `$line = `$line.Trim()
+  if (-not `$line) { continue }
+  `$eq = `$line.IndexOf('=')
+  if (`$eq -lt 1) { continue }
+  `$mark[`$line.Substring(0, `$eq)] = `$line.Substring(`$eq + 1)
+}
+function Set-Note(`$obj, [string]`$n, `$v) {
+  if (`$obj -is [hashtable]) { `$obj[`$n] = `$v; return `$obj }
+  `$p = `$obj.PSObject.Properties[`$n]
+  if (`$p) { `$p.Value = `$v } else { `$obj | Add-Member NoteProperty `$n `$v -Force }
+  return `$obj
+}
+function Clear-Note(`$obj, [string]`$n) {
+  if (`$obj -is [hashtable]) { `$obj.Remove(`$n); return `$obj }
+  if (`$obj.PSObject.Properties[`$n]) { `$obj.PSObject.Properties.Remove(`$n) }
+  return `$obj
+}
+if (`$mark.ContainsKey('vtUrl')) {
+  `$entry = Set-Note `$entry 'vtUrl' `$mark['vtUrl']
+  `$entry = Set-Note `$entry 'vtSubmittedAt' `$mark['vtSubmittedAt']
+  `$entry = Clear-Note `$entry 'vtSkipReason'
+} elseif (`$mark.ContainsKey('vtSkipReason')) {
+  `$entry = Set-Note `$entry 'vtSkipReason' `$mark['vtSkipReason']
+  `$entry = Clear-Note `$entry 'vtUrl'
+  `$entry = Clear-Note `$entry 'vtSubmittedAt'
+}
+`$all[`$name] = `$entry
+[IO.File]::WriteAllText(`$f, (`$all | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding(`$false)))
+"@
+        $tmp = Join-Path $work ('mark-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+        [IO.File]::WriteAllText($tmp, $script, (New-Object Text.UTF8Encoding($false)))
+        try {
+            & $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $tmp
+            if ($LASTEXITCODE -ne 0) { throw "mark script exited $LASTEXITCODE" }
+        }
+        finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+    }
+
+    function Get-EntryField([string]$filesJson, [string]$exeName, [string]$field) {
+        # Read the string out of the JSON text. Windows PowerShell's
+        # ConvertFrom-Json turns an ISO-8601 value into a DateTime, which is
+        # the bug the mark path avoids; the harness must not reintroduce it
+        # when checking the file it just wrote.
+        $raw = [IO.File]::ReadAllText($filesJson)
+        $blockRe = '"' + [regex]::Escape($exeName) + '"\s*:\s*\{([\s\S]*?)\n\s*\}'
+        $bm = [regex]::Match($raw, $blockRe)
+        if (-not $bm.Success) { return $null }
+        $block = $bm.Groups[1].Value
+        $fm = [regex]::Match($block, '"' + [regex]::Escape($field) + '"\s*:\s*"([^"]*)"')
+        if ($fm.Success) { return $fm.Groups[1].Value }
+        return $null
+    }
+
+    function New-FilesJson([string]$exeName, [string]$sha) {
+        $p = Join-Path $work ('files-' + [Guid]::NewGuid().ToString('N') + '.json')
+        $obj = [ordered]@{}
+        $obj[$exeName] = [ordered]@{
+            label   = 'Thornswood installer'
+            version = '9-27-2026 8:00 AM'
+            sha256  = $sha
+            note    = 'tip'
+        }
+        [IO.File]::WriteAllText($p, ($obj | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))
+        return $p
+    }
+
+    # --- outcome: no-key
+    $outNoKey = Join-Path $work 'outcome-nokey.txt'
+    $r = Invoke-Vt $null @('-Path', $small, '-OutcomePath', $outNoKey)
+    $o = Read-Outcome $outNoKey
+    Yes 'no-key outcome status is skipped' ($r.Code -eq 0 -and $o.status -eq 'skipped')
+    Yes '  skipReason is no-key' ($o.skipReason -eq 'no-key')
+    Yes '  and has no reportUrl' ([string]::IsNullOrEmpty($o.reportUrl))
+
+    # --- outcome: already-has
+    $outHave = Join-Path $work 'outcome-have.txt'
+    $port = Get-FreePort
+    $root = 'http://127.0.0.1:' + $port + '/'
+    $log = Join-Path $work ('requests-outcome-have-' + $port + '.txt')
+    $job = Start-Job -ScriptBlock $Listener -ArgumentList $port, 'present', $log, $FakeKey
+    try {
+        $up = $false
+        for ($i = 0; $i -lt 150 -and -not $up; $i++) {
+            $up = Test-Knock ($root + 'ping')
+            if (-not $up) { Start-Sleep -Milliseconds 100 }
+        }
+        $r = Invoke-Vt $FakeKey @('-Path', $small, '-Api', ($root + 'api/v3'), '-OutcomePath', $outHave)
+    }
+    finally {
+        $null = Test-Knock ($root + 'stop')
+        $null = Wait-Job $job -Timeout 15 -ErrorAction SilentlyContinue
+        Remove-Job $job -Force -ErrorAction SilentlyContinue
+    }
+    $o = Read-Outcome $outHave
+    Yes 'already-has outcome status is already-has' ($r.Code -eq 0 -and $o.status -eq 'already-has')
+    Yes '  with sha256 and reportUrl' (
+        $o.sha256 -eq $smallSha -and
+        $o.reportUrl -eq ('https://www.virustotal.com/gui/file/' + $smallSha))
+    Yes '  and no skipReason' ([string]::IsNullOrEmpty($o.skipReason))
+
+    # --- outcome: sent
+    $outSent = Join-Path $work 'outcome-sent.txt'
+    $port = Get-FreePort
+    $root = 'http://127.0.0.1:' + $port + '/'
+    $log = Join-Path $work ('requests-outcome-sent-' + $port + '.txt')
+    $job = Start-Job -ScriptBlock $Listener -ArgumentList $port, 'missing', $log, $FakeKey
+    try {
+        $up = $false
+        for ($i = 0; $i -lt 150 -and -not $up; $i++) {
+            $up = Test-Knock ($root + 'ping')
+            if (-not $up) { Start-Sleep -Milliseconds 100 }
+        }
+        $r = Invoke-Vt $FakeKey @('-Path', $small, '-Api', ($root + 'api/v3'), '-OutcomePath', $outSent)
+    }
+    finally {
+        $null = Test-Knock ($root + 'stop')
+        $null = Wait-Job $job -Timeout 15 -ErrorAction SilentlyContinue
+        Remove-Job $job -Force -ErrorAction SilentlyContinue
+    }
+    $o = Read-Outcome $outSent
+    Yes 'sent outcome status is sent' ($r.Code -eq 0 -and $o.status -eq 'sent')
+    Yes '  with sha256 and reportUrl' (
+        $o.sha256 -eq $smallSha -and
+        $o.reportUrl -eq ('https://www.virustotal.com/gui/file/' + $smallSha))
+    Yes '  and no skipReason' ([string]::IsNullOrEmpty($o.skipReason))
+
+    # --- outcome: over-650mb
+    $outHuge = Join-Path $work 'outcome-huge.txt'
+    $port = Get-FreePort
+    $root = 'http://127.0.0.1:' + $port + '/'
+    $log = Join-Path $work ('requests-outcome-huge-' + $port + '.txt')
+    $job = Start-Job -ScriptBlock $Listener -ArgumentList $port, 'missing', $log, $FakeKey
+    try {
+        $up = $false
+        for ($i = 0; $i -lt 150 -and -not $up; $i++) {
+            $up = Test-Knock ($root + 'ping')
+            if (-not $up) { Start-Sleep -Milliseconds 100 }
+        }
+        $r = Invoke-Vt $FakeKey @('-Path', $huge, '-Api', ($root + 'api/v3'), '-OutcomePath', $outHuge)
+    }
+    finally {
+        $null = Test-Knock ($root + 'stop')
+        $null = Wait-Job $job -Timeout 15 -ErrorAction SilentlyContinue
+        Remove-Job $job -Force -ErrorAction SilentlyContinue
+    }
+    $o = Read-Outcome $outHuge
+    Yes 'over-650 outcome status is skipped' ($r.Code -eq 0 -and $o.status -eq 'skipped')
+    Yes '  skipReason is over-650mb' ($o.skipReason -eq 'over-650mb')
+
+    # --- end-to-end mark on a scratch files.json (ssh stand-in = local body)
+    $exeName = 'Thornswood-Setup-20260927-0830.exe'
+    $vtUrl = 'https://www.virustotal.com/gui/file/' + $smallSha
+
+    $fj = New-FilesJson $exeName $smallSha
+    $vtAt = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture)
+    Invoke-MarkLocal $fj $exeName (('vtUrl=' + $vtUrl) + [char]10 + ('vtSubmittedAt=' + $vtAt) + [char]10 + 'clearSkip=1')
+    $gotUrl = Get-EntryField $fj $exeName 'vtUrl'
+    $gotAt = Get-EntryField $fj $exeName 'vtSubmittedAt'
+    $gotSkip = Get-EntryField $fj $exeName 'vtSkipReason'
+    Yes 'mark success sets vtUrl from measured sha' ($gotUrl -eq $vtUrl)
+    Yes '  and vtSubmittedAt as UTC Z' (
+        $gotAt -match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$' -and $gotAt -eq $vtAt)
+    Yes '  and no vtSkipReason' ($null -eq $gotSkip)
+    $rawJson = [IO.File]::ReadAllText($fj)
+    Yes '  and the JSON keeps the Z on vtSubmittedAt' ($rawJson -match ('"vtSubmittedAt"\s*:\s*"' + [regex]::Escape($vtAt) + '"'))
+
+    $fj2 = New-FilesJson $exeName $smallSha
+    Invoke-MarkLocal $fj2 $exeName 'vtSkipReason=over-650mb'
+    Yes 'mark over-650 sets vtSkipReason' ((Get-EntryField $fj2 $exeName 'vtSkipReason') -eq 'over-650mb')
+    Yes '  and sets neither vtUrl nor vtSubmittedAt' (
+        $null -eq (Get-EntryField $fj2 $exeName 'vtUrl') -and
+        $null -eq (Get-EntryField $fj2 $exeName 'vtSubmittedAt'))
+
+    $fj3 = New-FilesJson $exeName $smallSha
+    Invoke-MarkLocal $fj3 $exeName 'vtSkipReason=no-key'
+    Yes 'mark no-key sets vtSkipReason' ((Get-EntryField $fj3 $exeName 'vtSkipReason') -eq 'no-key')
+    Yes '  and sets neither vtUrl nor vtSubmittedAt' (
+        $null -eq (Get-EntryField $fj3 $exeName 'vtUrl') -and
+        $null -eq (Get-EntryField $fj3 $exeName 'vtSubmittedAt'))
+
+    $fj4 = New-FilesJson $exeName $smallSha
+    Invoke-MarkLocal $fj4 $exeName 'vtSkipReason=upload-failed'
+    Invoke-MarkLocal $fj4 $exeName (('vtUrl=' + $vtUrl) + [char]10 + ('vtSubmittedAt=' + $vtAt))
+    Yes 'mark already-has/success clears vtSkipReason' ($null -eq (Get-EntryField $fj4 $exeName 'vtSkipReason'))
+    Yes '  and keeps vtUrl + vtSubmittedAt' (
+        (Get-EntryField $fj4 $exeName 'vtUrl') -eq $vtUrl -and
+        (Get-EntryField $fj4 $exeName 'vtSubmittedAt') -eq $vtAt)
+
+
     # ============================================ Publish-Installer calls it
 
     Yes 'Publish-Installer.ps1 is there' (Test-Path -LiteralPath $Installer)
@@ -436,8 +667,13 @@ try {
     Yes 'it calls Publish-VirusTotal.ps1' ($pub -match "Publish-VirusTotal\.ps1'\)\s*-Path\b")
     Yes '  with the exe and the hash it measured' (
         $pub -match "Publish-VirusTotal\.ps1'\)\s+-Path\s+\`$exeItem\.FullName\s+-Sha256\s+\`$exeSha")
+    Yes '  and passes -OutcomePath for the mark' ($pub -match '-OutcomePath\s+\$vtOutcome')
     Yes '  and still prints the report address itself' (
         $pub -match 'VirusTotal: https://www\.virustotal\.com/gui/file/')
+    Yes '  and marks files.json with name=value, not JSON' (
+        $pub -match 'vtUrl=' -and $pub -match 'vtSubmittedAt=' -and
+        $pub -match 'vtSkipReason=' -and $pub -match 'markB64' -and
+        $pub -match '-split \[char\]10')
     # After the exe and the payload are on the VPS and files.json is written.
     # A publish that has happened is not undone by a report that is missing.
     $at = $pub.IndexOf('& (Join-Path $Here ''Publish-VirusTotal.ps1'')')
