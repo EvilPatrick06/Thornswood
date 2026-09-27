@@ -238,7 +238,7 @@ namespace Thornswood
                         if (t.Exception != null)
                             why = t.Exception.GetBaseException().Message;
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("MenuMusic.CreateAsyncFault", ex); }
                     Stamp("Menu music: WebView2 environment failed (" + why + "); trying default");
                     host.Dispatcher.BeginInvoke(new Action(delegate
                     {
