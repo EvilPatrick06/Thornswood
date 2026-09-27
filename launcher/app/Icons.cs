@@ -35,10 +35,18 @@ namespace Thornswood
     static class Icons
     {
         const int SHCNE_ASSOCCHANGED = 0x08000000;
+        const int SHCNE_UPDATEITEM = 0x00002000;
         const uint SHCNF_IDLIST = 0x0000;
+        const uint SHCNF_PATHW = 0x0005;
+        const uint SHCNF_FLUSH = 0x1000;
 
         [DllImport("shell32.dll", CharSet = CharSet.Auto)]
         static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
+
+        // Same entry point, path form: telling Explorer about one .lnk is what
+        // makes a blank shortcut redraw without clearing the whole icon cache.
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        static extern void SHChangeNotify(int eventId, uint flags, string item1, string item2);
 
         /// <summary>
         /// The running launcher, wherever it is and whatever it is called. It
@@ -163,14 +171,36 @@ namespace Thornswood
         /// Points every shortcut that runs this launcher at the current icon.
         /// Returns how many it had to change, so a start that changed nothing
         /// can stay quiet. Never throws and never restarts anything.
+        ///
+        /// Pass force after a self-update: Windows can blank the cached picture
+        /// for a shortcut even when IconLocation still names the right file, and
+        /// a quiet Ensure then skips the notify that would redraw it. Force
+        /// rewrites the same IconLocation, tells Explorer about each .lnk, and
+        /// asks ie4uinit to refresh, without killing Explorer (Repair still does
+        /// that from Settings when somebody needs the heavy pass).
         /// </summary>
         public static int Ensure()
+        {
+            return Ensure(false);
+        }
+
+        /// <summary>See <see cref="Ensure()"/>.</summary>
+        public static int Ensure(bool force)
         {
             string icon = IconFile();
             string exe = LauncherExe;
             string want = (icon == null ? exe : icon) + ",0";
 
+            // SelfSwap keeps the previous exe as Thornswood.exe.old until this
+            // window has drawn. Seeing that file means this is the first start
+            // after an update, which is when blank icons show up.
+            if (!force)
+            {
+                try { if (File.Exists(exe + ".old")) force = true; } catch { /* .old gone mid-check: treat as ordinary start */ }
+            }
+
             int changed = 0;
+            var touchedLinks = new List<string>();
             object shell = null;
             Type shellType = null;
             try
@@ -227,6 +257,7 @@ namespace Thornswood
                                 else if (Rename(shellType, shell, sc, dest, want))
                                 {
                                     Kill(lnk);
+                                    touchedLinks.Add(dest);
                                     changed++;
                                 }
                                 continue;
@@ -235,7 +266,10 @@ namespace Thornswood
                             bool touched = false;
                             string now = t.InvokeMember("IconLocation", BindingFlags.GetProperty,
                                                         null, sc, null) as string;
-                            if (!string.Equals(now, want, StringComparison.OrdinalIgnoreCase))
+                            // Force rewrites even when the string matches: the
+                            // .lnk timestamp and a shell notify are what clear a
+                            // blank cache entry after SelfSwap replaced the exe.
+                            if (force || !string.Equals(now, want, StringComparison.OrdinalIgnoreCase))
                             {
                                 t.InvokeMember("IconLocation", BindingFlags.SetProperty,
                                                null, sc, new object[] { want });
@@ -254,6 +288,7 @@ namespace Thornswood
                             if (touched)
                             {
                                 t.InvokeMember("Save", BindingFlags.InvokeMethod, null, sc, null);
+                                touchedLinks.Add(lnk);
                                 changed++;
                             }
                         }
@@ -268,7 +303,14 @@ namespace Thornswood
                     // the Start menu gets one it never had. Only the places
                     // the build wants one in; never the taskbar pins.
                     if (!found && spot.MakeIfMissing && File.Exists(exe))
-                        if (Make(shellType, shell, Path.Combine(place, Name), exe, want)) changed++;
+                    {
+                        string made = Path.Combine(place, Name);
+                        if (Make(shellType, shell, made, exe, want))
+                        {
+                            touchedLinks.Add(made);
+                            changed++;
+                        }
+                    }
                 }
             }
             catch { }
@@ -279,10 +321,16 @@ namespace Thornswood
 
             if (icon != null) Sweep(icon);
 
-            // Telling the shell an association changed is what makes Explorer
-            // redraw. Unlike clearing the cache it costs nothing and nobody
-            // sees their taskbar disappear.
-            if (changed > 0) try { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero); } catch { }
+            if (changed > 0 || force)
+            {
+                // One .lnk at a time first: ASSOCCHANGED alone leaves blank
+                // shortcut icons after a self-update on some machines.
+                foreach (string lnk in touchedLinks)
+                    try { SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATHW | SHCNF_FLUSH, lnk, null); } catch { /* shell notify is best-effort */ }
+                try { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero); } catch { /* shell notify is best-effort */ }
+                // Same soft ask Install-Launcher uses before it ever kills Explorer.
+                AskIconCache();
+            }
             return changed;
         }
 
@@ -294,7 +342,7 @@ namespace Thornswood
         /// </summary>
         public static string Repair()
         {
-            int changed = Ensure();
+            int changed = Ensure(true);
 
             int gone = 0;
             bool restarted = false;
@@ -415,6 +463,21 @@ namespace Thornswood
             {
                 if (made != null) try { Marshal.ReleaseComObject(made); } catch { }
             }
+        }
+
+        /// <summary>
+        /// Asks Windows to rebuild what it has drawn for icons, without killing
+        /// Explorer. Matches Install-Launcher.ps1's soft pass.
+        /// </summary>
+        static void AskIconCache()
+        {
+            try
+            {
+                string ie4 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "ie4uinit.exe");
+                if (!File.Exists(ie4)) return;
+                Run(ie4, "-show", 8000);
+            }
+            catch { /* ie4uinit missing or refused: Ensure already notified each .lnk */ }
         }
 
         static void Run(string file, string args, int waitMs)
