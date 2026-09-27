@@ -34,14 +34,16 @@ the branch `thornswood/engine-changes`. Anybody can read it or download it,
 with no account.
 
 The six client files are built from commit
-[`d0006351`](https://github.com/EvilPatrick06/skymp/tree/d00063515242e0ad1a9affb690c83194acf2c937).
+[`9732d2cc`](https://github.com/EvilPatrick06/skymp/tree/9732d2cce1ff39829f22c8f4892f9f2a51df39bc).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `f926944b`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...d0006351)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...9732d2cc)
 is the difference between the two.
 
 The server's engine, `scam_native.node`, is built from
-[that same commit](https://github.com/EvilPatrick06/skymp/tree/d00063515242e0ad1a9affb690c83194acf2c937).
+[commit `d0006351`](https://github.com/EvilPatrick06/skymp/tree/d00063515242e0ad1a9affb690c83194acf2c937),
+an earlier commit on the same branch; what lies between the two changes only the
+client and a unit test.
 It was built and sent to our server on 27 September, and it is what the server
 runs now.
 
