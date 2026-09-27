@@ -457,6 +457,8 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   const roadmap = await get(port, '/roadmap');
   yes('the roadmap is still built by the page, not filled in here',
       roadmap.text.indexOf('<div class="wrap" id="pagebody"></div>') >= 0);
+  yes('an async public page does not flash the home landing while it loads',
+      roadmap.text.indexOf('<div id="landing" hidden>') >= 0);
 
   let api = {};
   try { api = JSON.parse((await get(port, '/api/page/rules')).text); } catch (e) { }
