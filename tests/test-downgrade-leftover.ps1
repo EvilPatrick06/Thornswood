@@ -94,6 +94,7 @@ function Get-Member([string]$all, [string]$signature) {
 $wanted = [ordered]@{
     'ClearLeftover' = 'static bool ClearLeftover(string folder, int part, Action<string> log, Action<string> status)'
     'MarkerIs'      = 'static bool MarkerIs(string folder, string manifest)'
+    'WriteMarker'   = 'static void WriteMarker(string folder, string manifest)'
     'FolderSize'    = 'static long FolderSize(string folder)'
     'Run'           = 'static bool Run(Config cfg, Action<string> log, Action<string> status)'
 }
@@ -128,6 +129,8 @@ using System.IO;
 
 namespace Probe
 {
+    static class Swallow { public static void Note(string where, Exception e) { } }
+
     public static class Downgrade
     {
 __LIFTED__
@@ -135,7 +138,7 @@ __LIFTED__
 }
 '@
 $body = New-Object System.Text.StringBuilder
-foreach ($k in 'ClearLeftover', 'MarkerIs', 'FolderSize') { [void]$body.AppendLine($lifted[$k]) }
+foreach ($k in 'ClearLeftover', 'MarkerIs', 'WriteMarker', 'FolderSize') { [void]$body.AppendLine($lifted[$k]) }
 # Since #343 an early stop goes through Stop, which also hides the Downgrade
 # card's bar. Stop is lifted as it is; the bar is a stand-in that counts.
 $stop = Get-Member $text 'static bool Stop(string why, Action<string> log, Action<string> status)'
@@ -213,6 +216,37 @@ try {
     #    way here.
     $d = New-Depot 'depot_489831' '8442952117333549665'
     Yes 'a marker for this manifest counts as this build, so Run keeps it' (Marker-Is $d '8442952117333549665')
+
+    # 3b. And the files it was written for have to still be there. A marker on
+    #     its own said the part was downloaded even when the folder had been
+    #     emptied since, by a disk cleaner or by somebody clearing space part
+    #     way through eleven gigabytes. Run then skipped the part rather than
+    #     fetching it again, and the copy put nothing of it into the game while
+    #     the exe out of another part made the game read as 1.6.1170. That is
+    #     the mixed build the clearing is for.
+    function Write-Marker([string]$folder, [string]$manifest) {
+        $T.GetMethod('WriteMarker', $flags).Invoke($null, @($folder, $manifest)) | Out-Null
+    }
+    $d = New-Depot 'depot_489831b' ''
+    Write-Marker $d '8442952117333549665'
+    Yes 'the marker Run writes records the manifest and the size' (
+        (Marker-Is $d '8442952117333549665') -and
+        ([IO.File]::ReadAllText((Join-Path $d '.thornswood-complete')).Trim() -match '^8442952117333549665\s+13312$'))
+    Yes 'and it is still not another build''s' (-not (Marker-Is $d '1914580699073641964'))
+    [IO.File]::SetAttributes((Join-Path $d 'Data\Leftover - Another Build.bsa'), [IO.FileAttributes]::Normal)
+    [IO.File]::Delete((Join-Path $d 'Data\Skyrim - Textures0.bsa'))
+    Yes 'a folder that has lost files since is not taken as downloaded' (-not (Marker-Is $d '8442952117333549665'))
+    Yes 'so it goes to ClearLeftover and Steam is asked for the part again' ((Clear-Leftover $d 1) -and -not (Test-Path -LiteralPath $d))
+
+    # 3c. A marker from before the size was written holds the manifest alone.
+    #     One of those still counts, as long as the folder has something in it.
+    $d = New-Depot 'depot_489833b' '1914580699073641964'
+    Yes 'a marker from an older launcher, with no size in it, still counts' (Marker-Is $d '1914580699073641964')
+    foreach ($f in [IO.Directory]::GetFiles($d, '*', 'AllDirectories')) {
+        [IO.File]::SetAttributes($f, [IO.FileAttributes]::Normal)
+        if (-not $f.EndsWith('.thornswood-complete')) { [IO.File]::Delete($f) }
+    }
+    Yes 'and an emptied folder with one of those does not' (-not (Marker-Is $d '1914580699073641964'))
 
     # 4. Nothing there.
     Clear-Said

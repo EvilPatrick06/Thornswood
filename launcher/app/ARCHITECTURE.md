@@ -306,7 +306,7 @@ are not (`ClientRuntime.cs:206 Heal()`).
 **Downgrade** (Downgrade.cs). Puts the Steam copy back on Skyrim 1.6.1170
 through Steam's own console when Steam has updated it, after asking, since it
 takes over Steam's window and the keyboard; the question shows the three
-console lines (`Downgrade.cs:154 Commands()`). The game folder is then
+console lines (`Downgrade.cs:164 Commands()`). The game folder is then
 refreshed from it.
 
 **SteamUpdates** (SteamUpdates.cs, with ShellSteamUpdates.cs for its
