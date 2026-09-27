@@ -115,7 +115,7 @@ packs and as its own asset named in the feed's `clientRuntime`
 - **The installer.** `Package-Thornswood.ps1` builds `Thornswood-Setup` and
   `Publish-Installer.ps1` copies it over ssh into `C:\Thornswood-Docs\files`
   on the VPS (`Publish-Installer.ps1:45,157,198`). The setup program asks the
-  site's `/api/payload` for the newest `Thornswood-Setup-*.zip`, its size and
+  site's `/api/payload` for `Thornswood-Setup.zip` (or a leftover stamped tip), its size and
   sha256 (`site/server.js:2247-2275`); people get it from
   `https://thornswood.net/downloads` (`server.js:2214-2215`). A dev release
   never touches the installer (`Ship.ps1:975-978`).

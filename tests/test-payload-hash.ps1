@@ -73,8 +73,8 @@ try {
     # opens it as a zip; what is measured is the bytes.
     $site = Join-Path $work 'files'
     New-Item -ItemType Directory -Path $site -Force | Out-Null
-    $exeOut = 'Thornswood-Setup-20260924-0100.exe'
-    $zipOut = 'Thornswood-Setup-20260924-0100.zip'
+    $exeOut = 'Thornswood-Setup.exe'
+    $zipOut = 'Thornswood-Setup.zip'
     $zipPath = Join-Path $site $zipOut
     $bytes = New-Object byte[] (2MB + 17)
     (New-Object Random 173).NextBytes($bytes)
@@ -236,8 +236,8 @@ process.stdout.write(sent === null ? 'NOTHING SENT' : sent);
         ('{"' + $zipOut + '":{"sha256":"' + $want.ToUpper() + '"}}'), $noBom)
     Yes 'an upper case hash in files.json goes out lower case' ((Field (Parse (Reply $up)) 'sha256') -ceq $want.ToLower())
 
-    # With -KeepOld two zips sit there. The newest is the one offered, and the
-    # hash has to be that one's, not the other's.
+    # Two zips sit there (stable tip plus a leftover stamped name). The newest
+    # is the one offered, and the hash has to be that one's, not the other's.
     $two = Join-Path $work 'files-two'
     New-Item -ItemType Directory -Path $two -Force | Out-Null
     $olderName = 'Thornswood-Setup-20260920-0900.zip'

@@ -2476,7 +2476,7 @@ async function handle(req, res) {
     let best = null;
     try {
       for (const name of fs.readdirSync(FILES)) {
-        if (!/^Thornswood-Setup-.*\.zip$/i.test(name)) continue;
+        if (!/^Thornswood-Setup(?:-\d{8}-\d{4})?\.zip$/i.test(name)) continue;
         const st = fs.statSync(path.join(FILES, name));
         if (!st.isFile()) continue;
         if (!best || st.mtimeMs > best.at) best = { name, at: st.mtimeMs, size: st.size };
