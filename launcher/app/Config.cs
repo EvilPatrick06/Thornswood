@@ -115,10 +115,6 @@ namespace Thornswood
         // can say something useful even when the server does not announce itself.
         [DataMember] public int MaxOnline = 25;
 
-        // Skyrim Together took a password on its join screen and the launcher
-        // typed it in for people. SkyMP has no such screen: the client reads an
-        // address and a port and connects. Kept so an older config.json still
-        // loads, and as somewhere to put one if a gate is added later.
         [DataMember] public long ExpectedExeBytes = 37157144;
 
         // Set these to turn on updates. Leave blank and the launcher never
@@ -523,7 +519,6 @@ namespace Thornswood
 
         [DataMember] public string serverPort = "";
         [DataMember] public int maxOnline;
-        [DataMember] public string serverPassword = "";
 
         // Where updates come from, and where voice lives. These used to be
         // boxes on the Settings page, which was wrong twice over: they are not
