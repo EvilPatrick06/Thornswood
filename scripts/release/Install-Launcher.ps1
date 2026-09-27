@@ -28,6 +28,9 @@ param(
     [Parameter(Mandatory = $true)][string]$Root,
     # The folder Build-Launcher.ps1 wrote Thornswood.exe into (its -OutDir).
     [string]$From,
+    # When set, do not Stop-Game / Stop-Launcher. Ship -DryRun uses this so a
+    # dry run can still put the built exe in place without closing a running game.
+    [switch]$NoClose,
     [switch]$NoPause
 )
 
@@ -65,10 +68,22 @@ $oldExe = Join-Path $outDir 'SkyrimTogether.exe'
 # Moved here from Build-Launcher.ps1 as it was. Stop-Game matches SkyrimSE and
 # skse64_loader by name alone, wherever they run from, so installing the dev
 # build still closes a game running from the play install. Publish-Update.ps1
-# makes the same call during every Ship, so scoping it here alone would not
-# save that game; it is left for a change of its own.
-$null = Stop-Game -Root $Root
-$null = Stop-Launcher -Root $Root
+# makes the same call during every Ship; Ship -DryRun passes -NoClose to both
+# so a dry run closes neither (issue #494).
+if ($NoClose) {
+    $running = @(Get-GameProcesses -Root $Root)
+    if ($running.Count -gt 0) {
+        $names = ($running | ForEach-Object { $_.ProcessName } | Sort-Object -Unique) -join ', '
+        Say ("  -NoClose: would close running game (" + $names + "), leaving it alone") 'Yellow'
+    }
+    $found = Get-LauncherProcesses -Root $Root
+    if ($found.Mine.Count -gt 0) {
+        Say '  -NoClose: would close the launcher, leaving it alone' 'Yellow'
+    }
+} else {
+    $null = Stop-Game -Root $Root
+    $null = Stop-Launcher -Root $Root
+}
 
 # Copied rather than compiled in place, so csc never has to write over a
 # launcher that is still running. Copy-Item keeps the file's own write time,
