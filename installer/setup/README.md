@@ -41,6 +41,30 @@ On the machine of anybody installing Thornswood for the first time.
 Ship rebuilds them when it is given `-Package`; a dev Ship never touches the
 installer. The address it downloads from is written into `Bootstrap.cs`.
 
+### The VirusTotal report the Downloads page links to
+
+The page prints the exe's SHA-256 with a link to VirusTotal's report on that
+hash, and a file nobody has sent to VirusTotal has no report, so that link
+landed on an "item not found" page from 24 September until the upload was
+wired up. `Publish-Installer.ps1` now sends the exe through
+`scripts\release\Publish-VirusTotal.ps1`, which Ship can also call on its own
+for any file:
+
+```
+.\scripts\release\Publish-VirusTotal.ps1 -Path <file>
+.\scripts\release\Publish-VirusTotal.ps1 -Path <file> -Sha256 <hex>
+```
+
+It reads the key from the environment variable `VT_API_KEY` and from nowhere
+else. That is set on the machine that ships. A machine without it, which is
+every other machine and every pull request build, prints
+`VirusTotal: skipped (VT_API_KEY not set)` and carries on: the upload cannot
+fail a publish, so the worst a missing key costs is a link that says item not
+found until somebody sends that build by hand. VirusTotal takes files up to
+650 MB, so a one-file installer above that is refused by VirusTotal rather
+than by us, and the line says so. `tests\test-virustotal-upload.ps1` holds the
+skip and the fail-soft paths to what is written here.
+
 ### What Windows shows, for the Downloads page and the FAQ to match
 
 `Thornswood-Setup.exe` is not signed yet (that is issue #390), so until it is,
