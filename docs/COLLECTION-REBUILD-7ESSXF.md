@@ -91,10 +91,14 @@ left in place here because whether each is still needed depends on how 7essxf
 bakes MCM Helper's flags and rules, which cannot be read from a cloud runner:
 
 - `Fix-QuickLoot.ps1` inserts `MCMHelper.esp` into the server list after
-  `SunHelmDiseases.esp`. SunHelm is out of the collection, so that default
-  anchor no longer exists and the script would stop if run as is. Its premise
-  ("MCMHelper.esp is not ESL flagged, so it takes a real index") is the pre-light
-  state; confirm against 7essxf.
+  `SkyUI_SE.esp`, which is `MCMHelper.esp`'s own master and so the earliest
+  place the entry is legal: the server's reader refuses a plugin whose masters
+  are absent. The default anchor was `SunHelmDiseases.esp` until the SunHelm
+  removal (issue #480) left that plugin in no load order, and the script would
+  have stopped on it. It still stops when the master is not in the list, with
+  a message naming what to run first. Its premise ("MCMHelper.esp is not ESL
+  flagged, so it takes a real index") is the pre-light state; confirm against
+  7essxf.
 - `Enable-MCM.ps1` clears `SkyUI_SE.esp`'s light flag so `MCMHelper.esp` can take
   a normal index server side. Confirm whether 7essxf already carries MCM Helper
   in its load-order rules before running.

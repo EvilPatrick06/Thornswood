@@ -21,7 +21,7 @@ set up today. Read the header before running anything.
 | `Clean-Downloads.ps1` | Moved clutter out of one Downloads folder. | A personal clean up. |
 | `Fix-Voice.ps1` | Got the voice service running on the VPS on 13 September. | `Install-Voice.ps1` does that job. |
 | `Check-RosterScript.ps1` | Parsed the roster script before it was sent. | Named a path on one machine; `Check-Roster.ps1` is the live one. |
-| `Add-TempleRespawn.ps1` | Installed Respawn - Death Overhaul. | That mod is out (the known issues page). |
+| `Add-TempleRespawn.ps1` | Installed Respawn - Death Overhaul. | That mod is out (the known issues page). **It refuses to run.** It throws at the top rather than putting a plugin back that no live load order carries. |
 | `Add-JContainers.ps1` | Installed JContainers for SunHelm's meters. | SunHelm is out. |
 | `Remove-BodyMods.ps1`, `Remove-FomodLeftovers.ps1` | Cleaned up after the 13 September body mod install. | Done. |
 | `Fix-PluginProblems.ps1` | Removed CFTO-JK-Patch.esp and RaceMenuPlugin.esp. | **Do not run it.** The JK's patch went into the collection on 15 September, so this would now take out a plugin that belongs. |
