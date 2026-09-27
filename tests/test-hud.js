@@ -277,6 +277,8 @@ if (alert) {
         /m === 60 \|\| m === 30/.test(tick));
     yes('S9 and the ten second mark is deliberately left to chat',
         tick.indexOf('alertAll') !== -1 && !/m === 10/.test(tick));
+    yes('S9 update mode is left to chat, no banner for a launcher that may be up to date (#610)',
+        /restart\.mode !== 'update'/.test(tick));
   }
 }
 
