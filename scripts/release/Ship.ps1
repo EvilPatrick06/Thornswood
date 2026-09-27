@@ -197,11 +197,13 @@
   says which.
 
 .PARAMETER SkipRemirror
-  Ships without mirroring the tip onto the site. The feed a launcher reads
-  first is then the one the site already had, and the GitHub feed is the
-  fallback that keeps working, so this is for a release whose pack urls are
-  still GitHub's, or for getting a tip out while the VPS is unreachable.
-  .\scripts\release\Publish-SiteFeed.ps1 does it afterwards.
+  Ships without mirroring the tip onto the site, so thornswood.net goes on
+  serving whichever feed it last had. That is not the same as the GitHub
+  fallback: a launcher falls back only when the site feed does not answer at
+  all, and a site feed that answers with yesterday's release is the release
+  people are offered. So this is for getting a tip out while the VPS is
+  unreachable, or for a release nobody is waiting on, and
+  .\scripts\release\Publish-SiteFeed.ps1 is the thing to run as soon as it can be.
 
 .PARAMETER SkipLauncherUpdate
   Ships without checking that the feed a launcher reads offers this release and
@@ -1418,7 +1420,8 @@ if (-not $DryRun) {
     }
     else {
         if ($SkipRemirror) {
-            Say '  -SkipRemirror, so the site still serves the feed it had. Launchers fall back to GitHub.' 'Yellow'
+            Say '  -SkipRemirror, so the site goes on serving the feed it had, and anybody reading' 'Yellow'
+            Say '  it is offered that release rather than this one.' 'Yellow'
             Say ("  .\scripts\release\Publish-SiteFeed.ps1$chanArg   mirrors it") 'DarkGray'
         } else {
             Invoke-PostShip 'the site feed mirror' 'Publish-SiteFeed.ps1' `

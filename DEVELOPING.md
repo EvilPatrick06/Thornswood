@@ -112,8 +112,10 @@ go and get it:
 - `scripts\release\Publish-SiteFeed.ps1` mirrors the tip onto the site, so
   `thornswood.net/feed` serves the new `version.json` and the assets it names.
   That is the feed a launcher asks first since the #649 host cutover
-  (`docs\FEED.md`); until it is mirrored, launchers fall back to the GitHub
-  feed. The dev channel mirrors to `/feed-dev`.
+  (`docs\FEED.md`), and a launcher falls back to the GitHub feed only when the
+  site feed does not answer at all, so an unmirrored site feed offers people
+  the release it last held rather than this one. The dev channel mirrors to
+  `/feed-dev`.
 - `scripts\release\Update-Launcher.ps1` reads that feed back: it offers this
   release, its `launcherUrl` answers, and the install on this machine is
   running the exe that shipped. A `-ModsOnly` release skips it, having
