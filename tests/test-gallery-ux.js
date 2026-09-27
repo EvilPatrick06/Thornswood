@@ -1,0 +1,66 @@
+﻿// test-gallery-ux.js
+//
+// Public gallery themed like the site, home link + slideshow, staff queue and
+// reports inbox only on the hub. Per-image report stays on live public shots.
+const fs = require('fs');
+const path = require('path');
+const ROOT = path.join(__dirname, '..');
+const HOME = path.join(ROOT, 'site', 'public', 'home.html');
+const HUB = path.join(ROOT, 'site', 'public', 'index.html');
+const CR = String.fromCharCode(13);
+
+let pass = 0, fail = 0;
+function yes(what, cond) {
+  if (cond) { pass++; console.log('PASS  ' + what); }
+  else { fail++; console.log('FAIL  ' + what); }
+}
+
+const home = fs.readFileSync(HOME, 'utf8').split(CR).join('');
+const hub = fs.readFileSync(HUB, 'utf8').split(CR).join('');
+
+const barA = home.indexOf('<nav class="top" id="nav">');
+const barB = home.indexOf('</nav>', barA);
+const bar = home.slice(barA, barB);
+yes('top bar links to /gallery', /href="\/gallery">Gallery</.test(bar));
+yes('footer Community links to /gallery',
+    /<h4>Community<\/h4>\s*<a href="\/gallery">Gallery<\/a>/.test(home));
+
+yes('home has gallery slideshow shell', /id="galleryShow"/.test(home));
+yes('home has See the gallery link', /See the gallery/.test(home));
+yes('landing build starts a rotating slideshow',
+    /setInterval\(function \(\) \{ go\(\(i \+ 1\) % shots\.length\); \}, 5000\)/.test(home));
+yes('slideshow respects reduced motion',
+    /prefers-reduced-motion: reduce/.test(home) &&
+    /if \(!reduce && shots\.length > 1\)/.test(home));
+
+yes('gal-box uses stone panel, not iron slab',
+    /\.gal-box\{[^}]*background:var\(--stone\)/.test(home));
+yes('gal-box heading is gold carve',
+    /\.gal-box h2\{[^}]*color:var\(--gold\)/.test(home));
+
+yes('public gallery keeps Send a picture for members',
+    /id="galSubmit"/.test(home) && /Send a picture/.test(home));
+yes('public gallery keeps per-image Report',
+    /data-galreport/.test(home));
+yes('public gallery has no Waiting for approval queue',
+    !/Waiting for approval/.test(home) && !/gal-pending/.test(home));
+yes('public gallery has no Reports inbox',
+    !/id="galReports"/.test(home) && !/gal-reports/.test(home));
+yes('public gallery has no staff Delete on cards',
+    !/data-galdel/.test(home));
+yes('public gallery copy says staff tools are not here',
+    /Staff queue, approve, reject, delete and the reports inbox live on the/.test(home));
+
+yes('hub Gallery still has queue and reports mounts',
+    /id="galqueue"/.test(hub) && /id="galreports"/.test(hub));
+yes('hub still calls gallery pending and reports APIs',
+    /\/api\/gallery\/pending/.test(hub) && /\/api\/gallery\/reports/.test(hub));
+
+yes('new gallery copy has no em dash', !/[\u2014\u2013]/.test(
+  (home.match(/Send a picture[\s\S]{0,400}/) || [''])[0] +
+  (home.match(/gal-show[\s\S]{0,200}/) || [''])[0]
+));
+
+console.log('');
+console.log(pass + ' passed, ' + fail + ' failed');
+process.exit(fail ? 1 : 0);
