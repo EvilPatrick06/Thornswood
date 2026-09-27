@@ -230,7 +230,7 @@ namespace Thornswood
                 "F1 turns them off and on again. Like F2, it belongs to the game client and cannot be moved."),
 
             new HelpItem("If it breaks", "Your settings look wrong",
-                "Settings, Repair, with Skyrim closed. It puts this build's own settings and load order back to exactly what shipped. Your character is not touched, because it lives on the server."),
+                "Diagnostics, Scan and Fix, Repair, with Skyrim closed. It puts this build's own settings and load order back to exactly what shipped. Your character is not touched, because it lives on the server."),
 
             new HelpItem("If it breaks", "Updates stopped arriving",
                 "Updates come from a public feed and need no key on your machine. If the launcher says too many update checks have come from your connection, that clears by itself, usually within the hour. If it says the access token was refused, take the newest installer from thornswood.net. Anything else means the feed itself is not answering, which is not your end."),
