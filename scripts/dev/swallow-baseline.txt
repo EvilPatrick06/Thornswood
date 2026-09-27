@@ -45,9 +45,29 @@
 # that class on its own. The third in ShellUninstall.cs, the fault handler's
 # write to the log, says why in a comment too, because it is the log that
 # failed. Still 376, and none was raised.
+#
+# Issue #729, 27 Sep. Two files fell on main and their lines here were left
+# where they were, so the checker printed "down" on every run. Both drops are
+# real, and neither was traded for a swallow somewhere else, so both lines go
+# down to what the files hold now:
+#
+#   Checks.cs 21 to 20, with the Diagnostics rewrite (#709). The Ready to
+#   launch Mod list row counted blocking issues inside
+#   try { foreach (Issue i in Verify.Run()) ... } catch { }. That row reads
+#   Verify.LastIssues now, and the one catch left on its fallback path,
+#   catch { issues = new List<Issue>(); }, has a body, so it does not count.
+#
+#   Verify.cs 9 to 8, with the Fix that restores missing collection plugins
+#   (#706). The catch { } around FetchPlugin's "was it already in Data" read
+#   and its copy of the old file into Profile\Replaced became two tries, each
+#   logging with Swallow.Note.
+#
+# That is the whole of it: two numbers lowered, no launcher file touched and
+# nothing raised. The 20 left in Checks.cs and the 8 left in Verify.cs are
+# still entry 239's work, and each one converted lowers these lines again.
 Art.cs 1
 Chars.cs 18
-Checks.cs 21
+Checks.cs 20
 ClientRuntime.cs 3
 Config.cs 1
 DevBuild.cs 4
@@ -83,6 +103,6 @@ Swap.cs 6
 ThornIni.cs 1
 Uninstall.cs 16
 Updater.cs 20
-Verify.cs 9
+Verify.cs 8
 Voice.cs 22
 Waiting.cs 2
