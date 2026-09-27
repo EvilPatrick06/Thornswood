@@ -1,7 +1,7 @@
 // test-download-hash.js
 //
 // The Downloads page prints the installer's SHA-256 beside its size and date,
-// with a link to VirusTotal's report on that hash.
+// and links VirusTotal's report on that hash only when there is one.
 //
 // From the To Do List, entry 176: "the SHA-256 beside the size and date, and a
 // link to the VirusTotal report for that hash rather than instructions for
@@ -9,6 +9,17 @@
 // already, removed at Patrick's request on 20 September (2fa5dbe). The hash and
 // the link were the two things still missing, and nothing computed a hash for
 // the page to print.
+//
+// THE LINK WAS A PROMISE NOBODY KEPT, and that half is what changed on
+// 27 September. It was built from the hash alone, and nothing uploads the
+// installer to VirusTotal, so on every current build "VirusTotal report" led to
+// VirusTotal's item-not-found page. Checked live that day against
+// Thornswood-Setup-20260927-0257.exe. So files.json now says whether a report
+// exists, on the exe's own entry, as either vtUrl (the address for that file's
+// own hash) or vtSubmittedAt (when it was sent there). With neither, the page
+// prints the hash and says there is no report yet. The address is always built
+// from the hash the site already has, so no value in files.json can point the
+// link at somewhere else.
 //
 // THREE HALVES, AND THIS RUNS ALL THREE, because the value has to survive the
 // whole trip and a field name spelt differently at any one stop drops it
@@ -140,9 +151,12 @@ async function main() {
     const jsonFile = (p, fb) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fb; } };
     const listFiles = new Function('fs', 'path', 'FILES', 'jsonFile',
       lf[0] + '\nreturn listFiles;')(fs, path, files, jsonFile);
-    const out = listFiles();
-    const by = {};
-    for (const f of out) by[f.name] = f;
+    const list = () => {
+      const by = {};
+      for (const f of listFiles()) by[f.name] = f;
+      return by;
+    };
+    const by = list();
     const e = by['Thornswood-Setup-20260924-0100.exe'] || {};
     yes('/api/public carries the exe\'s sha256', e.sha256 === good);
     yes('in lower case, the way VirusTotal writes it in its addresses', e.sha256 === good.toLowerCase());
@@ -154,6 +168,38 @@ async function main() {
         e.label === 'Thornswood installer' && e.version === 'launcher 1.2.3' &&
         e.size === exeBytes.length && e.hidden === false &&
         (by['Thornswood-Setup-20260924-0100.zip'] || {}).hidden === true);
+
+    // The VirusTotal report, which only exists once somebody has sent the file
+    // there. files.json is the only thing that says so, and the address always
+    // comes from the hash rather than from the file.
+    const report = 'https://www.virustotal.com/gui/file/' + good;
+    const withMeta = (extra) => {
+      const m = JSON.parse(JSON.stringify(meta));
+      Object.assign(m['Thornswood-Setup-20260924-0100.exe'], extra);
+      fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(m));
+      return (list()['Thornswood-Setup-20260924-0100.exe'] || {}).vt;
+    };
+    yes('no report yet: nothing for the page to link', e.vt === '');
+    yes('vtUrl for this file\'s own hash: the report goes out',
+        withMeta({ vtUrl: report }) === report);
+    yes('and in upper case, the way somebody would paste it out of Get-FileHash',
+        withMeta({ vtUrl: 'https://www.virustotal.com/gui/file/' + good.toUpperCase() }) === report);
+    yes('vtSubmittedAt on its own is enough, and the address is built here',
+        withMeta({ vtSubmittedAt: '2026-09-27 03:10' }) === report);
+    yes('a vtUrl for somebody else\'s hash is refused',
+        withMeta({ vtUrl: 'https://www.virustotal.com/gui/file/' + sha(Buffer.from('another file')) }) === '');
+    yes('and so is a vtUrl pointing anywhere but VirusTotal',
+        withMeta({ vtUrl: 'https://evil.example/gui/file/' + good }) === '');
+    yes('and so is one that is not an address at all',
+        withMeta({ vtUrl: '"><img src=x onerror=alert(1)>' }) === '');
+    yes('an entry with no hash never gets a report, whatever it claims',
+        (function () {
+          const m = JSON.parse(JSON.stringify(meta));
+          m['Thornswood-Setup-20260924-0100.zip'].vtSubmittedAt = 'yesterday';
+          fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(m));
+          return (list()['Thornswood-Setup-20260924-0100.zip'] || {}).vt === '';
+        })());
+    fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(meta));
   }
 
   // ------------------------------------------------ home.html /downloads
@@ -172,9 +218,9 @@ async function main() {
     }
     const H = sha(Buffer.from('thornswood'));
     const VT = 'https://www.virustotal.com/gui/file/' + H;
-    const exe = (size, hash) => ({ name: 'Thornswood-Setup-20260924-0100.exe', size: size,
+    const exe = (size, hash, vt) => ({ name: 'Thornswood-Setup-20260924-0100.exe', size: size,
       at: 2, hidden: false, label: 'Thornswood installer', version: '2026-09-24 01:00',
-      note: '', sha256: hash });
+      note: '', sha256: hash, vt: vt === undefined ? '' : vt });
     const zip = (hidden) => ({ name: 'Thornswood-Setup-20260924-0100.zip', size: 385154603,
       at: 1, hidden: hidden, label: 'payload', version: '', note: '', sha256: '' });
     // The small print under the button, the paragraph with the size in it.
@@ -185,10 +231,10 @@ async function main() {
     };
 
     const cases = [
-      ['one file build', [exe(560000000, H)]],
+      ['one file build', [exe(560000000, H, VT)]],
       ['stub with a hidden payload, which is what the site serves now',
-        [exe(400000, H), zip(true)]],
-      ['stub with the payload beside it', [exe(400000, H), zip(false)]]
+        [exe(400000, H, VT), zip(true)]],
+      ['stub with the payload beside it', [exe(400000, H, VT), zip(false)]]
     ];
     for (const c of cases) {
       const html = await render({ files: c[1] });
@@ -201,11 +247,29 @@ async function main() {
           p.indexOf('href="' + VT + '"') >= 0);
       yes(c[0] + ': which opens somewhere else rather than leaving the page',
           /href="https:\/\/www\.virustotal\.com\/gui\/file\/[0-9a-f]{64}" target="_blank" rel="noopener"/.test(p));
+      yes(c[0] + ': and the line above the button names both checks',
+          /SHA-256 and VirusTotal report below/.test(html));
     }
+
+    // A hash and no report, which is every build until somebody uploads one.
+    // The hash still shows, and the page says there is no report rather than
+    // linking VirusTotal's item-not-found page.
+    const waiting = await render({ files: [exe(560000000, H)] });
+    const wp = small(waiting);
+    yes('a build nobody has sent to VirusTotal: the SHA-256 still shows',
+        wp.indexOf('SHA-256') >= 0 && wp.indexOf(H) >= 0);
+    yes('and it is not linked to a report that does not exist',
+        !/virustotal\.com/i.test(waiting) && waiting.indexOf('href="' + VT + '"') < 0);
+    yes('and the page says so in one line, without inventing a finding',
+        /No VirusTotal report for this build yet/.test(wp) &&
+        !/(clean|no detections|\d+ *\/ *\d+ *engines)/i.test(wp));
+    yes('and the line above the button names only the check that is there',
+        /The SHA-256 below lets you check/.test(waiting) &&
+        !/VirusTotal report below/.test(waiting));
 
     const none = await render({ files: [exe(560000000, '')] });
     yes('no hash on the site: the size and date still show', / MB/.test(small(none)));
-    yes('and no SHA-256 line and no link to nothing',
+    yes('and no SHA-256 line and nothing about VirusTotal at all',
         none.indexOf('SHA-256') < 0 && !/virustotal/i.test(none));
     const old = await render({ files: [exe(560000000, undefined)] });
     yes('a site older than this, with no sha256 field at all, shows no hash either',
@@ -213,6 +277,19 @@ async function main() {
     const bad = await render({ files: [exe(560000000, '"><img src=x onerror=alert(1)>')] });
     yes('a value that is not a SHA-256 is never put in the page',
         bad.indexOf('<img') < 0 && bad.indexOf('SHA-256') < 0 && !/virustotal/i.test(bad));
+    // A site that has not been redeployed sends no vt field, and one that has
+    // been tampered with can send anything. Neither gets a link.
+    const stale = await render({ files: [exe(560000000, H, undefined)] });
+    yes('a site older than this, with a hash and no vt field, links nothing',
+        stale.indexOf(H) >= 0 && !/virustotal\.com/i.test(stale));
+    for (const nasty of ['javascript:alert(1)', '" onmouseover="alert(1)',
+                         'https://www.virustotal.com/gui/file/' + sha(Buffer.from('somebody else')),
+                         'https://evil.example/gui/file/' + H]) {
+      const out = await render({ files: [exe(560000000, H, nasty)] });
+      yes('a vt value the site should never have sent is not linked: ' + nasty.slice(0, 32),
+          out.indexOf('href="' + nasty + '"') < 0 && out.indexOf(nasty) < 0 &&
+          /No VirusTotal report for this build yet/.test(out));
+    }
   }
 
   // ----------------------------------------------- what the entry ruled out

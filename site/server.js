@@ -699,13 +699,39 @@ function listFiles() {
     // files.json says about it.
     const script = /[.](ps1|psm1|cmd|bat|py|sh)$/i.test(name);
     // The installer's SHA-256, which Publish-Installer writes, so the Downloads
-    // page can print it beside the size and date and link VirusTotal's report
-    // on it (To Do entry 176). Only a well formed hash goes out, in lower case
-    // because Get-FileHash writes upper and the page builds an address from it.
+    // page can print it beside the size and date (To Do entry 176). Only a well
+    // formed hash goes out, in lower case because Get-FileHash writes upper and
+    // the page builds an address from it.
     const sha256 = String(m.sha256 || '').toLowerCase();
+    const hash = /^[0-9a-f]{64}$/.test(sha256) ? sha256 : '';
+    // And the VirusTotal report for that build, but only once there is one.
+    //
+    // The page used to build https://www.virustotal.com/gui/file/<hash> from
+    // the hash alone and call it "VirusTotal report". Nothing uploads the
+    // installer to VirusTotal, so on every current build that link landed on
+    // VirusTotal's item-not-found page: the site was promising a report that
+    // did not exist. Checked live on 27 September against
+    // Thornswood-Setup-20260927-0257.exe.
+    //
+    // So the link now comes from files.json and nowhere else. Whoever publishes
+    // the installer sets one of two fields on the exe's entry after the upload
+    // to VirusTotal has actually gone through:
+    //
+    //   vtUrl         the report address, which must be
+    //                 https://www.virustotal.com/gui/file/<this file's sha256>
+    //   vtSubmittedAt when the file was sent there, any non-empty string
+    //
+    // Either one means a report exists and the address is built from the hash
+    // here rather than taken from the file, so a wrong or hostile value in
+    // files.json cannot put a link to somewhere else on the page. Without
+    // either field the page shows the hash and says there is no report yet.
+    const vtWant = hash ? 'https://www.virustotal.com/gui/file/' + hash : '';
+    const vtUrl = String(m.vtUrl || '').trim().toLowerCase();
+    const vtAt = String(m.vtSubmittedAt || '').trim();
     out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden || script,
       label: m.label || name, version: m.version || '', note: m.note || '',
-      sha256: /^[0-9a-f]{64}$/.test(sha256) ? sha256 : '' });
+      sha256: hash,
+      vt: (hash && (vtUrl === vtWant || vtAt)) ? vtWant : '' });
   }
   out.sort((a, b) => b.at - a.at);
   return out;
