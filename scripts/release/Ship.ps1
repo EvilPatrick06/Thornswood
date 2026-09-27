@@ -243,6 +243,73 @@ function Get-LauncherExe([string]$dir) {
     return (Join-Path $dir 'Thornswood.exe')
 }
 
+# ==== thornswood release launcher ====
+# WHERE THE SHIPPED EXE COMES FROM, since issue #457: a clean runner, not this
+# machine. .github\workflows\release.yml builds Thornswood.exe on a dated
+# Windows image from the tagged commit, writes SHA256SUMS beside it, and
+# attaches both to the draft release for that tag. A main release downloads that
+# asset and checks it against SHA256SUMS rather than compiling the binary that
+# reaches every launcher here, so the person shipping never runs csc on what
+# ships. Byte-identical local and runner builds are not possible with the
+# Framework 4 csc, which stamps a build time and a fresh MVID into the PE, so
+# nothing compares against a local build: the runner's exe IS the shipped exe,
+# and its checksum file is what proves the download is that exe and nothing else.
+
+# Which repository the release.yml draft is on: the source clone's origin, where
+# the workflow runs and creates it, not the releases clone the packs go to.
+function Get-SourceRepo([string]$repoDir) {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $remote = ''
+    try { $remote = (& git -C $repoDir remote get-url origin 2>$null | Select-Object -First 1) } catch { }
+    $ErrorActionPreference = $old
+    if ($remote -and $remote -match 'github\.com[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
+    return 'EvilPatrick06/Thornswood'
+}
+
+# Downloads Thornswood.exe and SHA256SUMS for tag v<version> into $into and
+# checks the exe against its line in SHA256SUMS. Returns '' when the verified
+# exe is sitting in $into, or a sentence saying why not, for the caller to Die
+# on: nothing here compiles anything or writes to the repository.
+function Get-ReleaseLauncher([string]$repo, [string]$version, [string]$into) {
+    $tag = 'v' + $version
+    if (-not (Get-Command gh -EA SilentlyContinue)) {
+        return 'gh is not installed, so the launcher CI built cannot be downloaded. Install the GitHub CLI, gh auth login, then Ship again.'
+    }
+    New-Item -ItemType Directory -Force -Path $into | Out-Null
+    foreach ($n in 'Thornswood.exe', 'SHA256SUMS') {
+        $p = Join-Path $into $n
+        if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
+    }
+    $repoArg = @(); if ($repo) { $repoArg = @('--repo', $repo) }
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    & gh release download $tag @repoArg --dir $into --pattern 'Thornswood.exe' --pattern 'SHA256SUMS' --clobber 2>&1 | Out-Host
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    $exe = Join-Path $into 'Thornswood.exe'
+    $sums = Join-Path $into 'SHA256SUMS'
+    if ($rc -ne 0 -or -not (Test-Path -LiteralPath $exe) -or -not (Test-Path -LiteralPath $sums)) {
+        return ("There is no verified launcher for $tag on $repo yet. CI builds the exe that ships; this machine does not compile it. " +
+                "Push the tag to build it, wait for the ""Build the release launcher"" run to attach Thornswood.exe and SHA256SUMS to the " +
+                "draft release, then run this same Ship again:`r`n" +
+                "    git tag $tag`r`n" +
+                "    git push origin $tag")
+    }
+    # SHA256SUMS is "<hash>  Thornswood.exe", the sha256sum shape, so the line
+    # for the exe is found and its hash compared with the download's.
+    $want = ''
+    foreach ($line in [IO.File]::ReadAllLines($sums)) {
+        $m = [regex]::Match($line, '(?i)^\s*([0-9a-f]{64})\s+\*?Thornswood\.exe\s*$')
+        if ($m.Success) { $want = $m.Groups[1].Value.ToLower(); break }
+    }
+    if (-not $want) { return "SHA256SUMS from $tag has no line for Thornswood.exe, so the download cannot be verified. Nothing was published." }
+    $got = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLower()
+    if ($got -ne $want) {
+        return ("The launcher downloaded for $tag does not match its SHA256SUMS (wanted $want, got $got). Do not ship it. Nothing was published.")
+    }
+    return ''
+}
+# ==== end thornswood release launcher ====
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -652,7 +719,6 @@ function Unbump([string]$why) {
 
 # ------------------------------------------------------------ build
 if (-not $ModsOnly) {
-    Head 'Building the launcher'
     # Resolved twice on purpose. The install writes Thornswood.exe and removes a
     # SkyrimTogether.exe left over from before the rename, so the path that
     # existed going in is not necessarily the path that exists coming out.
@@ -674,29 +740,51 @@ if (-not $ModsOnly) {
     # then closes the game and the launcher, puts the exe in place and does
     # the shortcut and the icon, which is everything the build used to do.
     $buildOut = Join-Path ([IO.Path]::GetTempPath()) ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
-    & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -OutDir $buildOut -NoPause
-    $buildCode = $LASTEXITCODE
 
-    <#
-      The build script's own answer, read before anything else.
+    if (-not $Dev -and -not $DryRun) {
+        # A MAIN RELEASE TAKES THE EXE CI BUILT, and verifies it, since issue
+        # #457. The binary that reaches every launcher is compiled on a clean
+        # runner from the tagged commit, not here, and this checks it against
+        # its SHA256SUMS before a byte of it is packed. A dev build and a dry
+        # run still compile below: dev is pretest with no tag or release of its
+        # own, and a dry run publishes nothing, so neither is the shipped binary.
+        Head 'The launcher from CI'
+        $srcRepo = Get-SourceRepo $RepoDir
+        Say "  taking the exe CI built for v$target from $srcRepo" 'DarkGray'
+        $why = Get-ReleaseLauncher $srcRepo $target $buildOut
+        if ($why) {
+            Unbump 'there is no verified launcher to ship'
+            Die $why
+        }
+        Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item (Join-Path $buildOut 'Thornswood.exe')).Length / 1KB)) 'Green'
+    }
+    else {
+        Head 'Building the launcher'
+        & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -OutDir $buildOut -NoPause
+        $buildCode = $LASTEXITCODE
 
-      Whether the launcher built used to be judged only on an exe appearing with
-      a newer timestamp. Compiling happens near the start, so every step after
-      csc was invisible here: the stub, the signing, anything added later.
+        <#
+          The build script's own answer, read before anything else.
 
-      On 18 September that shipped a release that had already stopped.
-      Build-Launcher printed "STOP. Signing failed. Nothing was published." and
-      exited 1 because the Azure certificate profile did not exist yet. The exe
-      from the compile was sitting there and it was newer than before, so the
-      check below passed, and Ship went on to build the pack, upload it, rewrite
-      version.json, post the news, tell Discord and tell everybody in the world
-      they had five minutes. 1.1.48 went out unsigned, announcing that nothing
-      had been published.
-    #>
-    if ($buildCode -ne 0) {
-        Unbump 'the launcher build failed'
-        Die ('The launcher build stopped with exit code ' + $buildCode +
-             '. Nothing was published. The errors are above.')
+          Whether the launcher built used to be judged only on an exe appearing
+          with a newer timestamp. Compiling happens near the start, so every
+          step after csc was invisible here: the stub, the signing, anything
+          added later.
+
+          On 18 September that shipped a release that had already stopped.
+          Build-Launcher printed "STOP. Signing failed. Nothing was published."
+          and exited 1 because the Azure certificate profile did not exist yet.
+          The exe from the compile was sitting there and it was newer than
+          before, so the check below passed, and Ship went on to build the pack,
+          upload it, rewrite version.json, post the news, tell Discord and tell
+          everybody in the world they had five minutes. 1.1.48 went out unsigned,
+          announcing that nothing had been published.
+        #>
+        if ($buildCode -ne 0) {
+            Unbump 'the launcher build failed'
+            Die ('The launcher build stopped with exit code ' + $buildCode +
+                 '. Nothing was published. The errors are above.')
+        }
     }
 
     & (Join-Path $Here 'Install-Launcher.ps1') -Root $Root -From $buildOut -NoPause
@@ -708,13 +796,13 @@ if (-not $ModsOnly) {
     }
 
     $exe = Get-LauncherExe $launchDir
-    $built = Test-Path -LiteralPath $exe
-    if ($built) { $built = ((Get-Item -LiteralPath $exe).LastWriteTimeUtc -gt $before) }
-    if (-not $built) {
-        Unbump 'nothing was built'
-        Die 'The launcher did not build. Look at the errors above.'
+    $inPlace = Test-Path -LiteralPath $exe
+    if ($inPlace) { $inPlace = ((Get-Item -LiteralPath $exe).LastWriteTimeUtc -gt $before) }
+    if (-not $inPlace) {
+        Unbump 'nothing was put in place'
+        Die 'The launcher is not in place. Look at the errors above.'
     }
-    Say ("  built, {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
+    Say ("  in place, {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
     if ($Dev -and $target -ne $current) {
         $back = Get-Content $updaterCs -Raw
         $back = $back -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $current + '"')

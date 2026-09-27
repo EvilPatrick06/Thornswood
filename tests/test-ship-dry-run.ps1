@@ -32,6 +32,14 @@
   do write down the installer going to the site, the upload, the push, the
   news, the Discord and the restart.
 
+  R also proves the launcher that ships is the one CI built, not one compiled
+  here (issue #457). A real main Ship never calls Build-Launcher.ps1: it runs
+  gh release download for the tag, checks the exe against its SHA256SUMS, and
+  only then installs and packs it. The gh stand-in writes a Thornswood.exe and a
+  matching SHA256SUMS on "release download", so the verification passes and the
+  path is exercised. A dev build and a dry run still compile locally, which is
+  why V and D call Build-Launcher and never gh release download.
+
   The stand-ins are only worth what the real scripts do, so two of those are
   read as well: Package-Thornswood.ps1 calls Publish-Installer.ps1 only without
   -NoPublish, and every gh call and every git push, pull or fetch in
@@ -172,6 +180,8 @@ function Stub([string]$name, [string]$params, [string]$body) {
 $oldPath = $env:PATH
 $oldAppData = $env:LOCALAPPDATA
 $oldCalls = $env:TS_DRY_CALLS
+$oldGhPwsh = $env:TS_GH_PWSH
+$oldGhDl = $env:TS_GH_DL
 $ps = (Get-Process -Id $PID).Path
 
 function Invoke-Ship([string[]]$shipArgs) {
@@ -251,10 +261,35 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     foreach ($n in 'git', 'gh', 'ssh', 'scp') {
         [IO.File]::WriteAllText((Join-Path $bin ($n + '.cmd')), "@echo off`r`n>>`"%TS_DRY_CALLS%`" echo %~n0 %*`r`nexit /b 0`r`n")
     }
+    # gh needs one thing more than logging: on a real main Ship the launcher is
+    # not compiled here, it is downloaded from the release CI built and checked
+    # against SHA256SUMS (issue #457). So the gh stand-in, on "release download",
+    # writes Thornswood.exe and a SHA256SUMS whose hash is that file's, into the
+    # --dir it was given, the way the real gh would. It computes the hash itself,
+    # so the download always verifies and the test proves the path runs, not that
+    # a particular byte matches. Every other gh call still only logs.
+    $ghDl = Join-Path $bin 'gh-download.ps1'
+    [IO.File]::WriteAllText($ghDl, @'
+$dir = ''
+for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--dir') { $dir = $args[$i + 1] } }
+if ($dir) {
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $exe = Join-Path $dir 'Thornswood.exe'
+    [IO.File]::WriteAllText($exe, 'the launcher CI built for this tag')
+    $h = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLower()
+    Set-Content -LiteralPath (Join-Path $dir 'SHA256SUMS') -Value ("$h  Thornswood.exe") -Encoding ascii
+}
+'@)
+    [IO.File]::WriteAllText((Join-Path $bin 'gh.cmd'),
+        "@echo off`r`n>>`"%TS_DRY_CALLS%`" echo gh %*`r`n" +
+        "if /I `"%~1`"==`"release`" if /I `"%~2`"==`"download`" `"%TS_GH_PWSH%`" -NoProfile -ExecutionPolicy Bypass -File `"%TS_GH_DL%`" %*`r`n" +
+        "exit /b 0`r`n")
 
     $env:PATH = $bin + ';' + $oldPath
     $env:LOCALAPPDATA = $appdata
     $env:TS_DRY_CALLS = $log
+    $env:TS_GH_PWSH = $ps
+    $env:TS_GH_DL = $ghDl
 
     $feed = Join-Path $rel 'version.json'
     $devFeed = Join-Path $relDev 'version.json'
@@ -314,8 +349,12 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
         Yes "R $n.ps1 is called" ((Called $r $n).Count -eq 1)
     }
     $gone = Away $r
-    Yes ('R the stand-ins on PATH do catch what leaves: the upload and the pushes (' + ($gone -join '; ') + ')') (
-        @($gone | Where-Object { $_ -match '^gh release' }).Count -eq 1 -and @($gone | Where-Object { $_ -match '^git .*\bpush\b' }).Count -ge 1)
+    Yes 'R the shipped launcher is not compiled here: Build-Launcher.ps1 is not called' ((Called $r 'Build-Launcher').Count -eq 0)
+    Yes ('R the launcher CI built is downloaded and verified: gh release download runs once (' + ($gone -join '; ') + ')') (
+        @($gone | Where-Object { $_ -match '^gh release download' }).Count -eq 1)
+    Yes 'R the pack is uploaded: gh release create or upload runs' (
+        @($gone | Where-Object { $_ -match '^gh release (create|upload)' }).Count -ge 1)
+    Yes 'R the pushes happen' (@($gone | Where-Object { $_ -match '^git .*\bpush\b' }).Count -ge 1)
 
     # ---- E: a dev dry run with no dev worktree and no dev branch to see ---------------
     Remove-Item -LiteralPath $relDev -Recurse -Force
@@ -331,6 +370,8 @@ finally {
     $env:PATH = $oldPath
     $env:LOCALAPPDATA = $oldAppData
     $env:TS_DRY_CALLS = $oldCalls
+    $env:TS_GH_PWSH = $oldGhPwsh
+    $env:TS_GH_DL = $oldGhDl
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
 }
 
