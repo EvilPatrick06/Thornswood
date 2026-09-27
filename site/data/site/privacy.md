@@ -65,8 +65,12 @@ both are served from here now.
 - **Sign-in records**, which are the only thing here holding your address, are
   deleted after 30 days. That is enforced by the site rather than promised:
   old rows go whenever the log is written or read.
-- **Session records and chat** are kept for the playtest. Nothing ages them
-  out yet, and that is the honest answer rather than a policy.
+- **Session records and chat** are kept for 365 days, then dropped. The site
+  prunes session logs after that window (a session marked kept is never
+  pruned). Chat on the voice service ages the same way. Both numbers come from
+  the code rather than a promise on this page; if they change, this line
+  changes with them.
+
 - **Your character** is kept until you ask for it to be deleted, or until a
   wipe, which is announced first.
 - **Launcher logs** are kept while they are useful for fixing something.
