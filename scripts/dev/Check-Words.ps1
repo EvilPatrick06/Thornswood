@@ -55,7 +55,10 @@ $Paths = @(
 $Rules = @(
     @{ Re = ([string][char]0x2014) + '|&mdash;|&#0*8212;|&#x0*2014;'; Say = 'an em dash. Use a comma, a colon or a full stop.' },
     @{ Re = '\bplayers?\b'; Say = 'the word player. Say customers, clients, people, testers or partners.' },
-    @{ Re = '\bgavin\b'; Say = 'the old owner name. He is Patrick.' }
+    # "Gavin Knotts" is the Authenticode certificate subject (Azure Artifact
+    # Signing). That string is what Windows shows as publisher, so Help and
+    # Downloads may name it. Lone "Gavin" is still the old owner name.
+    @{ Re = '\bgavin\b(?!\s+Knotts\b)'; Say = 'the old owner name. He is Patrick.' }
 )
 
 $hits = 0; $read = 0
