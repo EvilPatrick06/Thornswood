@@ -669,7 +669,7 @@
                   <!-- Discord is the door. The launcher asks the site who you are
                        every time you press Play, so this has to be linked before
                        the game will start. -->
-                  <StackPanel x:Name="DiscordCard">
+                  <StackPanel x:Name="DiscordCard" Margin="0,0,0,26">
                     <TextBlock Text="Your account" Style="{StaticResource Eyebrow}"/>
                     <Border Style="{StaticResource Slab}">
                       <StackPanel>
@@ -709,11 +709,11 @@
 
                   <StackPanel x:Name="QuickKeysCard" Visibility="Collapsed">
                     <TextBlock Text="In game" Style="{StaticResource Eyebrow}"/>
-                    <Border Style="{StaticResource Slab}" Padding="18,14">
+                    <Border Style="{StaticResource Slab}" Padding="18,16">
                       <StackPanel x:Name="QuickKeys"/>
                     </Border>
                     <Button x:Name="BtnAllControls" Style="{StaticResource Link}" Content="All of the controls"
-                            HorizontalAlignment="Left" Margin="1,10,0,0"/>
+                            HorizontalAlignment="Left" Margin="0,10,0,0"/>
                   </StackPanel>
                 </StackPanel>
               </Grid>
