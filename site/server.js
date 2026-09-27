@@ -193,8 +193,15 @@ cfg.discord = Object.assign({ clientId:'', clientSecret:'', botToken:'', guildId
                             cfg.discord || {});
 cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
 // Who may use the dev build and join the dev server. Left out of config.json
-// it is the admin roles, Owner and Dev. Add role names here to widen it.
-if (!Array.isArray(cfg.access.dev)) cfg.access.dev = cfg.access.admin.slice();
+// it is the Discord staff roles, the same set the bot's STAFF_ROLES names
+// (Owner, Dev, Gamemaster, Moderator, Loremaster; Content Creator is not
+// staff, bot.py). Gavin's call on 27 September for the dev-build install gate
+// (#605): the dev build is for staff, not the admin pair alone. It folds
+// access.admin in through out.dev below, so widening admin still widens dev.
+// Add role names here to widen it further.
+if (!Array.isArray(cfg.access.dev)) {
+  cfg.access.dev = ['Owner', 'Dev', 'Gamemaster', 'Moderator', 'Loremaster'];
+}
 // Who gets a third character slot at the game's main menu. Everybody gets
 // two; a Patreon tier or a Gamemaster gets three, and so do the admin roles.
 // Decided by Patrick on 20 September. The tier names are Build-Discord.py's.
@@ -202,6 +209,16 @@ if (!Array.isArray(cfg.access.slots3)) {
   cfg.access.slots3 = ['Thalmor Boot-Licker', 'Talos Worshiper', 'Milk Drinker', 'Gamemaster'];
 }
 cfg.admins  = Array.isArray(cfg.admins) ? cfg.admins.map(String) : [];
+
+// A list of role names for a sentence: "Owner, Dev and Gamemaster" rather than
+// "Owner and Dev and Gamemaster", so the dev-role refusal reads plainly once
+// access.dev holds more than the old admin pair (#605).
+function andList(names) {
+  const a = (names || []).filter(Boolean);
+  if (a.length === 0) return '';
+  if (a.length === 1) return a[0];
+  return a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+}
 
 /* Signs the admin cookie. Kept apart from the password so changing the
    password does not sign everybody out of Discord, and made once rather than
@@ -2708,11 +2725,12 @@ async function handle(req, res) {
       'That Discord account has no role that lets it in yet.',
       invite: cfg.discord.invite || '' });
     // The dev build checks in as channel dev. It is for the roles in
-    // access.dev (Owner and Dev unless config.json says otherwise); anyone
-    // else is sent back to the main build with a plain reason.
+    // access.dev (the staff roles by default, Gavin 27 Sep #605, unless
+    // config.json says otherwise); anyone else is sent back to the main build
+    // with a plain reason.
     const wantsDev = String(o.channel || '') === 'dev';
     if (wantsDev && !st.dev) return sendJson(res, 403, { ok:false, why:'dev', dev: false, message:
-      'The dev build is for the ' + (cfg.access.dev || []).join(' and ') + ' roles. Play on the main build.' });
+      'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
 
     // The launcher sends the profile id it is about to play as. The game
     // server never sees a Discord account, only this number, so this is the

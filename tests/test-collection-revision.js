@@ -1,8 +1,7 @@
 /*
   test-collection-revision.js
 
-  Which revision of the collection a machine has, read from the name Vortex
-  gives the collection's own mod folder.
+  Which revision of the collection a machine has installed.
 
   WHY THIS EXISTS AND WHY IT IS WORTH A TEST. Until 22 September the launcher
   decided "your collection is behind" by asking whether po3_StartOnSave.dll
@@ -17,12 +16,18 @@
   because the file was there. Two revisions of drift on the shipping machine,
   invisible.
 
-  A number is the honest answer to a question about a revision. This checks
-  the parsing of that number, because a folder name is a string from outside
-  and every way it can be malformed ends with either a wrong warning or a
-  missing one.
+  WHERE THE NUMBER COMES FROM, rewritten 27 September. The first fix read the
+  revision out of the mod folder name, collection_<slug>_<rev>_<when>. Current
+  Vortex does not name the folder that way any more: it is vortex_collection_
+  <opaque id>_, with no slug and no number in it, so the folder name could no
+  longer answer and Have went to 0 on every up to date machine. The honest
+  source is Vortex's own state.v2, which records the slug and the revision
+  NUMBER against the collection's mod, independent of the folder name. This
+  checks both readers: the state scan (the source of truth now) and the old
+  folder-name parse (the legacy fallback), plus that the C# and PowerShell
+  copies still carry both.
 
-  Read only. It makes folder names in a temp directory and reads nothing else.
+  Read only. It builds strings in memory and reads the two source files.
 */
 const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
 const fs = require('fs');
@@ -44,7 +49,9 @@ const yes = (w, c) => {
   else { fail++; console.log('FAIL  ' + w); }
 };
 
-/* The rule, as this test understands it. */
+/* The legacy folder-name rule, as this test understands it. Current Vortex
+   does not write these folders any more; this is the fallback for a machine
+   that still has them and no readable state. */
 function revisionFrom(names, slug) {
   const prefix = 'collection_' + slug + '_';
   let best = 0;
@@ -58,6 +65,41 @@ function revisionFrom(names, slug) {
     if (n > best) best = n;
   }
   return best;
+}
+
+/* The state.v2 rule, the source of truth now. Vortex flattens its state into
+   LevelDB keys joined by ###, each key then a length byte (a control char)
+   then the value's JSON. The slug and the revision number are separate keys
+   tied together only by the mod id both carry, so this matches the slug to
+   its mod id and takes the highest revision recorded against a mod id whose
+   slug is the one asked for. The same rule as Get-CollectionRevisionFromState
+   in LoadOrder.ps1 and CollectionRevisionFromState in Checks.cs. */
+function revisionFromState(text, slug) {
+  const esc = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const slugRe = new RegExp('mods###skyrimse###([^#]+)###attributes###collectionSlug[\\x00-\\x1F]{1,4}"' + esc + '"', 'g');
+  const revRe = /mods###skyrimse###([^#]+)###attributes###revisionNumber[\x00-\x1F]{1,4}(\d+)/g;
+  const mine = new Set();
+  const rev = new Map();
+  let m;
+  while ((m = slugRe.exec(text)) !== null) mine.add(m[1]);
+  while ((m = revRe.exec(text)) !== null) {
+    const id = m[1];
+    const n = Number(m[2]);
+    if (!Number.isInteger(n)) continue;
+    if (!rev.has(id) || n > rev.get(id)) rev.set(id, n);
+  }
+  let best = 0;
+  for (const id of mine) if (rev.has(id) && rev.get(id) > best) best = rev.get(id);
+  return best;
+}
+
+/* One flattened key and its value, byte for byte as Vortex writes it into
+   the LevelDB log: the key, one length byte, the value's JSON, then the start
+   of the next key so the value is bounded. */
+function attr(modId, name, valueJson) {
+  return 'persistent###mods###skyrimse###' + modId + '###attributes###' + name +
+    String.fromCharCode(valueJson.length) + valueJson +
+    '\x01persistent###mods###skyrimse';
 }
 
 function slugFrom(url) {
@@ -84,9 +126,48 @@ yes('an empty address gives nothing', slugFrom('') === '');
    letters and digits is refused rather than passed through. */
 yes('a slug with punctuation in it is refused', slugFrom('https://x/collections/../../evil') === '');
 
-// ---- the revision ----------------------------------------------------------
-const real = ['collection_7essxf_1_2026-09-26T00-00-00Z'];
-yes('the real folder on this machine reads as revision 1', revisionFrom(real, '7essxf') === 1);
+// ---- the revision from state, the source of truth now ----------------------
+/* The folder Vortex writes today carries no number, so the number lives in
+   state and this is where it is read. */
+const newState = attr('vortex_collection_ZRT7NjhN_', 'collectionSlug', '"7essxf"') +
+                 attr('vortex_collection_ZRT7NjhN_', 'revisionNumber', '5');
+yes('the installed revision is read from Vortex state under the new folder naming',
+    revisionFromState(newState, '7essxf') === 5);
+
+yes('an upgrade in place, the same mod on a newer revision, reads the newer one',
+    revisionFromState(
+      attr('vortex_collection_ZRT7NjhN_', 'collectionSlug', '"7essxf"') +
+      attr('vortex_collection_ZRT7NjhN_', 'revisionNumber', '5') +
+      attr('vortex_collection_ZRT7NjhN_', 'revisionNumber', '6'), '7essxf') === 6);
+
+yes('two digit revisions read whole, not truncated',
+    revisionFromState(
+      attr('vortex_collection_ZRT7NjhN_', 'collectionSlug', '"7essxf"') +
+      attr('vortex_collection_ZRT7NjhN_', 'revisionNumber', '12'), '7essxf') === 12);
+
+/* Two collections installed at once, this machine on 7essxf and another on
+   ombo2a: each answers about its own, tied by the mod id, never mixed up. This
+   is the whole reason the slug and the number are correlated rather than taking
+   the highest number in the file. */
+const two = attr('vortex_collection_ZRT7NjhN_', 'collectionSlug', '"7essxf"') +
+            attr('vortex_collection_ZRT7NjhN_', 'revisionNumber', '5') +
+            attr('vortex_collection_AAbb99xx_', 'collectionSlug', '"ombo2a"') +
+            attr('vortex_collection_AAbb99xx_', 'revisionNumber', '12');
+yes('with two collections installed, 7essxf reads its own 5, not the other 12',
+    revisionFromState(two, '7essxf') === 5);
+yes('and ombo2a reads its own 12', revisionFromState(two, 'ombo2a') === 12);
+
+yes('nothing installed reads as 0, which means say nothing', revisionFromState('', '7essxf') === 0);
+yes('a slug with no revision recorded reads as 0',
+    revisionFromState(attr('vortex_collection_ZRT7NjhN_', 'collectionSlug', '"7essxf"'), '7essxf') === 0);
+yes('a revision recorded against another slug is not read as ours',
+    revisionFromState(
+      attr('vortex_collection_AAbb99xx_', 'collectionSlug', '"ombo2a"') +
+      attr('vortex_collection_AAbb99xx_', 'revisionNumber', '12'), '7essxf') === 0);
+
+// ---- the revision from the legacy folder name, the fallback ----------------
+const real = ['collection_7essxf_2_2026-09-15T21-08-00Z'];
+yes('the legacy folder still reads as revision 2', revisionFrom(real, '7essxf') === 2);
 
 yes('the newest wins when an upgrade leaves the old one behind',
     revisionFrom([
@@ -109,7 +190,11 @@ yes('another collection in the same folder is ignored',
 
 yes('an ordinary mod folder is ignored',
     revisionFrom(['SunHelm Survival-39414-3-1-4-1661703641'], '7essxf') === 0);
-yes('vortex_collection_* is not a revision', revisionFrom(['vortex_collection_qUAAu3jC3'], '7essxf') === 0);
+/* The opaque folder name carries no number, so the legacy parser says nothing
+   about it, and that is now correct: the revision comes from state instead
+   (proved above), not from this name. */
+yes('the opaque vortex_collection_* folder name has no revision to parse',
+    revisionFrom(['vortex_collection_qUAAu3jC3'], '7essxf') === 0);
 yes('nothing installed reads as 0, which means say nothing', revisionFrom([], '7essxf') === 0);
 yes('a name with no revision part reads as 0', revisionFrom(['collection_7essxf_'], '7essxf') === 0);
 yes('a name whose revision is not a number reads as 0',
@@ -121,15 +206,22 @@ yes('a name whose revision is not a number reads as 0',
   These assert the shape rather than the behaviour, so a rename or a dropped
   step fails here instead of silently telling everybody to reinstall.
 */
-yes('the launcher reads the revision from the folder name',
-    CS.indexOf('CollectionRevision') >= 0 && CS.indexOf('collection_') >= 0);
-yes('the launcher takes the highest revision it finds',
-    /if \(n > best\) best = n;/.test(CS));
+yes('the launcher reads the installed revision from Vortex state',
+    CS.indexOf('CollectionRevisionFromState') >= 0 &&
+    CS.indexOf('collectionSlug') >= 0 && CS.indexOf('revisionNumber') >= 0);
+yes('the launcher ties the slug to its mod id, not the highest number in the file',
+    /mods###skyrimse###\(\[\^#\]\+\)###attributes###collectionSlug/.test(CS));
+yes('the launcher keeps the legacy folder parse as a fallback',
+    CS.indexOf('CollectionRevisionFromFolder') >= 0 && CS.indexOf('collection_') >= 0);
 yes('the launcher refuses a slug that is not letters and digits',
     /IsLetterOrDigit/.test(CS));
-yes('the publisher reads it the same way',
-    PS.indexOf('Get-CollectionRevision') >= 0 && PS.indexOf('collection_') >= 0);
-yes('the publisher takes the highest too', /\$n -gt \$best/.test(PS));
+yes('the publisher reads it the same way, from state',
+    PS.indexOf('Get-CollectionRevisionFromState') >= 0 &&
+    PS.indexOf('collectionSlug') >= 0 && PS.indexOf('revisionNumber') >= 0);
+yes('the publisher ties the slug to its mod id too',
+    /mods###skyrimse###\(\[\^#\]\+\)###attributes###collectionSlug/.test(PS));
+yes('the publisher keeps the legacy folder parse as a fallback',
+    PS.indexOf('Get-CollectionRevisionFromFolder') >= 0 && PS.indexOf('collection_') >= 0);
 yes('the publisher refuses a bad slug', /\^\[A-Za-z0-9\]\+\$/.test(PS));
 
 /* The thing this replaced must not creep back as the test. */

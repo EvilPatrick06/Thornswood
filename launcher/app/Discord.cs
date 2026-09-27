@@ -43,8 +43,9 @@ namespace Thornswood
         public string Message = "";
         public string Invite = "";
         public bool Admin;
-        // Allowed on the dev build. The site decides: the Owner and Dev
-        // roles unless its config widens it.
+        // Allowed on the dev build. The site decides: the staff roles
+        // (Owner, Dev, Gamemaster, Moderator, Loremaster) unless its config
+        // widens it. Gavin's call on 27 September for the install gate (#605).
         public bool Dev;
         // Character slots at the game's main menu. Two, or three for a
         // Patreon tier or a Gamemaster; the site decides from the roles.

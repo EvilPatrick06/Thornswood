@@ -366,7 +366,7 @@ SIX.forEach(function (d) {
     para = lines.slice(s, e + 1).join('\n');
   }
   const ui = read('launcher/ui.xaml') || '';
-  const install = (/x:Name="BtnDevInstall"[^>]*Content="([^"]+)"/.exec(ui) || [])[1];
+  const install = (/x:Name="BtnServerDev"[^>]*Content="([^"]+)"/.exec(ui) || [])[1];
   const make = (/x:Name="BtnOwnGameMake"[^>]*Content="([^"]+)"/.exec(ui) || [])[1];
   yes('the setup paragraph names the button that installs the dev build as the launcher labels it, "' +
       install + '"', !!install && para.indexOf(install) >= 0);
