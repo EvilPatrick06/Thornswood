@@ -114,7 +114,7 @@
 # Checks, ...) are left for later slices.
 Chars.cs 18
 Checks.cs 20
-Icons.cs 21
+Icons.cs 20
 OwnGame.cs 18
 Shell.cs 76
 Uninstall.cs 16
