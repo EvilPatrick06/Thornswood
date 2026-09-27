@@ -9,9 +9,10 @@ each half, with the file and line for each step.
 
 `.gitmodules:11-15` names the fork, `https://github.com/EvilPatrick06/skymp.git`,
 on the branch `thornswood/engine-changes`, at `engine/skymp`. The repository
-pins a commit, not the branch: on 25 September `git submodule status` printed
-`c8832519866e6848b9501039940dc2c6f0508668`, the commit both build records name
-(`records\server-build.json:10`, `records\client-build.json:6`).
+pins a commit, not the branch: `git submodule status` prints
+`b6721bb068756a7a998a8b12a26c7489c6f0e525`, the commit `records\client-build.json:6`
+names (`records\server-build.json:10` still names the earlier
+`c8832519866e6848b9501039940dc2c6f0508668`).
 
 `ignore = dirty` (`.gitmodules:15`) keeps a build inside the fork from showing
 as a change here. A different commit checked out in it still shows, and is
