@@ -1,6 +1,18 @@
 <#
   Add-Characters.ps1
 
+  RETIRED. DO NOT RUN. Launcher #394 / #490 stripped Auto load and
+  StartOnSaveInstalled on Dev tip 20260927-1435-dev (1.1.101.11). WriteStartIni
+  stays while po3_StartOnSave.dll may still sit in live Data. Everything below
+  still installs Start On Save by hand into Game\Data, a second copy of what
+  collection 7essxf still carries until Patrick drops it on Nexus. Running it
+  now would put the DLL back into a build the launcher no longer wants as a
+  readiness probe. It refuses to run, and the rest of the file is kept for the
+  history of how it was installed. Pattern from #735 Add-TempleRespawn and
+  #768 Add-JContainers.
+
+  What it used to do, and what is left of it:
+
   Installs Start On Save into the build.
 
   Until 20 September this was what turned Play into a character screen: two
@@ -28,6 +40,17 @@ param(
     [switch]$NoShip,
     [switch]$NoPause
 )
+
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Add-Characters.ps1 is retired and installs nothing. ' +
+       'Launcher #394 / #490 dropped Auto load and StartOnSaveInstalled; WriteStartIni ' +
+       'stays while the DLL may remain. This script still installs Start On Save by hand ' +
+       'into Game\Data, which would put po3_StartOnSave.dll back into a build after the ' +
+       'launcher strip. Collection 7essxf still carries the mod until Patrick drops it ' +
+       'on Nexus; that revision is not this script. Pattern from #735 and #768. ' +
+       'The file is kept for the history of how it was installed. Delete this line only ' +
+       'if Start On Save is meant to be hand-installed again, and read the header first.')
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
