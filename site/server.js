@@ -725,13 +725,26 @@ function listFiles() {
     // here rather than taken from the file, so a wrong or hostile value in
     // files.json cannot put a link to somewhere else on the page. Without
     // either field the page shows the hash and says there is no report yet.
+    //
+    // VirusTotal refuses uploads over 650 MB (its documented upload-URL cap).
+    // Declared inside listFiles so the lift-test in test-download-hash.js can
+    // run this function alone. When there is no report, mark vtSkipped so the
+    // Downloads page can say the file is over that cap (or was refused for
+    // another reason Publish wrote into files.json) rather than implying a
+    // report is still coming. The reason string never goes out: only the flag.
+    const VT_CAP = 650 * 1024 * 1024;
     const vtWant = hash ? 'https://www.virustotal.com/gui/file/' + hash : '';
     const vtUrl = String(m.vtUrl || '').trim().toLowerCase();
     const vtAt = String(m.vtSubmittedAt || '').trim();
+    const vt = (hash && (vtUrl === vtWant || vtAt)) ? vtWant : '';
+    const skipReason = String(m.vtSkipReason || m.vtSkippedReason || '').trim();
+    const explicitSkip = m.vtSkipped === true || m.vtSkipped === 'true' || !!skipReason;
+    const vtSkipped = !vt && (explicitSkip || st.size > VT_CAP);
     out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden || script,
       label: m.label || name, version: m.version || '', note: m.note || '',
       sha256: hash,
-      vt: (hash && (vtUrl === vtWant || vtAt)) ? vtWant : '' });
+      vt: vt,
+      vtSkipped: vtSkipped });
   }
   out.sort((a, b) => b.at - a.at);
   return out;

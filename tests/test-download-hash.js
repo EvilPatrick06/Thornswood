@@ -200,6 +200,64 @@ async function main() {
           return (list()['Thornswood-Setup-20260924-0100.zip'] || {}).vt === '';
         })());
     fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(meta));
+
+    // VirusTotal will not take a file over 650 MB. listFiles marks those
+    // (and any entry Publish explicitly skipped) so the page can say so
+    // instead of implying a report is still coming. The reason string stays
+    // in files.json and never goes out on the API.
+    const CAP = 650 * 1024 * 1024;
+    yes('listFiles names the same 650 MB cap the page uses',
+        /const VT_CAP = 650 \* 1024 \* 1024;/.test(lf[0]));
+    const withSkip = (extra) => {
+      const m = JSON.parse(JSON.stringify(meta));
+      Object.assign(m['Thornswood-Setup-20260924-0100.exe'], extra);
+      fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(m));
+      return list()['Thornswood-Setup-20260924-0100.exe'] || {};
+    };
+    yes('under the cap with no report: vtSkipped is false',
+        withSkip({}).vtSkipped === false);
+    yes('vtSkipped: true in files.json marks the entry without a report',
+        withSkip({ vtSkipped: true }).vtSkipped === true &&
+        withSkip({ vtSkipped: true }).vt === '');
+    yes('vtSkipReason alone is enough, and the reason string does not go out',
+        (function () {
+          const e = withSkip({ vtSkipReason: 'key out of quota' });
+          return e.vtSkipped === true && e.vt === '' &&
+                 !('vtSkipReason' in e) && !JSON.stringify(e).includes('quota');
+        })());
+    yes('vtSkippedReason is accepted the same way',
+        withSkip({ vtSkippedReason: 'refused' }).vtSkipped === true);
+    yes('a report wins over an explicit skip: the link still goes out',
+        withSkip({ vtSkipped: true, vtUrl: report }).vt === report &&
+        withSkip({ vtSkipped: true, vtUrl: report }).vtSkipped === false);
+    fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(meta));
+
+    // A real file over the cap. Written short then size lied about via a
+    // stubbed stat so the test does not need a 650 MB fixture on disk.
+    const bigName = "Thornswood-Setup-over-cap.exe";
+    fs.writeFileSync(path.join(files, bigName), 'tiny');
+    const realStat = fs.statSync;
+    const bigMeta = JSON.parse(JSON.stringify(meta));
+    bigMeta[bigName] = { label: 'huge', sha256: sha(Buffer.from('tiny')).toUpperCase() };
+    fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(bigMeta));
+    const listBig = new Function("fs", "path", "FILES", "jsonFile",
+      lf[0] + '\nreturn listFiles;')({
+        readdirSync: () => fs.readdirSync(files),
+        statSync: (p) => {
+          const st = realStat(p);
+          if (String(p).endsWith(bigName)) {
+            return Object.assign(Object.create(Object.getPrototypeOf(st)), st, {
+              size: CAP + 1, isFile: () => true
+            });
+          }
+          return st;
+        },
+        readFileSync: fs.readFileSync
+      }, path, files, jsonFile);
+    const big = listBig().find((f) => f.name === bigName) || {};
+    yes('on-disk size over the cap: vtSkipped is true and there is no report',
+        big.vtSkipped === true && big.vt === '' && big.size === CAP + 1);
+    fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(meta));
   }
 
   // ------------------------------------------------ home.html /downloads
@@ -218,9 +276,9 @@ async function main() {
     }
     const H = sha(Buffer.from('thornswood'));
     const VT = 'https://www.virustotal.com/gui/file/' + H;
-    const exe = (size, hash, vt) => ({ name: 'Thornswood-Setup-20260924-0100.exe', size: size,
+    const exe = (size, hash, vt, extra) => Object.assign({ name: 'Thornswood-Setup-20260924-0100.exe', size: size,
       at: 2, hidden: false, label: 'Thornswood installer', version: '2026-09-24 01:00',
-      note: '', sha256: hash, vt: vt === undefined ? '' : vt });
+      note: '', sha256: hash, vt: vt === undefined ? '' : vt }, extra || {});
     const zip = (hidden) => ({ name: 'Thornswood-Setup-20260924-0100.zip', size: 385154603,
       at: 1, hidden: hidden, label: 'payload', version: '', note: '', sha256: '' });
     // The small print under the button, the paragraph with the size in it.
@@ -282,6 +340,43 @@ async function main() {
     const stale = await render({ files: [exe(560000000, H, undefined)] });
     yes('a site older than this, with a hash and no vt field, links nothing',
         stale.indexOf(H) >= 0 && !/virustotal\.com/i.test(stale));
+
+    // Over VirusTotal's 650 MB upload cap: say so, keep the hash, never imply
+    // a report might still appear.
+    const CAP = 650 * 1024 * 1024;
+    yes('the page names the same 650 MB cap listFiles uses',
+        /var VT_CAP = 650 \* 1024 \* 1024;/.test(body));
+    const over = await render({ files: [exe(CAP + 1, H)] });
+    const op = small(over);
+    yes('over the cap with no report: the SHA-256 still shows',
+        op.indexOf('SHA-256') >= 0 && op.indexOf(H) >= 0);
+    yes('and the page says the file is over VirusTotal\'s 650 MB upload cap',
+        /over VirusTotal's 650 MB upload cap/.test(op) &&
+        /cannot/.test(op));
+    yes('and it does not say a report is coming later',
+        !/No VirusTotal report for this build yet/.test(op) &&
+        !/virustotal\.com/i.test(over));
+    yes('and invents no clean or detection verdict',
+        !/(clean|no detections|\d+ *\/ *\d+ *engines)/i.test(op));
+
+    // A report that somehow exists for a huge file still links (hand upload).
+    const hugeLinked = await render({ files: [exe(CAP + 1, H, VT)] });
+    yes('over the cap but with a vt link: the report is linked',
+        small(hugeLinked).indexOf('href="' + VT + '"') >= 0);
+    yes('and the over-cap line is not shown when there is a report',
+        !/650 MB upload cap/.test(small(hugeLinked)));
+
+    // Explicit skip under the cap: waiting copy, not the over-cap line.
+    const skipped = await render({ files: [exe(560000000, H, '', { vtSkipped: true })] });
+    yes('under the cap with vtSkipped: the waiting line, not the over-cap line',
+        /No VirusTotal report for this build yet/.test(small(skipped)) &&
+        !/650 MB upload cap/.test(small(skipped)));
+    const reasonOut = await render({ files: [exe(560000000, H, '',
+      { vtSkipped: true, vtSkipReason: 'key out of quota' })] });
+    yes('and a skip-reason string from the API is never printed',
+        !/quota/i.test(reasonOut) &&
+        /No VirusTotal report for this build yet/.test(reasonOut));
+
     for (const nasty of ['javascript:alert(1)', '" onmouseover="alert(1)',
                          'https://www.virustotal.com/gui/file/' + sha(Buffer.from('somebody else')),
                          'https://evil.example/gui/file/' + H]) {
