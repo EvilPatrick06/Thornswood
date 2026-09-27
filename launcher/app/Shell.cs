@@ -142,11 +142,11 @@ namespace Thornswood
                       btnGalleryReportSend, btnGalleryReportCancel;
         static TextBox boxGalleryBy, boxGalleryNote, boxGalleryWhy;
         static TextBlock txtGalleryChosen, txtGalleryPageSaid, txtGalleryDropLead,
-                         txtGalleryApprovedEmpty, txtGalleryPendingEmpty;
-        static FrameworkElement galleryStaffBlock, galleryPageReportRow;
+                         txtGalleryApprovedEmpty;
+        static FrameworkElement galleryPageReportRow;
         static Border galleryDrop;
         static StackPanel galleryChosenList;
-        static WrapPanel galleryApprovedList, galleryPendingList;
+        static WrapPanel galleryApprovedList;
         static List<Gallery.Pending> galleryPending;
         static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
@@ -699,13 +699,10 @@ namespace Thornswood
             txtGalleryDropLead = F<TextBlock>("TxtGalleryDropLead");
             txtGalleryPageSaid = F<TextBlock>("TxtGalleryPageSaid");
             txtGalleryApprovedEmpty = F<TextBlock>("TxtGalleryApprovedEmpty");
-            txtGalleryPendingEmpty = F<TextBlock>("TxtGalleryPendingEmpty");
-            galleryStaffBlock = F<FrameworkElement>("GalleryStaffBlock");
             galleryPageReportRow = F<FrameworkElement>("GalleryPageReportRow");
             galleryDrop = F<Border>("GalleryDrop");
             galleryChosenList = F<StackPanel>("GalleryChosenList");
             galleryApprovedList = F<WrapPanel>("GalleryApprovedList");
-            galleryPendingList = F<WrapPanel>("GalleryPendingList");
 
             // Same order as the PageXxx constants above, and as PageTitles.
             // Gallery is appended at the end on purpose: renumbering the middle
@@ -1240,8 +1237,8 @@ namespace Thornswood
 
         /// <summary>
         /// The pictures the site is showing, turned through on the Play page
-        /// as a spotlight only. Upload, Report, Accept and Delete live on the
-        /// Gallery page (#731).
+        /// as a spotlight of approved pictures only. Upload, Report, Accept
+        /// and Delete live on the Gallery page (#731).
         ///
         /// Gallery.Load asks /api/public. The list is fetched once on a pool
         /// thread at start up with /api/gallery/who, so the Gallery page knows
@@ -1324,9 +1321,6 @@ namespace Thornswood
         static void PaintGalleryPage()
         {
             bool doors = galleryWho != null && galleryWho.Answered;
-            bool staff = GalleryStaff();
-            if (galleryStaffBlock != null)
-                galleryStaffBlock.Visibility = staff ? Visibility.Visible : Visibility.Collapsed;
             if (btnGallerySend != null)
                 btnGallerySend.IsEnabled = doors && Discord.Linked &&
                     galleryChosenPaths != null && galleryChosenPaths.Count > 0;
@@ -1381,214 +1375,225 @@ namespace Thornswood
 
                     galleryPending = pending;
                     PaintGalleryPage();
-                    FillGalleryApproved(shots);
-                    FillGalleryPending(pending, pendingBad);
+                    FillGalleryGrid(shots, pending, pendingBad);
                 }));
             });
         }
 
-﻿        static void FillGalleryApproved(List<Gallery.Shot> shots)
+﻿
+        /// <summary>
+        /// One Gallery grid: approved cards for everyone, plus pending cards for
+        /// staff (Door / DevAllowed) in the same WrapPanel. No separate waiting
+        /// section. Accept and Delete are staff-only; Reject is gone; Report
+        /// stays on approved cards for linked players.
+        /// </summary>
+        static void FillGalleryGrid(List<Gallery.Shot> shots, List<Gallery.Pending> pending, string pendingBad)
         {
             if (galleryApprovedList == null) return;
             galleryApprovedList.Children.Clear();
-            bool any = shots != null && shots.Count > 0;
-            if (txtGalleryApprovedEmpty != null)
-                txtGalleryApprovedEmpty.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
-            if (!any) return;
 
             bool doors = galleryWho != null && galleryWho.Answered;
             bool staff = GalleryStaff();
-            for (int i = 0; i < shots.Count; i++)
+            bool anyApproved = shots != null && shots.Count > 0;
+            bool anyPending = staff && pending != null && pending.Count > 0;
+            bool any = anyApproved || anyPending;
+
+            if (!string.IsNullOrEmpty(pendingBad) && staff)
+                SayGallery(pendingBad);
+
+            if (txtGalleryApprovedEmpty != null)
             {
-                Gallery.Shot shot = shots[i];
-                if (shot == null) continue;
+                txtGalleryApprovedEmpty.Text = any
+                    ? ""
+                    : "Nothing is on the gallery yet.";
+                txtGalleryApprovedEmpty.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
+            }
 
-                var card = new Border();
-                card.Style = (Style)win.FindResource("Slab");
-                card.Padding = new Thickness(0);
-                card.Margin = new Thickness(0, 0, 14, 14);
-                card.Width = 280;
-                card.ClipToBounds = true;
-
-                var stack = new StackPanel();
-
-                var frame = new Border();
-                frame.Height = 200;
-                frame.Background = (Brush)win.FindResource("Line");
-                frame.ClipToBounds = true;
-
-                var img = new Image();
-                img.Stretch = Stretch.UniformToFill;
-                img.HorizontalAlignment = HorizontalAlignment.Stretch;
-                img.VerticalAlignment = VerticalAlignment.Stretch;
-                RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
-                if (shot.Image != null) img.Source = shot.Image;
-                frame.Child = img;
-                stack.Children.Add(frame);
-
-                if (shot.Image == null && shot.ImageUrl != null && shot.ImageUrl.Length > 0)
+            if (anyApproved)
+            {
+                for (int i = 0; i < shots.Count; i++)
                 {
-                    Gallery.Shot hold = shot;
-                    Image holdImg = img;
-                    ThreadPool.QueueUserWorkItem(delegate
-                    {
-                        BitmapImage bi = Gallery.Fetch(hold);
-                        if (bi == null) return;
-                        win.Dispatcher.BeginInvoke(new Action(delegate
-                        {
-                            if (holdImg != null) holdImg.Source = bi;
-                        }));
-                    });
+                    Gallery.Shot shot = shots[i];
+                    if (shot == null) continue;
+                    galleryApprovedList.Children.Add(BuildApprovedCard(shot, doors, staff));
                 }
+            }
 
-                var meta = new StackPanel();
-                meta.Margin = new Thickness(12, 10, 12, 12);
-
-                var label = new TextBlock();
-                label.Style = (Style)win.FindResource("Body");
-                label.TextWrapping = TextWrapping.Wrap;
-                string by = (shot.By != null && shot.By.Length > 0) ? shot.By : "";
-                label.Text = by.Length > 0 ? ("By " + by) : "From the world";
-                meta.Children.Add(label);
-
-                if (doors && Discord.Linked && shot.Name != null && shot.Name.Length > 0)
+            // Pending only for staff, same grid as approved. Play never sees these.
+            if (anyPending)
+            {
+                for (int i = 0; i < pending.Count; i++)
                 {
-                    var acts = new StackPanel();
-                    acts.Orientation = Orientation.Horizontal;
-                    acts.Margin = new Thickness(0, 8, 0, 0);
-
-                    var report = new Button();
-                    report.Style = (Style)win.FindResource("Ghost");
-                    report.Content = "Report";
-                    report.Padding = new Thickness(10, 4, 10, 4);
-                    Gallery.Shot holdShot = shot;
-                    report.Click += delegate { OpenGalleryReport(holdShot); };
-                    acts.Children.Add(report);
-
-                    if (staff)
-                    {
-                        var del = new Button();
-                        del.Style = (Style)win.FindResource("Ghost");
-                        del.Content = "Delete";
-                        del.Padding = new Thickness(10, 4, 10, 4);
-                        del.Margin = new Thickness(8, 0, 0, 0);
-                        string name = shot.Name;
-                        del.Click += delegate { GalleryTakeDown(name); };
-                        acts.Children.Add(del);
-                    }
-                    meta.Children.Add(acts);
+                    Gallery.Pending item = pending[i];
+                    if (item == null || item.Name == null || item.Name.Length == 0) continue;
+                    galleryApprovedList.Children.Add(BuildPendingCard(item));
                 }
-
-                stack.Children.Add(meta);
-                card.Child = stack;
-                galleryApprovedList.Children.Add(card);
             }
         }
 
-        static void FillGalleryPending(List<Gallery.Pending> pending, string bad)
+        static Border BuildApprovedCard(Gallery.Shot shot, bool doors, bool staff)
         {
-            if (galleryPendingList == null) return;
-            galleryPendingList.Children.Clear();
-            if (!string.IsNullOrEmpty(bad))
+            var card = new Border();
+            card.Style = (Style)win.FindResource("Slab");
+            card.Padding = new Thickness(0);
+            card.Margin = new Thickness(0, 0, 14, 14);
+            card.Width = 280;
+            card.ClipToBounds = true;
+
+            var stack = new StackPanel();
+
+            var frame = new Border();
+            frame.Height = 200;
+            frame.Background = (Brush)win.FindResource("Line");
+            frame.ClipToBounds = true;
+
+            var img = new Image();
+            img.Stretch = Stretch.UniformToFill;
+            img.HorizontalAlignment = HorizontalAlignment.Stretch;
+            img.VerticalAlignment = VerticalAlignment.Stretch;
+            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+            if (shot.Image != null) img.Source = shot.Image;
+            frame.Child = img;
+            stack.Children.Add(frame);
+
+            if (shot.Image == null && shot.ImageUrl != null && shot.ImageUrl.Length > 0)
             {
-                if (txtGalleryPendingEmpty != null)
-                {
-                    txtGalleryPendingEmpty.Text = bad;
-                    txtGalleryPendingEmpty.Visibility = Visibility.Visible;
-                }
-                return;
-            }
-            bool any = pending != null && pending.Count > 0;
-            if (txtGalleryPendingEmpty != null)
-            {
-                txtGalleryPendingEmpty.Text = "Nothing is waiting.";
-                txtGalleryPendingEmpty.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
-            }
-            if (!any) return;
-
-            for (int i = 0; i < pending.Count; i++)
-            {
-                Gallery.Pending item = pending[i];
-                if (item == null || item.Name == null || item.Name.Length == 0) continue;
-
-                var card = new Border();
-                card.Style = (Style)win.FindResource("Slab");
-                card.Padding = new Thickness(0);
-                card.Margin = new Thickness(0, 0, 14, 14);
-                card.Width = 280;
-                card.ClipToBounds = true;
-
-                var stack = new StackPanel();
-
-                var frame = new Border();
-                frame.Height = 180;
-                frame.Background = (Brush)win.FindResource("Line");
-                frame.ClipToBounds = true;
-
-                var img = new Image();
-                img.Stretch = Stretch.UniformToFill;
-                RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
-                if (item.Image != null) img.Source = item.Image;
-                frame.Child = img;
-                stack.Children.Add(frame);
-
-                Gallery.Pending holdItem = item;
+                Gallery.Shot hold = shot;
                 Image holdImg = img;
                 ThreadPool.QueueUserWorkItem(delegate
                 {
-                    BitmapImage bi = Gallery.FetchPending(holdItem);
+                    BitmapImage bi = Gallery.Fetch(hold);
                     if (bi == null) return;
                     win.Dispatcher.BeginInvoke(new Action(delegate
                     {
                         if (holdImg != null) holdImg.Source = bi;
                     }));
                 });
-
-                var meta = new StackPanel();
-                meta.Margin = new Thickness(12, 10, 12, 12);
-
-                var label = new TextBlock();
-                label.Style = (Style)win.FindResource("Body");
-                label.TextWrapping = TextWrapping.Wrap;
-                string by = (item.By != null && item.By.Length > 0) ? item.By : "somebody";
-                label.Text = "By " + by;
-                meta.Children.Add(label);
-
-                if (item.Note != null && item.Note.Length > 0)
-                {
-                    var note = new TextBlock();
-                    note.Style = (Style)win.FindResource("Small");
-                    note.TextWrapping = TextWrapping.Wrap;
-                    note.Margin = new Thickness(0, 4, 0, 0);
-                    note.Text = item.Note;
-                    meta.Children.Add(note);
-                }
-
-                var buttons = new StackPanel();
-                buttons.Orientation = Orientation.Horizontal;
-                buttons.Margin = new Thickness(0, 10, 0, 0);
-
-                var accept = new Button();
-                accept.Style = (Style)win.FindResource("Solid");
-                accept.Content = "Accept";
-                accept.Padding = new Thickness(14, 6, 14, 6);
-                string name = item.Name;
-                accept.Click += delegate { GalleryAccept(name); };
-                buttons.Children.Add(accept);
-
-                var reject = new Button();
-                reject.Style = (Style)win.FindResource("Ghost");
-                reject.Content = "Reject";
-                reject.Padding = new Thickness(12, 6, 12, 6);
-                reject.Margin = new Thickness(8, 0, 0, 0);
-                reject.Click += delegate { GalleryReject(name); };
-                buttons.Children.Add(reject);
-
-                meta.Children.Add(buttons);
-                stack.Children.Add(meta);
-                card.Child = stack;
-                galleryPendingList.Children.Add(card);
             }
+
+            var meta = new StackPanel();
+            meta.Margin = new Thickness(12, 10, 12, 12);
+
+            var label = new TextBlock();
+            label.Style = (Style)win.FindResource("Body");
+            label.TextWrapping = TextWrapping.Wrap;
+            string by = (shot.By != null && shot.By.Length > 0) ? shot.By : "";
+            label.Text = by.Length > 0 ? ("By " + by) : "On the gallery";
+            meta.Children.Add(label);
+
+            if (doors && Discord.Linked && shot.Name != null && shot.Name.Length > 0)
+            {
+                var acts = new StackPanel();
+                acts.Orientation = Orientation.Horizontal;
+                acts.Margin = new Thickness(0, 8, 0, 0);
+
+                var report = new Button();
+                report.Style = (Style)win.FindResource("Ghost");
+                report.Content = "Report";
+                report.Padding = new Thickness(10, 4, 10, 4);
+                Gallery.Shot holdShot = shot;
+                report.Click += delegate { OpenGalleryReport(holdShot); };
+                acts.Children.Add(report);
+
+                if (staff)
+                {
+                    var del = new Button();
+                    del.Style = (Style)win.FindResource("Ghost");
+                    del.Content = "Delete";
+                    del.Padding = new Thickness(10, 4, 10, 4);
+                    del.Margin = new Thickness(8, 0, 0, 0);
+                    string name = shot.Name;
+                    del.Click += delegate { GalleryTakeDown(name); };
+                    acts.Children.Add(del);
+                }
+                meta.Children.Add(acts);
+            }
+
+            stack.Children.Add(meta);
+            card.Child = stack;
+            return card;
+        }
+
+        static Border BuildPendingCard(Gallery.Pending item)
+        {
+            var card = new Border();
+            card.Style = (Style)win.FindResource("Slab");
+            card.Padding = new Thickness(0);
+            card.Margin = new Thickness(0, 0, 14, 14);
+            card.Width = 280;
+            card.ClipToBounds = true;
+
+            var stack = new StackPanel();
+
+            var frame = new Border();
+            frame.Height = 200;
+            frame.Background = (Brush)win.FindResource("Line");
+            frame.ClipToBounds = true;
+
+            var img = new Image();
+            img.Stretch = Stretch.UniformToFill;
+            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+            if (item.Image != null) img.Source = item.Image;
+            frame.Child = img;
+            stack.Children.Add(frame);
+
+            Gallery.Pending holdItem = item;
+            Image holdImg = img;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                BitmapImage bi = Gallery.FetchPending(holdItem);
+                if (bi == null) return;
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (holdImg != null) holdImg.Source = bi;
+                }));
+            });
+
+            var meta = new StackPanel();
+            meta.Margin = new Thickness(12, 10, 12, 12);
+
+            var label = new TextBlock();
+            label.Style = (Style)win.FindResource("Body");
+            label.TextWrapping = TextWrapping.Wrap;
+            string by = (item.By != null && item.By.Length > 0) ? item.By : "somebody";
+            label.Text = "By " + by + " (waiting)";
+            meta.Children.Add(label);
+
+            if (item.Note != null && item.Note.Length > 0)
+            {
+                var note = new TextBlock();
+                note.Style = (Style)win.FindResource("Small");
+                note.TextWrapping = TextWrapping.Wrap;
+                note.Margin = new Thickness(0, 4, 0, 0);
+                note.Text = item.Note;
+                meta.Children.Add(note);
+            }
+
+            // Staff-only: this card is only built when GalleryStaff is true.
+            var buttons = new StackPanel();
+            buttons.Orientation = Orientation.Horizontal;
+            buttons.Margin = new Thickness(0, 10, 0, 0);
+
+            var accept = new Button();
+            accept.Style = (Style)win.FindResource("Solid");
+            accept.Content = "Accept";
+            accept.Padding = new Thickness(14, 6, 14, 6);
+            string name = item.Name;
+            accept.Click += delegate { GalleryAccept(name); };
+            buttons.Children.Add(accept);
+
+            var del = new Button();
+            del.Style = (Style)win.FindResource("Ghost");
+            del.Content = "Delete";
+            del.Padding = new Thickness(12, 6, 12, 6);
+            del.Margin = new Thickness(8, 0, 0, 0);
+            del.Click += delegate { GalleryDeletePending(name); };
+            buttons.Children.Add(del);
+
+            meta.Children.Add(buttons);
+            stack.Children.Add(meta);
+            card.Child = stack;
+            return card;
         }
 
         static void OpenGalleryReport(Gallery.Shot shot)
@@ -1890,17 +1895,18 @@ namespace Thornswood
             });
         }
 
-        static void GalleryReject(string name)
+        static void GalleryDeletePending(string name)
         {
-            SayGallery("Rejecting " + name + "...");
+            SayGallery("Deleting " + name + "...");
             ThreadPool.QueueUserWorkItem(delegate
             {
+                // Same staff queue door as the old Reject; UI no longer says Reject.
                 string bad = Gallery.Reject(name);
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     if (bad.Length == 0)
                     {
-                        SayGallery("Rejected. It is off the waiting list.");
+                        SayGallery("Deleted. It is off the gallery queue.");
                         BuildGalleryPage();
                     }
                     else SayGallery(bad);
@@ -1960,8 +1966,8 @@ namespace Thornswood
             }
             if (galleryBy != null)
                 galleryBy.Text = (shot.By != null && shot.By.Length > 0)
-                    ? "By " + shot.By + ", from the world"
-                    : "From the world";
+                    ? "By " + shot.By
+                    : "";
             if (galleryCard != null && galleryCard.Visibility != Visibility.Visible)
                 galleryCard.Visibility = Visibility.Visible;
         }
