@@ -4193,21 +4193,14 @@ namespace Thornswood
         {
             if (btnServerMain == null || btnServerDev == null || txtServerPick == null) return;
             // Do not assign Content: the XAML holds the status chip layout.
-            // Dropdown lists only the OTHER server; the closed chip already names this one.
-            if (cfg.IsDev)
-            {
-                txtServerPick.Text = "Dev";
-                btnServerDev.Visibility = Visibility.Collapsed;
-                btnServerMain.Visibility = Visibility.Visible;
-                btnServerMain.IsEnabled = true;
-            }
-            else
-            {
-                txtServerPick.Text = "Main";
-                btnServerMain.Visibility = Visibility.Collapsed;
-                btnServerDev.Visibility = Visibility.Visible;
-                btnServerDev.IsEnabled = true;
-            }
+            // Open panel lists both Main and Dev at the chip width; current stays enabled
+            // so the covered-chip popup is one complete panel, not a second orphan card.
+            if (cfg.IsDev) txtServerPick.Text = "Dev";
+            else txtServerPick.Text = "Main";
+            btnServerMain.Visibility = Visibility.Visible;
+            btnServerDev.Visibility = Visibility.Visible;
+            btnServerMain.IsEnabled = true;
+            btnServerDev.IsEnabled = true;
             PaintServerChip();
         }
 
@@ -4245,16 +4238,21 @@ namespace Thornswood
             if (serverPickPopup == null || btnServerPick == null) return;
             if (!serverPickPopup.IsOpen)
             {
-                // One shared width: chip MinWidth and the popup panel Width both
-                // lock to the same number so left/right edges match (Popup.Width
-                // alone does not size an AllowsTransparency child Border).
-                double w = Math.Max(btnServerPick.ActualWidth, 300);
-                btnServerPick.MinWidth = w;
+                // Exact chip width; cover the chip so open state is one left-aligned
+                // panel (Placement Bottom + VerticalOffset = -height), not a second card.
+                btnServerPick.UpdateLayout();
+                double w = btnServerPick.ActualWidth;
+                double h = btnServerPick.ActualHeight;
+                if (w < 1) w = btnServerPick.MinWidth > 0 ? btnServerPick.MinWidth : 210;
+                if (h < 1) h = 32;
                 if (serverPickPanel != null)
                 {
-                    serverPickPanel.MinWidth = w;
                     serverPickPanel.Width = w;
+                    serverPickPanel.MinWidth = w;
+                    serverPickPanel.MaxWidth = w;
                 }
+                serverPickPopup.HorizontalOffset = 0;
+                serverPickPopup.VerticalOffset = -h;
                 serverPickPopup.IsOpen = true;
             }
             else serverPickPopup.IsOpen = false;
