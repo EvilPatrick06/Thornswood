@@ -75,6 +75,19 @@ function PluginList([string]$path, [string[]]$lines) {
     [IO.File]::WriteAllText($path, $text + "`r`n", (New-Object Text.UTF8Encoding($false)))
 }
 
+# One flattened mod attribute in state.v2, byte for byte as Vortex writes it:
+# the key joined by ###, one length byte, then the value's JSON. This is how
+# the installed collection's slug and revision are recorded now that the mod
+# folder is named for an opaque id rather than the collection.
+function Attr([string]$modId, [string]$name, [string]$valueJson) {
+    $b = [Collections.Generic.List[byte]]::new()
+    $b.AddRange([Text.Encoding]::ASCII.GetBytes("persistent###mods###skyrimse###$modId###attributes###$name"))
+    $b.Add([byte]$valueJson.Length)
+    $b.AddRange([Text.Encoding]::ASCII.GetBytes($valueJson))
+    $b.AddRange([Text.Encoding]::ASCII.GetBytes([char]1 + 'persistent###mods###skyrimse'))
+    return $b.ToArray()
+}
+
 # A collection.json. Each rule is a hashtable with name and after or before,
 # names in lower case, as Vortex writes them. $null for a collection that
 # carries no plugin rules at all, which is revisions 2 to 4.
@@ -213,6 +226,21 @@ try {
     $emptyAppData = Join-Path $root 'EmptyAppData'
     $null = New-Item -ItemType Directory -Force -Path $emptyAppData
 
+    # The same machine as Vortex lays it out TODAY: the mod folder is named
+    # for an opaque mod id, not the collection, and the slug and revision live
+    # in state.v2. state maps the slug to the folder, and the revision comes
+    # from state, not from the folder name.
+    $appDataNew = Join-Path $root 'AppDataNew'
+    $modsNew = Join-Path $appDataNew 'Vortex\skyrimse\mods'
+    $modId = 'vortex_collection_ZRT7NjhN_'
+    Collection (Join-Path $modsNew ($modId + '\collection.json')) $chain
+    $stateNew = Join-Path $appDataNew 'Vortex\state.v2'
+    $null = New-Item -ItemType Directory -Force -Path $stateNew
+    $sb = [Collections.Generic.List[byte]]::new()
+    $sb.AddRange([byte[]](Attr $modId 'collectionSlug' '"7essxf"'))
+    $sb.AddRange([byte[]](Attr $modId 'revisionNumber' '5'))
+    [IO.File]::WriteAllBytes((Join-Path $stateNew '000200.log'), $sb.ToArray())
+
     # Everything the runs may read, so the last check can prove none was written.
     # Every path, and every file's size and write time. Not a folder's write
     # time: measured on the first run of this harness, NTFS moved the times of
@@ -300,6 +328,14 @@ try {
         $r = Run @('-Root', $machineOther)
         Yes 'config.json names the collection: it reads that one''s revision 9' (Has $r.Out 'revision 9,')
         Yes 'which carries no rules, so it fails (exit 1)' ($r.Code -eq 1)
+
+        # The new naming: the folder is vortex_collection_<id>_ and the number
+        # is in state. It must still be found, and the revision still read.
+        $env:APPDATA = $appDataNew
+        $r = Run @('-Root', $machine)
+        Yes 'the vortex_collection_<id> folder is found through state (exit 0)' ($r.Code -eq 0)
+        Yes 'and the revision reads from state, not the folder name' (Has $r.Out 'revision 5,')
+        Yes 'and the folder it read is the opaque one Vortex writes now' (Has $r.Out 'vortex_collection_ZRT7NjhN_')
 
         $env:APPDATA = $emptyAppData
         $r = Run @('-Root', $machine)
