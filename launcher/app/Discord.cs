@@ -1010,12 +1010,16 @@ namespace Thornswood
                     {
                         using (var r = new StreamReader(res.GetResponseStream())) reply = r.ReadToEnd();
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Discord.Send, reading refusal body", ex); }
                     return (int)res.StatusCode;
                 }
                 return 0;
             }
-            catch { return 0; }
+            catch (Exception ex)
+            {
+                Swallow.Note("Discord.Send", ex);
+                return 0;
+            }
         }
 
         /// <summary>
@@ -1054,12 +1058,16 @@ namespace Thornswood
                     {
                         using (var r = new StreamReader(res.GetResponseStream())) reply = r.ReadToEnd();
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Discord.PostBytes, reading refusal body", ex); }
                     return (int)res.StatusCode;
                 }
                 return 0;
             }
-            catch { return 0; }
+            catch (Exception ex)
+            {
+                Swallow.Note("Discord.PostBytes", ex);
+                return 0;
+            }
         }
 
         // Small enough to not want a JSON library for. Flat objects only, which
