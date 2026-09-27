@@ -121,9 +121,8 @@ namespace Thornswood
         static Button btnVoiceTest;
         static TextBlock txtVoiceState;
         static Button btnUninstall, btnServerStart, btnServerStop;
-        static Button btnDevInstall, btnDevRemove;
-        static TextBlock txtBrandSmall, txtBrandBig, txtDevState;
-        static StackPanel pnlDev;
+        static Button btnServerMain, btnServerDev;
+        static TextBlock txtBrandSmall, txtBrandBig, txtServerPick, noteServerPick;
         static TextBlock txtServerState;
         static Border updateBar, mineCard;
         static Border downgradeBar;
@@ -602,8 +601,8 @@ namespace Thornswood
             btnOpenLog = F<Button>("BtnOpenLog"); btnOpenSaves = F<Button>("BtnOpenSaves");
             btnRepair = F<Button>("BtnRepair"); btnRestore = F<Button>("BtnRestore");
             btnIcons = F<Button>("BtnIcons");
-            btnDevInstall = F<Button>("BtnDevInstall"); btnDevRemove = F<Button>("BtnDevRemove");
-            txtDevState = F<TextBlock>("TxtDevState"); pnlDev = F<StackPanel>("PnlDev");
+            btnServerMain = F<Button>("BtnServerMain"); btnServerDev = F<Button>("BtnServerDev");
+            txtServerPick = F<TextBlock>("TxtServerPick"); noteServerPick = F<TextBlock>("NoteServerPick");
             txtBrandSmall = F<TextBlock>("TxtBrandSmall"); txtBrandBig = F<TextBlock>("TxtBrandBig");
             btnUninstall = F<Button>("BtnUninstall"); chkKeepSaves = F<CheckBox>("ChkKeepSaves");
             chkDeleteMods = F<CheckBox>("ChkDeleteMods");
@@ -1074,7 +1073,7 @@ namespace Thornswood
                 if (txtBrandBig != null) txtBrandBig.Text = "ThornsWood Dev";
                 try { win.Title = "Thornswood Dev"; } catch { }
             }
-            DrawDevBuild();
+            DrawServerPick();
             boxSearch.Text = SearchHint;
             boxSearch.Foreground = Res("Faint");
 
@@ -1265,34 +1264,8 @@ namespace Thornswood
             {
                 btnUninstall.Click += delegate { DoUninstall(); };
             }
-            btnDevInstall.Click += delegate
-            {
-                if (DevBuild.Installed)
-                {
-                    try
-                    {
-                        Process.Start(new ProcessStartInfo(DevBuild.Exe) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(DevBuild.Exe) });
-                        Log("Opened the dev build.");
-                    }
-                    catch (Exception ex) { Log("Could not open the dev build: " + ex.Message); }
-                }
-                else
-                {
-                    try { Log(DevBuild.Install(cfg)); }
-                    catch (Exception ex) { Log("Could not install the dev build: " + ex.Message); }
-                }
-                DrawDevBuild();
-            };
-            btnDevRemove.Click += delegate
-            {
-                var r = MessageBox.Show(
-                    "Remove the dev build?\n\nThe second launcher and its folder go. Characters on the dev server stay on the server, and this build is not touched.",
-                    "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                if (r != MessageBoxResult.Yes) return;
-                try { Log(DevBuild.Remove()); }
-                catch (Exception ex) { Log("Could not remove the dev build: " + ex.Message); }
-                DrawDevBuild();
-            };
+            if (btnServerDev != null) btnServerDev.Click += delegate { SwitchToDev(); };
+            if (btnServerMain != null) btnServerMain.Click += delegate { SwitchToMain(); };
 
             btnOpenSaveFolder.Click += delegate { Open(Files.SaveDir); };
             btnOpenLogFolder.Click += delegate { Open(Files.SkseLogDir); };
@@ -3886,29 +3859,154 @@ namespace Thornswood
         // The probe waits on a socket, so it does not run on the thread that
         // draws. A settings page that freezes for most of a second every time
         // it is opened is worse than one that fills in a moment later.
-        /// <summary>The dev build card on Settings: what is installed and what the buttons do.</summary>
-        static void DrawDevBuild()
+        /// <summary>
+        /// The server selector on the Play page (#605): which server this build
+        /// joins, main or dev, and the buttons to switch. The two servers are two
+        /// launcher installs; the dev build is a second launcher in its own folder.
+        /// The button that is the build you are on is drawn greyed as the current
+        /// one, and the other switches: to dev by opening or installing the dev
+        /// build, to main by opening the main launcher beside it.
+        /// </summary>
+        static void DrawServerPick()
         {
-            if (btnDevInstall == null || btnDevRemove == null || txtDevState == null) return;
-            // The card is for the roles the dev build is for. It shows once
-            // the site has said yes at a check in, or when a dev build is
-            // already installed here, and on the dev build itself.
-            bool allowed = cfg.IsDev || Discord.DevAllowed || DevBuild.Installed;
-            if (pnlDev != null) pnlDev.Visibility = allowed ? Visibility.Visible : Visibility.Collapsed;
-            if (!allowed) return;
+            if (btnServerMain == null || btnServerDev == null || txtServerPick == null) return;
             if (cfg.IsDev)
             {
-                txtDevState.Text = "This is the dev build. It follows the dev branch and joins the dev server on port " + cfg.ServerPort + ". The main build is the one you installed first, and it is not touched from here.";
-                btnDevInstall.Visibility = Visibility.Collapsed;
-                btnDevRemove.Visibility = Visibility.Collapsed;
+                txtServerPick.Text = "You are on the dev build. It joins the dev server on port " + cfg.ServerPort + ".";
+                if (noteServerPick != null)
+                    noteServerPick.Text = "The main build is the one you installed first, and it is not touched from here. Switch back to it to play on the main server.";
+                btnServerDev.IsEnabled = false;
+                btnServerDev.Content = "Dev server";
+                btnServerMain.IsEnabled = true;
+                btnServerMain.Content = "Switch to the main server";
                 return;
             }
+            txtServerPick.Text = "You are on the main server.";
             bool have = DevBuild.Installed;
-            btnDevInstall.Content = have ? "Open the dev build" : "Install the dev build";
-            btnDevRemove.Visibility = have ? Visibility.Visible : Visibility.Collapsed;
-            txtDevState.Text = have
-                ? "Installed at " + DevBuild.Root + ". It has its own Start menu entry, Thornswood Dev, and updates itself from the dev branch."
-                : "Not installed. Installing copies this launcher into " + DevBuild.Root + " and opens it. Nothing about this build changes.";
+            if (noteServerPick != null)
+                noteServerPick.Text = have
+                    ? "The dev build is installed at " + DevBuild.Root + ". Switch to it to test on the dev server; this build is not touched."
+                    : "The dev build is a second launcher for testing on the dev server. Staff roles only; the launcher checks your Discord roles before it installs it.";
+            btnServerMain.IsEnabled = false;
+            btnServerMain.Content = "Main server";
+            btnServerDev.IsEnabled = true;
+            btnServerDev.Content = have ? "Open the dev build" : "Switch to the dev server";
+        }
+
+        /// <summary>
+        /// Switch to the dev server from the Play page. If the dev build is
+        /// already installed it is opened. If it is not, the site is asked
+        /// whether this account's Discord roles allow the dev build, and only a
+        /// yes offers the install. Kept off the window's thread for the check.
+        /// </summary>
+        static void SwitchToDev()
+        {
+            if (cfg.IsDev) return;
+
+            if (DevBuild.Installed)
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(DevBuild.Exe) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(DevBuild.Exe) });
+                    Log("Opened the dev build.");
+                }
+                catch (Exception ex) { Log("Could not open the dev build: " + ex.Message); }
+                return;
+            }
+
+            // The role check is the site asking Discord about this account, so
+            // there has to be an account to ask about first.
+            if (!Discord.Linked)
+            {
+                MessageBox.Show(win,
+                    "Connect Discord on the Play page first. The launcher checks your Discord roles before it installs the dev build.",
+                    "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            Log("Checking whether your Discord roles allow the dev build...");
+            if (btnServerDev != null) btnServerDev.IsEnabled = false;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                Standing st;
+                try { st = Discord.Join(); }
+                catch (Exception ex)
+                {
+                    st = new Standing();
+                    st.Ok = false;
+                    st.Why = "offline";
+                    st.Message = "Could not reach thornswood.net: " + ex.Message;
+                }
+
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    try
+                    {
+                        // Discord.Join has already written dev-allowed.txt when the
+                        // answer carried the flag, so DrawServerPick in the finally
+                        // reflects the fresh answer either way.
+                        if (st.Why == "offline" || st.Why == "could not ask Discord")
+                        {
+                            MessageBox.Show(win,
+                                "Could not reach thornswood.net to check your roles just now. Try again in a minute.",
+                                "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+                        if (st.Why == "link")
+                        {
+                            MessageBox.Show(win,
+                                "Connect Discord on the Play page first, then try again.",
+                                "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
+                            return;
+                        }
+                        if (!st.Dev)
+                        {
+                            MessageBox.Show(win,
+                                "The dev build is for the staff roles: Owner, Dev, Gamemaster, Moderator and Loremaster. Your account does not have one; ask Patrick if you need it.",
+                                "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+
+                        var r = MessageBox.Show(win,
+                            "Your roles allow the dev build. Install it?\n\nIt copies this launcher into " + DevBuild.Root +
+                            " and opens it. It follows the dev branch and joins the dev server; this build is not touched.",
+                            "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                        if (r != MessageBoxResult.Yes) return;
+                        try { Log(DevBuild.Install(cfg)); }
+                        catch (Exception ex) { Log("Could not install the dev build: " + ex.Message); }
+                    }
+                    finally
+                    {
+                        if (btnServerDev != null) btnServerDev.IsEnabled = true;
+                        DrawServerPick();
+                    }
+                }));
+            });
+        }
+
+        /// <summary>
+        /// Switch back to the main server from the dev build: open the main
+        /// launcher beside this one. Never installs or touches the main build,
+        /// only opens what is already there.
+        /// </summary>
+        static void SwitchToMain()
+        {
+            if (!cfg.IsDev) return;
+            if (DevBuild.MainInstalled)
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(DevBuild.MainExe) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(DevBuild.MainExe) });
+                    Log("Opened the main build.");
+                }
+                catch (Exception ex) { Log("Could not open the main build: " + ex.Message); }
+            }
+            else
+            {
+                MessageBox.Show(win,
+                    "The main build is not at " + DevBuild.MainRoot + ". Install it again from thornswood.net.",
+                    "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         static void DoUninstall()
@@ -4527,7 +4625,7 @@ namespace Thornswood
                         btnPlay.IsEnabled = true;
                         RefreshDiscord();
                         DrawStatus();
-                        DrawDevBuild();
+                        DrawServerPick();
                     });
                 return;
             }

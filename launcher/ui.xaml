@@ -706,6 +706,33 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
+                  <!-- The server selector (#605). Which server this build joins,
+                       main or dev, and the buttons to switch. The two servers are
+                       two launcher installs: the dev build is a second launcher in
+                       its own folder. Switching to dev opens it when it is already
+                       here, or checks the person's Discord roles and offers to
+                       install it only when they may. Moved off Settings, where the
+                       old dev-build card used to live. -->
+                  <StackPanel x:Name="ServerPickCard">
+                    <TextBlock Text="Server" Style="{StaticResource Eyebrow}"/>
+                    <Border Style="{StaticResource Slab}">
+                      <StackPanel>
+                        <TextBlock x:Name="TxtServerPick" Style="{StaticResource Body}"
+                                   Text="You are on the main server."/>
+                        <TextBlock x:Name="NoteServerPick" Style="{StaticResource Small}"
+                                   Foreground="{DynamicResource Muted}" TextWrapping="Wrap"
+                                   Margin="0,6,0,0"
+                                   Text="The dev build is a second launcher for testing on the dev server. Staff roles only; the launcher checks your Discord roles before it installs it."/>
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                          <Button x:Name="BtnServerMain" Style="{StaticResource Ghost}"
+                                  Content="Main server" Margin="0,0,8,0"/>
+                          <Button x:Name="BtnServerDev" Style="{StaticResource Ghost}"
+                                  Content="Switch to the dev server"/>
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+
                   <!-- Discord is the door. The launcher asks the site who you are
                        every time you press Play, so this has to be linked before
                        the game will start. -->
@@ -1237,17 +1264,9 @@
                     <!-- Repair, Restore Windows folders and Refresh the shortcut icon
                          moved to Diagnostics, Scan and Fix (#607). -->
 
-                    <StackPanel x:Name="PnlDev">
-                      <TextBlock Style="{StaticResource H2}" Text="The dev build"/>
-                      <TextBlock Style="{StaticResource Body}" Text="A second launcher beside this one, in its own folder with its own Start menu entry. It gets new changes first and joins the dev server, so things get broken there instead of here. Same Skyrim, same mods; each launcher puts its own files back before it plays. Characters on the dev server are separate, and they are throwaway. The Owner and Dev roles only."/>
-                      <TextBlock x:Name="TxtDevState" Style="{StaticResource Small}" Margin="0,8,0,0"/>
-                      <StackPanel Orientation="Horizontal" Margin="0,13,0,0">
-                        <Button x:Name="BtnDevInstall" Style="{StaticResource Ghost}" Content="Install the dev build" Margin="0,0,8,0"/>
-                        <Button x:Name="BtnDevRemove" Style="{StaticResource Ghost}" Content="Remove the dev build"/>
-                      </StackPanel>
-
-                      <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
-                    </StackPanel>
+                    <!-- The dev-build card moved to the Server selector on the Play
+                         page (#605). Choosing the dev server there installs or opens
+                         the dev build, after the same Discord role check. -->
 
                     <TextBlock Style="{StaticResource H2}" Text="Uninstall ThornsWood"/>
                     <TextBlock Style="{StaticResource Body}" Text="Puts your Windows Skyrim folders back, then deletes this build and the launcher with it. Your own Skyrim in Steam is never touched: this is a separate copy and Steam does not know it exists. There is no undo, and the whole thing has to be downloaded again afterwards."/>

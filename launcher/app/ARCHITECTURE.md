@@ -347,8 +347,12 @@ ShellUninstall.cs).
 
 **DevBuild** (DevBuild.cs). The second launcher in `<Root>-DevBuild`, made
 from the main one's files with the channel set to dev and the dev ports (game
-7787, voice 7789). It has its own Profile, and makes its own `Game` folder the
-same way from its own Settings, under Maintenance.
+7787, voice 7789). It is installed and opened from the Server card on the main
+build's Play page (`Shell.cs DrawServerPick()`, `SwitchToDev()`), which checks
+the person's Discord roles before it offers the install (#605); `MainRoot` and
+`MainExe` are the way back the dev build's own Server card opens the main
+launcher. It has its own Profile, and makes its own `Game` folder the same way
+from its own Settings, under Maintenance.
 
 **Smaller pieces.** Stats.cs (`Profile\stats.txt`), Leaks.cs (the shipped sign
 in file), Icons.cs (the shortcut icon), Firewall.cs (the rule for the game's
