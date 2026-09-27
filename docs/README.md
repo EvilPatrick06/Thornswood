@@ -16,6 +16,7 @@ CONTRIBUTING.md at the root; the long form is DEVELOPING.md.
 | [OWNERSHIP.md](OWNERSHIP.md) | Who holds each credential, account and build, and who the second holder is. |
 | [CLEAN-INSTALL-RUN.md](CLEAN-INSTALL-RUN.md) | The checklist for a stranger's first install, and what each step should show. |
 | [COLLECTION-METHOD.md](COLLECTION-METHOD.md) | Why the mods come from a Nexus collection (half of the 15 September plan was reversed; it says which). |
+| [VIRUSTOTAL-FALSE-POSITIVE.md](VIRUSTOTAL-FALSE-POSITIVE.md) | Why scanners flag the unsigned setup program, and the checklist for reporting each flagged hash to the vendors. |
 | [JKS-SKYRIM.md](JKS-SKYRIM.md), [GOURMET-FISHING-PATCH.md](GOURMET-FISHING-PATCH.md) | Records of two mod decisions and the patch made for one. |
 | [archive](archive) | Dated snapshots, history only. |
 
