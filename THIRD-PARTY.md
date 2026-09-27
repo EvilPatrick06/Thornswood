@@ -414,8 +414,10 @@ branch any more.
   installer also hands `GPL-3.0.txt`, `AGPL-3.0.txt` and `WebView2-LICENSE.txt`
   into the install folder beside `SOURCE CODE.txt` (Package-Thornswood.ps1
   stages them from `installer\licences`, Setup copies them, Uninstall removes
-  them). The launcher's updates and the release pages on GitHub still say
-  nothing about source beside the feed files themselves.
+  them). GitHub release pages for update packs now append a short source
+  footer (Publish-Update.ps1 `Get-ReleaseSourceFooter`, also Publish-Pack.ps1
+  and the launcher draft notes in `.github/workflows/release.yml`) naming the
+  recorded fork trees and https://thornswood.net/credits#source.
 - The Client Runtime's README names the fork's branch and no commit, and
   `___systemPolyfill.js` is gone from that branch, so the README's directions
   do not lead to that file's source. The exact place is under "Where the
