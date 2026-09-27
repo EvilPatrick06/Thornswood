@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -46,8 +46,8 @@ namespace Thornswood
         public static string Default()
         {
             string s = "";
-            try { s = Endpoint(eCommunications); } catch { }
-            if (s.Length == 0) { try { s = Endpoint(eConsole); } catch { } }
+            try { s = Endpoint(eCommunications); } catch (Exception ex) { Swallow.Note("Mics.Default, communications endpoint", ex); }
+            if (s.Length == 0) { try { s = Endpoint(eConsole); } catch (Exception ex) { Swallow.Note("Mics.Default, console endpoint", ex); } }
             return s;
         }
 
@@ -74,11 +74,11 @@ namespace Thornswood
                         string n = NameOf(dev);
                         if (n.Length > 0) outp.Add(n);
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Mics.All, reading one device", ex); }
                     finally { Release(dev); }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Mics.All, enumerating devices", ex); }
             finally { Release(col); Release(en); }
             return outp;
         }
@@ -210,7 +210,7 @@ namespace Thornswood
                     if (v.vt != 31 || v.pointerValue == IntPtr.Zero) return "";
                     return Marshal.PtrToStringUni(v.pointerValue) ?? "";
                 }
-                finally { try { PropVariantClear(ref v); } catch { } }
+                finally { try { PropVariantClear(ref v); } catch (Exception ex) { Swallow.Note("Mics.NameOf, PropVariantClear", ex); } }
             }
             catch { return ""; }
             finally { Release(store); }
@@ -219,7 +219,7 @@ namespace Thornswood
         static void Release(object o)
         {
             if (o == null) return;
-            try { if (Marshal.IsComObject(o)) Marshal.ReleaseComObject(o); } catch { }
+            try { if (Marshal.IsComObject(o)) Marshal.ReleaseComObject(o); } catch (Exception ex) { Swallow.Note("Mics.Release", ex); }
         }
 
         [DllImport("ole32.dll")]
