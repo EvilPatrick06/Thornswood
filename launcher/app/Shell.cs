@@ -3050,23 +3050,26 @@ namespace Thornswood
 
             quickKeys.Children.Clear();
 
-            // Read out of the real files rather than typed here. The old list
-            // was five hardcoded lines and it went stale the moment the build
-            // moved off Skyrim Together: it was still offering an F2 party menu
-            // that no longer exists and a trade key belonging to a mod that had
-            // been removed. A row now appears only if its binding is really
-            // there, and it shows the key it is really bound to.
+            // Read out of the real files rather than typed here. A hardcoded
+            // list went stale the moment the build moved off Skyrim Together:
+            // it was still offering an F2 party menu that no longer exists and
+            // a trade key belonging to a mod that had been removed. A row now
+            // appears only if its binding is really there, and it shows the key
+            // it is really bound to.
+            //
+            // The five that matter first for somebody joining the server: the
+            // emote wheel, and the four keys that only make sense here, trade,
+            // party, friend and journal. All are Thornswood's own, in
+            // Thornswood.ini, so each shows the key it is really bound to and
+            // the fuller Controls page below carries the rest.
             List<Keys.Binding> keys;
             try { keys = Keys.All(); } catch { keys = new List<Keys.Binding>(); }
 
-            AddKeyFor(keys, "emotewheel", "The emote wheel");
-            AddKeyFor(keys, "emotestop",  "Stand up out of an idle");
-            AddKeyFor(keys, "menu",       "Mod settings");
-            AddKeyFor(keys, "lock",       "Lock on to what you are aiming at");
-            AddKeyFor(keys, "search",     "Search your inventory");
-
-            // Not from a file: Skyrim's own, and the same on every install.
-            AddKey("E / R", "Take one item, or the lot, at a container");
+            AddKeyFor(keys, "emotewheel", "The emote wheel of gestures and animations, seen by everyone near you.");
+            AddKeyFor(keys, "tradewith",  "Offer a trade to whoever you are looking at.");
+            AddKeyFor(keys, "party",      "Your friends, who is online, and your party.");
+            AddKeyFor(keys, "friendkey",  "Add or remove the friend you are looking at.");
+            AddKeyFor(keys, "journal",    "Your journals, their pages, and sharing them.");
         }
 
         static void AddKeyFor(List<Keys.Binding> all, string id, string what)
