@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   Builds the launcher and publishes everything that changed, launcher and
   mods both, in a single release, to the main build or the dev build.
@@ -370,6 +370,8 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Wr
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
+# Launcher / setup-stub .pdb stay on this machine only (Ship-Rules, issue #462).
+. (Join-Path $Here 'Ship-Rules.ps1')
 # version.json lives in the public releases clone now, beside the source one.
 # Falls back to the source repo when that clone is not there yet, which is the
 # same thing Publish-Update does, so both agree about where the feed is.
@@ -845,6 +847,17 @@ if (-not $ModsOnly) {
         Die 'The launcher is not in place. Look at the errors above.'
     }
     Say ("  in place, {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
+    # Keep matching .pdb beside this release's version on the shipping machine.
+    # Packs, the installer and public release assets never carry them (#462).
+    $kept = @(Save-ShipSymbols $buildOut $target)
+    $stubPdb = Join-Path $Here '..\..\tools\setup-stub.pdb'
+    if (Test-Path -LiteralPath $stubPdb) {
+        $extra = @(Save-ShipSymbols (Split-Path -Parent (Resolve-Path $stubPdb)) $target)
+        if ($extra.Count -gt 0) { $kept = $kept + $extra }
+    }
+    if ($kept.Count -gt 0) {
+        Say ("  symbols kept under {0} ({1} file(s))" -f (Get-ShipSymbolDir $target), $kept.Count) 'DarkGray'
+    }
     if ($Dev -and $target -ne $current) {
         $back = Get-Content $updaterCs -Raw
         $back = $back -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $current + '"')
