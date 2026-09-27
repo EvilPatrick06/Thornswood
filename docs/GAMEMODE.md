@@ -204,8 +204,8 @@ In the server's folder, `C:\Thornswood-Server` live and
 
 ## Generated tables
 
-Never hand edit these. Each script writes its json in `tools` and then
-replaces its own block or line in `gamemode.js`. Run the Build-Recipe step
+Never hand edit these. Each script writes its json in `game\data` and then
+replaces its own block or line in `game\gamemode.js`. Run the Build-Recipe step
 after the ore, harvest, hunt and race tables, and Build-Bench after it,
 because each reads the one before.
 
@@ -252,7 +252,7 @@ Everything goes to the dev server first.
   and writes `server-settings.json` and the load order; it does not talk to
   the VPS (`scripts\deploy\Deploy-Gamemode.ps1:208`). Then `.\scripts\deploy\Deploy-Server.ps1`
   stages the build on the VPS, warns, swaps and restarts
-  (`scripts\deploy\Deploy-Server.ps1:410-422` takes `gamemode.js` from `tools`).
+  (`scripts\deploy\Deploy-Server.ps1:410-422` takes `gamemode.js` from `game`).
 
 Ship does not carry `gamemode.js`. `.\scripts\vps\Check-LiveGamemode.ps1` says
 whether the live server runs the file in this repository, by hash.

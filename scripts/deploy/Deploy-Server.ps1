@@ -414,7 +414,7 @@ if (Test-Path -LiteralPath $src) {
   $b = if (Test-Path -LiteralPath $built) { (Get-Item $built).Length } else { -1 }
   if ($a -ne $b) {
     Copy-Item $src $built -Force
-    Write-Host ("  gamemode.js taken from tools ({0:N0} bytes, build had {1})" -f `
+    Write-Host ("  gamemode.js taken from game ({0:N0} bytes, build had {1})" -f `
       $a, $(if ($b -lt 0) { 'none' } else { '{0:N0}' -f $b })) -ForegroundColor DarkGray
   }
 }
