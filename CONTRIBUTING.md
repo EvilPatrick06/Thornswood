@@ -27,6 +27,19 @@ reads the same file. CLAUDE.md only adds what is about a Claude. More people
 are planned; a new developer goes in this table, in CODEOWNERS beside the
 shared files, and on both repositories as a collaborator.
 
+Patrick's Grok Bot lanes (Smeagle, Launcher, Installer, Website, GitHub,
+Vortex) also work here, on the shipping machine, under his GitHub account.
+Every rule in this file binds them the same as a person. They share notes
+through an Obsidian vault at `C:\Thornswood Vault\Thornswood` on that machine
+(`wiki/status.md` is what is true now); the vault is for coordinating, and
+the board is still the one record of work. They mark what they are on with a
+`claimed: <lane>` label and the board card moved to In Progress. Their
+branches carry the lane's name (`launcher/`, `website/`, `github/` and so on).
+On the shipping machine `C:\Users\evilp\Downloads\Thornswood-Repo` is shared
+by all of them and sits detached at `origin/main`, because lanes build from
+it: branch work goes in a worktree beside it, removed with its branch once
+the pull request merges.
+
 
 ## Words
 
@@ -170,6 +183,14 @@ the team before code; nobody settles it alone, and a Claude never does.
   anybody on the team merges their own pull request once `Launcher builds`
   (the build check, on the VPS) is green and they have said what it is in
   #staff-general. Nobody waits for Patrick. Force pushes are refused.
+  Because nothing enforces it, it has to be kept by hand: on 25 Sep 35 pull
+  requests were merged with their VPS build red and 18 with no build at all,
+  and main went red with them. Wait for `Launcher builds` to say pass before
+  merging, every time, including your own and including a Claude's. The one
+  setting still left on is "require branches to be up to date", with no check
+  listed; Patrick turns it off with
+  `gh api -X DELETE repos/EvilPatrick06/Thornswood/branches/main/protection/required_status_checks`
+  (a Claude session was refused doing it, 27 Sep).
   What changed on 23 Sep, since 22 Sep: the review requirement was one
   approving review, which Patrick could not give himself and had to override
   with `--admin` on every one of his own pull requests, and it is now zero.
@@ -212,7 +233,16 @@ the team before code; nobody settles it alone, and a Claude never does.
   them from the side of the person playing: a title that says what changed
   for them, then one "- " line for each thing they will notice, saying what
   it does and what to do if anything. Ship refuses a title under three words
-  or notes with no "- " line. The shape:
+  or notes with no "- " line. Since 27 Sep it also refuses notes that say
+  what only we would understand (scripts\release\Note-Rules.ps1): the word
+  player, an em dash, an issue or pull request number, "PR", a code file or
+  a setting name (WEBVIEW2_LIKE_THIS), a name out of the code (PutInServerOrder,
+  camelCase), our own words for how we work (demoting, worktree, squash, CI),
+  and the same line twice. On 26 and 27 Sep all of those went out to the
+  launcher, the site and Discord. And "The load order moved, so start a new
+  character" is added by Publish-Update only when the plugins that are on, or
+  their order, really changed; it used to follow any byte of plugins.txt and
+  told testers to start over three times in two days. The shape:
 
   ```
   .\scripts\release\Ship.ps1 -Channel dev "The Downgrade button shows its progress and says why it stopped
@@ -284,8 +314,8 @@ machine, from the repo folder.
      saying what it does for them and how to use it: the key, the button, the
      place. Never one line, and never branch names, pull request numbers or
      entry numbers. The dev post of 24 September 14:36 is the shape to copy.
-     Ship warns about a one-line note and carries on, so the warning is not
-     the check.
+     Ship refuses notes that break this (see "Every release note has a title
+     and details" above), before it builds anything.
    - The gamemode behind that dev release: `.\scripts\deploy\Deploy-DevGamemode.ps1`.
      `Deploy-Gamemode.ps1` then `Deploy-Server.ps1` is the live pair.
    - The site's app or `site\public`: `.\scripts\deploy\Deploy-Docs.ps1`.
