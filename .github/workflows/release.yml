@@ -102,9 +102,39 @@ jobs:
           # A draft: a person promotes it, and Ship reads a draft's assets. If a
           # run for this tag already made the release, upload into it instead,
           # the same fallback Publish-Update.ps1 uses.
-          & gh release create $tag $exe $sums --draft --title "Launcher $tag" --notes $notes
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host 'A release for this tag exists, uploading the assets into it instead.'
-            & gh release upload $tag $exe $sums --clobber
-            if ($LASTEXITCODE -ne 0) { Write-Host '::error::could not attach the launcher to the release'; exit 1 }
+          # Use the GitHub REST API directly; the dedicated runner does not
+          # require the GitHub CLI to be installed on its PATH.
+          $repo = $env:GITHUB_REPOSITORY
+          $api = "https://api.github.com/repos/$repo"
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $release = $null
+          try {
+            $release = Invoke-RestMethod -Method Get -Uri "$api/releases/tags/$tag" -Headers $headers -ErrorAction Stop
+          } catch {
+            if ($_.Exception.Response.StatusCode.value__ -ne 404) { throw }
+          }
+          if (-not $release) {
+            $payload = @{
+              tag_name = $tag
+              target_commitish = $env:GITHUB_SHA
+              name = "Launcher $tag"
+              body = $notes
+              draft = $true
+              prerelease = $false
+            } | ConvertTo-Json
+            $release = Invoke-RestMethod -Method Post -Uri "$api/releases" -Headers $headers -ContentType 'application/json' -Body $payload
+          }
+          foreach ($asset in @($exe, $sums)) {
+            $assetName = [IO.Path]::GetFileName($asset)
+            $existing = @($release.assets | Where-Object { $_.name -eq $assetName })
+            foreach ($item in $existing) {
+              Invoke-RestMethod -Method Delete -Uri "$api/releases/assets/$($item.id)" -Headers $headers -ErrorAction Stop | Out-Null
+            }
+            $encodedName = [Uri]::EscapeDataString($assetName)
+            $uploadUri = "https://uploads.github.com/repos/$repo/releases/$($release.id)/assets?name=$encodedName"
+            Invoke-RestMethod -Method Post -Uri $uploadUri -Headers $headers -ContentType 'application/octet-stream' -InFile $asset -ErrorAction Stop | Out-Null
           }
