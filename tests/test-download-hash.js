@@ -73,8 +73,8 @@ async function main() {
       "$exeItem = Get-Item -LiteralPath '" + exe.replace(/'/g, "''") + "'",
       hashLine,
       "$Version = 'launcher 1.2.3'",
-      "$exeOut = 'Thornswood-Setup-20260924-0100.exe'",
-      "$zipOut = 'Thornswood-Setup-20260924-0100.zip'",
+      "$exeOut = 'Thornswood-Setup.exe'",
+      "$zipOut = 'Thornswood-Setup.zip'",
       'foreach ($single in @($true, $false)) {',
       metaBlock,
       '  $meta | ConvertTo-Json -Depth 4 -Compress',
@@ -103,7 +103,7 @@ async function main() {
       for (let i = 0; i < lines.length; i++) {
         let meta = {};
         try { meta = JSON.parse(lines[i]); } catch (e) { }
-        const e = meta['Thornswood-Setup-20260924-0100.exe'] || {};
+        const e = meta['Thornswood-Setup.exe'] || {};
         const kind = i === 0 ? 'one file build' : 'pair';
         yes(kind + ': files.json gets the exe\'s SHA-256 under sha256',
             String(e.sha256 || '').toLowerCase() === want);
@@ -121,14 +121,14 @@ async function main() {
     fs.mkdirSync(files);
     const exeBytes = Buffer.from('the exe');
     const good = sha(exeBytes);
-    fs.writeFileSync(path.join(files, 'Thornswood-Setup-20260924-0100.exe'), exeBytes);
-    fs.writeFileSync(path.join(files, 'Thornswood-Setup-20260924-0100.zip'), 'the zip');
+    fs.writeFileSync(path.join(files, 'Thornswood-Setup.exe'), exeBytes);
+    fs.writeFileSync(path.join(files, 'Thornswood-Setup.zip'), 'the zip');
     fs.writeFileSync(path.join(files, 'notes.txt'), 'no entry in files.json');
     const meta = {
       // Get-FileHash writes upper case.
-      'Thornswood-Setup-20260924-0100.exe': { label: 'Thornswood installer',
+      'Thornswood-Setup.exe': { label: 'Thornswood installer',
         version: 'launcher 1.2.3', sha256: good.toUpperCase() },
-      'Thornswood-Setup-20260924-0100.zip': { label: 'payload', hidden: true,
+      'Thornswood-Setup.zip': { label: 'payload', hidden: true,
         sha256: '"><img src=x onerror=alert(1)>' }
     };
     fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(meta));
@@ -141,17 +141,17 @@ async function main() {
       return by;
     };
     const by = list();
-    const e = by['Thornswood-Setup-20260924-0100.exe'] || {};
+    const e = by['Thornswood-Setup.exe'] || {};
     yes('/api/public carries the exe\'s sha256', e.sha256 === good);
     yes('in lower case', e.sha256 === good.toLowerCase());
     yes('a value that is not a SHA-256 does not go out',
-        (by['Thornswood-Setup-20260924-0100.zip'] || {}).sha256 === '');
+        (by['Thornswood-Setup.zip'] || {}).sha256 === '');
     yes('a file files.json says nothing about gets an empty one',
         (by['notes.txt'] || {}).sha256 === '');
     yes('and nothing that was there before is lost',
         e.label === 'Thornswood installer' && e.version === 'launcher 1.2.3' &&
         e.size === exeBytes.length && e.hidden === false &&
-        (by['Thornswood-Setup-20260924-0100.zip'] || {}).hidden === true);
+        (by['Thornswood-Setup.zip'] || {}).hidden === true);
 
     // VirusTotal fields no longer go out on /api/public.
     yes('listFiles does not emit vt', !('vt' in e));
@@ -161,9 +161,9 @@ async function main() {
     // Stale vtUrl / vtSkipped in files.json must not leak onto the API.
     const withMeta = (extra) => {
       const m = JSON.parse(JSON.stringify(meta));
-      Object.assign(m['Thornswood-Setup-20260924-0100.exe'], extra);
+      Object.assign(m['Thornswood-Setup.exe'], extra);
       fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(m));
-      return list()['Thornswood-Setup-20260924-0100.exe'] || {};
+      return list()['Thornswood-Setup.exe'] || {};
     };
     const leaked = withMeta({
       vtUrl: 'https://www.virustotal.com/gui/file/' + good,
@@ -193,10 +193,10 @@ async function main() {
       return new Promise((r) => setImmediate(() => r(html || '')));
     }
     const H = sha(Buffer.from('thornswood'));
-    const exe = (size, hash, extra) => Object.assign({ name: 'Thornswood-Setup-20260924-0100.exe', size: size,
+    const exe = (size, hash, extra) => Object.assign({ name: 'Thornswood-Setup.exe', size: size,
       at: 2, hidden: false, label: 'Thornswood installer', version: '2026-09-24 01:00',
       note: '', sha256: hash }, extra || {});
-    const zip = (hidden) => ({ name: 'Thornswood-Setup-20260924-0100.zip', size: 385154603,
+    const zip = (hidden) => ({ name: 'Thornswood-Setup.zip', size: 385154603,
       at: 1, hidden: hidden, label: 'payload', version: '', note: '', sha256: '' });
     const SIZE = /\d (KB|MB|GB)\b/;
     const small = (html) => {
