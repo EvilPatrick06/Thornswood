@@ -258,6 +258,16 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     Stub 'Publish-News' '' ''
     Stub 'Publish-Discord' '[switch]$Dev' ''
     Stub 'Request-Restart' '[double]$Minutes, [string]$Mode, [string]$Why, [string]$Data' ''
+    # The three that follow a tip. Each of the real ones reaches the VPS, the
+    # site or VirusTotal, so a dry run must not call any of them, and a real
+    # Ship must call all three. Ship reads each one's exit code and says at the
+    # end which did not complete, so these hand back 0 like the rest.
+    Stub 'Publish-SiteFeed' ('[string]$Channel, [string]$ReleaseDir, [string]$Root, [string]$DistRoot, ' +
+                             '[switch]$All, [switch]$Plan, [switch]$Offline, [switch]$NoVerify, [switch]$NoPause') ''
+    Stub 'Update-Launcher' ('[string]$Channel, [string]$ReleaseDir, [string]$Root, [string]$From, ' +
+                            '[switch]$NoInstall, [switch]$NoVerify, [switch]$NoPause') ''
+    Stub 'Publish-VirusTotal' ('[string]$Channel, [string]$Root, [string]$DistRoot, [switch]$CheckOnly, ' +
+                               '[switch]$NoPause') ''
     foreach ($n in 'git', 'gh', 'ssh', 'scp') {
         [IO.File]::WriteAllText((Join-Path $bin ($n + '.cmd')), "@echo off`r`n>>`"%TS_DRY_CALLS%`" echo %~n0 %*`r`nexit /b 0`r`n")
     }
@@ -307,7 +317,8 @@ if ($dir) {
     Yes ('D the installer is not built for the site: Package-Thornswood.ps1 is not called without -NoPublish' +
          $(if ($pk.Count) { ' (' + ($pk -join '; ') + ')' } else { '' })) (@($pk | Where-Object { $_ -notmatch ' -NoPublish\b' }).Count -eq 0)
     Yes 'D nothing goes on the site: Publish-Installer.ps1 is not called' ((Called $d 'Publish-Installer').Count -eq 0)
-    foreach ($n in 'Publish-News', 'Publish-Discord', 'Request-Restart') {
+    foreach ($n in 'Publish-News', 'Publish-Discord', 'Request-Restart',
+                   'Publish-SiteFeed', 'Update-Launcher', 'Publish-VirusTotal') {
         Yes "D $n.ps1 is not called" ((Called $d $n).Count -eq 0)
     }
     $gone = Away $d
@@ -326,7 +337,8 @@ if ($dir) {
     Yes ("V a dev -DryRun -Package runs to the end (exit {0})" -f $v.Code) ($v.Code -eq 0 -and $v.Out -match 'Dry run finished')
     $pub = Called $v 'Publish-Update'
     Yes 'V the publisher ran on dev, told not to upload and not to push' ($pub.Count -eq 1 -and $pub[0] -match ' -Channel dev\b' -and $pub[0] -match ' -NoUpload\b' -and $pub[0] -match ' -NoPush\b')
-    foreach ($n in 'Package-Thornswood', 'Publish-Installer', 'Publish-News', 'Publish-Discord', 'Request-Restart') {
+    foreach ($n in 'Package-Thornswood', 'Publish-Installer', 'Publish-News', 'Publish-Discord', 'Request-Restart',
+                   'Publish-SiteFeed', 'Update-Launcher', 'Publish-VirusTotal') {
         Yes "V $n.ps1 is not called" ((Called $v $n).Count -eq 0)
     }
     $gone = Away $v
@@ -348,6 +360,19 @@ if ($dir) {
     foreach ($n in 'Publish-News', 'Publish-Discord', 'Request-Restart') {
         Yes "R $n.ps1 is called" ((Called $r $n).Count -eq 1)
     }
+    # The three that follow a tip, on the main channel, each once, and each
+    # given the channel it is for. The mirror has to have the releases clone
+    # and the staging folder, because that is where the tip and its bytes are.
+    $mirror = Called $r 'Publish-SiteFeed'
+    Yes ('R the site feed is mirrored, for main, from the releases clone' + $(if ($mirror.Count) { ' (' + ($mirror -join '; ') + ')' } else { '' })) (
+        $mirror.Count -eq 1 -and $mirror[0] -match ' -Channel main\b' -and $mirror[0].Contains(' -ReleaseDir ' + $rel) -and
+        $mirror[0].Contains(' -DistRoot ' + $dist))
+    $upd = Called $r 'Update-Launcher'
+    Yes ('R the launcher update is read back, for main' + $(if ($upd.Count) { ' (' + ($upd -join '; ') + ')' } else { '' })) (
+        $upd.Count -eq 1 -and $upd[0] -match ' -Channel main\b' -and $upd[0] -match ' -From ')
+    $vt = Called $r 'Publish-VirusTotal'
+    Yes ('R VirusTotal is asked for a report, for main' + $(if ($vt.Count) { ' (' + ($vt -join '; ') + ')' } else { '' })) (
+        $vt.Count -eq 1 -and $vt[0] -match ' -Channel main\b')
     $gone = Away $r
     Yes 'R the shipped launcher is not compiled here: Build-Launcher.ps1 is not called' ((Called $r 'Build-Launcher').Count -eq 0)
     Yes ('R the launcher CI built is downloaded and verified: gh release download runs once (' + ($gone -join '; ') + ')') (
