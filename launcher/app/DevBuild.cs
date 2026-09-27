@@ -14,12 +14,12 @@ namespace Thornswood
     /// Made from the Server card on the Play page of the main build, out of the
     /// main build's own files: the launcher folder is copied, the config is copied with the
     /// channel, branch and ports changed, and the profile records that say
-    /// which packs are already in the shared game folder are copied so the
+    /// which packs are already applied are copied so the
     /// dev launcher does not try to re-apply a year of updates on its first
     /// start. Characters are not copied: the dev server is its own world.
     ///
-    /// Both launchers share the one Skyrim. Keep is what stops them treading
-    /// on each other's plugin and page files.
+    /// Each build makes its own Game folder (OwnGame). The Game folder is not
+    /// copied here; the new build offers to make one at first start.
     /// </summary>
     static class DevBuild
     {
@@ -105,17 +105,19 @@ namespace Thornswood
                 copied++;
             }
 
-            // What the profile knows that is true for the shared game folder:
-            // the golden plugin list, which packs are in, what they wrote, and
-            // the kept copies of our own Data\Platform files. Not the log,
-            // not the characters, not the stats.
+            // Profile facts worth carrying over: the golden plugin list, which
+            // packs are in, what they wrote, and the kept copies of our own
+            // Data\Platform files. Not the log, not the characters, not the
+            // stats. The Game folder is not copied; OwnGame makes one later.
             CopyDir(Paths.Golden, Path.Combine(root, "Profile\\Default"));
             CopyDir(Paths.PacksDir, Path.Combine(root, "Profile\\Packs"));
             CopyDir(Keep.Dir, Path.Combine(root, "Profile\\Keep"));
             // Not installed-into-game.txt: that is the list the uninstaller
-            // deletes from the shared game folder, and the dev build's
-            // uninstall removes only itself (RemoveSelf).
-            foreach (string n in new[] { "applied.txt", "discord.txt", "discord-name.txt", "developer.flag" })
+            // deletes from the game folder, and the dev build's uninstall
+            // removes only itself (RemoveSelf).
+            // developer.flag is not copied: nothing writes it since 25 September
+            // (Publish-Update stopped; Keep still reads one if present).
+            foreach (string n in new[] { "applied.txt", "discord.txt", "discord-name.txt" })
             {
                 string src = Path.Combine(Paths.ProfileDir, n);
                 if (File.Exists(src)) File.Copy(src, Path.Combine(root, "Profile", n), true);
@@ -190,7 +192,7 @@ namespace Thornswood
         /// Run from inside the dev build: removes this install, folder and
         /// shortcuts, through a short detached script, because a program
         /// cannot delete the folder it is running from. The caller closes the
-        /// launcher right after. The shared game folder is not touched.
+        /// launcher right after. The Game folder is not touched.
         /// </summary>
         public static string RemoveSelf()
         {
