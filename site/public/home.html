@@ -394,8 +394,8 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
 
 <div class="notice">
   <div class="wrap">
-    <b>Closed playtest.</b> Thornswood is not open to everybody yet. Applications
-    are open in the Discord and we are taking people in small numbers.
+    <b>Alpha, eighteen and over.</b> Anyone can download and install Thornswood.
+    Playing is locked until you apply in the Discord and are given the role.
     <a href="DISCORD_URL" target="_blank" rel="noopener">Apply &rarr;</a>
   </div>
 </div>
@@ -455,7 +455,7 @@ try {
     <p class="pitch">Skyrim, fifty years after the war. Free, cold, and
       <em>still full of people</em>.</p>
     <div class="acts">
-      <a class="btn first" href="/downloads">Apply to playtest</a>
+      <a class="btn first" href="/downloads">Download</a>
       <a class="btn ghost" href="#world">Read the world</a>
     </div>
     <div class="live" id="live"><span class="dot" id="dot"></span><span id="livetext">Checking the server</span></div>
@@ -934,14 +934,39 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
            'under your own account), and ' +
            '<strong>Vortex</strong> with a free Nexus Mods account, which is how the ' +
            'mods get to you.</p>' +
-           '<p class="lede"><strong>We are in closed playtesting</strong>, so the first ' +
-           'step is an application rather than a download. We are taking people in small ' +
-           'numbers because a bug found by four people is a bug we can fix, and the same ' +
-           'bug found by two hundred is a bad week for everybody.</p>';
+           '<p class="lede"><strong>Eighteen and over.</strong> Downloading or playing ' +
+           'Thornswood is you stating that you are eighteen or older.</p>' +
+           '<p class="lede"><strong>Thornswood is in alpha.</strong> The installer is ' +
+           'open to anybody, so you can download and install it now. The launcher will ' +
+           'not let you into the world until you have applied in the Discord and been ' +
+           'given the role, and we are taking people in small numbers because a bug found ' +
+           'by four people is a bug we can fix, and the same bug found by two hundred is a ' +
+           'bad week for everybody.</p>';
 
     // The button belongs under the step that tells you to take it, not above
     // the list where it is the first thing you meet and the instructions are
     // something you scroll past afterwards.
+    //
+    // Above the button, the honest line from entry #423 and the interim
+    // VirusTotal work while code signing is pending. The Alpha installer is
+    // unsigned, so Windows SmartScreen may soft-block it and Defender may warn.
+    // The fix is More info then Run anyway, never turning protection off or
+    // adding an exclusion. The SHA-256 and the VirusTotal report below are how
+    // you check the file instead, and the FAQ says why it happens. The
+    // reference to the hash only goes in when there is one to show, since sum()
+    // prints nothing without one and a line pointing below at nothing would lie.
+    function warnLine(f) {
+      var signed = f && /^[0-9a-f]{64}$/.test(f.sha256 || '');
+      var check = signed
+        ? 'The SHA-256 and VirusTotal report below let you check the file is the ' +
+          'one we published. '
+        : '';
+      return '<p class="also">The installer is not signed yet, so Windows may ' +
+             'soft-block it and Defender may warn. If Windows says it protected ' +
+             'your PC, press More info and then Run anyway. Do not turn Defender ' +
+             'off and do not add an exclusion for the installer. ' + check +
+             '<a href="/help#defender">Why this happens</a>.</p>';
+    }
     var grab = '';
     if (!exe) {
       grab = '<p style="color:var(--faint)">' + (zip
@@ -949,31 +974,32 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
                  'Only the payload is up.'
                : 'Nothing uploaded yet.') + '</p>';
     } else if (single || !zip || zip.hidden) {
-      grab = '<div class="grab">' +
+      grab = '<div class="grab">' + warnLine(exe) +
              '<a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
              'Download the installer</a>' +
-             '<p class="also faintly">' + esc(human(exe.size)) +
+             '<p class="also faintly">Published by Thornswood<br>' + esc(human(exe.size)) +
              (exe.version ? ' · ' + esc(clock(exe.version)) : '') + sum(exe) + '</p></div>';
     } else {
-      grab = '<div class="grab">' +
+      grab = '<div class="grab">' + warnLine(exe) +
              '<a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
              'Download the installer</a>' +
              '<p class="also">and its payload, <a href="/file/' +
              encodeURIComponent(zip.name) + '">' + esc(zip.name) + '</a>, ' +
              esc(human(zip.size)) + '. Both into the same folder, then run the exe. ' +
              'Do not unzip anything yourself.</p>' +
-             '<p class="also faintly">' + esc(human(exe.size)) + ' and ' +
+             '<p class="also faintly">Published by Thornswood<br>' + esc(human(exe.size)) + ' and ' +
              esc(human(zip.size)) + (exe.version ? ' · ' + esc(clock(exe.version)) : '') +
              sum(exe) + '</p></div>';
     }
 
-    out += '<h2>Apply first, then four steps</h2>' +
+    out += '<h2>Apply to play, then four steps</h2>' +
            '<div class="steps">' +
            '<div class="step"><div><h3>Come into the Discord and apply</h3>' +
-             '<p>Open a ticket saying who you are and why you want in. It is a few ' +
-             'lines, not an essay, and somebody answers. If you are accepted your ' +
-             'Discord account is what lets you through, so there is nothing else to ' +
-             'sign up for.</p>' +
+             '<p>The installer is open to anybody, but the world is not, so this is ' +
+             'the step that unlocks Play. Open a ticket saying who you are and why you ' +
+             'want in. It is a few lines, not an essay, and somebody answers. If you are ' +
+             'accepted your Discord account is what lets you through, so there is nothing ' +
+             'else to sign up for.</p>' +
              // The first step is the only one that had no way to do it from
              // here. The installer has its two buttons and the collection has
              // one, and this said come into the Discord without a door. The
@@ -1022,8 +1048,9 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
              '<p>One click. Your browser opens, you say yes, and it closes itself. ' +
              'You never do it again.</p></div></div>' +
            '<div class="step"><div><h3>Press Play</h3>' +
-             '<p>No address to type, no password to remember. The launcher patches ' +
-             'anything that changed and puts you in the world.</p></div></div>' +
+             '<p>No address to type, no password to remember. Once your Discord has the ' +
+             'role, the launcher patches anything that changed and puts you in the ' +
+             'world.</p></div></div>' +
            '</div>';
 
     out += '<p class="lede" style="margin-top:34px">The installer is open to anybody. ' +
