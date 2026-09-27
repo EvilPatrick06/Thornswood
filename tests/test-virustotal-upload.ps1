@@ -108,74 +108,137 @@ function NoKey([string]$what, $r) {
 # request into a log the checks below read. It never writes the key it was
 # sent, only whether the header was there and matched.
 #
+# A socket and HTTP written out by hand, rather than HttpListener, which is
+# the obvious way and cannot be used here: on Windows it needs the URL
+# reserved with netsh or the process elevated, and the nightly runner on the
+# VPS is a plain local account that is neither. This needs nothing but a port
+# on 127.0.0.1, which every machine gives anybody.
+#
 # It ends itself on a request to /stop rather than being killed. Measured
-# while writing this: Stop-Job on a job sitting in HttpListener.GetContext
-# does not always come back, and the harness hung there for as long as it was
-# given. /ping is how the case below knows it is up, and neither of those two
-# is counted or written down.
+# while writing this: Stop-Job on a job sitting in an accept call does not
+# always come back, and the harness hung there for as long as it was given.
+# /ping is how the case below knows it is up, and neither of those two is
+# counted or written down.
 $Listener = {
     param([int]$port, [string]$mode, [string]$log, [string]$expectKey)
 
-    $prefix = 'http://127.0.0.1:' + $port + '/'
-    $l = New-Object Net.HttpListener
-    $l.Prefixes.Add($prefix)
+    # Latin-1 maps every byte to one character, so a multipart body of file
+    # bytes reads as text without anything failing to decode.
+    $latin = [Text.Encoding]::GetEncoding(28591)
+    $l = New-Object Net.Sockets.TcpListener ([Net.IPAddress]::Loopback), $port
     $l.Start()
     try {
         for ($served = 0; $served -lt 20; $served++) {
-            $ctx = $l.GetContext()
-            $req = $ctx.Request
-            $path = $req.Url.AbsolutePath
-            if ($path -eq '/ping' -or $path -eq '/stop') {
-                $ctx.Response.StatusCode = 204
-                $ctx.Response.ContentLength64 = 0
-                $ctx.Response.Close()
-                if ($path -eq '/stop') { break }
-                $served--
-                continue
-            }
-            $key = [string]$req.Headers['x-apikey']
-            # Latin-1, so a multipart body of file bytes decodes without loss.
-            $body = ''
-            if ($req.HasEntityBody) {
-                $sr = New-Object IO.StreamReader($req.InputStream, [Text.Encoding]::GetEncoding(28591))
-                try { $body = $sr.ReadToEnd() } finally { $sr.Dispose() }
-            }
-            # .NET Framework quotes the name in the Content-Disposition header
-            # and .NET Core does not, so both shapes are read here rather than
-            # the harness passing under one PowerShell and not the other.
-            $name = ''
-            if ($body -match 'filename=("?)([^";\r\n]+)\1') { $name = $Matches[2] }
-            Add-Content -LiteralPath $log -Value (
-                $req.HttpMethod + ' ' + $req.Url.AbsolutePath +
-                ' key=' + $(if ($key -eq $expectKey) { 'ours' } elseif ($key) { 'other' } else { 'none' }) +
-                ' len=' + $body.Length +
-                ' name=' + $name +
-                ' bytes=' + $(if ($body.Contains('THORNSWOOD-HARNESS-BYTES')) { 'ours' } else { 'no' }))
+            $client = $l.AcceptTcpClient()
+            $path = ''
+            try {
+                $ns = $client.GetStream()
+                $ns.ReadTimeout = 30000
+                $ns.WriteTimeout = 30000
+                $buf = New-Object byte[] 65536
 
-            $code = 200
-            $text = '{"data":{"type":"analysis","id":"made-up-analysis-id"}}'
-            if ($req.Url.AbsolutePath.EndsWith('/upload_url')) {
-                $text = '{"data":"' + $prefix + 'one-time-upload"}'
-            }
-            elseif ($req.HttpMethod -eq 'GET') {
-                switch ($mode) {
-                    'present' { $text = '{"data":{"id":"made-up-file-id"}}' }
-                    'refused' {
-                        $code = 401
-                        $text = '{"error":{"code":"WrongCredentialsError","message":"Wrong API key"}}'
+                # The head, to the blank line. Whatever of the body came with
+                # it is kept, because one read can carry both.
+                $head = ''
+                while ($head.IndexOf("`r`n`r`n") -lt 0) {
+                    $n = $ns.Read($buf, 0, $buf.Length)
+                    if ($n -le 0) { break }
+                    $head += $latin.GetString($buf, 0, $n)
+                }
+                $cut = $head.IndexOf("`r`n`r`n")
+                if ($cut -lt 0) { $served--; continue }
+                $start = $latin.GetBytes($head.Substring($cut + 4))
+                $lines = @($head.Substring(0, $cut) -split "`r`n")
+
+                $verb = ''
+                $path = ''
+                if ($lines[0] -match '^(\S+)\s+(\S+)') { $verb = $Matches[1]; $path = $Matches[2] }
+                $key = ''
+                $want = 0
+                $waits = $false
+                foreach ($h in @($lines | Select-Object -Skip 1)) {
+                    if ($h -match '^(?i)x-apikey:\s*(.+)$') { $key = $Matches[1].Trim() }
+                    elseif ($h -match '^(?i)content-length:\s*(\d+)') { $want = [int]$Matches[1] }
+                    elseif ($h -match '^(?i)expect:\s*100-continue') { $waits = $true }
+                }
+
+                # Answering, then reading, then answering again. Windows
+                # PowerShell's HttpClient asks first and waits, and without
+                # this the body arrives only after it gives up waiting.
+                if ($waits) {
+                    $go = $latin.GetBytes("HTTP/1.1 100 Continue`r`n`r`n")
+                    $ns.Write($go, 0, $go.Length)
+                    $ns.Flush()
+                }
+
+                # The body into memory rather than onto a string, because a
+                # 33 MB one grown 64 KB at a time is minutes of copying.
+                $ms = New-Object IO.MemoryStream
+                try {
+                    $ms.Write($start, 0, $start.Length)
+                    while ($ms.Length -lt $want) {
+                        $n = $ns.Read($buf, 0, [Math]::Min($buf.Length, [int]($want - $ms.Length)))
+                        if ($n -le 0) { break }
+                        $ms.Write($buf, 0, $n)
                     }
-                    default {
-                        $code = 404
-                        $text = '{"error":{"code":"NotFoundError","message":"File not found"}}'
+                    $len = $ms.Length
+                    # Only the front of it is read: the part headers and the
+                    # first of the file are both in there, and nothing here
+                    # wants the rest.
+                    $peek = $latin.GetString($ms.GetBuffer(), 0, [Math]::Min(4096, [int]$len))
+                }
+                finally { $ms.Dispose() }
+
+                if ($path -eq '/ping' -or $path -eq '/stop') {
+                    $text = '{}'
+                    $code = '200 OK'
+                }
+                else {
+                    # .NET Framework quotes the name in the Content-Disposition
+                    # header and .NET Core does not, so both shapes are read
+                    # rather than the harness passing under one and not both.
+                    $name = ''
+                    if ($peek -match 'filename=("?)([^";\r\n]+)\1') { $name = $Matches[2] }
+                    Add-Content -LiteralPath $log -Value (
+                        $verb + ' ' + $path +
+                        ' key=' + $(if ($key -eq $expectKey) { 'ours' } elseif ($key) { 'other' } else { 'none' }) +
+                        ' len=' + $len +
+                        ' name=' + $name +
+                        ' bytes=' + $(if ($peek.Contains('THORNSWOOD-HARNESS-BYTES')) { 'ours' } else { 'no' }))
+
+                    $code = '200 OK'
+                    $text = '{"data":{"type":"analysis","id":"made-up-analysis-id"}}'
+                    if ($path.EndsWith('/upload_url')) {
+                        $text = '{"data":"http://127.0.0.1:' + $port + '/one-time-upload"}'
+                    }
+                    elseif ($verb -eq 'GET') {
+                        switch ($mode) {
+                            'present' { $text = '{"data":{"id":"made-up-file-id"}}' }
+                            'refused' {
+                                $code = '401 Unauthorized'
+                                $text = '{"error":{"code":"WrongCredentialsError","message":"Wrong API key"}}'
+                            }
+                            default {
+                                $code = '404 Not Found'
+                                $text = '{"error":{"code":"NotFoundError","message":"File not found"}}'
+                            }
+                        }
                     }
                 }
+
+                $payload = [Text.Encoding]::UTF8.GetBytes($text)
+                $reply = $latin.GetBytes(
+                    "HTTP/1.1 $code`r`n" +
+                    "Content-Type: application/json`r`n" +
+                    "Content-Length: $($payload.Length)`r`n" +
+                    "Connection: close`r`n`r`n")
+                $ns.Write($reply, 0, $reply.Length)
+                $ns.Write($payload, 0, $payload.Length)
+                $ns.Flush()
             }
-            $buf = [Text.Encoding]::UTF8.GetBytes($text)
-            $ctx.Response.StatusCode = $code
-            $ctx.Response.ContentType = 'application/json'
-            $ctx.Response.ContentLength64 = $buf.Length
-            $ctx.Response.OutputStream.Write($buf, 0, $buf.Length)
-            $ctx.Response.Close()
+            finally { $client.Close() }
+            if ($path -eq '/stop') { break }
+            if ($path -eq '/ping') { $served-- }
         }
     }
     finally { $l.Stop() }
