@@ -231,6 +231,56 @@ $doc = Feed
 $r = Run-Append $doc @() $false
 Yes 'a release with no packs still warns and adds nothing' (($r -eq 'ok') -and ((Ids $doc.packs) -eq 'old1,old2,new1') -and (($script:said -join "`n") -like '*2 pack(s)*'))
 
+# ------------------------------------------------------------ Publish-Update, the asset urls
+Write-Host ''
+Write-Host 'Publish-Update writing the asset urls'
+
+# Entry 236 / #445. A launcher with no token shares sixty api.github.com
+# requests an hour with everything else on its address, and the update checks
+# need them, so a new asset goes into the feed by its browser download address,
+# which counts against nothing. The api.github.com asset id address stays as
+# the fallback for an asset gh did not name a browser one for.
+$urlFrom = $pubSrc.IndexOf('# ==== thornswood asset urls ====')
+$urlTo   = $pubSrc.IndexOf('# ==== end thornswood asset urls ====')
+Yes 'the asset url block is marked in Publish-Update.ps1' (($urlFrom -ge 0) -and ($urlTo -gt $urlFrom))
+$urlBlock = ''
+if ($urlFrom -ge 0 -and $urlTo -gt $urlFrom) { $urlBlock = $pubSrc.Substring($urlFrom, $urlTo - $urlFrom) }
+
+function Dl([string]$repo, [string]$tag, [string]$name) { return "https://github.com/$repo/releases/download/$tag/$name" }
+function Asset([string]$name, [string]$id, $browser) {
+    $o = [pscustomobject]@{ id = $id; name = $name }
+    if ($null -ne $browser) { $o | Add-Member -NotePropertyName browser_download_url -NotePropertyValue $browser }
+    return $o
+}
+# The block on its own, with the variables Publish-Update has by the time it
+# runs: the release's assets as gh listed them, and the things whose urls it
+# fills in.
+function Run-Urls($relAssets) {
+    $Repo = $pub
+    $exeUrl = ''
+    $clientRel = [pscustomobject]@{ name = 'client-runtime.zip'; url = ''; sha256 = ('2' * 64) }
+    $chunks = @((Chunk 'N1' ''), (Chunk 'N2' ''))
+    if (-not $urlBlock) { return $null }
+    Invoke-Expression $urlBlock
+    return [pscustomobject]@{ Exe = $exeUrl; Client = $clientRel.url; Packs = @($chunks | ForEach-Object { [string]$_.Url }) }
+}
+
+$dlExe    = Dl $pub '20260927-0508' 'Thornswood.exe'
+$dlClient = Dl $pub '20260927-0508' 'client-runtime.zip'
+$dlPack   = Dl $pub '20260927-0508' 'pack-N1.zip'
+$u = Run-Urls @(
+    (Asset 'Thornswood.exe' '900' $dlExe),
+    (Asset 'client-runtime.zip' '901' $dlClient),
+    (Asset 'pack-N1.zip' '902' $dlPack),
+    (Asset 'pack-N2.zip' '903' $null))
+Yes 'the launcher goes into the feed by its browser download address' ($u.Exe -eq $dlExe)
+Yes 'so does the client runtime' ($u.Client -eq $dlClient)
+Yes 'and so does a pack' ($u.Packs[0] -eq $dlPack)
+Yes 'none of the three spends a GitHub API request' (-not (($u.Exe + $u.Client + $u.Packs[0]) -like '*api.github.com*'))
+Yes 'an asset gh named no browser address for keeps the api one' ($u.Packs[1] -eq (Api $pub '903'))
+Yes 'a browser download address is one a launcher may download' (Test-FeedPackUrl $dlPack $pub)
+Yes 'and one in another repository still is not' (-not (Test-FeedPackUrl (Dl $priv '20260927-0508' 'pack-N1.zip') $pub))
+
 # ------------------------------------------------------------ Publish-Update, before uploading
 Write-Host ''
 Write-Host 'Publish-Update before it uploads'

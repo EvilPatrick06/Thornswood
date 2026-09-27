@@ -1139,14 +1139,33 @@ if (-not $NoUpload -and $gh) {
     $relAssets = @()
     if ($rel -and $rel.PSObject.Properties['assets'] -and $rel.assets) { $relAssets = @($rel.assets) }
 
+    # ==== thornswood asset urls ====
+    # The browser download address, not the api.github.com asset id one (#445).
+    #
+    # Both hand over the same bytes and both are on the launcher's allowed host
+    # list. The difference is the quota: api.github.com counts every request
+    # against sixty an hour per address for a launcher with no token, shared
+    # with every other launcher on the connection, so a house downloading a
+    # release spent the same allowance the update checks need. The
+    # github.com/<owner>/<name>/releases/download/<tag>/<name> address is a
+    # plain redirect to the asset CDN and counts against nothing.
+    #
+    # Only urls written from here on move. Feed-Rules.ps1 already accepts both
+    # shapes, and the packs already on the feed keep the addresses they were
+    # published with. -HostAssetUrls below still rewrites these to the site.
+    # The api address is the fallback for a gh that did not name one.
     foreach ($a in $relAssets) {
         $u = "https://api.github.com/repos/$Repo/releases/assets/$($a.id)"
+        if ($a.PSObject.Properties['browser_download_url'] -and $a.browser_download_url) {
+            $u = [string]$a.browser_download_url
+        }
         if ($a.name -eq 'Thornswood.exe' -or $a.name -eq 'SkyrimTogether.exe') { $exeUrl = $u; continue }
         if ($clientRel -and $a.name -eq $clientRel.name) { $clientRel.url = $u; continue }
         foreach ($c in $chunks) {
             if ($a.name -eq ('pack-' + $c.Id + '.zip')) { $c.Url = $u }
         }
     }
+    # ==== end thornswood asset urls ====
 
     # The same refusal the packs and the launcher get. A clientRuntime line
     # with no url is a launcher that downloads nothing and falls back to
