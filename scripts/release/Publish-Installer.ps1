@@ -20,6 +20,13 @@
   Only the current pair is kept by default. At a gigabyte each, three
   generations is several gigabytes of VPS disk for something nobody has ever
   rolled back to.
+
+  IT ALSO SENDS THE EXE TO VIRUSTOTAL, through Publish-VirusTotal.ps1, so the
+  report the Downloads page links to for that hash exists. That needs the
+  VirusTotal key in the environment variable VT_API_KEY on the machine that
+  ships, and nowhere else: a machine without it says it is skipping and
+  publishes exactly as it always did. Nothing about the upload can fail a
+  publish that has already happened.
 #>
 [CmdletBinding()]
 param(
@@ -232,7 +239,22 @@ Write-Host ''
 # door that no longer exists, and it read as if the password still crossed
 # the wire in clear.
 Write-Host "  on the site under Downloads: https://thornswood.net" -ForegroundColor Green
-# Where the page's VirusTotal link for this build goes. A file nobody has sent
-# to VirusTotal has no report, so until this exe is uploaded there once the
-# link lands on a page saying so. Printed here so that is one click to check.
+# Where the page's VirusTotal link for this build goes. Printed here so that is
+# one click to check.
 Write-Host "  VirusTotal: https://www.virustotal.com/gui/file/$($exeSha.ToLowerInvariant())"
+
+# And the file goes there, so that address is a report rather than the
+# "item not found" page it landed on from 24 September until now. Publishing
+# has already succeeded by this point and nothing below may undo it:
+# Publish-VirusTotal.ps1 exits 0 whatever happens, prints one line saying
+# which, and a machine without VT_API_KEY set says it is skipping and stops.
+# Called with the hash measured above so there is one measurement of it, which
+# that script checks against its own. The try is the belt to its braces: this
+# script runs under $ErrorActionPreference = 'Stop', so anything that threw in
+# there rather than returning would take a finished publish down with it.
+try {
+  & (Join-Path $Here 'Publish-VirusTotal.ps1') -Path $exeItem.FullName -Sha256 $exeSha
+}
+catch {
+  Write-Host ("  VirusTotal: not sent (" + $_.Exception.Message + ")") -ForegroundColor Yellow
+}
