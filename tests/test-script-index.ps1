@@ -142,36 +142,25 @@ $saysLoose = $channelFlat -match '(?i)a file under tools git does not know'
 Yes ('Get-Help -Parameter Channel names the refusal of a file under tools git does not know, exactly when the code does' +
      ' (code refuses: ' + $refusesLoose + ', help says: ' + $saysLoose + ')') ($refusesLoose -eq $saysLoose)
 
-# A dry run is not harmless, and the help has to say so. On 24 Sep this
-# branch's example said a dry run "leaves nothing behind" while the scripts it
-# still runs, the launcher install and the publisher, each close any running
-# Skyrim before they touch a file. Someone who trusted that mid playtest would
-# lose their game. So the scripts Ship runs are read off Ship.ps1 itself, each
-# is asked whether it calls Stop-Game, and the help has to say a dry run closes
-# the game exactly when one of them does.
-#
-# Found from Ship rather than named here, because test-build-vs-install.ps1
-# counts any script that names the install script in a string as one that
-# runs it, and this harness only reads it.
-$closers = @()
-foreach ($m in [regex]::Matches($shipText, "& \(Join-Path \`$Here '([^']+\.ps1)'\)")) {
-    $n = $m.Groups[1].Value
-    if ($closers -contains $n) { continue }
-    $p = Join-Path (Join-Path $ToolsPath 'release') $n
-    if ((Test-Path -LiteralPath $p) -and ([IO.File]::ReadAllText($p, $Utf8) -match '(?m)^\s*(\$null\s*=\s*)?Stop-Game\b')) { $closers += $n }
-}
-$closers = @($closers | Sort-Object)
+# A dry run must not close a running game and must not prune old packs
+# (issue #494). Until then the help had to admit that Install-Launcher and
+# Publish-Update still called Stop-Game on a dry run. Ship now passes -NoClose
+# (and KeepPacks 0) when -DryRun is set; help and the DryRun example must say
+# a dry run does not close, matching that wiring.
 $dryHelp = ''
 try { $dryHelp = (Get-Help $Ship -Parameter DryRun -ErrorAction Stop | Out-String) } catch { $dryHelp = '' }
 $dryHelp = $dryHelp -replace '\s+', ' '
 $dryExample = (@($h.examples.example) | Where-Object { $_.code -match '-DryRun' } |
                ForEach-Object { (@($_.remarks) | ForEach-Object { $_.Text }) -join ' ' }) -join ' '
 $dryExample = $dryExample -replace '\s+', ' '
-$dryCloses = $closers.Count -gt 0
-$saysCloses = ($dryHelp -match '(?i)closes any running Skyrim') -and ($dryExample -match '(?i)closes a running game')
-Yes ('Get-Help says a dry run closes a running game, in -DryRun and in its example, exactly when the code does' +
-     ' (code closes: ' + $dryCloses + $(if ($closers.Count) { ' in ' + ($closers -join ', ') } else { '' }) +
-     ', help says: ' + $saysCloses + ')') ($dryCloses -eq $saysCloses)
+$dryNoClose = ($shipText -match "(?s)\`$installArgs\['NoClose'\]\s*=\s*\`$true") -and
+              ($shipText -match "(?s)\`$pubArgs\['NoClose'\]\s*=\s*\`$true") -and
+              ($shipText -match "(?s)\`$pubArgs\['KeepPacks'\]\s*=\s*0")
+$saysNoClose = ($dryHelp -match '(?i)does not\s+close a running game') -and
+               ($dryExample -match '(?i)does not\s+close a running game') -and
+               ($dryHelp -match '(?i)non-destructive for close')
+Yes ('Ship -DryRun passes -NoClose and KeepPacks 0, and Get-Help says it does not close (#494)' +
+     ' (code: ' + $dryNoClose + ', help: ' + $saysNoClose + ')') ($dryNoClose -and $saysNoClose)
 Yes 'and nothing in it says a dry run leaves nothing behind' (
     ($dryHelp + ' ' + $dryExample) -notmatch '(?i)leaves nothing behind')
 
