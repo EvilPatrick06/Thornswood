@@ -40,6 +40,23 @@ yes('gal-box heading is gold carve',
 
 yes('public gallery keeps Send a picture for members',
     /id="galSubmit"/.test(home) && /Send a picture/.test(home));
+yes('send form does not show Signed in as',
+    !/Signed in as /.test((home.match(/id="galSubmit"[\s\S]{0,900}/) || [''])[0]));
+yes('send form hides native file input and offers Choose files',
+    /\.gal-box \.form input\[type=file\]\{[^}]*clip:rect\(0,0,0,0\)/.test(home) &&
+    /id="galPick">Choose files</.test(home) &&
+    /id="galFileName">No file chosen</.test(home));
+yes('file input allows multi-select', /\smultiple[>\s]/.test(
+    (home.match(/id="galFile"[^>]*>/) || [''])[0]));
+yes('Choose files button opens the hidden input',
+    /getElementById\('galPick'\)/.test(home) && /f\.click\(\)/.test(home));
+yes('send walks each chosen file in order',
+    /picked\.length \? picked\.slice\(\)/.test(home) &&
+    /\/api\/gallery\/submit\?name=/.test(home));
+yes('submit box accepts drag-and-drop',
+    /getElementById\('galSubmit'\)/.test(home) &&
+    /dataTransfer/.test(home) &&
+    /\.gal-box\.drag\{/.test(home));
 yes('public gallery keeps per-image Report',
     /data-galreport/.test(home));
 yes('public gallery has no Waiting for approval queue',
