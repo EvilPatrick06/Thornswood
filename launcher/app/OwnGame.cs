@@ -568,6 +568,20 @@ namespace Thornswood
         {
             if (!Active) throw new Exception("This install is not running from a folder of its own.");
             string src = DeploysInto(cfg);
+
+            // Same deployment stamp and same rules as the last refresh: nothing
+            // to bring in. Skip WhyNot, Gather, the per-file Links walk, and
+            // SettleSettings. SettleSettings used to copy Golden plugins.txt
+            // over Paths.Live on every refresh, which put Thornswood-Content.esp
+            // (and the rest) back out of the server's order and left Mod list
+            // red after "already matches". ShellOwnGame applies PutInServerOrder
+            // after this returns; when nothing changed that write is a no-op.
+            if (!string.IsNullOrEmpty(src)
+                && Recorded("rules") == Rules
+                && DeploymentStamp(src) == Recorded("deployment")
+                && Recorded("deployment") != 0)
+                return "Thornswood's own Skyrim folder already matches what Vortex has deployed.";
+
             string why = WhyNot(cfg, src);
             if (why != null) throw new Exception(why);
 
@@ -861,14 +875,20 @@ namespace Thornswood
         /// </summary>
         static void SettleSettings(bool first)
         {
-            // The load order the server expects, where Skyrim will read it.
+            // Seed the plugin list where Skyrim will read it. On Make (first),
+            // always lay Golden down. On Refresh, only fill a missing file:
+            // overwriting Live every time put Golden's order (Thornswood-Content
+            // near the end) over a Fix/PutInServerOrder list and Mod list went
+            // red after Bring it up to date said the folder already matched.
             try
             {
                 Directory.CreateDirectory(Paths.LocalAD);
                 foreach (string n in new string[] { "plugins.txt", "loadorder.txt" })
                 {
                     string shipped = Path.Combine(Paths.Golden, n);
-                    if (File.Exists(shipped)) File.Copy(shipped, Path.Combine(Paths.LocalAD, n), true);
+                    string dest = Path.Combine(Paths.LocalAD, n);
+                    if (!File.Exists(shipped)) continue;
+                    if (first || !File.Exists(dest)) File.Copy(shipped, dest, true);
                 }
             }
             catch { }
