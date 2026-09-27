@@ -44,6 +44,8 @@ param(
     [switch]$NoUpload,
     [switch]$NoPush,
     [switch]$NoPause
+    # Ship -DryRun passes this so a dry run does not Stop-Game (issue #494).
+    ,[switch]$NoClose
     ,[switch]$MoveServer
     # main is the build everybody plays on. dev is the second launcher and
     # the dev server: its own release branch, its own baseline, its own pack
@@ -456,7 +458,18 @@ $null = New-Item -ItemType Directory -Force -Path $DistDir
 . (Join-Path $Here '..\dev\Close-Launcher.ps1')
 # Every file below gets hashed and compared against what friends already have.
 # A game still running underneath would publish a file that is mid-write.
-$null = Stop-Game -Root $Root
+# Ship -DryRun passes -NoClose so a dry run only logs what it would close (issue #494).
+if ($NoClose) {
+    $running = @(Get-GameProcesses -Root $Root)
+    if ($running.Count -gt 0) {
+        $names = ($running | ForEach-Object { $_.ProcessName } | Sort-Object -Unique) -join ', '
+        Say ("  -NoClose: would close running game (" + $names + "), leaving it alone") 'Yellow'
+    } else {
+        Say '  -NoClose: no running game to close' 'DarkGray'
+    }
+} else {
+    $null = Stop-Game -Root $Root
+}
 
 Head 'Thornswood - publish'
 
@@ -1836,8 +1849,13 @@ if ($KeepPacks -gt 0) {
             # clean in a bare prompt and fails only where it matters.
             $go = @($packs | Select-Object -Skip $KeepPacks)
             $mb = (($go | Measure-Object Length -Sum).Sum / 1MB)
-            foreach ($f in $go) { Remove-Item -LiteralPath $f.FullName -Force -EA SilentlyContinue }
-            Say ("  {0} older pack(s) removed from $DistDir, {1:N1} MB. They are all on the releases repository." -f $go.Count, $mb) 'DarkGray'
+            if ($NoClose) {
+                # Ship -DryRun sets -NoClose; dry run must not prune (issue #494).
+                Say ("  -NoClose: would remove {0} older pack(s) from $DistDir, {1:N1} MB; leaving them" -f $go.Count, $mb) 'Yellow'
+            } else {
+                foreach ($f in $go) { Remove-Item -LiteralPath $f.FullName -Force -EA SilentlyContinue }
+                Say ("  {0} older pack(s) removed from $DistDir, {1:N1} MB. They are all on the releases repository." -f $go.Count, $mb) 'DarkGray'
+            }
         }
     } catch {
         Say "  could not tidy the old packs: $_" 'DarkGray'
