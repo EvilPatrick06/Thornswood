@@ -1399,10 +1399,11 @@ function findSession(rows, key, who) {
   on a public server is weeks. They are kept for SLOG_DAYS instead, and a
   session whose row is marked kept is never pruned at all.
 
-  WHAT THIS DOES NOT COVER, and it matters for the ban case: nothing here is a
-  record of what anybody SAID. Chat and voice are not logged anywhere, so an
-  argument about behaviour between two people is still one person's word
-  against another's. That is its own piece of work and this is not it.
+  CHAT is kept elsewhere: the voice service writes one JSON line per message
+  under its chat folder and ages whole days past THORNSWOOD_CHAT_DAYS
+  (default 365). This block is only the launcher session logs. A session
+  marked kept never loses its logs to the age prune; its chat lines still
+  live in the voice folder and age with that window unless copied first.
 
   Caps, because this accepts a body from every launcher: one log is trimmed to
   its last 256 KB (the end is the part with the fault in it) and a whole set to
