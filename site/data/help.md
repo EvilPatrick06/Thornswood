@@ -45,8 +45,10 @@ all it takes.
 Do not turn Defender off and do not add an exclusion for the installer. You do
 not need to, and it is not worth doing for one file. Check the file instead:
 every build's SHA-256 is printed on the [Downloads](/downloads) page next to the
-button, with a link to its VirusTotal report on that same hash, so you can see
-what the file is before you run it.
+button, so you can compare it with the file you have before you run it. When a
+build has been sent to VirusTotal, that page links its report on the same hash;
+until then it says there is no report yet rather than pointing you at an empty
+one.
 
 The real fix is code signing, which is being worked on. Once the installer is
 signed the warning goes on its own, and none of this is needed.
