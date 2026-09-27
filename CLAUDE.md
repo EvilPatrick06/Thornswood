@@ -87,6 +87,34 @@ this section exists for.
   `Claude outputs\` and `art-latest.txt` are untracked here and show up in
   that warning every time; they are not part of the pull request.
 
+## On the shipping machine
+
+Added by Patrick on 27 Sep, after a session found 624 local branches and 15
+worktrees in the shared clone and read a session-start snapshot as the truth.
+
+- `C:\Users\evilp\Downloads\Thornswood-Repo` is shared with Patrick's Grok Bot
+  lanes and sits detached at `origin/main`, because they build from it. Do
+  branch work in a worktree beside it (`git worktree add
+  ..\Thornswood-claude-<what> -b claude/<what> origin/main`), and afterwards
+  remove the worktree and delete the branch. Never leave that folder on a
+  branch. Before deleting a worktree or branch you did not make, check no
+  running process names its folder and its pull request merged over an hour
+  ago; lanes may be mid-run in it.
+- The git status at the start of a session is a snapshot and can be hours
+  old. Run `git status` and `git log -1 origin/main` before saying what state
+  the clone is in.
+- Claude here often runs behind Headroom, which compresses tool output on
+  purpose to save credits and drops small words from it ("the rule is and
+  not"). A line that reads wrong may be the compression: read the file itself
+  before acting on a rule that seems to say something odd, and never quote
+  compressed output back as what a file says.
+- The lanes' shared notes are the vault at `C:\Thornswood Vault\Thornswood`
+  (`wiki/status.md` for what is true now, rewritten in place). Anything a
+  session changes about tips, standing orders or what waits on Patrick goes
+  there as well as on the board.
+- Merge only once `Launcher builds` (the VPS runner) says pass. Nothing on
+  GitHub enforces it; see CONTRIBUTING.md.
+
 ## Where things are
 
 CONTRIBUTING.md (the rules, for everybody), the board for open work,
