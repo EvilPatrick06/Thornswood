@@ -268,10 +268,15 @@ Head 'Compiling'
 # Reference Assemblies, and csc stopped with CS1703, one identity imported
 # twice. Everything the launcher needs is in $refs by hand, so csc.rsp has
 # nothing to add.
+# Application manifest: PerMonitorV2 DPI, supportedOS through Win10/11, asInvoker.
+# /win32icon can stay beside /win32manifest; /win32res would conflict (issue #463).
+$manifest = Join-Path $Src 'Thornswood.manifest'
+if (-not (Test-Path -LiteralPath $manifest)) { Die "Thornswood.manifest is not at $manifest. It is in the repository, so the path is wrong; the launcher would ship without per-monitor DPI awareness." }
 $cscArgs = @(
     '/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+', '/debug:pdbonly',
     "/out:$exe",
     "/win32icon:$((Resolve-Path $icon).Path)",
+    "/win32manifest:$((Resolve-Path $manifest).Path)",
     "/resource:$((Resolve-Path $xaml).Path),ui.xaml"
 )
 if (Test-Path $logo) { $cscArgs += "/resource:$((Resolve-Path $logo).Path),logo.png" }
