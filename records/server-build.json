@@ -1,5 +1,5 @@
 {
-  "_note": "What the server binary in this release is, and the source it was built from. Deploy-Server.ps1 refuses to ship a binary whose sha256 is not this one. Regenerate with scripts\\release\\New-ServerBuildRecord.ps1 after every rebuild.",
+  "_note": "What the server binary in this release is, and the source it is pinned to. Deploy-Server.ps1 refuses to ship a binary whose sha256 is not this one. Regenerate with scripts\\release\\New-ServerBuildRecord.ps1 after every rebuild. DRIFT (2026-09-27): source.commit below is the pinned fork source 5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df, the commit records\\client-build.json and the engine/skymp submodule already use. The binary hashed here (sha256 de74c5..., built 2026-09-22) is the artifact still deployed on the VPS, built from the EARLIER commit 3cbf2f8779f512ab571009e9bcbd1274c39d9874. The live server has NOT been rebuilt against the pinned source; Deploy-Server.ps1 will refuse a rebuilt scam_native.node until this file is regenerated for it.",
   "binary": "scam_native.node",
   "sha256": "de74c5829033fe1407cbdaf5f4b117ab882ee7e85ee2bec12fdd41d20b98e3ae",
   "bytes": 5575168,
@@ -7,7 +7,7 @@
   "source": {
     "repo": "https://github.com/EvilPatrick06/skymp.git",
     "branch": "thornswood/engine-changes",
-    "commit": "3cbf2f8779f512ab571009e9bcbd1274c39d9874",
+    "commit": "5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df",
     "upstream": "https://github.com/skyrim-multiplayer/skymp.git",
     "upstreamBase": "f926944b18e3aed4bc3864ce668626c05ec2545f"
   },
