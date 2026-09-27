@@ -1,5 +1,5 @@
 {
   "Endpoint": "https://wus2.codesigning.azure.net",
   "CodeSigningAccountName": "ThornswoodSigning",
-  "CertificateProfileName": "FILL THIS IN AFTER THE PROFILE EXISTS"
+  "CertificateProfileName": "ThornswoodRelease"
 }
