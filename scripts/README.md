@@ -102,6 +102,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [ops/Set-Door.ps1](ops/Set-Door.ps1) | Turns the game server's door on, off, or tells you what it has been seeing. |
 | [ops/Set-Server.ps1](ops/Set-Server.ps1) | Sets the server everyone connects to, in the two places that decide it, and pushes. |
 | [ops/Wipe-Saves.ps1](ops/Wipe-Saves.ps1) | Starts the world over. Everybody begins again, nothing is claimed, nothing has been looted, and every container in the province is holding what Bethesda put in it. |
+| [release/Add-VirusTotalComment.ps1](release/Add-VirusTotalComment.ps1) | Leaves one community comment on a build's VirusTotal report saying what the file is, or says plainly that it is not commenting and carries on. |
 | [release/Build-Engine.ps1](release/Build-Engine.ps1) | Takes a machine from a fresh clone to a built engine: the SkyMP server and the client runtime, out of the fork in engine\skymp. |
 | [release/Build-Launcher.ps1](release/Build-Launcher.ps1) | Compiles the launcher into a real Thornswood.exe. |
 | [release/Build-Server.ps1](release/Build-Server.ps1) | Compiles the game server out of our fork and puts the result where Deploy-Server.ps1 and Publish-Server.ps1 expect to find it. |
