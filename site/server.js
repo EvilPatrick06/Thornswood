@@ -727,6 +727,9 @@ const UPMETA = path.join(UP, 'uploads.json');
 // waiting for an admin to approve or reject, and is never public.
 const GALLERY = path.join(DATA, 'gallery.json');
 const GPENDING = path.join(DATA, 'gallery-pending.json');
+// Reports against approved shots. Same deploy rule as the queue: starts [],
+// and Deploy-Docs only sends it when the VPS is missing it.
+const GREPORTS = path.join(DATA, 'gallery-reports.json');
 // What the gallery accepts and how big. Images first, on purpose: /shot serves
 // with a plain Content-Length and no range, which a browser needs before it
 // will play an mp4, so video waits until /shot honours a range (noted on #603).
@@ -883,13 +886,17 @@ async function standingCached(id) {
 
 async function who(req) {
   const me = identity(req);
-  if (!me) return { member: isMember(req), admin: false, name: '', id: '', play: false };
+  if (!me) return { member: isMember(req), admin: false, dev: false, name: '', id: '', play: false };
   const st = await standingCached(me.id);
   return {
     // "member" is now "may use the hub", and only staff may. Being allowed
     // into the GAME is st.play, and that is asked separately by the launcher.
+    // "dev" is staff (access.dev: Owner, Dev, Gamemaster, Moderator,
+    // Loremaster), used by the gallery queue and reports. Not the Owner/Dev
+    // admin pair alone.
     member: st.admin || isMember(req),
     admin: st.admin,
+    dev: !!st.dev,
     play: st.play,
     banned: st.banned,
     inGuild: st.inGuild,
@@ -2324,7 +2331,8 @@ async function handle(req, res) {
 
   if (p === '/api/hello') {
     return sendJson(res, w.member ? 200 : 401, {
-      ok: w.member, admin: w.admin, name: w.name,
+      ok: w.member, admin: w.admin, dev: !!w.dev, play: !!w.play,
+      name: w.name,
       discord: discordReady(),
       invite: cfg.discord.invite || ''
     });
@@ -2752,10 +2760,11 @@ async function handle(req, res) {
 
   // ------------------------------------------------------------- gallery --
   /*
-    Somebody sends a picture in, an admin decides whether it goes on the public
-    gallery. Two doors in: a member signed in to the hub (the /api/upload door),
-    or the launcher with the same signed Discord ticket it uses at /api/play/join,
-    so a person can send a shot from the game without a site sign in.
+    Somebody sends a picture in, staff decide whether it goes on the public
+    gallery. Two doors in: a signed-in Discord account that may play (or the
+    hub member cookie), or the launcher with the same signed Discord ticket it
+    uses at /api/play/join, so a person can send a shot from the game without
+    a site sign in.
 
     The body IS the file, the /api/upload way, so the ticket and the note ride in
     the query, not in the body. The file lands in uploads/ under a stamped name
@@ -2770,7 +2779,11 @@ async function handle(req, res) {
     // the same answers /api/play/join gives, so a banned or departed account
     // cannot put a picture in the queue.
     let from = '', discordId = '';
-    if (w.member) {
+    // A signed-in Discord account that may play, or the hub member cookie
+    // (password bootstrap / staff). Hub "member" alone used to be the only
+    // web door, and with Discord live that meant only admins could submit
+    // from the site. Play-capable signed-in people submit too.
+    if (w.play || w.member) {
       from = 'web';
       discordId = w.id || '';
     } else {
@@ -2810,10 +2823,10 @@ async function handle(req, res) {
     });
   }
 
-  // The queue, for an admin to look through. Never public, so it is its own
-  // door rather than a field on /api/public.
+  // The queue, for staff (access.dev) to look through. Never public, so it is
+  // its own door rather than a field on /api/public.
   if (p === '/api/gallery/pending' && req.method === 'GET') {
-    if (!w.admin) return sendJson(res, 403, { error: 'admins only' });
+    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
     return sendJson(res, 200, { pending: jsonFile(GPENDING, []) });
   }
 
@@ -2821,7 +2834,7 @@ async function handle(req, res) {
   // so approving the same name twice is a 200 that changed nothing the second
   // time, and a name already on the gallery is left where it is.
   if (p === '/api/gallery/approve' && req.method === 'POST') {
-    if (!w.admin) return sendJson(res, 403, { error: 'admins only' });
+    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
     let o = {};
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
     const name = String(o.name || '');
@@ -2852,7 +2865,7 @@ async function handle(req, res) {
   // Reject: take it off the queue, and unlink the upload when asked. gallery.json
   // is not touched, because a rejected shot was never on it.
   if (p === '/api/gallery/reject' && req.method === 'POST') {
-    if (!w.admin) return sendJson(res, 403, { error: 'admins only' });
+    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
     let o = {};
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
     const name = String(o.name || '');
@@ -2873,6 +2886,116 @@ async function handle(req, res) {
     }
     return sendJson(res, 200, { ok: true, name: name, removed: pending.length - left.length });
   }
+
+  // Who may submit or moderate on the public gallery page. Always 200: the
+  // page needs to know whether to show Sign in, Submit, or the staff tools
+  // without treating a play-capable signed-in person as signed out the way
+  // /api/hello does for the hub.
+  if (p === '/api/gallery/who' && req.method === 'GET') {
+    return sendJson(res, 200, {
+      signed: !!(w.id || w.member),
+      canSubmit: !!(w.play || w.member),
+      staff: !!w.dev,
+      admin: !!w.admin,
+      name: w.name || ''
+    });
+  }
+
+  // Take an approved shot off the public gallery. Not the same as reject:
+  // reject only clears the pending queue. Staff only (access.dev).
+  if (p === '/api/gallery/approved' && req.method === 'DELETE') {
+    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const name = String(o.name || '');
+    if (!name) return sendJson(res, 400, { error: 'no name' });
+
+    const gallery = jsonFile(GALLERY, []);
+    const left = gallery.filter((x) => String(x.name) !== name);
+    if (left.length !== gallery.length) putJson(GALLERY, left);
+
+    // Drop open reports against this name too, so the reports list does not
+    // keep asking about a picture that is already gone.
+    const reports = jsonFile(GREPORTS, []);
+    const kept = reports.filter((r) => String(r.name) !== name);
+    if (kept.length !== reports.length) putJson(GREPORTS, kept);
+
+    if (o.deleteFile) {
+      const file = path.join(UP, name);
+      if (file.startsWith(UP + path.sep)) {
+        try { fs.unlinkSync(file); } catch (e) { }
+        const meta = jsonFile(UPMETA, {});
+        delete meta[name];
+        putJson(UPMETA, meta);
+      }
+    }
+    return sendJson(res, 200, { ok: true, name: name, removed: gallery.length - left.length });
+  }
+
+  // Report an approved shot. Any signed-in play-capable member, or the
+  // launcher with the same ticket /api/gallery/submit takes. The report sits
+  // in gallery-reports.json for staff; it does not take the shot down.
+  if (p === '/api/gallery/report' && req.method === 'POST') {
+    let from = '', discordId = '';
+    if (w.play || w.member) {
+      from = 'web';
+      discordId = w.id || '';
+    } else {
+      const t = readTicket(url.searchParams.get('ticket'));
+      if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
+        'Sign in, or send a valid launcher ticket.' });
+      const st = await standing(t.d);
+      standCache.delete(String(t.d));
+      if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
+        'Thornswood could not ask Discord about that account just now. Try again in a minute.' });
+      if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
+        'That Discord account is not in the Thornswood Discord.' });
+      if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', error:
+        'That Discord account is banned from Thornswood.' });
+      if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', error:
+        'That Discord account has no role that lets it in yet.' });
+      from = 'launcher';
+      discordId = String(t.d);
+    }
+
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const name = String(o.name || '');
+    if (!name) return sendJson(res, 400, { error: 'no name' });
+    const why = String(o.why || '').slice(0, 500);
+
+    const gallery = jsonFile(GALLERY, []);
+    if (!gallery.find((g) => String(g.name) === name)) {
+      return sendJson(res, 404, { error: 'not on the gallery' });
+    }
+
+    const reports = jsonFile(GREPORTS, []);
+    const id = crypto.randomBytes(8).toString('hex');
+    const entry = { id: id, name: name, why: why, at: Date.now(), from: from };
+    if (discordId) entry.discordId = discordId;
+    reports.push(entry);
+    // Keep the newest 500 so a flood cannot grow the file forever.
+    putJson(GREPORTS, reports.slice(-500));
+    return sendJson(res, 200, { ok: true, id: id });
+  }
+
+  if (p === '/api/gallery/reports' && req.method === 'GET') {
+    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    return sendJson(res, 200, { reports: jsonFile(GREPORTS, []) });
+  }
+
+  if (p === '/api/gallery/report/dismiss' && req.method === 'POST') {
+    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const id = String(o.id || '');
+    if (!id) return sendJson(res, 400, { error: 'no id' });
+    const reports = jsonFile(GREPORTS, []);
+    const left = reports.filter((r) => String(r.id) !== id);
+    putJson(GREPORTS, left);
+    return sendJson(res, 200, { ok: true, id: id, removed: reports.length - left.length });
+  }
+
 
   // -------------------------------------------------------------- the door
   /*

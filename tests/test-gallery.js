@@ -82,6 +82,15 @@ const adminCookie = () => {
   const raw = ADMIN_ID + '|Admin|' + at + '|' + sign(ADMIN_ID + '|Admin|' + at);
   return 'twa=' + encodeURIComponent(raw);
 };
+// A Discord cookie for a play-capable account that is not on the admin list.
+// With no bot token, standing() gives every non-admin play:true and
+// admin/dev false, so this is the member who can submit and report but not
+// approve.
+const playCookie = () => {
+  const at = Date.now();
+  const raw = MEMBER_ID + '|Member|' + at + '|' + sign(MEMBER_ID + '|Member|' + at);
+  return 'twa=' + encodeURIComponent(raw);
+};
 const memberCookie = () =>
   'tw=' + crypto.createHash('sha256').update('thornswood:' + PASSWORD).digest('hex');
 function ticket(id, name) {
@@ -205,20 +214,25 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     yes('a file that is not an image is refused 415', r.status === 415 && r.json && Array.isArray(r.json.allowed));
     yes('and refusing it added nothing to the queue', (readJson('gallery-pending.json') || []).length === 2);
 
-    // ---- the queue is admin only --------------------------------------------
+    // ---- the queue is staff only (access.dev; admin list counts as staff) --
     r = await ask('GET', '/api/gallery/pending', { cookie: memberCookie() });
-    yes('a member cannot read the pending queue (' + r.status + ')', r.status === 403);
+    yes('a password member cannot read the pending queue (' + r.status + ')', r.status === 403);
+    r = await ask('GET', '/api/gallery/pending', { cookie: playCookie() });
+    yes('a play-signed-in member cannot read the pending queue (' + r.status + ')', r.status === 403);
     r = await ask('GET', '/api/gallery/pending', { cookie: adminCookie() });
-    yes('an admin reads the pending queue, both submissions on it',
+    yes('staff reads the pending queue, both submissions on it',
         r.status === 200 && r.json && Array.isArray(r.json.pending) && r.json.pending.length === 2);
 
     // ---- approve -------------------------------------------------------------
     r = await ask('POST', '/api/gallery/approve', { cookie: memberCookie(), 'content-type': 'application/json' },
                   JSON.stringify({ name: webName }));
     yes('a member cannot approve (' + r.status + ')', r.status === 403);
+    r = await ask('POST', '/api/gallery/approve', { cookie: playCookie(), 'content-type': 'application/json' },
+                  JSON.stringify({ name: webName }));
+    yes('a play member cannot approve either (' + r.status + ')', r.status === 403);
     r = await ask('POST', '/api/gallery/approve', { cookie: adminCookie(), 'content-type': 'application/json' },
                   JSON.stringify({ name: webName }));
-    yes('an admin approves the web submission (' + r.status + ')', r.status === 200 && r.json && r.json.approved === true);
+    yes('staff approves the web submission (' + r.status + ')', r.status === 200 && r.json && r.json.approved === true);
     let gal = readJson('gallery.json') || [];
     const galEntry = gal.find((g) => g.name === webName);
     yes('it is now on gallery.json as { name, url: /shot/name, by }',
@@ -250,7 +264,7 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
         fs.existsSync(path.join(dir, 'uploads', gameName)));
     r = await ask('POST', '/api/gallery/reject', { cookie: adminCookie(), 'content-type': 'application/json' },
                   JSON.stringify({ name: gameName, deleteFile: true }));
-    yes('an admin rejects the launcher submission (' + r.status + ')', r.status === 200 && r.json && r.json.removed === 1);
+    yes('staff rejects the launcher submission (' + r.status + ')', r.status === 200 && r.json && r.json.removed === 1);
     pend = readJson('gallery-pending.json') || [];
     yes('it is off the queue', !pend.find((x) => x.name === gameName) && pend.length === 0);
     yes('the upload file was unlinked, because deleteFile was set',
@@ -265,6 +279,69 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     pub = await ask('GET', '/api/public');
     yes('a fresh submission waiting in the queue is not on /api/public',
         r.status === 200 && pub.json && !pub.json.gallery.find((g) => g.name === moreName));
+
+    // ---- play-signed-in web submit ------------------------------------------
+    r = await ask('GET', '/api/gallery/who', { cookie: playCookie() });
+    yes('/api/gallery/who says a play cookie can submit and is not staff',
+        r.status === 200 && r.json && r.json.canSubmit === true && r.json.staff === false);
+    r = await ask('GET', '/api/gallery/who', { cookie: adminCookie() });
+    yes('/api/gallery/who says staff can submit and is staff',
+        r.status === 200 && r.json && r.json.canSubmit === true && r.json.staff === true);
+    r = await ask('POST', upQ('play-web.png', 'Member'),
+                  { 'content-type': 'image/png', cookie: playCookie() }, PNG);
+    yes('a play-signed-in Discord cookie can submit from the web (' + r.status + ')',
+        r.status === 200 && r.json && r.json.ok === true);
+    const playWebName = r.json ? r.json.name : '';
+
+    // ---- report / list / dismiss --------------------------------------------
+    r = await ask('POST', '/api/gallery/report', { cookie: playCookie(), 'content-type': 'application/json' },
+                  JSON.stringify({ name: webName, why: 'looks wrong' }));
+    yes('a play member can report an approved shot (' + r.status + ')',
+        r.status === 200 && r.json && r.json.ok === true && r.json.id);
+    const reportId = r.json ? r.json.id : '';
+    yes('the shot is still on the public gallery after a report',
+        (readJson('gallery.json') || []).some((g) => g.name === webName));
+    r = await ask('GET', '/api/gallery/reports', { cookie: playCookie() });
+    yes('a play member cannot list reports (' + r.status + ')', r.status === 403);
+    r = await ask('GET', '/api/gallery/reports', { cookie: adminCookie() });
+    yes('staff lists the open report',
+        r.status === 200 && r.json && r.json.reports.some((x) => x.id === reportId && x.name === webName));
+    r = await ask('POST', '/api/gallery/report', { 'content-type': 'application/json' },
+                  JSON.stringify({ name: webName, why: 'anon' }));
+    yes('a report with no sign in and no ticket is refused 401', r.status === 401);
+    r = await ask('POST', '/api/gallery/report/dismiss', { cookie: playCookie(), 'content-type': 'application/json' },
+                  JSON.stringify({ id: reportId }));
+    yes('a play member cannot dismiss a report (' + r.status + ')', r.status === 403);
+    r = await ask('POST', '/api/gallery/report/dismiss', { cookie: adminCookie(), 'content-type': 'application/json' },
+                  JSON.stringify({ id: reportId }));
+    yes('staff dismisses the report (' + r.status + ')', r.status === 200 && r.json && r.json.removed === 1);
+    yes('the reports file no longer holds it',
+        !(readJson('gallery-reports.json') || []).some((x) => x.id === reportId));
+
+    // ---- delete approved (not reject) ---------------------------------------
+    r = await ask('DELETE', '/api/gallery/approved', { cookie: playCookie(), 'content-type': 'application/json' },
+                  JSON.stringify({ name: webName }));
+    yes('a play member cannot delete an approved shot (' + r.status + ')', r.status === 403);
+    yes('the approved file is on disk before delete',
+        fs.existsSync(path.join(dir, 'uploads', webName)));
+    // Put a report back so delete clears it.
+    r = await ask('POST', '/api/gallery/report', { cookie: playCookie(), 'content-type': 'application/json' },
+                  JSON.stringify({ name: webName, why: 'clear me' }));
+    const clearId = r.json ? r.json.id : '';
+    r = await ask('DELETE', '/api/gallery/approved', { cookie: adminCookie(), 'content-type': 'application/json' },
+                  JSON.stringify({ name: webName, deleteFile: true }));
+    yes('staff deletes an approved shot (' + r.status + ')', r.status === 200 && r.json && r.json.removed === 1);
+    gal = readJson('gallery.json') || [];
+    yes('it is off gallery.json', !gal.find((g) => g.name === webName));
+    yes('the upload file was unlinked', !fs.existsSync(path.join(dir, 'uploads', webName)));
+    yes('reports against that name were cleared too',
+        !(readJson('gallery-reports.json') || []).some((x) => x.id === clearId || x.name === webName));
+    shot = await ask('GET', '/shot/' + webName);
+    yes('/shot no longer serves a deleted approved shot (' + shot.status + ')', shot.status === 404);
+    // pending was not the target: playWebName and moreName should still be queued
+    pend = readJson('gallery-pending.json') || [];
+    yes('delete-approved did not clear the pending queue',
+        !!pend.find((x) => x.name === playWebName) && !!pend.find((x) => x.name === moreName));
 
   } catch (e) {
     fail++;
