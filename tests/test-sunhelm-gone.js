@@ -286,6 +286,50 @@ yes('none of them names a mod that has left' + (cartGone.length ? ': ' + cartGon
 yes('and the fast travel line says the SkyMP client turns it off',
     says.some(function (s) { return /fast travel/i.test(s) && /SkyMP client/i.test(s); }));
 
+/*
+  ---------------------------------------- the scripts run on the shipping PC
+
+  The words are only half of it. Two operator scripts still named a mod that
+  had left in the one place a name has to be true, the plugin they reach for,
+  and neither would have failed until somebody ran it in the middle of a
+  release.
+
+  Fix-QuickLoot.ps1 inserts MCMHelper.esp into the server list behind the
+  plugin -After names, and the default was SunHelmDiseases.esp, read off one
+  machine's plugins.txt in September. Add-TempleRespawn.ps1 installed Respawn
+  - Death Overhaul and put it back into plugins.txt and loadorder.txt.
+
+  So the anchor is checked to be a plugin that is still here, and checked
+  against the master MCMHelper.esp cannot load without, which is where the
+  entry has to go rather than a line number that goes stale on the next bake.
+  Add-TempleRespawn.ps1 is checked to refuse before it reaches any of the
+  install.
+*/
+const QUICKLOOT = read(['..', 'scripts', 'mods', 'Fix-QuickLoot.ps1']);
+const anchor = /\[string\]\s*\$After\s*=\s*'([^']+)'/.exec(QUICKLOOT);
+yes('Fix-QuickLoot.ps1 has a default plugin to insert behind', anchor !== null);
+const anchorName = anchor ? anchor[1] : '';
+yes('and it is not a mod that has left, it is ' + anchorName, goneIn(anchorName).length === 0);
+
+// The chain at the top of Enable-MCM.ps1 is where the masters are written
+// down: "MCMHelper.esp   NOT light, masters SkyUI_SE.esp".
+const ENABLE_MCM = read(['..', 'scripts', 'mods', 'Enable-MCM.ps1']);
+const master = /MCMHelper\.esp\b[^\n]*masters\s+(\S+\.es[pml])/i.exec(ENABLE_MCM);
+yes('Enable-MCM.ps1 says what MCMHelper.esp masters', master !== null);
+yes('and the anchor is that master, so the entry lands where the server can read it',
+    master !== null && anchorName.toLowerCase() === master[1].toLowerCase());
+yes('a missing anchor stops the script rather than guessing a place',
+    /throw \("?\$After is not in the server load order/.test(QUICKLOOT));
+
+const TEMPLE = read(['..', 'scripts', 'oneoff', 'Add-TempleRespawn.ps1']);
+const stopAt = TEMPLE.indexOf('throw (\'STOP.');
+const installAt = TEMPLE.indexOf('Head \'Making room\'');
+yes('Add-TempleRespawn.ps1 throws a STOP', stopAt >= 0);
+yes('and it throws before it looks for an archive or writes anything',
+    stopAt >= 0 && installAt > stopAt);
+yes('and it says why, which is the mod it installed leaving the collection',
+    stopAt >= 0 && goneIn(TEMPLE.slice(stopAt, stopAt + 600)).length > 0);
+
 // ------------------------------------------------------- this machine
 const ROOT = process.env.TS_ROOT || ('C:' + BS + 'Thornswood');
 const PLUGINS = path.join(ROOT, 'Profile', 'Default', 'plugins.txt');
