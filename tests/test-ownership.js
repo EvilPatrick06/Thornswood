@@ -125,6 +125,7 @@ const NOT_SECRET = {
   'config.shipped.txt': 'the launcher\'s copy of SkyUI\'s settings as they shipped',
   'door.txt': 'the launcher\'s last yes or no from the site and when, no key in it',
   'discord-name.txt': 'the Discord display name the launcher shows',
+  'discord-avatar.txt': 'the Discord avatar hash the launcher shows, the public part of a cdn.discordapp.com address and no key in it',
   'check-secrets.allow.txt': 'the secret scan\'s list of known non-secrets, paths and rule names only',
   'discord-webhook.txt': 'a made-up file test-check-secrets.ps1 writes in its own temp folder to prove the scan catches a webhook',
   'github-token.txt': 'the same, for a GitHub token',
