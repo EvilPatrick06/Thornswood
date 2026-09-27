@@ -41,74 +41,65 @@ On the machine of anybody installing Thornswood for the first time.
 Ship rebuilds them when it is given `-Package`; a dev Ship never touches the
 installer. The address it downloads from is written into `Bootstrap.cs`.
 
-### The VirusTotal report the Downloads page links to
+### VirusTotal (optional, manual)
 
-The page prints the exe's SHA-256 with a link to VirusTotal's report on that
-hash, and a file nobody has sent to VirusTotal has no report, so that link
-landed on an "item not found" page from 24 September until the upload was
-wired up. `Publish-Installer.ps1` now sends the exe through
-`scripts\release\Publish-VirusTotal.ps1`, which Ship can also call on its own
-for any file:
+Publish no longer sends the installer to VirusTotal. Code signing (#390) is the
+trust path; the website is separately removing site VT warnings. Soft-skip and
+`VT_API_KEY` requirements are gone from `Publish-Installer.ps1`, Package, and
+Ship's post-tip block.
+
+`scripts\release\Publish-VirusTotal.ps1` and
+`scripts\release\Add-VirusTotalComment.ps1` stay in the repo as optional
+manual tools when somebody wants a report by hand:
 
 ```
 .\scripts\release\Publish-VirusTotal.ps1 -Path <file>
 .\scripts\release\Publish-VirusTotal.ps1 -Path <file> -Sha256 <hex>
 ```
 
-It reads the key from the environment variable `VT_API_KEY` and from nowhere
-else. That is set on the machine that ships. A machine without it, which is
-every other machine and every pull request build, prints
-`VirusTotal: skipped (VT_API_KEY not set)` and carries on: the upload cannot
-fail a publish, so the worst a missing key costs is a link that says item not
-found until somebody sends that build by hand. VirusTotal takes files up to
-650 MB, so a one-file installer above that is refused by VirusTotal rather
-than by us, and the line says so. `tests\test-virustotal-upload.ps1` holds the
-skip and the fail-soft paths to what is written here.
+They still read `VT_API_KEY` from the environment and nowhere else.
+`tests\test-virustotal-upload.ps1` holds the skip and fail-soft paths for that
+manual script.
 
 ### What Windows shows, for the Downloads page and the FAQ to match
 
-`Thornswood-Setup.exe` is not signed yet (that is issue #390), so until it is,
-Windows cannot show a verified publisher and the UAC prompt's publisher line
-reads `Unknown`. The product NAME strings the prompt and the file's Properties
-show come from a version resource `Bootstrap.cs` carries itself, and those names
-are kept stable so they do not change from one build to the next. File version
-and Product version are not hardcoded in Bootstrap; `Build-Launcher.ps1` stamps
-them at compile time from `launcher\app\Updater.cs` (`Version = "x.y.z"`), so
-the stub tracks the launcher release number (e.g. File version `1.1.95.0`,
-Product version `1.1.95` when the launcher is at 1.1.95). The build date rides
-in the file name, never in the product name. Website owns the Downloads and FAQ
-copy; these are the exact strings to write it against: Program name
+`Thornswood-Setup.exe` is signed when the build machine has `tools\signing.json`
+(#390 done). The UAC publisher line then shows the signed publisher rather than
+`Unknown`. The product NAME strings the prompt and the file's Properties show
+come from a version resource `Bootstrap.cs` carries itself, and those names are
+kept stable so they do not change from one build to the next. File version and
+Product version are not hardcoded in Bootstrap; `Build-Launcher.ps1` stamps them
+at compile time from `launcher\app\Updater.cs` (`Version = "x.y.z"`), so the
+stub tracks the launcher release number (e.g. File version `1.1.95.0`, Product
+version `1.1.95` when the launcher is at 1.1.95). The build date rides in the
+file name, never in the product name. Website owns the Downloads and FAQ copy;
+these are the exact strings to write it against: Program name
 (`FileDescription`), the UAC prompt's first line, is `Thornswood Setup`;
-Verified publisher is `Unknown` until #390 signs it; Product name, shown in
-Properties and to SmartScreen, is `Thornswood Setup`; Company is `Thornswood`;
-Copyright is `Copyright (c) Thornswood`; File version and Product version match
-the current launcher release from Updater.cs; and the Original file name is
-`Thornswood-Setup.exe`. The setup window's own title bar says `Thornswood Setup`
-too, so the name is the same from the download link through UAC to the window,
-and the emblem is compiled in as the file's icon, so the download is not a blank
-mark in the browser. `tests\test-setup-stub-identity.ps1` holds the name
-strings and the Build-Launcher version-stamping wiring to what is here.
+Verified publisher is the signed publisher when signing.json is present;
+Product name, shown in Properties and to SmartScreen, is `Thornswood Setup`;
+Company is `Thornswood`; Copyright is `Copyright (c) Thornswood`; File version
+and Product version match the current launcher release from Updater.cs; and the
+Original file name is `Thornswood-Setup.exe`. The setup window's own title bar
+says `Thornswood Setup` too, so the name is the same from the download link
+through UAC to the window, and the emblem is compiled in as the file's icon, so
+the download is not a blank mark in the browser.
+`tests\test-setup-stub-identity.ps1` holds the name strings and the
+Build-Launcher version-stamping wiring to what is here.
 
-### Version resource and the VirusTotal flags
+### Version resource after signing
 
-`Package-Thornswood.ps1` only copies this stub to `Thornswood-Setup.exe` (and,
-for a one-file build, appends the payload and a trailer after the end of the
-file), and `Publish-Installer.ps1` only uploads it. Neither rewrites the exe or
+`Build-Launcher.ps1` leaves `tools\setup-stub.exe` unsigned. `Package-Thornswood.ps1`
+copies it to `Thornswood-Setup.exe`, for a one-file build appends the payload and
+a trailer, then signs the final Setup (a pre-signed stub cannot be signed again
+after attach). `Publish-Installer.ps1` only uploads it. Neither rewrites the exe or
 strips its version resource, so what a person downloads carries the exact fields
 above. Checked on the live tip: `FileDescription`/`ProductName` `Thornswood
 Setup`, `Company` `Thornswood`, `Copyright` `Copyright (c) Thornswood`,
 `OriginalFilename`/`InternalName` `Thornswood-Setup.exe`, and matching File and
 Product version.
 
-That resource being filled and honest is worth having, but on its own it does
-not clear the machine-learning engines that make up most of the VirusTotal
-flags (CrowdStrike Falcon, APEX, Trapmine), and a hash-intel hit like McAfeeD
-moves only when the file's reputation does. Code signing (issue #390, held) is
-the real fix and the lever to re-measure on once it is turned on. The
-friend-facing side of the same story, the SmartScreen soft-block, the Defender
-warning and the VirusTotal report link, is on the site: the Downloads page and
-the Help page's "Why does Windows or Defender warn about the installer?"
-(`site\data\help.md`, anchor `defender`).
+Signing is the trust path (#390). Friend-facing copy about SmartScreen or
+Defender, if any remains, is on the site (`site\data\help.md`).
 
 ## Which drive it offers
 
@@ -127,3 +118,4 @@ different drive asks once more before anything is written. It asks and does not
 refuse: whether the launcher may fall back to copies instead, at about 26 to 41
 GB, is the team's call in #staff-general (issue #473).
 `tests\test-setup-skyrim-drive.ps1` holds all of that to what is here.
+

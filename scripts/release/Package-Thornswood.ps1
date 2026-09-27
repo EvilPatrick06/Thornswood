@@ -1024,6 +1024,33 @@ if (Test-Path $exe) { Remove-Item $exe -Force }
 Copy-Item $stub $exe -Force
 Say "  stub: $stub" 'DarkGray'
 
+# A signed stub cannot take the OneFile payload. Build-Launcher leaves the stub
+# unsigned for that reason; strip here anyway so a hand-signed stub or an older
+# tools\setup-stub.exe does not break Package the way Main did on 27 September
+# (signtool 0x800700C1 after attach). Sign-Artifact below signs the final Setup.
+$preSig = Get-AuthenticodeSignature -LiteralPath $exe
+if ($preSig -and $preSig.Status -ne 'NotSigned' -and $preSig.SignerCertificate) {
+    $signtoolStrip = $null
+    foreach ($kit in @(
+        ${env:ProgramFiles(x86)} + '\Windows Kits\10\bin',
+        ${env:ProgramFiles} + '\Windows Kits\10\bin'
+    )) {
+        if (-not (Test-Path -LiteralPath $kit)) { continue }
+        $hit = Get-ChildItem -LiteralPath $kit -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending | Select-Object -First 1
+        if ($hit) { $signtoolStrip = $hit.FullName; break }
+    }
+    if ($signtoolStrip) {
+        Say '  stub was signed; stripping so OneFile attach can be signed afterwards' 'DarkGray'
+        & $signtoolStrip remove /s $exe 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Die 'could not strip the stub signature before attaching the payload'
+        }
+    } else {
+        Die 'stub is signed and signtool was not found to strip it before OneFile attach'
+    }
+}
+
 # ---- one file, payload attached -------------------------------------------
 # STSFX001, then the offset the payload starts at, then its length. Both are
 # 64 bit and little endian, which is what BinaryReader.ReadInt64 wants on the
