@@ -1,13 +1,20 @@
 <#
   Setup-Thornswood.ps1
 
-  Puts Thornswood on this machine.
+  Puts Thornswood on this machine. It does not put the game folder Thornswood
+  plays out of on it. That is Root\Game, and the launcher builds it itself the
+  first time it opens, out of the Steam copy of Skyrim and what Vortex has
+  deployed into it, most of it as hard links so the collection is not on the
+  disk twice (launcher\app\OwnGame.cs).
 
-  Two shapes, decided by a collection.txt the build leaves in the payload. With
-  it, Thornswood goes into the Skyrim already installed through Steam, because
-  that is where Vortex deploys the collection, and no second copy of the game
-  is made. Without it, the old behaviour: a standalone copy under -Root built
-  out of the Steam one, which is then only ever read.
+  Two shapes, decided by a collection.txt the build leaves in the payload.
+  With it, this script lays the launcher down under -Root and Thornswood's own
+  content where Vortex deploys the collection, which is the Steam copy, and
+  makes no copy of the base game: the payload is built with the collection's
+  files left out, and Bethesda's archives are already on the disk. It keeps a
+  list of what it wrote there so an uninstall can take it back out again.
+  Without it, the old behaviour: a standalone copy under -Root built out of
+  the Steam one, which is then only ever read.
 
   Bethesda's own files are never renamed or deleted either way.
 #>
