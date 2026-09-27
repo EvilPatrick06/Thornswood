@@ -86,11 +86,15 @@ facts, so write them once and paste them into each form.
 1. **VirusTotal, the report itself.** Get the hash the way the site gets it,
    in lower case: Publish-Installer prints it at the end of every publish
    (`scripts\release\Publish-Installer.ps1:238`), and the Downloads page shows
-   it beside the size with the report link (`site\public\home.html:1315`).
+   it beside the size with the report link (`site\public\home.html:1314`).
    Open `https://www.virustotal.com/gui/file/<sha256>`, read which engines
    flagged it, and leave a community comment with the three facts above.
-   `scripts\release\Publish-VirusTotal.ps1` posts that comment through the API
-   when `VT_API_KEY` is set, so in practice this step is one command.
+   `scripts\release\Add-VirusTotalComment.ps1` posts that comment through the
+   API when `VT_API_KEY` is set, so in practice this step is one command. The
+   upload that makes the report exist in the first place is a separate script,
+   `Publish-VirusTotal.ps1`, which Publish-Installer calls; until that one is
+   on your checkout, send the file at <https://www.virustotal.com/gui/home/upload>
+   by hand first, because there is nothing to comment on before it has been.
 2. **Vote.** On the same report, a clean vote from the account that posted the
    comment. Votes and comments are what the smaller engines look at when
    somebody in their queue reads the case.
@@ -131,10 +135,13 @@ A new build is a new hash, and none of the work above carries over to it. So
 after each `Package-Thornswood.ps1` and `Publish-Installer.ps1`:
 
 - Take the hash Publish-Installer printed.
-- Run `scripts\release\Publish-VirusTotal.ps1 -Path <the exe>` with `VT_API_KEY`
-  set, which uploads the file if VirusTotal has never seen it and leaves the
-  comment on the report either way. Without the key it says so and does
-  nothing, so it is safe on any machine.
+- Send the file, so the report exists. `Publish-VirusTotal.ps1 -Path <the exe>`
+  does that, and Publish-Installer calls it; on a checkout that does not carry
+  that script yet, upload the exe on the site by hand.
+- Run `scripts\release\Add-VirusTotalComment.ps1 -Path <the exe>` with
+  `VT_API_KEY` set. Without the key, without the file, or with nothing
+  answering, it says which and exits 0, so it is safe on any machine and in
+  any script.
 - Look at the report. If the count is zero, there is nothing else to do.
 - If anything flagged it, work the checklist above for that hash.
 
