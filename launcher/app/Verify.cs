@@ -12,15 +12,17 @@ namespace Thornswood
     {
         public string Text;
         public bool Blocking;      // true = you will be refused by the server
-        // The file is not in Data at all. Fix rewrites a plugin list, it cannot
-        // install a mod, so offering the button for one of these is worse than
-        // not offering it.
+        // The plugin is not in the live list and not on disk ("is not installed").
+        // Fix cannot invent a mod Vortex never had; Shell greys the button for
+        // these unless Vortex deploys somewhere else (OwnFolderNext).
         public bool Absent;
-        // The plugin's file is missing from the game folder's Data. Set once per
-        // plugin the server expects but that is not on disk, so the Mods card can
-        // count how many and, when it is most of them, say the collection is not
-        // deployed in one sentence instead of one line per plugin. It changes
-        // only what is shown; the gate still counts Blocking (see Shell Play).
+        // The plugin's file is missing from the game folder's Data, including
+        // ones still named in plugins.txt. Set once per plugin the golden list
+        // expects but that is not on disk, so the Mods card can count how many
+        // and, when it is most of them, say the collection is not deployed in
+        // one sentence instead of one line per plugin. Fix restores these from
+        // Vortex (OwnGame.RestoreMissingPlugins); it does not drop them from
+        // the list. The gate still counts Blocking (see Shell Play).
         public bool FileMissing;
         // The file is there, enabled, in the right place, and its bytes are
         // not the server's. Fix fetches the server's copy. Which file, and what
@@ -250,6 +252,7 @@ namespace Thornswood
                     {
                         var gone = new Issue(p + " is in the list but the file is not in Data.", true);
                         gone.FileMissing = true;
+                        gone.Plugin = p;
                         issues.Add(gone);
                     }
                 }
@@ -671,12 +674,18 @@ namespace Thornswood
                 say(i.Plugin + ": what the server handed over is not what its own manifest describes, so nothing was changed.");
                 return false;
             }
-            try
+            bool hadLocal = false;
+            try { hadLocal = File.Exists(dest); }
+            catch (Exception ex) { Swallow.Note("Verify.FetchPlugin, asking whether " + i.Plugin + " was already in Data", ex); }
+            if (hadLocal)
             {
-                Directory.CreateDirectory(Paths.Replaced);
-                File.Copy(dest, Path.Combine(Paths.Replaced, i.Plugin + "." + DateTime.Now.ToString("yyyyMMdd-HHmmss")), true);
+                try
+                {
+                    Directory.CreateDirectory(Paths.Replaced);
+                    File.Copy(dest, Path.Combine(Paths.Replaced, i.Plugin + "." + DateTime.Now.ToString("yyyyMMdd-HHmmss")), true);
+                }
+                catch (Exception ex) { Swallow.Note("Verify.FetchPlugin, keeping the old copy of " + i.Plugin + " under Profile\\Replaced", ex); }
             }
-            catch { }
             // Our bytes go in our copy of the file and nowhere else.
             //
             // Vortex deploys by hard link, so this plugin and the Nexus mod in
@@ -698,7 +707,7 @@ namespace Thornswood
                 return false;
             }
             lock (crcCache) { crcCache.Remove(dest); }
-            say(i.Plugin + " is now the server's copy (" + Fmt(bytes.LongLength) + "). Yours is kept in Profile\\Replaced.");
+            say(i.Plugin + " is now the server's copy (" + Fmt(bytes.LongLength) + ")." + (hadLocal ? " Yours is kept in Profile\\Replaced." : ""));
             return true;
         }
 
@@ -805,11 +814,53 @@ namespace Thornswood
                 try { n += PutInServerOrder(cfg, say); } catch { }
             }
 
+            // Missing plugins the golden list expects. SettleLoadOrder only
+            // rewrites plugins.txt; it never puts a file back into Data, which
+            // is why Diagnostics Fix left CFTO-Lanterns / BeardMaskFix and the
+            // like uncleared on Djinn's machine. Restore from Vortex first
+            // (light plugins are not on the server at all). Then fetch any
+            // still-missing non-light plugin the manifest names.
+            try { n += OwnGame.RestoreMissingPlugins(cfg, say); }
+            catch (Exception ex) { Swallow.Note("Verify.Fix, restoring missing plugins from Vortex", ex); say("Could not restore missing plugins from Vortex (" + ex.Message.TrimEnd('.') + ")."); }
+
             // The server's copy of every plugin whose bytes are not its own.
             if (cfg != null)
             {
                 foreach (Issue i in Bytes(cfg))
                     if (i.Plugin != null && FetchPlugin(cfg, i, say)) n++;
+            }
+
+            // Still missing from Data and listed on the server: fetch that copy.
+            // Bytes skips absent files on purpose (Run already named them); Fix
+            // still has to put them back when Vortex did not have them.
+            if (cfg != null)
+            {
+                try
+                {
+                    ServerMod[] mods = Manifest(cfg);
+                    if (mods != null)
+                    {
+                        string dataDir = Path.Combine(Paths.Game, "Data");
+                        for (int idx = 0; idx < mods.Length; idx++)
+                        {
+                            ServerMod m = mods[idx];
+                            if (m == null || string.IsNullOrEmpty(m.filename) || Storefront.Contains(m.filename)) continue;
+                            string dest = Path.Combine(dataDir, m.filename);
+                            bool goneFile = false;
+                            try { goneFile = !File.Exists(dest); }
+                            catch (Exception ex) { Swallow.Note("Verify.Fix, asking whether " + m.filename + " is still missing before fetch", ex); goneFile = true; }
+                            if (!goneFile) continue;
+                            var miss = new Issue(m.filename + " is missing from Data; Fix fetches the server's copy.", true);
+                            miss.FileMissing = true;
+                            miss.Plugin = m.filename;
+                            miss.WantSize = m.size;
+                            miss.WantCrc = (int)m.crc32;
+                            miss.WantIndex = idx;
+                            if (FetchPlugin(cfg, miss, say)) n++;
+                        }
+                    }
+                }
+                catch (Exception ex) { Swallow.Note("Verify.Fix, fetching still-missing plugins from the server", ex); }
             }
             return n;
         }
