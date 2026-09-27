@@ -24,6 +24,25 @@
 // has to be one that folder's code reads. When one of these fails after a code
 // change, the README is what has gone wrong; change the README.
 //
+// TWO THINGS IT USED TO GET WRONG, both fixed here rather than in what they
+// read, because in both the document and the window were right and this file
+// was behind.
+//
+// The three sections were read as the whole of a README. site\README.md has a
+// fourth, `## The gallery`, a table of the ten gallery routes and who may ask
+// them, which is worth having and does not belong under any of the three. So
+// the three are what a README OPENS with, in that order, and a folder may say
+// more after them; every section, the extra ones included, still has to say
+// something.
+//
+// And the two buttons were read as a Content attribute on the Button, which is
+// how a button with a plain label is written. BtnServerDev stopped being one:
+// the dev build moved onto the Play page's server dropdown (#703), and that
+// entry is a dot, a label and a line of grey meta, so its label is a nested
+// TextBlock and Content is not there at all. The regex found nothing and the
+// failure read `as the launcher labels it, "undefined"`, which is this harness
+// describing itself. Label() below takes either shape.
+//
 // It also checks that nothing which carries these folders to people would
 // carry a README with them. Go.ps1 copies the overlays and the plugins by
 // filter, Deploy-Docs and Install-Voice send named files, and Build-Launcher
@@ -77,6 +96,37 @@ function tracked(rel) {
     return execSync('git ls-files -- "' + rel + '"', { cwd: ROOT }).toString().trim().length > 0;
   } catch (e) { return null; }
 }
+// What a button in ui.xaml says on it, whichever way it is written: the
+// Content attribute for a plain label, or the first nested TextBlock's Text for
+// one built out of a dot, a label and a line of meta, which is how every entry
+// in the Play page's server dropdown is written. '' when there is no such
+// button, so a renamed control reads as missing rather than as a label.
+function label(ui, buttonName) {
+  const at = ui.indexOf('x:Name="' + buttonName + '"');
+  if (at < 0) { return ''; }
+  const open = ui.lastIndexOf('<Button', at);
+  if (open < 0) { return ''; }
+  const openEnd = ui.indexOf('>', at);
+  if (openEnd < 0) { return ''; }
+  const openTag = ui.slice(open, openEnd + 1);
+  const content = /\bContent="([^"]+)"/.exec(openTag);
+  if (content) { return content[1]; }
+  // Self closing and no Content: nothing is written on it.
+  if (ui[openEnd - 1] === '/') { return ''; }
+  const shut = ui.indexOf('</Button>', openEnd);
+  if (shut < 0) { return ''; }
+  const inner = ui.slice(openEnd + 1, shut);
+  const text = /<TextBlock[^>]*\bText="([^"]+)"/.exec(inner);
+  return text ? text[1] : '';
+}
+// That label as its own word, so a paragraph naming Thornswood-DevBuild is not
+// mistaken for one naming the Dev entry.
+function namesLabel(text, lbl) {
+  if (!lbl) { return false; }
+  const esc = lbl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(?:^|[^A-Za-z])' + esc + '(?![A-Za-z])').test(text);
+}
+
 // A PowerShell -Filter glob as a regular expression.
 function glob(f) {
   const g = f.replace(/^['"]|['"]$/g, '');
@@ -106,11 +156,14 @@ SIX.forEach(function (d) {
   const lines = t.split('\n');
   yes(name + ': it starts with a title', /^# \S/.test(lines[0]));
   const heads = lines.filter(function (l) { return /^## /.test(l); });
-  yes(name + ': it has the three sections, in order: what it is, on your machine, where it runs',
-      JSON.stringify(heads) === JSON.stringify(HEADS));
+  // The three come first, in order. Anything after them is that folder's own
+  // detail, and site\README.md has one: `## The gallery`.
+  yes(name + ': it opens with the three sections, in order: what it is, on your machine, where it runs' +
+      (heads.length > 3 ? ', then ' + heads.slice(3).join(', ') : ''),
+      JSON.stringify(heads.slice(0, 3)) === JSON.stringify(HEADS));
   const parts = t.split(/^## .*$/m).slice(1);
-  yes(name + ': every section says something',
-      parts.length === 3 && parts.every(function (p) {
+  yes(name + ': every section says something, the extra ones included (' + parts.length + ')',
+      parts.length === heads.length && parts.length >= 3 && parts.every(function (p) {
         return p.replace(/\s+/g, ' ').trim().split(' ').length >= 25;
       }));
 
@@ -366,11 +419,22 @@ SIX.forEach(function (d) {
     para = lines.slice(s, e + 1).join('\n');
   }
   const ui = read('launcher/ui.xaml') || '';
-  const install = (/x:Name="BtnServerDev"[^>]*Content="([^"]+)"/.exec(ui) || [])[1];
-  const make = (/x:Name="BtnOwnGameMake"[^>]*Content="([^"]+)"/.exec(ui) || [])[1];
-  yes('the setup paragraph names the button that installs the dev build as the launcher labels it, "' +
-      install + '"', !!install && para.indexOf(install) >= 0);
+  const shell = read('launcher/app/Shell.cs') || '';
+  const install = label(ui, 'BtnServerDev');
+  const make = label(ui, 'BtnOwnGameMake');
+  yes('the setup paragraph names the entry that installs the dev build as the launcher labels it, "' +
+      install + '"', namesLabel(para, install));
   yes('and the one that makes its game folder, "' + make + '"', !!make && para.indexOf('"' + make + '"') >= 0);
+  // Which entry that is, measured rather than taken from the paragraph. The
+  // label above is only worth checking while this is the control that does it.
+  yes('that entry is in the dropdown the paragraph sends a reader to, under the server button',
+      /<Popup x:Name="ServerPickPopup"[^>]*[\s\S]*?ElementName=BtnServerPick/.test(ui) &&
+      ui.indexOf('x:Name="BtnServerPick"') < ui.indexOf('x:Name="BtnServerDev"') &&
+      /Play page/.test(para) && /dropdown/.test(para));
+  yes('and pressing it is what installs the dev build (Shell.cs, SwitchToDev)',
+      /btnServerDev\s*=\s*F<Button>\("BtnServerDev"\)/.test(shell) &&
+      /btnServerDev\.Click\s*\+=[\s\S]{0,160}?SwitchToDev\(\)/.test(shell) &&
+      /static void SwitchToDev\(\)[\s\S]*?DevBuild\.Install\(/.test(shell));
 
   const ship = read('scripts/release/Ship.ps1') || '';
   yes('Ship.ps1 refuses the dev channel without the dev build, as the paragraph says',
