@@ -50,8 +50,15 @@ Confirmed with Website. Signing / `ExpectedSigner` is still **off**.
   ignored.
 - **On disk.** Publishers keep a clone beside the source repo:
   `Thornswood-Releases` on `main`, and the worktree `Thornswood-Releases-dev` on
-  `dev` (`Publish-Update.ps1`). Mirror the same `version.json` (and assets by
-  sha256) onto the site paths above for the host cutover.
+  `dev` (`Publish-Update.ps1`). The same `version.json`, and the assets it names
+  by sha256, are mirrored onto the site paths above by
+  `scripts\release\Publish-SiteFeed.ps1`, which `Ship.ps1` runs at the end of
+  every release (`-SkipRemirror` leaves it out, and then launchers fall back to
+  the GitHub feed until somebody runs it). Assets go up first and
+  `version.json` last, so the feed never names bytes the site does not hold;
+  an asset the feed sends launchers to thornswood.net for that is neither on the
+  site nor on the publishing machine stops the mirror before `version.json`
+  moves. `-Plan` says what it would send and sends nothing.
 
 ## A real entry, trimmed
 
