@@ -1220,45 +1220,53 @@
 
 
           <!-- ================ GALLERY ================ -->
-          <!-- Upload, browse approved shots, Report, Delete (take down) and
-               Accept (approve pending). Play keeps the spotlight only (#731). -->
+          <!-- Upload (multi + drop), browse approved image cards, Report,
+               Delete, and staff Accept / Reject on pending (#731). Play keeps
+               the spotlight only. -->
           <Grid x:Name="PageGallery" Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-              <StackPanel Margin="36,30,36,34" MaxWidth="900" HorizontalAlignment="Left">
+              <StackPanel Margin="36,30,36,34" MaxWidth="980" HorizontalAlignment="Left">
 
-                <TextBlock Text="Send a shot" Style="{StaticResource Eyebrow}"/>
-                <Border Style="{StaticResource Slab}" Padding="18,16" Margin="0,0,0,22">
+                <TextBlock Text="Send a picture" Style="{StaticResource Eyebrow}"/>
+                <Border Style="{StaticResource Slab}" Padding="22,20" Margin="0,0,0,22">
                   <StackPanel>
+                    <TextBlock Style="{StaticResource Small}" Margin="0,0,0,12"
+                               Text="png, jpg, jpeg, webp or gif, up to 25 MB each. They go to the queue, not live, until staff Accept."/>
+                    <Border x:Name="GalleryDrop" AllowDrop="True" Padding="26,22" Margin="0,0,0,14"
+                            BorderBrush="{DynamicResource Edge}" BorderThickness="1.5" Background="#8C0B0E0A"
+                            CornerRadius="2" Cursor="Hand">
+                      <StackPanel HorizontalAlignment="Center">
+                        <TextBlock x:Name="TxtGalleryDropLead" Text="Drop pictures here or choose files"
+                                   Style="{StaticResource Body}" HorizontalAlignment="Center" Margin="0,0,0,14"
+                                   TextAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                          <Button x:Name="BtnGalleryChoose" Style="{StaticResource Ghost}"
+                                  Content="Choose pictures" Padding="14,8"/>
+                          <TextBlock x:Name="TxtGalleryChosen" Style="{StaticResource Small}"
+                                     Text="No file chosen" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                    <StackPanel x:Name="GalleryChosenList" Margin="0,0,0,14"/>
                     <Grid>
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                      </Grid.ColumnDefinitions>
-                      <Button x:Name="BtnGalleryChoose" Grid.Column="0" Style="{StaticResource Ghost}"
-                              Content="Choose picture..." Padding="12,6" Margin="0,0,12,0"/>
-                      <TextBlock x:Name="TxtGalleryChosen" Grid.Column="1" Style="{StaticResource Small}"
-                                 Text="No file chosen yet." VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                      <Button x:Name="BtnGallerySend" Grid.Column="2" Style="{StaticResource Solid}"
-                              Content="Send" Padding="14,6" Margin="12,0,0,0" IsEnabled="False"/>
-                    </Grid>
-                    <Grid Margin="0,12,0,0">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="16"/>
                         <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="Auto"/>
                       </Grid.ColumnDefinitions>
                       <StackPanel Grid.Column="0">
                         <TextBlock Text="By" Style="{StaticResource Small}" Margin="0,0,0,4"/>
                         <TextBox x:Name="BoxGalleryBy" Style="{StaticResource Field}" MaxLength="40" Padding="10,6"/>
                       </StackPanel>
                       <StackPanel Grid.Column="2">
-                        <TextBlock Text="Note" Style="{StaticResource Small}" Margin="0,0,0,4"/>
+                        <TextBlock Text="Note (optional)" Style="{StaticResource Small}" Margin="0,0,0,4"/>
                         <TextBox x:Name="BoxGalleryNote" Style="{StaticResource Field}" MaxLength="300" Padding="10,6"/>
                       </StackPanel>
+                      <Button x:Name="BtnGallerySend" Grid.Column="3" Style="{StaticResource Solid}"
+                              Content="Send" Padding="18,8" Margin="16,18,0,0" VerticalAlignment="Bottom"
+                              IsEnabled="False"/>
                     </Grid>
-                    <TextBlock Style="{StaticResource Small}" Margin="0,10,0,0"
-                               Text="png, jpg, jpeg, webp or gif, up to 25 MB. Staff Accept puts it on Play and the site. Screen recordings need a Website change first."/>
                   </StackPanel>
                 </Border>
 
@@ -1268,16 +1276,15 @@
                 <TextBlock Text="On the gallery" Style="{StaticResource Eyebrow}"/>
                 <TextBlock x:Name="TxtGalleryApprovedEmpty" Style="{StaticResource Small}" Margin="0,0,0,10"
                            Text="Nothing is on the gallery yet."/>
-                <StackPanel x:Name="GalleryApprovedList" Margin="0,0,0,22"/>
+                <WrapPanel x:Name="GalleryApprovedList" Margin="0,0,0,22"/>
 
                 <StackPanel x:Name="GalleryStaffBlock" Visibility="Collapsed">
                   <TextBlock Text="Waiting for Accept" Style="{StaticResource Eyebrow}"/>
                   <TextBlock x:Name="TxtGalleryPendingEmpty" Style="{StaticResource Small}" Margin="0,0,0,10"
                              Text="Nothing is waiting."/>
-                  <StackPanel x:Name="GalleryPendingList" Margin="0,0,0,22"/>
+                  <WrapPanel x:Name="GalleryPendingList" Margin="0,0,0,22"/>
                 </StackPanel>
 
-                <!-- Open only while a report is being written on this page. -->
                 <Grid x:Name="GalleryPageReportRow" Margin="0,0,0,12" Visibility="Collapsed">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
