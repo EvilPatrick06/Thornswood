@@ -169,13 +169,17 @@ const fakeServer = http.createServer((req, res) => {
   });
 });
 
-/* One poll against the stand-in, and time for its acknowledgement to land. */
+/* One poll against the stand-in. The GET is waited on by the ask count;
+   the acknowledgement is waited on by the ack count (or the until times
+   out when none is posted: parse fail, or a service with no ids). A flat
+   250 ms after the ask was what drifted under load. */
 async function pollFake(api, answer) {
   fake.answer = answer;
   const asks = fake.asks.length;
+  const acks = fake.acks.length;
   api.poll();
   await until(() => fake.asks.length > asks, 2000);
-  await wait(250);
+  await until(() => fake.acks.length > acks, 2000);
 }
 
 function done() {
@@ -250,17 +254,25 @@ function done() {
   }
   yes('it was offered exactly ' + OFFERS + ' times', offered === OFFERS);
   yes('and is no longer queued', (await queued()) === 0);
+  // console.log is through the child's stdout pipe; under load the parent's
+  // srvLog can lag the HTTP answer that already dropped the command.
   yes('and giving up on it is written in the service log, by id and not by text',
-      /gave up on command [0-9a-f]{8}:\d+ from profile 4242 after \d+ offers/.test(srvLog) &&
+      await until(() => /gave up on command [0-9a-f]{8}:\d+ from profile 4242 after \d+ offers/.test(srvLog), 3000) &&
       srvLog.indexOf('/where') < 0);
 
   // ---- a full queue refuses the newest and says so -------------------------
   console.log('\na full queue refuses the newest, keeps the oldest, and tells the sender:');
-  for (let i = 1; i <= CAP; i++) { djinn.say('/n ' + i); }
-  yes('the queue fills to its cap', await until(async () => (await queued()) === CAP, 5000));
+  // Each slash line does a sync chat log write in the service. Under load
+  // (a full harness sweep) two hundred of those can take longer than five
+  // seconds to land, and the refusal checks below cascade from this one.
+  for (let i = 1; i <= CAP; i++) {
+    djinn.say('/n ' + i);
+    if (i % 25 === 0) { await wait(0); }
+  }
+  yes('the queue fills to its cap', await until(async () => (await queued()) === CAP, 30000));
   const heardBefore = djinn.heard.length;
   djinn.say('/n newest');
-  const told = await until(() => djinn.heard.length > heardBefore, 2000);
+  const told = await until(() => djinn.heard.length > heardBefore, 5000);
   const notice = djinn.heard[djinn.heard.length - 1] || {};
   yes('the sender is told', told && /not taking commands right now/.test(String(notice.text)));
   yes('by the server, as a chat line to them alone', notice.from === 0 && notice.name === 'Thornswood');
@@ -270,14 +282,18 @@ function done() {
   yes('the oldest was not dropped', !!full && full.length > 0 && full[0].text === '/n 1');
   yes('the newest was refused', !!full && !full.some((x) => x.text === '/n newest'));
   djinn.say('/n again');
-  await wait(300);
+  // Negative: wait the same window a refusal that should arrive uses, and
+  // require that no second line showed up. A flat 300 ms was both short under
+  // load (missed a late duplicate) and raced nothing useful.
+  const secondLine = await until(() => djinn.heard.length > heardBefore + 1, 5000);
   yes('a second refusal inside ten seconds is not a second line in the chat',
-      djinn.heard.length === heardBefore + 1);
+      !secondLine && djinn.heard.length === heardBefore + 1);
   const ken = await join(7, 'Ken');
   ken.say('/tp whiterun');
   yes('somebody else sending into the full queue is told too',
-      await until(() => ken.heard.some((m) => /not taking commands/.test(String(m.text))), 2000));
-  yes('the refusal is written in the service log', /the command queue is full at 200/.test(srvLog));
+      await until(() => ken.heard.some((m) => /not taking commands/.test(String(m.text))), 5000));
+  yes('the refusal is written in the service log',
+      await until(() => /the command queue is full at 200/.test(srvLog), 3000));
   const cleared = await ack((full || []).map((x) => x.id));
   yes('and an acknowledgement of the lot empties it', cleared && cleared.removed === CAP &&
       (await queued()) === 0);
@@ -350,9 +366,12 @@ function done() {
     yes('the command runs', await until(() => ran2.length === 1, 3000) &&
         ran2[0].text === '/tp falkreath' && ran2[0].profileId === 4242);
     yes('the acknowledgement empties the queue', await until(async () => (await queued()) === 0, 3000));
+    const ranBefore = ran2.length;
     live.poll();
-    await wait(400);
-    yes('and the next poll runs nothing', ran2.length === 1);
+    // The second poll's GET is async; wait until a late run would have shown,
+    // then require the count stayed put. A flat 400 ms was the old settle.
+    const lateRun = await until(() => ran2.length > ranBefore, 2000);
+    yes('and the next poll runs nothing', !lateRun && ran2.length === 1);
     yes('and it went through dispatch(), not straight to handle()', live.straight.length === 0);
   } else {
     yes('the poll block lifts out of gamemode.js for the end to end run', false);
