@@ -915,6 +915,17 @@ namespace SkyrimTogetherSetup
         /// process behind with no window, which nobody can see and nobody can
         /// close. It holds files open under the build and the installer script
         /// refuses to run while it is there, so it goes first.
+        ///
+        /// It is asked for politely, and the last resort is asked about.
+        /// CloseMainWindow is the window's own close button and a running game
+        /// saves and exits on it; Kill is not, and a program that ends
+        /// somebody's game without a word is both rude and exactly the shape a
+        /// behaviour scanner is built to flag. Five engines on VirusTotal
+        /// flagged the setup stub on 27 September with nothing but machine
+        /// learning verdicts behind it, and this was one of the two things it
+        /// did that earned them (docs\VIRUSTOTAL-FALSE-POSITIVE.md). So
+        /// anything still alive after the wait is named in a Yes or No box:
+        /// Yes ends it, No stops the install having changed nothing.
         /// </summary>
         static int StopSkyrim()
         {
@@ -941,15 +952,72 @@ namespace SkyrimTogetherSetup
                 for (int i = 0; i < 24; i++)
                 {
                     Thread.Sleep(250);
-                    bool any = false;
-                    foreach (Process p in found) { try { if (!p.HasExited) any = true; } catch { } }
-                    if (!any) break;
+                    if (StillOpen(found).Count == 0) break;
                 }
             }
-            foreach (Process p in found) { try { if (!p.HasExited) p.Kill(); } catch { } }
+
+            List<string> left = StillOpen(found);
+            if (left.Count > 0)
+            {
+                if (!AskToClose(left))
+                {
+                    foreach (Process p in found) { try { p.Dispose(); } catch { } }
+                    throw new Exception("Skyrim is still open, so nothing was installed and nothing was " +
+                                        "closed for you. Close it yourself, check the taskbar and the " +
+                                        "system tray for anything of Skyrim's left behind, and run this " +
+                                        "again.");
+                }
+                foreach (Process p in found) { try { if (!p.HasExited) p.Kill(); } catch { } }
+            }
             foreach (Process p in found) { try { p.Dispose(); } catch { } }
             Thread.Sleep(750);
             return found.Count;
+        }
+
+        /// <summary>The names of the ones that are still running, each named once.</summary>
+        static List<string> StillOpen(List<Process> all)
+        {
+            var names = new List<string>();
+            foreach (Process p in all)
+            {
+                try
+                {
+                    if (p.HasExited) continue;
+                    string n = p.ProcessName;
+                    if (!names.Contains(n)) names.Add(n);
+                }
+                catch { }
+            }
+            return names;
+        }
+
+        /// <summary>
+        /// Yes or No on ending what is still running, asked on the window's own
+        /// thread because this runs on the unpack thread. Anything that goes
+        /// wrong asking counts as No: not installing is recoverable, ending
+        /// somebody's game without their say so is not.
+        /// </summary>
+        static bool AskToClose(List<string> names)
+        {
+            string text = "Skyrim is still running (" + string.Join(", ", names.ToArray()) + ").\n\n" +
+                          "It may be the game itself, or a helper of it left behind by a crash, with " +
+                          "no window of its own. It holds the game files open, and the " +
+                          "install cannot carry on while it is there.\n\n" +
+                          "Close it now?\n\n" +
+                          "Yes ends it, and anything not saved in the game is lost.\n" +
+                          "No stops the install and changes nothing, so you can save and quit " +
+                          "yourself, then run this again.";
+            var answer = MessageBoxResult.No;
+            try
+            {
+                win.Dispatcher.Invoke(new Action(delegate
+                {
+                    answer = MessageBox.Show(win, text, "Thornswood Setup",
+                                             MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                }));
+            }
+            catch { return false; }
+            return answer == MessageBoxResult.Yes;
         }
 
         static void Work()
