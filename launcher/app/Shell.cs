@@ -163,7 +163,7 @@ namespace Thornswood
         static Button buttonDiscord;
         static TextBlock labelDiscord;
         static Ellipse discordAvatar;
-        static Button btnPlay, btnRecheck, btnCopy, btnUpdate, btnMin, btnMax, btnClose,
+        static Button btnPlay, btnCopy, btnUpdate, btnMin, btnMax, btnClose,
                       btnSaveServer, btnCheckNow, btnFolder, btnOpenLog, btnOpenSaves,
                       btnRepair, btnRestore, btnIcons, tabPlugins, tabSkse, tabMine, tabAddons,
                       btnRefreshAddons,
@@ -622,7 +622,7 @@ namespace Thornswood
             txtDowngradeTitle = F<TextBlock>("TxtDowngradeTitle");
             noticeBar = F<Border>("NoticeBar"); txtNoticeTitle = F<TextBlock>("TxtNoticeTitle"); txtNoticeNote = F<TextBlock>("TxtNoticeNote");
 
-            btnPlay = F<Button>("BtnPlay"); btnRecheck = F<Button>("BtnRecheck"); btnCopy = F<Button>("BtnCopy");
+            btnPlay = F<Button>("BtnPlay"); btnCopy = F<Button>("BtnCopy");
             btnUpdate = F<Button>("BtnUpdate"); btnMin = F<Button>("BtnMin"); btnMax = F<Button>("BtnMax");
             btnClose = F<Button>("BtnClose"); btnSaveServer = F<Button>("BtnSaveServer");
             btnCheckNow = F<Button>("BtnCheckNow"); btnInstallNow = F<Button>("BtnInstallNow");
@@ -1383,25 +1383,6 @@ namespace Thornswood
 
             btnCopy.Visibility = Visibility.Collapsed;
 
-            btnRecheck.Click += delegate
-            {
-                // The one button that drives the whole consolidated path (#607):
-                // the Ready to launch checks, the Scan against the server's mod
-                // list, the client repair and the update check, all from Play.
-                // The checklist and the Scan and Fix card it fills both live on
-                // the Diagnostics page now.
-                bool ok = DrawStatus();
-                RunScan();
-                Log(ok ? "Everything checks out." : "Something needs attention, see Diagnostics.");
-                StartPing();
-                HealClientBackground();
-                if (Updater.Enabled(cfg))
-                {
-                    Log("Checking for updates...");
-                    ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(true); });
-                }
-                else Log("Updates are off: " + Updater.WhyDisabled(cfg));
-            };
             btnPlay.Click += delegate
             {
                 // Play means Play. Until 20 September this opened a bar of two
