@@ -1042,7 +1042,7 @@ if (AGE_PATHS[here] && !ageOk()) {
     } else {
       out += '<div class="gallery">' + shots.map(function (g) {
         var card = '<div class="shot-card"><div class="shot"><img src="' + esc(g.url) +
-          '" alt="' + esc(g.by || '') + '" loading="lazy"></div>';
+          '" alt="' + esc(g.by || 'Gallery image') + '" loading="lazy"></div>';
         if (g.by) card += '<div class="also faintly">' + esc(g.by) + '</div>';
         // Per-image report for live public shots only. No staff inbox here.
         if (who.signed || who.canSubmit) {
@@ -1115,6 +1115,7 @@ if (AGE_PATHS[here] && !ageOk()) {
           var url = URL.createObjectURL(file);
           previewUrls.push(url);
           img.src = url;
+          // This local preview repeats the filename and size below, so it is decorative by design.
           img.alt = '';
           thumb.appendChild(img);
         }
@@ -1598,7 +1599,7 @@ fetch('/api/public', { credentials:'same-origin' })
       shots.forEach(function (s, n) {
         var img = document.createElement('img');
         img.src = s.url;
-        img.alt = s.by || '';
+        img.alt = s.by || 'Gallery image';
         img.loading = n === 0 ? 'eager' : 'lazy';
         if (n === 0) img.className = 'on';
         show.appendChild(img);

@@ -2171,7 +2171,7 @@ function loadGalleryQueue() {
       q.forEach(function (g) {
         var href = '/up/' + encodeURIComponent(g.name);
         out += '<div class="file">' +
-          '<a class="thumb" href="' + href + '" target="_blank"><img src="' + href + '" alt="" loading="lazy"></a>' +
+          '<a class="thumb" href="' + href + '" target="_blank"><img src="' + href + '" alt="' + esc(g.by || 'Pending gallery image') + '" loading="lazy"></a>' +
           '<div class="who"><div class="nm">' + esc(g.name) + '</div>' +
           '<div class="meta">' + (g.by ? esc(g.by) + '  &middot;  ' : '') +
             'from ' + esc(g.from || '?') + '  &middot;  ' + new Date(g.at).toLocaleString() +
@@ -2223,7 +2223,7 @@ function loadGalleryLive() {
       q.forEach(function (g) {
         var href = g.url || ('/shot/' + encodeURIComponent(g.name));
         out += '<div class="file compact">' +
-          '<a class="thumb sm" href="' + esc(href) + '" target="_blank"><img src="' + esc(href) + '" alt="" loading="lazy"></a>' +
+          '<a class="thumb sm" href="' + esc(href) + '" target="_blank"><img src="' + esc(href) + '" alt="' + esc(g.by || 'Live gallery image') + '" loading="lazy"></a>' +
           '<div class="who"><div class="nm">' + esc(g.name) + '</div>' +
           '<div class="meta">' + (g.by ? esc(g.by) : 'no by') + '</div></div>' +
           '<button class="btn" data-galdel="' + esc(g.name) + '">Delete</button>' +
