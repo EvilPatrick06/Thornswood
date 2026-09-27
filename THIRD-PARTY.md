@@ -49,10 +49,14 @@ or the build check goes red.
   listed under "On the site".
 
 Everything else Build-Launcher.ps1 compiles into the launcher is Thornswood's
-own: `ui.xaml`, `logo.png`, `launcher-header.jpg`, `launcher-header.mp4`,
-`app.ico`, `voice-host.html`, `Thornswood.ini` and `client-build.json`. The
-setup stub, `Thornswood-Setup.exe`, is `installer\setup\Bootstrap.cs` and
-`logo-192.png`, also Thornswood's own.
+own: `ui.xaml`, `logo.png`, `logo-dev.png`, `launcher-header.jpg`,
+`launcher-header.mp4`, `app.ico`, `app-dev.ico`, `voice-host.html`,
+`Thornswood.ini` and `client-build.json`. `logo-dev.png` is the emblem the dev
+build shows in place of `logo.png` (Art.cs) and `app-dev.ico` is the icon its
+shortcuts carry in place of `app.ico` (Icons.cs); both are drawn for
+Thornswood, the same as the two they stand in for. The setup stub,
+`Thornswood-Setup.exe`, is `installer\setup\Bootstrap.cs` and `logo-192.png`,
+also Thornswood's own.
 
 ## Microsoft WebView2 SDK, inside the launcher
 

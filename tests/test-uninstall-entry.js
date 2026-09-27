@@ -30,6 +30,16 @@
   still puts the Windows Skyrim folders back before it deletes anything, and
   the command Windows runs is still the exe with -root and -uninstall.
 
+  ONE THING IT USED TO GET WRONG, fixed here rather than in the launcher,
+  because the launcher was right and this file was behind. The theme was read
+  as `music.Open(...)`, the WPF MediaPlayer. That failed on the ship PC with
+  "Windows Media Player version 10 or later is required", so the theme moved
+  to MenuMusic, the WebView2 page, and StartMenuMusic calls MenuMusic.Start
+  instead (#697). The old regex then matched nothing in either walk: the line
+  holding a normal start to the theme failed, and the line keeping the theme
+  out of an uninstall passed with nothing left to check. Both read MenuMusic
+  now, so both mean what they say again.
+
   Read only. Give it a folder to read another copy of launcher\app, which is how
   it was shown to fail on the code before the change:
 
@@ -298,7 +308,8 @@ const NETWORK = [
 for (const pair of NETWORK) {
   yes('opened to uninstall, nothing on the way in makes ' + pair[1], !pair[0].test(un.text));
 }
-yes('opened to uninstall, the theme is never opened or played', !/\bmusic\s*\.\s*(Open|Play)\s*\(/.test(un.text));
+yes('opened to uninstall, the theme is never started or told to play',
+    !un.calls.has('MenuMusic.Start') && !un.calls.has('MenuMusic.Decide'));
 
 // The window has to be the real one, drawn, and on the right page.
 yes('the real window is still parsed and bound, because DoUninstall reads its controls',
@@ -365,7 +376,7 @@ const MUST = ['CheckUpdatesBackground', 'StartPing', 'RunScan', 'HealClientBackg
               'RefreshDiscord', 'DrawVoiceState', 'Register.Ensure', 'Voice.Prepare', 'Voice.Start',
               'Keep.Seed', 'AutoJoin.Ensure', 'Discord.SendPendingLogs', 'SteamUpdates.Report'];
 for (const name of MUST) yes('a normal start still reaches ' + name, play.calls.has(name));
-yes('a normal start still plays the theme', /\bmusic\s*\.\s*Open\s*\(/.test(play.text));
+yes('a normal start still plays the theme', play.calls.has('MenuMusic.Start'));
 yes('a normal start still opens on Play', /\bShowPage\s*\(\s*PagePlay\s*\)/.test(play.text));
 yes('a normal start never goes through OpenForUninstall', !play.calls.has('OpenForUninstall'));
 

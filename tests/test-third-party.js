@@ -70,9 +70,11 @@ const C = creditsRaw || '';
 const OURS = {
   'ui.xaml': 'the launcher window, launcher\\ui.xaml',
   'logo.png': 'the emblem, launcher\\logo.png and logo-192.png for the setup stub',
+  'logo-dev.png': 'the emblem the dev build shows instead, launcher\\logo-dev.png',
   'launcher-header.jpg': 'a strip of the Thornswood backdrop, launcher\\art',
   'launcher-header.mp4': 'the same strip moving',
   'app.ico': 'the icon',
+  'app-dev.ico': 'the icon the dev build\'s shortcuts carry, launcher\\app-dev.ico',
   'voice-host.html': 'the voice page, launcher',
   'Thornswood.ini': 'the key template, launcher',
   'client-build.json': 'the record of the client runtime'
@@ -332,8 +334,20 @@ Object.keys(LICENCE_OF).forEach(function (sub) {
 });
 
 // ---------------------------------------------------------------- the server
+//
+// The record is written by New-ServerBuildRecord.ps1. Windows PowerShell's
+// -Encoding UTF8 puts a byte order mark in front of the file, which PowerShell
+// reads back happily and JSON.parse will not read at all. The record of
+// 26 September went to GitHub that way, so this file read nothing out of it and
+// the four lines below, which are what hold THIRD-PARTY.md and the credits page
+// to the server commit that is live, quietly stopped running. The mark is
+// checked on its own line so the next one says what it is rather than only that
+// the file did not read. The writer uses UTF8Encoding($false) now, the same as
+// New-ClientBuildRecord.ps1.
+const sbText = read(path.join(TOOLS, '..', 'records', 'server-build.json'));
+yes('records\\server-build.json has no byte order mark in front of it', !!sbText && sbText.charCodeAt(0) !== 0xFEFF);
 let sb = null;
-try { sb = JSON.parse(read(path.join(TOOLS, '..', 'records', 'server-build.json'))); } catch (e) { sb = null; }
+try { sb = JSON.parse(sbText); } catch (e) { sb = null; }
 yes('records\\server-build.json reads', !!(sb && sb.source && sb.source.commit));
 if (sb && sb.source) {
   const sc = String(sb.source.commit);
