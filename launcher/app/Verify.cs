@@ -684,7 +684,7 @@ namespace Thornswood
                     Directory.CreateDirectory(Paths.Replaced);
                     File.Copy(dest, Path.Combine(Paths.Replaced, i.Plugin + "." + DateTime.Now.ToString("yyyyMMdd-HHmmss")), true);
                 }
-                catch (Exception ex) { Swallow.Note("Verify.FetchPlugin, keeping the old copy of " + i.Plugin + " under Profile\Replaced", ex); }
+                catch (Exception ex) { Swallow.Note("Verify.FetchPlugin, keeping the old copy of " + i.Plugin + " under Profile\\Replaced", ex); }
             }
             // Our bytes go in our copy of the file and nowhere else.
             //
