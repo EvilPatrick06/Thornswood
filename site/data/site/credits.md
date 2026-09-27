@@ -40,10 +40,10 @@ That commit starts from
 [every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...b6721bb0)
 is the difference between the two.
 
-The server's engine, `scam_native.node`, has not been rebuilt against that
-commit yet: the copy running on our server is the earlier build from
-[`c8832519`](https://github.com/EvilPatrick06/skymp/tree/c8832519866e6848b9501039940dc2c6f0508668),
-and it stays until we rebuild and redeploy.
+The server's engine, `scam_native.node`, is built from
+[that same commit](https://github.com/EvilPatrick06/skymp/tree/b6721bb068756a7a998a8b12a26c7489c6f0e525).
+It was built and sent to our server on 27 September, and it is what the server
+runs now.
 
 | File | Built from | Licence |
 |---|---|---|

@@ -12,9 +12,10 @@ on the branch `thornswood/engine-changes`, at `engine/skymp`. The repository
 pins a commit, not the branch: `git submodule status` prints
 `b6721bb068756a7a998a8b12a26c7489c6f0e525`, the commit `records\client-build.json:6`
 and `records\server-build.json:10` now both name. The binary that server record
-hashes is still the earlier build from `c8832519866e6848b9501039940dc2c6f0508668`:
-the VPS has not been rebuilt against the pin, and `Deploy-Server.ps1` refuses a
-rebuilt `scam_native.node` until `New-ServerBuildRecord.ps1` records it (see
+hashes is the build of that commit, `e5d85ed8...`, built 2026-09-27T05:19:54Z
+and recorded after the Deploy-Server that sent it, so the client half and the
+server half are the same source now. `Deploy-Server.ps1` refuses a rebuilt
+`scam_native.node` until `New-ServerBuildRecord.ps1` records it (see
 "Rebuilding the same commit").
 
 `ignore = dirty` (`.gitmodules:15`) keeps a build inside the fork from showing
@@ -168,11 +169,10 @@ hashed `ecb029cb...`, not the recorded `de74c582...`. The recorded binary was
 put back from `local\engine-dist-c8832519`, so neither record changed and
 `Deploy-Server.ps1` still takes it (`docs\archive\todo-list-2026-09-25.md:2987`).
 
-Since 27 September the source pin in both records is `b6721bb0` while this
-recorded server binary is still the `c8832519` build above: the client was
-rebuilt against the new pin and the server was not. The live server carries the
-older binary until a rebuild from `b6721bb0` is recorded here and shipped with
-`Deploy-Server.ps1`.
+Since 27 September both records name `b6721bb0` and both halves are built from
+it: `records\server-build.json` hashes `e5d85ed8...`, the build of that commit,
+recorded after the Deploy-Server of that morning, and the `c8832519` build above
+is history.
 
 So the recorded binaries stay unless the engine changed:
 

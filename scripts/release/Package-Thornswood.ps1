@@ -613,8 +613,10 @@ foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRS
 #
 # Measured 24 September: git ls-remote against the public fork, with no
 # credentials, answers c8832519866e for thornswood/engine-changes, the commit
-# both records name. Which folder builds which file was read off the fork's own
-# build files at that commit, and each licence off that folder's LICENSE.
+# both records named that day. Both name b6721bb0 since 27 September, and this
+# note reads them rather than repeating either. Which folder builds which file
+# was read off the fork's own build files at that commit, and each licence off
+# that folder's LICENSE.
 #
 # The six are not all the SkyMP the installer carries. The 23 September stage
 # also had Data\Platform\UI\build.js (a webpack build of skymp5-front, GPL v3,
