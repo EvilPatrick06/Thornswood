@@ -761,7 +761,8 @@ const UPMETA = path.join(UP, 'uploads.json');
 // other data JSON (Deploy-Docs sends a data JSON only when the VPS is missing
 // it, so neither is ever overwritten once it exists there). gallery.json is the
 // approved list /api/public and /shot read; gallery-pending.json is what is
-// waiting for an admin to approve or reject, and is never public.
+// waiting for staff to Accept, and is never public. Unaccepted items sit
+// in the staff Gallery until Accept or Delete; there is no Reject.
 const GALLERY = path.join(DATA, 'gallery.json');
 const GPENDING = path.join(DATA, 'gallery-pending.json');
 /* Serialise gallery-pending.json writes. The site form can POST several files
@@ -969,8 +970,8 @@ const allowed = (key, w) =>
 
   So a ticket in the query is the other, read and re-checked against Discord
   exactly the way /api/gallery/submit and /api/gallery/report read theirs, with
-  one bar higher: st.dev rather than st.play, because these doors approve,
-  reject and delete rather than send something in.
+  one bar higher: st.dev rather than st.play, because these doors Accept
+  and Delete rather than send something in.
 
   It answers { ok: true, from, discordId } or { ok: false, code, body }. With
   neither cookie nor ticket the refusal is the 403 'staff only' these doors
@@ -3028,31 +3029,6 @@ async function handle(req, res) {
     return sendJson(res, 200, { ok: true, name: name, approved: true });
   }
 
-  // Reject: take it off the queue, and unlink the upload when asked. gallery.json
-  // is not touched, because a rejected shot was never on it.
-  if (p === '/api/gallery/reject' && req.method === 'POST') {
-    const gs = await galleryStaff(url, w);
-    if (!gs.ok) return sendJson(res, gs.code, gs.body);
-    let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
-    const name = String(o.name || '');
-    if (!name) return sendJson(res, 400, { error: 'no name' });
-
-    const pending = jsonFile(GPENDING, []);
-    const left = pending.filter((x) => String(x.name) !== name);
-    putJson(GPENDING, left);
-
-    if (o.deleteFile) {
-      const file = path.join(UP, name);
-      if (file.startsWith(UP + path.sep)) {
-        try { fs.unlinkSync(file); } catch (e) { }
-        const meta = jsonFile(UPMETA, {});
-        delete meta[name];
-        putJson(UPMETA, meta);
-      }
-    }
-    return sendJson(res, 200, { ok: true, name: name, removed: pending.length - left.length });
-  }
 
   // Who may submit or moderate on the public gallery page. Always 200: the
   // page needs to know whether to show Sign in, Submit, or the staff tools
@@ -3068,8 +3044,9 @@ async function handle(req, res) {
     });
   }
 
-  // Take an approved shot off the public gallery. Not the same as reject:
-  // reject only clears the pending queue. Staff only (access.dev).
+  // Delete: take a shot off the public gallery and/or the pending queue.
+  // Staff only (access.dev). Pending items that staff do not want go this
+  // way; there is no separate Reject door. Same deleteFile option as before.
   if (p === '/api/gallery/approved' && req.method === 'DELETE') {
     const gs = await galleryStaff(url, w);
     if (!gs.ok) return sendJson(res, gs.code, gs.body);
@@ -3079,8 +3056,14 @@ async function handle(req, res) {
     if (!name) return sendJson(res, 400, { error: 'no name' });
 
     const gallery = jsonFile(GALLERY, []);
-    const left = gallery.filter((x) => String(x.name) !== name);
-    if (left.length !== gallery.length) putJson(GALLERY, left);
+    const leftGal = gallery.filter((x) => String(x.name) !== name);
+    const removedGal = gallery.length - leftGal.length;
+    if (removedGal) putJson(GALLERY, leftGal);
+
+    const pending = jsonFile(GPENDING, []);
+    const leftPend = pending.filter((x) => String(x.name) !== name);
+    const removedPend = pending.length - leftPend.length;
+    if (removedPend) putJson(GPENDING, leftPend);
 
     // Drop open reports against this name too, so the reports list does not
     // keep asking about a picture that is already gone.
@@ -3097,7 +3080,13 @@ async function handle(req, res) {
         putJson(UPMETA, meta);
       }
     }
-    return sendJson(res, 200, { ok: true, name: name, removed: gallery.length - left.length });
+    return sendJson(res, 200, {
+      ok: true,
+      name: name,
+      removed: removedGal + removedPend,
+      removedApproved: removedGal,
+      removedPending: removedPend
+    });
   }
 
   // Report an approved shot. Any signed-in play-capable member, or the

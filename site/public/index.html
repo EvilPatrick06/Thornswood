@@ -592,7 +592,7 @@ var BOARDKEYS = []; /* hub no longer edits issue boards (#433 trim) */
 var isBoard = function (k) { return BOARDKEYS.indexOf(k) >= 0; };
 
 var ABOUT = {
-  uploads:     'Staff approve the queue and remove live gallery shots. Send and browse pictures on /gallery.',
+  uploads:     'Staff Accept waiting shots and Delete pending or live ones. Send and browse pictures on /gallery.',
   inbox:       'Bugs and ideas sent in from the public report page.',
   linked:      'Everybody who has linked a Discord account to a copy of the game.',
   sessions:    'One card a person, newest first by when they last played. ' +
@@ -2158,89 +2158,56 @@ function drawNews() {
 
 /* ------------------------------------------------------------- uploads -- */
 /*
-  Hub Gallery is staff tools: pending approve/reject queue, plus a compact live
-  cleanup list (small thumbs + Delete). Public send/browse stays on /gallery.
+  Hub Gallery is one staff grid: pending shots show Accept + Delete, accepted
+  shots show Delete. No Reject. Public send/browse stays on /gallery.
 */
 function drawUploads() {
   var out = head() +
     (S.me.dev || S.me.admin
-      ? '<div id="galqueue"></div><div id="gallive"></div>'
+      ? '<div id="galgrid"></div>'
       : '');
   el('page').innerHTML = out;
-  if (S.me.dev || S.me.admin) {
-    loadGalleryQueue();
-    loadGalleryLive();
-  }
+  if (S.me.dev || S.me.admin) loadGalleryStaff();
 }
 
-/* The pending gallery, staff (access.dev) only, on the Gallery page rather
-   than a page of its own: a submission comes in through /api/gallery/submit,
-   waits here, and goes public only when staff approve it onto gallery.json.
-   Loaded on its own because it is not part of /api/all. */
-function loadGalleryQueue() {
-  var box = el('galqueue');
+/* Staff Gallery grid. Pending and accepted share one list so Accept sits on
+   the waiting card rather than a separate queue section. Pending comes from
+   /api/gallery/pending; accepted from /api/public (same set /gallery shows).
+   Accept posts /api/gallery/approve; Delete uses DELETE /api/gallery/approved
+   which also clears a pending name. */
+function loadGalleryStaff() {
+  var box = el('galgrid');
   if (!box) return;
-  api('/api/gallery/pending').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
-    if (!el('galqueue')) return;
-    box = el('galqueue');
-    var q = (d && d.pending) || [];
-    var out = '<div class="section-label">Gallery queue' + (q.length ? ' &middot; ' + q.length + ' waiting' : '') + '</div>';
-    if (!q.length) {
-      out += '<div class="empty">Nothing waiting for the gallery.</div>';
+  Promise.all([
+    api('/api/gallery/pending').then(function (r) { return r.ok ? r.json() : null; }),
+    api('/api/public').then(function (r) { return r.ok ? r.json() : null; })
+  ]).then(function (pair) {
+    if (!el('galgrid')) return;
+    box = el('galgrid');
+    var pending = (pair[0] && pair[0].pending) || [];
+    var live = (pair[1] && pair[1].gallery) || [];
+    var waiting = pending.length;
+    var out = '<div class="section-label">Gallery' +
+      (waiting ? ' &middot; ' + waiting + ' waiting' : '') +
+      (live.length ? (waiting ? ', ' : ' &middot; ') + live.length + ' live' : '') +
+      '</div>';
+    out += '<p class="lede" style="margin:0 0 12px">Pending shots need Accept before they appear on /gallery or Play. Delete removes a pending or live shot. Players Report; only staff Accept or Delete.</p>';
+    if (!pending.length && !live.length) {
+      out += '<div class="empty">Nothing in the gallery yet.</div>';
     } else {
-      q.forEach(function (g) {
+      pending.forEach(function (g) {
         var href = '/up/' + encodeURIComponent(g.name);
         out += '<div class="file">' +
           '<a class="thumb" href="' + href + '" target="_blank"><img src="' + href + '" alt="' + esc(g.by || 'Pending gallery image') + '" loading="lazy"></a>' +
-          '<div class="who"><div class="nm">' + esc(g.name) + '</div>' +
+          '<div class="who"><div class="nm">' + esc(g.name) + ' <span class="pill">waiting</span></div>' +
           '<div class="meta">' + (g.by ? esc(g.by) + '  &middot;  ' : '') +
             'from ' + esc(g.from || '?') + '  &middot;  ' + new Date(g.at).toLocaleString() +
             (g.note ? '<br>' + esc(g.note) : '') + '</div></div>' +
-          '<button class="btn key" data-galok="' + esc(g.name) + '">Approve</button>' +
-          '<button class="btn" data-galno="' + esc(g.name) + '">Reject</button>' +
+          '<button class="btn key" data-galok="' + esc(g.name) + '">Accept</button>' +
+          '<button class="btn" data-galdel="' + esc(g.name) + '" data-galpend="1">Delete</button>' +
         '</div>';
       });
-    }
-    box.innerHTML = out;
-    each(box, '[data-galok]', function (b) {
-      b.onclick = function () {
-        b.disabled = true; b.textContent = 'approving';
-        api('/api/gallery/approve', { method:'POST', headers:{ 'content-type':'application/json' },
-            body: JSON.stringify({ name: b.dataset.galok }) })
-          .then(function () { loadGalleryQueue(); loadGalleryLive(); });
-      };
-    });
-    each(box, '[data-galno]', function (b) {
-      b.onclick = function () {
-        if (!confirm('Reject ' + b.dataset.galno + '? Tick OK to also delete the upload.')) return;
-        var drop = confirm('Delete the uploaded file too? Cancel keeps the file, only takes it off the queue.');
-        b.disabled = true; b.textContent = 'rejecting';
-        api('/api/gallery/reject', { method:'POST', headers:{ 'content-type':'application/json' },
-            body: JSON.stringify({ name: b.dataset.galno, deleteFile: drop }) })
-          .then(function () { loadGalleryQueue(); });
-      };
-    });
-  }).catch(function () { });
-}
-
-/* Live (approved) gallery, staff cleanup tool: small thumbs + Delete, not a
-   public gallery view. Uses /api/public for the same set /gallery shows, and
-   DELETE /api/gallery/approved to take one off. Pending queue stays above. */
-function loadGalleryLive() {
-  var box = el('gallive');
-  if (!box) return;
-  api('/api/public').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
-    if (!el('gallive')) return;
-    box = el('gallive');
-    var q = (d && d.gallery) || [];
-    var out = '<div class="section-label">Live gallery' +
-      (q.length ? ' &middot; ' + q.length : '') +
-      '</div>';
-    out += '<p class="lede" style="margin:0 0 12px">Approved shots on /gallery. Delete removes one from the live set (cleanup after a report).</p>';
-    if (!q.length) {
-      out += '<div class="empty">No live gallery shots.</div>';
-    } else {
-      q.forEach(function (g) {
+      live.forEach(function (g) {
         var href = g.url || ('/shot/' + encodeURIComponent(g.name));
         out += '<div class="file compact">' +
           '<a class="thumb sm" href="' + esc(href) + '" target="_blank"><img src="' + esc(href) + '" alt="' + esc(g.by || 'Live gallery image') + '" loading="lazy"></a>' +
@@ -2251,14 +2218,26 @@ function loadGalleryLive() {
       });
     }
     box.innerHTML = out;
+    each(box, '[data-galok]', function (b) {
+      b.onclick = function () {
+        b.disabled = true; b.textContent = 'accepting';
+        api('/api/gallery/approve', { method:'POST', headers:{ 'content-type':'application/json' },
+            body: JSON.stringify({ name: b.dataset.galok }) })
+          .then(function () { loadGalleryStaff(); });
+      };
+    });
     each(box, '[data-galdel]', function (b) {
       b.onclick = function () {
-        if (!confirm('Delete ' + b.dataset.galdel + ' from the live gallery?')) return;
-        var drop = confirm('Also delete the uploaded file? Cancel keeps the file on disk, only takes it off the gallery.');
+        var pendingOne = b.getAttribute('data-galpend') === '1';
+        var ask = pendingOne
+          ? ('Delete ' + b.dataset.galdel + ' from the waiting queue?')
+          : ('Delete ' + b.dataset.galdel + ' from the live gallery?');
+        if (!confirm(ask)) return;
+        var drop = confirm('Also delete the uploaded file? Cancel keeps the file on disk.');
         b.disabled = true; b.textContent = 'deleting';
         api('/api/gallery/approved', { method:'DELETE', headers:{ 'content-type':'application/json' },
             body: JSON.stringify({ name: b.dataset.galdel, deleteFile: drop }) })
-          .then(function () { loadGalleryLive(); });
+          .then(function () { loadGalleryStaff(); });
       };
     });
   }).catch(function () { });
