@@ -41,8 +41,11 @@ channels.
 No cheating, no exploiting the server, no griefing. If you find something that
 lets you break the world, report it instead of using it.
 
-**4. Do not share the installer outside the Discord.**
-Send people here instead.
+**4. Link the download, do not repackage it.**
+The installer is a public download on the [downloads page](/downloads), so send
+people there rather than passing round your own copy: no rehosting it, no
+rebranding it, and never selling it. Getting into the world is still decided in
+the Discord, so do not promise anybody you can get them in.
 
 **5. Push to talk.**
 Open microphones with a fan in the background ruin it for everybody.
