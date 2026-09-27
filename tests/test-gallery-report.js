@@ -174,21 +174,35 @@ yes('PageGallery exists', /x:Name="PageGallery"/.test(XAML));
 for (const name of ['BtnGalleryChoose', 'BtnGallerySend', 'BtnGalleryRefresh',
                     'BoxGalleryBy', 'BoxGalleryNote', 'BoxGalleryWhy',
                     'BtnGalleryReportSend', 'BtnGalleryReportCancel',
-                    'GalleryApprovedList', 'GalleryPendingList', 'GalleryStaffBlock',
+                    'GalleryApprovedList',
                     'GalleryPageReportRow', 'TxtGalleryPageSaid',
                     'GalleryDrop', 'GalleryChosenList', 'TxtGalleryDropLead']) {
   yes('ui.xaml has ' + name, XAML.indexOf('x:Name="' + name + '"') > 0);
   yes('Shell.cs looks up ' + name, SHELL.indexOf('"' + name + '"') > 0);
 }
+yes('no separate waiting section in XAML',
+    XAML.indexOf('GalleryStaffBlock') < 0 &&
+    XAML.indexOf('GalleryPendingList') < 0 &&
+    XAML.indexOf('Waiting for Accept') < 0);
+yes('Play keeps From the world header',
+    /Text="From the world"/.test(XAML));
+yes('Play byline has no from the world suffix',
+    SHELL.indexOf(', from the world') < 0 &&
+    /galleryBy\.Text = \(shot\.By != null && shot\.By\.Length > 0\)/.test(SHELL));
 
 yes('Gallery.FetchPending loads waiting thumbs with ticket',
     /public static BitmapImage FetchPending\(Pending item\)/.test(GALLERY));
 yes('Shell wires the drop zone', /WireGalleryDrop\(\)/.test(SHELL));
 yes('approved list is a WrapPanel of image cards',
     /WrapPanel x:Name="GalleryApprovedList"/.test(XAML));
-yes('pending list is a WrapPanel with Accept buttons in Shell',
-    /WrapPanel x:Name="GalleryPendingList"/.test(XAML) &&
-    /accept\.Content = "Accept"/.test(SHELL));
+yes('pending cards share GalleryApprovedList with Accept in Shell',
+    /WrapPanel x:Name="GalleryApprovedList"/.test(XAML) &&
+    /FillGalleryGrid\(/.test(SHELL) &&
+    /accept\.Content = "Accept"/.test(SHELL) &&
+    /GalleryDeletePending\(/.test(SHELL));
+yes('Reject button is gone from Shell UI',
+    SHELL.indexOf('Content = "Reject"') < 0 &&
+    SHELL.indexOf('GalleryReject(') < 0);
 yes('staff Accept is not gated on who.Answered',
     /bool staff = GalleryStaff\(\);/.test(SHELL) &&
     !/bool staff = doors && GalleryStaff\(\);/.test(SHELL));
@@ -207,8 +221,17 @@ yes('Accept calls Gallery.Approve',
     /Gallery\.Approve\(name\)/.test(SHELL));
 yes('Delete calls Gallery.TakeDown',
     /Gallery\.TakeDown\(name\)/.test(SHELL));
-yes('Reject calls Gallery.Reject',
+yes('Delete pending still uses Gallery.Reject API under Delete',
+    /GalleryDeletePending\(/.test(SHELL) &&
     /Gallery\.Reject\(name\)/.test(SHELL));
+yes('Auto load / StartOnSaveInstalled row is gone from Checks',
+    (function () {
+      const checks = fs.readFileSync(path.join(APP, 'Checks.cs'), 'utf8');
+      return checks.indexOf('StartOnSaveInstalled') < 0 &&
+             checks.indexOf('Auto load') < 0;
+    })());
+yes('WriteStartIni remains while DLL may still be in Data',
+    /static void WriteStartIni\(\)/.test(fs.readFileSync(path.join(APP, 'Chars.cs'), 'utf8')));
 
 // reports inbox stays at the site
 const csFiles = fs.readdirSync(APP).filter(f => f.endsWith('.cs'));
