@@ -604,6 +604,10 @@ namespace Thornswood
                     // the Steam copy gets a copy of its own, as it is now.
                     // Rules 6: a Distribution redistributable this folder still
                     // holds as its own copy becomes a hard link to Vortex's.
+                    // Only Distribution: a broader !MustCopy re-link also
+                    // undid Fix's light-flag Separates on plugins such as
+                    // CBBE.esp (copy, ESL set, then Bring it up to date from
+                    // Vortex replaced it with Vortex's unflagged staging).
                     try
                     {
                         if (MustCopy(f.Rel, deployed) && Links(dest) > 1)
@@ -611,7 +615,8 @@ namespace Thornswood
                             Separate(dest);
                             if (Links(dest) <= 1) { kind = 'C'; separated++; }
                         }
-                        else if (!MustCopy(f.Rel, deployed) && origin == 'V' && Links(dest) <= 1)
+                        else if (!MustCopy(f.Rel, deployed) && origin == 'V' && Links(dest) <= 1
+                                 && f.Rel.StartsWith("Data\\Platform\\Distribution\\", StringComparison.OrdinalIgnoreCase))
                         {
                             bool nowLink;
                             DropName(dest);
