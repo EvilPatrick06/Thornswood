@@ -15,7 +15,7 @@
 
     .\Publish-Installer.ps1
     .\Publish-Installer.ps1 -OutDir .\out\dist\Thornswood\_dist
-    .\Publish-Installer.ps1 -KeepOld     keep the previous pair as a rollback
+    .\Publish-Installer.ps1 -KeepOld     ignored (stable name; stamped leftovers always pruned)
 
   Only the current pair is kept by default. At a gigabyte each, three
   generations is several gigabytes of VPS disk for something nobody has ever
@@ -140,12 +140,13 @@ if (-not $single) {
 # testing this morning's installer and reporting a bug fixed at lunch.
 # Shown under the download button, so it is read the way a clock is read
 # rather than the way a log line is. The site reformats an older 24 hour
-# stamp too, for the one already sitting in files.json.
+# Update the tip entry already sitting in files.json.
 if (-not $Version) { $Version = $exeItem.LastWriteTime.ToString('M-d-yyyy h:mm tt') }
 
-$stamp  = $exeItem.LastWriteTime.ToString('yyyyMMdd-HHmm')
-$exeOut = "Thornswood-Setup-$stamp.exe"
-$zipOut = "Thornswood-Setup-$stamp.zip"
+# Stable download name (Gavin 2026-09-27): no date stamp in the filename.
+# Version and SHA-256 stay in files.json / the Downloads page.
+$exeOut = 'Thornswood-Setup.exe'
+$zipOut = 'Thornswood-Setup.zip'
 
 '{0,-26} {1:N0} bytes' -f 'Thornswood-Setup.exe', $exeItem.Length | Write-Host
 if (-not $single) { '{0,-26} {1:N0} bytes' -f 'Thornswood-Setup.zip', $zipItem.Length | Write-Host }
@@ -193,7 +194,6 @@ if ($single) {
 }
 $b64 = [Convert]::ToBase64String(
   [Text.Encoding]::UTF8.GetBytes(($meta | ConvertTo-Json -Depth 4 -Compress)))
-$keep = if ($KeepOld) { 2 } else { 1 }
 
 Write-Host ''
 Remote @"
@@ -207,14 +207,11 @@ if (Test-Path `$f) {
 (([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64'))) |
   ConvertFrom-Json).PSObject.Properties | ForEach-Object { `$all[`$_.Name] = `$_.Value }
 
-# Prune by pair. The stamp in the name is what ties an exe to its zip, so both
-# halves of an old build go or neither does.
-`$stamps = Get-ChildItem `$dir -Filter 'Thornswood-Setup-*.*' |
-  ForEach-Object { if (`$_.Name -match 'Thornswood-Setup-(\d{8}-\d{4})\.') { `$Matches[1] } } |
-  Sort-Object -Unique -Descending
-`$drop = `$stamps | Select-Object -Skip $keep
-foreach (`$s in `$drop) {
-  Get-ChildItem `$dir -Filter ('Thornswood-Setup-' + `$s + '.*') | ForEach-Object {
+# Stable name overwrites in place via scp. Drop any leftover stamped tips
+# (Thornswood-Setup-YYYYMMDD-HHMM.*) and their files.json keys. -KeepOld is
+# ignored for the stable name; one tip is enough.
+Get-ChildItem `$dir -Filter 'Thornswood-Setup-*.*' | ForEach-Object {
+  if (`$_.Name -match '^Thornswood-Setup-\d{8}-\d{4}\.') {
     Remove-Item `$_.FullName -Force -EA SilentlyContinue
     `$all.Remove(`$_.Name)
     'removed old ' + `$_.Name
