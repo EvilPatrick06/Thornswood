@@ -326,20 +326,23 @@ if ($file.Length -gt $UrlCap) {
 $url = $Api.TrimEnd('/') + '/files'
 if ($file.Length -gt $PlainCap) {
     # Anything over 32 MB goes to a one-time address VirusTotal hands out for
-    # that upload. The installer is always on this path.
+    # that upload. The installer is always on this path. $uploadReply is the
+    # HTTP reply from /files/upload_url (parsed body in .Json), not a file on
+    # disk and not a credential: the body is the one-time URL, the key stays
+    # in the request header only.
     try {
-        $ticket = Invoke-Get ($Api.TrimEnd('/') + '/files/upload_url')
+        $uploadReply = Invoke-Get ($Api.TrimEnd('/') + '/files/upload_url')
     }
     catch {
         Stop-Here ('not sent (' + (Get-Why $_) + '). ' + $report +
                    ' says item not found until it is.') -Sha $sha -ReportUrl $report -SkipReason 'upload-failed'
     }
-    $why = Get-Refusal $ticket
+    $why = Get-Refusal $uploadReply
     if ($why) {
         Stop-Here ('not sent (' + $why + '). ' + $report + ' says item not found until it is.') `
             -Sha $sha -ReportUrl $report -SkipReason 'upload-failed'
     }
-    $url = [string](Get-Field $ticket.Json 'data')
+    $url = [string](Get-Field $uploadReply.Json 'data')
     if (-not $url) {
         Stop-Here ('not sent (VirusTotal gave no upload address). ' + $report +
                    ' says item not found until it is.') -Sha $sha -ReportUrl $report -SkipReason 'upload-failed'
