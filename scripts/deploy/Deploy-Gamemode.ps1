@@ -1,4 +1,4 @@
-﻿<#
+<#
   Deploy-Gamemode.ps1
 
   Puts gamemode.js into the built server and writes a server load order that
@@ -35,6 +35,8 @@
 param(
     [string]$Gamemode,
     [string]$Dist     = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
+    # C:\Thornswood\... on most machines; Find-Root below retargets when the
+    # launcher is on another drive. -Data, -Plugins and -Vortex still win.
     [string]$Data     = 'C:\Thornswood\Game\Data',
     [string]$Plugins  = 'C:\Thornswood\Profile\Default\plugins.txt',
     [string]$ServerName = 'Thornswood',
@@ -135,6 +137,27 @@ param(
     [switch]$IgnoreRevision
 )
 
+# Same rule as Find-Root in Publish-Update.ps1 / Repair-Manifest.ps1. -Data,
+# -Plugins and -Vortex still win; this only fills the defaults when they were
+# not passed, so a machine whose launcher lives on another drive is not stuck
+# on C:\Thornswood.
+function Find-Root {
+    $first = 'C:\Thornswood'
+    if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
+    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
+        $cand = Join-Path $d.Root 'Thornswood'
+        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
+    }
+    return $first
+}
+if (-not $Vortex) {
+    if (-not $PSBoundParameters.ContainsKey('Data')) {
+        $Data = Join-Path (Find-Root) 'Game\Data'
+    }
+    if (-not $PSBoundParameters.ContainsKey('Plugins')) {
+        $Plugins = Join-Path (Find-Root) 'Profile\Default\plugins.txt'
+    }
+}
 # ---------------------------------------------------------------- -Vortex ---
 #
 # Where the build actually is.
@@ -328,7 +351,7 @@ $lo = Join-Path $PSScriptRoot '..\mods\LoadOrder.ps1'
 if (Test-Path -LiteralPath $lo) {
     . $lo
     $cfgPath = Join-Path (Split-Path -Parent $Data) 'config.json'
-    if (-not (Test-Path -LiteralPath $cfgPath)) { $cfgPath = 'C:\Thornswood\config.json' }
+    if (-not (Test-Path -LiteralPath $cfgPath)) { $cfgPath = Join-Path (Find-Root) 'config.json' }
     $colUrl = ''
     try { $colUrl = [string](Get-Content -LiteralPath $cfgPath -Raw | ConvertFrom-Json).CollectionUrl } catch { }
     $cs = Get-CollectionState $colUrl
