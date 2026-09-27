@@ -2203,7 +2203,7 @@ function size(b) {
 */
 function drawUploads() {
   var out = head() +
-    (S.me.admin ? '<div id="galqueue"></div>' : '') +
+    (S.me.dev || S.me.admin ? '<div id="galqueue"></div><div id="galreports"></div>' : '') +
     '<div class="drop" id="drop">' +
       '<div class="big">Drop files here</div>' +
       '<div class="said">or <span class="link" id="pick">choose them</span>. ' +
@@ -2261,13 +2261,13 @@ function drawUploads() {
     };
   });
 
-  if (S.me.admin) loadGalleryQueue();
+  if (S.me.dev || S.me.admin) loadGalleryQueue();
 }
 
-/* The pending gallery, admin only, on the Uploads page rather than a page of
-   its own: a submission comes in through /api/gallery/submit, waits here, and
-   goes public only when an admin approves it onto gallery.json. Loaded on its
-   own because it is not part of /api/all. */
+/* The pending gallery, staff (access.dev) only, on the Uploads page rather
+   than a page of its own: a submission comes in through /api/gallery/submit,
+   waits here, and goes public only when staff approve it onto gallery.json.
+   Loaded on its own because it is not part of /api/all. */
 function loadGalleryQueue() {
   var box = el('galqueue');
   if (!box) return;
@@ -2309,6 +2309,40 @@ function loadGalleryQueue() {
         api('/api/gallery/reject', { method:'POST', headers:{ 'content-type':'application/json' },
             body: JSON.stringify({ name: b.dataset.galno, deleteFile: drop }) })
           .then(function () { loadGalleryQueue(); });
+      };
+    });
+  }).catch(function () { });
+  loadGalleryReports();
+}
+
+function loadGalleryReports() {
+  var box = el('galreports');
+  if (!box) return;
+  api('/api/gallery/reports').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+    if (!el('galreports')) return;
+    box = el('galreports');
+    var q = (d && d.reports) || [];
+    var out = '<div class="section-label">Gallery reports' + (q.length ? ' &middot; ' + q.length : '') + '</div>';
+    if (!q.length) {
+      out += '<div class="empty">No open reports.</div>';
+    } else {
+      q.slice().reverse().forEach(function (r) {
+        out += '<div class="file">' +
+          '<div class="who"><div class="nm">' + esc(r.name) + '</div>' +
+          '<div class="meta">' + (r.why ? esc(r.why) + '  &middot;  ' : '') +
+            'from ' + esc(r.from || '?') + '  &middot;  ' + new Date(r.at).toLocaleString() +
+          '</div></div>' +
+          '<button class="btn" data-galdismiss="' + esc(r.id) + '">Dismiss</button>' +
+        '</div>';
+      });
+    }
+    box.innerHTML = out;
+    each(box, '[data-galdismiss]', function (b) {
+      b.onclick = function () {
+        b.disabled = true; b.textContent = 'dismissing';
+        api('/api/gallery/report/dismiss', { method:'POST', headers:{ 'content-type':'application/json' },
+            body: JSON.stringify({ id: b.dataset.galdismiss }) })
+          .then(function () { loadGalleryReports(); });
       };
     });
   }).catch(function () { });
