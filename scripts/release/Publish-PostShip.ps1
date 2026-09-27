@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
   Runs what follows a published tip, the host feed remirror and the VirusTotal
-  upload for the installer the Downloads page offers, and says which of them did
-  not happen.
+  upload for the installer the Downloads page offers, and says plainly when one
+  of them did not happen.
 
 .DESCRIPTION
   WHAT A TIP IS. The tip customers get is `version.json`, written and pushed by
@@ -10,80 +10,51 @@
   feed (`docs\FEED.md`, and `Get-HostFeedVersionUrl` in `Feed-Rules.ps1`:
   https://thornswood.net/feed/version.json live, /feed-dev for dev). So once the
   publisher has written that file, two things are left before the tip is the one
-  the world reads, and neither used to be part of shipping:
+  the world reads, and neither used to be part of shipping.
 
-    the remirror   Remirror-Site-Feed.ps1, the website lane's script. Main takes
-                   the Thornswood-Releases tip to thornswood.net/feed/, dev
-                   takes the Thornswood-Releases-dev tip to
-                   thornswood.net/feed-dev/, with the assets each feed names.
-    VirusTotal     Publish-VirusTotal.ps1, the installer lane's upload hook, on
-                   the installer exe that the Downloads page offers, so the link
-                   the page prints beside its SHA-256 is a report rather than
-                   item-not-found. Publish-Installer.ps1 calls the same hook
-                   after it hashes and sends a new installer, so this is the
-                   releases that did not rebuild one. The page wiring for those
-                   download urls is the website lane's.
+  THE TWO CALLS, EXACTLY AS THEIR LANES PINNED THEM. Both paths are relative to
+  this script, which sits in scripts\release beside Ship.ps1, so they are the
+  same two lines either would run:
 
-  THIS SCRIPT IMPLEMENTS NEITHER OF THEM. It is the one place that knows a
-  release has two things after it, in what order, on which channel, and what to
-  say when one did not happen. Remirror-Site-Feed.ps1 asked for exactly this
-  call in its own header: "After the release is published and before the news
-  step, one line."
+      & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') -Dev:$Dev
+      & (Join-Path $Here 'Publish-VirusTotal.ps1') -Path <file> -Sha256 <hex>
 
-  BOTH CONTRACTS ARE THE LANES' OWN, and these are the shapes they settled:
+  The remirror is the website lane's (pull request #730). Default is main, to
+  /feed; -Dev is the dev channel, to /feed-dev. It has -Check for a dry run,
+  -Verify to rehash what is up there, and optional -FeedDir and -AssetDir, and
+  nothing here passes those: it works the clone out from the channel itself.
 
-      scripts\deploy\Remirror-Site-Feed.ps1 [-Dev] [-FeedDir <clone>]
-      scripts\release\Publish-VirusTotal.ps1 -Path <file> [-Sha256 <hex>]
+  The upload is the installer lane's (pull request #734). It reads the key from
+  the environment variable VT_API_KEY and nowhere else, and a missing key or an
+  answer it cannot use is one line and exit 0. There is no upload written here
+  to fall back on, by their lane's decision and this one's.
 
-  The upload reads the key from the environment variable VT_API_KEY and nowhere
-  else, and a missing key or an answer it cannot use is a line on screen and
-  exit 0, never a stopped release. None of that is this script's to change, and
-  there is no upload written here to fall back on.
+  NOTHING HERE FAILS A RELEASE. The tip is on the feed before any of this runs.
+  A script that is not on this machine yet is a line naming it. A remirror that
+  exits 1 has refused to publish a feed naming bytes the site does not hold,
+  which leaves the site one release behind rather than pointing launchers at a
+  404, and that is a line too. Both are said in full, with the command that puts
+  them right, and the release stays out and stays announced. Asked for by the
+  website lane on 27 September: "Exit 1 = refused publish (do not fail the
+  release)", the same spirit as Ship's own try/catch around Publish-News.
 
-  Each is looked for at its own path first, then in the other release or deploy
-  folder, then anywhere under scripts\ by file name, and -RemirrorScript and
-  -VirusTotalScript name one outright. Whatever is found is called with the
-  parameters it actually declares, read off its own param block: -Dev or
-  -Channel, -FeedDir or -ReleaseDir, -Path, and -Sha256 when it takes one. So a
-  script that lands in another folder, or with the other name for the same
-  thing, still runs, and a parameter that lane has not got is never passed.
-  NOTHING HERE REQUIRES -FeedDir: the remirror works out the clone from the
-  channel by itself, and this only says which one when the script offers to be
-  told.
-
-  A HOOK THAT IS NOT ON THE MACHINE IS A LINE, NOT A FAILURE. The remirror
-  script is the website lane's to land and this one cannot do its job, so a
-  release that runs before it arrives says which file it looked for and where,
-  and hands back 0. What does count as not completing is a hook that is here and
-  stopped: then this hands back non-zero, Ship says so on its last screen, and
-  the tip is still published, still announced, and nothing is unpublished.
-
-  THERE IS NO THIRD STEP FOR THE LAUNCHER, and that is the Launcher lane's
+  THERE IS NO THIRD STEP FOR THE LAUNCHER, and that is the launcher lane's
   answer rather than an omission. A launcher polls the feed and updates itself,
   so the remirror IS the launcher update reaching people. Ship's mid-release
   Install-Launcher.ps1 refreshes the install on the machine that shipped
   (C:\Thornswood for main, C:\Thornswood-DevBuild for dev) and nothing else, so
   re-running it after the tip would refresh that one install again.
 
-  THE SAME BLOCK RUNS ON DEV, on purpose. Everything goes to dev first
-  (CONTRIBUTING.md, decided 23 September), so the dev channel is where this gets
-  exercised several times a week rather than once a fortnight. Dev remirrors to
-  /feed-dev, and its VirusTotal step asks about whatever installer exe is on the
-  machine, which a dev release did not rebuild: the hook asks VirusTotal before
-  it sends anything, so on most dev releases that is one read and nothing else.
+  IT RUNS ON EVERY RELEASE, DEV AND MAIN, and no switch turns either half off.
+  Everything goes to dev first (CONTRIBUTING.md, decided 23 September), so the
+  dev channel is where this is exercised several times a week rather than once a
+  fortnight. -Only is how Ship takes one half at a time and how a person runs one
+  by hand; it is not an escape hatch for a release.
 
-  ONE HALF AT A TIME, WHICH IS WHY -Only EXISTS. Ship runs this twice: -Only
-  Remirror before the site news, the Discord post and the server's countdown,
-  because those three send people to fetch a release the feed has to be serving
-  first, and -Only VirusTotal after them, because an upload of most of a gigabyte
-  that nobody is waiting on must not hold up a five minute warning to everybody
-  in the world. Run by hand with neither, both halves run in that order.
-
-  NO SWITCH TURNS EITHER HALF OFF, asked for by the website and launcher lanes on
-  27 September, so that every release exercises the block and the dev channel
-  exercises it several times a week. -Only is for running one half by hand, not
-  for a release leaving one out. Both halves ask before they act, so running this
-  again after a failure does nothing the first run already did.
+  Both halves ask before they act: the remirror sends only what the site does not
+  already hold, and the upload asks VirusTotal whether it has the hash before it
+  sends a byte. So running this again after a bad run does nothing the first run
+  already did.
 
     .\scripts\release\Publish-PostShip.ps1                     after a main release
     .\scripts\release\Publish-PostShip.ps1 -Channel dev        after a dev release
@@ -91,47 +62,33 @@
 
 .PARAMETER Channel
   main or dev. main remirrors the Thornswood-Releases tip to
-  thornswood.net/feed/; dev remirrors the Thornswood-Releases-dev tip to
-  thornswood.net/feed-dev/. Passed on as -Dev, or as -Channel to a script that
-  takes that instead.
-
-.PARAMETER ReleaseDir
-  The clone or worktree holding the version.json that was just published, passed
-  to the remirror as its -FeedDir (or -ReleaseDir, whichever it declares). Left
-  out, that script works it out from the channel, the same way
-  Publish-Update.ps1 does.
+  https://thornswood.net/feed/; dev passes -Dev, which takes the
+  Thornswood-Releases-dev tip to https://thornswood.net/feed-dev/.
 
 .PARAMETER Root
-  The install the release was built from. Only used to find the installer for
-  the VirusTotal half, in the staging folder for that root.
+  The install the release was built from. Its staging folder is where the
+  installer is looked for, and its Launcher folder is where -AlsoLauncher reads
+  the shipped exe.
 
 .PARAMETER DistRoot
-  Where releases are staged, so the installer is looked for in the same place
+  Where releases are staged, so the installer is found in the same place
   Package-Thornswood.ps1 built it and Publish-Installer.ps1 published it from.
 
 .PARAMETER Installer
-  The file to hand the VirusTotal hook, when it is not the Thornswood-Setup.exe
-  in the staging folder. That exe is what the Downloads page offers, so its hash
-  is the one the page prints a VirusTotal link for.
+  The file to send instead of the Thornswood-Setup.exe in the staging folder.
+  That exe is what the Downloads page offers, so its hash is the one the page
+  prints a VirusTotal link for.
 
 .PARAMETER AlsoLauncher
-  Hands the shipped launcher exe to the VirusTotal hook as well. Off, because the
-  Downloads page lists the installer and not the launcher, so no page link is
-  waiting on a launcher report and version.json needs nothing from VirusTotal
-  either. On for the day the page offers the launcher on its own.
+  Sends the shipped launcher exe as well. Off, because the Downloads page lists
+  the installer and not the launcher, so no link on it is waiting on a launcher
+  report and version.json needs nothing from VirusTotal either. On for the day
+  the page offers the launcher on its own.
 
 .PARAMETER Only
-  Remirror or VirusTotal, to run that half and not the other. Ship uses it to put
-  the feed before the announcements and the upload after them, and it is how a
-  person runs one half by hand. Left out, both halves run, the feed first. It is
-  not an escape hatch for a release: nothing on Ship turns either half off.
-
-.PARAMETER RemirrorScript
-  The remirror script outright, for a machine or a branch where it is somewhere
-  this would not find it.
-
-.PARAMETER VirusTotalScript
-  The VirusTotal upload hook outright, on the same terms.
+  Remirror or VirusTotal, to run that half and not the other. Ship uses it to run
+  the two in order with its own headings; a person uses it to redo one half. Left
+  out, both run, the feed first.
 
 .PARAMETER NoPause
   Exits without waiting for Enter, so Ship can call this without stopping for a
@@ -140,28 +97,24 @@
 .EXAMPLE
   .\scripts\release\Publish-PostShip.ps1 -Channel dev
 
-  Puts the dev tip on thornswood.net/feed-dev and asks VirusTotal about the
-  installer this machine holds.
+  Puts the dev tip on thornswood.net/feed-dev and sends the installer this
+  machine holds to VirusTotal.
 
 .NOTES
-  Exit codes: 0 the halves asked for are done, or are waiting on a script that is
-  not on this machine yet, and 1 a half that is here stopped. A missing script is
-  a line and a 0 on purpose, the same spirit as the upload's own answer to a
-  missing VT_API_KEY: Ship must not break on work another lane has not landed.
-  Ship.ps1 reads that code, still tells the site, the Discord and the server, and
-  says on its last screen which line to run again.
+  Exit codes: 0 when the halves asked for are done, or are waiting on a script
+  another lane has not landed, and 1 when a half that is here stopped. Ship reads
+  that code to say on its last screen which line to run again, and does not fail
+  the release over it: a release that is out on the feed, in #news and on the
+  server is out.
 #>
 [CmdletBinding()]
 param(
     [ValidateSet('main', 'dev')][string]$Channel = 'main',
-    [string]$ReleaseDir,
     [string]$Root = 'C:\Thornswood',
     [string]$DistRoot = (& (Join-Path $PSScriptRoot 'Where.ps1') Dist),
     [string]$Installer,
     [switch]$AlsoLauncher,
     [ValidateSet('Both', 'Remirror', 'VirusTotal')][string]$Only = 'Both',
-    [string]$RemirrorScript,
-    [string]$VirusTotalScript,
     [switch]$NoPause
 )
 
@@ -170,125 +123,84 @@ $ErrorActionPreference = 'Stop'
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-$ScriptsDir = Split-Path -Parent $Here
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 
 $Dev = ($Channel -eq 'dev')
 $devArg = if ($Dev) { ' -Dev' } else { '' }
-$failed = New-Object System.Collections.ArrayList
-$waiting = New-Object System.Collections.ArrayList
-
-# What a script declares it takes, read off its own param block. A hook is
-# called with those and nothing else, so two lanes calling the same thing by
-# different names, -FeedDir against -ReleaseDir, is not a reason for either to
-# rename anything.
-function Get-Accepts([string]$path) {
-    $tokens = $null; $errors = $null
-    $ast = $null
-    try { $ast = [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors) } catch { return @() }
-    if ($null -eq $ast -or $null -eq $ast.ParamBlock) { return @() }
-    return @($ast.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
-}
-
-# Where a hook is. Named outright, else its own path, else the other obvious
-# folder, else anywhere under scripts\ by file name, so the lane that owns it can
-# land it where it belongs without this script being edited to match. By the
-# settled name and never by a guess at one: Add-VirusTotalComment.ps1 also takes
-# a -Path, and a release that quietly wrote a comment instead of sending a file
-# would look exactly like a release that worked.
-function Find-Hook([string]$given, [string]$leaf, [string[]]$expected) {
-    if ($given) {
-        if (Test-Path -LiteralPath $given) { return (Resolve-Path -LiteralPath $given).ProviderPath }
-        return ''
-    }
-    foreach ($rel in $expected) {
-        $p = Join-Path $ScriptsDir $rel
-        if (Test-Path -LiteralPath $p) { return (Resolve-Path -LiteralPath $p).ProviderPath }
-    }
-    $hits = @(Get-ChildItem -LiteralPath $ScriptsDir -Filter $leaf -File -Recurse -EA SilentlyContinue |
-              Sort-Object FullName)
-    if ($hits.Count) { return $hits[0].FullName }
-    return ''
-}
-
-# One half, and what its exit code meant. Reading that code is the whole point
-# of this script: entry 118 on the To Do List is Ship calling something and
-# never looking at what it said, and a half that stopped has to be a line
-# somebody sees rather than a silence.
-function Invoke-Half([string]$what, [string]$path, [hashtable]$withArgs, [string]$putRight) {
-    $global:LASTEXITCODE = 0
-    try { & $path @withArgs }
-    catch {
-        Say "  $what stopped: $($_.Exception.Message)" 'Red'
-        [void]$failed.Add([pscustomobject]@{ What = $what; PutRight = $putRight })
-        return
-    }
-    if ($LASTEXITCODE -ne 0) {
-        Say "  $what stopped with exit code $LASTEXITCODE. The lines above say why." 'Red'
-        [void]$failed.Add([pscustomobject]@{ What = $what; PutRight = $putRight })
-        return
-    }
-}
+$trouble = New-Object System.Collections.ArrayList
 
 Write-Host ''
-$what = switch ($Only) {
+$half = switch ($Only) {
     'Remirror'   { 'THE HOST FEED' }
     'VirusTotal' { 'VIRUSTOTAL' }
     default      { 'THE HOST FEED AND VIRUSTOTAL' }
 }
-Write-Host "  AFTER THE TIP, $Channel : $what" -ForegroundColor White
+Write-Host "  AFTER THE TIP, $Channel : $half" -ForegroundColor White
 
-# ------------------------------------------------------------ the remirror
+# ------------------------------------------------------------ the host feed
 if ($Only -eq 'VirusTotal') {
-    Say '  the host feed was this release''s first call, before anybody was told' 'DarkGray'
+    Say '  the host feed was the call before this one, before anybody was told' 'DarkGray'
 }
 else {
     Head 'The host feed'
-    $mirror = Find-Hook $RemirrorScript 'Remirror-Site-Feed.ps1' `
-                        @('deploy\Remirror-Site-Feed.ps1', 'release\Remirror-Site-Feed.ps1')
-    if (-not $mirror) {
+    $remirror = Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1'
+    if (-not (Test-Path -LiteralPath $remirror)) {
         # The website lane's script, and nothing here can mirror a feed without
         # it. Said with the path it looked for, so their pull request lands
         # beside this one rather than into a rename.
-        Say '  Remirror-Site-Feed.ps1 is not on this branch, so the site still serves the' 'Yellow'
-        Say '  feed it had, and anybody reading it is offered that release rather than this one.' 'Yellow'
-        Say '  Expected at scripts\deploy\Remirror-Site-Feed.ps1 (the website lane owns it);' 'DarkGray'
-        Say '  anywhere under scripts\ is found too, or pass -RemirrorScript.' 'DarkGray'
-        [void]$waiting.Add('the host feed remirror, waiting on Remirror-Site-Feed.ps1')
+        Say '  scripts\deploy\Remirror-Site-Feed.ps1 is not on this machine, so the site goes on' 'Yellow'
+        Say '  serving the feed it had, and anybody reading it is offered that release.' 'Yellow'
+        Say '  It is the website lane''s script, from pull request #730. The release is fine.' 'DarkGray'
+        [void]$trouble.Add([pscustomobject]@{
+            What     = 'The host feed was not remirrored'
+            PutRight = ".\scripts\deploy\Remirror-Site-Feed.ps1$devArg"
+        })
     }
     else {
-        # Main takes the Thornswood-Releases tip to /feed/, dev takes the
-        # Thornswood-Releases-dev tip to /feed-dev/. That is the website lane's
-        # contract for this script, and -Dev or -Channel is how it is said.
         $where = if ($Dev) { 'https://thornswood.net/feed-dev/' } else { 'https://thornswood.net/feed/' }
-        Say "  $mirror" 'DarkGray'
         Say "  the $Channel tip to $where" 'DarkGray'
-        $accepts = Get-Accepts $mirror
-        $mirrorArgs = @{}
-        if ($accepts -contains 'Dev') { $mirrorArgs['Dev'] = $Dev }
-        elseif ($accepts -contains 'Channel') { $mirrorArgs['Channel'] = $Channel }
-        if ($ReleaseDir) {
-            if ($accepts -contains 'FeedDir') { $mirrorArgs['FeedDir'] = $ReleaseDir }
-            elseif ($accepts -contains 'ReleaseDir') { $mirrorArgs['ReleaseDir'] = $ReleaseDir }
+        # The line the website lane asked for, in a try/catch like Ship's own
+        # around Publish-News. -Dev:$Dev rather than a switch built up by hand,
+        # so main says -Dev:$false and there is one call site rather than two.
+        $global:LASTEXITCODE = 0
+        $why = ''
+        try { & $remirror -Dev:$Dev }
+        catch { $why = $_.Exception.Message }
+        if ($why) {
+            Say "  the remirror stopped: $why" 'Red'
+            [void]$trouble.Add([pscustomobject]@{
+                What     = 'The host feed was not remirrored'
+                PutRight = ".\scripts\deploy\Remirror-Site-Feed.ps1$devArg"
+            })
         }
-        if ($accepts -contains 'NoPause') { $mirrorArgs['NoPause'] = $true }
-        Invoke-Half 'The host feed remirror' $mirror $mirrorArgs ".\scripts\deploy\Remirror-Site-Feed.ps1$devArg"
+        elseif ($LASTEXITCODE -ne 0) {
+            # Its own meaning for a non-zero code: it refused to publish a feed
+            # naming bytes the site does not hold. So the site is one release
+            # behind, which is what launchers were already reading, rather than
+            # pointing at a 404. A line, never a failed release.
+            Say "  the remirror refused to publish the feed (exit $LASTEXITCODE). The lines above say which asset." 'Red'
+            Say '  The site is one release behind, which is what launchers were already reading.' 'Yellow'
+            [void]$trouble.Add([pscustomobject]@{
+                What     = 'The host feed was not remirrored'
+                PutRight = ".\scripts\deploy\Remirror-Site-Feed.ps1$devArg   and .\scripts\deploy\Remirror-Site-Feed.ps1$devArg -Check to see what it wants first"
+            })
+        }
     }
 }
 
 # ------------------------------------------------------------ VirusTotal
 #
 # The installer is what the Downloads page offers and the hash it prints a
-# VirusTotal link for, so the exe in the staging folder is the file to hand the
-# hook. Publish-Installer.ps1 already calls the same hook when it publishes a
-# new installer, so this is for every release that did not rebuild one, where
-# what the page offers may still have no report. The hook asks VirusTotal before
-# it sends anything, which is why running this on every release, dev included,
-# costs one read.
+# VirusTotal link for, so the exe in the staging folder is the file to send.
+# Publish-Installer.ps1 calls the same script after it hashes and sends a new
+# installer, so this is for every release that did not rebuild one, where what
+# the page offers may still have no report. It asks VirusTotal before it sends
+# anything, which is why running it on every release, dev included, costs one
+# read.
 if ($Only -eq 'Remirror') {
-    Say '  VirusTotal is this release''s second call, after everybody has been told' 'DarkGray'
+    Say '  VirusTotal is the call after this one' 'DarkGray'
 }
 else {
     Head 'VirusTotal'
@@ -303,9 +215,6 @@ else {
             if (Test-Path -LiteralPath $candidate) { $Installer = $candidate; break }
         }
     }
-    # The launcher exe too, only when asked: the Downloads page lists the
-    # installer, so no link on it is waiting on a launcher report, and
-    # version.json needs nothing from VirusTotal either.
     $send = @()
     if ($Installer) { $send += $Installer }
     if ($AlsoLauncher) {
@@ -314,77 +223,73 @@ else {
             if (Test-Path -LiteralPath $p) { $send += $p; break }
         }
     }
-    $vt = Find-Hook $VirusTotalScript 'Publish-VirusTotal.ps1' `
-                    @('release\Publish-VirusTotal.ps1', 'deploy\Publish-VirusTotal.ps1')
+    $upload = Join-Path $Here 'Publish-VirusTotal.ps1'
     if (-not $send.Count) {
         Say '  there is no Thornswood-Setup.exe on this machine, so there is nothing to send.' 'Yellow'
         Say '  Whoever built the installer the site is serving runs the upload there:' 'DarkGray'
         Say '  .\scripts\release\Publish-VirusTotal.ps1 -Path <the installer exe>' 'DarkGray'
     }
-    elseif (-not $vt) {
-        Say '  Publish-VirusTotal.ps1 is not on this branch, so the link the Downloads page' 'Yellow'
-        Say '  prints stays whatever it was, item-not-found for a file nobody has sent.' 'Yellow'
-        Say '  Expected at scripts\release\Publish-VirusTotal.ps1 (the installer lane owns it);' 'DarkGray'
-        Say '  anywhere under scripts\ is found too, or pass -VirusTotalScript. It reads the key' 'DarkGray'
-        Say '  from VT_API_KEY and says so and carries on without one.' 'DarkGray'
-        [void]$waiting.Add('the VirusTotal upload, waiting on Publish-VirusTotal.ps1')
+    elseif (-not (Test-Path -LiteralPath $upload)) {
+        Say '  scripts\release\Publish-VirusTotal.ps1 is not on this machine, so the link the' 'Yellow'
+        Say '  Downloads page prints stays item-not-found for a file nobody has sent.' 'Yellow'
+        Say '  It is the installer lane''s script, from pull request #734. The release is fine.' 'DarkGray'
+        [void]$trouble.Add([pscustomobject]@{
+            What     = 'VirusTotal was not asked about the installer'
+            PutRight = ".\scripts\release\Publish-VirusTotal.ps1 -Path `"$($send[0])`""
+        })
     }
     else {
-        Say "  $vt" 'DarkGray'
         if ($Dev) { Say '  a dev release did not rebuild the installer, so this is the one on disk' 'DarkGray' }
-        $accepts = Get-Accepts $vt
-        $which = ''
-        if ($accepts -contains 'Path') { $which = 'Path' }
-        elseif ($accepts -contains 'File') { $which = 'File' }
-        if (-not $which) {
-            Say '  it takes neither -Path nor -File, so this cannot tell it which file to send.' 'Red'
-            [void]$failed.Add([pscustomobject]@{
-                What = 'The VirusTotal upload'
-                PutRight = ".\scripts\release\Publish-VirusTotal.ps1   run it by hand, with whatever it names the file"
-            })
-        }
-        else {
-            foreach ($file in $send) {
-                Say "  on $file" 'DarkGray'
-                $vtArgs = @{ $which = $file }
-                # The hash as well when it takes one. It measures the file itself
-                # either way and says so if the two disagree, which is the check
-                # worth having: the file it reads is the file this picked, and
-                # nothing rewrote Thornswood-Setup.exe in between.
-                if ($accepts -contains 'Sha256') {
-                    try { $vtArgs['Sha256'] = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() }
-                    catch { }
-                }
-                if ($accepts -contains 'NoPause') { $vtArgs['NoPause'] = $true }
-                Invoke-Half 'The VirusTotal upload' $vt $vtArgs ".\scripts\release\Publish-VirusTotal.ps1 -Path `"$file`""
+        foreach ($file in $send) {
+            Say "  $file" 'DarkGray'
+            # The hash goes with the file. That script measures it itself and
+            # says so when the two disagree, which is the check that the file it
+            # read is the file this picked and nothing rewrote it in between.
+            $sha = ''
+            try { $sha = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() } catch { $sha = '' }
+            $global:LASTEXITCODE = 0
+            $why = ''
+            try {
+                if ($sha) { & $upload -Path $file -Sha256 $sha }
+                else { & $upload -Path $file }
+            }
+            catch { $why = $_.Exception.Message }
+            if ($why) {
+                Say "  the upload stopped: $why" 'Red'
+                [void]$trouble.Add([pscustomobject]@{
+                    What     = 'VirusTotal was not asked about ' + (Split-Path -Leaf $file)
+                    PutRight = ".\scripts\release\Publish-VirusTotal.ps1 -Path `"$file`""
+                })
+            }
+            elseif ($LASTEXITCODE -ne 0) {
+                # It is written to exit 0 whatever happens, missing key included,
+                # so a non-zero code here is something nobody expected.
+                Say "  the upload handed back exit $LASTEXITCODE, which it is not written to do." 'Red'
+                [void]$trouble.Add([pscustomobject]@{
+                    What     = 'VirusTotal was not asked about ' + (Split-Path -Leaf $file)
+                    PutRight = ".\scripts\release\Publish-VirusTotal.ps1 -Path `"$file`""
+                })
             }
         }
     }
 }
 
 Head 'Done'
-if ($failed.Count) {
-    Say "The tip is published and stays published, but $($failed.Count) of what follows it did NOT complete:" 'Red'
-    foreach ($f in $failed) {
-        Say ("  $($f.What)") 'Red'
-        Say ("    $($f.PutRight)") 'Yellow'
+if (-not $trouble.Count) {
+    if ($Only -eq 'Both') { Say "Everything that follows the $Channel tip is done." 'Green' }
+    else { Say "This half of what follows the $Channel tip is done." 'Green' }
+}
+else {
+    Say 'The release is out and stays out. What did not happen after it:' 'Yellow'
+    foreach ($t in $trouble) {
+        Say ("  $($t.What)") 'Red'
+        Say ("    $($t.PutRight)") 'Yellow'
     }
     Say '  Each line above asks before it acts, so running it changes nothing else.' 'DarkGray'
 }
-elseif ($waiting.Count) {
-    Say "Everything this branch can do after the $Channel tip is done." 'Yellow'
-    foreach ($w in $waiting) { Say "  still to come: $w" 'Yellow' }
-}
-elseif ($Only -eq 'Both') {
-    Say "Everything that follows the $Channel tip is done." 'Green'
-}
-else {
-    Say "This half of what follows the $Channel tip is done." 'Green'
-}
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-# Said out loud, because the halves leave their own exit codes behind and
-# Ship.ps1 reads this one. A hook that is not here yet is not a failure: there
-# is nothing on this branch that could have done its job.
-if ($failed.Count) { exit 1 }
+# Said out loud for Ship, which repeats it on its last screen. It is not a failed
+# release: a release that is on the feed, in #news and on the server is out.
+if ($trouble.Count) { exit 1 }
 exit 0

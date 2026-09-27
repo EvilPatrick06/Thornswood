@@ -37,53 +37,40 @@
       Get-Help .\scripts\release\Ship.ps1 -Full
       Get-Help .\scripts\release\Ship.ps1 -Parameter Channel
 
-  TWO THINGS FOLLOW A SUCCESSFUL TIP, and one script runs both of them:
+  TWO THINGS FOLLOW A SUCCESSFUL TIP, in this order, and one script runs both:
   .\scripts\release\Publish-PostShip.ps1, keyed off -Channel. It implements
   neither of them; each belongs to the lane whose work it is.
 
-      the host feed remirror   thornswood.net/feed for main, /feed-dev for dev,
-                               gets the tip's version.json and the assets it
-                               names (scripts\deploy\Remirror-Site-Feed.ps1,
-                               the website lane's)
-      VirusTotal               the installer the Downloads page offers has a
-                               report, so the link it prints beside the SHA-256
-                               is not item-not-found
-                               (scripts\release\Publish-VirusTotal.ps1, the
-                               installer lane's upload hook)
+      1  the host feed remirror   scripts\deploy\Remirror-Site-Feed.ps1, the
+                                  website lane's. Main takes the
+                                  Thornswood-Releases tip to
+                                  thornswood.net/feed/, -Dev takes the
+                                  Thornswood-Releases-dev tip to
+                                  thornswood.net/feed-dev/.
+      2  VirusTotal               scripts\release\Publish-VirusTotal.ps1, the
+                                  installer lane's, on the installer exe the
+                                  Downloads page offers, so the link it prints
+                                  beside the SHA-256 is not item-not-found.
+      3  the site news            Publish-News.ps1, then the #news post and the
+                                  server's countdown, all unchanged and the news
+                                  main only, as they always were.
 
-  IN THIS ORDER: the remirror, then the site news, the #news post and the
-  server's countdown, then the VirusTotal upload. The feed has to be serving the
-  release before anybody is sent to fetch it, and an upload of most of a gigabyte
-  that nobody is waiting on must not hold up a five minute warning to everybody
-  in the world.
+  The feed is mirrored before any of those three tell people to update, because
+  they send everybody to fetch a release the feed has to be serving.
 
-  THE SAME BLOCK RUNS ON DEV. Everything goes to dev first, so the dev channel
-  is where this is exercised several times a week rather than once a fortnight.
-  A hook that is not on the branch yet is a line saying which file it looked
-  for, not a failure: only a hook that is there and stops counts as not
-  completing.
-
-  THERE IS NO THIRD STEP FOR THE LAUNCHER. The tip customers get is
-  version.json, and launchers poll the feed url in it and update themselves, so
-  the mirror IS the launcher update reaching people. Install-Launcher.ps1 runs
-  in the middle of this script, before the publish, and refreshes the install on
-  this machine only: re-running it afterwards would refresh the same one install
-  again. Answered by the Launcher lane on 27 September, after this section
-  briefly described a post-tip launcher step that does not exist.
-
-  NO SWITCH TURNS EITHER OF THEM OFF, asked for by the website and launcher
+  NO SWITCH TURNS EITHER OF THE TWO OFF, asked for by the website and launcher
   lanes on 27 September: the block runs on every release, dev and main, so the
-  dev channel exercises it several times a week. A dry run still runs none of it,
+  dev channel exercises it several times a week. A dry run runs none of it,
   because a dry run publishes nothing to follow.
 
-  THE TIP STAYS PUBLISHED WHATEVER THEY DO. They run after the release is on
-  the feed, so a failure there cannot unpublish anything, and Ship still tells
-  the site, the Discord and the server. A hook that is not on the machine yet is
-  a line naming the file it looked for, and the release is fine. A hook that is
-  there and stops is named again on the last screen with the line that puts it
-  right, and Ship exits 1 at the very end: the release is out and announced
-  either way, and the code is how a script chaining Ship learns that the tip and
-  its follow-ons did not go out together.
+  AND NEITHER OF THEM CAN FAIL A RELEASE. They run after the release is on the
+  feed, so nothing there can unpublish anything. A script another lane has not
+  landed is a line naming it. A remirror that exits 1 has refused to publish a
+  feed naming bytes the site does not hold, which leaves the site one release
+  behind rather than pointing launchers at a 404, and the website lane asked for
+  that to be a line as well: "Exit 1 = refused publish (do not fail the
+  release)". So Ship says on its last screen what did not happen and what to run,
+  and still exits 0.
 
   This header used to carry a hand-written list of five options, laid out as
   if it were all of them, while the param block declared thirteen. -Channel,
@@ -1352,21 +1339,20 @@ else {
   hand, and both halves ask before they act, so running it again after a failure
   does nothing the first run already did.
 
-  ORDER. The remirror goes before the site news, the Discord post and the
-  server's countdown, on purpose: those three tell people to update, and the feed
-  has to serve the release before anybody is told to go and get it. The VirusTotal
-  upload goes after all of them, in its own section further down, because it can
-  be most of a gigabyte and nothing but a link on the Downloads page is waiting
-  on it. Both calls are the same script with -Only naming the half.
+  ORDER, pinned by the website lane: the remirror, then the VirusTotal upload,
+  then the site news, the Discord post and the server's countdown. Those three
+  tell people to update, and the feed has to be serving the release before
+  anybody is sent to fetch it. Both calls are the same script with -Only naming
+  the half, so the two headings on screen are the two things that happened.
 
   WHAT A FAILURE DOES. The tip is already on the feed by the time this runs, so
   none of it can unpublish anything, and dying here would leave a release out
   with #news, the site and the server never told, which the installer note
-  further up calls the worse half state. So it reports what happened, the
-  release is announced either way, the Done section names what did not complete
-  with the line that puts it right, and Ship exits 1. That is the standing order
-  kept: the follow-ons go out with the tip, or Ship says so loudly enough that a
-  script chaining it stops too.
+  further up calls the worse half state. So it reports what happened, the release
+  is announced either way, and the Done section names what did not complete with
+  the line that puts it right. Ship still exits 0: the website lane's rule is
+  that a refused remirror is a line and not a failed release, and a release that
+  is on the feed, in #news and on the server is out.
 #>
 function Invoke-PostShip([string]$what, [string]$leaf, [hashtable]$withArgs, [string]$putRight) {
     $path = Join-Path $Here $leaf
@@ -1395,14 +1381,19 @@ function Invoke-PostShip([string]$what, [string]$leaf, [hashtable]$withArgs, [st
 
 $chan = if ($Dev) { 'dev' } else { 'main' }
 $chanArg = if ($Dev) { ' -Channel dev' } else { '' }
-# What both calls give it. The second one adds nothing: the same channel, the
-# same clone, the same staging folder, one half each.
-$postArgs = @{ Channel = $chan; ReleaseDir = $ReleaseDir; Root = $Root; DistRoot = $DistRoot; NoPause = $true }
+# What both calls give it: the same channel, the same install, the same staging
+# folder, one half each. The remirror works its own clone out from the channel,
+# so nothing here passes it one.
+$postArgs = @{ Channel = $chan; Root = $Root; DistRoot = $DistRoot; NoPause = $true }
 
 if (-not $DryRun) {
-    Head 'After the tip'
+    Head 'The host feed'
     Invoke-PostShip 'the host feed remirror' 'Publish-PostShip.ps1' ($postArgs + @{ Only = 'Remirror' }) `
         ".\scripts\release\Publish-PostShip.ps1$chanArg -Only Remirror"
+
+    Head 'VirusTotal'
+    Invoke-PostShip 'the VirusTotal upload' 'Publish-PostShip.ps1' ($postArgs + @{ Only = 'VirusTotal' }) `
+        ".\scripts\release\Publish-PostShip.ps1$chanArg -Only VirusTotal"
 }
 
 # ------------------------------------------------------------------- news
@@ -1472,22 +1463,6 @@ if (-not $DryRun -and -not $NoAnnounce) {
     } else {
         Say '  Request-Restart.ps1 is missing, nobody was told.' 'Yellow'
     }
-}
-
-# --------------------------------------------------------- the VirusTotal half
-# THE SECOND HALF OF WHAT FOLLOWS THE TIP, and it is down here for one reason:
-# an upload of most of a gigabyte that nobody is waiting on must not hold up the
-# feed, the news, the #news post or a five minute warning to everybody in the
-# world. The remirror went first, before any of those, because they send people
-# to fetch a release the feed has to be serving. This goes last, because the
-# only thing waiting on it is a link on the Downloads page.
-#
-# The installer lane's script asks VirusTotal before it sends anything and needs
-# VT_API_KEY, which it skips itself without, so on most releases this is one read.
-if (-not $DryRun) {
-    Head 'VirusTotal'
-    Invoke-PostShip 'the VirusTotal upload' 'Publish-PostShip.ps1' ($postArgs + @{ Only = 'VirusTotal' }) `
-        ".\scripts\release\Publish-PostShip.ps1$chanArg -Only VirusTotal"
 }
 
 # ------------------------------------------------------- dev follows main
@@ -1587,14 +1562,14 @@ if ($global:ThornswoodDiscordResult -eq 'failed') {
 # the last screen is the one that gets looked at, and one red line in the middle
 # of a release log is a line nobody reads.
 if ($script:PostShipFailed.Count) {
-    Say 'The tip is published and stays published, but what follows it did NOT complete:' 'Red'
+    Say 'The release is out and stays out. What did not happen after it:' 'Yellow'
     foreach ($f in $script:PostShipFailed) {
         Say ("  $($f.What)") 'Red'
         Say ("    $($f.PutRight)") 'Yellow'
     }
-    Say '  Until it does, the site may be serving the feed it had, which is the release' 'DarkGray'
+    Say '  Until they run, the site may be serving the feed it had, which is the release' 'DarkGray'
     Say '  people are offered, or the VirusTotal link on the Downloads page says' 'DarkGray'
-    Say '  item-not-found. The line above asks before it acts, so it can be run twice.' 'DarkGray'
+    Say '  item-not-found. Each line above asks before it acts, so it can be run twice.' 'DarkGray'
     Write-Host ''
 }
 if ($DryRun) { Say 'Dry run finished. Nothing left your machine.' 'Yellow' }
@@ -1605,8 +1580,10 @@ else {
 }
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-# NON-ZERO WHEN WHAT FOLLOWS THE TIP DID NOT COMPLETE, and only then. The
-# release is out either way, so this is not "the release failed": it is the
-# standing order that the tip, the host feed mirror and the VirusTotal report go
-# out together, said in the one way a script that chains Ship can read.
-if ($script:PostShipFailed.Count) { exit 1 }
+# AND SHIP STILL EXITS 0 WHEN ONE OF THOSE DID NOT HAPPEN, asked for by the
+# website lane on 27 September: "Exit 1 = refused publish (do not fail the
+# release)". This section used to exit 1 on it, which was this lane's own reading
+# of the standing order that the tip and its follow-ons go out together. A
+# release that is on the feed, in #news and on the server is out, and a remirror
+# that refused rather than publish a feed naming missing bytes did the careful
+# thing. The lines above are the record, and they name what to run.

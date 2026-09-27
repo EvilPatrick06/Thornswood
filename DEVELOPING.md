@@ -109,32 +109,31 @@ uploads pack and launcher as a GitHub release in the releases repo, rewrites
 The tip customers get is that `version.json`, and launchers poll the feed url in
 it. So two things follow the tip, both run by
 `scripts\release\Publish-PostShip.ps1`, which Ship calls once per half with the
-channel it shipped, in this order:
+channel it shipped, and then the release is announced as it always was:
 
-1. **The host feed remirror**, `scripts\deploy\Remirror-Site-Feed.ps1`, the
-   website lane's script, run with `-Dev` on a dev Ship. The
+1. **The host feed remirror**, the website lane's script, called as
+   `& (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') -Dev:$Dev`. The
    Thornswood-Releases tip goes to `https://thornswood.net/feed/` and the
    Thornswood-Releases-dev tip to `https://thornswood.net/feed-dev/`, with the
-   assets each feed names. That is the feed a launcher polls since the #649 host
-   cutover (`docs\FEED.md`), and a launcher falls back to the GitHub feed only
-   when the site feed does not answer at all, so an unmirrored site feed offers
-   people the release it last held rather than this one. This one goes first,
-   before anybody is told.
-2. **The site news, the #news post and the server's countdown**, as they always
-   were. Those tell people to update, which is why the feed is mirrored first.
-3. **The VirusTotal upload**, the installer lane's hook, called as
-   `.\scripts\release\Publish-VirusTotal.ps1 -Path <file> [-Sha256 <hex>]`.
-   The installer is what the Downloads page offers and the hash it prints a
-   VirusTotal link for, so that exe is the file it is handed, with the hash this
-   machine measured, and the hook asks VirusTotal before sending anything because
-   a rerun is normal and the file is most of a gigabyte. It reads the key from the
-   environment variable `VT_API_KEY` and nowhere else, and a missing key or an
-   answer it cannot use is one line and exit 0, never a stopped release; the key
-   is in the secrets table below. `Publish-Installer.ps1` calls the same hook
-   after it hashes and sends a new installer, so this covers the releases that did
-   not rebuild one. It goes last because nothing but a link on the Downloads page
-   is waiting on it, and an upload that size must not hold up a five minute
-   warning. The website lane owns the page wiring for those download urls.
+   assets each feed names. It has `-Check` for a dry run and `-Verify` to rehash
+   what is up there, and optional `-FeedDir` and `-AssetDir` that nothing here
+   passes: it works the clone out from the channel itself. That is the feed a
+   launcher polls since the #649 host cutover (`docs\FEED.md`), and a launcher
+   falls back to the GitHub feed only when the site feed does not answer at all,
+   so an unmirrored site feed offers people the release it last held rather than
+   this one.
+2. **The VirusTotal upload**, the installer lane's script, called as
+   `.\scripts\release\Publish-VirusTotal.ps1 -Path <file> -Sha256 <hex>` on the
+   installer exe the Downloads page offers, which is the hash the page prints a
+   VirusTotal link for. It reads the key from the environment variable
+   `VT_API_KEY` and nowhere else, and a missing key or an answer it cannot use is
+   one line and exit 0; the key is in the secrets table below.
+   `Publish-Installer.ps1` calls the same script after it hashes and sends a new
+   installer, so this covers the releases that did not rebuild one. The website
+   lane owns the page wiring for those download urls.
+3. **The site news, the #news post and the server's countdown**, unchanged, the
+   news main only as it always was. Those three tell people to update, which is
+   why the feed is mirrored before them.
 
 There is no third step for the launcher. A launcher updates itself from the feed
 it polls, so the remirror is how a launcher update reaches anybody, and the
@@ -151,18 +150,17 @@ saying which file it looked for rather than a failed release.
 
 No switch turns either half off, asked for by the website and launcher lanes so
 that every release exercises the block and the dev channel exercises it several
-times a week. A `-DryRun` still runs none of it, because a dry run publishes
-nothing to follow.
+times a week. A `-DryRun` runs none of it, because a dry run publishes nothing to
+follow.
 
-A hook that is not on the machine yet is a line naming the file it looked for,
-and the release is fine: that is the same spirit as the upload's own answer to a
-missing `VT_API_KEY`. A half that is there and stops leaves the release
-published, is named again on the last screen with the line that puts it right,
-and makes Ship exit 1 at the very end, after everything has been announced: the
-tip and its follow-ons are meant to go out together, and the code is how a
-script chaining Ship learns they did not. In practice that is the remirror, which
-refuses rather than publish a feed naming bytes the site does not hold. Both
-halves ask before they act, so `Publish-PostShip.ps1` can be run again by hand.
+Neither of them can fail a release. A script another lane has not landed is a
+line naming it. A remirror that exits 1 has refused to publish a feed naming
+bytes the site does not hold, which leaves the site one release behind rather
+than pointing launchers at a 404, and the website lane asked for that to be a
+line as well. So Ship names what did not happen on its last screen, with the
+command for each, and still exits 0: a release that is on the feed, in #news and
+on the server is out. Both halves ask before they act, so
+`Publish-PostShip.ps1` can be run again by hand.
 
 **A hotfix** is the one live release that does not come off main (decided by
 Patrick on 24 Sep). A branch named `hotfix/...` starts from the commit the live

@@ -263,8 +263,8 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     # VirusTotal, so a dry run must not call it at all and a real Ship calls it
     # twice. Ship reads each exit code and says at the end whether they
     # completed, so this hands back 0 like the rest.
-    Stub 'Publish-PostShip' ('[string]$Channel, [string]$ReleaseDir, [string]$Root, [string]$DistRoot, ' +
-                             '[string]$Only, [string]$Installer, [switch]$AlsoLauncher, [switch]$NoPause') ''
+    Stub 'Publish-PostShip' ('[string]$Channel, [string]$Root, [string]$DistRoot, [string]$Only, ' +
+                             '[string]$Installer, [switch]$AlsoLauncher, [switch]$NoPause') ''
     foreach ($n in 'git', 'gh', 'ssh', 'scp') {
         [IO.File]::WriteAllText((Join-Path $bin ($n + '.cmd')), "@echo off`r`n>>`"%TS_DRY_CALLS%`" echo %~n0 %*`r`nexit /b 0`r`n")
     }
@@ -357,15 +357,16 @@ if ($dir) {
         Yes "R $n.ps1 is called" ((Called $r $n).Count -eq 1)
     }
     # What follows the tip: one call per half, on the main channel, each with the
-    # releases clone and the staging folder, because that is where the tip and
-    # its bytes are. No switch can hold either half back, so nothing here says
-    # -Skip anything.
+    # install and the staging folder, because that is where the installer is. No
+    # switch can hold either half back, so nothing here says -Skip anything, and
+    # no clone is passed: the remirror works its own out from the channel.
     $post = Called $r 'Publish-PostShip'
-    Yes ('R what follows the tip runs twice, one half each, for main, with the releases clone and the staging folder' +
+    Yes ('R what follows the tip runs twice, one half each, for main, with the install and the staging folder' +
          $(if ($post.Count) { ' (' + ($post -join '; ') + ')' } else { '' })) (
         $post.Count -eq 2 -and
-        @($post | Where-Object { $_ -match ' -Channel main\b' -and $_.Contains(' -ReleaseDir ' + $rel) -and
-                                 $_.Contains(' -DistRoot ' + $dist) -and $_ -notmatch ' -Skip' }).Count -eq 2 -and
+        @($post | Where-Object { $_ -match ' -Channel main\b' -and $_.Contains(' -Root ' + $root) -and
+                                 $_.Contains(' -DistRoot ' + $dist) -and $_ -notmatch ' -Skip' -and
+                                 $_ -notmatch ' -ReleaseDir' }).Count -eq 2 -and
         @($post | Where-Object { $_ -match ' -Only Remirror\b' }).Count -eq 1 -and
         @($post | Where-Object { $_ -match ' -Only VirusTotal\b' }).Count -eq 1)
     # And the only launcher install is the mid-release one, into the root this
