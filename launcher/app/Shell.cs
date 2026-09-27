@@ -106,8 +106,9 @@ namespace Thornswood
         static TextBlock txtServer, txtPing, txtStatus, txtStatusRight, txtVersion, txtBuildLine,
                          txtUpdateTitle, txtUpdateNote, txtModCount, txtUpdateSource,
                          txtPageTitle, txtHeroLine, txtVerifyTitle, txtVerifyNote,
-                         txtSaveNote, txtSaveCount, txtLogCount, txtDisplayNote;
-        static Ellipse dotServer, dotVerify;
+                         txtSaveNote, txtSaveCount, txtLogCount, txtDisplayNote,
+                         txtReadyTitle, txtReadyNote;
+        static Ellipse dotServer, dotVerify, dotReady;
         static StackPanel statusList, modList, themeRow, pathRows, helpList,
                           newsList, saveList, logList, statRow, displayModeRow,
                           firstRunCard, quickKeysCard, quickKeys;
@@ -576,6 +577,8 @@ namespace Thornswood
             chkLockRes = F<CheckBox>("ChkLockRes");
             chkMusic = F<CheckBox>("ChkMusic"); sldMusic = F<Slider>("SldMusic"); txtMusic = F<TextBlock>("TxtMusic");
             dotServer = F<Ellipse>("DotServer"); dotVerify = F<Ellipse>("DotVerify");
+            dotReady = F<Ellipse>("DotReady");
+            txtReadyTitle = F<TextBlock>("TxtReadyTitle"); txtReadyNote = F<TextBlock>("TxtReadyNote");
             mineCard = F<Border>("MineCard");
             statusList = F<StackPanel>("StatusList"); modList = F<StackPanel>("ModList");
             themeRow = F<StackPanel>("ThemeRow"); pathRows = F<StackPanel>("PathRows");
@@ -1153,10 +1156,15 @@ namespace Thornswood
 
             btnRecheck.Click += delegate
             {
-                Log(DrawStatus() ? "Everything checks out." : "Something is still off, see the red rows.");
+                // The one button that drives the whole consolidated path (#607):
+                // the Ready to launch checks, the Scan against the server's mod
+                // list, the client repair and the update check, all from Play.
+                // The checklist and the Scan and Fix card it fills both live on
+                // the Diagnostics page now.
+                bool ok = DrawStatus();
+                RunScan();
+                Log(ok ? "Everything checks out." : "Something needs attention, see Diagnostics.");
                 StartPing();
-                // Recheck is the button somebody presses when a row is red, so
-                // it is the button that has to do something about it.
                 HealClientBackground();
                 if (Updater.Enabled(cfg))
                 {
@@ -1806,47 +1814,41 @@ namespace Thornswood
         // ------------------------------------------------------------- checks
         static bool DrawStatus()
         {
-            statusList.Children.Clear();
+            // The checklist now lives on the Diagnostics page and Play shows a
+            // one line summary of it (UpdateReadySummary). See #607.
+            //
+            // The rows are updated in place rather than cleared and rebuilt
+            // every time. Rebuilding them on every scan, recheck and update
+            // check made the list flash and re-say itself even when nothing had
+            // changed, which #607 asked to stop: "it shouldn't say checking
+            // every time it checks, it should just update in place if numbers
+            // change". Only a row whose text or colour actually differs is
+            // touched now, so an unchanged pass moves nothing on screen.
+            List<Check> checks = Checks.All(cfg);
             bool all = true;
-            foreach (Check c in Checks.All(cfg))
+            int problems = 0;
+            foreach (Check c in checks)
             {
                 // An advisory row that fails is drawn amber and leaves Play
                 // alone. See Check.Advisory.
-                if (c.Blocks) all = false;
-                var row = new Grid();
-                row.Margin = new Thickness(0, 0, 0, 1);
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-                var back = new Border();
-                back.Background = Res("Card");
-                back.BorderBrush = Res("Line");
-                back.BorderThickness = new Thickness(1);
-                back.Padding = new Thickness(15, 11, 15, 11);
-                back.Margin = new Thickness(0, 0, 0, 7);
-
-                var dot = new Ellipse();
-                dot.Width = 7; dot.Height = 7;
-                dot.Margin = new Thickness(0, 0, 12, 0);
-                dot.VerticalAlignment = VerticalAlignment.Center;
-                dot.Fill = Res(c.Ok ? "Ok" : c.Advisory ? "Warn" : "Bad");
-                Grid.SetColumn(dot, 0); row.Children.Add(dot);
-
-                var t1 = new TextBlock();
-                t1.Text = c.Name; t1.FontSize = 13; t1.Foreground = Res("Ink");
-                t1.VerticalAlignment = VerticalAlignment.Center;
-                Grid.SetColumn(t1, 1); row.Children.Add(t1);
-
-                var t2 = new TextBlock();
-                t2.Text = c.Detail; t2.FontSize = 11.5;
-                t2.VerticalAlignment = VerticalAlignment.Center;
-                t2.Foreground = Res(c.Ok ? "Muted" : c.Advisory ? "Warn" : "Bad");
-                Grid.SetColumn(t2, 2); row.Children.Add(t2);
-
-                back.Child = row;
-                statusList.Children.Add(back);
+                if (c.Blocks) { all = false; problems++; }
             }
+
+            if (statusList != null)
+            {
+                // Positional: Checks.All is the one thing that decides how many
+                // rows there are, so a change in their number, not just their
+                // values, is the only thing that rebuilds.
+                if (statusList.Children.Count != checks.Count)
+                {
+                    statusList.Children.Clear();
+                    for (int i = 0; i < checks.Count; i++) statusList.Children.Add(StatusRow());
+                }
+                for (int i = 0; i < checks.Count; i++)
+                    FillStatusRow(statusList.Children[i] as Border, checks[i]);
+            }
+
+            UpdateReadySummary(all, problems);
 
             // No card here. It said the same thing as the bar above Play, which
             // lives in its own grid row below the scroller, so the two stacked
@@ -1990,6 +1992,98 @@ namespace Thornswood
                 btnPlay.Content = "PLAY";
             }
             return all;
+        }
+
+        /// <summary>
+        /// One empty checklist row for the Ready to launch list on Diagnostics.
+        /// Built once and then filled by FillStatusRow, so the list is not torn
+        /// down and rebuilt on every pass (#607). The shape is a Border holding
+        /// a three column Grid: a dot, the name, and the detail.
+        /// </summary>
+        static Border StatusRow()
+        {
+            var row = new Grid();
+            row.Margin = new Thickness(0, 0, 0, 1);
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var back = new Border();
+            back.Background = Res("Card");
+            back.BorderBrush = Res("Line");
+            back.BorderThickness = new Thickness(1);
+            back.Padding = new Thickness(15, 11, 15, 11);
+            back.Margin = new Thickness(0, 0, 0, 7);
+
+            var dot = new Ellipse();
+            dot.Width = 7; dot.Height = 7;
+            dot.Margin = new Thickness(0, 0, 12, 0);
+            dot.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(dot, 0); row.Children.Add(dot);
+
+            var t1 = new TextBlock();
+            t1.FontSize = 13; t1.Foreground = Res("Ink");
+            t1.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(t1, 1); row.Children.Add(t1);
+
+            var t2 = new TextBlock();
+            t2.FontSize = 11.5;
+            t2.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(t2, 2); row.Children.Add(t2);
+
+            back.Child = row;
+            return back;
+        }
+
+        /// <summary>
+        /// Fills one row from a check, touching only what has actually changed
+        /// so an unchanged pass moves nothing on screen. Res returns the one
+        /// cached brush per key, so a reference match means the colour is the
+        /// same and does not need setting again.
+        /// </summary>
+        static void FillStatusRow(Border back, Check c)
+        {
+            if (back == null) return;
+            var row = back.Child as Grid;
+            if (row == null || row.Children.Count < 3) return;
+            var dot = row.Children[0] as Ellipse;
+            var t1 = row.Children[1] as TextBlock;
+            var t2 = row.Children[2] as TextBlock;
+
+            Brush wantDot = Res(c.Ok ? "Ok" : c.Advisory ? "Warn" : "Bad");
+            if (dot != null && !ReferenceEquals(dot.Fill, wantDot)) dot.Fill = wantDot;
+
+            if (t1 != null && t1.Text != c.Name) t1.Text = c.Name;
+
+            if (t2 != null)
+            {
+                if (t2.Text != c.Detail) t2.Text = c.Detail;
+                Brush wantT2 = Res(c.Ok ? "Muted" : c.Advisory ? "Warn" : "Bad");
+                if (!ReferenceEquals(t2.Foreground, wantT2)) t2.Foreground = wantT2;
+            }
+        }
+
+        /// <summary>
+        /// The one line summary of the checklist that sits on the Play page
+        /// (#607). Updated in place: it does not flash or re-say itself when the
+        /// count has not changed. The button's own words say why Play is held
+        /// for anything that is not a failing row (an update, a downgrade, the
+        /// feed), so this stays about the checks themselves.
+        /// </summary>
+        static void UpdateReadySummary(bool all, int problems)
+        {
+            if (dotReady != null)
+            {
+                Brush want = Res(all ? "Ok" : "Bad");
+                if (!ReferenceEquals(dotReady.Fill, want)) dotReady.Fill = want;
+            }
+            if (txtReadyTitle != null)
+            {
+                string t = all ? "Everything checks out"
+                         : problems == 1 ? "1 thing needs attention"
+                         : problems + " things need attention";
+                if (txtReadyTitle.Text != t) txtReadyTitle.Text = t;
+            }
         }
 
         /// <summary>
@@ -2245,10 +2339,8 @@ namespace Thornswood
             mineCard.Visibility   = modTab == 2 ? Visibility.Visible : Visibility.Collapsed;
             if (addonsCard != null)
                 addonsCard.Visibility = modTab == 3 ? Visibility.Visible : Visibility.Collapsed;
-            // Scan and Fix compare against the server's list, which covers the
-            // first two tabs. Your own folder and the add-ons are both outside
-            // what the server looks at, so the card has nothing to say there.
-            verifyCardVisible(modTab == 0 || modTab == 1);
+            // Scan and Fix moved to the Diagnostics page (#607), so this page no
+            // longer shows or hides that card per tab.
 
             // Above every sub tab, not just Add-ons. It lived in BuildPackRows,
             // which only runs when somebody has already clicked Add-ons, so the
@@ -2609,12 +2701,6 @@ namespace Thornswood
                 else win.Dispatcher.BeginInvoke(new Action(delegate { Log(m); }));
             }
             catch { }
-        }
-
-        static void verifyCardVisible(bool on)
-        {
-            var c = win.FindName("VerifyCard") as UIElement;
-            if (c != null) c.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // Plugin and DLL rows go to the mod's own page. Anything the catalogue
