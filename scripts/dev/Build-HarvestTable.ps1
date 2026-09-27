@@ -375,8 +375,8 @@ $PRODUCE_NOT_GATHERED = @('KEYM')
 $PRODUCE_A_SCRIPT_MUST_OPEN = ' \(\d+\)$'
 #
 # OUR_STATIONS: the bases this server places in the world itself, read out of
-# tools\thornswood-src\stations.json, which is the file the gamemode's own
-# STATIONS line is generated from. A record Thornswood put in the world is
+# game\data\stations.json, which Install-GamemodeConsts.js also installs into
+# the gamemode's STATIONS line. A record Thornswood put in the world is
 # answered by the station code written for it, never by a sweep of the load
 # order, and neither pass may claim one.
 #

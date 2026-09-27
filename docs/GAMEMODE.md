@@ -223,12 +223,19 @@ because each reads the one before.
 | `BUILDING_BY_DOOR` 9575-9582, `BUILDING_NAME` 9584-9590, `WAY_OUT` 9592-9599 | `Build-DoorTable.py` | `doors.json` | `Build-DoorTable.py:450-483` |
 | `BENCH_BY_BASE` 9627-9633, `BENCH_ACCESS` 9635-9736 | `Build-BenchTable.py`, from `recipes.json` | none | `Build-BenchTable.py:362-376` |
 | `SPELL_IDS` 11826-11930 | `Build-SpellTable.ps1` | `spells.json` | `Build-SpellTable.ps1:622-628` |
+| `DATA` 23 | `Install-GamemodeConsts.js` | `data.json` | `Install-GamemodeConsts.js` |
+| `STATIONS` 24 | `Install-GamemodeConsts.js` | `stations.json` | `Install-GamemodeConsts.js` |
+| `ITEMS` 25 | `Install-GamemodeConsts.js` | `items.json` | `Install-GamemodeConsts.js` |
+| `CHARGEN` ~3878 | `Install-GamemodeConsts.js` | `chargen.json` | `Install-GamemodeConsts.js` |
 
-`DATA`, `STATIONS`, `ITEMS` (lines 23-25) and `CHARGEN` (line 3881) have no
-generator in this repository. The comments name `respawn-holds.json`
-(`gamemode.js:339`) and `game\data\stations.json` (`gamemode.js:5742`); the old
-`tools\thornswood-src` pipeline that wrote them is gone. `fires.json` is not
-in the gamemode: it goes into `thornswood-front.js`.
+`DATA`, `STATIONS`, `ITEMS` (lines 23-25) and `CHARGEN` (around line 3878)
+are installed from checked-in JSON by `scripts\dev\Install-GamemodeConsts.js`
+(`data.json`, `stations.json`, `items.json`, `chargen.json` under `game\data`).
+They are not read out of the plugins: the values were recovered into JSON when
+`tools\thornswood-src` was retired (5d1f3f0). Edit the JSON, then run the
+installer. `--check` proves the gamemode matches. Older comments named
+`respawn-holds.json`; that file never lived in this repository.
+`fires.json` is not in the gamemode: it goes into `thornswood-front.js`.
 
 ## Deploying it
 

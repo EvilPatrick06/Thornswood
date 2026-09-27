@@ -1,0 +1,176 @@
+{
+ "shift": [
+  [
+   "1be1a:Skyrim.esm",
+   1
+  ],
+  [
+   "1be1b:Skyrim.esm",
+   1
+  ]
+ ],
+ "towns": {
+  "e80030:Thornswood-Content.esp": {
+   "key": "whiterun",
+   "town": "Whiterun",
+   "arrival": {
+    "cell": "WhiterunBanneredMare",
+    "desc": "1605e:Skyrim.esm",
+    "pos": [
+     -113.6,
+     -810,
+     69.3
+    ],
+    "rot": [
+     0,
+     0,
+     3.7
+    ]
+   }
+  },
+  "e80031:Thornswood-Content.esp": {
+   "key": "riften",
+   "town": "Riften",
+   "arrival": {
+    "cell": "RiftenBeeandBarb",
+    "desc": "16bdf:Skyrim.esm",
+    "pos": [
+     -150.2,
+     -598.2,
+     64
+    ],
+    "rot": [
+     0,
+     0,
+     36.3
+    ]
+   }
+  },
+  "e80032:Thornswood-Content.esp": {
+   "key": "solitude",
+   "town": "Solitude",
+   "arrival": {
+    "cell": "SolitudeWinkingSkeever",
+    "desc": "16a0e:Skyrim.esm",
+    "pos": [
+     -293.9,
+     -1450.6,
+     0
+    ],
+    "rot": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "e80033:Thornswood-Content.esp": {
+   "key": "windhelm",
+   "town": "Windhelm",
+   "arrival": {
+    "cell": "WindhelmCandlehearthHall",
+    "desc": "16789:Skyrim.esm",
+    "pos": [
+     554.3,
+     -3766.2,
+     64
+    ],
+    "rot": [
+     0,
+     0,
+     91.9
+    ]
+   }
+  },
+  "e80034:Thornswood-Content.esp": {
+   "key": "markarth",
+   "town": "Markarth",
+   "arrival": {
+    "cell": "MarkarthSilverBloodInn",
+    "desc": "16dfe:Skyrim.esm",
+    "pos": [
+     -5588.5,
+     -1925.8,
+     -16.0
+    ],
+    "rot": [
+     0,
+     0,
+     180.0
+    ]
+   }
+  },
+  "e80035:Thornswood-Content.esp": {
+   "key": "falkreath",
+   "town": "Falkreath",
+   "arrival": {
+    "cell": "FalkreathDeadMansDrink",
+    "desc": "3a184:Skyrim.esm",
+    "pos": [
+     670.4,
+     -443.1,
+     0.5
+    ],
+    "rot": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "e80036:Thornswood-Content.esp": {
+   "key": "morthal",
+   "town": "Morthal",
+   "arrival": {
+    "cell": "MorthalMoorsideInn",
+    "desc": "138ce:Skyrim.esm",
+    "pos": [
+     1970.6,
+     -160.2,
+     0
+    ],
+    "rot": [
+     0,
+     0,
+     270.9
+    ]
+   }
+  },
+  "e80037:Thornswood-Content.esp": {
+   "key": "dawnstar",
+   "town": "Dawnstar",
+   "arrival": {
+    "cell": "DawnstarWindpeakInn",
+    "desc": "13a7f:Skyrim.esm",
+    "pos": [
+     1823.2,
+     -534.7,
+     0.5
+    ],
+    "rot": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "e80038:Thornswood-Content.esp": {
+   "key": "winterhold",
+   "town": "Winterhold",
+   "arrival": {
+    "cell": "WinterholdTheFrozenHearth",
+    "desc": "13814:Skyrim.esm",
+    "pos": [
+     1791.6,
+     7.3,
+     0
+    ],
+    "rot": [
+     0,
+     0,
+     88
+    ]
+   }
+  }
+ }
+}
