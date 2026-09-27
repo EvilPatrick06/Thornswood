@@ -1,6 +1,18 @@
 ﻿<#
   Add-JContainers.ps1
 
+  RETIRED. DO NOT RUN. SunHelm left the collection with the needs rebuild
+  (issue #480) and is in no live load order. Everything below installs
+  JContainers SE and switches on the MCM recording that set SunHelm's
+  hunger, thirst, exhaustion and cold meters on first character create.
+  Running it now would put that SunHelm recorder path back into Game\Data
+  for a mod the server does not carry. It refuses to run, and the rest of
+  the file is kept for the history of how it was installed. site\data\known.md
+  is where the removal is written down for people. Leftover after #735
+  retired Add-TempleRespawn the same way.
+
+  What it used to do, and what is left of it:
+
   Installs JContainers SE and switches on the MCM recording that sets
   everyone's survival meters up for them.
 
@@ -29,6 +41,17 @@ param(
     [switch]$NoShip,
     [switch]$NoPause
 )
+
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Add-JContainers.ps1 is retired and installs nothing. ' +
+       'SunHelm left the collection with the needs rebuild (issue #480) and is in no live load ' +
+       'order, so the MCM Recorder path this script still wires for SunHelm would put settings ' +
+       'back for a mod the server does not carry. JContainers itself is already in the build when ' +
+       'needed; this one-off was only the SunHelm first-run recording installer. ' +
+       'Leftover called out after #735 retired Add-TempleRespawn the same way. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'SunHelm comes back to the collection, and read the header first.')
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
