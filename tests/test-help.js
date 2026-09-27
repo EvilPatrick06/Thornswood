@@ -84,7 +84,7 @@ if (help) {
         /Enter opens the chat/.test(ask('talking', false)[0]) &&
         /the server rolls it/.test(ask('talking', false)[0]));
     yes('people explains the three keys, which is what was asked for',
-        /press G/.test(ask('people', false)[0]) &&
+        /press Y/.test(ask('people', false)[0]) &&
         /H to offer a/.test(ask('people', false)[0]) &&
         /L to stop hearing/.test(ask('people', false)[0]));
     yes('and staff points at the places a person is actually reachable',

@@ -304,23 +304,22 @@
     "P for the Party menu... J for Journal".
 
     DirectInput scan codes, the same as ChatKey and SkillsKey above, because
-    that is what buttonEvent hands back. G, H and B do nothing in vanilla
+    that is what buttonEvent hands back. Y, H and L do nothing in vanilla
     Skyrim and are only armed while somebody is under the crosshair, so even a
     mod that wanted one of them would keep it the rest of the time.
   */
   const PARTY_KEY   = iniNumber(ini, 'PartyKey', 25);      // P
   const JOURNAL_KEY = iniNumber(ini, 'JournalKey', 36);    // J
-  const FRIEND_KEY  = iniNumber(ini, 'FriendKey', 34);     // G
+  const FRIEND_KEY  = iniNumber(ini, 'FriendKey', 21);     // Y, not G: G is the emote wheel (#529)
   const TRADE_KEY   = iniNumber(ini, 'TradeWithKey', 35);  // H
   /*
     MuteThemKey, NOT MuteKey. MuteKey is already in this same file and is the
-    microphone: "Mute the microphone... for when somebody walks into the
-    room", Keys.cs, default Y. Reusing the name would have made one launcher
-    row set two different things, and the first person to rebind their
-    microphone would have rebound this as well.
+    microphone's, once a row on the Controls page with nothing reading it
+    (it went in #529). Reusing the name would have made one launcher row set
+    two different things.
 
-    L rather than B or N or M: WheelKey is B, StopKey is N and MenuKey is M,
-    all of them in this file already.
+    L rather than G, B, N or M: WheelKey is G, VoiceModeKey is B, StopKey is
+    N and MenuKey is M, all of them in this file already.
   */
   const MUTE_KEY    = iniNumber(ini, 'MuteThemKey', 38);   // L
   /*
@@ -3533,10 +3532,14 @@
     not gain a record while the game runs. What is kept is the Key Mold's
     runtime id and not the form, for the reason under THE IDS, RESOLVED ONCE.
 
-    A STAMPED MOLD LOOKS LIKE A BLANK FROM HERE. Which door a mold is for is
-    the name on the server's copy of the pack, and getItemCount counts the
-    record. So the line shows for anybody carrying a Key Mold, and somebody
-    whose only mold is already stamped is told so by the server on the press.
+    ONLY FOR A BLANK (#529). Which door a mold is for is the name on it, and
+    getItemCount counts the record, so a stamped mold and a blank look the
+    same through it, and every holder saw the line at every door. The name
+    reaches the game as TextDisplayData on the item, the same place
+    skymp5-client reads it back from (sync/inventory.ts in the fork), so the
+    named molds are counted out of getExtraContainerChanges and taken off.
+    If that cannot be read, nothing is taken off: the line shows as it did,
+    and the server still refuses a stamped mold on the press.
 
     ON THE CROSSHAIR POLL'S BEAT, a third of a second, never every frame. On a
     build without the recipe that is one comparison and no call into the game.
@@ -3583,7 +3586,29 @@
     return moldBase > 0;
   }
 
-  /** The door under the crosshair, in hex, while a Key Mold could go into it. '' otherwise. */
+  /** How many of the Key Molds carried have a name, which is a door's. 0 when it cannot tell. */
+  function stampedMolds(pc) {
+    let named = 0;
+    try {
+      const changes = sp.getExtraContainerChanges(pc.getFormID()) || [];
+      for (let i = 0; i < changes.length; i++) {
+        if (!changes[i] || changes[i].baseId !== moldBase) { continue; }
+        const lists = changes[i].extendDataList || [];
+        for (let j = 0; j < lists.length; j++) {
+          let n = 1, name = false;
+          (lists[j] || []).forEach(function (x) {
+            if (!x) { return; }
+            if (x.type === 'Count') { n = Number(x.count) || 1; }
+            if (x.type === 'TextDisplayData' && x.name) { name = true; }
+          });
+          if (name) { named += n; }
+        }
+      }
+    } catch (e) { named = 0; }
+    return named;
+  }
+
+  /** The door under the crosshair, in hex, while a blank Key Mold could go into it. '' otherwise. */
   function moldDoorNow() {
     if (!moldReady()) { return ''; }
     if (anyClaim()) { return ''; }
@@ -3598,12 +3623,14 @@
     if (!door) { return ''; }
     if (busyMenuOpenNow()) { return ''; }
     let carried = 0;
+    let pc = null;
     try {
-      const pc = sp.Game.getPlayer();
+      pc = sp.Game.getPlayer();
       const mold = sp.Game.getFormEx(moldBase);
       carried = (pc && mold) ? pc.getItemCount(mold) : 0;
     } catch (e) { carried = 0; }
     if (!(carried > 0)) { return ''; }
+    if (!(carried - stampedMolds(pc) > 0)) { return ''; }
     let hex = '';
     try { hex = (ref.getFormID() >>> 0).toString(16); } catch (e) { hex = ''; }
     return hex;

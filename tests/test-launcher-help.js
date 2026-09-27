@@ -333,8 +333,9 @@ function freshKey(name) {
       '), so the page names no letter for it and sends people to the Controls page',
       t !== f ? (/Controls page/.test(wheel) && !/\b[A-Z]\b/.test(wheel)) : true);
   const mode = num(vplug, /let MODE_KEY = (\d+);/);
-  yes('the voice mode key is ' + LETTER[mode] + ' in the plugin and not in the template, and the page says so',
-      templateKey('VoiceModeKey') === null && item('Chat and commands', 'Voice').indexOf(LETTER[mode] + ' steps your voice') !== -1);
+  yes('the voice mode key is ' + LETTER[mode] + ' in the plugin, the template agrees, and the page says so',
+      (templateKey('VoiceModeKey') === null || templateKey('VoiceModeKey') === mode) &&
+      item('Chat and commands', 'Voice').indexOf(LETTER[mode] + ' steps your voice') !== -1);
 }
 
 // --------------------------------------------------------------- the wheel

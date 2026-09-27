@@ -110,7 +110,7 @@ namespace Thornswood
                 "Hold V to talk. Voice runs in the launcher rather than in the game, so leave the launcher open while you play; it minimises by itself. B steps your voice between a whisper, which carries about 7 metres, your normal voice, about 30 metres, and a yell, about 85 metres. The further away somebody is standing, the quieter you are to them."),
 
             new HelpItem("Chat and commands", "Friends and trading",
-                "Look at somebody and press G to ask them to be friends, H to offer a trade, or L to stop hearing them. Those three only work with somebody under your crosshair. /yes and /no answer whatever somebody has asked you. Your friends are on the P panel, and friends are kept."),
+                "Look at somebody and press Y to ask them to be friends, H to offer a trade, or L to stop hearing them. Those three only work with somebody under your crosshair. /yes and /no answer whatever somebody has asked you. Your friends are on the P panel, and friends are kept."),
 
             // The two party items came from main (entry 336, #281), which put
             // them in place of the old item that said there were no parties.
