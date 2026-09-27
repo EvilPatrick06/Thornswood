@@ -443,6 +443,17 @@ yes('THIRD-PARTY.md has a "Not shipped by Thornswood" section', notShipped.lengt
 });
 yes('"What is still missing" does not say nothing hands a person the GPL text',
     missingSec.length > 0 && !/nothing hands a person the GPL/i.test(flat(missingSec)));
+yes('"What is still missing" says the installer hands AGPL-3.0.txt',
+    /installer also hands[\s\S]{0,200}AGPL-3\.0\.txt/.test(missingSec));
+yes('installer/licences/AGPL-3.0.txt exists', (function () {
+  try { return fs.statSync(path.join(ROOT, 'installer', 'licences', 'AGPL-3.0.txt')).isFile(); } catch (e) { return false; }
+})());
+yes('installer/licences/GPL-3.0.txt exists', (function () {
+  try { return fs.statSync(path.join(ROOT, 'installer', 'licences', 'GPL-3.0.txt')).isFile(); } catch (e) { return false; }
+})());
+yes('installer/licences/WebView2-LICENSE.txt exists', (function () {
+  try { return fs.statSync(path.join(ROOT, 'installer', 'licences', 'WebView2-LICENSE.txt')).isFile(); } catch (e) { return false; }
+})());
 const polyRows = runtimeSec.split('\n').filter(function (l) {
   return l.charAt(0) === '|' && l.indexOf('`___systemPolyfill.js`') >= 0;
 });
