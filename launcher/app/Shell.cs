@@ -109,7 +109,7 @@ namespace Thornswood
                          txtSaveNote, txtSaveCount, txtLogCount, txtDisplayNote,
                          txtReadyTitle, txtReadyNote;
         static Ellipse dotServer, dotVerify, dotReady;
-        static StackPanel statusList, modList, themeRow, pathRows, helpList,
+        static StackPanel statusList, modList, themeRow, themeEditor, pathRows, helpList,
                           newsList, saveList, logList, statRow, displayModeRow,
                           firstRunCard, quickKeysCard, quickKeys;
         static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
@@ -265,9 +265,10 @@ namespace Thornswood
             win = (Window)XamlReader.Parse(xaml);
 
             Bind();
-            Themes.Apply(win, cfg.Theme);
+            Themes.Apply(win, Themes.Resolve(cfg));
             Wire();
             BuildThemeRow();
+            BuildThemeEditor();
             BuildDisplay();
             BuildChat();
             BuildStatRow();
@@ -581,7 +582,8 @@ namespace Thornswood
             txtReadyTitle = F<TextBlock>("TxtReadyTitle"); txtReadyNote = F<TextBlock>("TxtReadyNote");
             mineCard = F<Border>("MineCard");
             statusList = F<StackPanel>("StatusList"); modList = F<StackPanel>("ModList");
-            themeRow = F<StackPanel>("ThemeRow"); pathRows = F<StackPanel>("PathRows");
+            themeRow = F<StackPanel>("ThemeRow"); themeEditor = F<StackPanel>("ThemeEditor");
+            pathRows = F<StackPanel>("PathRows");
             helpList = F<StackPanel>("HelpList");
             boxSearch = F<TextBox>("BoxSearch"); boxAddress = F<TextBox>("BoxAddress"); boxPort = F<TextBox>("BoxPort");
             btnShowServer = F<Button>("BtnShowServer");
@@ -2901,55 +2903,169 @@ namespace Thornswood
             themeRow.Children.Add(wrap);
 
             foreach (Theme t in Themes.All)
+                AddThemeButton(wrap, t);
+
+            // The theme the person built themselves sits after the built-ins,
+            // once there is one to sit there. Picking it puts their colours
+            // back without retyping them; the editor below is only for making
+            // or changing them.
+            if (Themes.HasCustom(cfg.CustomColors))
+                AddThemeButton(wrap, Themes.Custom(cfg.CustomColors, cfg.CustomLight));
+
+            Theme cur = Themes.Resolve(cfg);
+            txtThemeNote.Text = cur.Name + ". " + cur.Note;
+        }
+
+        static void AddThemeButton(WrapPanel wrap, Theme t)
+        {
+            Theme captured = t;
+            bool on = string.Equals(t.Name, cfg.Theme, StringComparison.OrdinalIgnoreCase);
+
+            var sw = new Border();
+            sw.Width = 15; sw.Height = 15;
+            sw.CornerRadius = new CornerRadius(2);
+            sw.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(t.Swatch));
+            sw.Margin = new Thickness(0, 0, 10, 0);
+            sw.VerticalAlignment = VerticalAlignment.Center;
+
+            var label = new TextBlock();
+            label.Text = t.Name;
+            label.VerticalAlignment = VerticalAlignment.Center;
+            label.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+
+            var sp = new StackPanel();
+            sp.Orientation = Orientation.Horizontal;
+            sp.Children.Add(sw);
+            sp.Children.Add(label);
+
+            var b = new Button();
+            b.Content = sp;
+            b.Style = (Style)win.Resources["Ghost"];
+            b.Margin = new Thickness(0, 0, 9, 9);
+            b.Padding = new Thickness(12, 9, 16, 9);
+            b.MinWidth = 148;
+            b.HorizontalContentAlignment = HorizontalAlignment.Left;
+            if (on) b.Background = Res("CardHover");
+            b.Click += delegate
             {
-                Theme captured = t;
-                bool on = string.Equals(t.Name, cfg.Theme, StringComparison.OrdinalIgnoreCase);
+                cfg.Theme = captured.Name;
+                cfg.Save(Paths.CfgFile);
+                Themes.Apply(win, Themes.Resolve(cfg));
+                Redraw();
+                Log("Theme set to " + captured.Name + ".");
+            };
+            wrap.Children.Add(b);
+        }
 
-                var sw = new Border();
-                sw.Width = 15; sw.Height = 15;
-                sw.CornerRadius = new CornerRadius(2);
-                sw.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(t.Swatch));
-                sw.Margin = new Thickness(0, 0, 10, 0);
-                sw.VerticalAlignment = VerticalAlignment.Center;
+        // The boxes the editor draws, kept so their text can be read back when
+        // the person presses Use these colours. Rebuilt whenever the editor is.
+        static readonly Dictionary<string, TextBox> themeBoxes = new Dictionary<string, TextBox>();
+        static CheckBox themeLightBox;
 
-                var label = new TextBlock();
-                label.Text = t.Name;
-                label.VerticalAlignment = VerticalAlignment.Center;
-                label.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+        // The make-your-own editor, under the swatch row. It fills its boxes
+        // from whatever theme is on right now, so the way to start from a
+        // built-in is to pick it above first and then change what you want.
+        static void BuildThemeEditor()
+        {
+            if (themeEditor == null) return;
+            themeEditor.Children.Clear();
+            themeBoxes.Clear();
 
-                var sp = new StackPanel();
-                sp.Orientation = Orientation.Horizontal;
-                sp.Children.Add(sw);
-                sp.Children.Add(label);
+            Theme cur = Themes.Resolve(cfg);
 
-                var b = new Button();
-                b.Content = sp;
-                b.Style = (Style)win.Resources["Ghost"];
-                b.Margin = new Thickness(0, 0, 9, 9);
-                b.Padding = new Thickness(12, 9, 16, 9);
-                b.MinWidth = 148;
-                b.HorizontalContentAlignment = HorizontalAlignment.Left;
-                if (on) b.Background = Res("CardHover");
-                b.Click += delegate
+            var head = new TextBlock();
+            head.Text = "Make your own";
+            head.FontFamily = new FontFamily("Constantia, Georgia");
+            head.FontSize = 13;
+            head.Foreground = Res("Faint");
+            head.Margin = new Thickness(0, 2, 0, 8);
+            themeEditor.Children.Add(head);
+
+            var blurb = new TextBlock();
+            blurb.Text = "Pick a theme above to start from, change any colour to a hex value like #C8763A, "
+                       + "then press Use these colours. The two soft ones put the opacity first, so "
+                       + "#3CC8763A is that accent at low opacity.";
+            blurb.FontSize = 11.5; blurb.Foreground = Res("Faint");
+            blurb.TextWrapping = TextWrapping.Wrap; blurb.LineHeight = 17;
+            blurb.Margin = new Thickness(0, 0, 0, 12);
+            themeEditor.Children.Add(blurb);
+
+            var grid = new WrapPanel();
+            foreach (string name in Themes.Names)
+            {
+                string val;
+                cur.Colors.TryGetValue(name, out val);
+
+                var col = new StackPanel();
+                col.Width = 152;
+                col.Margin = new Thickness(0, 0, 14, 12);
+
+                var l = new TextBlock();
+                l.Text = name;
+                l.FontSize = 11.5; l.Foreground = Res("Muted");
+                l.Margin = new Thickness(2, 0, 0, 4);
+                col.Children.Add(l);
+
+                var box = new TextBox();
+                box.Text = val == null ? "" : val;
+                box.Style = (Style)win.Resources["Field"];
+                box.FontFamily = new FontFamily("Cascadia Mono, Consolas");
+                col.Children.Add(box);
+
+                themeBoxes[name] = box;
+                grid.Children.Add(col);
+            }
+            themeEditor.Children.Add(grid);
+
+            themeLightBox = new CheckBox();
+            themeLightBox.Content = "This is a light theme, so the launcher shades its own graphics for a light background";
+            themeLightBox.IsChecked = cur.Light;
+            themeLightBox.Margin = new Thickness(2, 2, 0, 14);
+            themeEditor.Children.Add(themeLightBox);
+
+            var apply = new Button();
+            apply.Content = "Use these colours";
+            apply.Style = (Style)win.Resources["Solid"];
+            apply.HorizontalAlignment = HorizontalAlignment.Left;
+            apply.Click += delegate { ApplyCustomTheme(); };
+            themeEditor.Children.Add(apply);
+        }
+
+        static void ApplyCustomTheme()
+        {
+            var pairs = new List<string>();
+            foreach (string name in Themes.Names)
+            {
+                TextBox box;
+                if (!themeBoxes.TryGetValue(name, out box)) continue;
+                string hex = (box.Text == null ? "" : box.Text).Trim();
+
+                bool good = false;
+                try { ColorConverter.ConvertFromString(hex); good = true; }
+                catch (Exception ex) { Swallow.Note("ApplyCustomTheme, reading " + name, ex); }
+                if (!good)
                 {
-                    cfg.Theme = captured.Name;
-                    cfg.Save(Paths.CfgFile);
-                    Themes.Apply(win, captured.Name);
-                    Redraw();
-                    Log("Theme set to " + captured.Name + ".");
-                };
-                wrap.Children.Add(b);
+                    Log("The colour for " + name + " is not a hex value. Use something like #C8763A. Nothing changed.");
+                    return;
+                }
+                pairs.Add(name);
+                pairs.Add(hex);
             }
 
-            Theme cur = Themes.Find(cfg.Theme);
-            txtThemeNote.Text = cur.Name + ". " + cur.Note;
+            cfg.CustomColors = pairs.ToArray();
+            cfg.CustomLight = themeLightBox != null && themeLightBox.IsChecked == true;
+            cfg.Theme = Themes.CustomName;
+            cfg.Save(Paths.CfgFile);
+            Themes.Apply(win, Themes.Resolve(cfg));
+            Redraw();
+            Log("Your own theme is on. Change the colours any time, or pick another theme to leave it.");
         }
 
         // Everything that paints itself from the theme brushes rather than
         // binding to them. Called after a theme change, and nowhere else.
         static void Redraw()
         {
-            BuildThemeRow(); BuildModList(); DrawStatus(); BuildPathRows(); BuildHelp();
+            BuildThemeRow(); BuildThemeEditor(); BuildModList(); DrawStatus(); BuildPathRows(); BuildHelp();
             BuildStatRow(); BuildNews(); BuildLogs(); BuildDisplay(); BuildChat();
             BuildServer(); BuildInstalled(); BuildControls(); BuildDiag(); RefreshDiscord();
             boxSearch.Foreground = Res(boxSearch.Text == SearchHint ? "Faint" : "Ink");
