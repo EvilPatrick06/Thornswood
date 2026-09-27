@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 
 namespace Thornswood
@@ -86,7 +86,7 @@ namespace Thornswood
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Online.AskPort", ex); }
             return got;
         }
 
