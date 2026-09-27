@@ -482,7 +482,7 @@ namespace Thornswood
                     }
                     Thread.Sleep(2000);
                 }
-                try { File.WriteAllText(Path.Combine(folder, ".thornswood-complete"), manifest); } catch { }
+                WriteMarker(folder, manifest);
                 log("Part " + (i + 1) + " of 3 is down (depot " + depot + ", " + (FolderSize(folder) / 1048576).ToString("n0") + " MB).");
                 Progress((i + 1) * 100 / Stages);
             }
@@ -1392,11 +1392,33 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// Writes the marker that says this folder holds the build being asked
+        /// for: the manifest on the first line, then how many bytes the folder
+        /// held when the download finished. MarkerIs reads both.
+        /// </summary>
+        static void WriteMarker(string folder, string manifest)
+        {
+            try { File.WriteAllText(Path.Combine(folder, ".thornswood-complete"), manifest + Environment.NewLine + FolderSize(folder)); }
+            catch (Exception ex) { Swallow.Note("Downgrade, writing the marker in " + folder, ex); }
+        }
+
+        /// <summary>
         /// True when this depot folder's completion marker was written for the
-        /// manifest being asked for now. The marker holds the manifest id, so a
-        /// folder from an attempt at another build reads as not downloaded and
-        /// is fetched again. An empty or unreadable marker is the same answer:
-        /// nothing in it says these are the files being asked for.
+        /// manifest being asked for now AND the files it was written for are
+        /// still there. The marker holds the manifest id, so a folder from an
+        /// attempt at another build reads as not downloaded and is fetched
+        /// again. An empty or unreadable marker is the same answer: nothing in
+        /// it says these are the files being asked for.
+        ///
+        /// The size is checked as well because a marker on its own said the
+        /// part was downloaded even when the folder had been emptied since, by
+        /// a disk cleaner, by Steam, or by somebody clearing space part way
+        /// through eleven gigabytes. The part was then skipped rather than
+        /// cleared and fetched again, and the copy put nothing of it into the
+        /// game while the exe from another part made the game read as 1.6.1170.
+        /// That is the mixed build this is meant to stop. A marker from before
+        /// the size was written holds the manifest alone; for one of those the
+        /// folder only has to still have something in it.
         /// </summary>
         static bool MarkerIs(string folder, string manifest)
         {
@@ -1404,7 +1426,15 @@ namespace Thornswood
             {
                 string mark = Path.Combine(folder, ".thornswood-complete");
                 if (!File.Exists(mark)) return false;
-                return string.Equals(File.ReadAllText(mark).Trim(), manifest, StringComparison.Ordinal);
+                string[] lines = File.ReadAllText(mark).Replace("\r", "").Split('\n');
+                if (!string.Equals(lines[0].Trim(), manifest, StringComparison.Ordinal)) return false;
+                long was = 0;
+                if (lines.Length > 1) long.TryParse(lines[1].Trim(), out was);
+                // The marker itself is not one of the downloaded files, so a
+                // folder holding nothing but the marker measures zero here and
+                // does not pass as a part that is down.
+                long now = FolderSize(folder) - new FileInfo(mark).Length;
+                return now >= Math.Max(was, 1L);
             }
             catch { return false; }
         }
