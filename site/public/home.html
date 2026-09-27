@@ -202,7 +202,7 @@ h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
 .btn.first{background:var(--gold);color:#120F07;
   box-shadow:0 14px 36px -14px rgba(201,162,75,.6)}
 .btn.first:hover{background:var(--gold-hot);color:#120F07}
-.btn.ghost{border-color:var(--edge2);color:var(--page)}
+.btn.ghost{background:transparent;border-color:var(--edge2);color:var(--page)}
 .btn.ghost:hover{border-color:var(--gold);color:var(--gold)}
 .live{margin-top:30px;font:400 13px/1 var(--sans);letter-spacing:.1em;
   text-transform:uppercase;color:rgba(240,230,206,.7);display:flex;gap:9px;
@@ -314,15 +314,24 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .gal-box .form label{color:var(--page)}
 /* Native file control stays white on Windows; hide it and paint our own. */
 .gal-box .form input[type=file]{position:absolute;width:1px;height:1px;padding:0;
-  margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
-.gal-box .form .file-pick{display:flex;flex-wrap:wrap;align-items:center;gap:12px;
-  margin-top:8px}
-.gal-box .form .file-pick .btn{padding:12px 22px}
+  margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;opacity:0}
+.gal-box .form .gal-label{display:block;font:600 13px/1.5 var(--sans);letter-spacing:.04em;
+  text-transform:uppercase;color:var(--page);margin:0 0 8px}
+.gal-box .form .gal-drop{position:relative;padding:26px 22px;text-align:center;
+  border:1.5px dashed var(--edge2);border-radius:2px;background:rgba(11,14,10,.55);
+  transition:border-color .12s,background .12s,box-shadow .12s}
+.gal-box .form .gal-drop-lead{margin:0 0 16px;font:400 15.5px/1.45 var(--serif);
+  color:var(--quiet);text-transform:none;letter-spacing:0}
+.gal-box .form .file-pick{display:flex;flex-wrap:wrap;align-items:center;
+  justify-content:center;gap:12px}
+.gal-box .form .btn.gal-pick{padding:12px 22px;background:var(--iron);
+  border-color:var(--gold);color:var(--gold)}
+.gal-box .form .btn.gal-pick:hover{background:var(--gold);color:#120F07}
 .gal-box .form .file-name{font:400 14px/1.4 var(--serif);color:var(--quiet);
   text-transform:none;letter-spacing:0}
 .gal-box .form input[type=text]{background:var(--night)}
-.gal-box.drag{border-color:var(--gold);
-  box-shadow:inset 0 1px 0 rgba(201,162,75,.08),0 0 0 1px rgba(201,162,75,.35)}
+.gal-box .form .gal-drop.drag{border-color:var(--gold);background:rgba(201,162,75,.1);
+  box-shadow:inset 0 0 0 1px rgba(201,162,75,.28)}
 
 /* Eighteen-and-over door for /downloads and /join only. Statement, not a check. */
 .age-gate{max-width:34rem;margin:48px auto;padding:32px 34px;border:1px solid var(--edge);
@@ -947,14 +956,17 @@ if (AGE_PATHS[here] && !ageOk()) {
     if (who.canSubmit) {
       out += '<div class="gal-box" id="galSubmit">' +
         '<h2>Send a picture</h2>' +
-        '<p class="hint">png, jpg, webp or gif, up to 25 MB each. Pick one or several, or drop them on this box; they go to the queue, not live.</p>' +
+        '<p class="hint">png, jpg, webp or gif, up to 25 MB each. They go to the queue, not live.</p>' +
         '<div class="form">' +
-        '<label>Pictures' +
-        '<input type="file" id="galFile" accept=".png,.jpg,.jpeg,.webp,.gif,image/*" multiple>' +
-        '<span class="file-pick">' +
-        '<button class="btn ghost" type="button" id="galPick">Choose files</button>' +
+        '<div class="gal-field">' +
+        '<span class="gal-label">Pictures</span>' +
+        '<div class="gal-drop" id="galDrop">' +
+        '<input type="file" id="galFile" accept=".png,.jpg,.jpeg,.webp,.gif,image/*" multiple tabindex="-1" aria-hidden="true">' +
+        '<p class="gal-drop-lead">Drop pictures here or choose files</p>' +
+        '<div class="file-pick">' +
+        '<button class="btn gal-pick" type="button" id="galPick">Choose pictures</button>' +
         '<span class="file-name" id="galFileName">No file chosen</span>' +
-        '</span></label>' +
+        '</div></div></div>' +
         '<label>By<input type="text" id="galBy" maxlength="40" placeholder="a name for the caption"></label>' +
         '<label>Note<span class="hint">optional</span><input type="text" id="galNote" maxlength="300"></label>' +
         '<div><button class="btn first" type="button" id="galSend">Send it</button></div>' +
@@ -1001,7 +1013,7 @@ if (AGE_PATHS[here] && !ageOk()) {
     var f = document.getElementById('galFile');
     var pick = document.getElementById('galPick');
     var nameEl = document.getElementById('galFileName');
-    var box = document.getElementById('galSubmit');
+    var box = document.getElementById('galDrop');
     var picked = [];
 
     function showPicked() {
