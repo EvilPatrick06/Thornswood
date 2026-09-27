@@ -128,5 +128,10 @@
 # Swap.Restore / Hold.Release / Keep.Unpark is still log-only; stop-
 # swallowing remains later work. Giant leftovers Shell and Updater are left
 # for later slices.
-Shell.cs 76
-Updater.cs 20
+# Issue #461 next slice, 27 Sep. Converted every empty catch in Shell and
+# Updater to Swallow.Note. That is 96 fewer silent catches, 96 down to 0.
+# Files that reached zero are dropped from this list (an unlisted file is
+# allowed none). No baseline number was raised. Behaviour of Config.Save /
+# Swap.Restore / Hold.Release / Keep.Unpark is still log-only; stop-
+# swallowing remains later work. No silent-catch file lines remain in this
+# baseline.
