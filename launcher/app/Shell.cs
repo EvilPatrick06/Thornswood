@@ -3767,7 +3767,7 @@ namespace Thornswood
             if (noteServerPick != null)
                 noteServerPick.Text = have
                     ? "The dev build is installed at " + DevBuild.Root + ". Switch to it to test on the dev server; this build is not touched."
-                    : "The dev build is a second launcher for testing on the dev server. The Owner and Dev roles only; the launcher checks your roles before it installs it.";
+                    : "The dev build is a second launcher for testing on the dev server. Staff roles only; the launcher checks your Discord roles before it installs it.";
             btnServerMain.IsEnabled = false;
             btnServerMain.Content = "Main server";
             btnServerDev.IsEnabled = true;
@@ -3843,7 +3843,7 @@ namespace Thornswood
                         if (!st.Dev)
                         {
                             MessageBox.Show(win,
-                                "The dev build is for the Owner and Dev roles only, and your account does not have one. Ask Patrick if you need it.",
+                                "The dev build is for the staff roles: Owner, Dev, Gamemaster, Moderator and Loremaster. Your account does not have one; ask Patrick if you need it.",
                                 "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
                             return;
                         }
