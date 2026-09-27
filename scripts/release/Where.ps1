@@ -28,11 +28,19 @@
   otherwise. A machine that never had C:\Thornswood-Dev, Djinn's, gets the new
   places from the start.
 
+  LAYOUT. layout.json at the repository root holds the new and old places, and
+  the map of old tools\ paths to the folders after the reorganisation (issue
+  #440, phase 0). This script and where.js beside it both read that file and
+  prefer the new place when it is present. A Move name (bot, voice, site, ...)
+  resolves the same way: new folder first, then the old tools\ path.
+
   Read only. It creates nothing and prints nothing but the one path.
 
 .PARAMETER What
   Which place: Repo, Engine, ServerDist, ClientDist, ServerSettings,
-  ChangeForms, Out, Dist, Package, Payload, ServerZip, Releases or ReleasesDev.
+  ChangeForms, Out, Dist, Package, Payload, ServerZip, Releases or ReleasesDev;
+  or a move name from layout.json (docs, bot, voice, site, tests, game,
+  launcher, installer, records, scripts).
 
 .PARAMETER OldRoot
   The folder the old layout lived in. C:\Thornswood-Dev; tests\test-where.ps1
@@ -41,46 +49,100 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
-                 'Out', 'Dist', 'Package', 'Payload', 'ServerZip',
-                 'Releases', 'ReleasesDev')]
     [string]$What,
-    [string]$OldRoot = 'C:\Thornswood-Dev'
+    [string]$OldRoot = ''
 )
 
 $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent (Split-Path -Parent $here)
 
+$layoutPath = Join-Path $repo 'layout.json'
+if (-not (Test-Path -LiteralPath $layoutPath)) {
+    throw "layout.json is not at $layoutPath. It is in the repository, so the path is wrong."
+}
+$layout = Get-Content -LiteralPath $layoutPath -Raw -Encoding UTF8 | ConvertFrom-Json
+if (-not $OldRoot) { $OldRoot = [string]$layout.oldRootDefault }
+if (-not $OldRoot) { $OldRoot = 'C:\Thornswood-Dev' }
+
+function Join-Repo([string]$rel) {
+    if (-not $rel) { return $repo }
+    $parts = $rel -split '[\\/]+' | Where-Object { $_ -and $_ -ne '.' }
+    $p = $repo
+    foreach ($part in $parts) { $p = Join-Path $p $part }
+    return $p
+}
+
+function Join-Under([string]$root, [string]$rel) {
+    if (-not $rel) { return $root }
+    $parts = $rel -split '[\\/]+' | Where-Object { $_ -and $_ -ne '.' }
+    $p = $root
+    foreach ($part in $parts) { $p = Join-Path $p $part }
+    return $p
+}
+
 # An uninitialised submodule is an empty folder, so the engine counts as moved
 # only once the fork's own top level file is there.
 function Get-Engine {
-    $new = Join-Path $repo 'engine\skymp'
-    $old = Join-Path $OldRoot 'skymp'
-    if (Test-Path -LiteralPath (Join-Path $new 'CMakeLists.txt')) { return $new }
+    $spec = $layout.places.Engine
+    $new = Join-Repo ([string]$spec.new)
+    $old = Join-Under $OldRoot ([string]$spec.oldUnderRoot)
+    $probe = [string]$spec.presentWhen
+    if ($probe -and (Test-Path -LiteralPath (Join-Path $new $probe))) { return $new }
     if (Test-Path -LiteralPath $old) { return $old }
     return $new
 }
 
 function Get-Out {
-    $new = Join-Path $repo 'out'
+    $spec = $layout.places.Out
+    $new = Join-Repo ([string]$spec.new)
     if (Test-Path -LiteralPath $new) { return $new }
-    if ((Test-Path -LiteralPath (Join-Path $OldRoot 'dist')) -or (Test-Path -LiteralPath (Join-Path $OldRoot '_payload'))) { return $OldRoot }
+    $any = @($spec.oldPresentWhenAny)
+    foreach ($name in $any) {
+        if (Test-Path -LiteralPath (Join-Path $OldRoot $name)) { return $OldRoot }
+    }
     return $new
 }
 
-switch ($What) {
-    'Repo'           { $repo }
-    'Engine'         { Get-Engine }
-    'ServerDist'     { Join-Path (Get-Engine) 'build\dist\server' }
-    'ClientDist'     { Join-Path (Get-Engine) 'build\dist\client' }
-    'ServerSettings' { Join-Path (Get-Engine) 'build\dist\server\server-settings.json' }
-    'ChangeForms'    { Join-Path (Get-Engine) 'build\dist\server\world\changeForms' }
-    'Out'            { Get-Out }
-    'Dist'           { Join-Path (Get-Out) 'dist' }
-    'Package'        { Join-Path (Get-Out) 'dist\Thornswood\_dist' }
-    'Payload'        { Join-Path (Get-Out) '_payload' }
-    'ServerZip'      { Join-Path (Get-Out) 'thornswood-server.zip' }
-    'Releases'       { Join-Path (Split-Path -Parent $repo) 'Thornswood-Releases' }
-    'ReleasesDev'    { Join-Path (Split-Path -Parent $repo) 'Thornswood-Releases-dev' }
+function Get-Place([string]$name) {
+    switch ($name) {
+        'Repo'   { return $repo }
+        'Engine' { return Get-Engine }
+        'Out'    { return Get-Out }
+    }
+    $sib = $layout.siblings.$name
+    if ($null -ne $sib) {
+        return Join-Path (Split-Path -Parent $repo) ([string]$sib)
+    }
+    $der = $layout.derived.$name
+    if ($null -ne $der) {
+        $base = Get-Place ([string]$der.from)
+        return Join-Under $base ([string]$der.join)
+    }
+    return $null
+}
+
+function Get-Move([string]$name) {
+    $m = $layout.moves.$name
+    if ($null -eq $m) { return $null }
+    $new = Join-Repo ([string]$m.new)
+    $old = Join-Repo ([string]$m.old)
+    if (Test-Path -LiteralPath $new) { return $new }
+    if (Test-Path -LiteralPath $old) { return $old }
+    return $new
+}
+
+$placeNames = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
+                'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Releases', 'ReleasesDev')
+$moveNames = @($layout.moves.PSObject.Properties.Name)
+
+if ($placeNames -contains $What) {
+    Get-Place $What
+}
+elseif ($moveNames -contains $What) {
+    Get-Move $What
+}
+else {
+    $known = ($placeNames + $moveNames) -join ', '
+    throw "Where.ps1 does not know '$What'. Known: $known"
 }
