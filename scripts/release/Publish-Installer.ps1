@@ -115,6 +115,20 @@ $exeItem = Get-Item -LiteralPath $exe
 # scripts\release\Publish-VirusTotal.ps1 when somebody wants a report.
 $exeSha = (Get-FileHash -LiteralPath $exeItem.FullName -Algorithm SHA256).Hash
 
+# Publish sign gate: the tip on the site must be Authenticode Valid under
+# ExpectedSigner. Package -NoPublish may leave an unsigned Setup for local use;
+# this script is the site path and refuses that soft skip.
+. (Join-Path $Here 'Assert-PublishSigned.ps1')
+$repoRoot = Split-Path -Parent (Split-Path -Parent $Here)
+try {
+  $expectWho = Get-ExpectedSignerFragment -RepoRoot $repoRoot
+} catch {
+  throw $_.Exception.Message
+}
+$signWhy = Get-PublishSignRefusal -Path $exeItem.FullName -ExpectedSigner $expectWho
+if ($signWhy) { throw $signWhy }
+Write-Host ("  publish sign gate: {0} Authenticode Valid, ExpectedSigner {1}" -f $exeItem.Name, $expectWho) -ForegroundColor Green
+
 # A one file build is decided by the exe rather than by the switch, because the
 # switch is easy to forget on a rerun and the file on disk is not. Anything
 # over 64 MB is carrying the payload: the plain stub is under half a megabyte.
