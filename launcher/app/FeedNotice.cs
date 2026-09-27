@@ -62,7 +62,7 @@ namespace Thornswood
             {
                 n.Title = "Closed for maintenance";
                 n.Text = (whole.Length > 0 ? whole : "Something is being put right, and Play is off until it is.") +
-                         " Press Recheck to look again.";
+                         " Open Diagnostics to look again.";
                 n.Hold = "Play is off: Thornswood is closed for maintenance." + (whole.Length > 0 ? " " + whole : "");
                 n.Button = "CLOSED FOR MAINTENANCE";
             }

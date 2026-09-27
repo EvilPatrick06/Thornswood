@@ -831,23 +831,30 @@
               </StackPanel>
             </Border>
 
+            <!-- Same columns as the Gallery | gap | Ready row above: PLAY under Gallery,
+                 server chip under the Ready column. Recheck is gone; Diagnostics owns that path. -->
             <Grid Grid.Row="4" Margin="36,4,36,28">
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1.9*" MinWidth="330"/>
-                <ColumnDefinition Width="30"/>
-                <ColumnDefinition Width="1*" MinWidth="290"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="28"/>
+                <ColumnDefinition Width="250"/>
               </Grid.ColumnDefinitions>
-              <Button x:Name="BtnPlay" Grid.Column="0" Style="{StaticResource Primary}" Content="Play"/>
-              <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button x:Name="BtnQuitGame" Style="{StaticResource Ghost}" Content="Quit Skyrim" Margin="0,0,8,0" Visibility="Collapsed"/>
-                <Button x:Name="BtnRecheck" Style="{StaticResource Ghost}" Content="Recheck" Margin="0,0,8,0"/>
-                <Grid x:Name="ServerPickCard" Margin="0,0,8,0" HorizontalAlignment="Left">
-                  <!-- One control open and closed. Closed: Ghost chip. Open: Popup covers the
-                       chip (VerticalOffset = -chip height in Shell) with one Border the exact
-                       chip width, left-aligned, both Main and Dev rows inside. No second card. -->
+              <Button x:Name="BtnPlay" Grid.Column="0" Style="{StaticResource Primary}" Content="Play"
+                      HorizontalAlignment="Stretch"/>
+              <Grid Grid.Column="2" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Name="BtnQuitGame" Grid.Column="0" Style="{StaticResource Ghost}" Content="Quit Skyrim" Margin="0,0,8,0" Visibility="Collapsed"/>
+                <Grid x:Name="ServerPickCard" Grid.Column="1" HorizontalAlignment="Stretch">
+                  <!-- One control open and closed. Closed: Ghost chip full width of the Ready
+                       column. Open: Popup covers the chip (VerticalOffset = -chip height in
+                       Shell) with one Border the exact chip width, both Main and Dev rows. -->
                   <Button x:Name="BtnServerPick" Style="{StaticResource Ghost}"
-                          HorizontalAlignment="Left" HorizontalContentAlignment="Stretch"
-                          Padding="10,8" MinWidth="210">
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                          Padding="10,8">
                     <Grid>
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -900,8 +907,8 @@
                     </Border>
                   </Popup>
                 </Grid>
-                <Button x:Name="BtnCopy"    Style="{StaticResource Ghost}" Content="Copy address"/>
-              </StackPanel>
+                <Button x:Name="BtnCopy" Grid.Column="2" Style="{StaticResource Ghost}" Content="Copy address" Visibility="Collapsed"/>
+              </Grid>
             </Grid>
           </Grid>
 
@@ -1144,9 +1151,9 @@
                 <TextBlock x:Name="TxtDiagNote" Style="{StaticResource Small}" Margin="2,13,0,0"/>
 
                 <!-- ============ Ready to launch (moved from Play, #607) ============
-                     The gate rows that used to sit on the Play page. Play now
-                     shows a one line summary of these and its Recheck button
-                     redraws them here. DrawStatus fills this list in place. -->
+                     The gate rows that used to sit on the Play page. Play shows
+                     a one line summary; Diagnostics Check now redraws them here.
+                     DrawStatus fills this list in place. -->
                 <TextBlock Text="Ready to launch" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
                 <StackPanel x:Name="StatusList"/>
 
