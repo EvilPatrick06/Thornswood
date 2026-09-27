@@ -32,6 +32,8 @@
     - a code identifier: camelCase, or three or more joined capitalised words
       (PutInServerOrder, EnvironmentOptions); a short list of ordinary names
       (SkyUI, SkyMP, GitHub, YouTube, WebView) is allowed
+    - a version number in the title, and a four-part number (1.1.92.1)
+      anywhere, which the News page check reads as a server address
     - the same line twice
   Each problem comes back as one line saying what and where, so the person
   shipping can rewrite it rather than guess.
@@ -55,6 +57,13 @@ function Get-NoteProblems([string]$Notes) {
         if ($seen.ContainsKey($key)) { $problems.Add("$where repeats an earlier line: '$short'"); continue }
         $seen[$key] = $true
 
+        # Version numbers. Publish-Update adds the "Launcher 1.1.x" line itself;
+        # a title that names one says nothing to the person reading it, and a
+        # four-part dev number (1.1.92.1) reads as a server address, which the
+        # News page check (tests\test-public-news.ps1) refuses. Both went out
+        # on 26 and 27 Sep.
+        if ($n -eq 1 -and $line -match '\b\d+\.\d+\.\d+\b') { $problems.Add("the title names a version; say what changed instead: '$short'") }
+        if ($line -match '\b\d{1,3}(\.\d{1,3}){3}\b') { $problems.Add("$where has a four-part number, which reads as a server address: '$short'") }
         if ($line -match '(?i)\bplayers?\b') { $problems.Add("$where says player; the people in the world are customers, testers or people: '$short'") }
         if ($line.Contains([string][char]0x2014)) { $problems.Add("$where has an em dash; use a comma or a full stop: '$short'") }
         if ($line -match '#\d+' -or $line -match '\bPR\b' -or $line -match '(?i)\bpull request') { $problems.Add("$where names an issue or pull request; say what changed for the person instead: '$short'") }
