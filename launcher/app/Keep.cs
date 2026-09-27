@@ -188,7 +188,7 @@ namespace Thornswood
                     File.Copy(src, dst, true);
                     n++;
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Keep.Remember, copy", ex); }
             }
             return n;
         }
@@ -212,7 +212,7 @@ namespace Thornswood
                     File.Delete(kept);
                     n++;
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Keep.Forget, delete", ex); }
             }
             return n;
         }
@@ -261,11 +261,11 @@ namespace Thornswood
                             File.Copy(live, kept, false);
                             n++;
                         }
-                        catch { }
+                        catch (Exception ex) { Swallow.Note("Keep.Seed, copy live", ex); }
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Keep.Seed", ex); }
             return n;
         }
 
@@ -293,7 +293,7 @@ namespace Thornswood
                     if (!homes.Contains(home)) homes.Add(home);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Keep.ParkedHomes, reading list", ex); }
             return homes;
         }
 
@@ -311,7 +311,7 @@ namespace Thornswood
                     if (UnderPlatform(rel)) l.Add(rel);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Keep.ParkedHomes, UnderPlatform scan", ex); }
             return l;
         }
 
@@ -351,7 +351,7 @@ namespace Thornswood
                     File.Copy(kept, live, true);
                     back.Add(Path.GetFileName(rel));
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Keep.Restore, copy kept to live", ex); }
             }
 
             try
@@ -369,16 +369,16 @@ namespace Thornswood
                             string dest = Path.Combine(ParkDir, Path.GetFileName(f));
                             if (File.Exists(dest)) dest = Path.Combine(ParkDir,
                                 DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Path.GetFileName(f));
-                            try { File.SetAttributes(f, FileAttributes.Normal); } catch { }
+                            try { File.SetAttributes(f, FileAttributes.Normal); } catch (Exception ex) { Swallow.Note("Keep.Restore, clearing attributes", ex); }
                             File.Move(f, dest);
                             File.AppendAllText(ParkList, dest + "|" + f + Environment.NewLine);
                             aside.Add(Path.GetFileName(f));
                         }
-                        catch { }
+                        catch (Exception ex) { Swallow.Note("Keep.Restore, parking file", ex); }
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Keep.Restore", ex); }
 
             if (back.Count == 0 && aside.Count == 0 && taken.Count == 0) return null;
             string said = "";
@@ -479,12 +479,12 @@ namespace Thornswood
                 Directory.CreateDirectory(Path.GetDirectoryName(NoteFile));
                 File.WriteAllText(NoteFile, ms + " " + Build());
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Keep.LeaveNote", ex); }
         }
 
         public static void TakeNote()
         {
-            try { if (File.Exists(NoteFile)) File.Delete(NoteFile); } catch { }
+            try { if (File.Exists(NoteFile)) File.Delete(NoteFile); } catch (Exception ex) { Swallow.Note("Keep.TakeNote", ex); }
         }
 
         /// <summary>What this install is called in the log: the build name if the shell has set one.</summary>
