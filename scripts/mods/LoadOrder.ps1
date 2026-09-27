@@ -339,7 +339,7 @@ function Assert-VortexProfile([string]$Name = 'Thornswood') {
 #>
 function Get-LoadOrderCopyDiffs([hashtable]$Copies) {
     $diffs = New-Object Collections.Generic.List[string]
-    if (-not $Copies -or $Copies.Count -lt 2) { return , [string[]]$diffs.ToArray() }
+    if (-not $Copies -or $Copies.Count -lt 2) { return [string[]]$diffs.ToArray() }
     $names = @($Copies.Keys | Sort-Object)
     for ($i = 0; $i -lt $names.Count; $i++) {
         for ($j = $i + 1; $j -lt $names.Count; $j++) {
@@ -362,7 +362,7 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) {
             }
         }
     }
-    return , [string[]]$diffs.ToArray()
+    return [string[]]$diffs.ToArray()
 }
 
 # "7essxf" out of https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf
