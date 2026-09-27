@@ -1306,10 +1306,6 @@ if (AGE_PATHS[here] && !ageOk()) {
   fetch('/api/public').then(function (r) { return r.json(); }).then(function (d) {
     var files = d.files || [];
 
-    // VirusTotal refuses uploads over 650 MB. Declared inside this branch
-    // so the lift-test in test-download-hash.js can run it alone.
-    var VT_CAP = 650 * 1024 * 1024;
-
     // The stamp under the download button, read the way a clock is read.
     //
     // Publish-Installer writes it as a 24 hour time and it is shown to people,
@@ -1335,58 +1331,21 @@ if (AGE_PATHS[here] && !ageOk()) {
       if (b >= 1048576)    return Math.round(b / 1048576) + ' MB';
       return Math.max(1, Math.round(b / 1024)) + ' KB';
     }
-    // The installer's SHA-256, under the size and date. To Do entry 176 asked
-    // for the hash and for a VirusTotal report on it "rather than instructions
-    // for running one": somebody who wants to know what the file is before
-    // running it reads a report instead of uploading it. It is not a signature,
-    // and signing is still entry 2. An installer published before
-    // Publish-Installer wrote a hash has none, and then nothing shows rather
-    // than a link to nothing.
+    // The installer's SHA-256, under the size and date. An installer published
+    // before Publish-Installer wrote a hash has none, and then nothing shows
+    // rather than a link to nothing.
     function hash(f) {
       return f && /^[0-9a-f]{64}$/.test(f.sha256 || '') ? f.sha256 : '';
-    }
-    // The report link, and only when there is a report.
-    //
-    // This used to be built from the hash alone, so every build claimed a
-    // report that nobody had ever asked VirusTotal for, and the link landed on
-    // its item-not-found page. Checked live on 27 September. listFiles in
-    // server.js now sends vt only when files.json says the file has been sent
-    // to VirusTotal, and sends it as the address for that file's own hash, so
-    // this compares the two and shows nothing if they disagree.
-    function vt(f) {
-      var h = hash(f);
-      if (!h) return '';
-      var want = 'https://www.virustotal.com/gui/file/' + h;
-      return (f.vt || '') === want ? want : '';
     }
     function sum(f) {
       var h = hash(f);
       if (!h) return '';
-      // Three lines, not four. The label is held together with white-space:nowrap
-      // so the browser cannot soft-break it at the ASCII hyphen (SHA- / 256), the
-      // orphaning that a plain &nbsp; alone did not stop. The non-breaking space
-      // then keeps the whole label riding on the same line as the hash's start,
-      // the hash wraps within itself if the column is narrow (overflow-wrap only
-      // on the hash, never the label), and the third line (the report, the
-      // over-cap line, or the waiting line) stands alone rather than trailing
-      // the hash's last row after a middot.
-      // Three copy states under the button: a real report link, a clear over-cap
-      // line when the file cannot be sent to VirusTotal, or the waiting line
-      // when it still might be. Never invent a clean or detection verdict, and
-      // never echo a skip-reason string from files.json into the page.
-      var report;
-      if (vt(f)) {
-        report = '<a href="' + vt(f) + '" target="_blank" rel="noopener">VirusTotal report</a>';
-      } else if ((f.size || 0) > VT_CAP) {
-        report = 'This file is over VirusTotal\'s 650 MB upload cap, so there cannot ' +
-                 'be a report for it.';
-      } else {
-        report = 'No VirusTotal report for this build yet. One shows here once the file ' +
-                 'has been sent to VirusTotal, and a new file takes a few minutes to scan.';
-      }
+      // The label is held together with white-space:nowrap so the browser cannot
+      // soft-break it at the ASCII hyphen (SHA- / 256). The non-breaking space
+      // keeps the whole label on the same line as the hash's start, and the hash
+      // wraps within itself if the column is narrow.
       return '<br><span style="white-space:nowrap">SHA-256</span>&nbsp;' +
-             '<span style="overflow-wrap:anywhere">' + h + '</span>' +
-             '<br>' + report;
+             '<span style="overflow-wrap:anywhere">' + h + '</span>';
     }
     // hidden is the payload: on the site because the installer fetches it,
     // never on this page, because clicking it gets you 700 MB that does
@@ -1426,29 +1385,18 @@ if (AGE_PATHS[here] && !ageOk()) {
     // the list where it is the first thing you meet and the instructions are
     // something you scroll past afterwards.
     //
-    // Above the button, the honest line from entry #423 and the interim
-    // VirusTotal work while code signing is pending. The Alpha installer is
-    // unsigned, so Windows SmartScreen may soft-block it and Defender may warn.
-    // The fix is More info then Run anyway, never turning protection off or
-    // adding an exclusion. The SHA-256 below is how you check the file instead,
-    // and the FAQ says why it happens. What this sentence names is only what is
-    // actually below it: the hash when there is one, the report as well when
-    // there is one of those, and neither when sum() has nothing to print.
+    // Above the button: signed Setup may still get a soft SmartScreen ask on a
+    // brand-new hash. The SHA-256 below is how you check the file, and the FAQ
+    // says why a soft block can still appear.
     function warnLine(f) {
       var check = '';
-      if (hash(f) && vt(f)) {
-        check = 'The SHA-256 and VirusTotal report below let you check the file is ' +
-                'the one we published. ';
-      } else if (hash(f)) {
+      if (hash(f)) {
         check = 'The SHA-256 below lets you check the file is the one we published. ';
       }
-      return '<p class="also">The installer is not signed yet, so Windows may ' +
-             'soft-block it and Defender may warn. If Windows says it protected ' +
-             'your PC, press More info and then Run anyway. Do not turn Defender ' +
-             'off and do not add an exclusion for the installer. Setup may also ' +
-             'show as "Thornswood Setup" with publisher Unknown until code ' +
-             'signing lands; that is the same unsigned state, not a different ' +
-             'problem. ' + check +
+      return '<p class="also">The installer is signed as Gavin Knotts. Windows may still ' +
+             'ask More info and then Run anyway on a brand-new download, because SmartScreen ' +
+             'has not seen that file hash before. The publisher should show as Gavin Knotts. ' +
+             check +
              '<a href="/help#defender">Why this happens</a>.</p>';
     }
     var grab = '';
