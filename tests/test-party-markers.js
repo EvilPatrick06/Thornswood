@@ -176,6 +176,18 @@ function code(s) {
       /thornswoodParty\.setWhere/.test(front));
   yes('nothing is drawn for somebody with no party', /if \(!where\.length\) \{ stripEl\.style\.display = 'none'/.test(page));
 
+  // #531: the strip wears the party window's look, not the To Do List web
+  // page's greys and brass it kept when the windows were restyled on 24 Sep.
+  const sa = page.indexOf('var STRIP_CSS');
+  const sb = page.indexOf('function ensureStrip');
+  const strip = sa >= 0 && sb > sa ? page.slice(sa, sb) : '';
+  yes('the strip\'s code was found', strip.length > 0);
+  yes('the strip uses the window\'s Palatino', /font-family:"Palatino Linotype",Palatino,Georgia,serif/.test(strip) && !/font-family:Georgia,serif/.test(strip));
+  yes('the strip\'s text is the window\'s parchment', /color:#d9cfb4/.test(strip));
+  yes('the same room is the window\'s green and anywhere else its gold', /sameRoom \? '#9fcf92' : '#e9d19b'/.test(strip));
+  yes('none of the old web page colours is left on the strip',
+      !/#8fb85e|#d9ab52|#98a2ae|#e9e7e1/i.test(strip));
+
   /*
     THE BEARING, RUN RATHER THAN READ.
 

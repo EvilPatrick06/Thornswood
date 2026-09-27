@@ -168,10 +168,15 @@
   var stripEl = null;
   var stripTimer = null;
 
+  // The window's look (#531): its Palatino, its parchment text, and for the
+  // second line its faded parchment. It was Georgia and the To Do List web
+  // page's greys, left behind when the windows were restyled on 24 Sep.
+  var STRIP_MUTED = 'rgba(217,207,180,.6)';
   var STRIP_CSS =
     'position:fixed;left:50%;top:76px;transform:translateX(-50%);' +
-    'z-index:2147483400;pointer-events:none;font-family:Georgia,serif;' +
-    'font-size:15px;letter-spacing:.03em;color:#e9e7e1;' +
+    'z-index:2147483400;pointer-events:none;' +
+    'font-family:"Palatino Linotype",Palatino,Georgia,serif;' +
+    'font-size:15px;letter-spacing:.03em;color:#d9cfb4;' +
     'text-shadow:0 2px 4px rgba(0,0,0,.95);white-space:nowrap;display:none';
 
   function esc2(s) {
@@ -237,7 +242,7 @@
       }
 
       if (!them || !them.pos || !mine || !mine.pos) {
-        bits.push('<span style="margin:0 14px;color:#98a2ae">' + name + '</span>');
+        bits.push('<span style="margin:0 14px;color:' + STRIP_MUTED + '">' + name + '</span>');
         continue;
       }
 
@@ -258,9 +263,9 @@
       var sameRoom = String(them.cell) === String(mine.cell);
 
       bits.push(
-        '<span style="margin:0 14px;color:' + (sameRoom ? '#8fb85e' : '#d9ab52') + '">' +
+        '<span style="margin:0 14px;color:' + (sameRoom ? '#9fcf92' : '#e9d19b') + '">' +
         '<span style="font-size:18px">' + arrowFor(rel) + '</span> ' +
-        name + ' <span style="color:#98a2ae;font-size:13px">' + reads + '</span>' +
+        name + ' <span style="color:' + STRIP_MUTED + ';font-size:13px">' + reads + '</span>' +
         '</span>');
     }
 
