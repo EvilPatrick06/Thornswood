@@ -64,7 +64,7 @@ namespace Thornswood
                     string me = System.Reflection.Assembly.GetExecutingAssembly().Location;
                     if (!string.IsNullOrEmpty(me) && File.Exists(me)) return me;
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Icons.LauncherExe", ex); }
                 foreach (string n in new[] { "Thornswood.exe", "SkyrimTogether.exe" })
                 {
                     string p = Path.Combine(Paths.LauncherDir, n);
@@ -124,9 +124,9 @@ namespace Thornswood
             {
                 foreach (string f in Directory.GetFiles(Paths.LauncherDir, "icon-*.ico"))
                     if (!string.Equals(f, keep, StringComparison.OrdinalIgnoreCase))
-                        try { File.Delete(f); } catch { }
+                        try { File.Delete(f); } catch (Exception ex) { Swallow.Note("Icons.Sweep, delete", ex); }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Icons.Sweep", ex); }
         }
 
         class Place
@@ -149,8 +149,8 @@ namespace Thornswood
         static List<Place> Places()
         {
             var l = new List<Place>();
-            try { l.Add(new Place(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), true)); } catch { }
-            try { l.Add(new Place(Paths.Root, true)); } catch { }
+            try { l.Add(new Place(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), true)); } catch (Exception ex) { Swallow.Note("Icons.Places, desktop", ex); }
+            try { l.Add(new Place(Paths.Root, true)); } catch (Exception ex) { Swallow.Note("Icons.Places, root", ex); }
             try
             {
                 string app = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -163,7 +163,7 @@ namespace Thornswood
                 // pinned, and a pin dies with the file it points at.
                 l.Add(new Place(Path.Combine(app, "Microsoft\\Windows\\Start Menu\\Programs"), false, true));
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Icons.Places, start menu", ex); }
             return l;
         }
 
@@ -292,10 +292,10 @@ namespace Thornswood
                                 changed++;
                             }
                         }
-                        catch { }
+                        catch (Exception ex) { Swallow.Note("Icons.Ensure, shortcut", ex); }
                         finally
                         {
-                            if (sc != null) try { Marshal.ReleaseComObject(sc); } catch { }
+                            if (sc != null) try { Marshal.ReleaseComObject(sc); } catch (Exception ex) { Swallow.Note("Icons.Ensure, release shortcut", ex); }
                         }
                     }
 
@@ -313,10 +313,10 @@ namespace Thornswood
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Icons.Ensure", ex); }
             finally
             {
-                if (shell != null) try { Marshal.ReleaseComObject(shell); } catch { }
+                if (shell != null) try { Marshal.ReleaseComObject(shell); } catch (Exception ex) { Swallow.Note("Icons.Ensure, release shell", ex); }
             }
 
             if (icon != null) Sweep(icon);
@@ -359,18 +359,18 @@ namespace Thornswood
                     if (Directory.Exists(dir))
                         targets.AddRange(Directory.GetFiles(dir, "iconcache_*.db"));
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Icons.Repair, list cache", ex); }
 
                 foreach (string f in targets)
-                    try { if (File.Exists(f)) { File.Delete(f); gone++; } } catch { }
+                    try { if (File.Exists(f)) { File.Delete(f); gone++; } } catch (Exception ex) { Swallow.Note("Icons.Repair, delete cache", ex); }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Icons.Repair", ex); }
             finally
             {
-                try { Process.Start("explorer.exe"); restarted = true; } catch { }
+                try { Process.Start("explorer.exe"); restarted = true; } catch (Exception ex) { Swallow.Note("Icons.Repair, restart explorer", ex); }
             }
 
-            try { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero); } catch { }
+            try { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero); } catch (Exception ex) { Swallow.Note("Icons.Repair, notify", ex); }
 
             string said = "Shortcut icon refreshed";
             if (changed > 0) said += ", " + changed + (changed == 1 ? " shortcut repointed" : " shortcuts repointed");
@@ -391,8 +391,8 @@ namespace Thornswood
         public static List<string> ShortcutPaths(string buildName)
         {
             var l = new List<string>();
-            try { l.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), buildName + ".lnk")); } catch { }
-            try { l.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft\\Windows\\Start Menu\\Programs\\" + buildName + ".lnk")); } catch { }
+            try { l.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), buildName + ".lnk")); } catch (Exception ex) { Swallow.Note("Icons.ShortcutPaths, desktop", ex); }
+            try { l.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft\\Windows\\Start Menu\\Programs\\" + buildName + ".lnk")); } catch (Exception ex) { Swallow.Note("Icons.ShortcutPaths, start menu", ex); }
             return l;
         }
 
@@ -436,7 +436,7 @@ namespace Thornswood
             catch { return false; }
             finally
             {
-                if (made != null) try { Marshal.ReleaseComObject(made); } catch { }
+                if (made != null) try { Marshal.ReleaseComObject(made); } catch (Exception ex) { Swallow.Note("Icons.Rename, release", ex); }
             }
         }
 
@@ -461,7 +461,7 @@ namespace Thornswood
             catch { return false; }
             finally
             {
-                if (made != null) try { Marshal.ReleaseComObject(made); } catch { }
+                if (made != null) try { Marshal.ReleaseComObject(made); } catch (Exception ex) { Swallow.Note("Icons.Make, release", ex); }
             }
         }
 
@@ -491,7 +491,7 @@ namespace Thornswood
                 Process p = Process.Start(psi);
                 if (p != null) p.WaitForExit(waitMs);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Icons.Run", ex); }
         }
     }
 }
