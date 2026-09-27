@@ -1,4 +1,4 @@
-﻿<#
+<#
   test-mustcopy-distribution.ps1
 
       pwsh -NoProfile -File .\tests\test-mustcopy-distribution.ps1
@@ -57,6 +57,14 @@ Yes 'OwnGame.Rules is 6 for the Distribution hard-link change' (
     $rulesNum.Success -and [int]$rulesNum.Groups[1].Value -eq 6)
 Yes 'and the history comment names Distribution redistributables under that number' (
     $rulesDoc.Success -and $rulesDoc.Groups[1].Value -eq '6')
+
+# Refresh used to re-link every !MustCopy Vortex file with Links<=1, which undid
+# Fix's light-flag Separates on plugins (CBBE.esp). Relink is Distribution only.
+Yes 'Refresh re-link of Vortex copies is scoped to Data\Platform\Distribution' (
+    $og.Contains('Links(dest) <= 1') -and
+    $og.Contains('f.Rel.StartsWith("Data\\Platform\\Distribution\\"') -and
+    $og.Contains('Only Distribution: a broader !MustCopy re-link also') -and
+    $og.Contains('CBBE.esp'))
 
 function Get-CsMember([string]$text, [string]$declaration) {
     $at = $text.IndexOf($declaration, [StringComparison]::Ordinal)
