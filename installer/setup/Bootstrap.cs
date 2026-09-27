@@ -36,7 +36,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyDescription("Installs Thornswood, the Skyrim multiplayer client, from thornswood.net.")]
 [assembly: AssemblyProduct("Thornswood Setup")]
 [assembly: AssemblyCompany("Thornswood")]
-[assembly: AssemblyCopyright("Thornswood")]
+[assembly: AssemblyCopyright("Copyright (c) Thornswood")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
 [assembly: AssemblyInformationalVersion("1.0.0")]

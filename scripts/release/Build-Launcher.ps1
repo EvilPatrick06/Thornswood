@@ -356,8 +356,16 @@ if (Test-Path $stubSrc) {
     # Built to a scratch name first. Deleting the old one up front meant a
     # failed compile left no installer at all, and the only sign of it was a
     # yellow line an hour before anyone noticed the package had no exe in it.
+    #
+    # The scratch name is the name it ships under, Thornswood-Setup.exe, not a
+    # setup-stub name, because csc writes the exe's OriginalFilename and
+    # InternalName version fields from the /out leaf. Package-Thornswood.ps1
+    # copies tools\setup-stub.exe to Thornswood-Setup.exe without recompiling,
+    # so if it were built as setup-stub.exe those two fields would read a name
+    # nobody ever downloads. Built under the shipped name in %TEMP% and then
+    # moved onto tools\setup-stub.exe, which is what packaging copies from.
     $stub = Join-Path $Here '..\..\tools\setup-stub.exe'
-    $stubNew = Join-Path $Here '..\..\tools\setup-stub.new.exe'
+    $stubNew = Join-Path $env:TEMP 'Thornswood-Setup.exe'
     if (Test-Path $stubNew) { Remove-Item $stubNew -Force }
     $stubArgs = @('/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+',
                   "/out:$stubNew", "/win32icon:$((Resolve-Path $icon).Path)")
@@ -374,7 +382,7 @@ if (Test-Path $stubSrc) {
     $stubInfo = $null
     if ((Get-Content $stubSrc -Raw) -notmatch '(?m)^\s*\[assembly:') {
         $stubInfo = Join-Path $env:TEMP 'ThornswoodSetupInfo.cs'
-        New-Info $stubInfo 'Thornswood Setup' 'Thornswood setup' $verFour $ver -product 'Thornswood Setup'
+        New-Info $stubInfo 'Thornswood Setup' 'Thornswood setup' $verFour $ver -product 'Thornswood Setup' -copyright 'Copyright (c) Thornswood'
     }
     $stubArgs += (Resolve-Path $stubSrc).Path
     if ($stubInfo) { $stubArgs += $stubInfo }

@@ -45,7 +45,6 @@ $notInGit = @{
     'version.json'                  = 'the releases clone''s feed; the scripts that name it are pointed at that clone'
     'tools/mod-audit.json'          = 'what Audit-Mods.ps1 writes, ignored by git'
     'tools/setup-stub.exe'          = 'built by Build-Launcher.ps1, ignored with every exe'
-    'tools/setup-stub.new.exe'      = 'Build-Launcher.ps1''s scratch copy while it builds the stub'
     'tools/signing.json'            = 'a machine''s signing settings, ignored by git'
     'tools/backup-key.txt'          = 'the backup passphrase, a secret kept out of git'
     'tools/thornswood-front.zip'    = 'the front build, made outside the repository and dropped beside Go.ps1'

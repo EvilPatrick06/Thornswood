@@ -47,7 +47,7 @@ Yes 'the stub carries its own version resource attributes' ($bs -match '(?m)^\s*
 Yes 'the product name is the stable "Thornswood Setup"' ($bs.Contains('[assembly: AssemblyProduct("Thornswood Setup")]'))
 Yes 'and the UAC program name (AssemblyTitle) is the same' ($bs.Contains('[assembly: AssemblyTitle("Thornswood Setup")]'))
 Yes 'the company is filled in' ($bs.Contains('[assembly: AssemblyCompany("Thornswood")]'))
-Yes 'and the copyright' ($bs.Contains('[assembly: AssemblyCopyright("Thornswood")]'))
+Yes 'and a legal copyright notice' ($bs.Contains('[assembly: AssemblyCopyright("Copyright (c) Thornswood")]'))
 $fileVer = [regex]::Match($bs, '\[assembly:\s*AssemblyFileVersion\("([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)"\)\]')
 $prodVer = [regex]::Match($bs, '\[assembly:\s*AssemblyInformationalVersion\("([0-9][0-9.]*)"\)\]')
 Yes 'a four-part file version is set' ($fileVer.Success)
@@ -95,6 +95,23 @@ Yes 'Install still starts disabled behind the age checkbox' ($bs.Contains('btnGo
 Yes 'and the else-branch that enables it when the control is missing is intact' (
     $bs.Contains('// Rather than an installer nobody can ever start.') -and
     $bs.Contains('btnGo.IsEnabled = true;'))
+
+# ---- 5. the build wiring: compiled under the shipped name, with an icon ------
+# OriginalFilename and InternalName come off the /out leaf, and the shipped exe
+# is Thornswood-Setup.exe, so the stub is compiled under that name and then
+# moved onto tools\setup-stub.exe, which packaging copies without recompiling.
+# A file icon (/win32icon) keeps the download from arriving as a blank mark.
+$blPath = Join-Path $Here '..\..\scripts\release\Build-Launcher.ps1'
+if (Test-Path -LiteralPath $blPath) {
+    $bl = [IO.File]::ReadAllText($blPath)
+    Yes 'the setup stub is compiled under its shipped name, Thornswood-Setup.exe' (
+        [regex]::IsMatch($bl, '(?m)\$stubNew\s*=\s*Join-Path[^\r\n]*Thornswood-Setup\.exe'))
+    Yes 'and that is the /out the compiler writes' ($bl.Contains('/out:$stubNew'))
+    Yes 'then moved onto the setup-stub.exe packaging copies from' ($bl.Contains('Move-Item $stubNew $stub'))
+    Yes 'the stub exe gets a file icon, so it is not a blank mark in the browser' ($bl.Contains('/win32icon:'))
+} else {
+    Yes 'Build-Launcher.ps1 is where this expects it' $false
+}
 
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
