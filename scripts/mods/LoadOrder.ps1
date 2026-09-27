@@ -283,14 +283,16 @@ function Get-CollectionInstalledFolder([string]$Slug) {
     $dir = Join-Path $env:APPDATA 'Vortex\skyrimse\mods'
     if (-not (Test-Path -LiteralPath $dir)) { return $null }
 
-    # New naming: folder is the mod id from state. Prefer collection.json when
-    # present; otherwise the staging folder itself (draft installs often omit
-    # collection.json). Never invent a revision from the opaque folder name.
+    # New naming: folder is the mod id from state. Prefer a folder the JSON can
+    # be read out of, loose or inside an export archive; otherwise the staging
+    # folder itself (draft installs often omit collection.json). Never invent a
+    # revision from the opaque folder name.
     $withJson = New-Object Collections.Generic.List[object]
     $without = New-Object Collections.Generic.List[object]
     foreach ($id in (Get-CollectionModIds $Slug)) {
         foreach ($d in (Get-ChildItem -LiteralPath $dir -Directory -Filter ($id + '*') -EA SilentlyContinue)) {
-            if (Test-Path -LiteralPath (Join-Path $d.FullName 'collection.json')) { [void]$withJson.Add($d) }
+            if ((Test-Path -LiteralPath (Join-Path $d.FullName 'collection.json')) -or
+                @(Get-CollectionExportArchive $d.FullName).Count -gt 0) { [void]$withJson.Add($d) }
             else { [void]$without.Add($d) }
         }
     }
@@ -307,6 +309,149 @@ function Get-CollectionInstalledFolder([string]$Slug) {
         if ($r -gt $bestRev) { $bestRev = $r; $best = $d }
     }
     return $best
+}
+
+<#
+  Where Get-CollectionJsonPath last read a collection.json from when it was
+  not loose: the full path of the export archive, or '' when the loose file
+  was used. Set on every call so a caller can say which file it read.
+#>
+$script:CollectionJsonFrom = ''
+
+<#
+  Vortex's export archives under an installed collection's staging folder,
+  best first, or an empty array.
+
+  WHY THIS EXISTS. Measured on the shipping machine on 27 September against
+  collection 7essxf: the installed folder
+  %APPDATA%\Vortex\skyrimse\mods\vortex_collection_ZRT7NjhN_ holds NO loose
+  collection.json. The JSON is inside export\collection_0.7z, which is what
+  Vortex writes when the collection is authored on the machine rather than
+  subscribed to. Check-CollectionRules looked only for the loose file, so on
+  that machine it stopped with "no collection.json at ...\collection.json"
+  and exited 1 unless somebody unpacked the archive and passed -Collection.
+
+  Best first means: the export folder before the staging folder's own root,
+  a name starting with collection before any other name, and the newest
+  write time before an older one. In the staging folder's own root only a
+  collection* name counts, because anything else there is a mod's archive
+  and not the collection.
+#>
+function Get-CollectionExportArchive([string]$Folder) {
+    $none = New-Object object[] 0
+    if (-not $Folder -or -not (Test-Path -LiteralPath $Folder -PathType Container)) { return , $none }
+    $found = New-Object Collections.Generic.List[object]
+    $places = @((Join-Path $Folder 'export'), $Folder)
+    for ($i = 0; $i -lt $places.Count; $i++) {
+        if (-not (Test-Path -LiteralPath $places[$i] -PathType Container)) { continue }
+        foreach ($f in (Get-ChildItem -LiteralPath $places[$i] -File -EA SilentlyContinue)) {
+            if ($f.Extension -ne '.7z' -and $f.Extension -ne '.zip') { continue }
+            $named = 1
+            if ($f.Name -like 'collection*') { $named = 0 }
+            if ($i -gt 0 -and $named -ne 0) { continue }
+            [void]$found.Add([pscustomobject]@{ File = $f; Place = $i; Named = $named })
+        }
+    }
+    if ($found.Count -eq 0) { return , $none }
+    $sorted = @($found | Sort-Object Place, Named, @{ Expression = { $_.File.LastWriteTimeUtc }; Descending = $true })
+    return , [object[]]@($sorted | ForEach-Object { $_.File })
+}
+
+<#
+  The 7-Zip on this machine, or $null. Only used to read one collection.json
+  out of a Vortex export archive, so nothing here installs it: a machine
+  without 7-Zip is told to pass the extracted file with -Collection instead.
+  Vortex's own copy counts, since a machine with Vortex on it usually has one.
+#>
+function Get-SevenZipPath {
+    $spots = New-Object Collections.Generic.List[string]
+    if ($env:ProgramFiles) {
+        [void]$spots.Add((Join-Path $env:ProgramFiles '7-Zip\7z.exe'))
+        [void]$spots.Add((Join-Path $env:ProgramFiles 'Black Tree Gaming Ltd\Vortex\resources\7z.exe'))
+    }
+    if (${env:ProgramFiles(x86)}) { [void]$spots.Add((Join-Path ${env:ProgramFiles(x86)} '7-Zip\7z.exe')) }
+    if ($env:LOCALAPPDATA) {
+        [void]$spots.Add((Join-Path $env:LOCALAPPDATA 'Programs\7-Zip\7z.exe'))
+        [void]$spots.Add((Join-Path $env:LOCALAPPDATA 'Programs\Vortex\resources\7z.exe'))
+    }
+    foreach ($p in $spots) { if (Test-Path -LiteralPath $p -PathType Leaf) { return $p } }
+    foreach ($n in '7z', '7za', '7zz') {
+        $c = @(Get-Command $n -CommandType Application -EA SilentlyContinue) | Select-Object -First 1
+        if ($c) { return $c.Source }
+    }
+    return $null
+}
+
+<#
+  One collection.json read out of an export archive, cached under the temp
+  folder, or $null.
+
+  Read only where it matters: nothing is written into Vortex's folders. The
+  cache path carries the archive's path, size and write time, so a re-exported
+  archive never reads back an old JSON and a second run costs nothing. A .zip
+  is opened with what .NET already has; a .7z needs 7-Zip, and without it this
+  returns $null and the caller says so.
+#>
+function Expand-CollectionJson($Archive) {
+    if (-not $Archive -or -not (Test-Path -LiteralPath $Archive.FullName -PathType Leaf)) { return $null }
+    $key = $Archive.FullName + '|' + $Archive.Length + '|' + $Archive.LastWriteTimeUtc.Ticks
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = [BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($key))).Replace('-', '').Substring(0, 16)
+    } finally { $sha.Dispose() }
+    $cache = Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'thornswood-collection') $hash
+    $out = Join-Path $cache 'collection.json'
+    if (Test-Path -LiteralPath $out -PathType Leaf) { return $out }
+    $null = New-Item -ItemType Directory -Force -Path $cache -EA SilentlyContinue
+    if (-not (Test-Path -LiteralPath $cache -PathType Container)) { return $null }
+
+    if ($Archive.Extension -eq '.zip') {
+        try {
+            Add-Type -AssemblyName System.IO.Compression.FileSystem -EA SilentlyContinue
+            $zip = [IO.Compression.ZipFile]::OpenRead($Archive.FullName)
+            try {
+                $entry = @($zip.Entries | Where-Object { $_.Name -eq 'collection.json' } |
+                        Sort-Object { $_.FullName.Length }) | Select-Object -First 1
+                if ($entry) { [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $out, $true) }
+            } finally { $zip.Dispose() }
+        } catch { }
+        if (Test-Path -LiteralPath $out -PathType Leaf) { return $out }
+    }
+
+    $exe = Get-SevenZipPath
+    if ($exe) {
+        # 7-Zip writes to stderr on a warning, which is a terminating error in
+        # the callers that run with ErrorActionPreference Stop, so it is
+        # relaxed around the call the same way Package-Thornswood does it.
+        $was = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try { & $exe e -y ('-o' + $cache) $Archive.FullName 'collection.json' -r 2>&1 | Out-Null } catch { }
+        finally { $ErrorActionPreference = $was }
+        if (Test-Path -LiteralPath $out -PathType Leaf) { return $out }
+    }
+    Remove-Item -LiteralPath $cache -Recurse -Force -EA SilentlyContinue
+    return $null
+}
+
+<#
+  The collection.json for an installed collection's staging folder, or $null.
+
+  The loose file when it is there, which is what a subscribed install writes.
+  Otherwise the one inside the newest export archive, unpacked to the temp
+  cache, which is the only copy an authored collection leaves on the machine.
+  $script:CollectionJsonFrom names the archive it came out of, or is '' for
+  the loose file, so the caller can print where it read.
+#>
+function Get-CollectionJsonPath([string]$Folder) {
+    $script:CollectionJsonFrom = ''
+    if (-not $Folder) { return $null }
+    $loose = Join-Path $Folder 'collection.json'
+    if (Test-Path -LiteralPath $loose -PathType Leaf) { return $loose }
+    foreach ($a in @(Get-CollectionExportArchive $Folder)) {
+        $out = Expand-CollectionJson $a
+        if ($out) { $script:CollectionJsonFrom = $a.FullName; return $out }
+    }
+    return $null
 }
 
 <#
