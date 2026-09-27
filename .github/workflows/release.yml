@@ -1,0 +1,110 @@
+# The launcher exe that ships is built HERE, on a clean runner, not on the
+# machine of whoever runs Ship. Issue #457: CI builds the shipped launcher exe,
+# and Ship publishes the runner's artifact, verified by its checksum file,
+# instead of compiling the binary that reaches every launcher locally.
+#
+# WHAT IT DOES. On a tag v<version> it checks the tag out clean, runs the same
+# scripts\release\Build-Launcher.ps1 the build check runs, into a folder under
+# RUNNER_TEMP so it never touches a Desktop shortcut or closes a game on a real
+# machine, writes SHA256SUMS beside Thornswood.exe, and attaches both to a
+# DRAFT release for that tag. A person promotes the draft; Ship reads a draft's
+# assets fine. Ship then downloads Thornswood.exe and SHA256SUMS and refuses to
+# ship unless the checksum matches. Byte-identical local and runner builds are
+# impossible with the Framework 4 csc (it stamps a build time and a fresh MVID
+# into the PE), so nothing compares against a local build: the runner's exe IS
+# the shipped exe, and SHA256SUMS is what proves the download is that exe and
+# nothing else.
+#
+# WHY IT IS PINNED. runs-on names a DATED image, not windows-latest, so a runner
+# image rebuilt by GitHub cannot change what ships without a commit here. Every
+# action is pinned to a full-length commit SHA for the same reason: a moved tag
+# on an action cannot change what runs. This is the layer Azure Artifact Signing
+# goes on top of later (issue #457, and the signing entry): signing needs the
+# secrets that are not in this repository yet, so it is a follow-up, and until
+# then the checksum file is the whole of the verification.
+#
+# WHERE IT RUNS. windows-2022 is a GitHub-hosted image. The build check and the
+# nightly run on the VPS self-hosted runner because GitHub's hosted minutes were
+# blocked on billing (issue #437); a real tag trial of this workflow needs those
+# minutes enabled, or runs-on changed to the self-hosted label. Said in the pull
+# request so it is not a surprise on the first tag.
+name: Release launcher
+on:
+  push:
+    tags:
+      - 'v*'
+  # So the exe can be rebuilt for a tag that already exists without moving it,
+  # for a first trial or a runner that died halfway.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The v<version> tag to build and draft a release for
+        required: true
+# The draft release is created with the repository token, which needs write.
+permissions:
+  contents: write
+# One run per tag. A release build is not cancelled by a newer one: two pushes
+# of the same tag queue rather than race for the one draft.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  launcher:
+    name: Build the release launcher
+    runs-on: windows-2022
+    # The build is about two minutes; past this it is stuck, not slow.
+    timeout-minutes: 20
+    steps:
+      - name: Check out the tag, clean
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          clean: true
+          submodules: false
+
+      - name: Build the launcher into RUNNER_TEMP
+        shell: pwsh
+        run: |
+          # RUNNER_TEMP, not a real install root, so Install-Launcher is never
+          # run and no Desktop shortcut, icon cache or Stop-Game is touched.
+          # The same call the build check makes (.github/workflows/build.yml).
+          $root = Join-Path $env:RUNNER_TEMP 'Thornswood'
+          New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
+          .\scripts\release\Build-Launcher.ps1 -Root $root -NoPause
+          $exe = Join-Path $root 'Launcher\Thornswood.exe'
+          if (-not (Test-Path $exe)) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
+
+      - name: Collect the exe and write SHA256SUMS
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'Thornswood'
+          $exe = Join-Path $root 'Launcher\Thornswood.exe'
+          $out = Join-Path $env:RUNNER_TEMP 'release'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item -LiteralPath $exe -Destination (Join-Path $out 'Thornswood.exe') -Force
+          $hash = (Get-FileHash -LiteralPath (Join-Path $out 'Thornswood.exe') -Algorithm SHA256).Hash.ToLower()
+          # The sha256sum shape, "<hash>  <name>" with two spaces, so both
+          # `sha256sum -c` and Ship read the same file.
+          Set-Content -LiteralPath (Join-Path $out 'SHA256SUMS') -Value ("$hash  Thornswood.exe") -Encoding ascii
+          Write-Host ("SHA256  {0}  Thornswood.exe" -f $hash)
+
+      - name: Draft a release with the exe and its checksum
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          $tag = if ($env:INPUT_TAG) { $env:INPUT_TAG } else { $env:GITHUB_REF_NAME }
+          $out = Join-Path $env:RUNNER_TEMP 'release'
+          $exe = Join-Path $out 'Thornswood.exe'
+          $sums = Join-Path $out 'SHA256SUMS'
+          $notes = "Launcher exe for $tag, built on a clean runner and verified by SHA256SUMS. Ship downloads this and checks the checksum instead of compiling the shipped binary (issue #457)."
+          # A draft: a person promotes it, and Ship reads a draft's assets. If a
+          # run for this tag already made the release, upload into it instead,
+          # the same fallback Publish-Update.ps1 uses.
+          & gh release create $tag $exe $sums --draft --title "Launcher $tag" --notes $notes
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host 'A release for this tag exists, uploading the assets into it instead.'
+            & gh release upload $tag $exe $sums --clobber
+            if ($LASTEXITCODE -ne 0) { Write-Host '::error::could not attach the launcher to the release'; exit 1 }
+          }
