@@ -306,6 +306,9 @@ namespace Thornswood
 
             BuildModList();
             RefreshDiscord();
+            // Linked tickets from before the site sent avatar still need a hash.
+            // Join answers with it; paint once it lands so the sidebar is not stuck on Clyde.
+            PullDiscordAvatarIfNeeded();
             ShowPage(PagePlay);
 
             // And put Thornswood in Installed apps, or bring the entry up to
@@ -830,6 +833,32 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// When linked but no avatar hash is on disk yet, ask /api/play/join once
+        /// so the site can hand back Discord's avatar field, then paint it.
+        /// </summary>
+        static void PullDiscordAvatarIfNeeded()
+        {
+            if (!Discord.Linked) return;
+            string have = "";
+            try { have = Discord.Avatar; } catch (Exception ex) { Swallow.Note("Shell.PullDiscordAvatar", ex); }
+            if (have != null && have.Length > 0) return;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try { Discord.Join(); }
+                catch (Exception ex) { Swallow.Note("Shell.PullDiscordAvatar", ex); }
+                try
+                {
+                    win.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        try { LoadDiscordAvatar(); }
+                        catch (Exception ex) { Swallow.Note("Shell.PullDiscordAvatar", ex); }
+                    }));
+                }
+                catch (Exception ex) { Swallow.Note("Shell.PullDiscordAvatar", ex); }
+            });
+        }
+
+        /// <summary>
         /// Discord profile picture into the sidebar circle. Fetched off the UI
         /// thread so a slow CDN does not freeze the window; a miss leaves the
         /// empty circle.
@@ -878,7 +907,11 @@ namespace Thornswood
                         string now = "";
                         try { now = Discord.AvatarUrl; } catch (Exception ex) { Swallow.Note("Shell.LoadDiscordAvatar", ex); }
                         if (now != want) return;
-                        discordAvatar.Fill = new ImageBrush(pic) { Stretch = Stretch.UniformToFill };
+                        var brush = new ImageBrush(pic);
+                        brush.Stretch = Stretch.UniformToFill;
+                        brush.AlignmentX = AlignmentX.Center;
+                        brush.AlignmentY = AlignmentY.Center;
+                        discordAvatar.Fill = brush;
                     }));
                 }
                 catch (Exception ex) { Swallow.Note("Shell.LoadDiscordAvatar", ex); }
@@ -1208,7 +1241,13 @@ namespace Thornswood
         static void ShowShot(Gallery.Shot shot)
         {
             if (shot == null || shot.Image == null) return;
-            if (galleryImage != null) galleryImage.Source = shot.Image;
+            if (galleryImage != null)
+            {
+                galleryImage.Stretch = Stretch.UniformToFill;
+                galleryImage.HorizontalAlignment = HorizontalAlignment.Stretch;
+                galleryImage.VerticalAlignment = VerticalAlignment.Stretch;
+                galleryImage.Source = shot.Image;
+            }
             if (galleryBy != null)
                 galleryBy.Text = (shot.By != null && shot.By.Length > 0)
                     ? "By " + shot.By + ", from the world"
@@ -1240,15 +1279,14 @@ namespace Thornswood
             PaintServerBoxes();
             chkAutoUpdate.IsChecked = cfg.AutoUpdate;
             txtVersion.Text = "launcher " + Updater.Version;
-            // The dev build says so everywhere a person looks, so nobody
-            // reports a dev break against the main build or the other way.
+            // Channel is already on the sidebar brand (Thornswood Dev). Do not
+            // also tag the version line; that leftover truncated as "dev bu".
             if (cfg.IsDev)
             {
                 txtServer.Text = "Thornswood Dev";
-                txtVersion.Text = "launcher " + Updater.Version + "  \u00b7  dev build";
                 if (txtBrandSmall != null) txtBrandSmall.Text = "Thornswood Dev";
                 if (txtBrandBig != null) txtBrandBig.Text = "Thornswood Dev";
-                try { win.Title = "Thornswood Dev"; } catch { }
+                try { win.Title = "Thornswood Dev"; } catch (Exception ex) { Swallow.Note("Shell.ApplyConfig", ex); }
             }
             DrawServerPick();
             boxSearch.Text = SearchHint;
@@ -4153,16 +4191,19 @@ namespace Thornswood
         {
             if (btnServerMain == null || btnServerDev == null || txtServerPick == null) return;
             // Do not assign Content: the XAML holds the status chip layout.
+            // Dropdown lists only the OTHER server; the closed chip already names this one.
             if (cfg.IsDev)
             {
                 txtServerPick.Text = "Dev";
-                btnServerDev.IsEnabled = false;
+                btnServerDev.Visibility = Visibility.Collapsed;
+                btnServerMain.Visibility = Visibility.Visible;
                 btnServerMain.IsEnabled = true;
             }
             else
             {
                 txtServerPick.Text = "Main";
-                btnServerMain.IsEnabled = false;
+                btnServerMain.Visibility = Visibility.Collapsed;
+                btnServerDev.Visibility = Visibility.Visible;
                 btnServerDev.IsEnabled = true;
             }
             PaintServerChip();
@@ -4202,8 +4243,12 @@ namespace Thornswood
             if (serverPickPopup == null || btnServerPick == null) return;
             if (!serverPickPopup.IsOpen)
             {
-                // Match the closed control so the list lines up under it.
-                serverPickPopup.MinWidth = btnServerPick.ActualWidth;
+                // Same width open and closed: grow the chip up to the list, and
+                // the list down to the chip, so the popup never sticks out wider.
+                double w = Math.Max(btnServerPick.ActualWidth, 280);
+                btnServerPick.MinWidth = w;
+                serverPickPopup.MinWidth = w;
+                serverPickPopup.Width = w;
                 serverPickPopup.IsOpen = true;
             }
             else serverPickPopup.IsOpen = false;
@@ -5036,7 +5081,20 @@ namespace Thornswood
                 // check in that had SUCCEEDED. st.Ok was true and the site had
                 // said yes. The launcher was telling somebody it had failed to
                 // do the thing it had just done.
-                if (st.Ok) { PresenceLog("checked character " + id + " in with thornswood.net"); return true; }
+                if (st.Ok)
+                {
+                    PresenceLog("checked character " + id + " in with thornswood.net");
+                    try
+                    {
+                        win.Dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            try { LoadDiscordAvatar(); }
+                            catch (Exception ex) { Swallow.Note("Shell.CheckIn", ex); }
+                        }));
+                    }
+                    catch (Exception ex) { Swallow.Note("Shell.CheckIn", ex); }
+                    return true;
+                }
 
                 // The site not answering is not the site saying no, and it
                 // used to be reported as though it were.
