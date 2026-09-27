@@ -27,9 +27,10 @@ using Microsoft.Win32;
 // Product NAME stays stable on purpose. A name that is rewritten every build is
 // a new identity every build, which is the same reputation problem the download
 // further down was written to escape: a name SmartScreen has never seen before
-// earns no trust. The build date rides in the file NAME
-// (Thornswood-Setup-<date>.exe); the product name / company / copyright below
-// do not move with it. FileVersion and ProductVersion are NOT hardcoded here -
+// earns no trust. The download file name stays Thornswood-Setup.exe;
+// version and SHA-256 live in files.json / the Downloads page. The product
+// name / company / copyright below do not move with each release either.
+// FileVersion and ProductVersion are NOT hardcoded here -
 // Build-Launcher.ps1 stamps them at compile time from launcher\app\Updater.cs
 // (Version = "x.y.z") so the stub tracks the launcher release number. The
 // Downloads page and FAQ can still match on the stable name strings.
