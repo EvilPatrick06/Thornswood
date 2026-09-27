@@ -34,10 +34,10 @@ the branch `thornswood/engine-changes`. Anybody can read it or download it,
 with no account.
 
 The current release is built from commit
-[`3cbf2f87`](https://github.com/EvilPatrick06/skymp/tree/3cbf2f8779f512ab571009e9bcbd1274c39d9874),
+[`5c54e8b9`](https://github.com/EvilPatrick06/skymp/tree/5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df),
 the six files and the server's engine alike. That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `f926944b`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...3cbf2f87)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...5c54e8b9)
 is the difference between the two.
 
 | File | Built from | Licence |

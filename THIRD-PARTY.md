@@ -85,7 +85,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` are built from
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `3cbf2f87` (in full, `3cbf2f8779f512ab571009e9bcbd1274c39d9874`). That
+commit `5c54e8b9` (in full, `5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df`). That
 is upstream skyrim-multiplayer/skymp at `f926944b` with Thornswood's changes on
 top. The copies in `C:\Thornswood\Game` matched the recorded sha256 of all six
 on 24 September.
@@ -346,7 +346,7 @@ them, names the SIL Open Font License, Version 1.1.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`. It is built from `skymp5-server` in the fork at the
-  same commit, `3cbf2f8779f512ab571009e9bcbd1274c39d9874`, and it is AGPL-3.0.
+  same commit, `5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df`, and it is AGPL-3.0.
   Section 13 of the AGPL asks that everybody who connects to a modified server
   over a network be offered its source. The next section is that offer.
 
@@ -355,7 +355,7 @@ them, names the SIL Open Font License, Version 1.1.
 For the six client files and the game server module, the Corresponding Source
 is the fork at the recorded commit:
 
-https://github.com/EvilPatrick06/skymp/tree/3cbf2f8779f512ab571009e9bcbd1274c39d9874
+https://github.com/EvilPatrick06/skymp/tree/5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df
 
 It is on the branch `thornswood/engine-changes`, it is public, and it answered
 an anonymous request on 24 September. It builds with CMake and vcpkg from the
