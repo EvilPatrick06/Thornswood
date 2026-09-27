@@ -336,7 +336,8 @@ function dist2(ax, ay, bx, by) {
 // respawn resolution
 //
 // Port of respawnResolver.ts. Same five branches, same order. See
-// respawn-holds.json for where the numbers come from; never hand-edit them.
+// game\data\data.json for where the numbers come from; never hand-edit them.
+// (Older comments named respawn-holds.json; that file never lived in this repo.)
 // ---------------------------------------------------------------------------
 
 function holdOfCell(cellDesc) {
