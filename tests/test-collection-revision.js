@@ -90,6 +90,49 @@ function revisionFromState(text, slug) {
   }
   let best = 0;
   for (const id of mine) if (rev.has(id) && rev.get(id) > best) best = rev.get(id);
+  if (best > 0) return best;
+
+  // Authoring shape: newestFileId on the collection mod -> collections###revisions.
+  const revSlugRe = new RegExp(
+    'collections###revisions###([^#]+)###info###collection###slug[\\x00-\\x1F]{1,4}"' + esc + '"', 'g');
+  const fileIdRe = /mods###skyrimse###([^#]+)###attributes###newestFileId[\x00-\x1F]{1,4}(\d+)/g;
+  const verRe = /mods###skyrimse###([^#]+)###attributes###newestVersion[\x00-\x1F]{1,4}"(\d+)"/g;
+  const revIds = new Set();
+  const fileIdMods = new Map();
+  const modVer = new Map();
+  while ((m = revSlugRe.exec(text)) !== null) revIds.add(m[1]);
+  while ((m = fileIdRe.exec(text)) !== null) {
+    const fid = m[2];
+    if (!fileIdMods.has(fid)) fileIdMods.set(fid, []);
+    if (!fileIdMods.get(fid).includes(m[1])) fileIdMods.get(fid).push(m[1]);
+  }
+  while ((m = verRe.exec(text)) !== null) {
+    const n = Number(m[2]);
+    if (!Number.isInteger(n)) continue;
+    if (!modVer.has(m[1]) || n > modVer.get(m[1])) modVer.set(m[1], n);
+  }
+  if (revIds.size === 0) return 0;
+  const revNum = new Map();
+  for (const rid of revIds) {
+    const numRe = new RegExp(
+      'collections###revisions###' + rid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+      '###info###revisionNumber[\\x00-\\x1F]{1,4}(\\d+)', 'g');
+    while ((m = numRe.exec(text)) !== null) {
+      const n = Number(m[1]);
+      if (!Number.isInteger(n)) continue;
+      if (!revNum.has(rid) || n > revNum.get(rid)) revNum.set(rid, n);
+    }
+  }
+  for (const rid of revIds) {
+    if (!fileIdMods.has(rid)) continue;
+    let n = revNum.has(rid) ? revNum.get(rid) : 0;
+    if (n <= 0) {
+      for (const mid of fileIdMods.get(rid)) {
+        if (modVer.has(mid) && modVer.get(mid) > n) n = modVer.get(mid);
+      }
+    }
+    if (n > best) best = n;
+  }
   return best;
 }
 
@@ -164,6 +207,21 @@ yes('a revision recorded against another slug is not read as ours',
     revisionFromState(
       attr('vortex_collection_AAbb99xx_', 'collectionSlug', '"ombo2a"') +
       attr('vortex_collection_AAbb99xx_', 'revisionNumber', '12'), '7essxf') === 0);
+// Authoring shape on the ship PC: no collectionSlug / revisionNumber attrs.
+function revInfo(revId, slug, num) {
+  return 'persistent###collections###revisions###' + revId + '###info###collection###slug' +
+    String.fromCharCode(('"' + slug + '"').length) + '"' + slug + '"' +
+    '\x01persistent###collections###revisions###' + revId + '###info###revisionNumber' +
+    String.fromCharCode(String(num).length) + String(num) +
+    '\x01persistent###mods###skyrimse';
+}
+const authored = attr('vortex_collection_ZRT7NjhN_', 'newestFileId', '796316') +
+  attr('vortex_collection_ZRT7NjhN_', 'newestVersion', '"1"') +
+  revInfo('796316', '7essxf', 1);
+yes('authoring shape (newestFileId, no collectionSlug) still reads Have 1',
+  revisionFromState(authored, '7essxf') === 1);
+yes('and does not cross to ombo2a', revisionFromState(authored, 'ombo2a') === 0);
+
 
 // ---- the revision from the legacy folder name, the fallback ----------------
 const real = ['collection_7essxf_2_2026-09-15T21-08-00Z'];
@@ -208,7 +266,8 @@ yes('a name whose revision is not a number reads as 0',
 */
 yes('the launcher reads the installed revision from Vortex state',
     CS.indexOf('CollectionRevisionFromState') >= 0 &&
-    CS.indexOf('collectionSlug') >= 0 && CS.indexOf('revisionNumber') >= 0);
+    CS.indexOf('collectionSlug') >= 0 && CS.indexOf('revisionNumber') >= 0 &&
+  CS.indexOf('newestFileId') >= 0);
 yes('the launcher ties the slug to its mod id, not the highest number in the file',
     /mods###skyrimse###\(\[\^#\]\+\)###attributes###collectionSlug/.test(CS));
 yes('the launcher keeps the legacy folder parse as a fallback',
@@ -217,7 +276,8 @@ yes('the launcher refuses a slug that is not letters and digits',
     /IsLetterOrDigit/.test(CS));
 yes('the publisher reads it the same way, from state',
     PS.indexOf('Get-CollectionRevisionFromState') >= 0 &&
-    PS.indexOf('collectionSlug') >= 0 && PS.indexOf('revisionNumber') >= 0);
+    PS.indexOf('collectionSlug') >= 0 && PS.indexOf('revisionNumber') >= 0 &&
+  PS.indexOf('newestFileId') >= 0);
 yes('the publisher ties the slug to its mod id too',
     /mods###skyrimse###\(\[\^#\]\+\)###attributes###collectionSlug/.test(PS));
 yes('the publisher keeps the legacy folder parse as a fallback',
