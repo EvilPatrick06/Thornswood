@@ -1,4 +1,4 @@
-﻿// test-gallery-ux.js
+// test-gallery-ux.js
 //
 // Public gallery themed like the site, home link + slideshow, staff queue on
 // the hub Gallery page. Hub member upload/list/reports UI removed; public
@@ -105,9 +105,11 @@ yes('hub still calls gallery pending API',
     /\/api\/gallery\/pending/.test(hub));
 yes('hub Gallery no longer loads gallery reports API on this page',
     !/\/api\/gallery\/reports/.test(hub));
-yes('hub Gallery points members to public gallery and Inbox',
-    /Approved pictures live on the public/.test(hub) && /href="\/gallery">Gallery</.test(hub) &&
-    /Bug and idea reports go to/.test(hub));
+yes('hub Gallery has no dashed empty-state to public gallery and Inbox',
+    !/Approved pictures live on the public/.test(hub) &&
+    !/Bug and idea reports go to/.test(hub));
+yes('hub Gallery keeps staff approve intro',
+    /Staff approve shots waiting for the public gallery/.test(hub));
 
 yes('new gallery copy has no em dash', !/[\u2014\u2013]/.test(
   (home.match(/Send a picture[\s\S]{0,400}/) || [''])[0] +
