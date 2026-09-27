@@ -105,6 +105,7 @@ $wanted = [ordered]@{
     'LogHasCompletion' = 'static bool LogHasCompletion(string said, string depot)'
     'FailedLine'       = 'static string FailedLine(string said, string depot)'
     'Refused'          = 'static bool Refused(string said, string depot, int part, string cmd, Action<string> log, Action<string> status)'
+    'Reason'           = 'static string Reason(string line)'
     'ByHand'           = 'static string ByHand(string cmd)'
     'DownloadedExe'    = 'static string DownloadedExe(string content)'
     'Depots'           = 'static readonly string[][] Depots ='
@@ -141,6 +142,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Probe
 {
@@ -228,6 +230,15 @@ try {
     Yes 'and says nothing was replaced' (($logs -join "`n").Contains('Nothing in the game folder has been replaced'))
     Yes 'and gives the way by hand with this part''s command' (($logs -join "`n").Contains('steam://open/console') -and ($logs -join "`n").Contains($cmd1))
     Yes 'and the line under the button says which part' (($stat -join "`n").Contains('part 1 of 3'))
+    # The entry: the line under the button says why it stopped and what to do
+    # next, not only the launcher log. It used to end at "See the log".
+    Yes 'and puts Steam''s own reason on the card too, not only in the log' (($stat -join "`n").Contains('Content unavailable'))
+    Yes 'and says nothing in the game folder was touched' (($stat -join "`n").Contains('Nothing in the game folder has been replaced'))
+    Yes 'and what to do next' (($stat -join "`n").Contains('Press Try again'))
+    Yes 'and never sends the person to the launcher log instead' (-not (($stat -join "`n") -match '(?i)see the log'))
+    Yes 'the timestamp Steam puts on the line is left off the card' (-not (($stat -join "`n").Contains('[2026-08-24 20:36:15]')))
+    Yes 'Reason drops the timestamp and keeps the rest' ((Call 'Reason' @($failed1)) -eq 'Depot download failed : Failed updating depot 489831 while downloading chunk "0a1b2c" (Failure) (Content unavailable)')
+    Yes 'a line with no timestamp is left as it is' ((Call 'Reason' @('Depot download failed : No connection')) -eq 'Depot download failed : No connection')
     $logs.Clear(); $stat.Clear()
     Yes 'Refused lets part 2 carry on past part 1''s failure line' (-not [bool](Call 'Refused' @($failed1, '489832', 2, 'x', $logA, $statA)))
     Yes 'and says nothing' ($logs.Count -eq 0 -and $stat.Count -eq 0)

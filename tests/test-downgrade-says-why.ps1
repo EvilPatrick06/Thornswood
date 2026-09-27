@@ -24,6 +24,20 @@
        the second request sat below the check for a window.
     4. The card said "7,145 MB down so far" with no end, and had no bar.
 
+  WHAT WAS STILL MISSING, read again on 27 September, with the issue reopened
+  as a real open bug that no released launcher had fixed:
+
+    5. The bar only came up once bytes started landing. Opening Steam, signing
+       in and getting the console to take the first command take minutes
+       between them, so the longest wait in the run had nothing moving.
+    6. The three downloads had the whole bar, so it filled to the end when the
+       last part came down and then started again at nothing for the copy.
+    7. Three stops did reach the card and then said "see the log": the
+       deadline, Steam refusing a part, and a download that was not the build.
+       The entry asks for why and what to do next, not a file to go and find.
+    8. AskSteam reported false and nothing read it, so a machine that could
+       not be made to open Steam at all waited ninety seconds first.
+
   HOW. The real text of AskSteam, Stop, Progress, SizedLine, Percent,
   DepotBytes, ProgressLine, ClipboardLine, Next and Parts is lifted out of
   Downgrade.cs by brace match and compiled with the .NET Framework csc the
@@ -138,8 +152,32 @@ $check = $type.IndexOf('if (h == IntPtr.Zero) continue;')
 Yes 'Steam is asked again halfway before the check for a window, so a Steam with no window is asked twice' ($reask -ge 0 -and $check -gt $reask)
 Yes 'with no window at all it asks for Steam''s main window too' ($type -match 'MainWindow\(\) == IntPtr\.Zero \? "steam://open/main" : "steam://open/console"')
 Yes 'the card''s line during a part comes from SizedLine, with Steam''s size once it is given' ($run -match 'status\(SizedLine\(i \+ 1, Depots\.Length, size, total, pasted\)\);' -and $run -match 'if \(total <= 0\) total = DepotBytes\(said, depot\);')
-Yes 'the bar moves during a part, and moves without a number before Steam gives a size' ($run -match 'Progress\(total > 0 \? Percent\(i, Depots\.Length, size, total\) : -2\);')
+
+# ---- the bar covers the whole run, not the downloads alone ---------------------
+#
+# Four stretches: the three downloads, then the copy into the game. The
+# downloads used to have the whole bar, so it filled when the last part came
+# down and started again at nothing for the copy.
+Yes 'the bar is divided into the three downloads and the copy' ($text -match '(?m)^\s*static readonly int Stages = Depots\.Length \+ 1;\s*$')
+$atBar = $run.IndexOf('Progress(-2);')
+Yes 'the bar is up from the moment the run starts, before Steam is even opened' ($atBar -ge 0 -and $run.IndexOf('Steam.Path_()') -gt $atBar)
+Yes 'the bar moves during a part, and moves without a number before Steam gives a size' ($run -match 'Progress\(total > 0 \? Percent\(i, Stages, size, total\) : -2\);')
+Yes 'a part that is already downloaded still moves the bar on' ($run -match 'Progress\(\(i \+ 1\) \* 100 / Stages\);\s*continue;')
+Yes 'and so does one that has just come down' (([regex]::Matches($run, 'Progress\(\(i \+ 1\) \* 100 / Stages\);')).Count -eq 2)
+Yes 'the copy carries the same bar on rather than starting it again' ($run -match 'Progress\(Percent\(Depots\.Length, Stages, 0, toCopy\)\);' -and $run -match 'Progress\(Percent\(Depots\.Length, Stages, copied, toCopy\)\);')
+Yes 'nothing puts the bar back to nothing part way' ($run -notmatch 'Progress\(0\);')
 Yes 'the bar reaches 100 only when Skyrim is on 1.6.1170' ($run -match 'status\("Done\. Skyrim is on 1\.6\.1170\."\);\s*Progress\(100\);')
+
+# ---- and every stop says why on the card, not "see the log" --------------------
+#
+# The entry's words: the line under the button says why it stopped and what to
+# do next, not only the launcher log. Three stops used to hand the person a
+# file to go and find instead: the deadline, Steam refusing a part, and a
+# download that was not the build.
+Yes 'no line under the button sends the person to the launcher log' ($text -notmatch '(?i)status\("[^"]*see the log')
+Yes 'the deadline says how long, which part, and what to do' ($run -match 'return Stop\("Steam did nothing for " \+ GiveUpMinutes' -and $run -match 'press Try again')
+Yes 'a download that is not the build says so and what to do' ($run -match 'return Stop\("Steam''s download is not the build we need')
+Yes 'Steam that cannot be asked at all says so rather than waiting ninety seconds' ($wait -match 'if \(!AskSteam\("steam://open/main", log\)\)\s*return Stop\("Steam could not be started')
 
 # ---- compiled ------------------------------------------------------------------
 $probe = @'
@@ -280,6 +318,14 @@ try {
     Yes 'the start of the second part is a third' ((Call 'Percent' @(1, 3, 0L, $total)) -eq 33)
     Yes 'the end of the last part is 99, not 100' ((Call 'Percent' @(2, 3, $total, $total)) -eq 99)
     Yes 'no size is the whole parts before it' ((Call 'Percent' @(2, 3, $half, 0L)) -eq 66)
+
+    # Over the four stretches Run divides the bar into: three downloads, then
+    # the copy. The copy starts where the downloads left the bar and goes on
+    # from there, so the bar never drops back.
+    Yes 'half of the first download is an eighth of the whole run' ((Call 'Percent' @(0, 4, $half, $total)) -eq 12)
+    Yes 'the last download ending leaves the bar three quarters along' ((Call 'Percent' @(3, 4, 0L, $total)) -eq 75)
+    Yes 'the copy starts where the downloads stopped' ((Call 'Percent' @(3, 4, 0L, $total)) -ge (Call 'Percent' @(2, 4, $total, $total)))
+    Yes 'and ends at 99, so 100 is left for the run being done' ((Call 'Percent' @(3, 4, $total, $total)) -eq 99)
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
