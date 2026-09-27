@@ -167,7 +167,7 @@ namespace Thornswood
                 string d = Path.Combine(Paths.Game, "Data\\SKSE\\Plugins");
                 if (Directory.Exists(d)) skse = Directory.GetFiles(d, "*.dll").Length;
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Pages.BuildInstalled, SKSE plugins", ex); }
 
             txtBuildHead.Text = plugins + " plugins and " + skse + " script extender plugins";
             txtBuildSummary.Text = "Everything here was installed by the setup program and is kept in step by the launcher. "
@@ -175,7 +175,7 @@ namespace Thornswood
 
             buildRows.Children.Clear();
             long exe = 0;
-            try { exe = new FileInfo(Paths.Exe).Length; } catch { }
+            try { exe = new FileInfo(Paths.Exe).Length; } catch (Exception ex) { Swallow.Note("Pages.BuildInstalled, game exe size", ex); }
             buildRows.Children.Add(Fact("Skyrim", exe == cfg.ExpectedExeBytes ? "1.6.1170, the version the mods expect" : "not the expected build", false));
             buildRows.Children.Add(Fact("Script extender",
                 File.Exists(Path.Combine(Paths.Game, "skse64_1_6_1170.dll")) ? "skse64 2.2.6" : "missing", false));
@@ -184,7 +184,7 @@ namespace Thornswood
             buildRows.Children.Add(Fact("Script extender plugins", skse.ToString(), false));
 
             int mine = 0;
-            try { mine = Verify.PersonalFiles().Length; } catch { }
+            try { mine = Verify.PersonalFiles().Length; } catch (Exception ex) { Swallow.Note("Pages.BuildInstalled, PersonalFiles", ex); }
             buildRows.Children.Add(Fact("Files of your own", mine == 0 ? "none" : mine.ToString(), false));
             buildRows.Children.Add(Fact("Last update", string.IsNullOrEmpty(Stats.LastUpdate) ? "never" : Stats.LastUpdate, false));
             buildRows.Children.Add(Fact("Installed at", Paths.Root, true));
@@ -233,7 +233,7 @@ namespace Thornswood
                     {
                         long loose = 0;
                         foreach (string f in Directory.GetFiles(data))
-                        { try { loose += new FileInfo(f).Length; } catch { } }
+                        { try { loose += new FileInfo(f).Length; } catch (Exception ex) { Swallow.Note("Pages.StartSizeCount, loose file size", ex); } }
                         if (loose > 0) found.Add(new Slice { Name = "Archives and plugins", Bytes = loose });
 
                         foreach (string dir in Directory.GetDirectories(data))
@@ -242,14 +242,14 @@ namespace Thornswood
                             try
                             {
                                 foreach (string f in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
-                                { try { n += new FileInfo(f).Length; } catch { } }
+                                { try { n += new FileInfo(f).Length; } catch (Exception ex) { Swallow.Note("Pages.StartSizeCount, folder file size", ex); } }
                             }
-                            catch { }
+                            catch (Exception ex) { Swallow.Note("Pages.StartSizeCount, enumerating " + dir, ex); }
                             if (n > 0) found.Add(new Slice { Name = Path.GetFileName(dir), Bytes = n });
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Pages.StartSizeCount", ex); }
 
                 found.Sort(delegate(Slice a, Slice b) { return b.Bytes.CompareTo(a.Bytes); });
 
@@ -598,7 +598,7 @@ namespace Thornswood
                     if (files.Length > 0) newest = Path.GetFileName(files[files.Length - 1]);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Pages.BuildDiag, newest report", ex); }
             txtDiagNote.Text = newest.Length > 0
                 ? "Last report: " + newest + ", in Profile, Reports."
                 : "No report built yet.";

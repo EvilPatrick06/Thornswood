@@ -168,7 +168,7 @@ namespace Thornswood
             {
                 if (haveSet.Contains(p)) continue;
                 bool onDisk = true;
-                try { onDisk = File.Exists(Path.Combine(dataDir, p)); } catch { }
+                try { onDisk = File.Exists(Path.Combine(dataDir, p)); } catch (Exception ex) { Swallow.Note("Verify.Run, asking whether " + p + " is on disk", ex); }
                 issues.Add(new Issue(
                     onDisk ? p + " is turned off." : p + " is not installed.",
                     true, !onDisk));
@@ -214,7 +214,7 @@ namespace Thornswood
             if (issues.Count == 0)
             {
                 ServerMod[] mods = null;
-                try { mods = Manifest(cfg); } catch { }
+                try { mods = Manifest(cfg); } catch (Exception ex) { Swallow.Note("Verify.Run, asking the server for its manifest", ex); }
                 if (mods != null)
                 {
                     List<string> manifest = Names(mods);
@@ -275,7 +275,7 @@ namespace Thornswood
                         issues.Add(gone);
                     }
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Verify.Run, asking whether " + p + " is missing from Data", ex); }
             }
 
             // Personal mods that carry a plugin will be refused.
@@ -295,7 +295,7 @@ namespace Thornswood
             // (Bring it up to date after an already-matched Refresh).
             if (checkBytes)
             {
-                try { issues.AddRange(Bytes(cfg)); } catch { }
+                try { issues.AddRange(Bytes(cfg)); } catch (Exception ex) { Swallow.Note("Verify.Run, Bytes", ex); }
             }
 
             // Only a server-aware Run is remembered as the shared truth. A
@@ -526,7 +526,7 @@ namespace Thornswood
                     l.Add(n);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Verify.Ccc", ex); }
             return l;
         }
 
@@ -561,7 +561,7 @@ namespace Thornswood
         public static int PutInServerOrder(Config cfg, Action<string> say)
         {
             ServerMod[] mods = null;
-            try { mods = Manifest(cfg); } catch { }
+            try { mods = Manifest(cfg); } catch (Exception ex) { Swallow.Note("Verify.PutInServerOrder, asking the server for its manifest", ex); }
             if (mods == null) return 0;
             List<string> manifest = Names(mods);
 
@@ -848,7 +848,7 @@ namespace Thornswood
             // is what puts it right on a machine.
             if (cfg != null)
             {
-                try { n += PutInServerOrder(cfg, say); } catch { }
+                try { n += PutInServerOrder(cfg, say); } catch (Exception ex) { Swallow.Note("Verify.Fix, PutInServerOrder", ex); }
             }
 
             // Missing plugins the golden list expects. SettleLoadOrder only
@@ -932,7 +932,7 @@ namespace Thornswood
                     File.Copy(src, full, true);
                     n++;
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Verify.DeployPersonal, " + rel, ex); }
             }
             return n;
         }
