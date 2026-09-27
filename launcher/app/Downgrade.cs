@@ -885,11 +885,14 @@ namespace Thornswood
         ///
         /// Measured on the current Steam client at 100 percent scaling: the
         /// input's centre is 72 pixels above the bottom edge of the window,
-        /// with the status bar (Downloads, Friends and Chat) below it. Steam
-        /// draws itself at its monitor's scale, and this process sees window
-        /// coordinates at the system's, so the offset is scaled by the ratio
-        /// of the two. A Windows without GetDpiForWindow (before 10.0.1607)
-        /// gets the ratio 1, which is right whenever the two scales agree.
+        /// with the status bar (Downloads, Friends and Chat) below it. Under
+        /// the PerMonitorV2 manifest (#463) this process and Steam share
+        /// physical screen coordinates, so the old GetDpiForWindow over
+        /// GetDpiForSystem ratio (which compensated for system-DPI
+        /// virtualisation) is gone. The 72 is scaled by Steam's window DPI
+        /// over 96 so the click still tracks Steam's own UI scale. A Windows
+        /// without GetDpiForWindow (before 10.0.1607) keeps the bare 72.
+        /// DepotDownloader has not replaced this path.
         /// </summary>
         static void ClickCommandLine(IntPtr h)
         {
@@ -900,8 +903,11 @@ namespace Thornswood
             try
             {
                 uint steam = GetDpiForWindow(h);
-                uint system = GetDpiForSystem();
-                if (steam > 0 && system > 0) scale = steam / (double)system;
+                // 96 DPI is 100 percent, the scale the 72 pixel offset was
+                // measured at. Physical coordinates under PerMonitorV2 mean
+                // steam/system would undershoot whenever the system scale is
+                // above 100 percent on the same monitor as Steam.
+                if (steam > 0) scale = steam / 96.0;
             }
             catch (Exception ex) { Swallow.Note("Downgrade.ClickCommandLine, DPI scale", ex); }
             int x = (r.Left + r.Right) / 2;
@@ -1548,7 +1554,6 @@ namespace Thornswood
         [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hWnd, int cmd);
         [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
         [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr hWnd);
-        [DllImport("user32.dll")] static extern uint GetDpiForSystem();
         [DllImport("user32.dll", SetLastError = true)] static extern uint SendInput(uint n, INPUT[] inputs, int size);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int max);
         [DllImport("user32.dll")] static extern bool FlashWindowEx(ref FLASHWINFO info);

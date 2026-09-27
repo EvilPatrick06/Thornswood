@@ -565,6 +565,12 @@ namespace Thornswood
               OnMainWindowClose ties the app's life to this window, which is
               what anyone closing it means.
             */
+            // PerMonitorV2 is in the application manifest (#463). Framework WPF
+            // only rescales on WM_DPICHANGED when this switch is false; its
+            // default depends on a TargetFrameworkAttribute we do not emit, so
+            // set it here before Application is created.
+            AppContext.SetSwitch("Switch.System.Windows.DoNotScaleForDpiChanges", false);
+
             var app = new Application();
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
             app.Exit += delegate { Voice.Stop(); try { Presence.Stop(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } try { Hold.Release(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } };
