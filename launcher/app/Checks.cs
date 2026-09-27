@@ -119,7 +119,7 @@ namespace Thornswood
         ///
         /// Vortex names the collection's own mod folder for it:
         ///
-        ///     %APPDATA%\Vortex\skyrimse\mods\collection_ombo2a_2_2026-09-15T21-08-00Z
+        ///     %APPDATA%\Vortex\skyrimse\mods\collection_7essxf_1_2026-09-26T00-00-00Z
         ///                                               slug  ^ revision
         ///
         /// This replaces asking whether one named file exists, which is what
@@ -164,8 +164,8 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The collection's slug out of its address, "ombo2a" from
-        /// .../collections/ombo2a. Read from the config so a machine pointed at
+        /// The collection's slug out of its address, "7essxf" from
+        /// .../collections/7essxf. Read from the config so a machine pointed at
         /// a different collection still answers about its own.
         /// </summary>
         public static string CollectionSlug(Config cfg)

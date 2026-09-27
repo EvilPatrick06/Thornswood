@@ -32,7 +32,7 @@ or the build check goes red.
 - **Game packs and the installer payload**: every file in the game folder that
   the collection did not provide and Ship-Rules.ps1 does not hold back.
 - **Nexus Mods**, through the collection
-  (https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a).
+  (https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf).
   Most of what Vortex installs from it is other people's mods, under their own
   terms. Two of them are Thornswood's own uploads, by EvilPatrick06, and
   Vortex installs both for everybody who installs the collection: Thornswood

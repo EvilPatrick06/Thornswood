@@ -407,7 +407,7 @@ tester confused by a list that no longer matches.
 | 29 | `Your mods are not installed yet` | `launcher\app\Shell.cs` |
 | 29 | `Connect Discord first and this opens the collection.` | `launcher\app\Shell.cs` |
 | 29 | `INSTALL THE MODS FIRST` | `launcher\app\Shell.cs` |
-| 31 | `https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a` | `launcher\app\Config.cs` |
+| 31 | `https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf` | `launcher\app\Config.cs` |
 | 37 | `MAKE THORNSWOOD'S OWN FOLDER` | `launcher\app\Shell.cs` |
 | 38 | `Give Thornswood a Skyrim folder of its own?` | `launcher\app\ShellOwnGame.cs` |
 | 38 | `Thornswood and other servers are sharing one Skyrim right now` | `launcher\app\ShellOwnGame.cs` |

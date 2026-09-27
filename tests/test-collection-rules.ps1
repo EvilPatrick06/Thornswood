@@ -196,8 +196,8 @@ try {
     # newer one of somebody else's, and a Thornswood root with the reference.
     $appData = Join-Path $root 'AppData'
     $mods = Join-Path $appData 'Vortex\skyrimse\mods'
-    Collection (Join-Path $mods 'collection_ombo2a_4_2026-09-20T10-00-00Z\collection.json') $null
-    Collection (Join-Path $mods 'collection_ombo2a_5_2026-09-22T22-26-11Z\collection.json') $chain
+    Collection (Join-Path $mods 'collection_7essxf_4_2026-09-20T10-00-00Z\collection.json') $null
+    Collection (Join-Path $mods 'collection_7essxf_5_2026-09-22T22-26-11Z\collection.json') $chain
     Collection (Join-Path $mods 'collection_other1_9_2026-09-23T10-00-00Z\collection.json') $null
     $machine = Join-Path $root 'Thornswood'
     PluginList (Join-Path $machine 'Profile\Default\plugins.txt') $server
@@ -294,7 +294,7 @@ try {
         $r = Run @('-Root', $machine)
         Yes 'with no config.json, the launcher''s own collection is read, its newest revision (exit 0)' ($r.Code -eq 0)
         Yes 'and it says revision 5' (Has $r.Out 'revision 5,')
-        Yes 'from revision 5''s folder, not revision 4''s' (Has $r.Out 'collection_ombo2a_5_2026-09-22T22-26-11Z')
+        Yes 'from revision 5''s folder, not revision 4''s' (Has $r.Out 'collection_7essxf_5_2026-09-22T22-26-11Z')
         Yes 'and the reference under Profile\Default is the list it checked' (Has $r.Out (Join-Path $machine 'Profile\Default\plugins.txt'))
 
         $r = Run @('-Root', $machineOther)
