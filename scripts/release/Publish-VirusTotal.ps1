@@ -369,4 +369,15 @@ if ($why) {
 # is accepted, and the engines finish in their own time.
 Write-Outcome -Status 'sent' -Sha $sha -ReportUrl $report
 Say ('  VirusTotal: sent ' + $mb + '. The report appears at ' + $report + ' within a few minutes.') 'Green'
+
+# One community comment on the new report saying what the file is. Only on a
+# successful upload (not skip / already-has / refused). Fail-soft: the comment
+# script exits 0 itself, and a throw here still ends in exit 0 so a missing
+# comment never undoes a publish that already sent the file.
+try {
+    & (Join-Path $PSScriptRoot 'Add-VirusTotalComment.ps1') -Path $file.FullName -Sha256 $sha -Api $Api
+}
+catch {
+    Say ('  VirusTotal: no comment (' + (Get-Why $_) + '). The report is ' + $report) 'Yellow'
+}
 exit 0
