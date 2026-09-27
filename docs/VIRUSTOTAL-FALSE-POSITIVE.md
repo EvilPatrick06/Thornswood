@@ -36,10 +36,12 @@ also tagged the file `detect-debug-environment` and
 Five things about this program, all of them on purpose, are the same five a
 dropper does.
 
-- It is not signed. Authenticode is the one input every reputation system
-  weighs heavily and the only one that carries across releases. Issue #390 is
-  the lasting fix and it is deferred, so everything below is what can be done
-  without it.
+- Until 27 September it was not signed. Authenticode is the one input every
+  reputation system weighs heavily and the only one that carries across
+  releases. Issue #390 turned signing on that day (Azure Artifact Signing), so
+  a build from then on is signed and one from before is not: check which you
+  are looking at before reporting it. Everything below still helps a signed
+  build whose publisher has little reputation yet.
 - It is a small .NET executable that downloads a much bigger payload and runs
   what is inside it (`installer\setup\Bootstrap.cs:693`, Download). That is
   the definition of a downloader. The one thing that makes ours different is
@@ -112,7 +114,7 @@ facts, so write them once and paste them into each form.
    support portal, <https://supportportal.crowdstrike.com/>, which wants a
    Falcon subscription. Nobody here has one, so unless a tester who does
    raises it from their own console, the practical levers on Falcon are the
-   VirusTotal comment, the votes, and signing when #390 lands. Say so plainly
+   VirusTotal comment, the votes, and the signing that is on since #390. Say so plainly
    rather than pretending the ticket was filed.
 5. **McAfee and Trellix.** The consumer McAfee and the Trellix products share
    the same intelligence. Their submission routes move about, so find the
@@ -125,7 +127,8 @@ facts, so write them once and paste them into each form.
    VirusTotal report links to the vendor page. One short message each, with
    the same three facts and the report link. They answer more often than the
    big ones do.
-7. **Write down what was sent and when**, as a comment on issue #390, so the
+7. **Write down what was sent and when**, as a comment on the board issue for
+   the report (issue #390 is closed now that signing is on), so the
    next person can see which vendors have already been asked and does not
    start again from nothing.
 
@@ -145,9 +148,10 @@ after each `Package-Thornswood.ps1` and `Publish-Installer.ps1`:
 - Look at the report. If the count is zero, there is nothing else to do.
 - If anything flagged it, work the checklist above for that hash.
 
-What actually ends this is signing. Issue #390 moves reputation from a file
-hash that changes every release to a certificate that does not, and until it
-is done a low count on a fresh build is the best that can be expected. Keep
+What actually ends this is signing, and it is on since 27 September (issue
+#390). It moves reputation from a file hash that changes every release to a
+certificate that does not, so the counts should fall as signed builds are
+downloaded; a new publisher still starts with little reputation. Keep
 the identity strings stable, keep the ask before anything is ended, keep the
 published SHA-256 and the report link on the Downloads page, and send the
-false positive reports. That is the whole of what is available without it.
+false positive reports. Those still help while the signed publisher builds reputation.
