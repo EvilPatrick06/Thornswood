@@ -700,17 +700,37 @@ namespace Thornswood
             }
             catch { }
 
-            // Vortex's own list as it stands, for Publish-Update on a machine
-            // that ships. The collection's order is what a release carries.
+            // Vortex's Thornswood profile list, for Publish-Update on a machine
+            // that ships (#557). Windows' live plugins.txt follows whichever
+            // Vortex profile is active; the named Thornswood profile is the
+            // collection's order. Nothing here writes to Vortex.
             try
             {
-                foreach (string n in new string[] { "plugins.txt", "loadorder.txt" })
+                string tw = Checks.VortexProfileDir("Thornswood");
+                string livePlugins = Path.Combine(Paths.WinLocalAD, "plugins.txt");
+                if (tw == null)
                 {
-                    string live = Path.Combine(Paths.WinLocalAD, n);
-                    if (File.Exists(live) && !Junction.IsLink(Paths.WinLocalAD)) File.Copy(live, Path.Combine(Dir, n), true);
+                    try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  OwnGame: Vortex profile Thornswood was not found; leaving Profile\\OwnGame plugin list alone rather than copying Windows' live list from another profile." + Environment.NewLine); } catch { }
+                }
+                else
+                {
+                    Directory.CreateDirectory(Dir);
+                    foreach (string n in new string[] { "plugins.txt", "loadorder.txt" })
+                    {
+                        string from = Path.Combine(tw, n);
+                        if (File.Exists(from)) File.Copy(from, Path.Combine(Dir, n), true);
+                    }
+                    string twPlugins = Path.Combine(tw, "plugins.txt");
+                    if (File.Exists(livePlugins) && File.Exists(twPlugins) && !Junction.IsLink(Paths.WinLocalAD))
+                    {
+                        string a = File.ReadAllText(livePlugins);
+                        string b = File.ReadAllText(twPlugins);
+                        if (!string.Equals(a, b, StringComparison.Ordinal))
+                            try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  OwnGame: Windows' live plugins.txt differs from the Thornswood Vortex profile at " + tw + "; baked OwnGame from Thornswood." + Environment.NewLine); } catch { }
+                    }
                 }
             }
-            catch { }
+            catch (Exception ex) { try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  OwnGame: baking Thornswood profile list failed: " + ex.Message + Environment.NewLine); } catch { } }
 
             if (!first) return;
 

@@ -208,6 +208,61 @@ try {
   Yes 'and Known is true, so the deploy gate reads a real revision without -IgnoreRevision' ($csReady.Known)
   Yes 'and Behind is false when Have matches Newest' (-not $csReady.Behind)
 
+  # ---- Known without newestVersion (draft / first revision) ----------------
+  Clear-State
+  $draft = [Collections.Generic.List[byte]]::new()
+  $draft.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'collectionSlug' '"7essxf"'))
+  $draft.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'revisionNumber' '1'))
+  function RevInfo([string]$revId, [string]$slug, [int]$num) {
+    $b = [Collections.Generic.List[byte]]::new()
+    $b.AddRange([Text.Encoding]::ASCII.GetBytes("persistent###collections###revisions###$revId###info###collection###slug"))
+    $sj = '"' + $slug + '"'
+    $b.Add([byte]$sj.Length)
+    $b.AddRange([Text.Encoding]::ASCII.GetBytes($sj))
+    $b.AddRange([Text.Encoding]::ASCII.GetBytes([char]1 + "persistent###collections###revisions###$revId###info###revisionNumber"))
+    $nj = "$num"
+    $b.Add([byte]$nj.Length)
+    $b.AddRange([Text.Encoding]::ASCII.GetBytes($nj))
+    $b.AddRange([Text.Encoding]::ASCII.GetBytes([char]1 + 'persistent###mods###skyrimse'))
+    return $b.ToArray()
+  }
+  $draft.AddRange([byte[]](RevInfo '796316' '7essxf' 1))
+  Put '000200.log' $draft.ToArray()
+  $csDraft = Get-CollectionState 'https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf'
+  Yes 'without newestVersion, Have still reads 1 from state' ($csDraft.Have -eq 1)
+  Yes 'and Newest is 1 from collections revisions / installed floor' ($csDraft.Newest -eq 1)
+  Yes 'so Known is true on a current draft with no newestVersion key' ($csDraft.Known)
+
+  # ---- InstalledFolder via state, with or without collection.json ----------
+  Clear-State
+  $instFolder = [Collections.Generic.List[byte]]::new()
+  $instFolder.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'collectionSlug' '"7essxf"'))
+  Put '000200.log' $instFolder.ToArray()
+  $modsDir = Join-Path $root 'Vortex\skyrimse\mods'
+  $opaque = Join-Path $modsDir 'vortex_collection_ZRT7NjhN_'
+  $null = New-Item -ItemType Directory -Force -Path $opaque
+  $found = Get-CollectionInstalledFolder '7essxf'
+  Yes 'InstalledFolder maps slug to vortex_collection_* via state without collection.json' `
+    ($null -ne $found -and ([IO.Path]::GetFullPath($found.FullName) -eq [IO.Path]::GetFullPath($opaque)))
+  Set-Content -LiteralPath (Join-Path $opaque 'collection.json') -Value '{}' -Encoding ASCII
+  $found2 = Get-CollectionInstalledFolder '7essxf'
+  Yes 'InstalledFolder still returns the state-mapped folder when collection.json is present' `
+    ($null -ne $found2 -and ([IO.Path]::GetFullPath($found2.FullName) -eq [IO.Path]::GetFullPath($opaque)))
+  Remove-Item -LiteralPath $modsDir -Recurse -Force -EA SilentlyContinue
+
+  # ---- Thornswood profile lock helper --------------------------------------
+  Clear-State
+  $profLog = [Text.Encoding]::ASCII.GetBytes(
+    '{"type":"mod-enabled","data":{"profileId":"ZRT7NjhN_","profileName":"Thornswood"}}')
+  Put '000200.log' $profLog
+  $profDir = Join-Path $root 'Vortex\skyrimse\profiles\ZRT7NjhN_'
+  $null = New-Item -ItemType Directory -Force -Path $profDir
+  Set-Content -LiteralPath (Join-Path $profDir 'plugins.txt') -Value '*Skyrim.esm' -Encoding ASCII
+  $got = Get-VortexProfileDir 'Thornswood'
+  Yes 'Get-VortexProfileDir finds the Thornswood profile by name in state' `
+    ($null -ne $got -and ([IO.Path]::GetFullPath($got) -eq [IO.Path]::GetFullPath($profDir)))
+  Remove-Item -LiteralPath (Join-Path $root 'Vortex\skyrimse\profiles') -Recurse -Force -EA SilentlyContinue
+
   # ---- what the callers see ------------------------------------------------
   Clear-State; Put '000124.log' (Plain 5)
   $st = Get-CollectionState 'https://next.nexusmods.com/skyrimspecialedition/collections/7essxf'
