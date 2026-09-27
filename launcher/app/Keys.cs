@@ -225,7 +225,7 @@ namespace Thornswood
                     if (m.Success) return m.Groups[1].Value;
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Keys.ReadIni", ex); }
             return null;
         }
 
@@ -255,7 +255,7 @@ namespace Thornswood
                     return true;
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Keys.WriteIni", ex); }
             return false;
         }
 
@@ -570,7 +570,7 @@ namespace Thornswood
             foreach (Binding b in l)
             {
                 if (string.IsNullOrEmpty(b.File)) { live.Add(b); continue; }
-                try { if (File.Exists(b.File)) live.Add(b); } catch { }
+                try { if (File.Exists(b.File)) live.Add(b); } catch (Exception ex) { Swallow.Note("Keys.All, checking binding file", ex); }
             }
             return live;
         }
@@ -590,7 +590,7 @@ namespace Thornswood
                 if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out d))
                     return (int)Math.Round(d);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Keys.ParseCode", ex); }
             return fallback;
         }
 
