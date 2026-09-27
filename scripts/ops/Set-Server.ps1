@@ -4,7 +4,7 @@
   Sets the server everyone connects to, in the two places that decide it, and
   pushes.
 
-      .\Set-Server.ps1 -Address 192.135.112.23 -Port 7777
+      .\Set-Server.ps1 -Address <from scripts\vps\vps.json> -Port 7777
 
   The two places:
     config.json     this machine's launcher

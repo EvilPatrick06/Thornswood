@@ -37,13 +37,18 @@ param(
   # server's own resources folder on 3000, not to thornswood.net. Asking the
   # site for it gets a 401, because the site treats an unknown path as
   # something you have to sign in for.
-  [string]$Vps  = '192.135.112.23',
+  [string]$Vps  = '',
   [int]$Port    = 3000,
   [switch]$All,
   [switch]$Vortex,
   [switch]$NoPause
 )
 
+
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 # ---------------------------------------------------------------- -Vortex ---
 #
 # Where the build actually is.

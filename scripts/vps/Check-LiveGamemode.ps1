@@ -26,7 +26,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Vps  = '192.135.112.23',
+  [string]$Vps  = '',
   [string]$User = 'Administrator',
   [string]$Remote = 'C:\Thornswood-Server\gamemode.js',
   [switch]$NoPause
@@ -43,6 +43,8 @@ function Head($m) {
 }
 
 $Here = $PSScriptRoot
+. (Join-Path $Here 'Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $local = Join-Path $Here '..\..\game\gamemode.js'
 if (-not (Test-Path -LiteralPath $local)) { throw "not found: $local" }
 

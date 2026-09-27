@@ -32,7 +32,7 @@ param(
   # C:\Thornswood\Game on most machines; Find-Root below retargets when the
   # launcher is on another drive. -Game and -Vortex still win.
   [string] $Game   = 'C:\Thornswood\Game',
-  [string] $Vps    = '192.135.112.23',
+  [string] $Vps    = '',
   [string] $User   = 'Administrator',
   [switch] $SkipServer,
   # Install into the Skyrim that Steam owns and Vortex deploys the collection
@@ -85,6 +85,8 @@ $ErrorActionPreference = 'Continue'
 $ProgressPreference    = 'SilentlyContinue'
 
 $Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ui      = Join-Path $Game 'Data\Platform\UI'
 $plugins = Join-Path $Game 'Data\Platform\Plugins'
 

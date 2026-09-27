@@ -54,13 +54,18 @@ param(
     [Parameter(ParameterSetName = 'File')]
     [string]$Arguments = '',
 
-    [string]$VpsHost = '192.135.112.23',
+    [string]$VpsHost = '',
     [string]$VpsUser = 'Administrator',
 
     # Show the script before sending it. Worth doing for anything that writes.
     [switch]$Show
 )
 
+
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here 'Vps.ps1')
+if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 
 if ($PSCmdlet.ParameterSetName -eq 'File') {

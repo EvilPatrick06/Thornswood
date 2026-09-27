@@ -14,7 +14,7 @@
 
 [CmdletBinding()]
 param(
-  [string] $Vps  = '192.135.112.23',
+  [string] $Vps  = '',
   [string] $User = 'Administrator',
   [switch] $Push
 )
@@ -24,6 +24,8 @@ $ErrorActionPreference = 'Continue'
 $ProgressPreference    = 'SilentlyContinue'
 
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
 function Head($t) { Write-Host ''; Write-Host $t -ForegroundColor Cyan }
 function Note($t) { Write-Host "  $t" }

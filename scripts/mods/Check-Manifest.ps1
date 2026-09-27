@@ -25,7 +25,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Vps  = '192.135.112.23',
+  [string]$Vps  = '',
   [string]$User = 'Administrator',
   [string]$Client = '',
   [switch]$Dev,
@@ -33,6 +33,11 @@ param(
   [switch]$NoPause
 )
 
+
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 # The dev server is a second install beside the live one, and the dev build is
 # a second launcher beside the main one. Asking about one against the other is
 # what made this worth a switch rather than two paths typed by hand.
