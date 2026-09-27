@@ -111,7 +111,13 @@ namespace Thornswood
         static Ellipse dotServer, dotVerify, dotReady;
         static StackPanel statusList, modList, themeRow, pathRows, helpList,
                           newsList, saveList, logList, statRow, displayModeRow,
-                          firstRunCard, quickKeysCard, quickKeys;
+                          firstRunCard, quickKeysCard, quickKeys, galleryCard;
+        static Image galleryImage; static TextBlock galleryBy;
+        // The pictures /api/public is showing and where the card is in turning
+        // through them. Null until the feed has answered with at least one.
+        static List<Gallery.Shot> galleryShots;
+        static int galleryAt = -1;
+        static DispatcherTimer galleryTimer;
         static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
         static CheckBox chkMusic; static Slider sldMusic; static TextBlock txtMusic;
@@ -431,6 +437,7 @@ namespace Thornswood
             HealClientBackground();
             AutoDisplayOnce();
             StartPing();
+            StartGallery();
             if (Updater.Enabled(cfg))
                 ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
             else
@@ -619,6 +626,9 @@ namespace Thornswood
             quickKeysCard = F<StackPanel>("QuickKeysCard");
             quickKeys = F<StackPanel>("QuickKeys");
             btnAllControls = F<Button>("BtnAllControls");
+            galleryCard = F<StackPanel>("GalleryCard");
+            galleryImage = F<Image>("GalleryImage");
+            galleryBy = F<TextBlock>("GalleryBy");
 
             // Same order as the PageXxx constants above, and as PageTitles.
             navButtons = new Button[] {
@@ -836,6 +846,10 @@ namespace Thornswood
             else if (i == PageControls) BuildControls();
             else if (i == PageLogs) BuildLogs();
             else if (i == PageDiag) BuildDiag();
+
+            // The gallery turns only on the Play page, so a page change starts
+            // or stops it, the way the title video follows what is on screen.
+            GalleryDecide();
         }
 
         /// <summary>
@@ -1052,6 +1066,101 @@ namespace Thornswood
             if (txtMusic == null) return;
             int v = Math.Max(0, Math.Min(100, cfg.MusicVolume));
             txtMusic.Text = v == 0 ? "silent" : v + "%";
+        }
+
+        /// <summary>
+        /// The pictures the site is showing, turned through on the Play page.
+        ///
+        /// Read only: Gallery.Load asks /api/public, the same public feed the
+        /// front page reads, and the site keeps the queue and chooses what goes
+        /// into the gallery. The launcher shows what is already public and sends
+        /// nothing.
+        ///
+        /// The list is fetched once on a pool thread at start up. The card stays
+        /// hidden until the first picture has loaded, so a site that is down, or
+        /// a build shown before anybody has sent a picture, leaves the page
+        /// exactly as it was. It fails the way the online count and the roster
+        /// do: quietly, with nothing said.
+        /// </summary>
+        static void StartGallery()
+        {
+            if (galleryCard == null) return;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                // Load fails to an empty list on its own, so nothing here throws
+                // and there is no catch to swallow: the same shape as AskOnline.
+                List<Gallery.Shot> shots = Gallery.Load();
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    galleryShots = (shots != null && shots.Count > 0) ? shots : null;
+                    galleryAt = -1;
+                    if (galleryShots == null) return;
+
+                    if (galleryTimer == null)
+                    {
+                        galleryTimer = new DispatcherTimer();
+                        galleryTimer.Interval = TimeSpan.FromSeconds(7);
+                        galleryTimer.Tick += delegate { ShowNextShot(); };
+                        // Turn only while somebody can see it: off the Play
+                        // page, minimised or in game it stands still, the way
+                        // the menu music and the title video do.
+                        win.StateChanged += delegate { GalleryDecide(); };
+                    }
+                    ShowNextShot();
+                    GalleryDecide();
+                }));
+            });
+        }
+
+        /// <summary>
+        /// Turns to the next picture. Its image is fetched on a pool thread the
+        /// first time it is shown and kept after that; a picture that will not
+        /// load leaves the one before it up and the next tick turns past it.
+        /// </summary>
+        static void ShowNextShot()
+        {
+            if (galleryShots == null || galleryShots.Count == 0) return;
+            galleryAt = (galleryAt + 1) % galleryShots.Count;
+            Gallery.Shot shot = galleryShots[galleryAt];
+
+            if (shot.Image != null) { ShowShot(shot); return; }
+
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                // Fetch returns null rather than throwing, so there is no catch
+                // to swallow here either. A picture that will not load leaves
+                // the one before it up and the next tick turns past it.
+                BitmapImage bi = Gallery.Fetch(shot);
+                if (bi == null) return;
+                win.Dispatcher.BeginInvoke(new Action(delegate { ShowShot(shot); }));
+            });
+        }
+
+        static void ShowShot(Gallery.Shot shot)
+        {
+            if (shot == null || shot.Image == null) return;
+            if (galleryImage != null) galleryImage.Source = shot.Image;
+            if (galleryBy != null)
+                galleryBy.Text = (shot.By != null && shot.By.Length > 0)
+                    ? "By " + shot.By + ", from the world"
+                    : "From the world";
+            if (galleryCard != null && galleryCard.Visibility != Visibility.Visible)
+                galleryCard.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Runs the rotation only when the Play page is up, the window is not
+        /// minimised and no game is running, so nothing is fetched or turned
+        /// behind a page nobody is looking at.
+        /// </summary>
+        static void GalleryDecide()
+        {
+            if (galleryTimer == null || galleryShots == null) return;
+            bool seen = pages != null && pages[PagePlay] != null &&
+                        pages[PagePlay].IsVisible &&
+                        win.WindowState != WindowState.Minimized && !playing;
+            if (seen) { if (!galleryTimer.IsEnabled) galleryTimer.Start(); }
+            else { if (galleryTimer.IsEnabled) galleryTimer.Stop(); }
         }
 
         static void Wire()
@@ -1589,6 +1698,7 @@ namespace Thornswood
                 inPlayTicks = 0;
                 MusicDecide();
                 headerVideoDecide();
+                GalleryDecide();
                 // An update was seen during the session and they quit before
                 // the five minutes were up. The clock goes, the fact does not:
                 // it is fetched now, the same as it would have been had the
@@ -4184,6 +4294,7 @@ namespace Thornswood
                 playing = true;
                 MusicDecide();
                 headerVideoDecide();
+                GalleryDecide();
                 btnPlay.IsEnabled = false;
                 btnPlay.Content = "RUNNING";
                 btnQuitGame.Visibility = Visibility.Visible;
@@ -4284,6 +4395,7 @@ namespace Thornswood
                 Keep.TakeNote();
                 playing = false;
                 headerVideoDecide();
+                GalleryDecide();
                 btnPlay.Content = "PLAY";
                 DrawStatus();
 
