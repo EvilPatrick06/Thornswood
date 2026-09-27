@@ -419,7 +419,10 @@ namespace Thornswood
 
             // The shortcut points at whatever icon file the last build wrote,
             // and an update brings a new one. Quiet unless it actually had to
-            // move something.
+            // move something. After a self-update the previous exe is still
+            // sitting as .old; Ensure sees that and rewrites icons even when
+            // the path string did not change, so blank desktop icons do not
+            // stick until someone opens Settings.
             ThreadPool.QueueUserWorkItem(delegate
             {
                 int moved = 0;
@@ -527,8 +530,20 @@ namespace Thornswood
                 string self = Assembly.GetExecutingAssembly().Location;
                 ThreadPool.QueueUserWorkItem(delegate
                 {
+                    // Capture before Settle deletes .old. The early Icons.Ensure
+                    // usually runs while .old is still there; if it raced after
+                    // Settle, this second pass still forces the shortcut redraw.
+                    bool afterUpdate = false;
+                    try { afterUpdate = File.Exists(SelfSwap.OldOf(self)); } catch { }
                     string said = null;
                     try { said = SelfSwap.Settle(self); } catch (Exception ex) { Swallow.Note("Shell.Run, clearing the copy the self update kept", ex); }
+                    if (afterUpdate)
+                    {
+                        int moved = 0;
+                        try { moved = Icons.Ensure(true); } catch (Exception ex) { Swallow.Note("Shell.Run, refreshing shortcut icons after self update", ex); }
+                        if (moved > 0)
+                            try { win.Dispatcher.BeginInvoke((Action)delegate { Log("Shortcut icon brought up to date after the update."); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying shortcut icons were refreshed", ex); }
+                    }
                     if (string.IsNullOrEmpty(said)) return;
                     try { win.Dispatcher.BeginInvoke((Action)delegate { Log(said); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying what the self update left", ex); }
                 });
