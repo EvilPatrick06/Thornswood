@@ -24,8 +24,8 @@
 # pull request that runs code on the box.
 #
 # WHY THE ACTIONS ARE PINNED. Every action is named by a full length commit
-# SHA, with the tag it was on the end of the line, the same as release.yml has
-# been since it was written. A tag on an action is a moving pointer its owner
+# SHA, with the tag it was on in a comment at the end of the line, the same as
+# release.yml has been since it was written. A tag is a moving pointer its owner
 # can repoint at any commit, and these steps run on the VPS, beside the live
 # server: a repointed tag would be somebody else's code on that box without a
 # line changing here. The comment is what a person reads; the SHA is what runs.
