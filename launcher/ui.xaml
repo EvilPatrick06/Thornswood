@@ -782,6 +782,26 @@
                     <Button x:Name="BtnAllControls" Style="{StaticResource Link}" Content="All of the controls"
                             HorizontalAlignment="Left" Margin="0,10,0,0"/>
                   </StackPanel>
+
+                  <!-- From the world: the pictures thornswood.net is showing, each
+                       taken by somebody playing, turned through one at a time. Read
+                       only. The site keeps the queue and the staff choose what goes
+                       into the gallery; this shows what /api/public already serves
+                       and sends nothing. Filled by StartGallery in Shell.cs, hidden
+                       until the first picture has loaded (#603). -->
+                  <StackPanel x:Name="GalleryCard" Margin="0,26,0,0" Visibility="Collapsed">
+                    <TextBlock Text="From the world" Style="{StaticResource Eyebrow}"/>
+                    <Border Style="{StaticResource Slab}" Padding="0">
+                      <StackPanel>
+                        <Border Height="150" ClipToBounds="True">
+                          <Image x:Name="GalleryImage" Stretch="UniformToFill"
+                                 RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Border>
+                        <TextBlock x:Name="GalleryBy" Style="{StaticResource Small}"
+                                   TextWrapping="Wrap" Margin="16,10,16,13"/>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
                 </StackPanel>
               </Grid>
             </ScrollViewer>

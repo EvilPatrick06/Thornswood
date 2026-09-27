@@ -363,8 +363,9 @@ pages), Secrets.cs (DPAPI and locking a file to this account), Junction.cs
 Skyrim), Online.cs (the headcount the server publishes), Slots.cs (the one
 rule for moving a character's slot), Art.cs (the art inside the exe),
 Themes.cs, Help.cs (the Help page's text), Links.cs (the Nexus page behind
-each mod name), Swallow.cs (a caught exception written to `launcher.log`
-instead of dropped, section 1).
+each mod name), Gallery.cs (the pictures the site shows from the world, read
+from `/api/public` and turned through on the Play page, read only), Swallow.cs
+(a caught exception written to `launcher.log` instead of dropped, section 1).
 
 A new class gets a line on this page in the pull request that adds it.
 
