@@ -311,12 +311,16 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .gal-box h2{font:600 clamp(20px,2.4vw,26px)/1.22 var(--carve);letter-spacing:.03em;
   margin:0 0 10px;color:var(--gold)}
 .gal-box .hint{color:var(--quiet);margin:0 0 16px;font:400 15.5px/1.55 var(--serif)}
+.gal-box .form{gap:22px}
+.gal-box .form .gal-field{display:flex;flex-direction:column;gap:8px;min-width:0}
+.gal-box .form .gal-label{display:block;font:600 13px/1.5 var(--sans);letter-spacing:.04em;
+  text-transform:uppercase;color:var(--page);margin:0}
+.gal-box .form .gal-label .gal-opt{font:400 12px/1.5 var(--serif);letter-spacing:0;
+  text-transform:none;color:var(--faint);margin-left:6px}
 .gal-box .form label{color:var(--page)}
 /* Native file control stays white on Windows; hide it and paint our own. */
 .gal-box .form input[type=file]{position:absolute;width:1px;height:1px;padding:0;
   margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;opacity:0}
-.gal-box .form .gal-label{display:block;font:600 13px/1.5 var(--sans);letter-spacing:.04em;
-  text-transform:uppercase;color:var(--page);margin:0 0 8px}
 .gal-box .form .gal-drop{position:relative;padding:26px 22px;text-align:center;
   border:1.5px dashed var(--edge2);border-radius:2px;background:rgba(11,14,10,.55);
   transition:border-color .12s,background .12s,box-shadow .12s}
@@ -349,7 +353,15 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
   border-color:var(--edge2);color:var(--gold)}
 .gal-box .form .btn.gal-chosen-x:hover{border-color:var(--gold);
   background:rgba(201,162,75,.12);color:var(--gold)}
-.gal-box .form input[type=text]{background:var(--night)}
+.gal-box .form input[type=text]{width:100%;box-sizing:border-box;padding:12px 14px;
+  background:var(--iron);color:var(--page);border:1px solid var(--edge);
+  border-radius:2px;font:15px/1.6 var(--serif);
+  -webkit-appearance:none;appearance:none;color-scheme:dark;
+  transition:border-color .12s,background .12s,box-shadow .12s}
+.gal-box .form input[type=text]::placeholder{color:var(--faint);opacity:1}
+.gal-box .form input[type=text]:hover{border-color:var(--edge2);background:var(--night)}
+.gal-box .form input[type=text]:focus{outline:none;border-color:var(--gold);
+  background:var(--night);box-shadow:0 0 0 1px rgba(201,162,75,.28)}
 .gal-box .form .gal-drop.drag{border-color:var(--gold);background:rgba(201,162,75,.1);
   box-shadow:inset 0 0 0 1px rgba(201,162,75,.28)}
 
@@ -988,9 +1000,15 @@ if (AGE_PATHS[here] && !ageOk()) {
         '<span class="file-name" id="galFileName">No file chosen</span>' +
         '</div>' +
         '<ul class="gal-chosen" id="galChosen" hidden></ul>' +
-        '</div></div></div>' +
-        '<label>By<input type="text" id="galBy" maxlength="40" placeholder="a name for the caption"></label>' +
-        '<label>Note<span class="hint">optional</span><input type="text" id="galNote" maxlength="300"></label>' +
+        '</div></div>' +
+        '<div class="gal-field">' +
+        '<label class="gal-label" for="galBy">By</label>' +
+        '<input type="text" id="galBy" maxlength="40" placeholder="a name for the caption" autocomplete="nickname">' +
+        '</div>' +
+        '<div class="gal-field">' +
+        '<label class="gal-label" for="galNote">Note<span class="gal-opt">optional</span></label>' +
+        '<input type="text" id="galNote" maxlength="300" placeholder="a short note for staff">' +
+        '</div>' +
         '<div><button class="btn first" type="button" id="galSend">Send it</button></div>' +
         '<p class="said" id="galSaid" hidden></p>' +
         '</div></div>';
