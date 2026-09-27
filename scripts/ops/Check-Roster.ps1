@@ -38,13 +38,18 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Vps  = '192.135.112.23',
+    [string]$Vps  = '',
     [string]$User = 'Administrator',
     # Both by default, because the interesting answer is usually the
     # difference between them.
     [string[]]$Root = @('C:\Thornswood-Server', 'C:\Thornswood-Server-Dev')
 )
 
+
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
 

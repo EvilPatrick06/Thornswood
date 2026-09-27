@@ -24,7 +24,7 @@
 param(
   [string]$Domain = 'thornswood.net',
   [string]$Email,
-  [string]$Vps  = '192.135.112.23',
+  [string]$Vps  = '',
   [string]$User = 'Administrator',
   [string]$Root = 'C:/Thornswood-Docs',
   [string]$CaddyDir = 'C:/Thornswood-Caddy',
@@ -140,6 +140,8 @@ Write-Host 'Setting up Caddy on the VPS...'
 # address, and those two are swapped for what was asked.
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $tracked = Join-Path $Here 'Caddyfile'
 if (-not (Test-Path -LiteralPath $tracked)) { throw "not found: $tracked. The site's Caddyfile is kept in the repository, and nothing is sent without it." }
 $caddyfile = [IO.File]::ReadAllText($tracked, [Text.Encoding]::UTF8)
