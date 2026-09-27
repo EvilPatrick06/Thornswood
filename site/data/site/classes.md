@@ -8,8 +8,8 @@ own: your class, your profession and the half of it you will make your own,
 and the town you wake up in tomorrow. Take them in any order. The third one
 sends you to your inn. The same panel, on K, is where you spend skill points
 for the rest of your character's life, and where the recipe book tells you what
-your half can make at the rank you have reached. Nothing is handed out at the start but
-the clothes you stand in: what you carry, you earn, buy or are given.
+your half can make at the rank you have reached. A new character gets forty gold once, and the clothes they stand in:
+what else you carry, you earn, buy or are given.
 
 **A profession.** What you make, or how you fight.
 **A sub profession.** Which half of that you actually do.
