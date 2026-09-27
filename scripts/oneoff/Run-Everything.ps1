@@ -38,11 +38,6 @@ Write-Host '  Nothing is published until every step below has passed.' -Foregrou
 # that reach five people before anybody notices.
 $steps = @(
     @{
-        Name  = 'Character slots'
-        Script = 'Add-Characters.ps1'
-        Wants = @('SKSE\Plugins\po3_StartOnSave.dll')
-    },
-    @{
         Name  = 'Carriages and ferries'
         Script = 'Add-CartTravel.ps1'
         Wants = @('CFTO.esp')
@@ -112,9 +107,7 @@ if ($DryRun) {
 
 Head 'Publishing, once'
 $notes = @"
-Character slots, carriages, and damage that knows where it hit
-- Play now asks who you are, two slots with their own saves, and walks straight past Skyrim's main menu
-- an empty slot makes a new character, and characters can be deleted without the saves being destroyed
+Carriages, and damage that knows where it hit
 - carriages and ferries run between the holds, as a fade rather than a scripted ride so it survives co-op
 - where you hit somebody now matters, with the settings shipped identically to everyone
 - new bodies for everyone, CBBE and 3BA for women, HIMBO and The New Gentleman for men, with CBPC physics

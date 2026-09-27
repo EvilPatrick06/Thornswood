@@ -64,7 +64,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [mods/Add-Accuracy.ps1](mods/Add-Accuracy.ps1) | Localised combat damage. Where you hit somebody starts to matter, on top of what Precision already does for where your weapon actually is. |
 | [mods/Add-Bodies.ps1](mods/Add-Bodies.ps1) | Bodies, genitals and physics. Skeleton, female body, male body, and the jiggle that hangs off both. |
 | [mods/Add-CartTravel.ps1](mods/Add-CartTravel.ps1) | Carriages and ferries between the holds, so turning fast travel off leaves people with a way to get about. |
-| [mods/Add-Characters.ps1](mods/Add-Characters.ps1) | Installs Start On Save into the build. |
+| [mods/Add-Characters.ps1](mods/Add-Characters.ps1) | RETIRED. Installed Start On Save by hand. **It refuses to run.** Launcher #394/#490 strip landed; Nexus collection drop still Patrick. |
 | [mods/Add-McmShortcut.ps1](mods/Add-McmShortcut.ps1) | Installs MCM Shortcut NG, which is what lets Skyrim Unbound open its own config menu. |
 | [mods/Align-LoadOrder.ps1](mods/Align-LoadOrder.ps1) | The client counts its own plugins with Game.GetModCount, which skips every ESL-flagged one because Skyrim gives those no normal index. |
 | [mods/Audit-Leftovers.ps1](mods/Audit-Leftovers.ps1) | Measures. Deletes nothing, moves nothing, renames nothing. |
