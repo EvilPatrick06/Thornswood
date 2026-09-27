@@ -61,6 +61,12 @@ tools/signing.json
 # and any copy of it kept beside it while the setup is being changed.
 tools/signing.json.*
 
+# The VirusTotal API key, read by scripts\release\Publish-VirusTotal.ps1 on the
+# machine that ships. One line, and anybody holding it can use our account's
+# quota, so it stays out of git the same way the two webhooks do. Without it
+# that script stops and says where to put one.
+tools/virustotal.txt
+
 # Microsoft's signing client, Azure.CodeSigning.Dlib.dll and what comes with
 # it, fetched from NuGet. records\signing\metadata.json beside it is tracked on
 # purpose (records\signing\README.md).
