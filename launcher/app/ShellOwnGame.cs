@@ -349,15 +349,14 @@ namespace Thornswood
                 // that Windows asks once on the first launch instead.
                 // Only when a person started this.
                 //
-                // StartOwnGame is called three ways and loud tells them apart:
-                // true from Make it and from Bring it up to date, false from
-                // the refresh the launcher runs by itself at startup. Asking
-                // for administrator on that one would put a Windows prompt in
-                // front of somebody who has done nothing but open the launcher,
-                // which is the thing taking the button out was meant to avoid.
-                // A silent refresh stays silent; the rule waits for a build
-                // somebody asked for.
-                if (fail == null && loud)
+                // Firewall.Ensure elevates (runas) to write the browser-helper
+                // block rule. That is only needed when Make creates a new own
+                // folder: Windows ties rules to the program's full path, and
+                // that path just changed. Bring it up to date and the silent
+                // startup refresh leave the path alone, so elevation would
+                // only flash UAC / a console for no reason. Existing rules
+                // stay; Make still settles them for a brand-new folder.
+                if (fail == null && loud && make)
                 {
                     try
                     {
