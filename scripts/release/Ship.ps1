@@ -871,6 +871,42 @@ if ($GameDir) {
     Say '  installed into the Steam copy; no own game folder to check them against' 'Yellow'
 }
 
+# ------------------------------------------------------- load order copies (#477 / #557)
+# Require the named Thornswood Vortex profile. When Profile\OwnGame has a baked
+# copy it must match. Differing copies stop Ship naming which lists diverge.
+Head 'The load order copies'
+. (Join-Path $Here '..\mods\LoadOrder.ps1')
+try {
+    $twProfile = Assert-VortexProfile 'Thornswood'
+} catch {
+    Unbump 'Vortex profile Thornswood was not found'
+    Die $_.Exception.Message
+}
+$profileDir = Join-Path $Root 'Profile'
+$copies = @{
+    'Vortex Thornswood\plugins.txt' = (Join-Path $twProfile 'plugins.txt')
+}
+$ownPlugins = Join-Path $profileDir 'OwnGame\plugins.txt'
+if (Test-Path -LiteralPath $ownPlugins) {
+    $copies['Profile\OwnGame\plugins.txt'] = $ownPlugins
+}
+$loCopies = @{}
+foreach ($k in @($copies.Keys)) {
+    $pluginsPath = $copies[$k]
+    $loPath = Join-Path (Split-Path -Parent $pluginsPath) 'loadorder.txt'
+    if (Test-Path -LiteralPath $loPath) {
+        $loCopies[($k -replace 'plugins\.txt$', 'loadorder.txt')] = $loPath
+    }
+}
+$diffs = @(Get-LoadOrderCopyDiffs $copies)
+$diffs += @(Get-LoadOrderCopyDiffs $loCopies)
+if ($diffs.Count -gt 0) {
+    foreach ($line in $diffs) { Say "  $line" 'Red' }
+    Unbump 'load order copies diverge'
+    Die ("Load order copies that must match diverge:`n  " + ($diffs -join "`n  ") + "`nBake OwnGame from the Thornswood Vortex profile (launcher Settings, Maintenance, bring the folder up to date), or fix the lists, then Ship again.")
+}
+Say ("  Thornswood profile at $twProfile; load order copies agree") 'Green'
+
 # ------------------------------------------------------------ client build
 # The client runtime is built from the fork and recorded in client-build.json.
 # Until 20 September the copy in the game folder was whatever another server's

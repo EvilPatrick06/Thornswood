@@ -591,11 +591,16 @@ function Get-ShipLooseArt($files) {
 #                        the game runs, so reading it with the game closed
 #                        shipped the ordinary Skyrim's list.
 function Get-ShipLoadOrderDir([string]$Root, [string]$ProfileDir) {
+    $own = Join-Path $ProfileDir 'OwnGame'
+    if (Test-Path -LiteralPath (Join-Path $own 'plugins.txt')) { return $own }
+    # Named Thornswood Vortex profile over Windows' live list (#557).
+    if (Get-Command Get-VortexProfileDir -ErrorAction SilentlyContinue) {
+        $tw = Get-VortexProfileDir 'Thornswood'
+        if ($tw -and (Test-Path -LiteralPath (Join-Path $tw 'plugins.txt'))) { return $tw }
+    }
     if (-not (Test-Path -LiteralPath (Join-Path $Root 'Game'))) {
         return (Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition')
     }
-    $own = Join-Path $ProfileDir 'OwnGame'
-    if (Test-Path -LiteralPath (Join-Path $own 'plugins.txt')) { return $own }
     return (Join-Path $ProfileDir 'Default')
 }
 

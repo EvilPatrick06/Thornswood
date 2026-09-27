@@ -43,6 +43,19 @@ foreach ($p in @($Data, $Plugins, $Settings)) {
   if (-not (Test-Path -LiteralPath $p)) { throw "not found: $p" }
 }
 
+# When the Plugins path is under a Vortex profile, it must be the named
+# Thornswood profile (#557). Another profile's list must not bake the server.
+. (Join-Path $PSScriptRoot 'LoadOrder.ps1')
+if ($Plugins -match '(?i)[\\/]Vortex[\\/].*[\\/]profiles[\\/]') {
+  $tw = Assert-VortexProfile 'Thornswood'
+  $full = [IO.Path]::GetFullPath($Plugins)
+  $twDir = [IO.Path]::GetFullPath($tw)
+  if (-not $full.StartsWith($twDir, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Sync-LoadOrder will only read the Vortex profile named Thornswood (at $tw). Refusing $Plugins."
+  }
+}
+
+
 function Head($t) { Write-Host ''; Write-Host $t -ForegroundColor Cyan }
 function Note($t) { Write-Host "  $t" }
 function Bad($t)  { Write-Host "  $t" -ForegroundColor Yellow }
