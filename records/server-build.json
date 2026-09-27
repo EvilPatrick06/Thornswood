@@ -1,4 +1,4 @@
-﻿{
+{
     "_note":  "What the server binary in this release is, and the source it was built from. Deploy-Server.ps1 refuses to ship a binary whose sha256 is not this one. Regenerate with scripts\\release\\New-ServerBuildRecord.ps1 after every rebuild.",
     "binary":  "scam_native.node",
     "sha256":  "e5d85ed8038b5bfc8e896ab6addc757709d5f272765fba7c418374ca2aedd53f",

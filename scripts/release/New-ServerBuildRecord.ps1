@@ -141,7 +141,13 @@ $rec = [ordered]@{
   'recorded' = (Get-Date).ToString('yyyy-MM-dd')
 }
 
-$rec | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Out -Encoding UTF8
+# Written the way New-ClientBuildRecord.ps1 writes its record: UTF-8 with no
+# byte order mark. Windows PowerShell's -Encoding UTF8 puts one in, and the
+# record of 26 September went to GitHub with it, which PowerShell reads
+# happily and JSON.parse does not, so tests\test-third-party.js could not read
+# the server commit and the three lines that hold THIRD-PARTY.md and the
+# credits page to it never ran.
+[IO.File]::WriteAllText($Out, (($rec | ConvertTo-Json -Depth 5) + "`n"), (New-Object Text.UTF8Encoding($false)))
 
 Write-Host 'Server build recorded'
 Write-Host '---------------------'
