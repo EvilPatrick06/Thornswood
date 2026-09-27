@@ -3,37 +3,40 @@
 
       node .\tests\test-gallery-report.js
 
-  The launcher's end of the gallery: Report on the Play page, and the staff
-  doors staying at the site.
+  The launcher's end of the gallery: Report on the Play page, and the site
+  still being the shape Report was written against.
 
   WHY THIS EXISTS. Issue #731 asked for the launcher to report a picture and
-  for staff to approve, reject and take one down from the same card. Reading
-  site\server.js settled how much of that the launcher may do:
+  for staff to approve, reject and take one down from the same card. Report
+  came first (#739), because /api/gallery/report and /api/gallery/submit read
+  the launcher's signed ticket out of the query and check it the way
+  /api/play/join does, while the six staff doors read who(req), the twa Discord
+  cookie a browser gets at /auth/discord/callback, and the launcher holds no
+  cookie. So this harness held those six to cookie only, on purpose, so that
+  the day one grew a ticket path somebody would notice.
 
-    - /api/gallery/report and /api/gallery/submit read the launcher's signed
-      ticket out of the query and check it the way /api/play/join does, so
-      Report works from here;
-    - /api/gallery/pending, /approve, /reject, /reports, /report/dismiss and
-      DELETE /api/gallery/approved read who(req), which is the twa Discord
-      cookie a browser gets at /auth/discord/callback. The launcher holds no
-      cookie and cannot be given one without the site growing a ticket door,
-      which is the Website lane's change. So those stay on the site and the
-      card sends staff there instead of showing a button that answers 403.
+  The site's #743 is that day: one gate, galleryStaff, in front of all six,
+  taking either the cookie or a staff ticket. The staff half of the card that
+  uses it, and every check on it, is in tests\test-gallery-staff-card.js. This
+  file keeps Report and the card around it, and the staff-door block below now
+  reads whichever of the two shapes site\server.js is on and says which, so it
+  is honest on a checkout with that change and on one without it.
 
   The launcher cannot be started from here (CLAUDE.md), so this reads the
   source, the window and site\server.js and checks the shape:
 
     - Gallery.Report posts to /api/gallery/report with the ticket in the
       query and the name and the reason in the body;
-    - nothing in the launcher calls a staff door;
+    - the reports inbox and dismissing a report stay at the site: nothing in
+      the launcher calls either;
     - the card asks /api/gallery/who and hides Report until it has answered,
       so an older site leaves the page as it was;
     - the public rotation still reads /api/public;
-    - the two buttons exist in ui.xaml, Shell wires both, and the rotation
-      stands still while a report is being written;
+    - the buttons exist in ui.xaml, Shell wires them, and the rotation stands
+      still while a report is being written;
     - the doors named here are the doors site\server.js actually serves, and
-      the report door really does take the ticket while the staff doors
-      really do want staff, so this fails if either side moves;
+      the report door really does take the ticket, so this fails if either
+      side moves;
     - the words follow the house rules and the C# is C# 5.
 
   Read only. It reads launcher\app\*.cs, launcher\ui.xaml and site\server.js.
@@ -89,9 +92,12 @@ yes('the site serves GET /api/gallery/who and answers it to anybody',
 yes('who hands back signed, canSubmit, staff, admin and name',
     /signed: !!\(w\.id \|\| w\.member\)/.test(SERVER) && /staff: !!w\.dev/.test(SERVER));
 
-// Every staff door, and the proof each one wants a browser sign in rather
-// than a ticket. A door that grew a ticket path is a door the launcher could
-// take over, and this test going red is how that gets noticed.
+// Every staff door, and which of the two gates it is on. Before the site's
+// #743 each one read the cookie and nothing else; after it, all six go through
+// galleryStaff, which takes the cookie or a staff ticket. Either is a shape
+// this repository has really been in, so both pass here and the run says which
+// one it read. A door on neither is a door that moved without anybody saying
+// so, and that is the failure worth having.
 const staffDoors = [
   ["p === '/api/gallery/pending' && req.method === 'GET'", '/api/gallery/pending'],
   ["p === '/api/gallery/approve' && req.method === 'POST'", '/api/gallery/approve'],
@@ -100,14 +106,21 @@ const staffDoors = [
   ["p === '/api/gallery/reports' && req.method === 'GET'", '/api/gallery/reports'],
   ["p === '/api/gallery/report/dismiss' && req.method === 'POST'", '/api/gallery/report/dismiss']
 ];
+const ticketed = /async function galleryStaff\(/.test(SERVER);
+console.log('NOTE  site\\server.js has ' + (ticketed
+  ? 'galleryStaff, so the staff doors take a launcher ticket (#743)'
+  : 'no galleryStaff: the staff doors are still cookie only, so the card\'s staff tools wait on #743'));
 for (const [needle, name] of staffDoors) {
   const at = SERVER.indexOf(needle);
   const door = at < 0 ? '' : SERVER.slice(at, at + 400);
-  yes(name + ' is there and is staff only, by the cookie who(req) reads',
-      at > 0 && /if \(!w\.dev\) return sendJson\(res, 403/.test(door) &&
-      !/searchParams\.get\('ticket'\)/.test(door));
+  yes(name + ' is there and is staff only, ' +
+      (ticketed ? 'through the one galleryStaff gate' : 'by the cookie who(req) reads'),
+      at > 0 && (ticketed
+        ? /const gs = await galleryStaff\(url, w\);\s*\n\s*if \(!gs\.ok\) return sendJson\(res, gs\.code, gs\.body\);/.test(door)
+        : /if \(!w\.dev\) return sendJson\(res, 403/.test(door) &&
+          !/searchParams\.get\('ticket'\)/.test(door)));
 }
-yes('who(req) is the twa cookie and nothing else, so the launcher cannot be it',
+yes('who(req) is the twa cookie, so a browser is one way past that gate and not the launcher\'s way',
     /const ADMIN\s+= 'twa';/.test(SERVER) &&
     /function identity\(req\) \{\s*\n\s*const raw = cookies\(req\)\[ADMIN\] \|\| '';/.test(SERVER));
 
@@ -140,15 +153,19 @@ yes('the rotation still reads the public feed and nothing else',
 yes('Manage on the site points at the site page, not at a door',
     /public static string StaffPage \{ get \{ return Discord\.Site \+ "\/uploads"; \} \}/.test(GALLERY));
 
-// ---- no staff door is called from the launcher ------------------------------
+// ---- the two staff doors the card does not use ------------------------------
+// The reports inbox and dismissing a report are staff work about REPORTS, not
+// about a picture on the card, and there is nothing on the Play page to show
+// them on. They stay at the site; the card's own staff tools are the queue,
+// approve, reject and the take down, and tests\test-gallery-staff-card.js is
+// where those are checked.
 const csFiles = fs.readdirSync(APP).filter(f => f.endsWith('.cs'));
-for (const door of ['/api/gallery/approve', '/api/gallery/reject', '/api/gallery/pending',
-                    '/api/gallery/approved', '/api/gallery/reports', '/api/gallery/report/dismiss']) {
+for (const door of ['/api/gallery/reports', '/api/gallery/report/dismiss']) {
   let hits = 0;
   for (const f of csFiles) {
     const src = fs.readFileSync(path.join(APP, f), 'utf8');
     // The report door's own address starts with /api/gallery/report, so the
-    // dismiss one is looked for whole and the rest are plain.
+    // dismiss one is looked for whole and the other is plain.
     hits += (src.split('"' + door).length - 1);
   }
   yes('nothing in the launcher calls ' + door, hits === 0);

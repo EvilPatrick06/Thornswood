@@ -961,18 +961,37 @@ namespace Thornswood
 
         public static int PostJson(string url, string json, out string reply)
         {
+            return Send("POST", url, json, out reply);
+        }
+
+        /// <summary>
+        /// One call to the site and whatever it answered: the status code, and
+        /// the body in reply, refusals included. 0 is the site not reached at
+        /// all, which is not a refusal and is never read as one.
+        ///
+        /// The method is the caller's, because not every door the launcher may
+        /// use is a POST: the gallery queue is a GET and taking an approved
+        /// picture off the gallery is a DELETE (#731). json is the body when
+        /// there is one and null when there is none, so a GET asks with
+        /// nothing rather than with an empty object.
+        /// </summary>
+        public static int Send(string method, string url, string json, out string reply)
+        {
             reply = "";
             try
             {
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
                 var req = (HttpWebRequest)WebRequest.Create(url);
-                req.Method = "POST";
-                req.ContentType = "application/json";
+                req.Method = method;
                 req.Timeout = 15000;
                 req.UserAgent = "Thornswood";
-                var bytes = Encoding.UTF8.GetBytes(json);
-                req.ContentLength = bytes.Length;
-                using (var s = req.GetRequestStream()) s.Write(bytes, 0, bytes.Length);
+                if (json != null)
+                {
+                    req.ContentType = "application/json";
+                    var bytes = Encoding.UTF8.GetBytes(json);
+                    req.ContentLength = bytes.Length;
+                    using (var s = req.GetRequestStream()) s.Write(bytes, 0, bytes.Length);
+                }
                 using (var res = (HttpWebResponse)req.GetResponse())
                 using (var r = new StreamReader(res.GetResponseStream()))
                 {

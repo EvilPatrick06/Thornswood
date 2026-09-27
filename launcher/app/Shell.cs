@@ -131,17 +131,31 @@ namespace Thornswood
         static List<Gallery.Shot> galleryShots;
         static int galleryAt = -1;
         static DispatcherTimer galleryTimer;
-        // Report, and the way to the site's own staff page (#731). galleryWho
-        // is what /api/gallery/who answered at start up, null until it has;
-        // galleryReporting is the picture an open report is about, held so the
-        // report goes to that one even if the card has turned since.
+        // Report, the staff tools and the way to the site's own gallery page
+        // (#731). galleryWho is what /api/gallery/who answered at start up,
+        // null until it has; galleryReporting is the picture an open report is
+        // about, held so the report goes to that one even if the card has
+        // turned since, and galleryTakingDown is the same for a take down.
         static Button btnGalleryReport, btnGalleryManage,
-                      btnGalleryReportSend, btnGalleryReportCancel;
-        static FrameworkElement galleryReportRow;
+                      btnGalleryReportSend, btnGalleryReportCancel,
+                      btnGalleryQueue, btnGalleryTakeDown,
+                      btnGalleryApprove, btnGalleryReject,
+                      btnGalleryQueueNext, btnGalleryQueueClose,
+                      btnGalleryTakeDownYes, btnGalleryTakeDownNo;
+        static FrameworkElement galleryReportRow, galleryQueueRow, galleryTakeDownRow;
         static TextBox boxGalleryWhy;
-        static TextBlock txtGallerySaid;
+        static TextBlock txtGallerySaid, txtGalleryQueue;
         static Gallery.Who galleryWho;
-        static Gallery.Shot galleryReporting;
+        static Gallery.Shot galleryReporting, galleryTakingDown;
+        // What the site says is waiting, which one of it the queue row is on,
+        // and how many there were when it was last asked, which is the number
+        // on the Queue button. galleryQueueBusy holds Approve and Reject while
+        // one of them is in the air, so a second press cannot send the same
+        // name twice. gallerySaidSticks keeps one line under the card alive
+        // across the turn it caused: see SayGallery and StickGallery.
+        static List<Gallery.Pending> galleryQueue;
+        static int galleryQueueAt, galleryQueueCount;
+        static bool galleryQueueBusy, gallerySaidSticks;
         static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
         static CheckBox chkMusic; static Slider sldMusic; static TextBlock txtMusic;
@@ -688,6 +702,17 @@ namespace Thornswood
             btnGalleryReportSend = F<Button>("BtnGalleryReportSend");
             btnGalleryReportCancel = F<Button>("BtnGalleryReportCancel");
             txtGallerySaid = F<TextBlock>("TxtGallerySaid");
+            btnGalleryQueue = F<Button>("BtnGalleryQueue");
+            btnGalleryTakeDown = F<Button>("BtnGalleryTakeDown");
+            galleryQueueRow = F<FrameworkElement>("GalleryQueueRow");
+            txtGalleryQueue = F<TextBlock>("TxtGalleryQueue");
+            btnGalleryApprove = F<Button>("BtnGalleryApprove");
+            btnGalleryReject = F<Button>("BtnGalleryReject");
+            btnGalleryQueueNext = F<Button>("BtnGalleryQueueNext");
+            btnGalleryQueueClose = F<Button>("BtnGalleryQueueClose");
+            galleryTakeDownRow = F<FrameworkElement>("GalleryTakeDownRow");
+            btnGalleryTakeDownYes = F<Button>("BtnGalleryTakeDownYes");
+            btnGalleryTakeDownNo = F<Button>("BtnGalleryTakeDownNo");
 
             // Same order as the PageXxx constants above, and as PageTitles.
             navButtons = new Button[] {
@@ -854,9 +879,15 @@ namespace Thornswood
             }
             // Linking or unlinking is what decides whether the gallery card can
             // offer Report, and whether the site's last word made this account
-            // staff. A report half written under the account that has just gone
-            // is closed rather than sent under the new one.
-            if (GalleryReportOpen && !Discord.Linked) CloseGalleryReport();
+            // staff. A report half written, a queue open or a take down asked
+            // under the account that has just gone is closed rather than sent
+            // under the new one.
+            if (!Discord.Linked)
+            {
+                if (GalleryReportOpen) CloseGalleryReport();
+                if (GalleryQueueOpen) CloseGalleryQueue();
+                if (GalleryTakeDownOpen) CloseGalleryTakeDown();
+            }
             PaintGalleryTools();
         }
 
@@ -1221,17 +1252,20 @@ namespace Thornswood
         ///
         /// Gallery.Load asks /api/public, the same public feed the front page
         /// reads, and the site keeps the queue and chooses what goes into the
-        /// gallery. The launcher shows what is already public. The one thing it
-        /// sends is a report on the picture on the card (#731), over the same
-        /// signed ticket the door uses; approving, rejecting and taking an
-        /// approved picture down are the site's doors and want a browser sign
-        /// in, so BtnGalleryManage opens the site page for staff rather than
-        /// pretending to do it from here.
+        /// gallery. The launcher shows what is already public, and sends over
+        /// its own signed ticket (#731): a report on the picture on the card
+        /// from anybody whose copy is linked, and for staff the queue, approve,
+        /// reject and taking the picture on the card off the gallery, which the
+        /// site's #743 opened to a ticket. BtnGalleryManage stays as the way to
+        /// look at a picture that is still waiting, which needs the browser's
+        /// own sign in, and the way through if this site is older than that.
         ///
         /// The list is fetched once on a pool thread at start up, and
         /// /api/gallery/who is asked in the same trip, only to find out whether
         /// this site has the gallery doors at all: a site older than them has
-        /// no address to report to and the button stays hidden.
+        /// no address to report to and the button stays hidden. For staff the
+        /// queue is counted in the same trip, so the card says how many are
+        /// waiting without anybody pressing anything.
         ///
         /// The card stays hidden until the first picture has loaded, so a site
         /// that is down, or a build shown before anybody has sent a picture,
@@ -1248,27 +1282,48 @@ namespace Thornswood
                 // to swallow: the same shape as AskOnline.
                 List<Gallery.Shot> shots = Gallery.Load();
                 Gallery.Who who = Gallery.AskWho();
+                // Staff only, and only for the number on the Queue button. A
+                // site that will not answer it leaves the button saying Queue,
+                // and pressing it says why then.
+                int waiting = 0;
+                if (GalleryStaff())
+                {
+                    string bad;
+                    List<Gallery.Pending> queue = Gallery.Queue(out bad);
+                    if (bad.Length == 0) waiting = queue.Count;
+                }
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     galleryWho = who;
+                    galleryQueueCount = waiting;
+                    PaintQueueCount();
                     galleryShots = (shots != null && shots.Count > 0) ? shots : null;
                     galleryAt = -1;
-                    if (galleryShots == null) return;
+                    if (galleryShots == null) { ShowEmptyGallery(); return; }
 
-                    if (galleryTimer == null)
-                    {
-                        galleryTimer = new DispatcherTimer();
-                        galleryTimer.Interval = TimeSpan.FromSeconds(7);
-                        galleryTimer.Tick += delegate { ShowNextShot(); };
-                        // Turn only while somebody can see it: off the Play
-                        // page, minimised or in game it stands still, the way
-                        // the menu music and the title video do.
-                        win.StateChanged += delegate { GalleryDecide(); };
-                    }
+                    StartGalleryTimer();
                     ShowNextShot();
                     GalleryDecide();
                 }));
             });
+        }
+
+        /// <summary>
+        /// The seven second turn, made once. Called again when a picture
+        /// approved from the card fills a gallery that was empty when the
+        /// launcher started, which is the one way the rotation begins after
+        /// start up.
+        /// </summary>
+        static void StartGalleryTimer()
+        {
+            if (galleryTimer != null) return;
+            galleryTimer = new DispatcherTimer();
+            galleryTimer.Interval = TimeSpan.FromSeconds(7);
+            galleryTimer.Tick += delegate { ShowNextShot(); };
+            // Turn only while somebody can see it: off the Play page,
+            // minimised or in game it stands still, the way the menu music and
+            // the title video do.
+            win.StateChanged += delegate { GalleryDecide(); };
         }
 
         /// <summary>
@@ -1299,23 +1354,43 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Which of the two buttons under the picture apply right now. Report
-        /// for anybody whose copy is linked, once the site has shown it has the
+        /// Which of the buttons under the picture apply right now. Report for
+        /// anybody whose copy is linked, once the site has shown it has the
         /// gallery doors and the picture on the card has a name to report;
-        /// Manage on the site for staff.
+        /// Queue, Take this down and On the site for staff.
+        ///
+        /// Every one of them goes while a row is open underneath, so the card
+        /// asks one thing at a time and nothing can be started behind the
+        /// question already on it.
         /// </summary>
         static void PaintGalleryTools()
         {
             bool doors = galleryWho != null && galleryWho.Answered;
             Gallery.Shot shot = CurrentShot();
             bool named = shot != null && shot.Name != null && shot.Name.Length > 0;
+            bool staff = doors && GalleryStaff();
+            bool quiet = !GalleryReportOpen && !GalleryQueueOpen && !GalleryTakeDownOpen;
 
             if (btnGalleryReport != null)
-                btnGalleryReport.Visibility = (doors && named && Discord.Linked && !GalleryReportOpen)
+                btnGalleryReport.Visibility = (doors && named && Discord.Linked && quiet)
+                    ? Visibility.Visible : Visibility.Collapsed;
+            if (btnGalleryQueue != null)
+                btnGalleryQueue.Visibility = (staff && quiet)
+                    ? Visibility.Visible : Visibility.Collapsed;
+            if (btnGalleryTakeDown != null)
+                btnGalleryTakeDown.Visibility = (staff && named && quiet)
                     ? Visibility.Visible : Visibility.Collapsed;
             if (btnGalleryManage != null)
-                btnGalleryManage.Visibility = (doors && GalleryStaff())
+                btnGalleryManage.Visibility = (staff && quiet)
                     ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>How many are waiting, on the Queue button itself.</summary>
+        static void PaintQueueCount()
+        {
+            if (btnGalleryQueue == null) return;
+            btnGalleryQueue.Content = galleryQueueCount > 0
+                ? "Queue (" + galleryQueueCount + ")" : "Queue";
         }
 
         static bool GalleryReportOpen
@@ -1323,11 +1398,23 @@ namespace Thornswood
             get { return galleryReportRow != null && galleryReportRow.Visibility == Visibility.Visible; }
         }
 
+        static bool GalleryQueueOpen
+        {
+            get { return galleryQueueRow != null && galleryQueueRow.Visibility == Visibility.Visible; }
+        }
+
+        static bool GalleryTakeDownOpen
+        {
+            get { return galleryTakeDownRow != null && galleryTakeDownRow.Visibility == Visibility.Visible; }
+        }
+
         /// <summary>
         /// One line under the picture, or nothing when there is nothing to say.
+        /// It belongs to the picture that is up: the next turn clears it.
         /// </summary>
         static void SayGallery(string line)
         {
+            gallerySaidSticks = false;
             if (txtGallerySaid == null) return;
             if (string.IsNullOrEmpty(line))
             {
@@ -1337,6 +1424,34 @@ namespace Thornswood
             }
             txtGallerySaid.Text = line;
             txtGallerySaid.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// The same line, for an answer that must outlive the turn it causes:
+        /// approving a picture turns the card to it and taking one down turns
+        /// the card off it, and the answer to what somebody just did should not
+        /// be wiped by the card doing what they asked for.
+        /// </summary>
+        static void StickGallery(string line)
+        {
+            SayGallery(line);
+            gallerySaidSticks = !string.IsNullOrEmpty(line);
+        }
+
+        /// <summary>
+        /// Nothing is on the public gallery. The card stays hidden, the way it
+        /// always has, unless this is staff with something waiting: the queue
+        /// that would fill it is worked from this card now, and a hidden card
+        /// is no way to reach it.
+        /// </summary>
+        static void ShowEmptyGallery()
+        {
+            bool show = galleryQueueCount > 0 && GalleryStaff();
+            if (galleryBy != null && show) galleryBy.Text = "Nothing is on the gallery yet.";
+            if (galleryImage != null && show) galleryImage.Source = null;
+            if (galleryCard != null)
+                galleryCard.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            PaintGalleryTools();
         }
 
         /// <summary>
@@ -1354,6 +1469,8 @@ namespace Thornswood
                 return;
             }
 
+            CloseGalleryQueue();
+            CloseGalleryTakeDown();
             galleryReporting = shot;
             SayGallery("Say what is wrong with this picture. Staff read it; nothing comes off the gallery until one of them takes it off.");
             if (boxGalleryWhy != null) boxGalleryWhy.Text = "";
@@ -1406,6 +1523,303 @@ namespace Thornswood
             });
         }
 
+        // ---- the staff tools on the card (#731) --------------------------------
+        //
+        // The queue, approve, reject and taking the picture on the card off the
+        // gallery, all four over this copy's own ticket. The site decides on
+        // every call whether the Discord account behind that ticket is staff;
+        // what is below only decides which buttons are worth showing.
+
+        /// <summary>
+        /// Opens the queue on the card and asks the site what is waiting. One
+        /// picture at a time, with Approve and Reject beside it.
+        /// </summary>
+        static void OpenGalleryQueue()
+        {
+            if (!GalleryStaff()) return;
+            CloseGalleryReport();
+            CloseGalleryTakeDown();
+
+            galleryQueue = null;
+            galleryQueueAt = 0;
+            galleryQueueBusy = false;
+            if (galleryQueueRow != null) galleryQueueRow.Visibility = Visibility.Visible;
+            PaintGalleryQueue();
+            SayGallery("Asking thornswood.net what is waiting...");
+            PaintGalleryTools();
+            GalleryDecide();
+
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string bad;
+                List<Gallery.Pending> waiting = Gallery.Queue(out bad);
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    // Closed while the site was being asked: its answer is not
+                    // wanted any more, and neither is a line about it.
+                    if (!GalleryQueueOpen) return;
+                    if (bad.Length > 0) { CloseGalleryQueue(); SayGallery(bad); return; }
+
+                    galleryQueue = waiting;
+                    galleryQueueAt = 0;
+                    galleryQueueCount = waiting.Count;
+                    PaintQueueCount();
+                    if (waiting.Count == 0)
+                    {
+                        CloseGalleryQueue();
+                        SayGallery("Nothing is waiting for the gallery.");
+                        return;
+                    }
+                    SayGallery("");
+                    PaintGalleryQueue();
+                }));
+            });
+        }
+
+        static void CloseGalleryQueue()
+        {
+            if (galleryQueueRow != null) galleryQueueRow.Visibility = Visibility.Collapsed;
+            galleryQueue = null;
+            galleryQueueAt = 0;
+            galleryQueueBusy = false;
+            PaintGalleryTools();
+            GalleryDecide();
+        }
+
+        /// <summary>The one in the queue the row is on, or null.</summary>
+        static Gallery.Pending QueueAt()
+        {
+            if (galleryQueue == null || galleryQueueAt < 0 || galleryQueueAt >= galleryQueue.Count) return null;
+            return galleryQueue[galleryQueueAt];
+        }
+
+        /// <summary>
+        /// What is written on the queue row: which one of how many, its name,
+        /// who sent it, when, and the note they sent with it.
+        ///
+        /// Not the picture. The only door that serves one still waiting is the
+        /// site's /up, which takes the browser's cookie, so On the site is how
+        /// to look at it and the row says so rather than pretending otherwise.
+        /// </summary>
+        static void PaintGalleryQueue()
+        {
+            Gallery.Pending one = QueueAt();
+            bool have = one != null;
+            if (btnGalleryApprove != null) btnGalleryApprove.IsEnabled = have && !galleryQueueBusy;
+            if (btnGalleryReject != null) btnGalleryReject.IsEnabled = have && !galleryQueueBusy;
+            if (btnGalleryQueueNext != null)
+                btnGalleryQueueNext.Visibility = (galleryQueue != null && galleryQueue.Count > 1)
+                    ? Visibility.Visible : Visibility.Collapsed;
+            if (txtGalleryQueue == null) return;
+
+            if (!have) { txtGalleryQueue.Text = "Asking what is waiting..."; return; }
+
+            var sb = new StringBuilder();
+            sb.Append(galleryQueueAt + 1).Append(" of ").Append(galleryQueue.Count)
+              .Append(": ").Append(one.Name);
+            if (one.By.Length > 0) sb.Append(", by ").Append(one.By);
+            if (one.When != DateTime.MinValue) sb.Append(", sent ").Append(one.When.ToString("d MMM HH:mm"));
+            sb.Append(".");
+            if (one.Note.Length > 0) sb.Append(" Note: ").Append(one.Note);
+            sb.Append(" The picture itself opens on the site, which is where it can be looked at.");
+            txtGalleryQueue.Text = sb.ToString();
+        }
+
+        /// <summary>The next one waiting, wrapping round at the end.</summary>
+        static void NextInGalleryQueue()
+        {
+            if (galleryQueue == null || galleryQueue.Count == 0) return;
+            galleryQueueAt = (galleryQueueAt + 1) % galleryQueue.Count;
+            SayGallery("");
+            PaintGalleryQueue();
+        }
+
+        /// <summary>
+        /// Approve or reject the one the row is on. Approving puts it on the
+        /// public gallery, and the card then turns to it, so whoever approved
+        /// it sees what went up with Take this down beside it. Rejecting takes
+        /// it off the queue; it was never public, and the file stays on the
+        /// site.
+        /// </summary>
+        static void AnswerGalleryQueue(bool approve)
+        {
+            Gallery.Pending one = QueueAt();
+            if (one == null || galleryQueueBusy) return;
+
+            string name = one.Name;
+            galleryQueueBusy = true;
+            PaintGalleryQueue();
+            SayGallery(approve ? "Putting that on the gallery..." : "Taking that off the queue...");
+
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string bad = approve ? Gallery.Approve(name) : Gallery.Reject(name);
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    galleryQueueBusy = false;
+                    if (bad.Length > 0) { SayGallery(bad); PaintGalleryQueue(); return; }
+
+                    DropFromQueue(name);
+                    if (approve)
+                    {
+                        StickGallery("Approved. It is on the gallery now, and the card turns to it.");
+                        ReloadGalleryShots(name);
+                    }
+                    else
+                    {
+                        // Nothing turns on a reject, so this one does not have
+                        // to outlive a turn: the plain line is right.
+                        SayGallery("Rejected. It is off the queue and was never public, and the file stays on the site.");
+                    }
+
+                    if (galleryQueue == null || galleryQueue.Count == 0) CloseGalleryQueue();
+                    else PaintGalleryQueue();
+                }));
+            });
+        }
+
+        /// <summary>
+        /// One name off the queue held here, and off the number on the button,
+        /// after the site has said it took it.
+        /// </summary>
+        static void DropFromQueue(string name)
+        {
+            if (galleryQueue != null)
+            {
+                for (int i = 0; i < galleryQueue.Count; i++)
+                {
+                    if (galleryQueue[i].Name != name) continue;
+                    galleryQueue.RemoveAt(i);
+                    break;
+                }
+                if (galleryQueueAt >= galleryQueue.Count) galleryQueueAt = 0;
+            }
+            galleryQueueCount = galleryQueue != null ? galleryQueue.Count : Math.Max(0, galleryQueueCount - 1);
+            PaintQueueCount();
+        }
+
+        /// <summary>
+        /// Asks the question before taking the picture on the card off the
+        /// gallery. Two presses, because one press is all that stands between
+        /// the rotation turning and somebody taking down the wrong picture.
+        /// </summary>
+        static void OpenGalleryTakeDown()
+        {
+            if (!GalleryStaff()) return;
+            Gallery.Shot shot = CurrentShot();
+            if (shot == null || shot.Name == null || shot.Name.Length == 0) return;
+
+            CloseGalleryReport();
+            CloseGalleryQueue();
+            galleryTakingDown = shot;
+            if (btnGalleryTakeDownYes != null) btnGalleryTakeDownYes.IsEnabled = true;
+            if (galleryTakeDownRow != null) galleryTakeDownRow.Visibility = Visibility.Visible;
+            SayGallery("Take " + shot.Name + " off the gallery? Nobody sees it on the site after that, and any report about it goes with it. The file stays on the site.");
+            PaintGalleryTools();
+            GalleryDecide();
+        }
+
+        static void CloseGalleryTakeDown()
+        {
+            galleryTakingDown = null;
+            if (galleryTakeDownRow != null) galleryTakeDownRow.Visibility = Visibility.Collapsed;
+            if (btnGalleryTakeDownYes != null) btnGalleryTakeDownYes.IsEnabled = true;
+            PaintGalleryTools();
+            GalleryDecide();
+        }
+
+        /// <summary>
+        /// Takes the picture the question was asked about off the gallery, and
+        /// off this card with it, whatever the rotation has done since.
+        /// </summary>
+        static void TakeGalleryShotDown()
+        {
+            Gallery.Shot shot = galleryTakingDown;
+            if (shot == null) { CloseGalleryTakeDown(); return; }
+
+            string name = shot.Name;
+            if (btnGalleryTakeDownYes != null) btnGalleryTakeDownYes.IsEnabled = false;
+            SayGallery("Taking it down...");
+
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string bad = Gallery.TakeDown(name);
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (btnGalleryTakeDownYes != null) btnGalleryTakeDownYes.IsEnabled = true;
+                    if (bad.Length > 0) { SayGallery(bad); return; }
+
+                    CloseGalleryTakeDown();
+                    StickGallery("Taken down. It is off the gallery on the site as well as off this card.");
+                    DropShot(name);
+                }));
+            });
+        }
+
+        /// <summary>
+        /// One picture out of the rotation once the site has taken it off the
+        /// gallery, without asking the feed again: the card turns to the next
+        /// one, and with none left it goes back to hidden unless staff still
+        /// have a queue to work.
+        /// </summary>
+        static void DropShot(string name)
+        {
+            if (galleryShots == null) return;
+            int was = galleryAt;
+            for (int i = 0; i < galleryShots.Count; i++)
+            {
+                if (galleryShots[i].Name != name) continue;
+                galleryShots.RemoveAt(i);
+                // Everything after it slid down one, so the place the card is
+                // at slides with it, and the one that was next is next again.
+                if (i <= was) was--;
+                break;
+            }
+
+            if (galleryShots.Count == 0)
+            {
+                galleryShots = null;
+                galleryAt = -1;
+                if (galleryTimer != null) galleryTimer.Stop();
+                ShowEmptyGallery();
+                return;
+            }
+            galleryAt = was;
+            ShowNextShot();
+        }
+
+        /// <summary>
+        /// Reads the public feed again and turns the card to one picture by
+        /// name, which is what approving does: the shot that was waiting a
+        /// moment ago is on /api/public now and belongs in the rotation.
+        /// </summary>
+        static void ReloadGalleryShots(string show)
+        {
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                List<Gallery.Shot> shots = Gallery.Load();
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (shots == null || shots.Count == 0) return;
+                    galleryShots = shots;
+                    // The gallery may have been empty when the launcher
+                    // started, in which case this picture is the first one and
+                    // the rotation has nothing turning it yet.
+                    StartGalleryTimer();
+
+                    int at = 0;
+                    for (int i = 0; i < shots.Count; i++)
+                    {
+                        if (shots[i].Name != show) continue;
+                        at = i;
+                        break;
+                    }
+                    TurnTo(at);
+                    GalleryDecide();
+                }));
+            });
+        }
+
         /// <summary>
         /// Turns to the next picture. Its image is fetched on a pool thread the
         /// first time it is shown and kept after that; a picture that will not
@@ -1414,7 +1828,14 @@ namespace Thornswood
         static void ShowNextShot()
         {
             if (galleryShots == null || galleryShots.Count == 0) return;
-            galleryAt = (galleryAt + 1) % galleryShots.Count;
+            TurnTo((galleryAt + 1) % galleryShots.Count);
+        }
+
+        /// <summary>One picture by where it is in the list.</summary>
+        static void TurnTo(int index)
+        {
+            if (galleryShots == null || index < 0 || index >= galleryShots.Count) return;
+            galleryAt = index;
             Gallery.Shot shot = galleryShots[galleryAt];
 
             if (shot.Image != null) { ShowShot(shot); return; }
@@ -1446,17 +1867,20 @@ namespace Thornswood
                     : "From the world";
             if (galleryCard != null && galleryCard.Visibility != Visibility.Visible)
                 galleryCard.Visibility = Visibility.Visible;
-            // What was said about the picture before belongs to that picture.
-            SayGallery("");
+            // What was said about the picture before belongs to that picture,
+            // unless it is the answer to what staff just did to this one and
+            // this turn is what they asked for.
+            if (gallerySaidSticks) gallerySaidSticks = false;
+            else SayGallery("");
             PaintGalleryTools();
         }
 
         /// <summary>
         /// Runs the rotation only when the Play page is up, the window is not
-        /// minimised, no game is running and nobody is part way through
-        /// reporting the picture that is up, so nothing is fetched or turned
-        /// behind a page nobody is looking at, and the picture a report is
-        /// about cannot change under whoever is writing it.
+        /// minimised, no game is running and no row is open under the card, so
+        /// nothing is fetched or turned behind a page nobody is looking at, and
+        /// the picture a report, a queue answer or a take down is about cannot
+        /// change under whoever is part way through it.
         /// </summary>
         static void GalleryDecide()
         {
@@ -1464,7 +1888,7 @@ namespace Thornswood
             bool seen = pages != null && pages[PagePlay] != null &&
                         pages[PagePlay].IsVisible &&
                         win.WindowState != WindowState.Minimized && !playing &&
-                        !GalleryReportOpen;
+                        !GalleryReportOpen && !GalleryQueueOpen && !GalleryTakeDownOpen;
             if (seen) { if (!galleryTimer.IsEnabled) galleryTimer.Start(); }
             else { if (galleryTimer.IsEnabled) galleryTimer.Stop(); }
         }
@@ -1790,11 +2214,13 @@ namespace Thornswood
 
             btnAllControls.Click += delegate { ShowPage(PageControls); };
 
-            // The gallery card's two buttons (#731). Report writes to the site
-            // over this copy's own ticket; Manage on the site opens the page
-            // where staff approve the queue and take an approved picture down,
-            // because those doors read a browser sign in and the launcher has
-            // none to give them.
+            // The gallery card's buttons (#731). All of them write to the site
+            // over this copy's own ticket: Report for anybody who is linked,
+            // and for staff the queue, approve, reject and taking the picture
+            // on the card off the gallery. On the site opens the site's own
+            // gallery page, which is where a picture still waiting can be
+            // looked at and the way through if this site is older than the gate
+            // that takes a ticket.
             if (btnGalleryReport != null) btnGalleryReport.Click += delegate { OpenGalleryReport(); };
             if (btnGalleryReportCancel != null) btnGalleryReportCancel.Click += delegate { CloseGalleryReport(); };
             if (btnGalleryReportSend != null) btnGalleryReportSend.Click += delegate { SendGalleryReport(); };
@@ -1804,10 +2230,18 @@ namespace Thornswood
                     if (e.Key == Key.Enter) { e.Handled = true; SendGalleryReport(); }
                     else if (e.Key == Key.Escape) { e.Handled = true; CloseGalleryReport(); }
                 };
+            if (btnGalleryQueue != null) btnGalleryQueue.Click += delegate { OpenGalleryQueue(); };
+            if (btnGalleryQueueClose != null) btnGalleryQueueClose.Click += delegate { CloseGalleryQueue(); };
+            if (btnGalleryQueueNext != null) btnGalleryQueueNext.Click += delegate { NextInGalleryQueue(); };
+            if (btnGalleryApprove != null) btnGalleryApprove.Click += delegate { AnswerGalleryQueue(true); };
+            if (btnGalleryReject != null) btnGalleryReject.Click += delegate { AnswerGalleryQueue(false); };
+            if (btnGalleryTakeDown != null) btnGalleryTakeDown.Click += delegate { OpenGalleryTakeDown(); };
+            if (btnGalleryTakeDownNo != null) btnGalleryTakeDownNo.Click += delegate { CloseGalleryTakeDown(); };
+            if (btnGalleryTakeDownYes != null) btnGalleryTakeDownYes.Click += delegate { TakeGalleryShotDown(); };
             if (btnGalleryManage != null)
                 btnGalleryManage.Click += delegate
                 {
-                    SayGallery("Opening the gallery page on thornswood.net. Sign in there with Discord to approve what is waiting or take a picture down.");
+                    SayGallery("Opening the gallery page on thornswood.net. Sign in there with Discord to look at what is waiting.");
                     Open(Gallery.StaffPage);
                 };
 

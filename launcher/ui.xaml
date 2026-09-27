@@ -727,14 +727,20 @@
                   <!-- The byline, and what a person may do about the picture on
                        the card (#731). Report is there for anybody whose copy is
                        linked to Discord; it goes to the site over the launcher's
-                       own ticket. Manage on the site is for staff and opens the
-                       site page where the queue and the delete live, because
-                       those doors take a browser sign in and not a ticket.
-                       Both start hidden and Shell.cs shows what applies. -->
+                       own ticket. Queue and Take this down are for staff and go
+                       over the same ticket, since the site's #743 put one gate
+                       in front of the staff doors that takes a ticket as well
+                       as the browser cookie. On the site stays for staff as the
+                       way to LOOK at a picture waiting in the queue, which needs
+                       the browser's own sign in, and the way through when the
+                       site is older than that gate.
+                       All four start hidden and Shell.cs shows what applies. -->
                   <StackPanel Grid.Row="2" Margin="2,8,2,0">
                     <Grid>
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                       </Grid.ColumnDefinitions>
@@ -743,8 +749,14 @@
                       <Button x:Name="BtnGalleryReport" Grid.Column="1" Style="{StaticResource Ghost}"
                               Content="Report" Padding="10,4" Margin="10,0,0,0"
                               VerticalAlignment="Center" Visibility="Collapsed"/>
-                      <Button x:Name="BtnGalleryManage" Grid.Column="2" Style="{StaticResource Ghost}"
-                              Content="Manage on the site" Padding="10,4" Margin="8,0,0,0"
+                      <Button x:Name="BtnGalleryQueue" Grid.Column="2" Style="{StaticResource Ghost}"
+                              Content="Queue" Padding="10,4" Margin="8,0,0,0"
+                              VerticalAlignment="Center" Visibility="Collapsed"/>
+                      <Button x:Name="BtnGalleryTakeDown" Grid.Column="3" Style="{StaticResource Ghost}"
+                              Content="Take this down" Padding="10,4" Margin="8,0,0,0"
+                              VerticalAlignment="Center" Visibility="Collapsed"/>
+                      <Button x:Name="BtnGalleryManage" Grid.Column="4" Style="{StaticResource Ghost}"
+                              Content="On the site" Padding="10,4" Margin="8,0,0,0"
                               VerticalAlignment="Center" Visibility="Collapsed"/>
                     </Grid>
 
@@ -764,6 +776,43 @@
                       <Button x:Name="BtnGalleryReportCancel" Grid.Column="2" Style="{StaticResource Ghost}"
                               Content="Cancel" Padding="10,4" Margin="8,0,0,0"/>
                     </Grid>
+
+                    <!-- The staff queue, one waiting picture at a time. The
+                         picture itself is not here: the /up door at the site takes
+                         the browser's cookie and the launcher has none, so this
+                         is what was sent with it and On the site is how to look
+                         at it first. The rotation stands still while it is open. -->
+                    <Grid x:Name="GalleryQueueRow" Margin="0,8,0,0" Visibility="Collapsed">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock x:Name="TxtGalleryQueue" Grid.Column="0" Style="{StaticResource Small}"
+                                 TextWrapping="Wrap" VerticalAlignment="Center"/>
+                      <Button x:Name="BtnGalleryApprove" Grid.Column="1" Style="{StaticResource Ghost}"
+                              Content="Approve" Padding="10,4" Margin="10,0,0,0"/>
+                      <Button x:Name="BtnGalleryReject" Grid.Column="2" Style="{StaticResource Ghost}"
+                              Content="Reject" Padding="10,4" Margin="8,0,0,0"/>
+                      <Button x:Name="BtnGalleryQueueNext" Grid.Column="3" Style="{StaticResource Ghost}"
+                              Content="Next" Padding="10,4" Margin="8,0,0,0"/>
+                      <Button x:Name="BtnGalleryQueueClose" Grid.Column="4" Style="{StaticResource Ghost}"
+                              Content="Close" Padding="10,4" Margin="8,0,0,0"/>
+                    </Grid>
+
+                    <!-- Taking an approved picture off the gallery is asked
+                         twice, because the first press is one click away from
+                         the rotation turning under it. The question itself is
+                         the line under here. -->
+                    <StackPanel x:Name="GalleryTakeDownRow" Orientation="Horizontal"
+                                HorizontalAlignment="Right" Margin="0,8,0,0" Visibility="Collapsed">
+                      <Button x:Name="BtnGalleryTakeDownYes" Style="{StaticResource Ghost}"
+                              Content="Take it down" Padding="10,4"/>
+                      <Button x:Name="BtnGalleryTakeDownNo" Style="{StaticResource Ghost}"
+                              Content="Cancel" Padding="10,4" Margin="8,0,0,0"/>
+                    </StackPanel>
 
                     <TextBlock x:Name="TxtGallerySaid" Style="{StaticResource Small}"
                                TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
