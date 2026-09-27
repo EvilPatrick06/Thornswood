@@ -32,13 +32,13 @@
 
   ONE THING IT USED TO GET WRONG, fixed here rather than in the launcher,
   because the launcher was right and this file was behind. The theme was read
-  as a WPF MediaPlayer, `music.Open(...)`. That player failed on the ship PC
-  with "Windows Media Player version 10 or later is required", so the theme
-  moved to MenuMusic, the WebView2 page, and StartMenuMusic calls
-  MenuMusic.Start instead (#697). The old regex then matched nothing in either
-  walk: the line holding a normal start to the theme failed, and the line
-  keeping the theme out of an uninstall passed with nothing left to check.
-  Both read MenuMusic now, so both mean what they say again.
+  as `music.Open(...)`, the WPF MediaPlayer. That failed on the ship PC with
+  "Windows Media Player version 10 or later is required", so the theme moved
+  to MenuMusic, the WebView2 page, and StartMenuMusic calls MenuMusic.Start
+  instead (#697). The old regex then matched nothing in either walk: the line
+  holding a normal start to the theme failed, and the line keeping the theme
+  out of an uninstall passed with nothing left to check. Both read MenuMusic
+  now, so both mean what they say again.
 
   Read only. Give it a folder to read another copy of launcher\app, which is how
   it was shown to fail on the code before the change:
