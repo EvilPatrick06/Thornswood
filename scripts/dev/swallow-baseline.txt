@@ -120,8 +120,13 @@
 # number was raised. Behaviour of Config.Save / Swap.Restore / Hold.Release /
 # Keep.Unpark is still log-only; stop-swallowing remains later work. Giant
 # files (Shell, Voice, Icons, Checks, Updater) are left for later slices.
-Checks.cs 20
-Icons.cs 20
+#
+# Issue #461 next slice, 27 Sep. Converted every empty catch in Voice, Icons
+# and Checks to Swallow.Note. That is 62 fewer silent catches, 158 down to 96.
+# Files that reached zero are dropped from this list (an unlisted file is
+# allowed none). No baseline number was raised. Behaviour of Config.Save /
+# Swap.Restore / Hold.Release / Keep.Unpark is still log-only; stop-
+# swallowing remains later work. Giant leftovers Shell and Updater are left
+# for later slices.
 Shell.cs 76
 Updater.cs 20
-Voice.cs 22
