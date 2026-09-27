@@ -669,7 +669,7 @@
                   </Rectangle>
                 </Grid>
                 <!-- Tall cinematic strip: restore pre-shrink animated/hero height.
-                     195 was still short vs Gavin's left reference; 260 matches the
+                     195 was still short vs the left screenshot reference; 260 matches the
                      older MediaElement-era band with room for the landscape crop.
                      Window Height 880 keeps Gallery star space from shrinking. -->
                 <Grid Margin="36,26,36,24" MinHeight="260">
