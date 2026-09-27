@@ -630,24 +630,35 @@ namespace Thornswood
                 F<Grid>("PageHelp"), F<Grid>("PageSettings") };
 
             /*
-              Saves is gone.
+              Saves is gone, and with it Server, Mods, What is installed and
+              Logs (issue #599).
 
               Characters live on the server now, so a page for browsing and
               backing up local save files is showing people something that is
               no longer where their character is, which is worse than showing
-              them nothing.
+              them nothing. The other four are the read-and-diagnose pages the
+              team no longer wants in the everyday rail: Play, News, Controls,
+              Diagnostics, Help and Settings are what is left.
 
-              Collapsed rather than cut out of the arrays. These three arrays
-              and the PageXxx constants are parallel and indexed by number, and
-              the comment on those constants records that a bare number in the
-              middle of Play() once sent people to the wrong page for weeks.
-              Renumbering eleven entries to save one unreachable Grid is how
-              that happens again. The page cannot be reached, which is what was
-              asked for; the dead Grid costs nothing and can be cut properly
-              whenever the xaml is next opened.
+              Collapsed rather than cut out of the arrays. The three arrays
+              (navButtons, pages, PageTitles) and the PageXxx constants are
+              parallel and indexed by number, and the comment on those
+              constants records that a bare number in the middle of Play() once
+              sent people to the wrong page for weeks. Renumbering eleven
+              entries to save a few unreachable Grids is how that happens again.
+              The pages cannot be reached from the rail, which is what was
+              asked for; the dead Grids cost nothing and can be cut properly
+              whenever the xaml is next opened on a machine with the compiler.
+
+              Mods stays wired on purpose even though its button is hidden:
+              a blocked Play still sends people to it (ShowPage(PageMods)) so
+              they can see the scan and press Fix. It just is not somewhere to
+              wander into from the rail any more.
             */
-            if (navButtons[PageSaves] != null)
-                navButtons[PageSaves].Visibility = Visibility.Collapsed;
+            int[] hiddenNav = { PageSaves, PageServer, PageMods, PageBuild, PageLogs };
+            foreach (int p in hiddenNav)
+                if (navButtons[p] != null)
+                    navButtons[p].Visibility = Visibility.Collapsed;
 
             buttonDiscord       = F<Button>("ButtonDiscord");
             buttonDiscordForget = F<Button>("ButtonDiscordForget");

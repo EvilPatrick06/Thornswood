@@ -498,7 +498,13 @@
                   <TextBlock Text="Server" VerticalAlignment="Center"/>
                 </StackPanel>
               </Button>
-                <TextBlock Text="Your build" Style="{StaticResource NavGroup}"/>
+                <!-- The whole of "Your build" (Mods, What is installed, Saves)
+                     is hidden now, so its heading is too (issue #599). The
+                     buttons themselves are collapsed in Shell.cs rather than
+                     cut here, because navButtons/pages/PageTitles are parallel
+                     arrays indexed by number and renumbering them is the bug
+                     the PageXxx comment warns about. -->
+                <TextBlock Text="Your build" Style="{StaticResource NavGroup}" Visibility="Collapsed"/>
               <Button x:Name="NavMods" Style="{StaticResource Nav}">
                 <StackPanel Orientation="Horizontal">
                   <Path Width="15" Height="15" Stretch="Uniform" Margin="0,0,13,0" VerticalAlignment="Center"
