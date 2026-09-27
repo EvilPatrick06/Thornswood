@@ -630,7 +630,8 @@
               <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
+            <Border Grid.Row="0" Height="100" MaxHeight="100" ClipToBounds="True"
+                    Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
               <Grid>
                 <Rectangle Fill="{StaticResource Hatch}" Opacity="0.85"/>
                 <!-- The landscape behind the title, filled in from Art.Header().
@@ -668,10 +669,10 @@
                     </Rectangle.OpacityMask>
                   </Rectangle>
                 </Grid>
-                <!-- Short landscape/stats strip: MinHeight 134 matches main 1.1.96
-                     emblem-era band (~84 emblem + 26/24 margins). Logo and title stay
-                     collapsed; landscape and StatRow only. Window back to 800/670. -->
-                <Grid Margin="36,26,36,24" MinHeight="134">
+                <!-- Fixed short landscape/stats strip: Height+MaxHeight lock to main
+                     1.1.96 logo-band height. No MinHeight-only (image/video stretch
+                     was expanding the Auto row). Logo and title stay collapsed. -->
+                <Grid Margin="36,8,36,8" Height="84" MaxHeight="84">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -701,7 +702,7 @@
 
             <!-- No ScrollViewer on Play: the page fits the normal launcher window. Other pages keep theirs.
                  Gallery fills the large empty centre; compact Ready sits on the right where Server used to. -->
-            <Grid Grid.Row="1" Margin="36,20,36,10">
+            <Grid Grid.Row="1" Margin="36,20,36,10" ClipToBounds="True">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*"/>
                   <ColumnDefinition Width="28"/>
@@ -710,7 +711,7 @@
 
                 <!-- From the world: fills the big middle of Play. Read only. Filled by
                      StartGallery in Shell.cs, hidden until the first picture has loaded (#603). -->
-                <Grid x:Name="GalleryCard" Grid.Column="0" Visibility="Collapsed">
+                <Grid x:Name="GalleryCard" Grid.Column="0" ClipToBounds="True" Visibility="Collapsed">
                   <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
