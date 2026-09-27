@@ -64,3 +64,24 @@ too, so the name is the same from the download link through UAC to the window,
 and the emblem is compiled in as the file's icon, so the download is not a blank
 mark in the browser. `tests\test-setup-stub-identity.ps1` holds the name
 strings and the Build-Launcher version-stamping wiring to what is here.
+
+### Version resource and the VirusTotal flags
+
+`Package-Thornswood.ps1` only copies this stub to `Thornswood-Setup.exe` (and,
+for a one-file build, appends the payload and a trailer after the end of the
+file), and `Publish-Installer.ps1` only uploads it. Neither rewrites the exe or
+strips its version resource, so what a person downloads carries the exact fields
+above. Checked on the live tip: `FileDescription`/`ProductName` `Thornswood
+Setup`, `Company` `Thornswood`, `Copyright` `Copyright (c) Thornswood`,
+`OriginalFilename`/`InternalName` `Thornswood-Setup.exe`, and matching File and
+Product version.
+
+That resource being filled and honest is worth having, but on its own it does
+not clear the machine-learning engines that make up most of the VirusTotal
+flags (CrowdStrike Falcon, APEX, Trapmine), and a hash-intel hit like McAfeeD
+moves only when the file's reputation does. Code signing (issue #390, held) is
+the real fix and the lever to re-measure on once it is turned on. The
+friend-facing side of the same story, the SmartScreen soft-block, the Defender
+warning and the VirusTotal report link, is on the site: the Downloads page and
+the Help page's "Why does Windows or Defender warn about the installer?"
+(`site\data\help.md`, anchor `defender`).
