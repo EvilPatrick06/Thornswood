@@ -71,13 +71,19 @@
   again. Answered by the Launcher lane on 27 September, after this section
   briefly described a post-tip launcher step that does not exist.
 
+  NO SWITCH TURNS EITHER OF THEM OFF, asked for by the website and launcher
+  lanes on 27 September: the block runs on every release, dev and main, so the
+  dev channel exercises it several times a week. A dry run still runs none of it,
+  because a dry run publishes nothing to follow.
+
   THE TIP STAYS PUBLISHED WHATEVER THEY DO. They run after the release is on
   the feed, so a failure there cannot unpublish anything, and Ship still tells
-  the site, the Discord and the server. What it does instead is say which half
-  did not complete, with the line that puts it right, and exit 1, so the
-  standing order that the tip and its follow-ons go out together is either met
-  or reported. -SkipRemirror, -SkipVirusTotal and -SkipPostShip are the escape
-  hatches, and a dry run runs none of it.
+  the site, the Discord and the server. A hook that is not on the machine yet is
+  a line naming the file it looked for, and the release is fine. A hook that is
+  there and stops is named again on the last screen with the line that puts it
+  right, and Ship exits 1 at the very end: the release is out and announced
+  either way, and the code is how a script chaining Ship learns that the tip and
+  its follow-ons did not go out together.
 
   This header used to carry a hand-written list of five options, laid out as
   if it were all of them, while the param block declared thirteen. -Channel,
@@ -204,25 +210,6 @@
   for a security fix or for something that leaves the game untestable, and he
   says which.
 
-.PARAMETER SkipRemirror
-  Ships without mirroring the tip onto the site, so thornswood.net goes on
-  serving whichever feed it last had. That is not the same as the GitHub
-  fallback: a launcher falls back only when the site feed does not answer at
-  all, and a site feed that answers with yesterday's release is the release
-  people are offered. So this is for getting a tip out while the VPS is
-  unreachable, or for a release nobody is waiting on, and
-  .\scripts\deploy\Remirror-Site-Feed.ps1 is the thing to run as soon as it can be.
-
-.PARAMETER SkipVirusTotal
-  Ships without asking VirusTotal about the installer the Downloads page offers.
-  This is the one to reach for when a tip is wanted now and nobody wants to wait
-  on an upload of most of a gigabyte: the report the page links stays whatever
-  it was. .\scripts\release\Publish-VirusTotal.ps1 does it afterwards.
-
-.PARAMETER SkipPostShip
-  Both of the above at once, for a release that has to go out with nothing after
-  it. Ship says what was skipped and the command that does it later.
-
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
 
@@ -289,12 +276,6 @@ param(
     # dev first and gets broken there; a plain Ship afterwards promotes it all
     # to main and resets dev to match.
     ,[ValidateSet('main', 'dev')][string]$Channel = 'main'
-    # The two things that follow a tip, and the escape hatches from them. The
-    # header's own section says what each one is, why there is no third one for
-    # the launcher, and why the tip stays published when one fails.
-    ,[switch]$SkipRemirror
-    ,[switch]$SkipVirusTotal
-    ,[switch]$SkipPostShip
 )
 
 
@@ -1420,20 +1401,8 @@ $postArgs = @{ Channel = $chan; ReleaseDir = $ReleaseDir; Root = $Root; DistRoot
 
 if (-not $DryRun) {
     Head 'After the tip'
-    if ($SkipPostShip) {
-        Say '  -SkipPostShip, so nothing followed the tip. It is published, and the site still' 'Yellow'
-        Say '  serves the feed it had, so anybody reading it is offered that release:' 'Yellow'
-        Say ("  .\scripts\release\Publish-PostShip.ps1$chanArg   does both halves") 'DarkGray'
-    }
-    elseif ($SkipRemirror) {
-        Say '  -SkipRemirror, so the site goes on serving the feed it had, and anybody reading' 'Yellow'
-        Say '  it is offered that release rather than this one.' 'Yellow'
-        Say ("  .\scripts\deploy\Remirror-Site-Feed.ps1" + $(if ($Dev) { ' -Dev' } else { '' }) + '   mirrors it') 'DarkGray'
-    }
-    else {
-        Invoke-PostShip 'the host feed remirror' 'Publish-PostShip.ps1' ($postArgs + @{ Only = 'Remirror' }) `
-            ".\scripts\release\Publish-PostShip.ps1$chanArg -Only Remirror"
-    }
+    Invoke-PostShip 'the host feed remirror' 'Publish-PostShip.ps1' ($postArgs + @{ Only = 'Remirror' }) `
+        ".\scripts\release\Publish-PostShip.ps1$chanArg -Only Remirror"
 }
 
 # ------------------------------------------------------------------- news
@@ -1517,19 +1486,8 @@ if (-not $DryRun -and -not $NoAnnounce) {
 # VT_API_KEY, which it skips itself without, so on most releases this is one read.
 if (-not $DryRun) {
     Head 'VirusTotal'
-    if ($SkipPostShip) {
-        Say '  -SkipPostShip, so nothing was sent. The link the Downloads page prints is' 'Yellow'
-        Say '  whatever it was, which is item-not-found for a file nobody has sent.' 'Yellow'
-        Say ("  .\scripts\release\Publish-PostShip.ps1$chanArg   does both halves") 'DarkGray'
-    }
-    elseif ($SkipVirusTotal) {
-        Say '  -SkipVirusTotal, so the report the Downloads page links is whatever it was.' 'Yellow'
-        Say '  .\scripts\release\Publish-VirusTotal.ps1 -Path <the installer exe>   sends it' 'DarkGray'
-    }
-    else {
-        Invoke-PostShip 'the VirusTotal upload' 'Publish-PostShip.ps1' ($postArgs + @{ Only = 'VirusTotal' }) `
-            ".\scripts\release\Publish-PostShip.ps1$chanArg -Only VirusTotal"
-    }
+    Invoke-PostShip 'the VirusTotal upload' 'Publish-PostShip.ps1' ($postArgs + @{ Only = 'VirusTotal' }) `
+        ".\scripts\release\Publish-PostShip.ps1$chanArg -Only VirusTotal"
 }
 
 # ------------------------------------------------------- dev follows main

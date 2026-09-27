@@ -47,6 +47,9 @@
   -Channel, -FeedDir or -ReleaseDir, -Path, and -Sha256 when it takes one. So a
   script that lands in another folder, or with the other name for the same
   thing, still runs, and a parameter that lane has not got is never passed.
+  NOTHING HERE REQUIRES -FeedDir: the remirror works out the clone from the
+  channel by itself, and this only says which one when the script offers to be
+  told.
 
   A HOOK THAT IS NOT ON THE MACHINE IS A LINE, NOT A FAILURE. The remirror
   script is the website lane's to land and this one cannot do its job, so a
@@ -76,13 +79,15 @@
   that nobody is waiting on must not hold up a five minute warning to everybody
   in the world. Run by hand with neither, both halves run in that order.
 
-  Both halves ask before they act, so running this again after a failure does
-  nothing the first run already did.
+  NO SWITCH TURNS EITHER HALF OFF, asked for by the website and launcher lanes on
+  27 September, so that every release exercises the block and the dev channel
+  exercises it several times a week. -Only is for running one half by hand, not
+  for a release leaving one out. Both halves ask before they act, so running this
+  again after a failure does nothing the first run already did.
 
     .\scripts\release\Publish-PostShip.ps1                     after a main release
     .\scripts\release\Publish-PostShip.ps1 -Channel dev        after a dev release
     .\scripts\release\Publish-PostShip.ps1 -Only Remirror      the feed, nothing else
-    .\scripts\release\Publish-PostShip.ps1 -SkipVirusTotal     the same, said the other way
 
 .PARAMETER Channel
   main or dev. main remirrors the Thornswood-Releases tip to
@@ -117,8 +122,9 @@
 
 .PARAMETER Only
   Remirror or VirusTotal, to run that half and not the other. Ship uses it to put
-  the feed before the announcements and the upload after them. Left out, both
-  halves run, the feed first.
+  the feed before the announcements and the upload after them, and it is how a
+  person runs one half by hand. Left out, both halves run, the feed first. It is
+  not an escape hatch for a release: nothing on Ship turns either half off.
 
 .PARAMETER RemirrorScript
   The remirror script outright, for a machine or a branch where it is somewhere
@@ -126,15 +132,6 @@
 
 .PARAMETER VirusTotalScript
   The VirusTotal upload hook outright, on the same terms.
-
-.PARAMETER SkipRemirror
-  Leaves the site serving the feed it already had. A launcher falls back to the
-  GitHub feed only when the site feed does not answer at all, so an unmirrored
-  feed offers people the release it last held rather than this one.
-
-.PARAMETER SkipVirusTotal
-  Leaves the report the Downloads page links as whatever it was, for when a tip
-  is wanted now and nobody wants to wait on an upload of most of a gigabyte.
 
 .PARAMETER NoPause
   Exits without waiting for Enter, so Ship can call this without stopping for a
@@ -147,8 +144,10 @@
   installer this machine holds.
 
 .NOTES
-  Exit codes: 0 both halves are done, were skipped on purpose, or are waiting on
-  a script that is not on this branch yet, and 1 a half that is here stopped.
+  Exit codes: 0 the halves asked for are done, or are waiting on a script that is
+  not on this machine yet, and 1 a half that is here stopped. A missing script is
+  a line and a 0 on purpose, the same spirit as the upload's own answer to a
+  missing VT_API_KEY: Ship must not break on work another lane has not landed.
   Ship.ps1 reads that code, still tells the site, the Discord and the server, and
   says on its last screen which line to run again.
 #>
@@ -163,8 +162,6 @@ param(
     [ValidateSet('Both', 'Remirror', 'VirusTotal')][string]$Only = 'Both',
     [string]$RemirrorScript,
     [string]$VirusTotalScript,
-    [switch]$SkipRemirror,
-    [switch]$SkipVirusTotal,
     [switch]$NoPause
 )
 
@@ -247,12 +244,6 @@ Write-Host "  AFTER THE TIP, $Channel : $what" -ForegroundColor White
 if ($Only -eq 'VirusTotal') {
     Say '  the host feed was this release''s first call, before anybody was told' 'DarkGray'
 }
-elseif ($SkipRemirror) {
-    Head 'The host feed'
-    Say '  -SkipRemirror, so the site goes on serving the feed it had, and anybody' 'Yellow'
-    Say '  reading it is offered that release rather than this one.' 'Yellow'
-    Say ("  .\scripts\deploy\Remirror-Site-Feed.ps1$devArg   mirrors it") 'DarkGray'
-}
 else {
     Head 'The host feed'
     $mirror = Find-Hook $RemirrorScript 'Remirror-Site-Feed.ps1' `
@@ -298,11 +289,6 @@ else {
 # costs one read.
 if ($Only -eq 'Remirror') {
     Say '  VirusTotal is this release''s second call, after everybody has been told' 'DarkGray'
-}
-elseif ($SkipVirusTotal) {
-    Head 'VirusTotal'
-    Say '  -SkipVirusTotal, so the report the Downloads page links is whatever it was.' 'Yellow'
-    Say '  .\scripts\release\Publish-VirusTotal.ps1 -Path <the installer exe>   sends it' 'DarkGray'
 }
 else {
     Head 'VirusTotal'

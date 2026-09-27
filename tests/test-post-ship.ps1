@@ -115,8 +115,11 @@ if ($help) {
 $missing = @($declared | Where-Object { $documented -notcontains $_.ToUpperInvariant() })
 Yes ("  and every one of its $($declared.Count) parameter(s) has a .PARAMETER" +
      $(if ($missing.Count) { ': ' + ($missing -join ', ') + ' do not' } else { '' })) ($declared.Count -gt 0 -and $missing.Count -eq 0)
-foreach ($p in 'Channel', 'SkipRemirror', 'SkipVirusTotal', 'NoPause') {
+foreach ($p in 'Channel', 'Only', 'NoPause') {
     Yes "  and it takes -$p" ($declared -contains $p)
+}
+foreach ($p in 'SkipRemirror', 'SkipVirusTotal') {
+    Yes "  and no -$p, because no release leaves a half out" ($declared -notcontains $p)
 }
 
 $helperSrc = [IO.File]::ReadAllText($HelperPath, $Utf8)
@@ -126,7 +129,6 @@ Yes '  and the installer lane''s upload hook at its own' (
     $helperSrc -match "'Publish-VirusTotal\.ps1'" -and $helperSrc -match "release\\Publish-VirusTotal\.ps1")
 Yes '  by the settled name and never by a guess at one' ($helperSrc -notmatch '\*VirusTotal\*')
 Yes '  and either of them can be named outright' ($declared -contains 'RemirrorScript' -and $declared -contains 'VirusTotalScript')
-Yes '  and it takes -Only, so Ship can run one half at a time' ($declared -contains 'Only')
 # Neither half is reimplemented here, so nothing in it talks to the VPS or to
 # VirusTotal itself.
 Yes '  and does neither job itself: no ssh, no scp, no virustotal.com' (
@@ -168,10 +170,12 @@ $ship = Parse $ShipPath
 Yes '  Ship.ps1 parses' ($ship.Errors.Count -eq 0)
 $shipSrc = [IO.File]::ReadAllText($ShipPath, $Utf8)
 $shipDeclared = @($ship.Ast.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
-foreach ($sw in 'SkipRemirror', 'SkipVirusTotal', 'SkipPostShip') {
-    Yes "  Ship takes -$sw" ($shipDeclared -contains $sw)
+# No switch turns either half off, asked for by the website and launcher lanes so
+# that every release exercises the block and dev exercises it often. A -Skip on
+# Ship would be the thing somebody reaches for on the release where it matters.
+foreach ($sw in 'SkipRemirror', 'SkipVirusTotal', 'SkipPostShip', 'SkipLauncherUpdate') {
+    Yes "  Ship has no -$sw" ($shipDeclared -notcontains $sw)
 }
-Yes '  and no switch for a launcher step that does not exist' ($shipDeclared -notcontains 'SkipLauncherUpdate')
 
 # Two post-publish calls, both through Invoke-PostShip, which is what reads an
 # exit code and remembers a failure. Named in a Say line is not running it, so
@@ -191,15 +195,9 @@ foreach ($pair in @(@('the remirror', $mirrorCall), @('the upload', $vtCall))) {
     $conds = @(Conditions $call)
     Yes ("    inside a block a dry run never reaches" + $(if ($conds.Count) { ' (' + ($conds -join ' / ') + ')' } else { '' })) (
         @($conds | Where-Object { $_ -match '-not \$DryRun\b' }).Count -gt 0)
-    Yes '    and behind -SkipPostShip' (@($conds | Where-Object { $_ -match 'else of: .*\$SkipPostShip\b' }).Count -gt 0)
-}
-if ($mirrorCall.Count -eq 1) {
-    Yes '    and behind -SkipRemirror' (
-        @(Conditions $mirrorCall[0] | Where-Object { $_ -match 'else of: .*\$SkipRemirror\b' }).Count -gt 0)
-}
-if ($vtCall.Count -eq 1) {
-    Yes '    and behind -SkipVirusTotal' (
-        @(Conditions $vtCall[0] | Where-Object { $_ -match 'else of: .*\$SkipVirusTotal\b' }).Count -gt 0)
+    # And behind nothing else: a dry run is the only thing that holds it back,
+    # which is what "the block always runs" means.
+    Yes '    and behind nothing else' ($conds.Count -eq 1)
 }
 Yes '  both are given the channel it shipped' ($shipSrc -match '\$postArgs = @\{[^\r\n]*Channel = \$chan')
 Yes '  and the releases clone and the staging folder' (
@@ -371,6 +369,18 @@ try {
     Yes '  and the upload runs there too, on the installer this machine holds' (
         $dev.Out -match 'Publish-VirusTotal ran' -and $dev.Out -match 'did not rebuild the installer')
 
+    # ---- a remirror that takes only -Dev -----------------------------------
+    #
+    # The website lane's pin says -FeedDir is optional and must not be required,
+    # so a script that works the clone out from the channel by itself has to run
+    # with nothing but -Dev.
+    Hook $deploy 'Remirror-Site-Feed' '[switch]$Dev' 0
+    $devOnly = Run $release @('-Channel', 'dev', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("a remirror that takes only -Dev still runs (exit $($devOnly.Code))") (
+        $devOnly.Code -eq 0 -and $devOnly.Out -match 'Remirror-Site-Feed ran' -and $devOnly.Out -match 'Dev=True')
+    Yes '  and is given no -FeedDir it never declared' ($devOnly.Out -notmatch 'FeedDir=')
+    Hook $deploy 'Remirror-Site-Feed' $mirrorParams 0
+
     # ---- wherever the website lane lands it --------------------------------
     Move-Item -LiteralPath (Join-Path $deploy 'Remirror-Site-Feed.ps1') -Destination (Join-Path $release 'Remirror-Site-Feed.ps1')
     $moved = Run $release @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
@@ -399,14 +409,8 @@ try {
         $bad.Out -match 'The host feed remirror' -and $bad.Out -match 'Remirror-Site-Feed\.ps1')
     Yes '  and the other half still ran, because the tip is already published' ($bad.Out -match 'Publish-VirusTotal ran')
 
-    # ---- skipped, and no installer ----------------------------------------
+    # ---- no installer to send ---------------------------------------------
     Hook $deploy 'Remirror-Site-Feed' $mirrorParams 0
-    $skipped = Run $release @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist,
-                              '-SkipRemirror', '-SkipVirusTotal', '-NoPause')
-    Yes ("both halves skipped is not a failure (exit $($skipped.Code))") ($skipped.Code -eq 0)
-    Yes '  and neither ran' ($skipped.Out -notmatch ' ran')
-    Yes '  and it says what an unmirrored feed means' ($skipped.Out -match 'offered that release rather than this one')
-
     Remove-Item -LiteralPath $setup -Force
     $noSetup = Run $release @('-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
     Yes ("no installer on this machine is not a failure (exit $($noSetup.Code))") ($noSetup.Code -eq 0)

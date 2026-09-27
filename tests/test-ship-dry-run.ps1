@@ -264,8 +264,7 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     # twice. Ship reads each exit code and says at the end whether they
     # completed, so this hands back 0 like the rest.
     Stub 'Publish-PostShip' ('[string]$Channel, [string]$ReleaseDir, [string]$Root, [string]$DistRoot, ' +
-                             '[string]$Only, [string]$Installer, [switch]$AlsoLauncher, ' +
-                             '[switch]$SkipRemirror, [switch]$SkipVirusTotal, [switch]$NoPause') ''
+                             '[string]$Only, [string]$Installer, [switch]$AlsoLauncher, [switch]$NoPause') ''
     foreach ($n in 'git', 'gh', 'ssh', 'scp') {
         [IO.File]::WriteAllText((Join-Path $bin ($n + '.cmd')), "@echo off`r`n>>`"%TS_DRY_CALLS%`" echo %~n0 %*`r`nexit /b 0`r`n")
     }
@@ -359,8 +358,8 @@ if ($dir) {
     }
     # What follows the tip: one call per half, on the main channel, each with the
     # releases clone and the staging folder, because that is where the tip and
-    # its bytes are. Neither -SkipRemirror nor -SkipVirusTotal was given, so
-    # neither is passed.
+    # its bytes are. No switch can hold either half back, so nothing here says
+    # -Skip anything.
     $post = Called $r 'Publish-PostShip'
     Yes ('R what follows the tip runs twice, one half each, for main, with the releases clone and the staging folder' +
          $(if ($post.Count) { ' (' + ($post -join '; ') + ')' } else { '' })) (
