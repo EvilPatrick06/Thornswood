@@ -864,12 +864,12 @@ namespace Thornswood
                         if (discordAvatar == null || !Discord.Linked) return;
                         // Stale answer: Reconnect or Forget may have changed the account.
                         string now = "";
-                        try { now = Discord.AvatarUrl; } catch { }
+                        try { now = Discord.AvatarUrl; } catch (Exception ex) { Swallow.Note("Shell.LoadDiscordAvatar", ex); }
                         if (now != want) return;
                         discordAvatar.Fill = new ImageBrush(pic) { Stretch = Stretch.UniformToFill };
                     }));
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Shell.LoadDiscordAvatar", ex); }
             });
         }
 

@@ -213,7 +213,7 @@ namespace Thornswood
         {
             try { if (File.Exists(TicketFile)) File.Delete(TicketFile); } catch { }
             try { if (File.Exists(NameFile)) File.Delete(NameFile); } catch { }
-            try { if (File.Exists(AvatarFile)) File.Delete(AvatarFile); } catch { }
+            try { if (File.Exists(AvatarFile)) File.Delete(AvatarFile); } catch (Exception ex) { Swallow.Note("Discord.Forget", ex); }
             ticket = ""; name = ""; avatar = "";
         }
 
@@ -252,7 +252,7 @@ namespace Thornswood
                 Directory.CreateDirectory(Folder);
                 File.WriteAllText(AvatarFile, pic);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Discord.NoteAvatar", ex); }
             avatar = pic;
         }
 

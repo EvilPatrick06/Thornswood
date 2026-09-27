@@ -48,7 +48,7 @@ namespace Thornswood
 
         static void Stamp(string m)
         {
-            try { if (log != null) log(m); } catch { }
+            try { if (log != null) log(m); } catch (Exception ex) { Swallow.Note("MenuMusic.Stamp", ex); }
         }
 
         static void Begin()
@@ -92,9 +92,9 @@ namespace Thornswood
                         "window.chrome.webview.addEventListener('message',ev=>{" +
                         "try{const m=JSON.parse(ev.data);" +
                         "if(m.cmd==='vol')a.volume=Math.max(0,Math.min(1,+m.v||0));" +
-                        "if(m.cmd==='play'){a.volume=Math.max(0,Math.min(1,+m.v||0));a.play().catch(()=>{});}" +
+                        "if(m.cmd==='play'){a.volume=Math.max(0,Math.min(1,+m.v||0));a.play().catch(()=>{/*ignore*/});}" +
                         "if(m.cmd==='pause')a.pause();" +
-                        "}catch(err){}" +
+                        "}catch(err){/*ignore*/}" +
                         "});" +
                         "a.addEventListener('error',()=>window.chrome.webview.postMessage('err'));" +
                         "a.addEventListener('playing',()=>window.chrome.webview.postMessage('ok'));" +
@@ -109,7 +109,7 @@ namespace Thornswood
                             if (msg == "err") Stamp("Menu music: HTML5 audio failed for " + trackPath);
                             else if (msg == "ok") Stamp("Menu music: the theme is on (WebView2), from " + trackPath);
                         }
-                        catch { }
+                        catch (Exception ex) { Swallow.Note("MenuMusic.WebMessageReceived", ex); }
                     };
                     view.CoreWebView2.NavigateToString(html);
                     ready = true;
@@ -149,7 +149,7 @@ namespace Thornswood
                 else
                     view.CoreWebView2.PostWebMessageAsString("{\"cmd\":\"pause\",\"v\":" + v + "}");
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("MenuMusic.Apply", ex); }
         }
     }
 }
