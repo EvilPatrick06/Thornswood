@@ -1764,6 +1764,86 @@ async def watch_site():
         await asyncio.sleep(WATCH_EVERY)
 
 
+def _clock(ms):
+    """
+    A unix-ms stamp as 'HH:MM on D Month', in this box's own time.
+
+    The site stamps a session's start, end and a log's arrival with the same
+    clock the server log uses, so a time named here reads the same as the
+    lines on the sessions page.     fromtimestamp is local time, which is what the
+    box runs on. %-d is not on Windows, where this runs, so the day is built by
+    hand and carries no leading zero. Anything that is not a number, and 0
+    itself (the site's stamp for a start or end it never saw), gives '', so a
+    row without these fields drops the phrase rather than naming 1970.
+    """
+    try:
+        n = int(ms)
+    except (TypeError, ValueError):
+        return ''
+    if not n:
+        return ''
+    try:
+        t = datetime.datetime.fromtimestamp(n / 1000)
+    except (OSError, OverflowError, ValueError):
+        return ''
+    return '%02d:%02d on %d %s' % (t.hour, t.minute, t.day, t.strftime('%B'))
+
+
+# A log that arrives within this long of the session ending is the launcher's
+# own end-of-session upload, not a backlog, so its arrival is not called out.
+TROUBLE_LATE_MS = 5 * 60 * 1000
+
+
+def _trouble_line(row):
+    """
+    The staff-channel line for one session that went wrong.
+
+    NAMES THE SESSION'S OWN TIME, not the moment the alert fires. Issue #532:
+    a 401 held Patrick's 23 September logs until 14:09 the next day, when a
+    newer launcher uploaded the backlog, and the alert read ~14:10 as if the
+    crash had just happened. The session had started 20:07 the evening before.
+    So the start is named, and when the logs arrived well after the session
+    ended (a late upload, not the launcher's own end-of-session send) that is
+    said too, so a backlog no longer looks like a fresh failure.
+
+    A pure function of the row, so the harness can check the wording without a
+    Discord, a clock or the file. A row with no start or end (older rows, or a
+    session whose ends were never seen) simply drops those phrases.
+    """
+    who = row.get('name') or row.get('who') or 'somebody'
+    where = row.get('channel') or ''
+    where = {'dev': 'the dev build', 'main': 'the main build'}.get(
+        where, 'a build it did not name')
+    line = (row.get('line') or '').strip()
+
+    started = _clock(row.get('start'))
+    when = (' It started %s.' % started) if started else ''
+
+    late = ''
+    try:
+        end = int(row.get('end') or 0)
+        arrived = int(row.get('at') or 0)
+    except (TypeError, ValueError):
+        end = arrived = 0
+    if end and arrived and arrived - end > TROUBLE_LATE_MS:
+        got = _clock(arrived)
+        if got:
+            late = (' The logs did not arrive until %s, well after it ended, '
+                    'so this is a late upload rather than a new failure.' % got)
+
+    return (
+        '**A session went wrong.** %s, on %s%s.%s%s\n%s\n%s\n'
+        'The logs are on the sessions page under that session, '
+        'and it is the red one.'
+        % (who,
+           where,
+           (', launcher %s' % row['version']) if row.get('version') else '',
+           when,
+           late,
+           row.get('why') or 'something went wrong',
+           ('```\n%s\n```' % line[:400]) if line else ''))
+
+
 async def watch_trouble():
     """
     Say in the staff channel when a session goes wrong.
@@ -1813,21 +1893,7 @@ async def watch_trouble():
                 if not sid or sid in said:
                     continue
                 said.add(sid)
-
-                who = row.get('name') or row.get('who') or 'somebody'
-                where = row.get('channel') or ''
-                where = {'dev': 'the dev build', 'main': 'the main build'}.get(
-                    where, 'a build it did not name')
-                line = (row.get('line') or '').strip()
-                await trouble_say(
-                    '**A session went wrong.** %s, on %s%s.\n%s\n%s\n'
-                    'The logs are on the sessions page under that session, '
-                    'and it is the red one.'
-                    % (who,
-                       where,
-                       (', launcher %s' % row['version']) if row.get('version') else '',
-                       row.get('why') or 'something went wrong',
-                       ('```\n%s\n```' % line[:400]) if line else ''))
+                await trouble_say(_trouble_line(row))
         except Exception:
             log('trouble: the check itself failed, carrying on:\n'
                 + traceback.format_exc())
