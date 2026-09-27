@@ -195,7 +195,7 @@ cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
 // Who may use the dev build and join the dev server. Left out of config.json
 // it is the Discord staff roles, the same set the bot's STAFF_ROLES names
 // (Owner, Dev, Gamemaster, Moderator, Loremaster; Content Creator is not
-// staff, bot.py). Gavin's call on 27 September for the dev-build install gate
+// staff, bot.py). Patrick's call on 27 September for the dev-build install gate
 // (#605): the dev build is for staff, not the admin pair alone. It folds
 // access.admin in through out.dev below, so widening admin still widens dev.
 // Add role names here to widen it further.
@@ -3040,7 +3040,7 @@ async function handle(req, res) {
       'That Discord account has no role that lets it in yet.',
       invite: cfg.discord.invite || '' });
     // The dev build checks in as channel dev. It is for the roles in
-    // access.dev (the staff roles by default, Gavin 27 Sep #605, unless
+    // access.dev (the staff roles by default, Patrick 27 Sep #605, unless
     // config.json says otherwise); anyone else is sent back to the main build
     // with a plain reason.
     const wantsDev = String(o.channel || '') === 'dev';
