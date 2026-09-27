@@ -133,6 +133,7 @@ namespace Thornswood
         static Button btnUninstall, btnServerStart, btnServerStop;
         static Button btnServerMain, btnServerDev, btnServerPick, btnCheckDiagnostics;
         static Popup serverPickPopup;
+        static Border serverPickPanel;
         static TextBlock txtBrandSmall, txtBrandBig, txtServerPick, txtServerPickMeta;
         static TextBlock txtServerMainMeta, txtServerDevMeta;
         static Ellipse dotServerPick, dotServerMain, dotServerDev;
@@ -631,6 +632,7 @@ namespace Thornswood
             btnIcons = F<Button>("BtnIcons");
             btnServerMain = F<Button>("BtnServerMain"); btnServerDev = F<Button>("BtnServerDev");
             btnServerPick = F<Button>("BtnServerPick"); serverPickPopup = F<Popup>("ServerPickPopup");
+            serverPickPanel = F<Border>("ServerPickPanel");
             txtServerPick = F<TextBlock>("TxtServerPick");
             txtServerPickMeta = F<TextBlock>("TxtServerPickMeta");
             txtServerMainMeta = F<TextBlock>("TxtServerMainMeta");
@@ -4243,12 +4245,16 @@ namespace Thornswood
             if (serverPickPopup == null || btnServerPick == null) return;
             if (!serverPickPopup.IsOpen)
             {
-                // Same width open and closed: grow the chip up to the list, and
-                // the list down to the chip, so the popup never sticks out wider.
-                double w = Math.Max(btnServerPick.ActualWidth, 280);
+                // One shared width: chip MinWidth and the popup panel Width both
+                // lock to the same number so left/right edges match (Popup.Width
+                // alone does not size an AllowsTransparency child Border).
+                double w = Math.Max(btnServerPick.ActualWidth, 300);
                 btnServerPick.MinWidth = w;
-                serverPickPopup.MinWidth = w;
-                serverPickPopup.Width = w;
+                if (serverPickPanel != null)
+                {
+                    serverPickPanel.MinWidth = w;
+                    serverPickPanel.Width = w;
+                }
                 serverPickPopup.IsOpen = true;
             }
             else serverPickPopup.IsOpen = false;
