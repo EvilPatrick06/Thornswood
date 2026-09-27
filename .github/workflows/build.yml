@@ -214,3 +214,14 @@ jobs:
           name: Thornswood.exe
           path: ${{ runner.temp }}/Thornswood/Launcher/Thornswood.exe
           retention-days: 7
+
+      # Workflow artifact only (not a public release asset). The pdb carries
+      # absolute build-machine source paths; shipping it to customers needs a
+      # #dev decision (issue #462). Packs and the installer already skip *.pdb.
+      - name: Keep the pdb from this build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: Thornswood.pdb
+          path: ${{ runner.temp }}/Thornswood/Launcher/Thornswood.pdb
+          if-no-files-found: warn
+          retention-days: 7
