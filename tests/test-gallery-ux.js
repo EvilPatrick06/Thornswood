@@ -40,6 +40,14 @@ yes('gal-box heading is gold carve',
 
 yes('public gallery keeps Send a picture for members',
     /id="galSubmit"/.test(home) && /Send a picture/.test(home));
+yes('send form does not show Signed in as',
+    !/Signed in as /.test((home.match(/id="galSubmit"[\s\S]{0,900}/) || [''])[0]));
+yes('send form hides native file input and offers Choose file',
+    /\.gal-box \.form input\[type=file\]\{[^}]*clip:rect\(0,0,0,0\)/.test(home) &&
+    /id="galPick">Choose file</.test(home) &&
+    /id="galFileName">No file chosen</.test(home));
+yes('Choose file button opens the hidden input',
+    /galPick[\s\S]{0,200}f\.click\(\)/.test(home));
 yes('public gallery keeps per-image Report',
     /data-galreport/.test(home));
 yes('public gallery has no Waiting for approval queue',
