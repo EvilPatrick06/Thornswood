@@ -724,8 +724,50 @@
                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                            RenderOptions.BitmapScalingMode="HighQuality"/>
                   </Border>
-                  <TextBlock x:Name="GalleryBy" Grid.Row="2" Style="{StaticResource Small}"
-                             TextWrapping="Wrap" Margin="2,8,2,0"/>
+                  <!-- The byline, and what a person may do about the picture on
+                       the card (#731). Report is there for anybody whose copy is
+                       linked to Discord; it goes to the site over the launcher's
+                       own ticket. Manage on the site is for staff and opens the
+                       site page where the queue and the delete live, because
+                       those doors take a browser sign in and not a ticket.
+                       Both start hidden and Shell.cs shows what applies. -->
+                  <StackPanel Grid.Row="2" Margin="2,8,2,0">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock x:Name="GalleryBy" Grid.Column="0" Style="{StaticResource Small}"
+                                 TextWrapping="Wrap" VerticalAlignment="Center"/>
+                      <Button x:Name="BtnGalleryReport" Grid.Column="1" Style="{StaticResource Ghost}"
+                              Content="Report" Padding="10,4" Margin="10,0,0,0"
+                              VerticalAlignment="Center" Visibility="Collapsed"/>
+                      <Button x:Name="BtnGalleryManage" Grid.Column="2" Style="{StaticResource Ghost}"
+                              Content="Manage on the site" Padding="10,4" Margin="8,0,0,0"
+                              VerticalAlignment="Center" Visibility="Collapsed"/>
+                    </Grid>
+
+                    <!-- Open only while a report is being written. The rotation
+                         stands still behind it, so the picture cannot change
+                         under somebody halfway through saying what is wrong. -->
+                    <Grid x:Name="GalleryReportRow" Margin="0,8,0,0" Visibility="Collapsed">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBox x:Name="BoxGalleryWhy" Grid.Column="0" Style="{StaticResource Field}"
+                               MaxLength="500" Padding="10,6"/>
+                      <Button x:Name="BtnGalleryReportSend" Grid.Column="1" Style="{StaticResource Ghost}"
+                              Content="Send report" Padding="10,4" Margin="8,0,0,0"/>
+                      <Button x:Name="BtnGalleryReportCancel" Grid.Column="2" Style="{StaticResource Ghost}"
+                              Content="Cancel" Padding="10,4" Margin="8,0,0,0"/>
+                    </Grid>
+
+                    <TextBlock x:Name="TxtGallerySaid" Style="{StaticResource Small}"
+                               TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
+                  </StackPanel>
                 </Grid>
 
                 <StackPanel Grid.Column="2" VerticalAlignment="Top">
