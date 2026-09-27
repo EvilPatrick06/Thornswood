@@ -10,7 +10,7 @@ namespace Thornswood
 {
     static class Updater
     {
-        public const string Version = "1.1.92";
+        public const string Version = "1.1.95";
 
         /// <summary>
         /// The collection revision the last feed named, or 0 when it named
@@ -50,29 +50,48 @@ namespace Thornswood
             catch { }
             if (github && !string.IsNullOrEmpty(cfg.UpdateToken))
                 wc.Headers["Authorization"] = "Bearer " + cfg.UpdateToken;
-            wc.Headers["Accept"] = octet ? "application/octet-stream" : "application/vnd.github.raw";
+            // GitHub Contents API wants the raw media type; a direct https feed
+            // on thornswood.net is ordinary JSON (#649).
+            if (github)
+                wc.Headers["Accept"] = octet ? "application/octet-stream" : "application/vnd.github.raw";
+            else if (octet)
+                wc.Headers["Accept"] = "application/octet-stream";
+            else
+                wc.Headers["Accept"] = "application/json";
             return wc;
         }
 
         public static bool Enabled(Config cfg)
         {
-            // No token needed. Releases live in a public repository of their own
-            // now, holding version.json and the assets and nothing else, because
-            // the alternative was shipping a credential to every machine that
-            // installs the game so it could read a private one. UpdateToken is
-            // still honoured if somebody sets one, which is what keeps a private
+            // No token needed. The site feed (UpdateFeedUrl) is the primary
+            // source after the #649 cutover; Thornswood-Releases via UpdateRepo
+            // stays as the GitHub Contents API fallback. UpdateToken is still
+            // honoured if somebody sets one, which is what keeps a private
             // source working for whoever is developing against it.
+            if (!string.IsNullOrEmpty(cfg.UpdateFeedUrl))
+            {
+                Uri feed;
+                if (Uri.TryCreate(cfg.UpdateFeedUrl.Trim(), UriKind.Absolute, out feed)
+                    && feed.Scheme == Uri.UriSchemeHttps)
+                    return true;
+            }
             return !string.IsNullOrEmpty(cfg.UpdateRepo)
                    && cfg.UpdateRepo.Contains("/");
         }
 
         public static string WhyDisabled(Config cfg)
         {
+            if (!string.IsNullOrEmpty(cfg.UpdateFeedUrl))
+            {
+                Uri feed;
+                if (Uri.TryCreate(cfg.UpdateFeedUrl.Trim(), UriKind.Absolute, out feed)
+                    && feed.Scheme == Uri.UriSchemeHttps)
+                    return cfg.UpdateFeedUrl.Trim();
+            }
             if (string.IsNullOrEmpty(cfg.UpdateRepo) || !cfg.UpdateRepo.Contains("/")) return "no update source set";
             return cfg.UpdateRepo;
         }
 
-        /// <summary>Reads version.json from the repo. Returns null if updates are off or unreachable.</summary>
         /// <summary>
         /// True only when the published launcher is genuinely newer than the
         /// one running.
@@ -149,10 +168,40 @@ namespace Thornswood
             return l;
         }
 
+        /// <summary>
+        /// Reads version.json. Prefers UpdateFeedUrl (direct https on the
+        /// site, #649). If that fails or is unset, falls back to the GitHub
+        /// Contents API on UpdateRepo/UpdateBranch so Thornswood-Releases
+        /// stays a hot rollback. Returns null if updates are off.
+        /// </summary>
         public static VersionDoc Check(Config cfg)
         {
             if (!Enabled(cfg)) return null;
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
+
+            Exception hostFail = null;
+            if (!string.IsNullOrEmpty(cfg.UpdateFeedUrl))
+            {
+                string feedUrl = cfg.UpdateFeedUrl.Trim();
+                try
+                {
+                    CheckUrl(feedUrl);
+                    using (var wc = Client(cfg, false, feedUrl))
+                        return VersionDoc.Parse(wc.DownloadData(feedUrl));
+                }
+                catch (Exception ex)
+                {
+                    // Site feed missed; try GitHub so a site outage does not
+                    // leave every launcher without updates.
+                    hostFail = ex;
+                }
+            }
+
+            if (string.IsNullOrEmpty(cfg.UpdateRepo) || !cfg.UpdateRepo.Contains("/"))
+            {
+                if (hostFail != null) throw WrapFeedFail(hostFail, true);
+                return null;
+            }
 
             string branch = string.IsNullOrEmpty(cfg.UpdateBranch) ? "main" : cfg.UpdateBranch;
             List<string> tries = RepoCandidates(cfg.UpdateRepo);
@@ -210,10 +259,33 @@ namespace Thornswood
                     }
                     if (wex.Status == WebExceptionStatus.Timeout)
                         throw new Exception("GitHub did not answer in time. The check runs again by itself.");
-                    throw new Exception("could not reach GitHub");
+                    last = new Exception("could not reach GitHub");
+                }
+                catch (Exception ex)
+                {
+                    last = ex;
                 }
             }
-            throw (last != null ? last : new Exception("could not reach GitHub"));
+
+            // Both the site feed and GitHub missed. Prefer the GitHub reason
+            // when we got one; otherwise surface the site failure.
+            if (last != null) throw WrapFeedFail(last, false);
+            if (hostFail != null) throw WrapFeedFail(hostFail, true);
+            throw new Exception("could not reach the update feed");
+        }
+
+        static Exception WrapFeedFail(Exception ex, bool fromHost)
+        {
+            string where = fromHost ? "the site update feed" : "GitHub";
+            var wex = ex as WebException;
+            if (wex != null && wex.Status == WebExceptionStatus.Timeout)
+                return new Exception(where + " did not answer in time. The check runs again by itself.");
+            if (!string.IsNullOrEmpty(ex.Message)
+                && (ex.Message.StartsWith("the ", StringComparison.Ordinal)
+                    || ex.Message.StartsWith("GitHub ", StringComparison.Ordinal)
+                    || ex.Message.StartsWith("The update feed", StringComparison.Ordinal)))
+                return ex;
+            return new Exception("could not reach " + where);
         }
 
         public static HashSet<string> Applied()

@@ -9,9 +9,13 @@ each half, with the file and line for each step.
 
 `.gitmodules:11-15` names the fork, `https://github.com/EvilPatrick06/skymp.git`,
 on the branch `thornswood/engine-changes`, at `engine/skymp`. The repository
-pins a commit, not the branch: on 25 September `git submodule status` printed
-`c8832519866e6848b9501039940dc2c6f0508668`, the commit both build records name
-(`records\server-build.json:10`, `records\client-build.json:6`).
+pins a commit, not the branch: `git submodule status` prints
+`d00063515242e0ad1a9affb690c83194acf2c937`, the commit `records\client-build.json:6`
+and `records\server-build.json:10` now both name. The binary that server record
+hashes is still the earlier build from `c8832519866e6848b9501039940dc2c6f0508668`:
+the VPS has not been rebuilt against the pin, and `Deploy-Server.ps1` refuses a
+rebuilt `scam_native.node` until `New-ServerBuildRecord.ps1` records it (see
+"Rebuilding the same commit").
 
 `ignore = dirty` (`.gitmodules:15`) keeps a build inside the fork from showing
 as a change here. A different commit checked out in it still shows, and is
@@ -163,6 +167,12 @@ A rebuild of the same commit is not byte for byte the same. Measured on
 hashed `ecb029cb...`, not the recorded `de74c582...`. The recorded binary was
 put back from `local\engine-dist-c8832519`, so neither record changed and
 `Deploy-Server.ps1` still takes it (`docs\archive\todo-list-2026-09-25.md:2987`).
+
+Since 27 September the source pin in both records is `d0006351` while this
+recorded server binary is still the `c8832519` build above: the client was
+rebuilt against the new pin and the server was not. The live server carries the
+older binary until a rebuild from `d0006351` is recorded here and shipped with
+`Deploy-Server.ps1`.
 
 So the recorded binaries stay unless the engine changed:
 

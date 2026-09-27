@@ -103,17 +103,20 @@ $revision = 0
 if (-not $Collection) {
   $url = ''
   try { $url = [string](Get-Content -LiteralPath (Join-Path $Root 'config.json') -Raw | ConvertFrom-Json).CollectionUrl } catch { }
-  if (-not $url) { $url = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a' }
+  if (-not $url) { $url = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf' }
   $slug = Get-CollectionSlug $url
   $revision = Get-CollectionRevision $slug
-  if ($revision -le 0) {
+  # The folder is no longer named for the collection: current Vortex writes
+  # vortex_collection_<opaque id>_, with no slug in it, so a
+  # collection_<slug>_<rev>_* search finds nothing. Get-CollectionInstalledFolder
+  # maps the slug to its mod folder through state and falls back to the legacy
+  # name; $null means the collection is not installed here.
+  $dir = Get-CollectionInstalledFolder $slug
+  if (-not $dir) {
     Say "  SKIP  Vortex on this machine has no revision of collection '$slug' installed, so there are no rules to check." 'DarkGray'
     Write-Host ''
     exit 0
   }
-  $mods = Join-Path $env:APPDATA 'Vortex\skyrimse\mods'
-  $dir = Get-ChildItem -LiteralPath $mods -Directory -Filter ('collection_' + $slug + '_' + $revision + '_*') |
-         Sort-Object Name -Descending | Select-Object -First 1
   $Collection = Join-Path $dir.FullName 'collection.json'
 }
 elseif (Test-Path -LiteralPath $Collection -PathType Container) {

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace Thornswood
@@ -117,11 +119,6 @@ namespace Thornswood
         /// <summary>
         /// Which revision of the collection this machine has installed, or 0.
         ///
-        /// Vortex names the collection's own mod folder for it:
-        ///
-        ///     %APPDATA%\Vortex\skyrimse\mods\collection_ombo2a_2_2026-09-15T21-08-00Z
-        ///                                               slug  ^ revision
-        ///
         /// This replaces asking whether one named file exists, which is what
         /// decided "your collection is behind" until 22 September. That test
         /// was wrong in both directions. It named po3_StartOnSave.dll, which
@@ -131,9 +128,27 @@ namespace Thornswood
         /// anybody genuinely two revisions behind read as fine as long as the
         /// file was there.
         ///
-        /// A number is the honest answer to a question about a revision. The
-        /// newest folder wins, because an upgrade leaves the old one until
-        /// Vortex tidies it.
+        /// WHERE THE NUMBER COMES FROM, and why this was rewritten on
+        /// 27 September. The first version read the revision out of the name
+        /// Vortex gave the mod folder:
+        ///
+        ///     %APPDATA%\Vortex\skyrimse\mods\collection_ombo2a_2_2026-09-15T21-08-00Z
+        ///                                               slug  ^ revision
+        ///
+        /// Current Vortex does not name the folder that way any more. It names
+        /// it for the mod id it made up, with no slug and no number in it:
+        ///
+        ///     %APPDATA%\Vortex\skyrimse\mods\vortex_collection_ZRT7NjhN_
+        ///
+        /// So the folder name stopped being able to answer, Have went to 0 on
+        /// every up to date machine, and Deploy-Gamemode's revision gate
+        /// refused every deploy unless -IgnoreRevision.
+        ///
+        /// The honest source is Vortex's own state.v2, where it records the
+        /// slug and the revision NUMBER against the collection's mod. That is
+        /// independent of the folder name, so it answers for both eras. The
+        /// old folder-name parse stays as a fallback. The same rule as
+        /// Get-CollectionRevision in scripts\mods\LoadOrder.ps1.
         /// </summary>
         public static int CollectionRevision(Config cfg)
         {
@@ -141,6 +156,97 @@ namespace Thornswood
             {
                 string slug = CollectionSlug(cfg);
                 if (slug.Length == 0) return 0;
+                int fromState = CollectionRevisionFromState(slug);
+                if (fromState > 0) return fromState;
+                return CollectionRevisionFromFolder(slug);
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>
+        /// The installed revision as Vortex records it in state.v2, or 0.
+        ///
+        /// Vortex keeps the redux state flattened into LevelDB keys joined by
+        /// ###, the same shape Get-CollectionNewest reads. For an installed
+        /// collection the two keys that matter, under the mod's own id, are:
+        ///
+        ///     persistent###mods###skyrimse###&lt;modId&gt;###attributes###collectionSlug -> "ombo2a"
+        ///     persistent###mods###skyrimse###&lt;modId&gt;###attributes###revisionNumber -> 5
+        ///
+        /// LevelDB writes the key, a length byte (a control character), then
+        /// that many bytes of the value's JSON, so a string is "ombo2a" and a
+        /// number is a bare 5. The slug and the number are separate keys tied
+        /// together only by the &lt;modId&gt; both carry, so this reads both,
+        /// matches the slug to its mod id, and takes the highest revision
+        /// recorded against a mod id whose slug is the one asked for. A machine
+        /// can have two collections installed at once (ombo2a on main, 7essxf
+        /// on dev), and the numbers must not be mixed up between them.
+        /// </summary>
+        public static int CollectionRevisionFromState(string slug)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(slug)) return 0;
+                string dir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Vortex\\state.v2");
+                if (!Directory.Exists(dir)) return 0;
+
+                var slugRe = new Regex(
+                    "mods###skyrimse###([^#]+)###attributes###collectionSlug[\\x00-\\x1F]{1,4}\"" +
+                    Regex.Escape(slug) + "\"");
+                var revRe = new Regex(
+                    "mods###skyrimse###([^#]+)###attributes###revisionNumber[\\x00-\\x1F]{1,4}(\\d+)");
+
+                var mine = new HashSet<string>(StringComparer.Ordinal);
+                var rev = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (string f in Directory.GetFiles(dir))
+                {
+                    string txt;
+                    try
+                    {
+                        // Latin1: every byte maps to one char, so the control
+                        // length bytes survive for the regex to bound on.
+                        byte[] raw = File.ReadAllBytes(f);
+                        var sb = new StringBuilder(raw.Length);
+                        foreach (byte b in raw) sb.Append((char)b);
+                        txt = sb.ToString();
+                    }
+                    catch { continue; }
+
+                    foreach (Match m in slugRe.Matches(txt)) mine.Add(m.Groups[1].Value);
+                    foreach (Match m in revRe.Matches(txt))
+                    {
+                        int n;
+                        if (!int.TryParse(m.Groups[2].Value, out n)) continue;
+                        string id = m.Groups[1].Value;
+                        int cur;
+                        if (!rev.TryGetValue(id, out cur) || n > cur) rev[id] = n;
+                    }
+                }
+
+                int best = 0;
+                foreach (string id in mine)
+                {
+                    int r;
+                    if (rev.TryGetValue(id, out r) && r > best) best = r;
+                }
+                return best;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>
+        /// The legacy fallback: the revision out of the old folder name, or 0.
+        /// Kept for a machine that still has collection_&lt;slug&gt;_&lt;rev&gt;_&lt;when&gt;
+        /// folders and no readable state. Current Vortex does not write these
+        /// any more; see CollectionRevision above.
+        /// </summary>
+        public static int CollectionRevisionFromFolder(string slug)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(slug)) return 0;
                 string dir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "Vortex\\skyrimse\\mods");
@@ -164,8 +270,8 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The collection's slug out of its address, "ombo2a" from
-        /// .../collections/ombo2a. Read from the config so a machine pointed at
+        /// The collection's slug out of its address, "7essxf" from
+        /// .../collections/7essxf. Read from the config so a machine pointed at
         /// a different collection still answers about its own.
         /// </summary>
         public static string CollectionSlug(Config cfg)
@@ -339,6 +445,15 @@ namespace Thornswood
         /// 52. A copy without the flag gets an index of its own and pushes every
         /// plugin after it one place along. Fix only reorders the list, so it
         /// could never clear it; flagging it is what this list is for.
+        ///
+        /// This is now the HAND FALLBACK, not the whole answer. Verify.MustBeLight
+        /// derives the real set from the server: any plugin the collection
+        /// reference (Paths.Golden) enables that the server leaves out of its
+        /// manifest is one the server counts as light, so this machine must too.
+        /// That catches the next plugin that ships light on the server but not on
+        /// a tester's disk without a name being added here. This list is folded
+        /// into that set, so the two cases below are still caught when the server
+        /// cannot be asked and there is no manifest to derive from.
         /// </summary>
         public static readonly string[] MustBeLight = {
             "MCMHelper.esp",
@@ -365,13 +480,26 @@ namespace Thornswood
             catch { return true; }
         }
 
-        /// <summary>The plugins in MustBeLight that are present and not yet light.</summary>
-        public static List<string> NotLight()
+        /// <summary>The plugins in the hand list that are present and not yet light.</summary>
+        public static List<string> NotLight() { return NotLight(MustBeLight); }
+
+        /// <summary>
+        /// The plugins in <paramref name="mustBeLight"/> that are in Data and do
+        /// not yet carry the ESL flag. The set is the server's to decide:
+        /// Verify.MustBeLight works it out from the plugins the collection
+        /// reference enables that the server leaves out of its manifest, folding
+        /// the hand list above in for when the server cannot be asked. A file
+        /// that cannot be read, or is not there, is left alone.
+        /// </summary>
+        public static List<string> NotLight(IEnumerable<string> mustBeLight)
         {
             var l = new List<string>();
+            if (mustBeLight == null) return l;
             string data = Path.Combine(Paths.Game, "Data");
-            foreach (string n in MustBeLight)
+            foreach (string n in mustBeLight)
             {
+                if (string.IsNullOrEmpty(n)) continue;
+                if (l.Contains(n)) continue;
                 string p = Path.Combine(data, n);
                 try { if (File.Exists(p) && !IsLight(p)) l.Add(n); } catch { }
             }
@@ -379,15 +507,23 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Sets the ESL flag on each plugin in MustBeLight that lacks it. One
-        /// byte, in place, so a Vortex hard link stays a hard link and the
-        /// staging copy is corrected with it. Returns how many were changed.
+        /// Sets the ESL flag on each plugin in the hand list that lacks it. The
+        /// server-derived overload below is what Fix calls; this stays for a
+        /// caller with no Config to hand and for the fallback list.
         /// </summary>
-        public static int FlagLight(Action<string> say)
+        public static int FlagLight(Action<string> say) { return FlagLight(MustBeLight, say); }
+
+        /// <summary>
+        /// Sets the ESL flag on each plugin in <paramref name="mustBeLight"/>
+        /// that lacks it. One byte, in place, so a Vortex hard link stays a hard
+        /// link and the staging copy is corrected with it. Returns how many were
+        /// changed.
+        /// </summary>
+        public static int FlagLight(IEnumerable<string> mustBeLight, Action<string> say)
         {
             int n = 0;
             string data = Path.Combine(Paths.Game, "Data");
-            foreach (string name in NotLight())
+            foreach (string name in NotLight(mustBeLight))
             {
                 string p = Path.Combine(data, name);
                 try

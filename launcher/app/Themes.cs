@@ -38,14 +38,29 @@ namespace Thornswood
     //   Ok/Warn/Bad state, and never the accent
     static class Themes
     {
-        static Theme Make(string name, string note, bool light, string[] pairs)
+        // The sixteen colour names, in the order the editor lays them out.
+        // The same set the comment above lists and every theme fills in full.
+        public static readonly string[] Names = new string[] {
+            "Bg", "Panel", "Card", "CardHover", "Deep", "Line", "Edge", "Ink",
+            "Muted", "Faint", "Accent", "AccentSoft", "AccentInk", "Ok", "Warn", "Bad"
+        };
+
+        // The name a theme the person built themselves goes by. It is not in
+        // All, because it lives in config.json rather than in the code.
+        public const string CustomName = "Custom";
+
+        static Theme Make(string name, string note, bool light, string[] pairs, string swatch = null)
         {
             var t = new Theme();
             t.Name = name;
             t.Note = note;
             t.Light = light;
             for (int i = 0; i < pairs.Length; i += 2) t.Colors[pairs[i]] = pairs[i + 1];
-            t.Swatch = t.Colors["Accent"];
+            // The square on a theme's button is its accent, the one colour that
+            // tells the themes apart at a glance. A theme may hand its own in
+            // instead: Snow's accent is a blue that runs through its whole UI,
+            // but its button shows a white square, for the cold-daylight look.
+            t.Swatch = swatch ?? t.Colors["Accent"];
             return t;
         }
 
@@ -115,21 +130,13 @@ namespace Thornswood
                 "AccentInk","#171200", "Ok","#7D9A4A", "Warn","#D2762A",
                 "Bad","#BF4436" }),
 
-            Make("Parchment", "Ink on warm paper. Light.", true, new string[] {
-                "Bg","#EFEAE0", "Panel","#F8F4EC", "Card","#FFFDF8",
-                "CardHover","#F2ECE0", "Deep","#E4DDD0", "Line","#D8CFBE",
-                "Edge","#FFFFFF", "Ink","#221D16", "Muted","#5E5546",
-                "Faint","#8C8372", "Accent","#A2572A", "AccentSoft","#28A2572A",
-                "AccentInk","#FFF6EF", "Ok","#4A7D52", "Warn","#94702B",
-                "Bad","#A03A2E" }),
-
             Make("Snow", "Cold daylight. Light.", true, new string[] {
                 "Bg","#EEF1F4", "Panel","#F8FAFC", "Card","#FFFFFF",
                 "CardHover","#EFF3F7", "Deep","#E2E7EC", "Line","#D3DAE1",
                 "Edge","#FFFFFF", "Ink","#1A1F24", "Muted","#55606B",
                 "Faint","#8794A0", "Accent","#2F6FA8", "AccentSoft","#282F6FA8",
                 "AccentInk","#F2F8FC", "Ok","#3C7D4E", "Warn","#8A6A20",
-                "Bad","#A33A2E" }),
+                "Bad","#A33A2E" }, "#FFFFFF"),
 
         };
 
@@ -140,11 +147,57 @@ namespace Thornswood
             return All[0];
         }
 
-        public static void Apply(Window w, string name)
+        // Whether config.json holds enough of a custom theme to offer it: at
+        // least one name/hex pair. A shorter array is a half-written one, and
+        // is treated as none rather than shown next to the built-ins.
+        public static bool HasCustom(string[] pairs)
         {
-            Theme t = Find(name);
+            return pairs != null && pairs.Length >= 2;
+        }
+
+        // A theme built from the flat name/hex pairs the Settings editor
+        // saves. It starts as a full copy of the default so any name the
+        // pairs leave out still has a colour behind it, which is the same
+        // reason every built-in is written out in full: a missing slot would
+        // leave the old theme's colour on screen next to the new one.
+        public static Theme Custom(string[] pairs, bool light)
+        {
+            var t = new Theme();
+            t.Name = CustomName;
+            t.Note = "Your own colours. Change them below.";
+            t.Light = light;
+            foreach (KeyValuePair<string, string> kv in All[0].Colors)
+                t.Colors[kv.Key] = kv.Value;
+            if (pairs != null)
+                for (int i = 0; i + 1 < pairs.Length; i += 2)
+                    if (!string.IsNullOrEmpty(pairs[i]) && !string.IsNullOrEmpty(pairs[i + 1]))
+                        t.Colors[pairs[i]] = pairs[i + 1];
+            t.Swatch = t.Colors["Accent"];
+            return t;
+        }
+
+        // The theme this config actually wants: the custom one when it is
+        // chosen and there is a custom one to show, and otherwise the built-in
+        // it names. Everything that applies a theme goes through here so the
+        // custom one is never a special case at the call sites.
+        public static Theme Resolve(Config cfg)
+        {
+            if (cfg != null
+                && string.Equals(cfg.Theme, CustomName, StringComparison.OrdinalIgnoreCase)
+                && HasCustom(cfg.CustomColors))
+                return Custom(cfg.CustomColors, cfg.CustomLight);
+            return Find(cfg == null ? "Forge" : cfg.Theme);
+        }
+
+        public static void Apply(Window w, Theme t)
+        {
             foreach (KeyValuePair<string, string> kv in t.Colors)
                 w.Resources[kv.Key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(kv.Value));
+        }
+
+        public static void Apply(Window w, string name)
+        {
+            Apply(w, Find(name));
         }
     }
 }

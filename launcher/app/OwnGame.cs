@@ -425,8 +425,21 @@ namespace Thornswood
         /// 4: the retired dresser, thornswood-chargen.js, is left out, so a
         ///    refresh cannot copy the Steam copy's old one back in after a
         ///    pack deletes it. See Foreign.
+        /// 5: what Nemesis or FNIS writes (behavior files, the two character
+        ///    defaults, FNIS.pex) is copied, never linked, and a folder that
+        ///    already has them as links gets its own copy of each, as they are
+        ///    now. Folders parked at the game's root or in Data (a name that
+        ///    starts with an underscore, such as _Parked or _disabledByKzl) are
+        ///    left out, and taken out of a folder that already has them. See
+        ///    Generated and Parked.
+        /// 6: Vortex's Data\Platform\Distribution redistributables (the 68 CEF
+        ///    and Node files the collection carries, not the two recorded in
+        ///    records\client-build.json) are hard linked, even though they are
+        ///    .dll/.exe. A folder that still holds its own copy of each gets
+        ///    the link instead, giving the disk the second copy back. See
+        ///    MustCopy.
         /// </summary>
-        const int Rules = 4;
+        const int Rules = 6;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -498,7 +511,7 @@ namespace Thornswood
             {
                 if (Skip(f.Rel) != null) continue;
                 totalBytes += f.Size;
-                if (MustCopy(f.Rel)) copyBytes += f.Size;
+                if (MustCopy(f.Rel, deployed)) copyBytes += f.Size;
             }
             long free = FreeSpace(Paths.Root);
             if (free >= 0 && free < copyBytes + 512L * 1024 * 1024)
@@ -513,7 +526,7 @@ namespace Thornswood
                 string skip = Skip(f.Rel);
                 if (skip != null) { left.Add(f.Rel + "  (" + skip + ")"); continue; }
 
-                bool copy = MustCopy(f.Rel);
+                bool copy = MustCopy(f.Rel, deployed);
                 bool asLink;
                 try
                 {
@@ -567,7 +580,7 @@ namespace Thornswood
 
             var lines = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            int added = 0, changed = 0, removed = 0, kept = 0;
+            int added = 0, changed = 0, removed = 0, kept = 0, separated = 0, relinked = 0;
             long copyBytes = 0;
 
             foreach (Found f in all)
@@ -587,12 +600,33 @@ namespace Thornswood
                     // Unchanged in Vortex, or Thornswood's own update wrote it.
                     // Recorded against what the source holds now either way.
                     char kind = had ? r.Kind : 'C';
+                    // Rules 5: a generated file this folder still shares with
+                    // the Steam copy gets a copy of its own, as it is now.
+                    // Rules 6: a Distribution redistributable this folder still
+                    // holds as its own copy becomes a hard link to Vortex's.
+                    try
+                    {
+                        if (MustCopy(f.Rel, deployed) && Links(dest) > 1)
+                        {
+                            Separate(dest);
+                            if (Links(dest) <= 1) { kind = 'C'; separated++; }
+                        }
+                        else if (!MustCopy(f.Rel, deployed) && origin == 'V' && Links(dest) <= 1)
+                        {
+                            bool nowLink;
+                            DropName(dest);
+                            Place(f.From, dest, false, out nowLink);
+                            if (nowLink) { kind = 'L'; relinked++; }
+                            else kind = 'C';
+                        }
+                    }
+                    catch { /* unreadable right now: left as it was */ }
                     lines.Add(kind + "|" + origin + "|" + f.Size + "|" + f.Ticks + "|" + f.Rel);
                     kept++;
                     continue;
                 }
 
-                bool copy = MustCopy(f.Rel);
+                bool copy = MustCopy(f.Rel, deployed);
                 bool asLink;
                 try
                 {
@@ -622,7 +656,7 @@ namespace Thornswood
             foreach (KeyValuePair<string, Rec> kv in old)
             {
                 if (seen.Contains(kv.Key) || owned.Contains(kv.Key)) continue;
-                if (kv.Value.Origin != 'V' && !UnwantedCreation(kv.Key)) continue;
+                if (kv.Value.Origin != 'V' && !UnwantedCreation(kv.Key) && !Parked(kv.Key)) continue;
                 try
                 {
                     string dest = Path.Combine(Folder, kv.Key);
@@ -636,11 +670,14 @@ namespace Thornswood
             WriteMade(src);
             SettleSettings(false);
 
+            string own = "";
+            if (separated > 0) own += " " + separated.ToString("n0") + " animation file(s) it shared with the Steam copy are its own copies now.";
+            if (relinked > 0) own += " " + relinked.ToString("n0") + " Distribution redistributable(s) it held as its own copies are hard links now.";
             if (added + changed + removed == 0)
-                return "Thornswood's own Skyrim folder already matches what Vortex has deployed.";
+                return "Thornswood's own Skyrim folder already matches what Vortex has deployed." + own;
             return "Thornswood's own Skyrim folder is up to date with Vortex: " + added.ToString("n0") + " new, " +
                    changed.ToString("n0") + " changed, " + removed.ToString("n0") + " taken out" +
-                   (copyBytes > 0 ? ", " + Mb(copyBytes) + " copied" : "") + ".";
+                   (copyBytes > 0 ? ", " + Mb(copyBytes) + " copied" : "") + "." + own;
         }
 
         /// <summary>
@@ -816,6 +853,7 @@ namespace Thornswood
             if (leaf.EndsWith(".log", StringComparison.OrdinalIgnoreCase) || leaf.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase)) return "log";
             if (Regex.IsMatch(rel, @"(^|\\)Claude outputs\\", RegexOptions.IgnoreCase)) return "not part of the game";
             if (rel.StartsWith("_to_delete\\", StringComparison.OrdinalIgnoreCase)) return "not part of the game";
+            if (Parked(rel)) return "a folder something parked in the Steam copy, not part of the game";
             if (rel.StartsWith(".sentry-native\\", StringComparison.OrdinalIgnoreCase)) return "crash reporter scratch";
             if (rel.Equals("Data\\Platform\\thornswood-session.txt", StringComparison.OrdinalIgnoreCase)) return "session note";
             if (ClientFile(rel)) return "the client runtime comes from the build, not the Steam copy";
@@ -1040,18 +1078,80 @@ namespace Thornswood
 
 
         /// <summary>
+        /// What a behavior generator writes into the game: Nemesis and FNIS
+        /// rebuild every behavior graph, the two character defaults and FNIS.pex
+        /// for the mod list they are run against, and they write over the
+        /// existing files IN PLACE.
+        ///
+        /// 26 September, Djinn's machine. Nemesis was run at 5:32 AM for a Solo
+        /// profile in the Steam copy. Both Thornswood folders on that machine,
+        /// the live one and the dev one, had those files as hard links to the
+        /// Steam copy's, so both started playing the Solo animations at that
+        /// moment without any refresh, and the next dev Ship tried to send
+        /// them to every tester (the ship check stopped it). Running Nemesis
+        /// again for the Thornswood profile at 2:26 PM changed them back in all
+        /// three folders at once, which is the same leak the other way round.
+        ///
+        /// Copied, the folder keeps what it was built with until a refresh
+        /// brings in what Vortex has deployed for Thornswood, whatever anybody
+        /// generates in the Steam copy for another profile in between.
+        /// </summary>
+        static bool Generated(string rel)
+        {
+            const RegexOptions I = RegexOptions.IgnoreCase;
+            if (Regex.IsMatch(rel, @"^Data\\Meshes\\.*\\behaviors\\[^\\]+\.hkx$", I)) return true;
+            if (Regex.IsMatch(rel, @"^Data\\Meshes\\actors\\character\\characters( female)?\\default(male|female)\.hkx$", I)) return true;
+            if (Regex.IsMatch(rel, @"^Data\\Scripts\\FNIS[^\\]*\.pex$", I)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// A folder somebody parked inside the Steam copy: a name starting with
+        /// an underscore, at the game's root or directly in Data. Skyrim ships
+        /// none, and nothing loads from one. What was in them on 26 September:
+        /// _Parked (a whole multiplayer client with a voice token), _Solo Mods,
+        /// _Profile Switch (a switch script) and Data\_disabledByKzl. A file
+        /// whose own name starts with one, such as Data\_ResourcePack.esl, is
+        /// the game's and is not matched: only a folder is.
+        /// </summary>
+        static bool Parked(string rel)
+        {
+            string[] p = rel.Split('\\');
+            if (p.Length > 1 && p[0].StartsWith("_")) return true;
+            if (p.Length > 2 && p[0].Equals("Data", StringComparison.OrdinalIgnoreCase) && p[1].StartsWith("_")) return true;
+            return false;
+        }
+
+        /// <summary>
         /// Copied rather than linked: anything in the game's root folder, the
         /// client and browser folders, the script extender's folder and MCM's
         /// settings, any settings, script or program file wherever it is, the
         /// game's master files. Those are what gets rewritten in place.
+        ///
+        /// Exception under Data\Platform\Distribution: a file Vortex deployed
+        /// that is not one of the six recorded in records\client-build.json
+        /// (ClientFile) is hard linked, even when it is a .dll or .exe. Those
+        /// are the 68 CEF and Node redistributables the collection carries;
+        /// nothing rewrites them in place. The two recorded Distribution
+        /// files (SkyrimPlatformImpl.dll and SkyrimPlatformCEF.exe.hidden)
+        /// stay copied. Everything else under Data\Platform keeps being
+        /// copied. Issue #392.
         /// </summary>
-        static bool MustCopy(string rel)
+        public static bool MustCopy(string rel, HashSet<string> deployed)
         {
             if (rel.IndexOf('\\') < 0) return true;
+            // Vortex redistributables under Distribution: link, even .dll/.exe.
+            // The two recorded client-build files stay copied (ClientFile).
+            if (rel.StartsWith("Data\\Platform\\Distribution\\", StringComparison.OrdinalIgnoreCase)
+                && deployed != null
+                && deployed.Contains(rel)
+                && !ClientFile(rel))
+                return false;
             foreach (string d in new string[] { "Data\\Platform\\", "Data\\SKSE\\", "Data\\MCM\\", "Data\\Video\\" })
                 if (rel.StartsWith(d, StringComparison.OrdinalIgnoreCase)) return true;
             foreach (string m in Masters)
                 if (rel.Equals(m, StringComparison.OrdinalIgnoreCase)) return true;
+            if (Generated(rel)) return true;
             return Array.IndexOf(CopyTypes, Path.GetExtension(rel).ToLowerInvariant()) >= 0;
         }
 

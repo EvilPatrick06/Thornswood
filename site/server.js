@@ -193,8 +193,15 @@ cfg.discord = Object.assign({ clientId:'', clientSecret:'', botToken:'', guildId
                             cfg.discord || {});
 cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
 // Who may use the dev build and join the dev server. Left out of config.json
-// it is the admin roles, Owner and Dev. Add role names here to widen it.
-if (!Array.isArray(cfg.access.dev)) cfg.access.dev = cfg.access.admin.slice();
+// it is the Discord staff roles, the same set the bot's STAFF_ROLES names
+// (Owner, Dev, Gamemaster, Moderator, Loremaster; Content Creator is not
+// staff, bot.py). Gavin's call on 27 September for the dev-build install gate
+// (#605): the dev build is for staff, not the admin pair alone. It folds
+// access.admin in through out.dev below, so widening admin still widens dev.
+// Add role names here to widen it further.
+if (!Array.isArray(cfg.access.dev)) {
+  cfg.access.dev = ['Owner', 'Dev', 'Gamemaster', 'Moderator', 'Loremaster'];
+}
 // Who gets a third character slot at the game's main menu. Everybody gets
 // two; a Patreon tier or a Gamemaster gets three, and so do the admin roles.
 // Decided by Patrick on 20 September. The tier names are Build-Discord.py's.
@@ -202,6 +209,16 @@ if (!Array.isArray(cfg.access.slots3)) {
   cfg.access.slots3 = ['Thalmor Boot-Licker', 'Talos Worshiper', 'Milk Drinker', 'Gamemaster'];
 }
 cfg.admins  = Array.isArray(cfg.admins) ? cfg.admins.map(String) : [];
+
+// A list of role names for a sentence: "Owner, Dev and Gamemaster" rather than
+// "Owner and Dev and Gamemaster", so the dev-role refusal reads plainly once
+// access.dev holds more than the old admin pair (#605).
+function andList(names) {
+  const a = (names || []).filter(Boolean);
+  if (a.length === 0) return '';
+  if (a.length === 1) return a[0];
+  return a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+}
 
 /* Signs the admin cookie. Kept apart from the password so changing the
    password does not sign everybody out of Discord, and made once rather than
@@ -703,6 +720,24 @@ function listFiles() {
    name, and anyone with ssh reads that folder directly, which is the point: a
    log nobody can fetch is a log nobody reads. */
 const UPMETA = path.join(UP, 'uploads.json');
+// The two lists the gallery keeps in data/, deployed by the same rule as every
+// other data JSON (Deploy-Docs sends a data JSON only when the VPS is missing
+// it, so neither is ever overwritten once it exists there). gallery.json is the
+// approved list /api/public and /shot read; gallery-pending.json is what is
+// waiting for an admin to approve or reject, and is never public.
+const GALLERY = path.join(DATA, 'gallery.json');
+const GPENDING = path.join(DATA, 'gallery-pending.json');
+// Reports against approved shots. Same deploy rule as the queue: starts [],
+// and Deploy-Docs only sends it when the VPS is missing it.
+const GREPORTS = path.join(DATA, 'gallery-reports.json');
+// What the gallery accepts and how big. Images first, on purpose: /shot serves
+// with a plain Content-Length and no range, which a browser needs before it
+// will play an mp4, so video waits until /shot honours a range (noted on #603).
+// 25 MB rather than the 200 MB /api/upload takes for logs: a screenshot that
+// big is a mistake, and a smaller cap is a smaller thing for the launcher's
+// door to hand a stranger who verified with a ticket.
+const GALLERY_ALLOW = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
+const GALLERY_CAP = 25 * 1024 * 1024;
 const KIND = {
   '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.gif':'image/gif',
   '.webp':'image/webp', '.bmp':'image/bmp',
@@ -732,6 +767,51 @@ function listUploads() {
   }
   out.sort((a, b) => b.at - a.at);
   return out;
+}
+
+/* One place that takes a file off a request and lands it in uploads/ under a
+   stamped name, so /api/upload and /api/gallery/submit stamp and cap the same
+   way and a change to either is a change to both. The request body IS the file,
+   the way /api/upload has always worked, so the name and any note ride in the
+   query. asked is the name the caller offered; cap is the byte ceiling; allow
+   is null for any kind or a list of lower case extensions (with the dot) when a
+   route only wants some. It answers 413 or 415 itself and returns; on a good
+   file it calls saved(name) and leaves the reply to the route, because /upload
+   and /gallery/submit write different things once the bytes are down. */
+function receiveUpload(req, res, asked, cap, allow, saved) {
+  if (Number(req.headers['content-length'] || 0) > cap) {
+    return sendJson(res, 413, { error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' });
+  }
+  const offered = String(asked || 'file').split(/[\\/]/).pop();
+  const safe = offered.replace(/[^A-Za-z0-9._ -]/g, '_').replace(/^[. ]+/, '')
+                      .slice(0, 90) || 'file';
+  if (allow) {
+    const ext = path.extname(safe).toLowerCase();
+    if (allow.indexOf(ext) < 0) {
+      req.resume();
+      return sendJson(res, 415, { error: 'that kind of file is not allowed here', allowed: allow });
+    }
+  }
+  const d = new Date();
+  const two = (n) => String(n).padStart(2, '0');
+  const stamp = d.getFullYear() + two(d.getMonth() + 1) + two(d.getDate()) + '-' +
+                two(d.getHours()) + two(d.getMinutes());
+  let name = stamp + '-' + safe, n = 2;
+  while (fs.existsSync(path.join(UP, name))) { name = stamp + '-' + n + '-' + safe; n++; }
+  const dest = path.join(UP, name);
+
+  let got = 0, over = false;
+  const out = fs.createWriteStream(dest);
+  req.on('data', (c) => { got += c.length; if (got > cap) { over = true; req.destroy(); out.destroy(); } });
+  req.on('error', () => { over = true; });
+  req.pipe(out);
+  out.on('close', () => {
+    if (over) {
+      try { fs.unlinkSync(dest); } catch (e) { }
+      return sendJson(res, 413, { error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' });
+    }
+    saved(name);
+  });
 }
 
 // ------------------------------------------------------------------ auth --
@@ -806,13 +886,17 @@ async function standingCached(id) {
 
 async function who(req) {
   const me = identity(req);
-  if (!me) return { member: isMember(req), admin: false, name: '', id: '', play: false };
+  if (!me) return { member: isMember(req), admin: false, dev: false, name: '', id: '', play: false };
   const st = await standingCached(me.id);
   return {
     // "member" is now "may use the hub", and only staff may. Being allowed
     // into the GAME is st.play, and that is asked separately by the launcher.
+    // "dev" is staff (access.dev: Owner, Dev, Gamemaster, Moderator,
+    // Loremaster), used by the gallery queue and reports. Not the Owner/Dev
+    // admin pair alone.
     member: st.admin || isMember(req),
     admin: st.admin,
+    dev: !!st.dev,
     play: st.play,
     banned: st.banned,
     inGuild: st.inGuild,
@@ -888,7 +972,7 @@ function rangeReply(req, res, file, size, headers, head) {
     'content-range': 'bytes ' + start + '-' + end + '/' + size,
     'content-length': (end - start) + 1,
     'accept-ranges': 'bytes',
-    'cache-control': 'no-store',
+    'cache-control': headers['cache-control'] || 'no-store',
     'x-content-type-options': 'nosniff'
   }));
   if (head) { res.end(); return true; }
@@ -1434,6 +1518,13 @@ function noteTrouble(row, found) {
     const list = jsonFile(TROUBLE_FILE, []);
     const all = Array.isArray(list) ? list : [];
     if (all.some(t => t && t.session === row.session)) return;
+    /* start and end are the session's own window, in the same unix ms the
+       row was stamped with. at is when the logs arrived. They are kept apart
+       because a backlog uploaded by a newer launcher lands long after the
+       session ended: a 401 held Patrick's 23 September logs until 14:09 the
+       next day, and the alert read as a fresh crash. With the session's start
+       named and the arrival called out when it is later than the end, a late
+       upload no longer looks like a new failure (issue #532). */
     all.push({
       session: row.session,
       who: String(row.who),
@@ -1441,6 +1532,8 @@ function noteTrouble(row, found) {
       channel: String(row.channel || ''),
       profile: Number(row.profile) || 0,
       version: String(row.version || ''),
+      start: Number(row.start) || 0,
+      end: Number(row.end) || 0,
       at: Date.now(),
       why: found.why,
       file: found.file,
@@ -2238,7 +2331,8 @@ async function handle(req, res) {
 
   if (p === '/api/hello') {
     return sendJson(res, w.member ? 200 : 401, {
-      ok: w.member, admin: w.admin, name: w.name,
+      ok: w.member, admin: w.admin, dev: !!w.dev, play: !!w.play,
+      name: w.name,
       discord: discordReady(),
       invite: cfg.discord.invite || ''
     });
@@ -2291,7 +2385,7 @@ async function handle(req, res) {
       invite: cfg.discord.invite || '',
       patreon: cfg.patreon || '',
       status: { up: gameStatus.up, online: gameStatus.online },
-      gallery: jsonFile(path.join(DATA, 'gallery.json'), []),
+      gallery: jsonFile(GALLERY, []),
       launcher: feed.launcher || '',
       collection: feed.collection || '',
       files: listFiles(),
@@ -2463,7 +2557,7 @@ async function handle(req, res) {
   // not, which is why this is a separate door with its own list.
   const shot = route.match(/^\/shot\/([a-z0-9._ -]+)$/);
   if (shot && req.method === 'GET') {
-    const ok = jsonFile(path.join(DATA, 'gallery.json'), [])
+    const ok = jsonFile(GALLERY, [])
       .some((g) => String(g.name).toLowerCase() === shot[1]);
     const file = path.join(UP, shot[1]);
     if (!ok || !file.startsWith(UP + path.sep) || !fs.existsSync(file)) {
@@ -2572,6 +2666,47 @@ async function handle(req, res) {
     return fs.createReadStream(file).pipe(res);
   }
 
+  // --------------------------------------------------------------- ship feed
+  // Anonymous version.json and content-addressed packs for the launcher.
+  // Live at /feed/, preclear at /feed-dev/. Assets are named by lowercase
+  // sha256 only so a path cannot walk outside the folder. #649.
+  const feedVer = p.match(/^\/(feed(?:-dev)?)\/version\.json$/);
+  if (feedVer && req.method === 'GET') {
+    const dir = path.join(ROOT, feedVer[1]);
+    const file = path.join(dir, 'version.json');
+    if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
+      return send(res, 404, 'no such file', 'text/plain');
+    }
+    return send(res, 200, fs.readFileSync(file), 'application/json; charset=utf-8',
+      { 'Cache-Control': 'no-cache' });
+  }
+
+  const feedAsset = p.match(/^\/(feed(?:-dev)?)\/assets\/([0-9a-f]{64})$/);
+  if (feedAsset && req.method === 'GET') {
+    const dir = path.join(ROOT, feedAsset[1], 'assets');
+    const file = path.join(dir, feedAsset[2]);
+    if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
+      return send(res, 404, 'no such file', 'text/plain');
+    }
+    const st = fs.statSync(file);
+    /* Same Range resume as /file/: packs are tens of megabytes and a drop
+       must carry on. Cache-Control is long and immutable because the name
+       is the bytes; a new pack is a new name. */
+    const kind = {
+      'content-type': 'application/octet-stream',
+      'etag': '"' + st.size.toString(16) + '-' + Math.floor(st.mtimeMs).toString(16) + '"',
+      'last-modified': new Date(st.mtimeMs).toUTCString(),
+      'cache-control': 'public, max-age=31536000, immutable'
+    };
+    if (rangeReply(req, res, file, st.size, kind, head)) return;
+    res.writeHead(200, Object.assign({}, kind, {
+      'content-length': st.size,
+      'accept-ranges': 'bytes',
+      'x-content-type-options': 'nosniff'
+    }));
+    if (head) return res.end();
+    return fs.createReadStream(file).pipe(res);
+  }
   // --------------------------------------------------------------- uploads
   const up = p.match(/^\/up\/([A-Za-z0-9._ -]+)$/);
   if (up && req.method === 'GET') {
@@ -2597,31 +2732,8 @@ async function handle(req, res) {
 
   if (p === '/api/upload' && req.method === 'POST') {
     if (!w.member) return sendJson(res, 401, { error: 'sign in first' });
-    const CAP = 200 * 1024 * 1024;
-    if (Number(req.headers['content-length'] || 0) > CAP) {
-      return sendJson(res, 413, { error: 'that file is over 200 MB' });
-    }
     const asked = (url.searchParams.get('name') || 'file').split(/[\\/]/).pop();
-    const safe = asked.replace(/[^A-Za-z0-9._ -]/g, '_').replace(/^[. ]+/, '')
-                      .slice(0, 90) || 'file';
-    const d = new Date();
-    const two = (n) => String(n).padStart(2, '0');
-    const stamp = d.getFullYear() + two(d.getMonth() + 1) + two(d.getDate()) + '-' +
-                  two(d.getHours()) + two(d.getMinutes());
-    let name = stamp + '-' + safe, n = 2;
-    while (fs.existsSync(path.join(UP, name))) { name = stamp + '-' + n + '-' + safe; n++; }
-    const dest = path.join(UP, name);
-
-    let got = 0, over = false;
-    const out = fs.createWriteStream(dest);
-    req.on('data', (c) => { got += c.length; if (got > CAP) { over = true; req.destroy(); out.destroy(); } });
-    req.on('error', () => { over = true; });
-    req.pipe(out);
-    return out.on('close', () => {
-      if (over) {
-        try { fs.unlinkSync(dest); } catch (e) { }
-        return sendJson(res, 413, { error: 'that file is over 200 MB' });
-      }
+    return receiveUpload(req, res, asked, 200 * 1024 * 1024, null, (name) => {
       const meta = jsonFile(UPMETA, {});
       meta[name] = {
         orig: asked,
@@ -2645,6 +2757,245 @@ async function handle(req, res) {
     putJson(UPMETA, meta);
     return sendJson(res, 200, { ok: true });
   }
+
+  // ------------------------------------------------------------- gallery --
+  /*
+    Somebody sends a picture in, staff decide whether it goes on the public
+    gallery. Two doors in: a signed-in Discord account that may play (or the
+    hub member cookie), or the launcher with the same signed Discord ticket it
+    uses at /api/play/join, so a person can send a shot from the game without
+    a site sign in.
+
+    The body IS the file, the /api/upload way, so the ticket and the note ride in
+    the query, not in the body. The file lands in uploads/ under a stamped name
+    through the shared helper, exactly as an /api/upload file does, and an entry
+    goes on gallery-pending.json. Nothing here touches gallery.json: a submission
+    is not public until an admin approves it, and /api/public and /shot read only
+    gallery.json, so a pending shot is not reachable by either.
+  */
+  if (p === '/api/gallery/submit' && req.method === 'POST') {
+    // Who is asking. A hub member, or a launcher ticket verified the way the
+    // door verifies it: read it, ask Discord for the standing, and hold it to
+    // the same answers /api/play/join gives, so a banned or departed account
+    // cannot put a picture in the queue.
+    let from = '', discordId = '';
+    // A signed-in Discord account that may play, or the hub member cookie
+    // (password bootstrap / staff). Hub "member" alone used to be the only
+    // web door, and with Discord live that meant only admins could submit
+    // from the site. Play-capable signed-in people submit too.
+    if (w.play || w.member) {
+      from = 'web';
+      discordId = w.id || '';
+    } else {
+      const t = readTicket(url.searchParams.get('ticket'));
+      if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
+        'Sign in to the hub, or send a valid launcher ticket.' });
+      const st = await standing(t.d);
+      standCache.delete(String(t.d));
+      if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
+        'Thornswood could not ask Discord about that account just now. Try again in a minute.' });
+      if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
+        'That Discord account is not in the Thornswood Discord.' });
+      if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', error:
+        'That Discord account is banned from Thornswood.' });
+      if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', error:
+        'That Discord account has no role that lets it in yet.' });
+      from = 'launcher';
+      discordId = String(t.d);
+    }
+
+    const asked = (url.searchParams.get('name') || 'shot.png').split(/[\\/]/).pop();
+    const by = (url.searchParams.get('by') || '').slice(0, 40);
+    const note = (url.searchParams.get('note') || '').slice(0, 300);
+    return receiveUpload(req, res, asked, GALLERY_CAP, GALLERY_ALLOW, (name) => {
+      // The uploads.json note too, so this shot reads the same as any other
+      // file in the uploads listing (the orig name, who by, the note).
+      const meta = jsonFile(UPMETA, {});
+      meta[name] = { orig: asked, by: by, note: note, at: Date.now() };
+      putJson(UPMETA, meta);
+
+      const pending = jsonFile(GPENDING, []);
+      const entry = { name: name, by: by, note: note, at: Date.now(), from: from };
+      if (discordId) entry.discordId = discordId;
+      pending.push(entry);
+      putJson(GPENDING, pending);
+      sendJson(res, 200, { ok: true, name: name });
+    });
+  }
+
+  // The queue, for staff (access.dev) to look through. Never public, so it is
+  // its own door rather than a field on /api/public.
+  if (p === '/api/gallery/pending' && req.method === 'GET') {
+    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    return sendJson(res, 200, { pending: jsonFile(GPENDING, []) });
+  }
+
+  // Approve: take it off the queue and put it on the public list. Idempotent,
+  // so approving the same name twice is a 200 that changed nothing the second
+  // time, and a name already on the gallery is left where it is.
+  if (p === '/api/gallery/approve' && req.method === 'POST') {
+    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const name = String(o.name || '');
+    if (!name) return sendJson(res, 400, { error: 'no name' });
+
+    const pending = jsonFile(GPENDING, []);
+    const hit = pending.find((x) => String(x.name) === name);
+    // "by" from the call wins, then the pending entry's, then empty. The url is
+    // built here so gallery.json holds exactly the shape /api/public hands out.
+    const by = (o.by !== undefined && o.by !== null) ? String(o.by).slice(0, 40)
+             : (hit ? String(hit.by || '') : '');
+
+    const gallery = jsonFile(GALLERY, []);
+    const already = gallery.find((g) => String(g.name) === name);
+    if (already) {
+      already.url = '/shot/' + name;
+      if (by) already.by = by;
+    } else {
+      gallery.push({ name: name, url: '/shot/' + name, by: by });
+    }
+    putJson(GALLERY, gallery);
+
+    const left = pending.filter((x) => String(x.name) !== name);
+    if (left.length !== pending.length) putJson(GPENDING, left);
+    return sendJson(res, 200, { ok: true, name: name, approved: true });
+  }
+
+  // Reject: take it off the queue, and unlink the upload when asked. gallery.json
+  // is not touched, because a rejected shot was never on it.
+  if (p === '/api/gallery/reject' && req.method === 'POST') {
+    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const name = String(o.name || '');
+    if (!name) return sendJson(res, 400, { error: 'no name' });
+
+    const pending = jsonFile(GPENDING, []);
+    const left = pending.filter((x) => String(x.name) !== name);
+    putJson(GPENDING, left);
+
+    if (o.deleteFile) {
+      const file = path.join(UP, name);
+      if (file.startsWith(UP + path.sep)) {
+        try { fs.unlinkSync(file); } catch (e) { }
+        const meta = jsonFile(UPMETA, {});
+        delete meta[name];
+        putJson(UPMETA, meta);
+      }
+    }
+    return sendJson(res, 200, { ok: true, name: name, removed: pending.length - left.length });
+  }
+
+  // Who may submit or moderate on the public gallery page. Always 200: the
+  // page needs to know whether to show Sign in, Submit, or the staff tools
+  // without treating a play-capable signed-in person as signed out the way
+  // /api/hello does for the hub.
+  if (p === '/api/gallery/who' && req.method === 'GET') {
+    return sendJson(res, 200, {
+      signed: !!(w.id || w.member),
+      canSubmit: !!(w.play || w.member),
+      staff: !!w.dev,
+      admin: !!w.admin,
+      name: w.name || ''
+    });
+  }
+
+  // Take an approved shot off the public gallery. Not the same as reject:
+  // reject only clears the pending queue. Staff only (access.dev).
+  if (p === '/api/gallery/approved' && req.method === 'DELETE') {
+    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const name = String(o.name || '');
+    if (!name) return sendJson(res, 400, { error: 'no name' });
+
+    const gallery = jsonFile(GALLERY, []);
+    const left = gallery.filter((x) => String(x.name) !== name);
+    if (left.length !== gallery.length) putJson(GALLERY, left);
+
+    // Drop open reports against this name too, so the reports list does not
+    // keep asking about a picture that is already gone.
+    const reports = jsonFile(GREPORTS, []);
+    const kept = reports.filter((r) => String(r.name) !== name);
+    if (kept.length !== reports.length) putJson(GREPORTS, kept);
+
+    if (o.deleteFile) {
+      const file = path.join(UP, name);
+      if (file.startsWith(UP + path.sep)) {
+        try { fs.unlinkSync(file); } catch (e) { }
+        const meta = jsonFile(UPMETA, {});
+        delete meta[name];
+        putJson(UPMETA, meta);
+      }
+    }
+    return sendJson(res, 200, { ok: true, name: name, removed: gallery.length - left.length });
+  }
+
+  // Report an approved shot. Any signed-in play-capable member, or the
+  // launcher with the same ticket /api/gallery/submit takes. The report sits
+  // in gallery-reports.json for staff; it does not take the shot down.
+  if (p === '/api/gallery/report' && req.method === 'POST') {
+    let from = '', discordId = '';
+    if (w.play || w.member) {
+      from = 'web';
+      discordId = w.id || '';
+    } else {
+      const t = readTicket(url.searchParams.get('ticket'));
+      if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
+        'Sign in, or send a valid launcher ticket.' });
+      const st = await standing(t.d);
+      standCache.delete(String(t.d));
+      if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
+        'Thornswood could not ask Discord about that account just now. Try again in a minute.' });
+      if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
+        'That Discord account is not in the Thornswood Discord.' });
+      if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', error:
+        'That Discord account is banned from Thornswood.' });
+      if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', error:
+        'That Discord account has no role that lets it in yet.' });
+      from = 'launcher';
+      discordId = String(t.d);
+    }
+
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const name = String(o.name || '');
+    if (!name) return sendJson(res, 400, { error: 'no name' });
+    const why = String(o.why || '').slice(0, 500);
+
+    const gallery = jsonFile(GALLERY, []);
+    if (!gallery.find((g) => String(g.name) === name)) {
+      return sendJson(res, 404, { error: 'not on the gallery' });
+    }
+
+    const reports = jsonFile(GREPORTS, []);
+    const id = crypto.randomBytes(8).toString('hex');
+    const entry = { id: id, name: name, why: why, at: Date.now(), from: from };
+    if (discordId) entry.discordId = discordId;
+    reports.push(entry);
+    // Keep the newest 500 so a flood cannot grow the file forever.
+    putJson(GREPORTS, reports.slice(-500));
+    return sendJson(res, 200, { ok: true, id: id });
+  }
+
+  if (p === '/api/gallery/reports' && req.method === 'GET') {
+    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    return sendJson(res, 200, { reports: jsonFile(GREPORTS, []) });
+  }
+
+  if (p === '/api/gallery/report/dismiss' && req.method === 'POST') {
+    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const id = String(o.id || '');
+    if (!id) return sendJson(res, 400, { error: 'no id' });
+    const reports = jsonFile(GREPORTS, []);
+    const left = reports.filter((r) => String(r.id) !== id);
+    putJson(GREPORTS, left);
+    return sendJson(res, 200, { ok: true, id: id, removed: reports.length - left.length });
+  }
+
 
   // -------------------------------------------------------------- the door
   /*
@@ -2699,11 +3050,12 @@ async function handle(req, res) {
       'That Discord account has no role that lets it in yet.',
       invite: cfg.discord.invite || '' });
     // The dev build checks in as channel dev. It is for the roles in
-    // access.dev (Owner and Dev unless config.json says otherwise); anyone
-    // else is sent back to the main build with a plain reason.
+    // access.dev (the staff roles by default, Gavin 27 Sep #605, unless
+    // config.json says otherwise); anyone else is sent back to the main build
+    // with a plain reason.
     const wantsDev = String(o.channel || '') === 'dev';
     if (wantsDev && !st.dev) return sendJson(res, 403, { ok:false, why:'dev', dev: false, message:
-      'The dev build is for the ' + (cfg.access.dev || []).join(' and ') + ' roles. Play on the main build.' });
+      'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
 
     // The launcher sends the profile id it is about to play as. The game
     // server never sees a Discord account, only this number, so this is the

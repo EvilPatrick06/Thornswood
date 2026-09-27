@@ -3,9 +3,13 @@
 
       pwsh -NoProfile -File .\tests\test-collection-newest.ps1
 
-  Which revision of the collection Vortex knows is out, read out of its own
-  state.v2. This is the number the deploy gate stands on, and on 22 September
-  it silently went blind.
+  The two revision numbers the deploy gate stands on, both read out of Vortex's
+  own state.v2: the newest Vortex KNOWS is out (Get-CollectionNewest), and the
+  revision this machine HAS installed (Get-CollectionRevision). The newest half
+  silently went blind on 22 September; the installed half went blind on
+  27 September, when it is covered here, because current Vortex stopped naming
+  the mod folder for the collection and the folder-name reader could no longer
+  find a number.
 
   WHAT HAPPENED. Get-CollectionNewest only knew ONE shape, the transition
   Vortex writes the moment it notices a newer revision than the one installed:
@@ -67,6 +71,17 @@ function Plain([int]$n) {
 function Transition([int]$from, [int]$to) {
   return [Text.Encoding]::ASCII.GetBytes(
     'persistent###mods###skyrimse###"newestVersion","from":"' + $from + '","to":"' + $to + '"')
+}
+# One flattened mod attribute, byte for byte as Vortex writes it: the key
+# joined by ###, one length byte, then the value's JSON. This is how the
+# installed revision (Have) is recorded, tied to the collection by its slug.
+function Attr([string]$modId, [string]$name, [string]$valueJson) {
+  $b = [Collections.Generic.List[byte]]::new()
+  $b.AddRange([Text.Encoding]::ASCII.GetBytes("persistent###mods###skyrimse###$modId###attributes###$name"))
+  $b.Add([byte]$valueJson.Length)
+  $b.AddRange([Text.Encoding]::ASCII.GetBytes($valueJson))
+  $b.AddRange([Text.Encoding]::ASCII.GetBytes([char]1 + 'persistent###mods###skyrimse'))
+  return $b.ToArray()
 }
 function Put([string]$name, [byte[]]$bytes) {
   [IO.File]::WriteAllBytes((Join-Path $state $name), $bytes)
@@ -143,15 +158,65 @@ try {
   Put '000124.log' ([Text.Encoding]::ASCII.GetBytes('newestVersionXXXX"99"'))
   Yes 'printable filler between the key and a number is not a length byte' ((Get-CollectionNewest) -eq 0)
 
+  # ---- the installed revision (Have), read from state under the new naming --
+  # Vortex stopped naming the mod folder for the collection (it is
+  # vortex_collection_<opaque id>_ now), so the installed revision NUMBER is
+  # read from state.v2, tied to the collection by its slug. These build that
+  # state and point the shipped Get-CollectionRevision at it through APPDATA,
+  # so what is under test is the shipped reader, not a copy of it.
+  $ombo = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a'
+
+  Clear-State
+  $inst = [Collections.Generic.List[byte]]::new()
+  $inst.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'collectionSlug' '"ombo2a"'))
+  $inst.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'revisionNumber' '5'))
+  Put '000200.log' $inst.ToArray()
+  Yes 'the installed revision is read from state under vortex_collection_* naming' ((Get-CollectionRevision 'ombo2a') -eq 5)
+
+  # Two collections installed at once, ombo2a on main and 7essxf on dev: each
+  # answers about its own, tied by the mod id, never the other's number.
+  Clear-State
+  $both = [Collections.Generic.List[byte]]::new()
+  $both.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'collectionSlug' '"ombo2a"'))
+  $both.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'revisionNumber' '5'))
+  $both.AddRange([byte[]](Attr 'vortex_collection_AAbb99xx_' 'collectionSlug' '"7essxf"'))
+  $both.AddRange([byte[]](Attr 'vortex_collection_AAbb99xx_' 'revisionNumber' '12'))
+  Put '000200.log' $both.ToArray()
+  Yes 'ombo2a reads its own 5, not the other collection''s 12' ((Get-CollectionRevision 'ombo2a') -eq 5)
+  Yes 'and 7essxf reads its own 12' ((Get-CollectionRevision '7essxf') -eq 12)
+
+  # The legacy folder is still read when there is no state to read: a machine
+  # that only ever had the old collection_<slug>_<rev>_* folders.
+  Clear-State
+  $legacyMods = Join-Path $root 'Vortex\skyrimse\mods'
+  $null = New-Item -ItemType Directory -Force -Path (Join-Path $legacyMods 'collection_ombo2a_4_2026-09-20T10-00-00Z')
+  $null = New-Item -ItemType Directory -Force -Path (Join-Path $legacyMods 'collection_ombo2a_5_2026-09-22T22-26-11Z')
+  Yes 'with no state, the legacy folder name is still read, newest wins' ((Get-CollectionRevision 'ombo2a') -eq 5)
+  Remove-Item -LiteralPath $legacyMods -Recurse -Force -EA SilentlyContinue
+
+  # Have and Newest together, the two numbers Deploy-Gamemode stands on: with
+  # the collection installed at 5 and Vortex knowing 5 is newest, the state is
+  # Known and not Behind, which is a deploy that no longer needs -IgnoreRevision.
+  Clear-State
+  $ready = [Collections.Generic.List[byte]]::new()
+  $ready.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'collectionSlug' '"ombo2a"'))
+  $ready.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'revisionNumber' '5'))
+  $ready.AddRange([byte[]](Plain 5))
+  Put '000200.log' $ready.ToArray()
+  $csReady = Get-CollectionState $ombo
+  Yes 'Get-CollectionState reads Have from state now' ($csReady.Have -eq 5)
+  Yes 'and Known is true, so the deploy gate reads a real revision without -IgnoreRevision' ($csReady.Known)
+  Yes 'and Behind is false when Have matches Newest' (-not $csReady.Behind)
+
   # ---- what the callers see ------------------------------------------------
   Clear-State; Put '000124.log' (Plain 5)
-  $st = Get-CollectionState 'https://next.nexusmods.com/skyrimspecialedition/collections/ombo2a'
+  $st = Get-CollectionState 'https://next.nexusmods.com/skyrimspecialedition/collections/7essxf'
   Yes 'Get-CollectionState carries the newest through' ($st.Newest -eq 5)
   Yes 'and says it knew both numbers when it did' `
     (($st.Have -gt 0 -and $st.Known) -or (-not $st.Have -and -not $st.Known))
 
   Clear-State
-  $blind = Get-CollectionState 'https://next.nexusmods.com/skyrimspecialedition/collections/ombo2a'
+  $blind = Get-CollectionState 'https://next.nexusmods.com/skyrimspecialedition/collections/7essxf'
   Yes 'with nothing readable, Known is false' (-not $blind.Known)
   Yes 'and Behind is false too, so the bool alone cannot tell them apart' (-not $blind.Behind)
 }

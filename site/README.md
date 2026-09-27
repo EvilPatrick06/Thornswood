@@ -100,3 +100,40 @@ door along with the pages. `tests\test-site-local.js` measures the first two
 against a copy: with a page made to throw, `/api/play/who` still answers its
 401, and with a page made to hold the loop for a second and a half, the same
 question waits until it lets go.
+
+## The gallery
+
+The public gallery is `data\gallery.json`, a list of `{ name, url: '/shot/'+name,
+by }`. `/api/public` hands it out under `gallery` and `GET /shot/<name>` serves
+the file from `uploads\` only when the name is on that list. A picture reaches
+that list through a queue an admin approves, so nothing a stranger sends is
+public until somebody says so. The queue is `data\gallery-pending.json`, an
+array that starts `[]`, deployed by the same rule as every other data JSON
+(`Deploy-Docs.ps1` sends a data JSON only when the VPS is missing it, so the
+queue is never overwritten once it exists there). `/api/public` and `/shot`
+never read the queue.
+
+| Route | Method | Who | Body | Answers |
+| --- | --- | --- | --- | --- |
+| `/api/gallery/who` | GET | anybody | none | `200 {signed,canSubmit,staff,admin,name}` for the public gallery page |
+| `/api/gallery/submit` | POST | a signed-in Discord account that may play (or the hub member cookie), or the launcher with the same signed ticket it sends `/api/play/join` | the file is the body, the way `/api/upload` takes it; `name`, `by`, `note` and, for the launcher, `ticket` are in the query | `200 {ok,name}`; `401 {why:'link'}` with neither door; `403`/`503` for a launcher ticket the door would also refuse; `415` for anything but png, jpg, jpeg, webp or gif; `413` over 25 MB |
+| `/api/gallery/pending` | GET | staff (`access.dev`) | none | `200 {pending:[...]}`; `403` otherwise |
+| `/api/gallery/approve` | POST | staff | `{name, by?}` | `200 {ok,approved}`; upserts the name onto `gallery.json`, removes it from the queue, idempotent; `400` with no name |
+| `/api/gallery/reject` | POST | staff | `{name, deleteFile?}` | `200 {ok,removed}`; drops it from the queue and unlinks the upload when `deleteFile` is set; `gallery.json` is untouched; `400` with no name |
+| `/api/gallery/approved` | DELETE | staff | `{name, deleteFile?}` | `200 {ok,removed}`; takes an approved shot off `gallery.json` (not the same as reject); clears reports on that name; unlinks when asked |
+| `/api/gallery/report` | POST | signed-in play member, or launcher ticket | `{name, why?}` | `200 {ok,id}`; writes to `gallery-reports.json`; does not take the shot down; `404` if the name is not approved |
+| `/api/gallery/reports` | GET | staff | none | `200 {reports:[...]}` |
+| `/api/gallery/report/dismiss` | POST | staff | `{id}` | `200 {ok,removed}` |
+
+A submission lands in `uploads\` under the same stamped name `/api/upload` uses
+(`receiveUpload` in `server.js` is the one helper both go through) and adds
+`{ name, by, note, at, from: 'web'|'launcher', discordId? }` to the queue. The
+cap is 25 MB rather than the 200 MB `/api/upload` takes for logs, and only
+images are taken: `/shot` serves with a plain `Content-Length` and no range,
+which a browser needs before it will play an mp4, so video waits until `/shot`
+honours a range. Staff means the `access.dev` roles (Owner, Dev, Gamemaster,
+Moderator, Loremaster), not Owner/Dev-only `w.admin`. The public `/gallery`
+page has the member submit form; the hub Uploads page shows the queue and
+reports. `tests\test-gallery.js` drives the routes end to end against a copy.
+Deploy with `.\scripts\deploy\Deploy-Docs.ps1`, which sends `server.js`, the
+public and hub pages, and the empty queue and reports files.

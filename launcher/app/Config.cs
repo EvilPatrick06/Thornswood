@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.IO;
 using System.Runtime.Serialization;
@@ -34,7 +34,7 @@ namespace Thornswood
         // send somebody to the collection, because that is exactly the
         // state somebody installing for the first time is in.
         public const string Collection =
-            "https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a";
+            "https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf";
 
         // Where a server on this machine lives, when the address above is this
         // machine. Blank means look in the usual two places.
@@ -134,7 +134,26 @@ namespace Thornswood
         [DataMember] public string UpdateToken = "";   // read-only fine-grained PAT
         [DataMember] public string UpdateBranch = "main";
 
+        // Direct https URL for version.json on the site feed (#649). Empty
+        // means fall back to the GitHub Contents API on UpdateRepo (kept hot
+        // as rollback via Thornswood-Releases). Defaults in AfterLoad:
+        // main -> https://thornswood.net/feed/version.json ; Channel or
+        // UpdateBranch "dev" -> https://thornswood.net/feed-dev/version.json.
+        // The feed can announce a move the way updateRepo announces a rename
+        // by shipping updateFeedUrl under the old URL first.
+        [DataMember] public string UpdateFeedUrl = "";
+
         [DataMember] public string Theme = "Forge";
+
+        // A theme the person builds for themselves on the Settings page, kept
+        // as flat name/hex pairs so the serializer stays as plain as the rest
+        // of this file: "Bg","#100D0A","Panel","#171310", and so on for the
+        // sixteen colour names in Themes.cs. Null or too short to hold a pair
+        // means none has been made, and "Custom" is not offered. CustomLight
+        // is the same choice a built-in theme makes with its Light flag, so
+        // anything that draws its own graphics can pick a side.
+        [DataMember] public string[] CustomColors = null;
+        [DataMember] public bool CustomLight = false;
 
         /*
           Which build this install follows. Empty is the main build, the one
@@ -278,6 +297,16 @@ namespace Thornswood
             if (string.IsNullOrEmpty(UpdateRepo)) UpdateRepo = "EvilPatrick06/Thornswood-Releases";
             if (UpdateToken == null) UpdateToken = "";
             if (string.IsNullOrEmpty(UpdateBranch)) UpdateBranch = "main";
+            // Site feed first (#649). GitHub Contents API on UpdateRepo stays
+            // as the fallback when the site does not answer.
+            if (string.IsNullOrEmpty(UpdateFeedUrl))
+            {
+                bool feedDev = string.Equals(Channel, "dev", StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(UpdateBranch, "dev", StringComparison.OrdinalIgnoreCase);
+                UpdateFeedUrl = feedDev
+                    ? "https://thornswood.net/feed-dev/version.json"
+                    : "https://thornswood.net/feed/version.json";
+            }
             if (string.IsNullOrEmpty(Theme)) Theme = "Forge";
             if (Channel == null) Channel = "";
             if (string.IsNullOrEmpty(DiscordAppId)) DiscordAppId = "1549251507361292418";
@@ -506,6 +535,13 @@ namespace Thornswood
         // pointing at the new, then rename. Every stale copy reads it once and
         // finds its way home.
         [DataMember] public string updateRepo = "";
+
+        // Where version.json itself lives, when that is a direct https URL on
+        // the site rather than the GitHub Contents API. Same announce-a-rename
+        // pattern as updateRepo (#649): publish the new URL under the old feed
+        // first, then move. Null/empty on older feeds means keep whatever the
+        // launcher already has (including the AfterLoad default).
+        [DataMember] public string updateFeedUrl = "";
         [DataMember] public string voicePort = "";
 
         /// <summary>

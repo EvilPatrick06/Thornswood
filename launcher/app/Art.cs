@@ -27,11 +27,24 @@ namespace Thornswood
         static string headerVideo;
         static bool triedHeaderVideo;
 
+        /// <summary>
+        /// True in the dev build. Set by Shell as soon as the config is read,
+        /// before anything asks for the emblem or the shortcut icon.
+        /// </summary>
+        public static bool Dev;
+
+        /// <summary>
+        /// The emblem: logo.png on the main build, logo-dev.png on the dev
+        /// build (Djinn, 25 Sep: the new emblem is the dev launcher's only,
+        /// main keeps its own). A dev build without logo-dev.png falls back
+        /// to logo.png.
+        /// </summary>
         public static BitmapImage Emblem()
         {
             if (tried) return cached;
             tried = true;
-            cached = Load("logo.png");
+            if (Dev) cached = Load("logo-dev.png");
+            if (cached == null) cached = Load("logo.png");
             return cached;
         }
 

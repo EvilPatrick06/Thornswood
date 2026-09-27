@@ -144,6 +144,13 @@
                 <Setter TargetName="b" Property="Background" Value="{DynamicResource Card}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
               </Trigger>
+              <!-- Keyboard focus is drawn the same as hover, so a person
+                   moving through the chrome buttons with Tab can see where
+                   they are (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="b" Property="Background" Value="{DynamicResource Card}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+              </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -173,6 +180,12 @@
                 <Setter TargetName="bar" Property="Fill" Value="{DynamicResource Accent}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
+              </Trigger>
+              <!-- Tabbing to a nav item lights its accent bar, so keyboard
+                   focus is as plain to see as the page it is on (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="bar" Property="Fill" Value="{DynamicResource Accent}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -207,6 +220,11 @@
                 <Setter TargetName="b" Property="Background" Value="{DynamicResource CardHover}"/>
                 <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource Accent}"/>
               </Trigger>
+              <!-- Keyboard focus lights the accent border, the same edge
+                   hover gives, so a Tab lands somewhere a person can see (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+              </Trigger>
               <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4"/></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -224,6 +242,9 @@
             <Border Background="Transparent" Padding="0,2"><ContentPresenter/></Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource Accent}"/></Trigger>
+              <!-- A link in focus reads in the accent, so Tab shows it the
+                   same way the pointer does (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="Foreground" Value="{DynamicResource Accent}"/></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -244,10 +265,16 @@
             <Grid>
               <Border x:Name="b" Background="{DynamicResource Accent}" CornerRadius="2"/>
               <Rectangle Height="1" VerticalAlignment="Top" Margin="1,1,1,0" Fill="#33FFFFFF"/>
+              <!-- The focus ring sits on top of the accent fill, drawn in the
+                   ink that reads on it, and shows only when the button is
+                   reached by keyboard (#602). -->
+              <Rectangle x:Name="ring" RadiusX="2" RadiusY="2" Margin="3" Visibility="Collapsed"
+                         Stroke="{DynamicResource AccentInk}" StrokeThickness="1.5" StrokeDashArray="2 2"/>
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="b" Property="Opacity" Value="0.88"/></Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ring" Property="Visibility" Value="Visible"/></Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="b" Property="Background" Value="{DynamicResource Card}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Faint}"/>
@@ -267,11 +294,18 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="sb" Background="{DynamicResource Accent}" CornerRadius="2">
-              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
-            </Border>
+            <Grid>
+              <Border x:Name="sb" Background="{DynamicResource Accent}" CornerRadius="2">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+              </Border>
+              <!-- Shown only on keyboard focus, in the ink that reads on the
+                   accent fill, so Tab lands somewhere visible (#602). -->
+              <Rectangle x:Name="ring" RadiusX="2" RadiusY="2" Margin="3" Visibility="Collapsed"
+                         Stroke="{DynamicResource AccentInk}" StrokeThickness="1.5" StrokeDashArray="2 2"/>
+            </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="sb" Property="Opacity" Value="0.86"/></Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ring" Property="Visibility" Value="Visible"/></Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="sb" Property="Background" Value="{DynamicResource Card}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Faint}"/>
@@ -379,6 +413,12 @@
               <Trigger Property="IsMouseOver" Value="True">
                 <Setter TargetName="box" Property="BorderBrush" Value="{DynamicResource Accent}"/>
               </Trigger>
+              <!-- Keyboard focus lights the box edge, the same as hover, so a
+                   person tabbing through the settings can see the tick they
+                   are about to toggle (#602). -->
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="box" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+              </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -402,7 +442,15 @@
     </Style>
   </Window.Resources>
 
-  <Border BorderBrush="{DynamicResource Line}" BorderThickness="1" Background="{DynamicResource Bg}">
+  <!-- The window draws its own title bar. Without WindowChrome, WindowStyle None
+       with a resizable window shows the system resize border as a light strip
+       along the top edge (#596). The edges still resize the window. -->
+  <WindowChrome.WindowChrome>
+    <WindowChrome CaptionHeight="0" ResizeBorderThickness="6" GlassFrameThickness="0"
+                  CornerRadius="0" UseAeroCaptionButtons="False"/>
+  </WindowChrome.WindowChrome>
+
+  <Border x:Name="WindowFrame" BorderBrush="{DynamicResource Line}" BorderThickness="1" Background="{DynamicResource Bg}">
     <Grid>
       <Grid.RowDefinitions>
         <RowDefinition Height="46"/>
@@ -490,7 +538,13 @@
                   <TextBlock Text="Server" VerticalAlignment="Center"/>
                 </StackPanel>
               </Button>
-                <TextBlock Text="Your build" Style="{StaticResource NavGroup}"/>
+                <!-- The whole of "Your build" (Mods, What is installed, Saves)
+                     is hidden now, so its heading is too (issue #599). The
+                     buttons themselves are collapsed in Shell.cs rather than
+                     cut here, because navButtons/pages/PageTitles are parallel
+                     arrays indexed by number and renumbering them is the bug
+                     the PageXxx comment warns about. -->
+                <TextBlock Text="Your build" Style="{StaticResource NavGroup}" Visibility="Collapsed"/>
               <Button x:Name="NavMods" Style="{StaticResource Nav}">
                 <StackPanel Orientation="Horizontal">
                   <Path Width="15" Height="15" Stretch="Uniform" Margin="0,0,13,0" VerticalAlignment="Center"
@@ -604,21 +658,27 @@
                   <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <Image x:Name="Emblem" Width="84" Height="84" Margin="0,0,22,0" VerticalAlignment="Center"
                            RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed"/>
-                    <StackPanel VerticalAlignment="Center">
+                    <StackPanel x:Name="BannerTitle" VerticalAlignment="Center">
                       <TextBlock x:Name="TxtBrandBig" Text="ThornsWood" Style="{StaticResource Display}"/>
-                      <StackPanel Orientation="Horizontal" Margin="2,8,0,0">
+                      <!-- The dash and the plugins / game / launcher line under the name are not shown
+                           on the banner (#596). Kept in the tree because the code still fills the line. -->
+                      <StackPanel Orientation="Horizontal" Margin="2,8,0,0" Visibility="Collapsed">
                         <Rectangle Width="26" Height="2" Fill="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                         <TextBlock x:Name="TxtHeroLine" Style="{StaticResource Small}" FontSize="12" VerticalAlignment="Center"/>
                       </StackPanel>
                     </StackPanel>
                   </StackPanel>
-                  <StackPanel x:Name="StatRow" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"/>
+                  <StackPanel x:Name="StatRow" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel.Effect>
+                      <DropShadowEffect Color="Black" ShadowDepth="0" BlurRadius="8" Opacity="0.95"/>
+                    </StackPanel.Effect>
+                  </StackPanel>
                 </Grid>
               </Grid>
             </Border>
 
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-              <Grid Margin="36,28,36,10">
+            <!-- No ScrollViewer on Play: the page fits the normal launcher window. Other pages keep theirs. -->
+            <Grid Grid.Row="1" Margin="36,28,36,10">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="1.9*" MinWidth="330"/>
                   <ColumnDefinition Width="30"/>
@@ -627,14 +687,71 @@
 
                 <StackPanel Grid.Column="0">
                   <TextBlock Text="Ready to launch" Style="{StaticResource Eyebrow}"/>
-                  <StackPanel x:Name="StatusList"/>
+                  <!-- The full checklist and Scan and Fix live on the Diagnostics
+                       page now (#607). This is the one line summary of it; Recheck
+                       below runs the whole lot and updates it in place, so it does
+                       not flash or re-say itself when nothing has changed. -->
+                  <Border Style="{StaticResource Slab}" Padding="20,17">
+                    <Grid>
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                      <Ellipse x:Name="DotReady" Grid.Column="0" Width="10" Height="10" Fill="{DynamicResource Faint}"
+                               VerticalAlignment="Center" Margin="0,0,15,0"/>
+                      <StackPanel Grid.Column="1">
+                        <TextBlock x:Name="TxtReadyTitle" Style="{StaticResource H2}" Text="Checking..."/>
+                        <TextBlock x:Name="TxtReadyNote" Style="{StaticResource Small}" Margin="0,2,0,0" TextWrapping="Wrap"
+                                   Text="The full checklist and Scan and Fix are on the Diagnostics page. Recheck runs them all."/>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
+                  <!-- Compact Server selector. One control shows the current
+                       server and opens a dropdown (Main / Dev for now). The two
+                       servers are two launcher installs: picking Dev opens the
+                       second launcher when it is already here, or checks the
+                       person's Discord roles and offers to install it only when
+                       they may (#605). More servers later are more rows in the
+                       popup list. -->
+                  <StackPanel x:Name="ServerPickCard" Margin="0,0,0,26">
+                    <TextBlock Text="Server" Style="{StaticResource Eyebrow}"/>
+                    <Grid>
+                      <Button x:Name="BtnServerPick" Style="{StaticResource Ghost}"
+                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                              Padding="12,8">
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                          </Grid.ColumnDefinitions>
+                          <TextBlock x:Name="TxtServerPick" Grid.Column="0" Text="Main"
+                                     VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="1" Text="▾" Margin="12,0,0,0"
+                                     VerticalAlignment="Center" Foreground="{DynamicResource Muted}"/>
+                        </Grid>
+                      </Button>
+                      <Popup x:Name="ServerPickPopup" Placement="Bottom"
+                             PlacementTarget="{Binding ElementName=BtnServerPick}"
+                             StaysOpen="False" AllowsTransparency="True">
+                        <Border Background="{DynamicResource Card}" BorderBrush="{DynamicResource Line}"
+                                BorderThickness="1" CornerRadius="2" Padding="4">
+                          <StackPanel>
+                            <Button x:Name="BtnServerMain" Style="{StaticResource Ghost}"
+                                    Content="Main" HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left" Margin="0,0,0,2"/>
+                            <Button x:Name="BtnServerDev" Style="{StaticResource Ghost}"
+                                    Content="Dev" HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left"/>
+                          </StackPanel>
+                        </Border>
+                      </Popup>
+                    </Grid>
+                  </StackPanel>
+
                   <!-- Discord is the door. The launcher asks the site who you are
                        every time you press Play, so this has to be linked before
                        the game will start. -->
-                  <StackPanel x:Name="DiscordCard">
+                  <StackPanel x:Name="DiscordCard" Margin="0,0,0,26">
                     <TextBlock Text="Your account" Style="{StaticResource Eyebrow}"/>
                     <Border Style="{StaticResource Slab}">
                       <StackPanel>
@@ -674,15 +791,34 @@
 
                   <StackPanel x:Name="QuickKeysCard" Visibility="Collapsed">
                     <TextBlock Text="In game" Style="{StaticResource Eyebrow}"/>
-                    <Border Style="{StaticResource Slab}" Padding="18,14">
+                    <Border Style="{StaticResource Slab}" Padding="18,16">
                       <StackPanel x:Name="QuickKeys"/>
                     </Border>
                     <Button x:Name="BtnAllControls" Style="{StaticResource Link}" Content="All of the controls"
-                            HorizontalAlignment="Left" Margin="1,10,0,0"/>
+                            HorizontalAlignment="Left" Margin="0,10,0,0"/>
+                  </StackPanel>
+
+                  <!-- From the world: the pictures thornswood.net is showing, each
+                       taken by somebody playing, turned through one at a time. Read
+                       only. The site keeps the queue and the staff choose what goes
+                       into the gallery; this shows what /api/public already serves
+                       and sends nothing. Filled by StartGallery in Shell.cs, hidden
+                       until the first picture has loaded (#603). -->
+                  <StackPanel x:Name="GalleryCard" Margin="0,26,0,0" Visibility="Collapsed">
+                    <TextBlock Text="From the world" Style="{StaticResource Eyebrow}"/>
+                    <Border Style="{StaticResource Slab}" Padding="0">
+                      <StackPanel>
+                        <Border Height="150" ClipToBounds="True">
+                          <Image x:Name="GalleryImage" Stretch="UniformToFill"
+                                 RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Border>
+                        <TextBlock x:Name="GalleryBy" Style="{StaticResource Small}"
+                                   TextWrapping="Wrap" Margin="16,10,16,13"/>
+                      </StackPanel>
+                    </Border>
                   </StackPanel>
                 </StackPanel>
-              </Grid>
-            </ScrollViewer>
+            </Grid>
 
             <Border x:Name="UpdateBar" Grid.Row="2" Background="{DynamicResource Card}" BorderBrush="{DynamicResource Accent}"
                     BorderThickness="1" CornerRadius="2" Padding="20,16" Margin="36,0,36,16" Visibility="Collapsed">
@@ -825,22 +961,9 @@
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" x:Name="VerifyCard" Style="{StaticResource Slab}" Padding="20,17">
-              <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Ellipse x:Name="DotVerify" Grid.Column="0" Width="10" Height="10" Fill="{DynamicResource Faint}"
-                         VerticalAlignment="Center" Margin="0,0,15,0"/>
-                <StackPanel Grid.Column="1">
-                  <TextBlock x:Name="TxtVerifyTitle" Style="{StaticResource H2}" Text="Not checked yet"/>
-                  <TextBlock x:Name="TxtVerifyNote" Style="{StaticResource Small}" Margin="0,2,0,0"
-                             Text="Compares what you have against the list the server expects."/>
-                </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                  <Button x:Name="BtnScan" Style="{StaticResource Ghost}" Content="Scan" Margin="0,0,8,0"/>
-                  <Button x:Name="BtnFix"  Style="{StaticResource Solid}" Content="Fix" IsEnabled="False"/>
-                </StackPanel>
-              </Grid>
-            </Border>
+            <!-- The Scan and Fix card moved to the Diagnostics page (#607). This
+                 page is now the mod browser; the checks that gate Play, and the
+                 buttons that put things right, live together under Diagnostics. -->
 
             <Grid Grid.Row="1" Margin="0,22,0,0">
               <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -1000,6 +1123,58 @@
 
                 <TextBlock x:Name="TxtDiagNote" Style="{StaticResource Small}" Margin="2,13,0,0"/>
 
+                <!-- ============ Ready to launch (moved from Play, #607) ============
+                     The gate rows that used to sit on the Play page. Play now
+                     shows a one line summary of these and its Recheck button
+                     redraws them here. DrawStatus fills this list in place. -->
+                <TextBlock Text="Ready to launch" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
+                <StackPanel x:Name="StatusList"/>
+
+                <!-- ============ Scan and Fix (moved from Mods and Settings, #607) ==== -->
+                <TextBlock Text="Scan and Fix" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
+                <Border x:Name="VerifyCard" Style="{StaticResource Slab}" Padding="20,17">
+                  <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <Ellipse x:Name="DotVerify" Grid.Column="0" Width="10" Height="10" Fill="{DynamicResource Faint}"
+                             VerticalAlignment="Center" Margin="0,0,15,0"/>
+                    <StackPanel Grid.Column="1">
+                      <TextBlock x:Name="TxtVerifyTitle" Style="{StaticResource H2}" Text="Not checked yet"/>
+                      <TextBlock x:Name="TxtVerifyNote" Style="{StaticResource Small}" Margin="0,2,0,0"
+                                 Text="Compares what you have against the list the server expects."/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                      <Button x:Name="BtnScan" Style="{StaticResource Ghost}" Content="Scan" Margin="0,0,8,0"/>
+                      <Button x:Name="BtnFix"  Style="{StaticResource Solid}" Content="Fix" IsEnabled="False"/>
+                    </StackPanel>
+                  </Grid>
+                </Border>
+
+                <Border Style="{StaticResource Slab}" Padding="20,18" Margin="0,16,0,0">
+                  <StackPanel>
+                    <TextBlock Style="{StaticResource H2}" Text="Bring it up to date from Vortex"/>
+                    <TextBlock Style="{StaticResource Body}" Text="Thornswood runs from a Skyrim folder of its own, built from what Vortex has deployed. When Vortex deploys a newer collection, the launcher brings it in by itself the next time it starts. This does it now, on demand, without waiting for a restart."/>
+                    <Button x:Name="BtnOwnGameRefresh" Style="{StaticResource Ghost}" Content="Bring it up to date from Vortex" HorizontalAlignment="Left" Margin="0,13,0,0"/>
+
+                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
+
+                    <TextBlock Style="{StaticResource H2}" Text="Repair"/>
+                    <TextBlock Style="{StaticResource Body}" Text="Puts this build's own files back: the settings and load order that shipped with it, the client and the overlays under Data, the mod settings this build pins, and the class preset names. Another server's launcher can replace any of those, and an install that has never taken an update has never had a spare copy of them. This is everything Play does on the way in, done on demand, and it is safe to press twice. Close Skyrim first."/>
+                    <Button x:Name="BtnRepair" Style="{StaticResource Ghost}" Content="Repair" HorizontalAlignment="Left" Margin="0,13,0,0"/>
+
+                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
+
+                    <TextBlock Style="{StaticResource H2}" Text="Restore Windows folders"/>
+                    <TextBlock Style="{StaticResource Body}" Text="While the game runs, Windows' Skyrim settings and saves folders point at this build and are put back when you quit. If the game crashed hard and something still looks redirected, this undoes it by hand."/>
+                    <Button x:Name="BtnRestore" Style="{StaticResource Ghost}" Content="Restore" HorizontalAlignment="Left" Margin="0,13,0,0"/>
+
+                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
+
+                    <TextBlock Style="{StaticResource H2}" Text="Refresh the shortcut icon"/>
+                    <TextBlock Style="{StaticResource Body}" Text="The launcher repoints your shortcut at the current artwork every time it starts, which is usually enough. This is for when the desktop or the taskbar is still showing an old icon anyway. Explorer restarts, so the taskbar blinks once. Nothing is lost."/>
+                    <Button x:Name="BtnIcons" Style="{StaticResource Ghost}" Content="Refresh icon" HorizontalAlignment="Left" Margin="0,13,0,0"/>
+                  </StackPanel>
+                </Border>
+
                 <TextBlock Text="What the launcher can see right now" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
                 <StackPanel x:Name="DiagReadings"/>
               </StackPanel>
@@ -1020,7 +1195,8 @@
 
                 <TextBlock Text="Appearance" Style="{StaticResource Eyebrow}"/>
                 <StackPanel x:Name="ThemeRow" Margin="0,0,0,6"/>
-                <TextBlock x:Name="TxtThemeNote" Style="{StaticResource Small}" Margin="0,0,0,30"/>
+                <TextBlock x:Name="TxtThemeNote" Style="{StaticResource Small}" Margin="0,0,0,18"/>
+                <StackPanel x:Name="ThemeEditor" Margin="0,0,0,30"/>
 
                 <TextBlock Text="Music" Style="{StaticResource Eyebrow}"/>
                 <StackPanel Margin="0,0,0,30">
@@ -1107,9 +1283,9 @@
                       <TextBlock Style="{StaticResource Body}" Text="Runs Thornswood from a Skyrim folder of its own, made from what Vortex has deployed while the Thornswood profile is on. Any other Vortex profile can then use the Steam copy without reaching Thornswood, and switching profiles in Vortex no longer takes Thornswood's mods away. The big files are links to Vortex's copies, so the collection is not on the disk twice. When Vortex deploys a newer Thornswood collection, the launcher brings it in by itself the next time it starts. Windows asks for administrator once while this is set up, to write a firewall rule for the game's browser: Skyrim Platform draws the interface in a second program, and a rule is tied to a program's path, so moving the game into its own folder is what makes Windows ask about it. The rule is a block, because that program only ever talks to the game on this machine. Saying no is fine and only means Windows asks you about the browser on the first launch instead."/>
                       <TextBlock x:Name="TxtOwnGameState" Style="{StaticResource Small}" Margin="0,8,0,0"/>
                       <StackPanel Orientation="Horizontal" Margin="0,13,0,0">
-                        <Button x:Name="BtnOwnGameMake" Style="{StaticResource Ghost}" Content="Make it" Margin="0,0,8,0"/>
-                        <Button x:Name="BtnOwnGameRefresh" Style="{StaticResource Ghost}" Content="Bring it up to date from Vortex"/>
+                        <Button x:Name="BtnOwnGameMake" Style="{StaticResource Ghost}" Content="Make it"/>
                       </StackPanel>
+                      <!-- Bring it up to date from Vortex moved to Diagnostics, Scan and Fix (#607). -->
                       <TextBlock Style="{StaticResource Small}" Margin="0,13,0,0" Text="The launcher finds the folder Vortex deploys into when it is in a Steam library. If it is somewhere else, choose it here: in Vortex, Mods, Open, Open Game Folder shows which one. Only the files Vortex lists in it are used, and the game itself always comes from the Steam copy."/>
                       <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                         <Button x:Name="BtnOwnGamePick" Style="{StaticResource Ghost}" Content="Choose Vortex's folder" Margin="0,0,8,0"/>
@@ -1119,35 +1295,12 @@
                       <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
                     </StackPanel>
 
-                    <TextBlock Style="{StaticResource H2}" Text="Repair"/>
-                    <TextBlock Style="{StaticResource Body}" Text="Puts this build's own files back: the settings and load order that shipped with it, the client and the overlays under Data, the mod settings this build pins, and the class preset names. Another server's launcher can replace any of those, and an install that has never taken an update has never had a spare copy of them. This is everything Play does on the way in, done on demand, and it is safe to press twice. Close Skyrim first."/>
-                    <Button x:Name="BtnRepair" Style="{StaticResource Ghost}" Content="Repair" HorizontalAlignment="Left" Margin="0,13,0,0"/>
+                    <!-- Repair, Restore Windows folders and Refresh the shortcut icon
+                         moved to Diagnostics, Scan and Fix (#607). -->
 
-                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
-
-                    <TextBlock Style="{StaticResource H2}" Text="Restore Windows folders"/>
-                    <TextBlock Style="{StaticResource Body}" Text="While the game runs, Windows' Skyrim settings and saves folders point at this build and are put back when you quit. If the game crashed hard and something still looks redirected, this undoes it by hand."/>
-                    <Button x:Name="BtnRestore" Style="{StaticResource Ghost}" Content="Restore" HorizontalAlignment="Left" Margin="0,13,0,0"/>
-
-                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
-
-                    <TextBlock Style="{StaticResource H2}" Text="Refresh the shortcut icon"/>
-                    <TextBlock Style="{StaticResource Body}" Text="The launcher repoints your shortcut at the current artwork every time it starts, which is usually enough. This is for when the desktop or the taskbar is still showing an old icon anyway. Explorer restarts, so the taskbar blinks once. Nothing is lost."/>
-                    <Button x:Name="BtnIcons" Style="{StaticResource Ghost}" Content="Refresh icon" HorizontalAlignment="Left" Margin="0,13,0,0"/>
-
-                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
-
-                    <StackPanel x:Name="PnlDev">
-                      <TextBlock Style="{StaticResource H2}" Text="The dev build"/>
-                      <TextBlock Style="{StaticResource Body}" Text="A second launcher beside this one, in its own folder with its own Start menu entry. It gets new changes first and joins the dev server, so things get broken there instead of here. Same Skyrim, same mods; each launcher puts its own files back before it plays. Characters on the dev server are separate, and they are throwaway. The Owner and Dev roles only."/>
-                      <TextBlock x:Name="TxtDevState" Style="{StaticResource Small}" Margin="0,8,0,0"/>
-                      <StackPanel Orientation="Horizontal" Margin="0,13,0,0">
-                        <Button x:Name="BtnDevInstall" Style="{StaticResource Ghost}" Content="Install the dev build" Margin="0,0,8,0"/>
-                        <Button x:Name="BtnDevRemove" Style="{StaticResource Ghost}" Content="Remove the dev build"/>
-                      </StackPanel>
-
-                      <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
-                    </StackPanel>
+                    <!-- The dev-build card moved to the Server dropdown on the Play
+                         page (#605). Choosing the dev server there installs or opens
+                         the dev build, after the same Discord role check. -->
 
                     <TextBlock Style="{StaticResource H2}" Text="Uninstall ThornsWood"/>
                     <TextBlock Style="{StaticResource Body}" Text="Puts your Windows Skyrim folders back, then deletes this build and the launcher with it. Your own Skyrim in Steam is never touched: this is a separate copy and Steam does not know it exists. There is no undo, and the whole thing has to be downloaded again afterwards."/>

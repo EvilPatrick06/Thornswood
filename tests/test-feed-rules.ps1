@@ -83,6 +83,7 @@ Yes 'a private source asset is not' (-not (Test-FeedPackUrl (Api $priv '1') $pub
 Yes 'nor is a longer name that starts the same' (-not (Test-FeedPackUrl (Api "$pub-old" '1') $pub))
 Yes 'nor is an empty url' (-not (Test-FeedPackUrl '' $pub))
 Yes 'nor is anything when no repository is named' (-not (Test-FeedPackUrl (Api $pub '1') ''))
+Yes 'but a host feed asset does not need updateRepo' (Test-FeedPackUrl ("https://thornswood.net/feed/assets/$('b'*64)") '')
 
 $mixed = @(
     (P 'A' (Api $priv '10')),
@@ -105,6 +106,42 @@ $one = Split-FeedPacks @((P 'Z' (Api $pub '1'))) $pub
 Yes 'one pack comes back as a list of one, which strict mode can count' (($one.Keep.Count -eq 1) -and ($one.Drop.Count -eq 0))
 $none = Split-FeedPacks @() $pub
 Yes 'an empty feed splits into two empty lists' (($none.Keep.Count -eq 0) -and ($none.Drop.Count -eq 0))
+
+
+# ------------------------------------------------------------ host feed assets (#649)
+Write-Host ''
+Write-Host 'host feed assets'
+
+$sha = 'a' * 64
+$hostLive = "https://thornswood.net/feed/assets/$sha"
+$hostDev  = "https://thornswood.net/feed-dev/assets/$sha"
+$hostSub  = "https://cdn.thornswood.net/feed/assets/$sha"
+
+Yes 'a live host feed asset is downloadable' (Test-FeedPackUrl $hostLive $pub)
+Yes 'a dev host feed asset is downloadable' (Test-FeedPackUrl $hostDev $pub)
+Yes 'a subdomain host feed asset is downloadable' (Test-FeedPackUrl $hostSub $pub)
+Yes 'Test-HostFeedAssetUrl accepts the live shape' (Test-HostFeedAssetUrl $hostLive)
+Yes 'Test-HostFeedAssetUrl accepts the dev shape' (Test-HostFeedAssetUrl $hostDev)
+Yes 'Get-HostFeedAssetUrl builds the live url' ((Get-HostFeedAssetUrl $sha) -eq $hostLive)
+Yes 'Get-HostFeedAssetUrl -Dev builds the dev url' ((Get-HostFeedAssetUrl $sha -Dev) -eq $hostDev)
+Yes 'Get-HostFeedVersionUrl is the live version.json' ((Get-HostFeedVersionUrl) -eq 'https://thornswood.net/feed/version.json')
+Yes 'Get-HostFeedVersionUrl -Dev is the dev version.json' ((Get-HostFeedVersionUrl -Dev) -eq 'https://thornswood.net/feed-dev/version.json')
+Yes 'a short hash is not a host feed asset' (-not (Test-HostFeedAssetUrl "https://thornswood.net/feed/assets/abcd"))
+Yes 'a wrong path on thornswood.net is not' (-not (Test-HostFeedAssetUrl "https://thornswood.net/files/$sha"))
+Yes 'plain http on thornswood.net is not' (-not (Test-HostFeedAssetUrl ("http://thornswood.net/feed/assets/$sha")))
+Yes 'a lookalike host is not' (-not (Test-HostFeedAssetUrl "https://thornswood.net.evil.example/feed/assets/$sha"))
+Yes 'private source GitHub assets still refuse' (-not (Test-FeedPackUrl (Api $priv '1') $pub))
+Yes 'random hosts still refuse' (-not (Test-FeedPackUrl "https://evil.example/feed/assets/$sha" $pub))
+
+$hostMixed = @(
+    (P 'H1' $hostLive),
+    (P 'G1' (Api $pub '11')),
+    (P 'B1' (Api $priv '10')),
+    (P 'H2' $hostDev)
+)
+$hs = Split-FeedPacks $hostMixed $pub
+Yes 'kept: host assets and public GitHub, in feed order' ((Ids $hs.Keep) -eq 'H1,G1,H2')
+Yes 'dropped: private source only' ((Ids ($hs.Drop | ForEach-Object { $_.Pack })) -eq 'B1')
 
 # ------------------------------------------------------------ Publish-Update, adding packs
 Write-Host ''

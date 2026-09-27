@@ -1,68 +1,93 @@
 # The update feed
 
 Every Thornswood launcher decides what to download from one file:
-`version.json` in the public repository `EvilPatrick06/Thornswood-Releases`.
-This page is every field in it, who writes each one, who reads it, and what
-goes wrong when it is wrong. File and line references are to the source repo
-on 25 September (main at 044b737) unless they say otherwise.
+`version.json`. After the #649 host cutover that file is served from
+**thornswood.net** (`/feed/version.json` live, `/feed-dev/version.json` for
+dev), with `EvilPatrick06/Thornswood-Releases` kept as the GitHub Contents API
+fallback and rollback. This page is every field in it, who writes each one,
+who reads it, and what goes wrong when it is wrong.
 
 ## Where it is and how a launcher reads it
 
-- **One file per branch.** The `main` branch is the live feed. The `dev`
-  branch is the dev build's feed. A launcher reads the branch in its
-  `config.json` `UpdateBranch`, `main` when empty (`Config.cs:135,280`); the dev
-  build is installed with `UpdateBranch` and `Channel` set to `dev`
-  (`DevBuild.cs:100-101`).
-- **The request.** `GET https://api.github.com/repos/<UpdateRepo>/contents/version.json?ref=<branch>`
+### Host cutover (#649) — live URL shape
+
+Confirmed with Website. Signing / `ExpectedSigner` is still **off**.
+
+| What | URL |
+| --- | --- |
+| Live `version.json` | `https://thornswood.net/feed/version.json` |
+| Dev `version.json` | `https://thornswood.net/feed-dev/version.json` |
+| Live assets | `https://thornswood.net/feed/assets/<sha256>` |
+| Dev assets | `https://thornswood.net/feed-dev/assets/<sha256>` |
+
+- **Primary request.** The launcher prefers `config.json` `UpdateFeedUrl` (a
+  direct https GET of `version.json`). Defaults in `Config.AfterLoad`: main →
+  live URL above; `Channel` or `UpdateBranch` `dev` → dev URL
+  (`Config.cs`, `Updater.Check`). Host allowlist already includes
+  `thornswood.net`.
+- **Fallback / rollback.** If the site feed fails (or `UpdateFeedUrl` is
+  empty), `Updater.Check` falls back to the GitHub Contents API on
+  `UpdateRepo`/`UpdateBranch` (`EvilPatrick06/Thornswood-Releases`). Do **not**
+  delete that repository yet — it stays hot for rollback until the cutover
+  sticks. Publishers still upload release assets there; `-HostAssetUrls` on
+  `Publish-Update.ps1` only rewrites the urls written into `version.json`.
+- **Announce a move.** The feed field `updateFeedUrl` works like `updateRepo`:
+  publish the new URL under the old feed first, then move. Shell saves it
+  quietly into `config.json`.
+- **One file per channel on GitHub (fallback).** The `main` branch of
+  Thornswood-Releases is the live fallback feed; `dev` is the dev fallback. A
+  launcher reads `UpdateBranch`, `main` when empty; the dev build is installed
+  with `UpdateBranch` and `Channel` set to `dev` (`DevBuild.cs`).
+- **GitHub request (fallback).** `GET https://api.github.com/repos/<UpdateRepo>/contents/version.json?ref=<branch>`
   with `Accept: application/vnd.github.raw`, no token unless the config holds
-  one (`Updater.cs:42-55,157-169`). With no token, GitHub allows sixty of these
-  an hour per address; a 403 or 429 is reported as a rate limit, not a fault
-  (`Updater.cs:195-209`). While the game is running the launcher checks every
-  30 seconds (`Shell.cs:1517,1534`).
-- **Parsing.** `VersionDoc.Parse` with the .NET `DataContractJsonSerializer`
-  (`Config.cs:569-578`). A byte order mark is skipped. A value of the wrong JSON
-  type can make the serializer throw, and then the whole document is unread and
-  every launcher reports no answer from the update source and shuts Play
-  (`Config.cs:537-543`). Unknown fields are ignored.
+  one. With no token, GitHub allows sixty of these an hour per address; a 403
+  or 429 is reported as a rate limit, not a fault. While the game is running
+  the launcher checks every 30 seconds (`Shell.cs`).
+- **Parsing.** `VersionDoc.Parse` with the .NET `DataContractJsonSerializer`.
+  A byte order mark is skipped. A value of the wrong JSON type can make the
+  serializer throw, and then the whole document is unread and every launcher
+  reports no answer from the update source and shuts Play. Unknown fields are
+  ignored.
 - **On disk.** Publishers keep a clone beside the source repo:
   `Thornswood-Releases` on `main`, and the worktree `Thornswood-Releases-dev` on
-  `dev` (`Publish-Update.ps1:111-129`).
+  `dev` (`Publish-Update.ps1`). Mirror the same `version.json` (and assets by
+  sha256) onto the site paths above for the host cutover.
 
 ## A real entry, trimmed
 
-From `/home/user/thornswood-releases/version.json` (main, commit 51d1968).
-`packs` holds 229 entries and `news` 40; one of each is shown. Nothing here is
-a secret: the hashes are public and `discordAppId` is a public application id
-(`Config.cs:160-164`).
+From the live feed on `EvilPatrick06/Thornswood-Releases` (main, commit a22e4ef).
+`packs` holds 69 entries and `news` 40; one of each is shown, trimmed. Nothing
+here is a secret: the hashes are public and `discordAppId` is a public
+application id (`Config.cs:160-164`).
 
 ```json
 {
-  "launcherVersion": "1.1.94",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/587122255",
-  "launcherSha256": "8d5ffda17c740f340c431236fb15df74fd83abc5e5dd742db85a21bdda09f950",
+  "launcherVersion": "1.1.95",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/591560398",
+  "launcherSha256": "8dc36e32eb3dde35691e7a68e46195c6354968c3ea01585d03eb53289dca3070",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
   "packs": [
     {
-      "id": "20260924-1810",
-      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/587122257",
-      "sha256": "1a67e3c99b1d6a7c4fc06be90a96795afefde0a40a105bf512e90c2f6b84b2c8",
-      "notes": "The Downgrade button works on its own again.\nIt finds Steam's window however your Steam draws it, ..."
+      "id": "20260915-0030",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/565069058",
+      "sha256": "5bf7ff5c7009e24a8c21e599bb732ba11402035a7a4199d91cdf3180360cf1b3",
+      "notes": "Connect your Discord from the launcher"
     }
   ],
   "news": [
     {
-      "date": "9-24-2026 6:10 PM",
-      "title": "The Downgrade button works on its own again.",
-      "body": "It finds Steam's window however your Steam draws it, ...",
-      "details": ["Launcher 1.1.94", "21 files to download, 17.4 MB"],
+      "date": "9-26-2026 10:09 PM",
+      "title": "What arrived with launcher 1.1.95",
+      "body": "The last main note only said demoting was promoted. This is what players actually got ...",
+      "details": ["A sealed scroll opens Thornswood: click to open, Continue to characters; ...", "5 files to download, 48.4 MB"],
       "channel": ""
     }
   ],
   "updateRepo": "EvilPatrick06/Thornswood-Releases",
   "voicePort": "7778",
-  "collectionUrl": "https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a",
+  "collectionUrl": "https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf",
   "maxOnline": 25,
   "mainVersion": "",
   "voiceUrl": "https://thornswood.net/voice",
@@ -71,18 +96,19 @@ a secret: the hashes are public and `discordAppId` is a public application id
   "presenceImage": "https://thornswood.net/presence.png",
   "collectionRevision": 5,
   "clientRuntime": {
-    "url": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/583111894",
-    "sha256": "3fb5bb91f773e065b85be1ce190e341e5394e059673bfcda1a0268a524f1ce5c",
-    "bytes": 6538349,
-    "forkCommit": "c8832519"
+    "url": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/591302878",
+    "sha256": "efc8debfc3cd480183ab5d229b241e198f06f942b99a50baa50b172891b35726",
+    "bytes": 6356315,
+    "forkCommit": "d0006351"
   }
 }
 ```
 
-The dev feed (branch `dev`, commit d00a6f7) has the same shape with
+The dev feed (branch `dev`, commit 12f71c8) has the same shape with
 `serverPort` `"7787"`, `voicePort` `"7789"`, `voiceUrl`
-`"https://thornswood.net/voice-dev"`, `launcherVersion` `"1.1.92.1"`, pack ids
-ending `-dev`, and a non-empty `mainVersion`.
+`"https://thornswood.net/voice-dev"`, `launcherVersion` `"1.1.95.11"`,
+`collectionUrl` ending `7essxf` rather than main's `ombo2a`, pack ids ending
+`-dev`, and a non-empty `mainVersion`.
 
 ## Top-level fields
 
@@ -103,7 +129,8 @@ launcher.
 | `maxOnline` | number | `Publish-Update.ps1:1348-1352` | `Shell.cs:4551` | Saved when above 0. Written as a number because a quoted `"25"` reads as 0 (`Publish-Update.ps1:1344-1347`). |
 | `collectionUrl` | string | `Set-Collection.ps1:98-101` only; Ship carries it forward untouched | `Shell.cs:4549` | Saved. Where the Collection button sends people. |
 | `collectionRevision` | number | `Publish-Update.ps1:1371-1379`, read off the shipping machine's Vortex | `Shell.cs:4564`, then `Shell.cs:4814-4860` | Not saved. 0 or missing: the launcher says nothing about the collection being behind or ahead. Wrong: tells people to reinstall a collection that is fine. |
-| `updateRepo` | string `owner/name` | `Publish-Update.ps1:1316-1321` from `UpdateRepo` | `Shell.cs:4573-4576`, `Feed-Rules.ps1:43-49` | Saved, quietly. Wrong: every launcher asks the wrong repository next time and may never find its way back. This is how a rename is announced (`Config.cs:505-507`). |
+| `updateRepo` | string `owner/name` | `Publish-Update.ps1` from `UpdateRepo` | `Shell.cs`, `Feed-Rules.ps1` | Saved, quietly. Wrong: every launcher asks the wrong repository next time and may never find its way back. This is how a rename is announced. GitHub Contents API fallback (#649). |
+| `updateFeedUrl` | string, https | `Publish-Update.ps1` from `UpdateFeedUrl` (defaults to the site live/dev URL by channel) | `Shell.cs`, `Updater.Check` | Saved, quietly. Primary `version.json` fetch after #649. Same announce-a-move pattern as `updateRepo`. Empty/absent: keep the launcher default / fall back to GitHub. |
 | `voicePort` | string | from `VoicePort` | `Shell.cs:4569-4572` | Saved, quietly. Used when `voiceUrl` is empty. |
 | `voiceUrl` | string or absent | `Publish-Update.ps1:1328-1342`; `-dev` appended on the dev channel | `Shell.cs:4581-4585` | Saved, quietly. The one field that can be cleared: `""` sends launchers back to the raw port, absent changes nothing (`Config.cs:511-526`). |
 | `discordAppId`, `siteUrl`, `presenceImage` | string | from config, `Publish-Update.ps1:1316-1321` | `Shell.cs:4579-4586` | Saved, quietly. The Discord presence card and its buttons. |
@@ -122,7 +149,7 @@ launcher.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | `yyyyMMdd-HHmm`, `-dev` added on the dev channel, `-<part>` added when a release is split to stay under GitHub's 2 GiB asset limit (`Publish-Update.ps1:762,768-804`). Compared case-insensitively with `applied.txt`. An empty id is never offered. |
-| `url` | string | The asset's API address in the feed's own `updateRepo` (`Feed-Rules.ps1:8-14,55-64`). Empty: the launcher skips it and writes it off as applied (`Shell.cs:4925-4941`). A url that answers 404 fails the whole update and Play stays off (`Shell.cs:4969-4984`). |
+| `url` | string | A GitHub release asset in the feed's `updateRepo`, **or** a thornswood.net host asset under `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>` (`Feed-Rules.ps1`). Empty: the launcher skips it and writes it off as applied. A url that answers 404 fails the whole update and Play stays off. |
 | `sha256` | string, 64 hex | Mandatory; checked after download (`Updater.cs:436-448`). |
 | `notes` | string | The whole Ship note, first line first. The update card shows it (`Shell.cs:4669-4670`). |
 | `name`, `bytes` | string, number | Optional packs only: the Add-ons tab shows them (`Config.cs:354-360`). Publish-Pack also writes `notes` as a file count. |
@@ -175,12 +202,16 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
   one refuses the download (`Updater.cs:428-451`).
 - **Signature.** `ExpectedSigner` is empty, so the launcher exe's signature is
   not checked yet (`Updater.cs:881-901`).
-- **Publish side.** `Feed-Rules.ps1` refuses a new pack whose url is not a
-  release asset in `updateRepo` (`Publish-Update.ps1:1216-1220`).
-  `Check-Secrets.ps1` scans every zip and exe before upload
-  (`Publish-Update.ps1:1039-1047`). Nothing is written to the feed if any asset
-  failed to upload (`Publish-Update.ps1:1139-1172`), and `version.json` is
-  written without a byte order mark (`Publish-Update.ps1:1601-1605`).
+- **Publish side.** `Feed-Rules.ps1` refuses a new pack whose url is neither a
+  release asset in `updateRepo` nor a thornswood.net feed asset under
+  `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>`. Pass `-HostAssetUrls`
+  on `Publish-Update.ps1` to rewrite uploaded pack (and launcher /
+  clientRuntime) urls to the site shape after the GitHub upload; assets still
+  land on Thornswood-Releases for rollback. `Check-Secrets.ps1` scans every zip
+  and exe before upload. Nothing is written to the feed if any asset failed to
+  upload, and `version.json` is written without a byte order mark.
+- **Signing.** `ExpectedSigner` is still empty/absent — Azure Artifact Signing
+  is out of scope for the #649 cutover. Do not invent secrets.
 
 ## Main and dev
 
@@ -211,20 +242,26 @@ is what happened on 21 September, when 1.1.76 was undone by 1.1.77
 
 ## What looks wrong in the feeds today
 
-- **The live feed still lists 164 packs no launcher can download**, ids
-  `20260910-2345` to `20260914-1917`, all under the private source repository.
-  Read off the clone: 164 of 229 `packs` urls are
-  `repos/EvilPatrick06/Thornswood/releases/assets/...`. The dev feed had them
-  removed on 24 September (dev commit e42a112). `Repair-Manifest.ps1` has not
-  been run on main. Any launcher whose `applied.txt` is lost or incomplete
-  fails on the first one and Play stays off (`Feed-Rules.ps1:15-26`).
-- **The dev feed's `mainVersion` is `"1.1.37"`; main is on 1.1.94**, and all
-  40 dev news entries are marked `"dev"`, 30 of which main has. On a dev Ship,
-  `Publish-Update.ps1:1557-1561` reads `Thornswood-Releases\version.json`
-  from disk without pulling it, so a machine with an old main clone writes an
-  old number and marks everything dev. The dev launcher's News tab says so to
-  testers (`Shell.cs:2999-3001`).
-- **`Updater.cs:13` on main says 1.1.92** while the live feed says 1.1.94,
-  from the two hotfix branches. `Bump-Version.ps1:66-112` reads the live feed
-  and climbs past it, so the next main number is safe as long as the releases
-  clone is pulled first.
+Re-checked against the live feed (main commit a22e4ef, dev commit 12f71c8):
+the three problems this section used to list have all cleared.
+
+- **The dead private packs are gone.** The live feed once carried 164 packs
+  under the private source repository that no launcher could download; the
+  main feed now holds 69 packs and 0 of them point at
+  `repos/EvilPatrick06/Thornswood/...`. Every pack url is a release asset in
+  `updateRepo` (`Feed-Rules.ps1:8-14,55-64`), so a launcher with a lost or
+  incomplete `applied.txt` can fetch them all.
+- **Main and dev launcher versions agree.** The dev feed's `mainVersion` is
+  `"1.1.95"`, matching main's `launcherVersion` `1.1.95` (it used to be stuck
+  on `"1.1.37"`), and only 1 of the 40 dev news entries is marked `"dev"`. The
+  stale-main-clone hazard in `Publish-Update.ps1:1557-1561` still exists, so
+  keep the releases clone pulled before a dev Ship.
+- **`Updater.cs:13` and the live feed match.** The launcher's `Version` is
+  `1.1.95` and so is the feed's `launcherVersion`. `Bump-Version.ps1:66-112`
+  reads the live feed and climbs past it, so the next main number stays safe as
+  long as the releases clone is pulled first.
+
+The one standing gap is not new and is by design for now: `ExpectedSigner` is
+still empty/absent in the feed, so the launcher exe's signature is not checked
+(`Updater.cs:881-901`, and "Checks on every download" above). Do not read that
+as a signer that failed to publish; no signer has been set yet.

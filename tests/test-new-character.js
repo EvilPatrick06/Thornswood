@@ -179,6 +179,28 @@ if (block !== null) {
       /DRESS_TRIES/.test(code) && /if \(\(dressTried\[actorId\] \|\| 0\) >= DRESS_TRIES\) \{ return ''; \}/.test(code));
 }
 
+
+// ------------------------------------- RP-only old trades must re-pick
+/*
+  Issue #391: a character whose old chargen class was bard / merchant /
+  priest / scholar / thief must not keep Class or Profession privileges.
+  migrate clears the key and leaves progression empty so they pick again.
+*/
+{
+  const five = ['bard', 'merchant', 'priest', 'scholar', 'thief'];
+  yes('RP_ONLY names all five retired trades',
+      /var RP_ONLY = \{/.test(src) &&
+      five.every(function (k) { return new RegExp('\\b' + k + ':\\s*\\{').test(src); }));
+  five.forEach(function (k) {
+    yes('migrate treats ' + k + ' as RP-only (clear and re-pick)',
+        /P\.has\(P\.TABLE\.rpOnly, trade\)/.test(src) &&
+        src.indexOf("is RP-only; cleared, they must pick a class and profession") >= 0);
+  });
+  yes('migrate clears the old class key on thornswoodChargen',
+      /old\['class'\]\s*=\s*''/.test(src) &&
+      /mp\.set\(actorId, 'thornswoodChargen', old\)/.test(src));
+}
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

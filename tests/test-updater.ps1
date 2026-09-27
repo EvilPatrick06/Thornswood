@@ -288,6 +288,11 @@ function Run {
         'https://release-assets.githubusercontent.com/github-production-release-asset/1/2',
         'https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/1',
         'https://thornswood.net/files/pack.zip',
+        'https://thornswood.net/feed/version.json',
+        'https://thornswood.net/feed-dev/version.json',
+        'https://thornswood.net/feed/assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'https://thornswood.net/feed-dev/assets/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        'https://cdn.thornswood.net/feed/assets/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
         'https://codeload.github.com/EvilPatrick06/Thornswood-Releases/zip/main',
         'https://GitHub.com/EvilPatrick06/Thornswood-Releases/releases/download/v1/a.zip')) {
         $why = Refusal $u

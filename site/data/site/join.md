@@ -25,7 +25,9 @@ Skyrim the way it was.
 **Thornswood is eighteen and over.** Applying is you stating that you are. The
 [rules](/rules) say what that is about before they say anything else.
 
-**Thornswood is in closed playtesting.** It is not open to everybody yet.
+**Thornswood is in alpha.** Anyone can download and install it. The world stays
+locked until you have applied in the Discord and been given the role, so
+applying is the first thing to do.
 
 Come into the Discord and open a ticket. Say who you are, roughly what you are
 after, and whether you have played on a server like this before. A few lines is

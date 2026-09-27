@@ -22,11 +22,6 @@ $script:LoadOrderMasters = 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthF
 <#
   Which revision of the collection this machine has installed, or 0.
 
-  Vortex names the collection's own mod folder for it:
-
-      %APPDATA%\Vortex\skyrimse\mods\collection_ombo2a_2_2026-09-15T21-08-00Z
-                                                slug  ^ revision
-
   The same rule as Checks.CollectionRevision in the launcher, and it is here
   because the SHIPPING machine's answer is the one that goes in the feed: the
   server's load order and the reference plugin list are both derived from this
@@ -38,8 +33,95 @@ $script:LoadOrderMasters = 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthF
   the only test was whether one named file existed and that file was not in
   the collection at all. Two revisions of drift, on the machine that builds
   the server.
+
+  WHERE THE NUMBER COMES FROM, and why this was rewritten on 27 September.
+  The first version read the revision out of the name Vortex gave the mod
+  folder:
+
+      %APPDATA%\Vortex\skyrimse\mods\collection_ombo2a_2_2026-09-15T21-08-00Z
+                                                slug  ^ revision
+
+  Current Vortex does not name the folder that way any more. It names it for
+  the mod id it made up, with no slug and no number in it at all:
+
+      %APPDATA%\Vortex\skyrimse\mods\vortex_collection_ZRT7NjhN_
+
+  So the folder name stopped being able to answer the question, Have went to
+  0 on every up to date machine, Get-CollectionState.Known went false, and
+  Deploy-Gamemode's revision gate refused every deploy unless -IgnoreRevision.
+
+  The honest source is Vortex's own state, not the folder name. When Vortex
+  installs a collection it records, against the mod, the slug it was installed
+  from and the revision NUMBER it is on. That is independent of what the folder
+  is called, so it answers for both eras. It is read the same way
+  Get-CollectionNewest reads state.v2, as text rather than by opening the
+  database, because this only needs a number and must never be the reason a
+  deploy fails. The old folder-name parse stays as a fallback for a machine
+  that only has the legacy folders and no readable state.
 #>
 function Get-CollectionRevision([string]$Slug) {
+    if (-not $Slug) { return 0 }
+    $fromState = Get-CollectionRevisionFromState $Slug
+    if ($fromState -gt 0) { return $fromState }
+    return Get-CollectionRevisionFromFolder $Slug
+}
+
+<#
+  The installed revision as Vortex records it in state.v2, or 0.
+
+  Vortex keeps the redux state flattened into LevelDB keys joined by ###, the
+  same shape Get-CollectionNewest reads. For an installed collection the two
+  keys that matter are, under the mod's own id:
+
+      persistent###mods###skyrimse###<modId>###attributes###collectionSlug -> "ombo2a"
+      persistent###mods###skyrimse###<modId>###attributes###revisionNumber -> 5
+
+  LevelDB writes the key, then a length byte (a control character), then that
+  many bytes of the value's JSON, so a string value is "ombo2a" and a number
+  value is a bare 5. The slug and the number are separate keys, tied together
+  only by the <modId> that both carry, so this reads both, matches the slug
+  to its mod id, and takes the highest revision recorded against a mod id
+  whose slug is the one asked for. That last part matters: a machine can have
+  two collections installed at once (ombo2a on main, 7essxf on dev), and the
+  revision numbers must not be mixed up between them.
+
+  The length byte is [\x00-\x1F], a bounded class rather than a wildcard, for
+  the reason Get-CollectionNewest gives: a wildcard would step over a quote
+  and read a number out of a neighbouring key.
+#>
+function Get-CollectionRevisionFromState([string]$Slug) {
+    if (-not $Slug) { return 0 }
+    $st = Join-Path $env:APPDATA 'Vortex\state.v2'
+    if (-not (Test-Path -LiteralPath $st)) { return 0 }
+    $slugRe = 'mods###skyrimse###([^#]+)###attributes###collectionSlug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
+    $revRe = 'mods###skyrimse###([^#]+)###attributes###revisionNumber[\x00-\x1F]{1,4}(\d+)'
+    $mine = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $rev = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::Ordinal)
+    foreach ($f in (Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)) {
+        try {
+            $txt = [Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($f.FullName))
+            foreach ($m in [regex]::Matches($txt, $slugRe)) { [void]$mine.Add($m.Groups[1].Value) }
+            foreach ($m in [regex]::Matches($txt, $revRe)) {
+                $id = $m.Groups[1].Value
+                $n = 0
+                if ([int]::TryParse($m.Groups[2].Value, [ref]$n)) {
+                    if (-not $rev.ContainsKey($id) -or $n -gt $rev[$id]) { $rev[$id] = $n }
+                }
+            }
+        } catch { }
+    }
+    $best = 0
+    foreach ($id in $mine) { if ($rev.ContainsKey($id) -and $rev[$id] -gt $best) { $best = $rev[$id] } }
+    return $best
+}
+
+<#
+  The legacy fallback: the revision out of the old folder name, or 0. Kept for
+  a machine that still has collection_<slug>_<rev>_<when> folders and no state
+  to read. Current Vortex does not write these any more; see
+  Get-CollectionRevision above.
+#>
+function Get-CollectionRevisionFromFolder([string]$Slug) {
     if (-not $Slug) { return 0 }
     $dir = Join-Path $env:APPDATA 'Vortex\skyrimse\mods'
     if (-not (Test-Path -LiteralPath $dir)) { return 0 }
@@ -51,6 +133,65 @@ function Get-CollectionRevision([string]$Slug) {
         $n = 0
         if (-not [int]::TryParse($rest.Substring(0, $cut), [ref]$n)) { continue }
         if ($n -gt $best) { $best = $n }
+    }
+    return $best
+}
+
+<#
+  The mod ids Vortex has recorded against a collection slug, from state.v2.
+  Empty when state cannot be read or names no collection with that slug. Used
+  to find the collection's mod folder now that the folder is named for the mod
+  id rather than the slug (see Get-CollectionInstalledFolder).
+#>
+function Get-CollectionModIds([string]$Slug) {
+    $ids = New-Object Collections.Generic.List[string]
+    if (-not $Slug) { return , [string[]]$ids.ToArray() }
+    $st = Join-Path $env:APPDATA 'Vortex\state.v2'
+    if (-not (Test-Path -LiteralPath $st)) { return , [string[]]$ids.ToArray() }
+    $slugRe = 'mods###skyrimse###([^#]+)###attributes###collectionSlug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($f in (Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)) {
+        try {
+            $txt = [Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($f.FullName))
+            foreach ($m in [regex]::Matches($txt, $slugRe)) {
+                if ($seen.Add($m.Groups[1].Value)) { [void]$ids.Add($m.Groups[1].Value) }
+            }
+        } catch { }
+    }
+    return , [string[]]$ids.ToArray()
+}
+
+<#
+  The staging folder holding the installed collection's collection.json, or
+  $null. Check-CollectionRules needs the file itself, not just the number, and
+  the folder is no longer named for the slug, so this maps slug to mod id
+  through state (new naming) and falls back to the collection_<slug>_<rev>_*
+  folder (legacy). The newest revision wins in both cases.
+#>
+function Get-CollectionInstalledFolder([string]$Slug) {
+    if (-not $Slug) { return $null }
+    $dir = Join-Path $env:APPDATA 'Vortex\skyrimse\mods'
+    if (-not (Test-Path -LiteralPath $dir)) { return $null }
+
+    # New naming: the folder is the mod id Vortex made up, which state ties to
+    # the slug. Newest by write time, since the id carries no number.
+    $new = New-Object Collections.Generic.List[object]
+    foreach ($id in (Get-CollectionModIds $Slug)) {
+        foreach ($d in (Get-ChildItem -LiteralPath $dir -Directory -Filter ($id + '*') -EA SilentlyContinue)) {
+            if (Test-Path -LiteralPath (Join-Path $d.FullName 'collection.json')) { [void]$new.Add($d) }
+        }
+    }
+    if ($new.Count -gt 0) { return ($new | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1) }
+
+    # Legacy naming: collection_<slug>_<rev>_<when>, highest revision wins.
+    $best = $null
+    $bestRev = -1
+    foreach ($d in (Get-ChildItem -LiteralPath $dir -Directory -Filter ('collection_' + $Slug + '_*') -EA SilentlyContinue)) {
+        if (-not (Test-Path -LiteralPath (Join-Path $d.FullName 'collection.json'))) { continue }
+        $m = [regex]::Match($d.Name, '^collection_' + [regex]::Escape($Slug) + '_(\d+)_')
+        if (-not $m.Success) { continue }
+        $r = [int]$m.Groups[1].Value
+        if ($r -gt $bestRev) { $bestRev = $r; $best = $d }
     }
     return $best
 }
@@ -142,7 +283,7 @@ function Get-CollectionState([string]$Url) {
     }
 }
 
-# "ombo2a" out of https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a
+# "7essxf" out of https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf
 function Get-CollectionSlug([string]$Url) {
     if (-not $Url) { return '' }
     $at = $Url.LastIndexOf('/collections/', [StringComparison]::OrdinalIgnoreCase)

@@ -49,7 +49,7 @@ the part to check first.
 
 ### What the exe is
 
-`tools\Build-Launcher.ps1` compiles every `launcher\app\*.cs` with the .NET
+`scripts\release\Build-Launcher.ps1` compiles every `launcher\app\*.cs` with the .NET
 Framework 4 csc (C# 5 only) into `<Root>\Launcher\Thornswood.exe`. It embeds,
 as resources: `launcher\ui.xaml`, the emblem, header art and video, the WebView2
 DLLs, `launcher\voice-host.html`, the `Thornswood.ini` template from
@@ -104,7 +104,7 @@ it says a pool thread.
 | 17 | `Shell.cs:340 Keep.Unpark` | Puts back plugins a crashed session left parked. Then `Shell.cs:344 Keep.Seed` fills `Profile\Keep` from pack records for files it has no copy of yet. |
 | 18 | `Shell.cs:353 Display.MatchScreen` | Unless Lock resolution is ticked: the game's resolution and menu scale follow the screen (`Shell.cs:359 Display.ScaleMenus`). |
 | 19 | `Shell.cs:370 Icons.Ensure` | Pool thread. The shortcut icon follows the exe. `Shell.cs:393 ClearLeftovers` (pool) ends a windowless Skyrim over three minutes old. `Shell.cs:407 Uninstall.DropScratch` (pool) deletes the installer's leftover `Thornswood-setup` folder. |
-| 20 | `Shell.cs:423 RunScan` | `Verify.Run` against the server's manifest, then the Mods card. Then DrawStatus draws the rows on the Play page and decides the button (see "The gate" below). |
+| 20 | `Shell.cs:423 RunScan` | `Verify.Run` against the server's manifest, then the Mods card. Then DrawStatus fills the checklist (on Diagnostics since #607), the Play summary and the button (see "The gate" below). |
 | 21 | `Shell.cs:429 HealClientBackground` | Pool thread, only when the six client runtime files are not the recorded build: `ClientRuntime.cs:206 Heal()` fetches them. Then `Shell.cs:430 AutoDisplayOnce` marks `config.json` so it never runs again and, on an install that has never played, matches the game's resolution to the screen; `Shell.cs:431 StartPing` asks whether the server is up. |
 | 22 | `Shell.cs:433 CheckUpdatesBackground` | Pool thread: the update check (see Updater in section 2). With no update source configured, `Shell.cs:435 Unblock` frees Play instead. |
 | 23 | `Shell.cs:451 Voice.Prepare` | Installs the resolver that loads WebView2 out of the exe. `Shell.cs:453 Voice.Start` is queued until the window is idle on screen. |
@@ -170,7 +170,7 @@ what it wrote into `Profile\Packs\<pack id>.files`, the id into
 script in the temp folder, `st-update-<process id>.cmd`, that swaps it in once
 this process has gone and keeps the old one until the new one has started
 (see SelfSwap below). `Version` at the top of the file is the launcher's
-version, moved by `tools\Bump-Version.ps1` before a Ship. In the launcher,
+version, moved by `scripts\release\Bump-Version.ps1` before a Ship. In the launcher,
 `Shell.cs:4457 CheckUpdatesBackground()` asks, `OnVersionDoc` decides,
 `Shell.cs:4903 RunUpdate()` installs, and `Shell.cs:4477 CheckFailed()` keeps
 Play shut and asks again every thirty seconds when the source does not answer.
@@ -347,8 +347,12 @@ ShellUninstall.cs).
 
 **DevBuild** (DevBuild.cs). The second launcher in `<Root>-DevBuild`, made
 from the main one's files with the channel set to dev and the dev ports (game
-7787, voice 7789). It has its own Profile, and makes its own `Game` folder the
-same way from its own Settings, under Maintenance.
+7787, voice 7789). It is installed and opened from the Server card on the main
+build's Play page (`Shell.cs DrawServerPick()`, `SwitchToDev()`), which checks
+the person's Discord roles before it offers the install (#605); `MainRoot` and
+`MainExe` are the way back the dev build's own Server card opens the main
+launcher. It has its own Profile, and makes its own `Game` folder the same way
+from its own Settings, under Maintenance.
 
 **Smaller pieces.** Stats.cs (`Profile\stats.txt`), Leaks.cs (the shipped sign
 in file), Icons.cs (the shortcut icon), Firewall.cs (the rule for the game's
@@ -359,8 +363,9 @@ pages), Secrets.cs (DPAPI and locking a file to this account), Junction.cs
 Skyrim), Online.cs (the headcount the server publishes), Slots.cs (the one
 rule for moving a character's slot), Art.cs (the art inside the exe),
 Themes.cs, Help.cs (the Help page's text), Links.cs (the Nexus page behind
-each mod name), Swallow.cs (a caught exception written to `launcher.log`
-instead of dropped, section 1).
+each mod name), Gallery.cs (the pictures the site shows from the world, read
+from `/api/public` and turned through on the Play page, read only), Swallow.cs
+(a caught exception written to `launcher.log` instead of dropped, section 1).
 
 A new class gets a line on this page in the pull request that adds it.
 
@@ -376,7 +381,12 @@ appearing".
 `Shell.cs:1775 DrawStatus()` runs on every page change, scan and recheck. It
 draws a row for each check in `Checks.cs:668 All()`, and a failed row counts
 against Play unless it is advisory (`Shell.cs:1783 c.Blocks`); an advisory row
-that fails is drawn amber instead. Then it sets
+that fails is drawn amber instead. The rows live in `StatusList` on the
+Diagnostics page now (#607); the Play page shows a one line summary of them
+(`DrawStatus.UpdateReadySummary`), and both are updated in place rather than
+torn down and rebuilt, so an unchanged pass does not flash or re-say itself.
+`DrawStatus.StatusRow` builds a row once and `DrawStatus.FillStatusRow` fills
+it. Then it sets
 `Shell.cs:1885 btnPlay.IsEnabled`, which turns the button on only when no row
 counts against Play, none of
 `playing`, `updatePending`, `collectionBarUp` or `ownGameBusy` is set, and the

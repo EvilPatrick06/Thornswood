@@ -169,6 +169,13 @@ $logoSml = Join-Path $Here '..\..\launcher\logo-192.png'
 # warning here would ship a launcher without it (issue #440, phase 0).
 if (-not (Test-Path $logo))    { Die "logo.png is not at $logo. It is in the repository, so the path is wrong; the launcher would ship without its emblem." }
 if (-not (Test-Path $logoSml)) { $logoSml = $logo }
+# The dev build's own emblem and icon (Djinn, 25 Sep). The same exe serves both
+# builds, so both go in and Art.Dev picks at run time. The exe's own file icon
+# (/win32icon) stays app.ico: Windows reads that from the file, not at run time.
+$logoDev = Join-Path $Here '..\..\launcher\logo-dev.png'
+$iconDev = Join-Path $Here '..\..\launcher\app-dev.ico'
+if (-not (Test-Path $logoDev)) { Die "logo-dev.png is not at $logoDev. It is in the repository, so the path is wrong; the dev launcher would show the main emblem." }
+if (-not (Test-Path $iconDev)) { Die "app-dev.ico is not at $iconDev. It is in the repository, so the path is wrong; dev shortcuts would show the main icon." }
 # The landscape behind the title on the Play page. Optional the same way:
 # without it the band keeps its pattern.
 $headerArt = Join-Path $Here '..\..\launcher\launcher-header.jpg'
@@ -213,7 +220,12 @@ if (Test-Path $updaterCs) {
 $verFour = $ver
 while (($verFour -split '\.').Count -lt 4) { $verFour = "$verFour.0" }
 
-function New-Info([string]$path, [string]$title, [string]$desc, [string]$v4, [string]$v) {
+# Product and company default to Thornswood, which is what the launcher wants.
+# The setup stub keeps its own Title/Product/Company/Copyright in Bootstrap.cs
+# and gets FileVersion/ProductVersion from a generated ThornswoodSetupVersion.cs
+# (see the setup-stub block below). New-Info is for the launcher only.
+function New-Info([string]$path, [string]$title, [string]$desc, [string]$v4, [string]$v,
+                  [string]$product = 'Thornswood', [string]$company = 'Thornswood', [string]$copyright = 'Thornswood') {
     $body = @"
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -221,9 +233,9 @@ using System.Runtime.InteropServices;
 // Written by Build-Launcher.ps1 on every build. Editing it does nothing.
 [assembly: AssemblyTitle("$title")]
 [assembly: AssemblyDescription("$desc")]
-[assembly: AssemblyProduct("Thornswood")]
-[assembly: AssemblyCompany("Thornswood")]
-[assembly: AssemblyCopyright("Thornswood")]
+[assembly: AssemblyProduct("$product")]
+[assembly: AssemblyCompany("$company")]
+[assembly: AssemblyCopyright("$copyright")]
 [assembly: AssemblyVersion("$v4")]
 [assembly: AssemblyFileVersion("$v4")]
 [assembly: AssemblyInformationalVersion("$v")]
@@ -263,6 +275,7 @@ $cscArgs = @(
     "/resource:$((Resolve-Path $xaml).Path),ui.xaml"
 )
 if (Test-Path $logo) { $cscArgs += "/resource:$((Resolve-Path $logo).Path),logo.png" }
+$cscArgs += "/resource:$((Resolve-Path $logoDev).Path),logo-dev.png"
 if (Test-Path $headerArt) { $cscArgs += "/resource:$((Resolve-Path $headerArt).Path),launcher-header.jpg" }
 if (Test-Path $headerVideo) { $cscArgs += "/resource:$((Resolve-Path $headerVideo).Path),launcher-header.mp4" }
 # The artwork goes in as a resource as well as a win32 icon, because the
@@ -270,6 +283,7 @@ if (Test-Path $headerVideo) { $cscArgs += "/resource:$((Resolve-Path $headerVide
 # contents. That is what stops Windows showing a remembered picture of the old
 # one, and it has to travel with the update rather than sit loose in a folder.
 $cscArgs += "/resource:$((Resolve-Path $icon).Path),app.ico"
+$cscArgs += "/resource:$((Resolve-Path $iconDev).Path),app-dev.ico"
 
 # WebView2 travels inside the exe. Voice.cs hands the two managed ones back to
 # the CLR from an AssemblyResolve handler, and writes the native loader out
@@ -341,20 +355,36 @@ if (Test-Path $stubSrc) {
     # Built to a scratch name first. Deleting the old one up front meant a
     # failed compile left no installer at all, and the only sign of it was a
     # yellow line an hour before anyone noticed the package had no exe in it.
+    #
+    # The scratch name is the name it ships under, Thornswood-Setup.exe, not a
+    # setup-stub name, because csc writes the exe's OriginalFilename and
+    # InternalName version fields from the /out leaf. Package-Thornswood.ps1
+    # copies tools\setup-stub.exe to Thornswood-Setup.exe without recompiling,
+    # so if it were built as setup-stub.exe those two fields would read a name
+    # nobody ever downloads. Built under the shipped name in %TEMP% and then
+    # moved onto tools\setup-stub.exe, which is what packaging copies from.
     $stub = Join-Path $Here '..\..\tools\setup-stub.exe'
-    $stubNew = Join-Path $Here '..\..\tools\setup-stub.new.exe'
+    $stubNew = Join-Path $env:TEMP 'Thornswood-Setup.exe'
     if (Test-Path $stubNew) { Remove-Item $stubNew -Force }
     $stubArgs = @('/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+',
                   "/out:$stubNew", "/win32icon:$((Resolve-Path $icon).Path)")
     if (Test-Path $logoSml) { $stubArgs += "/resource:$((Resolve-Path $logoSml).Path),logo.png" }
     foreach ($r in $refs) { $stubArgs += "/reference:$r" }
-    $stubInfo = $null
-    if ((Get-Content $stubSrc -Raw) -notmatch '(?m)^\s*\[assembly:') {
-        $stubInfo = Join-Path $env:TEMP 'ThornswoodSetupInfo.cs'
-        New-Info $stubInfo 'Thornswood Setup' 'Thornswood setup' $verFour $ver
-    }
+    # Bootstrap.cs keeps the stable product NAME (Title/Product/Company/
+    # Copyright). FileVersion and ProductVersion are stamped here from
+    # Updater.cs ($ver / $verFour) so the stub tracks the launcher release.
+    # A version-only .cs is always generated; do NOT call New-Info for the
+    # stub (that would duplicate Title/Product and fail csc).
+    $stubVerCs = Join-Path $env:TEMP 'ThornswoodSetupVersion.cs'
+    $stubVerBody = @"
+using System.Reflection;
+[assembly: AssemblyVersion("$verFour")]
+[assembly: AssemblyFileVersion("$verFour")]
+[assembly: AssemblyInformationalVersion("$ver")]
+"@
+    Set-Content -Path $stubVerCs -Value $stubVerBody -Encoding ASCII
     $stubArgs += (Resolve-Path $stubSrc).Path
-    if ($stubInfo) { $stubArgs += $stubInfo }
+    $stubArgs += $stubVerCs
 
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     & $csc @stubArgs
@@ -385,7 +415,7 @@ if (Test-Path $stubSrc) {
 #
 # This does nothing at all unless tools\signing.json exists, so Djinn's machine
 # and the pull request build carry on exactly as before. See the header of
-# Sign-Artifact.ps1 for what that file holds, and Bootstrap.cs:75-95 for why
+# Sign-Artifact.ps1 for what that file holds, and Bootstrap.cs:112-121 for why
 # any of this matters.
 $signer = Join-Path $Here 'Sign-Artifact.ps1'
 if (Test-Path -LiteralPath $signer) {

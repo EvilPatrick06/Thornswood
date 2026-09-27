@@ -243,6 +243,73 @@ function Get-LauncherExe([string]$dir) {
     return (Join-Path $dir 'Thornswood.exe')
 }
 
+# ==== thornswood release launcher ====
+# WHERE THE SHIPPED EXE COMES FROM, since issue #457: a clean runner, not this
+# machine. .github\workflows\release.yml builds Thornswood.exe on a dated
+# Windows image from the tagged commit, writes SHA256SUMS beside it, and
+# attaches both to the draft release for that tag. A main release downloads that
+# asset and checks it against SHA256SUMS rather than compiling the binary that
+# reaches every launcher here, so the person shipping never runs csc on what
+# ships. Byte-identical local and runner builds are not possible with the
+# Framework 4 csc, which stamps a build time and a fresh MVID into the PE, so
+# nothing compares against a local build: the runner's exe IS the shipped exe,
+# and its checksum file is what proves the download is that exe and nothing else.
+
+# Which repository the release.yml draft is on: the source clone's origin, where
+# the workflow runs and creates it, not the releases clone the packs go to.
+function Get-SourceRepo([string]$repoDir) {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $remote = ''
+    try { $remote = (& git -C $repoDir remote get-url origin 2>$null | Select-Object -First 1) } catch { }
+    $ErrorActionPreference = $old
+    if ($remote -and $remote -match 'github\.com[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
+    return 'EvilPatrick06/Thornswood'
+}
+
+# Downloads Thornswood.exe and SHA256SUMS for tag v<version> into $into and
+# checks the exe against its line in SHA256SUMS. Returns '' when the verified
+# exe is sitting in $into, or a sentence saying why not, for the caller to Die
+# on: nothing here compiles anything or writes to the repository.
+function Get-ReleaseLauncher([string]$repo, [string]$version, [string]$into) {
+    $tag = 'v' + $version
+    if (-not (Get-Command gh -EA SilentlyContinue)) {
+        return 'gh is not installed, so the launcher CI built cannot be downloaded. Install the GitHub CLI, gh auth login, then Ship again.'
+    }
+    New-Item -ItemType Directory -Force -Path $into | Out-Null
+    foreach ($n in 'Thornswood.exe', 'SHA256SUMS') {
+        $p = Join-Path $into $n
+        if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
+    }
+    $repoArg = @(); if ($repo) { $repoArg = @('--repo', $repo) }
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    & gh release download $tag @repoArg --dir $into --pattern 'Thornswood.exe' --pattern 'SHA256SUMS' --clobber 2>&1 | Out-Host
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    $exe = Join-Path $into 'Thornswood.exe'
+    $sums = Join-Path $into 'SHA256SUMS'
+    if ($rc -ne 0 -or -not (Test-Path -LiteralPath $exe) -or -not (Test-Path -LiteralPath $sums)) {
+        return ("There is no verified launcher for $tag on $repo yet. CI builds the exe that ships; this machine does not compile it. " +
+                "Push the tag to build it, wait for the ""Build the release launcher"" run to attach Thornswood.exe and SHA256SUMS to the " +
+                "draft release, then run this same Ship again:`r`n" +
+                "    git tag $tag`r`n" +
+                "    git push origin $tag")
+    }
+    # SHA256SUMS is "<hash>  Thornswood.exe", the sha256sum shape, so the line
+    # for the exe is found and its hash compared with the download's.
+    $want = ''
+    foreach ($line in [IO.File]::ReadAllLines($sums)) {
+        $m = [regex]::Match($line, '(?i)^\s*([0-9a-f]{64})\s+\*?Thornswood\.exe\s*$')
+        if ($m.Success) { $want = $m.Groups[1].Value.ToLower(); break }
+    }
+    if (-not $want) { return "SHA256SUMS from $tag has no line for Thornswood.exe, so the download cannot be verified. Nothing was published." }
+    $got = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLower()
+    if ($got -ne $want) {
+        return ("The launcher downloaded for $tag does not match its SHA256SUMS (wanted $want, got $got). Do not ship it. Nothing was published.")
+    }
+    return ''
+}
+# ==== end thornswood release launcher ====
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -652,7 +719,6 @@ function Unbump([string]$why) {
 
 # ------------------------------------------------------------ build
 if (-not $ModsOnly) {
-    Head 'Building the launcher'
     # Resolved twice on purpose. The install writes Thornswood.exe and removes a
     # SkyrimTogether.exe left over from before the rename, so the path that
     # existed going in is not necessarily the path that exists coming out.
@@ -674,29 +740,51 @@ if (-not $ModsOnly) {
     # then closes the game and the launcher, puts the exe in place and does
     # the shortcut and the icon, which is everything the build used to do.
     $buildOut = Join-Path ([IO.Path]::GetTempPath()) ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
-    & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -OutDir $buildOut -NoPause
-    $buildCode = $LASTEXITCODE
 
-    <#
-      The build script's own answer, read before anything else.
+    if (-not $Dev -and -not $DryRun) {
+        # A MAIN RELEASE TAKES THE EXE CI BUILT, and verifies it, since issue
+        # #457. The binary that reaches every launcher is compiled on a clean
+        # runner from the tagged commit, not here, and this checks it against
+        # its SHA256SUMS before a byte of it is packed. A dev build and a dry
+        # run still compile below: dev is pretest with no tag or release of its
+        # own, and a dry run publishes nothing, so neither is the shipped binary.
+        Head 'The launcher from CI'
+        $srcRepo = Get-SourceRepo $RepoDir
+        Say "  taking the exe CI built for v$target from $srcRepo" 'DarkGray'
+        $why = Get-ReleaseLauncher $srcRepo $target $buildOut
+        if ($why) {
+            Unbump 'there is no verified launcher to ship'
+            Die $why
+        }
+        Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item (Join-Path $buildOut 'Thornswood.exe')).Length / 1KB)) 'Green'
+    }
+    else {
+        Head 'Building the launcher'
+        & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -OutDir $buildOut -NoPause
+        $buildCode = $LASTEXITCODE
 
-      Whether the launcher built used to be judged only on an exe appearing with
-      a newer timestamp. Compiling happens near the start, so every step after
-      csc was invisible here: the stub, the signing, anything added later.
+        <#
+          The build script's own answer, read before anything else.
 
-      On 18 September that shipped a release that had already stopped.
-      Build-Launcher printed "STOP. Signing failed. Nothing was published." and
-      exited 1 because the Azure certificate profile did not exist yet. The exe
-      from the compile was sitting there and it was newer than before, so the
-      check below passed, and Ship went on to build the pack, upload it, rewrite
-      version.json, post the news, tell Discord and tell everybody in the world
-      they had five minutes. 1.1.48 went out unsigned, announcing that nothing
-      had been published.
-    #>
-    if ($buildCode -ne 0) {
-        Unbump 'the launcher build failed'
-        Die ('The launcher build stopped with exit code ' + $buildCode +
-             '. Nothing was published. The errors are above.')
+          Whether the launcher built used to be judged only on an exe appearing
+          with a newer timestamp. Compiling happens near the start, so every
+          step after csc was invisible here: the stub, the signing, anything
+          added later.
+
+          On 18 September that shipped a release that had already stopped.
+          Build-Launcher printed "STOP. Signing failed. Nothing was published."
+          and exited 1 because the Azure certificate profile did not exist yet.
+          The exe from the compile was sitting there and it was newer than
+          before, so the check below passed, and Ship went on to build the pack,
+          upload it, rewrite version.json, post the news, tell Discord and tell
+          everybody in the world they had five minutes. 1.1.48 went out unsigned,
+          announcing that nothing had been published.
+        #>
+        if ($buildCode -ne 0) {
+            Unbump 'the launcher build failed'
+            Die ('The launcher build stopped with exit code ' + $buildCode +
+                 '. Nothing was published. The errors are above.')
+        }
     }
 
     & (Join-Path $Here 'Install-Launcher.ps1') -Root $Root -From $buildOut -NoPause
@@ -708,13 +796,13 @@ if (-not $ModsOnly) {
     }
 
     $exe = Get-LauncherExe $launchDir
-    $built = Test-Path -LiteralPath $exe
-    if ($built) { $built = ((Get-Item -LiteralPath $exe).LastWriteTimeUtc -gt $before) }
-    if (-not $built) {
-        Unbump 'nothing was built'
-        Die 'The launcher did not build. Look at the errors above.'
+    $inPlace = Test-Path -LiteralPath $exe
+    if ($inPlace) { $inPlace = ((Get-Item -LiteralPath $exe).LastWriteTimeUtc -gt $before) }
+    if (-not $inPlace) {
+        Unbump 'nothing was put in place'
+        Die 'The launcher is not in place. Look at the errors above.'
     }
-    Say ("  built, {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
+    Say ("  in place, {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
     if ($Dev -and $target -ne $current) {
         $back = Get-Content $updaterCs -Raw
         $back = $back -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $current + '"')
@@ -807,6 +895,87 @@ if ($LASTEXITCODE -eq 2) {
 if ($LASTEXITCODE -ne 0) {
     Unbump 'the client build could not be checked'
     Die 'Sync-Client.ps1 refused. Rebuild the client, run .\scripts\release\New-ClientBuildRecord.ps1, and Ship again.'
+}
+
+# HOW FAR BEHIND the public installer is: the zip on disk against the releases
+# the feed lists. Asked twice, and the two answers differ on purpose. Before
+# publishing, the gate just below reads it to refuse a main release that would
+# leave an already-behind installer further behind. After publishing, the
+# closing note reads it again, by which point version.json carries this
+# release's pack (a dry run puts it back), so a fresh installer that was current
+# now reads as one behind. Reading the zip and the feed each time keeps both
+# answers true to the disk rather than to a value cached before the publish.
+#
+# Staged out of the play install since 22 September: one folder per install
+# root under the dev tree, the same shape Publish-Update and Package-Thornswood
+# use, so the three agree on one answer. -DistRoot moves the lot. The old
+# $Root\_dist is still read when it is the only one there, so a machine that has
+# not published since the move still finds its installer.
+function Measure-Installer {
+    $distDir = Join-Path (Join-Path $DistRoot (Split-Path -Leaf $Root.TrimEnd('\'))) '_dist'
+    $z = Join-Path $distDir 'Thornswood-Setup.zip'
+    if (-not (Test-Path -LiteralPath $z)) {
+        $wasZip = Join-Path $Root '_dist\Thornswood-Setup.zip'
+        if (Test-Path -LiteralPath $wasZip) { $z = $wasZip }
+    }
+    $have = Test-Path $z
+    $count = 0
+    $when = [datetime]::MinValue
+    if ($have) {
+        $when = (Get-Item $z).LastWriteTime
+        $vf = Join-Path $ReleaseDir 'version.json'
+        if (Test-Path $vf) {
+            $doc = Get-Content $vf -Raw | ConvertFrom-Json
+            if ($doc.PSObject.Properties['packs'] -and $doc.packs) {
+                $seen = @{}
+                foreach ($p in @($doc.packs)) {
+                    # ids are yyyyMMdd-HHmm, with -1 -2 -3 on the split ones, and
+                    # three parts of one release are still one release.
+                    $stamp = "$($p.id)"
+                    if ($stamp.Length -lt 13) { continue }
+                    $stamp = $stamp.Substring(0, 13)
+                    if ($seen.ContainsKey($stamp)) { continue }
+                    $seen[$stamp] = $true
+                    $t = [datetime]::MinValue
+                    if ([datetime]::TryParseExact($stamp, 'yyyyMMdd-HHmm', $null, 'None', [ref]$t)) {
+                        if ($t -gt $when) { $count++ }
+                    }
+                }
+            }
+        }
+    }
+    return [pscustomobject]@{ DistDir = $distDir; Zip = $z; HaveZip = $have; Behind = $count; ZipTime = $when }
+}
+
+# ---------------------------------------------------- the installer gate
+# A MAIN RELEASE REFUSES TO GO OUT WHILE THE PUBLIC INSTALLER IS BEHIND, and
+# this is the whole of that rule. Every main Ship adds a pack the installer does
+# not carry, so an already-stale Thornswood-Setup.zip only gets staler, and a
+# new person installing from it sits through the whole pile on first launch. The
+# closing note has counted this for a long time and warned; a warning on the one
+# screen nobody rereads let the installer drift release after release.
+#
+# BEFORE PUBLISH, on purpose. A refusal after the pack is on the feed would
+# leave a release out with #news, the site and the server never told, which is
+# the half-published state the -Package failure note further down calls worse
+# than an installer one release behind. Here nothing has shipped yet, so the
+# operator rebuilds and runs again with everything intact.
+#
+# -Package is the way through: it rebuilds the installer after this release, so
+# the two go out together, and a release that carries -Package is not refused
+# for behind because the rebuild is coming. A dev release never refuses: it does
+# not touch the installer, and its closing note still warns. A hotfix never
+# refuses either: it is the live build plus one urgent fix, and holding it for a
+# twenty-minute installer rebuild is the opposite of what a hotfix is for.
+if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
+    $ins = Measure-Installer
+    if ($ins.HaveZip -and $ins.Behind -gt 0) {
+        Unbump 'the installer is behind and nothing here was going to rebuild it'
+        Die (("Thornswood-Setup.zip is {0} release{1} behind, built {2:d MMM HH:mm}, and a main release would leave it further behind. " -f `
+                 $ins.Behind, $(if ($ins.Behind -eq 1) { '' } else { 's' }), $ins.ZipTime) +
+             'Anyone installing from it would sit through all of those on first launch. Rebuild it as part of this ' +
+             'release by adding -Package, or run .\scripts\release\Package-Thornswood.ps1 first, then Ship.')
+    }
 }
 
 # ------------------------------------------------------------ publish
@@ -929,50 +1098,23 @@ if (-not $DryRun -and -not $ModsOnly) {
 }
 
 <#
-  How far behind the installer is, worked out before anything can exit.
+  How far behind the installer is now, worked out before anything can exit.
 
   This used to sit below the early return further down, so the one run that
   most needed it never printed: ship something, get told nothing changed,
   leave, and the package quietly stays another release behind. A count that
   only appears on the runs where it is least urgent is not a warning.
-#>
-# Staged out of the play install since 22 September: one folder per install
-# root under the dev tree, the same shape Publish-Update and
-# Package-Thornswood use, so the three agree on one answer. -DistRoot moves
-# the lot. The old $Root\_dist is still read when it is the only one there, so
-# a machine that has not published since the move still finds its installer.
-$DistDir = Join-Path (Join-Path $DistRoot (Split-Path -Leaf $Root.TrimEnd('\'))) '_dist'
-$zip = Join-Path $DistDir 'Thornswood-Setup.zip'
-if (-not (Test-Path -LiteralPath $zip)) {
-    $wasZip = Join-Path $Root '_dist\Thornswood-Setup.zip'
-    if (Test-Path -LiteralPath $wasZip) { $zip = $wasZip }
-}
-$behind = 0
-$haveZip = Test-Path $zip
 
-if ($haveZip) {
-    $zipTime = (Get-Item $zip).LastWriteTime
-    $vf = Join-Path $ReleaseDir 'version.json'
-    if (Test-Path $vf) {
-        $doc = Get-Content $vf -Raw | ConvertFrom-Json
-        if ($doc.PSObject.Properties['packs'] -and $doc.packs) {
-            $seen = @{}
-            foreach ($p in @($doc.packs)) {
-                # ids are yyyyMMdd-HHmm, with -1 -2 -3 on the split ones, and
-                # three parts of one release are still one release.
-                $stamp = "$($p.id)"
-                if ($stamp.Length -lt 13) { continue }
-                $stamp = $stamp.Substring(0, 13)
-                if ($seen.ContainsKey($stamp)) { continue }
-                $seen[$stamp] = $true
-                $when = [datetime]::MinValue
-                if ([datetime]::TryParseExact($stamp, 'yyyyMMdd-HHmm', $null, 'None', [ref]$when)) {
-                    if ($when -gt $zipTime) { $behind++ }
-                }
-            }
-        }
-    }
-}
+  Measure-Installer is the same reading the gate above the publish took, run
+  again because version.json has moved: by now it carries this release's pack
+  (a dry run put it back), so a fresh installer reads as one behind, which is
+  what the closing note says.
+#>
+$ins = Measure-Installer
+$DistDir = $ins.DistDir
+$haveZip = $ins.HaveZip
+$behind = $ins.Behind
+$zipTime = $ins.ZipTime
 
 function Show-Installer {
     if (-not $haveZip) {

@@ -32,7 +32,7 @@ or the build check goes red.
 - **Game packs and the installer payload**: every file in the game folder that
   the collection did not provide and Ship-Rules.ps1 does not hold back.
 - **Nexus Mods**, through the collection
-  (https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a).
+  (https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf).
   Most of what Vortex installs from it is other people's mods, under their own
   terms. Two of them are Thornswood's own uploads, by EvilPatrick06, and
   Vortex installs both for everybody who installs the collection: Thornswood
@@ -85,7 +85,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` are built from
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `c8832519` (in full, `c8832519866e6848b9501039940dc2c6f0508668`). That
+commit `d0006351` (in full, `d00063515242e0ad1a9affb690c83194acf2c937`). That
 is upstream skyrim-multiplayer/skymp at `f926944b` with Thornswood's changes on
 top. The copies in `C:\Thornswood\Game` matched the recorded sha256 of all six
 on 24 September.
@@ -240,8 +240,11 @@ the source is".
 
 Nexus Mods mod 192001,
 https://www.nexusmods.com/skyrimspecialedition/mods/192001, by EvilPatrick06.
-Revision 5 of the collection carries version 1.1.0, file 809365. Its three
-files, read in Vortex's copy on 24 September:
+The rebuilt collection (`7essxf`) carries version 1.2 of this mod. The per-file
+measurements below were last read in Vortex's copy on 24 September against
+version 1.1.0 (file 809365); they have to be re-read on the shipping machine
+once it has the `7essxf` collection installed, since the 1.2 upload changes the
+plugin. Its three files, as read on 24 September:
 
 - `Thornswood-Content.esp`, Thornswood's own plugin, 141,234 bytes, sha256
   `3b3ecb3bda4b97e312df10a61191cdd2949286007ab03a948b323d4a749af2ae`.
@@ -342,21 +345,30 @@ them, names the SIL Open Font License, Version 1.1.
 ## On our servers
 
 - The game server's native module, `scam_native.node`, recorded in
-  `records\server-build.json`. It is built from `skymp5-server` in the fork at the
-  same commit, `c8832519866e6848b9501039940dc2c6f0508668`, and it is AGPL-3.0.
-  Section 13 of the AGPL asks that everybody who connects to a modified server
-  over a network be offered its source. The next section is that offer.
+  `records\server-build.json`. That record pins `skymp5-server` in the fork at
+  `d00063515242e0ad1a9affb690c83194acf2c937`, the same commit
+  `records\client-build.json` names, and it is AGPL-3.0. The binary running on
+  the VPS has not been rebuilt against that pin yet: it is still the earlier
+  build from `c8832519866e6848b9501039940dc2c6f0508668`, and `Deploy-Server.ps1`
+  refuses a rebuilt module until the record names its sha256. Section 13 of the
+  AGPL asks that everybody who connects to a modified server over a network be
+  offered its source. The next section is that offer.
 
 ## Where the source is
 
-For the six client files and the game server module, the Corresponding Source
-is the fork at the recorded commit:
+For the six client files, the Corresponding Source is the fork at the recorded
+commit:
+
+https://github.com/EvilPatrick06/skymp/tree/d00063515242e0ad1a9affb690c83194acf2c937
+
+The game server module running on the VPS is the earlier build, so its
+Corresponding Source is the fork at the commit that binary was built from:
 
 https://github.com/EvilPatrick06/skymp/tree/c8832519866e6848b9501039940dc2c6f0508668
 
-It is on the branch `thornswood/engine-changes`, it is public, and it answered
-an anonymous request on 24 September. It builds with CMake and vcpkg from the
-fork's `vcpkg.json`. The licence texts are in the same tree:
+Both are on the branch `thornswood/engine-changes`, they are public, and the
+branch answered an anonymous request on 24 September. It builds with CMake and
+vcpkg from the fork's `vcpkg.json`. The licence texts are in each tree:
 `skymp5-client/LICENSE`, `skyrim-platform/LICENSE` and `skymp5-server/LICENSE`.
 
 That covers what Thornswood built. It does not cover

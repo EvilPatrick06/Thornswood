@@ -11,8 +11,8 @@ namespace Thornswood
     /// the dev server. New work lands there first and gets broken there, so
     /// the build everybody plays on stays playable while it is being tested.
     ///
-    /// Made from the Settings page of the main build, out of the main build's
-    /// own files: the launcher folder is copied, the config is copied with the
+    /// Made from the Server card on the Play page of the main build, out of the
+    /// main build's own files: the launcher folder is copied, the config is copied with the
     /// channel, branch and ports changed, and the profile records that say
     /// which packs are already in the shared game folder are copied so the
     /// dev launcher does not try to re-apply a year of updates on its first
@@ -61,6 +61,32 @@ namespace Thornswood
             get { try { return File.Exists(Exe); } catch { return false; } }
         }
 
+        /// <summary>
+        /// The main build beside a dev build: C:\Thornswood-DevBuild becomes
+        /// C:\Thornswood. Used by the server selector on the dev build to hand
+        /// the person back to the main server. On the main build this is Root.
+        /// </summary>
+        public static string MainRoot
+        {
+            get
+            {
+                string r = Paths.Root.TrimEnd('\\');
+                if (r.EndsWith("-DevBuild", StringComparison.OrdinalIgnoreCase))
+                    return r.Substring(0, r.Length - "-DevBuild".Length);
+                return r;
+            }
+        }
+
+        public static string MainExe
+        {
+            get { return Path.Combine(MainRoot, "Launcher\\Thornswood.exe"); }
+        }
+
+        public static bool MainInstalled
+        {
+            get { try { return File.Exists(MainExe); } catch { return false; } }
+        }
+
         /// <summary>Copies this install into the dev folder and opens it. Returns the log line.</summary>
         public static string Install(Config main)
         {
@@ -99,6 +125,7 @@ namespace Thornswood
             Config dev = Config.Load(Paths.CfgFile);
             dev.Channel = "dev";
             dev.UpdateBranch = "dev";
+            dev.UpdateFeedUrl = "https://thornswood.net/feed-dev/version.json";
             dev.ServerPort = DevPort;
             dev.VoicePort = DevVoicePort;
             dev.VoiceUrl = DevVoiceUrl(dev.VoiceUrl);
