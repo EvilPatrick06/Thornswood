@@ -71,8 +71,8 @@ yes('the site serves POST /api/gallery/report',
     /p === '\/api\/gallery\/report' && req\.method === 'POST'/.test(SERVER));
 yes('the site serves POST /api/gallery/submit',
     /p === '\/api\/gallery\/submit' && req\.method === 'POST'/.test(SERVER));
-yes('gallery submit allowlist is images only today',
-    /GALLERY_ALLOW = \['\.png', '\.jpg', '\.jpeg', '\.webp', '\.gif'\]/.test(SERVER));
+yes('gallery submit allowlist is images plus mp4 and webm',
+    /GALLERY_ALLOW = \['\.png', '\.jpg', '\.jpeg', '\.webp', '\.gif', '\.mp4', '\.webm'\]/.test(SERVER));
 yes('the site serves GET /api/gallery/who',
     /p === '\/api\/gallery\/who' && req\.method === 'GET'/.test(SERVER));
 
@@ -82,7 +82,6 @@ yes('the site serves GET /api/gallery/who',
 const staffDoors = [
   ["p === '/api/gallery/pending' && req.method === 'GET'", '/api/gallery/pending'],
   ["p === '/api/gallery/approve' && req.method === 'POST'", '/api/gallery/approve'],
-  ["p === '/api/gallery/reject' && req.method === 'POST'", '/api/gallery/reject'],
   ["p === '/api/gallery/approved' && req.method === 'DELETE'", '/api/gallery/approved'],
   ["p === '/api/gallery/reports' && req.method === 'GET'", '/api/gallery/reports'],
   ["p === '/api/gallery/report/dismiss' && req.method === 'POST'", '/api/gallery/report/dismiss']
@@ -131,13 +130,13 @@ yes('Submit posts to /api/gallery/submit with ticket',
     /"\/api\/gallery\/submit\?ticket="/.test(submit));
 yes('Submit uses Discord.PostBytes (body is the file)',
     /Discord\.PostBytes\(url, data, ContentTypeFor\(ext\), 60000, out reply\)/.test(submit));
-yes('Submit allowlist matches the site images',
-    /AllowExt = new string\[\] \{ \"\.png\", \"\.jpg\", \"\.jpeg\", \"\.webp\", \"\.gif\" \}/.test(GALLERY));
+yes('Submit allowlist matches the site images and recordings',
+    /AllowExt = new string\[\] \{ \"\.png\", \"\.jpg\", \"\.jpeg\", \"\.webp\", \"\.gif\", \"\.mp4\", \"\.webm\" \}/.test(GALLERY));
 
 yes('Gallery.Approve hits /api/gallery/approve',
     /Staff\("POST", "\/api\/gallery\/approve"/.test(GALLERY));
-yes('Gallery.Reject hits /api/gallery/reject',
-    /Staff\("POST", "\/api\/gallery\/reject"/.test(GALLERY));
+yes('Gallery.Reject DELETEs /api/gallery/approved for pending',
+    /Staff\("DELETE", "\/api\/gallery\/approved"/.test(GALLERY));
 yes('Gallery.TakeDown DELETEs /api/gallery/approved',
     /Staff\("DELETE", "\/api\/gallery\/approved"/.test(GALLERY));
 yes('Gallery.Queue GETs /api/gallery/pending',
