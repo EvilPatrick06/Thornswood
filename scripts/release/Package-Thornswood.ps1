@@ -1016,7 +1016,7 @@ if ($OneFile) {
 
 # ---- sign it, if this machine can -----------------------------------------
 #
-# After the payload is attached, not before. Bootstrap.cs:648-660 already
+# After the payload is attached, not before. Bootstrap.cs:625-636 already
 # expects this: the certificate lands on the end after the trailer, which is
 # exactly why its loader scans backwards for STSFX001 rather than reading a
 # fixed offset from the end.
