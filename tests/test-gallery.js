@@ -25,8 +25,8 @@
       play, a broken one, and a banned one;
     - approve moves a submission onto gallery.json as { name, url, by }, is
       idempotent, and then /api/public and /shot serve it;
-    - reject takes it off the queue and, when asked, unlinks the upload, and
-      never touches gallery.json;
+    - Delete clears a pending name off the queue (and an approved one off
+      gallery.json) and, when asked, unlinks the upload;
     - /api/public still hands out only the approved gallery, never the queue.
 
   Give it an older server.js to watch it fail on the code from before #603.
@@ -277,21 +277,22 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
         r.status === 200 && gal.filter((g) => g.name === webName).length === 1 &&
         gal.find((g) => g.name === webName).by === 'Djinn (fixed)');
 
-    // ---- reject --------------------------------------------------------------
-    r = await ask('POST', '/api/gallery/reject', { cookie: memberCookie(), 'content-type': 'application/json' },
+    // ---- delete pending (no Reject door) -------------------------------------
+    r = await ask('DELETE', '/api/gallery/approved', { cookie: memberCookie(), 'content-type': 'application/json' },
                   JSON.stringify({ name: gameName }));
-    yes('a member cannot reject (' + r.status + ')', r.status === 403);
-    yes('the upload file for the queued submission is on disk before reject',
+    yes('a member cannot delete a pending shot (' + r.status + ')', r.status === 403);
+    yes('the upload file for the queued submission is on disk before delete',
         fs.existsSync(path.join(dir, 'uploads', gameName)));
-    r = await ask('POST', '/api/gallery/reject', { cookie: adminCookie(), 'content-type': 'application/json' },
+    r = await ask('DELETE', '/api/gallery/approved', { cookie: adminCookie(), 'content-type': 'application/json' },
                   JSON.stringify({ name: gameName, deleteFile: true }));
-    yes('staff rejects the launcher submission (' + r.status + ')', r.status === 200 && r.json && r.json.removed === 1);
+    yes('staff deletes the launcher pending submission (' + r.status + ')',
+        r.status === 200 && r.json && r.json.removed === 1 && r.json.removedPending === 1);
     pend = readJson('gallery-pending.json') || [];
     yes('it is off the queue', !pend.find((x) => x.name === gameName) && pend.length === 3);
     yes('the upload file was unlinked, because deleteFile was set',
         !fs.existsSync(path.join(dir, 'uploads', gameName)));
     gal = readJson('gallery.json') || [];
-    yes('and gallery.json was not touched by the reject', gal.length === 1 && gal[0].name === webName);
+    yes('and gallery.json was not touched by deleting a pending shot', gal.length === 1 && gal[0].name === webName);
 
     // ---- the queue is never public ------------------------------------------
     r = await ask('POST', upQ('one-more.png') + '&ticket=' + encodeURIComponent(ticket(MEMBER_ID, 'Ataxayk')),
@@ -421,10 +422,11 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
         !(readJson('gallery.json') || []).some((g) => g.name === playWebName) &&
         !fs.existsSync(path.join(dir, 'uploads', playWebName)));
 
-    r = await ask('POST', '/api/gallery/reject' + playT, asJson, JSON.stringify({ name: moreName }));
-    yes('a play ticket cannot reject (' + r.status + ')', r.status === 403 && r.json && r.json.why === 'role');
-    r = await ask('POST', '/api/gallery/reject' + staffT, asJson, JSON.stringify({ name: moreName }));
-    yes('a staff ticket rejects (' + r.status + ')', r.status === 200 && r.json && r.json.removed === 1);
+    r = await ask('DELETE', '/api/gallery/approved' + playT, asJson, JSON.stringify({ name: moreName }));
+    yes('a play ticket cannot delete pending (' + r.status + ')', r.status === 403 && r.json && r.json.why === 'role');
+    r = await ask('DELETE', '/api/gallery/approved' + staffT, asJson, JSON.stringify({ name: moreName }));
+    yes('a staff ticket deletes pending (' + r.status + ')',
+        r.status === 200 && r.json && r.json.removed === 1 && r.json.removedPending === 1);
     pend = readJson('gallery-pending.json') || [];
     yes('and the queue is down to the three batch submissions',
         pend.length === 3 && !pend.find((x) => x.name === moreName));
