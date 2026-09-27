@@ -21,10 +21,10 @@
   So this starts real copies of server.js and asks them over HTTP.
 
     With no config.json, what server.js writes for itself is its defaults, and
-    config.sample.json has to be exactly that with the cookie secret empty, so
+    config.example.json has to be exactly that with the cookie secret empty, so
     the sample cannot drift from what the code reads.
 
-    With config.sample.json as config.json, as the README says, the door check
+    With config.example.json as config.json, as the README says, the door check
     the README gives answers 401 with why link, and a ticket signed with the
     copy's own secret gets a yes, because with no bot token every account is
     allowed in.
@@ -38,7 +38,7 @@
     paragraph in the README that says one process is what to change.
 
   Every copy is in the temp folder: server.js, public\home.html, and
-  config.sample.json as config.json. Nothing here opens
+  config.example.json as config.json. Nothing here opens
   site\config.json, which on a machine that has one is that
   machine's own, and nothing asks Discord: the sample is checked for empty
   Discord settings before any copy that reads it is started.
@@ -86,7 +86,7 @@ function canon(v) {
 const readme = read('site/README.md') || '';
 const server = read('site/server.js') || '';
 const deploy = read('scripts/deploy/Deploy-Docs.ps1') || '';
-const sampleText = String(read('site/config.sample.json'));
+const sampleText = String(read('site/config.example.json'));
 // server.js takes a byte order mark off the front before it parses, so this
 // does too. Built rather than typed, like the backslash.
 const BOM = String.fromCharCode(65279);
@@ -94,7 +94,7 @@ let sample = null;
 try { sample = JSON.parse(sampleText.charAt(0) === BOM ? sampleText.slice(1) : sampleText); } catch (e) { sample = null; }
 
 // ------------------------------------------------------------ the sample --
-yes('site' + BS + 'config.sample.json is there and parses the way server.js reads a config',
+yes('site' + BS + 'config.example.json is there and parses the way server.js reads a config',
     !!sample && typeof sample === 'object' && !Array.isArray(sample));
 const S = sample || {};
 
@@ -132,11 +132,13 @@ const pw = (/\bpassword: '([^']*)'/.exec(server) || [])[1];
 yes('the member password in it is the one already written in server.js, not another',
     typeof pw === 'string' && S.password === pw);
 yes('Deploy-Docs.ps1 never names the sample, so it stays on the machine',
-    deploy.length > 0 && deploy.indexOf('config.sample') < 0);
+    deploy.length > 0 && deploy.indexOf('config.example') < 0);
+yes('site config template uses .example (same suffix as root config.example.json); .sample is gone',
+    read('site/config.example.json') !== null && read('site/config.sample.json') === null);
 
 // ------------------------------------------------------------ the README --
-yes('the README tells a copy to take config.sample.json as its config.json',
-    readme.indexOf('Copy `config.sample.json` into the copy as `config.json`') >= 0);
+yes('the README tells a copy to take config.example.json as its config.json',
+    readme.indexOf('Copy `config.example.json` into the copy as `config.json`') >= 0);
 const runPort = (/THORNSWOOD_DOCS_PORT = '(\d+)'; \$env:THORNSWOOD_DOCS_LOCAL = '1'; node server\.js/.exec(readme) || [])[1];
 yes('the README has the one line local run, on loopback, port ' + runPort, !!runPort);
 const curl = readme.split('\n').filter(function (l) { return /^curl\.exe /.test(l); })[0] || '';
@@ -283,7 +285,7 @@ function copy(tag, withConfig, patch) {
   fs.writeFileSync(path.join(dir, 'server.js'), src);
   fs.mkdirSync(path.join(dir, 'public'));
   fs.copyFileSync(path.join(APP, 'public', 'home.html'), path.join(dir, 'public', 'home.html'));
-  if (withConfig) { fs.copyFileSync(path.join(APP, 'config.sample.json'), path.join(dir, 'config.json')); }
+  if (withConfig) { fs.copyFileSync(path.join(APP, 'config.example.json'), path.join(dir, 'config.json')); }
   return dir;
 }
 async function start(dir) {
@@ -388,10 +390,10 @@ function breakPages(src) {
       const off = uniq(Object.keys(bare).concat(Object.keys(sample))).filter(function (k) {
         return canon(bare[k]) !== canon(sample[k]);
       });
-      yes('config.sample.json is exactly those defaults with the cookie secret left empty' +
+      yes('config.example.json is exactly those defaults with the cookie secret left empty' +
           (off.length ? ', differs in ' + off.join(', ') : ''), off.length === 0);
     } else {
-      yes('config.sample.json is exactly those defaults with the cookie secret left empty', false);
+      yes('config.example.json is exactly those defaults with the cookie secret left empty', false);
     }
     await stop(a);
 
@@ -403,7 +405,7 @@ function breakPages(src) {
       const dB = copy('readme', true);
       const b = await start(dB);
       runs.push(b);
-      yes('the README run, config.sample.json as config.json, comes up on 127.0.0.1 only',
+      yes('the README run, config.example.json as config.json, comes up on 127.0.0.1 only',
           b.up && b.out.indexOf('listening on 127.0.0.1:' + b.port) >= 0);
       if (!b.up) { said(b); }
       // Said a few lines after the listening line, which can arrive on its own.

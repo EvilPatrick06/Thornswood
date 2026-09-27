@@ -162,6 +162,12 @@ if (tracked) {
   // join page and a developer's machine is DEVELOPING.md, so a third
   // copy of either would only drift again, the way this one did.
   yes('SETUP.md is not tracked', tracked.indexOf('SETUP.md') < 0);
+  // #578: one suffix for committed config templates. Root already used
+  // .example; the site file was renamed from config.sample.json.
+  yes('site/config.sample.json is not tracked (suffix unified to .example)',
+      tracked.indexOf('site/config.sample.json') < 0);
+  yes('site/config.example.json is tracked (same suffix as root config.example.json)',
+      tracked.indexOf('site/config.example.json') >= 0);
   ['CLAUDE.md', 'DEVELOPING.md'].forEach(function (rel) {
     const t = read(rel);
     yes(rel + ' is there', t !== null);
