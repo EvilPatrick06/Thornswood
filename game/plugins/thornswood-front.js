@@ -422,6 +422,14 @@
   let menuPhase = 0;
   let menuAt = 0;
   const loadedAt = Date.now();
+  // The scroll setting as it stood when this start began, read once below.
+  // Not moved by the tick box on either screen: that box is about the next
+  // start, and the wait this session was decided before anybody saw it.
+  let menuIntroOff = false;
+  let menuWent = false;     // Continue was pressed on the scroll
+  let menuStayAt = 0;
+  let menuFgAt = 0;
+  let menuFgWas = null;
 
   function chosenOnDisk() {
     try { return !!readText(CHOICE_FILE).trim(); } catch (e) { return false; }
@@ -636,6 +644,11 @@
     // First, so nothing that throws further down can leave it held.
     T.claimFocus('select', choiceUp());
 
+    // Which window the keys are going to, and the two words that hold the
+    // client's wait open. Both are needed for as long as the choice is up and
+    // neither can be left to the page alone: see menuWatch.
+    if (choiceUp()) { menuWatch(now); }
+
     // Before the phase check, because menuChose parks the phase at 9 and this
     // has to go on running after it.
     if (menuChosenId) { keepSayingChoice(now); }
@@ -661,6 +674,10 @@
       // 100 ms, was 600 (Djinn, 25 September: the still before the loop was up too long).
       if (now - loadedAt < 100) { return; }
       if (chosenOnDisk()) { menuPhase = 9; log('menu: a choice is already on disk for this session'); return; }
+      // Read once, here, because menuWatch below needs it on every tick and
+      // the page is not always the one that told us (menuWhere only reads it
+      // when the page came up without the choice already drawn).
+      menuIntroOff = readText(INTRO_FILE).trim() === 'off';
       try {
         sp.browser.setVisible(true);
         sp.browser.setFocused(true);
@@ -701,7 +718,13 @@
       */
       if (menuBeatAt && now - menuBeatAt > 6000) {
         if (menuReloads >= 3) {
-          if (!menuGaveUp) { menuGaveUp = true; log('menu: the page went silent three times; leaving it, the client falls back to the last character'); }
+          if (!menuGaveUp) {
+            menuGaveUp = true;
+            log('menu: the page went silent three times; leaving it.',
+                menuIntroOff
+                  ? 'The scroll is switched off for this person, so the client falls back to the last character after three minutes.'
+                  : 'The scroll is on, so menuWatch goes on telling the client to wait and nothing falls back.');
+          }
         } else {
           menuReloads++;
           log('menu: the page went silent for six seconds, loading it again (' + menuReloads + ' of 3)');
@@ -832,6 +855,66 @@
   function choiceUp() { return menuPhase === 1 || menuPhase === 2; }
 
   /*
+    TWO THINGS THE CHOICE PAGE CANNOT DO FOR ITSELF, every tick that it is up.
+
+    WHICH WINDOW THE KEYS ARE GOING TO. Djinn, 25 September: the sealed scroll
+    opened at 16:23:50 with nobody at the game, because four key presses typed
+    into another program reached it (thornswood-input.log for that window: fg
+    another window, focus 0, keys 4). The scroll was made click only the same
+    day; the slots behind it were not, and they play the lit character on
+    Enter, so the same stray keys still took somebody into the world as
+    whoever happened to be lit. A page has no way to ask who has the keyboard.
+    sp.win32.foregroundWindow does, and the pulse already asks it every five
+    seconds once the world is up. So it is asked once a second here and the
+    answer is handed to the page, which swallows every key while the game is
+    behind something else. A client with no win32 is never told and the page
+    keeps what it did before. Once a second and not four times, because this
+    is a Windows call and the page starts out swallowing keys anyway: the only
+    thing a slower answer costs is a moment before the keys of somebody really
+    at the game start working.
+
+    THE WAIT THE CLIENT IS HOLDING. With the scroll on, the page tells the
+    client ('thornswood','stay') so nobody is logged in as their last
+    character for sitting at the start screen, and ('thornswood','choosing')
+    when Continue starts the choice. Both were the page's alone, and the page
+    is the part that dies: the silence watch above reloads it three times and
+    then leaves it, and from that moment nothing said either word and the
+    three minute fallback was back without anybody being told. So this says
+    them too, on the same ten seconds, exactly the way keepSayingChoice took
+    the pick's repeat over from the page after the same lesson. A client from
+    before those words ignores both.
+  */
+  function menuWatch(now) {
+    if (now - menuFgAt > 1000) {
+      menuFgAt = now;
+      let fg = null;
+      try {
+        if (sp.win32 && typeof sp.win32.foregroundWindow === 'function') {
+          fg = sp.win32.foregroundWindow();
+        }
+      } catch (e) { fg = null; }
+      if (fg) {
+        const here = !!fg.isGame;
+        T.js('try{window.thornswoodSelect&&window.thornswoodSelect.keys(' +
+             (here ? 'true' : 'false') + ');}catch(e){}');
+        // Said when it changes and never on the repeats, so the log shows
+        // when somebody left the game and came back and nothing else.
+        if (menuFgWas !== here) {
+          menuFgWas = here;
+          log('menu: the keys are going to', here ? 'the game' : ('another window (' + (fg.exe || fg.title || 'unnamed') + '), so the choice page ignores them'));
+        }
+      }
+    }
+
+    if (menuIntroOff) { return; }
+    if (now - menuStayAt < 10000) { return; }
+    menuStayAt = now;
+    T.js('try{window.skyrimPlatform.sendMessage("thornswood","stay");' +
+         (menuWent ? 'window.skyrimPlatform.sendMessage("thornswood","choosing");' : '') +
+         '}catch(e){}');
+  }
+
+  /*
     THE WORLD ARRIVED WITH THE CHOICE STILL UP AND NOTHING PICKED.
 
     Djinn on dev, 24 September: "Sitting on the character select window for
@@ -872,8 +955,8 @@
     try { uncaused = String(Number(globalThis.__thornswoodUncausedLoad) || 0); } catch (e) { }
     log('menu: the world loaded with the choice still up and nothing picked here',
         '(the client logs in as the last character, profile ' + PROFILE + ', after three minutes',
-        'without a pick; uncausedLoads=' + uncaused + '). Taking the choice down so it does not',
-        'sit over the world with no cursor');
+        'without a pick; uncausedLoads=' + uncaused + '; the scroll was ' + (menuIntroOff ? 'off for this person, which is when that fallback is meant to happen' : 'ON, so this should not have happened: the client took no notice of stay') + ').',
+        'Taking the choice down so it does not sit over the world with no cursor');
   }
 
   // ---------------------------------------------------------------- focus --
@@ -5567,6 +5650,26 @@
       try { require('fs').writeFileSync(INTRO_FILE, what.slice(13) + '\n'); }
       catch (e) { log('menu: could not write the scroll setting:', e); }
       log('menu: the scroll at the start is now', what.slice(13));
+      // menuIntroOff is deliberately left where it was. That flag decides
+      // whether this start waits for ever or falls back after three minutes,
+      // and this tick box is about the next start. Somebody who ticks "Show
+      // the sealed scroll next time" on the slots still has the three minutes
+      // they had a moment ago, which is what they came in under.
+      menuBeatAt = Date.now();
+      return;
+    }
+    /*
+      Continue was pressed on the scroll, so the choice starts now and the
+      client's three minutes start with it. The page says this word to the
+      client itself; it is repeated from here as well, because the page is the
+      part that dies. See menuWatch.
+    */
+    if (what === 'select:choosing') {
+      if (!menuWent) {
+        menuWent = true;
+        log('menu: Continue was pressed, so the three minutes to choose start now');
+      }
+      menuStayAt = 0;
       menuBeatAt = Date.now();
       return;
     }

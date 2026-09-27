@@ -216,6 +216,36 @@ Look at the compass near an undiscovered location. It should show a blacked out 
 
 Make a fresh character and wait two minutes after logging in. It used to freeze a few seconds in and need Task Manager.
 
+## TEST 18. The start screen, the sealed scroll and the character slots
+
+Five parts. Do them in order on one launch, on the dev build. Copy
+`thornswood-front.log` from the list at the top of this page afterwards, whatever happened.
+
+1. Press Play and wait for the start screen. The sealed scroll is resting on the
+   ledge by the warrior, and there is a soft gold glow around it that brightens
+   and dims. Pass if the glow is there and you can tell the scroll is something
+   to click.
+2. Leave the game where it is, click on another program, and type a few keys
+   into it: Enter, Space, Escape, the arrow keys, a number. Come back and look.
+   Pass if the scroll is still sealed and you are still on the start screen.
+   Fail if the seal broke, if the slots came up, or if the game went into the
+   world as one of your characters.
+3. Click the scroll. It breaks the seal and unrolls. Now click Continue. Pass if
+   the slots come up and the mouse was the only thing you used.
+4. Sit on the slots and do nothing for ten minutes. Pass if you are still
+   looking at the slots. Fail if the game loads the world as your last
+   character on its own. Then click a character and play as normal.
+5. Start again, and this time tick **Start without the scroll next time** on the
+   open scroll before you press Continue. A small box saying **Show the sealed
+   scroll next time** appears over Close the game. Leave it unticked, close the
+   game, and press Play again. Pass if the scroll is gone and the slots come up
+   at once. Now tick that box, close the game, press Play again, and pass if the
+   scroll is back.
+
+On part 5 with the scroll switched off, the slots do go in as your last
+character after three minutes. That is deliberate and not a fault: the wait
+without end is for people who are still being shown the scroll.
+
 ## Do not report these
 
 Typing in another window still moves your character. A flute, lute or drum looks wrong when you equip it and plays nothing. They come from PlayFluteLuteDrum.esp, which handles equipping one and playing it with scripts that never fire here. Use the Lute, Flute and Drum emotes instead: open the emote wheel with G, or whatever key the launcher's Controls page gives it if you have moved it, then pick Revelry. Mod settings menus reset every session. NPCs stand still when nobody is near them. That is on the roadmap rather than a bug, so report an NPC only for something the Known Issues page does not already describe. You cannot save.
