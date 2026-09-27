@@ -61,8 +61,10 @@ measured, names a second person.
 
 - The fork: `C:\Thornswood-Dev\skymp` is on `thornswood/engine-changes`, and
   the local branch and `origin/thornswood/engine-changes` both point at
-  c8832519, read off the clone's own refs. That is the commit both build
-  records name. The triage pass the same day found no uncommitted change in
+  c8832519, read off the clone's own refs. That was the commit both build
+  records named that day; both name d0006351 since 27 September, and
+  `records\client-build.json` and `records\server-build.json` are where to read
+  it. The triage pass the same day found no uncommitted change in
   it. So the source is not on one disk; the configured build and its
   toolchain are.
 - The build tree: `build\CMakeCache.txt` names Visual Studio 17 2022, x64,
