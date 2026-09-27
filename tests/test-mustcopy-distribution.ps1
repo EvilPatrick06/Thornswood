@@ -65,6 +65,32 @@ Yes 'Refresh re-link of Vortex copies is scoped to Data\Platform\Distribution' (
     $og.Contains('f.Rel.StartsWith("Data\\Platform\\Distribution\\"') -and
     $og.Contains('Only Distribution: a broader !MustCopy re-link also') -and
     $og.Contains('CBBE.esp'))
+# Refresh no-op when deployment stamp and rules already match: skip WhyNot/Gather/Links.
+Yes 'Refresh returns already-matches before WhyNot when stamp and rules match' (
+    $og.Contains('DeploymentStamp(src) == Recorded("deployment")') -and
+    $og.Contains('Recorded("rules") == Rules') -and
+    $og.Contains('Recorded("deployment") != 0') -and
+    $og.IndexOf('DeploymentStamp(src) == Recorded("deployment")') -lt $og.IndexOf('string why = WhyNot(cfg, src);', $og.IndexOf('public static string Refresh')))
+
+# SettleSettings on Refresh must not overwrite Live plugins.txt with Golden.
+Yes 'SettleSettings on Refresh only copies Golden plugins.txt when Live is missing' (
+    $og.Contains('if (first || !File.Exists(dest)) File.Copy(shipped, dest, true);') -and
+    $og.Contains('Thornswood-Content'))
+
+$shellOwn = [IO.File]::ReadAllText((Join-Path $AppPath 'ShellOwnGame.cs'))
+Yes 'Bring it up to date applies PutInServerOrder after FlagLight' (
+    $shellOwn.Contains('Verify.PutInServerOrder(c, say)') -and
+    $shellOwn.Contains('Checks.FlagLight(Verify.MustBeLight(c), say)') -and
+    $shellOwn.IndexOf('FlagLight(Verify.MustBeLight') -lt $shellOwn.IndexOf('PutInServerOrder(c, say)'))
+Yes 'Bring it up to date skips Bytes CRC when Refresh already matched' (
+    $shellOwn.Contains('Verify.Run(c, !already)') -and
+    $shellOwn.Contains('already matches what Vortex has deployed'))
+
+$verify = [IO.File]::ReadAllText((Join-Path $AppPath 'Verify.cs'))
+Yes 'Verify.Run accepts checkBytes and PutInServerOrder is public for ShellOwnGame' (
+    $verify.Contains('public static List<Issue> Run(Config cfg, bool checkBytes)') -and
+    $verify.Contains('public static int PutInServerOrder(Config cfg, Action<string> say)') -and
+    $verify.Contains('if (checkBytes)'))
 
 function Get-CsMember([string]$text, [string]$declaration) {
     $at = $text.IndexOf($declaration, [StringComparison]::Ordinal)
