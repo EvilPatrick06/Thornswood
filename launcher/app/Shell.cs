@@ -2348,6 +2348,19 @@ namespace Thornswood
         {
             List<Issue> issues = null;
             Waiting(delegate { issues = Verify.Run(cfg); });
+            ShowVerify(issues, true);
+        }
+
+        /// <summary>
+        /// Paints the Scan and Fix card from an Issue list and redraws Ready
+        /// to launch from the same list. <paramref name="logDetail"/> is true
+        /// for a fresh Scan (writes the issue lines to the log); false when
+        /// Diagnostics opens onto an already shared LastIssues and should not
+        /// re-say the scan.
+        /// </summary>
+        static void ShowVerify(List<Issue> issues, bool logDetail)
+        {
+            if (issues == null) issues = new List<Issue>();
             int blocking = 0;
             foreach (Issue i in issues) if (i.Blocking) blocking++;
             // Vortex deploys somewhere else, and Fix makes the own folder from
@@ -2453,6 +2466,8 @@ namespace Thornswood
             // When most of them are mods that are simply not in the game folder,
             // pressing Scan again or Fix changes nothing, and that is the line
             // worth reading.
+            if (logDetail)
+            {
             int missing = 0;
             foreach (Issue i in issues) if (i.Absent) missing++;
             Log("Scan finished. " + issues.Count + " issue" + (issues.Count == 1 ? "" : "s") + " found." +
@@ -2511,6 +2526,7 @@ namespace Thornswood
                 }
                 if (named.Count > shown)
                     Log("  and " + (named.Count - shown) + " more, not written out to keep the log readable.");
+            }
             }
 
             // Same Issue list the card just painted (Verify.LastIssues). Without

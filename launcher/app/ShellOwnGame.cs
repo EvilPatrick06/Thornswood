@@ -270,6 +270,31 @@ namespace Thornswood
                 try { said = make ? OwnGame.Make(c, say) : OwnGame.Refresh(c, say); }
                 catch (Exception ex) { fail = ex.Message; }
 
+                // Same light-flag step Fix runs. Refresh can bring Vortex's
+                // unflagged staging copy of a MustBeLight plugin (CBBE.esp and
+                // the rest) over a Separated flagged copy, or place a fresh
+                // one that never had the ESL bit. Ending green means applying
+                // FlagLight here so Mod list does not go red after Bring it
+                // up to date from Vortex. Then re-Run Verify so LastIssues
+                // matches the folder we just finished.
+                if (fail == null)
+                {
+                    try
+                    {
+                        int flagged = Checks.FlagLight(Verify.MustBeLight(c), say);
+                        if (flagged > 0)
+                            say("Flagged " + flagged + " plugin" + (flagged == 1 ? "" : "s") +
+                                " light so the load order matches the server after the Vortex update.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Swallow.Note("ShellOwnGame.StartOwnGame, FlagLight after Vortex bring-up-to-date", ex);
+                        say("Could not flag light plugins after the Vortex update (" + ex.Message.TrimEnd('.') + "). Press Fix on Diagnostics if Mod list goes red.");
+                    }
+                    try { Verify.Run(c); }
+                    catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, Verify after Vortex bring-up-to-date", ex); }
+                }
+
                 // The firewall rule for the game's browser, written here
                 // because here is where the reason for it happens.
                 //
@@ -336,6 +361,11 @@ namespace Thornswood
                                 RestartLauncher();
                                 return;
                             }
+                            // LastIssues was refreshed on the pool thread after
+                            // FlagLight; paint Scan and Fix and Ready from it
+                            // so the card does not stay on the pre-Vortex state.
+                            if (Verify.LastUsedServer && Verify.LastIssues != null)
+                                ShowVerify(Verify.LastIssues, false);
                         }
                         DrawStatus();
                         DrawOwnGame();
