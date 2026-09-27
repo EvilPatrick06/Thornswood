@@ -2374,17 +2374,34 @@ namespace Thornswood
                 // of noise with the one fact that matters left out, so say that
                 // fact once and point at Vortex and the collection. The gate is
                 // untouched: Play still counts the blocking issues and refuses
-                // (Shell Play, Verify.Run). Fix cannot install a mod, so it is
-                // greyed, the same as any other run of missing files.
+                // (Shell Play, Verify.Run). When this install already has its
+                // own Game folder, Fix refreshes it from Vortex and can put the
+                // missing plugins back; otherwise Fix cannot invent a collection
+                // Vortex never deployed, so the button stays grey.
                 dotVerify.Fill = Res("Bad");
                 txtVerifyTitle.Text = "The collection is not deployed";
                 string dataFolder = Path.Combine(Paths.Game, "Data");
-                txtVerifyNote.Text =
-                    "Thornswood's mods are not in " + dataFolder + ", so almost none of the " +
-                    "collection the server expects is installed where the launcher looks. Open " +
-                    "Vortex and press Deploy, and install the collection first if you have not. " +
-                    "The collection card above opens it. Then press Scan again.";
-                btnFix.IsEnabled = false;
+                bool canRefresh = false;
+                try { canRefresh = OwnGame.Active; }
+                catch (Exception ex) { Swallow.Note("Shell.RunScan, asking whether OwnGame is active for collection-not-deployed Fix", ex); }
+                if (canRefresh)
+                {
+                    txtVerifyNote.Text =
+                        "Thornswood's mods are not in " + dataFolder + ", so almost none of the " +
+                        "collection the server expects is installed where the launcher looks. Fix " +
+                        "refreshes Thornswood's own folder from what Vortex has deployed. Open " +
+                        "Vortex and press Deploy first if the collection is not on yet, then Fix.";
+                    btnFix.IsEnabled = true;
+                }
+                else
+                {
+                    txtVerifyNote.Text =
+                        "Thornswood's mods are not in " + dataFolder + ", so almost none of the " +
+                        "collection the server expects is installed where the launcher looks. Open " +
+                        "Vortex and press Deploy, and install the collection first if you have not. " +
+                        "The collection card above opens it. Then press Scan again.";
+                    btnFix.IsEnabled = false;
+                }
             }
             else
             {
@@ -2401,15 +2418,24 @@ namespace Thornswood
                     sb.Append(i.Text);
                     shown++;
                 }
-                // Fix repairs the plugin list. It cannot install a mod, so when
-                // the problem is files that are not there, the button is the
-                // wrong answer and offering it is worse than not offering it.
+                // Absent ("is not installed") means Vortex never put the mod on
+                // this machine's list. FileMissing means the list still names it
+                // and Data does not have the file: Fix restores those from Vortex
+                // (and from the server when it serves them). Greying the button
+                // for Absent alone is still right; FileMissing keeps Fix on.
                 int absent = 0;
+                int fileMissing = 0;
                 foreach (Issue i in issues) if (i.Absent) absent++;
+                foreach (Issue i in issues) if (i.FileMissing) fileMissing++;
                 if (absent > 0 && !elsewhere)
                 {
                     sb.Append("\n\nThese are not installed at all. Fix cannot help. In Vortex, " +
                               "Profiles, press Enable under Thornswood.");
+                }
+                else if (fileMissing > 0 && !elsewhere)
+                {
+                    sb.Append("\n\nFix puts the missing plugin files back into Data from Vortex " +
+                              "(and from the server when it has a copy). It does not remove them from the list.");
                 }
                 // Which file it judged. An hour went into a mismatch nobody
                 // could place, because the page reported problems without ever
