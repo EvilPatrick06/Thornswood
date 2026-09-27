@@ -56,6 +56,20 @@ $root = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-rules-' + [Guid]::NewG
 $realAppData = $env:APPDATA
 $shell = (Get-Process -Id $PID).Path
 
+# The same 7-Zip the check itself will look for, found by the same helper, so
+# a machine with 7-Zip proves the .7z shape and one without says it skipped
+# rather than failing. Nothing else is taken from here: the script under test
+# still runs as a child process.
+. (Join-Path $Here '..\scripts\mods\LoadOrder.ps1')
+$sevenZip = Get-SevenZipPath
+
+# Where the check unpacks an export archive to. Taken before anything runs so
+# the finally block takes away only what this run added and leaves any cache
+# the machine already had.
+$cacheRoot = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-collection'
+$cacheExisted = Test-Path -LiteralPath $cacheRoot
+$cacheBefore = @(Get-ChildItem -LiteralPath $cacheRoot -Directory -EA SilentlyContinue | ForEach-Object { $_.Name })
+
 # ---- fixture builders --------------------------------------------------------
 
 # A plugin file with a TES4 header: the four letters, the record size, then the
@@ -91,11 +105,67 @@ function Attr([string]$modId, [string]$name, [string]$valueJson) {
 # A collection.json. Each rule is a hashtable with name and after or before,
 # names in lower case, as Vortex writes them. $null for a collection that
 # carries no plugin rules at all, which is revisions 2 to 4.
-function Collection([string]$path, $rules) {
-    $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path)
+function CollectionText($rules) {
     $doc = [ordered]@{ info = [ordered]@{ name = 'Thornswood' }; mods = @() }
     if ($null -ne $rules) { $doc.pluginRules = [ordered]@{ plugins = @($rules); groups = @() } }
-    [IO.File]::WriteAllText($path, ($doc | ConvertTo-Json -Depth 8), (New-Object Text.UTF8Encoding($false)))
+    return ($doc | ConvertTo-Json -Depth 8)
+}
+function Collection([string]$path, $rules) {
+    $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path)
+    [IO.File]::WriteAllText($path, (CollectionText $rules), (New-Object Text.UTF8Encoding($false)))
+}
+
+# One APPDATA holding an installed collection the way Vortex lays one out
+# today: a staging folder named for an opaque mod id, and state.v2 tying the
+# slug and the revision number to that id. What goes inside the folder is the
+# caller's business, because that is the part this file is about.
+function VortexAppData([string]$name, [string]$modId, [int]$rev) {
+    $ad = Join-Path $root $name
+    $st = Join-Path $ad 'Vortex\state.v2'
+    $null = New-Item -ItemType Directory -Force -Path $st
+    $sb = [Collections.Generic.List[byte]]::new()
+    $sb.AddRange([byte[]](Attr $modId 'collectionSlug' '"7essxf"'))
+    $sb.AddRange([byte[]](Attr $modId 'revisionNumber' ([string]$rev)))
+    [IO.File]::WriteAllBytes((Join-Path $st '000200.log'), $sb.ToArray())
+    $mod = Join-Path $ad ('Vortex\skyrimse\mods\' + $modId)
+    $null = New-Item -ItemType Directory -Force -Path $mod
+    return [pscustomobject]@{ AppData = $ad; Mod = $mod }
+}
+
+# A Vortex export archive, which is what an AUTHORED collection leaves in its
+# staging folder instead of a loose collection.json. On the shipping machine
+# on 27 September that archive was the only copy of the JSON on the disk.
+# The .zip is built with what .NET already has, so it runs anywhere. The .7z
+# is the shape actually measured and needs 7-Zip, so ExportSevenZip says
+# whether it could build one and its checks are skipped when it could not.
+function ExportZip([string]$path, $rules, [bool]$withJson) {
+    $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path)
+    Add-Type -AssemblyName System.IO.Compression -EA SilentlyContinue
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -EA SilentlyContinue
+    $fs = [IO.File]::Open($path, [IO.FileMode]::Create)
+    try {
+        $zip = New-Object IO.Compression.ZipArchive($fs, [IO.Compression.ZipArchiveMode]::Create)
+        try {
+            $names = @('info.json')
+            if ($withJson) { $names += 'collection.json' }
+            foreach ($n in $names) {
+                $w = New-Object IO.StreamWriter($zip.CreateEntry($n).Open())
+                try { $w.Write((CollectionText $rules)) } finally { $w.Dispose() }
+            }
+        } finally { $zip.Dispose() }
+    } finally { $fs.Dispose() }
+}
+function ExportSevenZip([string]$path, $rules) {
+    if (-not $sevenZip) { return $false }
+    $stage = Join-Path $root ('7z-stage-' + [Guid]::NewGuid().ToString('N').Substring(0, 6))
+    Collection (Join-Path $stage 'collection.json') $rules
+    $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path)
+    # Local to this call: 7-Zip writes to stderr on a warning, which is a
+    # terminating error while this is Stop.
+    $ErrorActionPreference = 'Continue'
+    & $sevenZip a -t7z -y $path (Join-Path $stage '*') 2>&1 | Out-Null
+    Remove-Item -LiteralPath $stage -Recurse -Force -EA SilentlyContinue
+    return (Test-Path -LiteralPath $path -PathType Leaf)
 }
 
 function Run([string[]]$argList) {
@@ -226,6 +296,26 @@ try {
     $emptyAppData = Join-Path $root 'EmptyAppData'
     $null = New-Item -ItemType Directory -Force -Path $emptyAppData
 
+    # The shipping machine on 27 September, and the case this file grew for:
+    # an AUTHORED collection, whose staging folder holds no loose
+    # collection.json at all. The only copy is inside export\collection_0.7z.
+    # Four shapes: the .zip, the .7z, a loose file that must win over an
+    # archive, and an archive with no collection.json in it.
+    $zipMachine = VortexAppData 'AppDataExportZip' 'vortex_collection_ZRT7NjhN_' 5
+    ExportZip (Join-Path $zipMachine.Mod 'export\collection_0.zip') $chain $true
+    $sevenMachine = VortexAppData 'AppDataExport7z' 'vortex_collection_ZRT7NjhN_' 5
+    $have7z = ExportSevenZip (Join-Path $sevenMachine.Mod 'export\collection_0.7z') $chain
+    $looseWins = VortexAppData 'AppDataLooseWins' 'vortex_collection_Loose__' 5
+    Collection (Join-Path $looseWins.Mod 'collection.json') $chain
+    ExportZip (Join-Path $looseWins.Mod 'export\collection_0.zip') $null $true
+    $emptyArchive = VortexAppData 'AppDataNoJson' 'vortex_collection_NoJson_' 5
+    ExportZip (Join-Path $emptyArchive.Mod 'export\collection_0.zip') $chain $false
+
+    # The same shape again for -Collection on a folder, which is how somebody
+    # points the check at a collection that is not the installed one.
+    $exportOnly = Join-Path $root 'col-export-only'
+    ExportZip (Join-Path $exportOnly 'export\collection_0.zip') $chain $true
+
     # The same machine as Vortex lays it out TODAY: the mod folder is named
     # for an opaque mod id, not the collection, and the slug and revision live
     # in state.v2. state maps the slug to the folder, and the revision comes
@@ -337,6 +427,44 @@ try {
         Yes 'and the revision reads from state, not the folder name' (Has $r.Out 'revision 5,')
         Yes 'and the folder it read is the opaque one Vortex writes now' (Has $r.Out 'vortex_collection_ZRT7NjhN_')
 
+        # The JSON only inside Vortex's export archive. Measured on the
+        # shipping machine on 27 September: the default path stopped with
+        # "no collection.json at ...\vortex_collection_ZRT7NjhN_\collection.json"
+        # and exited 1, and the only way past it was to unpack the archive by
+        # hand and pass -Collection.
+        $env:APPDATA = $zipMachine.AppData
+        $r = Run @('-Root', $machine)
+        Yes 'a collection.json only inside an export archive is found, with no -Collection (exit 0)' ($r.Code -eq 0)
+        Yes 'and the old stop is gone' (-not (Has $r.Out 'no collection.json at'))
+        Yes 'and it says which archive it came out of' (Has $r.Out 'unpacked from')
+        Yes 'and names that archive, in the staging folder Vortex made' `
+            ((Has $r.Out 'collection_0.zip') -and (Has $r.Out 'vortex_collection_ZRT7NjhN_'))
+        Yes 'and the revision still reads from state' (Has $r.Out 'revision 5,')
+
+        if ($have7z) {
+            $env:APPDATA = $sevenMachine.AppData
+            $r = Run @('-Root', $machine)
+            Yes 'the same for the .7z the shipping machine actually holds (exit 0)' ($r.Code -eq 0)
+            Yes 'and it names collection_0.7z' (Has $r.Out 'collection_0.7z')
+        } else {
+            Write-Host 'SKIP  the .7z checks: no 7-Zip on this machine to build one with'
+        }
+
+        # A loose collection.json is the subscribed install's, and it is the
+        # one Vortex deployed, so it wins and nothing is unpacked. Here the
+        # loose file carries the chain and the archive carries no rules, so
+        # exit 0 can only mean the loose one was read.
+        $env:APPDATA = $looseWins.AppData
+        $r = Run @('-Root', $machine)
+        Yes 'a loose collection.json wins over an export archive (exit 0)' ($r.Code -eq 0)
+        Yes 'and nothing was unpacked' (-not (Has $r.Out 'unpacked from'))
+
+        $env:APPDATA = $emptyArchive.AppData
+        $r = Run @('-Root', $machine)
+        Yes 'an export archive with no collection.json in it stops it (exit 1)' ($r.Code -eq 1)
+        Yes 'and says which archive it could not read one out of, and why' `
+            (Has $r.Out 'none could be read out of collection_0.zip: that archive holds no collection.json')
+
         $env:APPDATA = $emptyAppData
         $r = Run @('-Root', $machine)
         Yes 'with no Vortex here it says SKIP' (Has $r.Out 'SKIP')
@@ -344,6 +472,10 @@ try {
     } finally {
         $env:APPDATA = $realAppData
     }
+
+    $r = Run @('-Collection', $exportOnly, '-List', $good, '-Data', $data, '-Root', $machine)
+    Yes '-Collection on a folder whose JSON is only in its export archive works (exit 0)' ($r.Code -eq 0)
+    Yes 'and says where it came from' (Has $r.Out 'unpacked from')
 
     # ---- read only ---------------------------------------------------------------
     $after = Snapshot
@@ -355,6 +487,13 @@ try {
 finally {
     $env:APPDATA = $realAppData
     Remove-Item -LiteralPath $root -Recurse -Force -EA SilentlyContinue
+    foreach ($d in (Get-ChildItem -LiteralPath $cacheRoot -Directory -EA SilentlyContinue)) {
+        if ($cacheBefore -notcontains $d.Name) { Remove-Item -LiteralPath $d.FullName -Recurse -Force -EA SilentlyContinue }
+    }
+    if (-not $cacheExisted -and (Test-Path -LiteralPath $cacheRoot) -and
+        -not @(Get-ChildItem -LiteralPath $cacheRoot -Force -EA SilentlyContinue).Count) {
+        Remove-Item -LiteralPath $cacheRoot -Force -EA SilentlyContinue
+    }
 }
 
 Finish

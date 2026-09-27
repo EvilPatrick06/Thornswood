@@ -48,10 +48,22 @@
   Thornswood-Content.esp". Publish-Update put it back in the server's order
   for the pack, so nobody received it, but it is what this machine holds.
 
-  Read only. It reads Vortex's copy of the collection, one plugin list and the
-  plugin headers in one Data folder, and writes nothing anywhere. With no
-  revision of the collection installed in Vortex it says SKIP and exits 0, so
-  it can run on a machine without Vortex.
+  WHERE THE COLLECTION.JSON COMES FROM, corrected 27 September. A subscribed
+  install leaves it loose in the staging folder. An AUTHORED collection, which
+  is what the shipping machine has, leaves no loose copy at all: the only one
+  is inside export\collection_0.7z. Measured that morning, this stopped with
+  "no collection.json at ...\vortex_collection_ZRT7NjhN_\collection.json" and
+  exited 1 on the one machine it matters most on, and the only way past it was
+  to unpack the archive by hand and pass -Collection. Get-CollectionJsonPath
+  in LoadOrder.ps1 now reads either shape.
+
+  Read only where it matters. It reads Vortex's copy of the collection, one
+  plugin list and the plugin headers in one Data folder, and writes nothing
+  into any of them. The one thing it writes is the collection.json it unpacks
+  out of an export archive, into a temp folder keyed by that archive's size
+  and write time, so a second run costs nothing. With no revision of the
+  collection installed in Vortex it says SKIP and exits 0, so it can run on a
+  machine without Vortex.
 #>
 [CmdletBinding()]
 param(
@@ -100,6 +112,7 @@ Write-Host ''
 # read, and it is named in the output, because a stale revision was the whole
 # problem on 22 September.
 $revision = 0
+$collectionFolder = ''
 if (-not $Collection) {
   $url = ''
   try { $url = [string](Get-Content -LiteralPath (Join-Path $Root 'config.json') -Raw | ConvertFrom-Json).CollectionUrl } catch { }
@@ -117,14 +130,37 @@ if (-not $Collection) {
     Write-Host ''
     exit 0
   }
-  $Collection = Join-Path $dir.FullName 'collection.json'
+  # An authored collection leaves no loose collection.json in its staging
+  # folder: the JSON is inside export\collection_0.7z. Get-CollectionJsonPath
+  # reads either shape, unpacking to a temp cache when it has to, so the
+  # normal machine needs no -Collection. Measured 27 September, and what it
+  # cost before this: "no collection.json at ...\vortex_collection_ZRT7NjhN_\collection.json".
+  $collectionFolder = $dir.FullName
+  $Collection = Get-CollectionJsonPath $collectionFolder
+  if (-not $Collection) { $Collection = Join-Path $collectionFolder 'collection.json' }
 }
 elseif (Test-Path -LiteralPath $Collection -PathType Container) {
-  $Collection = Join-Path $Collection 'collection.json'
+  $collectionFolder = $Collection
+  $Collection = Get-CollectionJsonPath $collectionFolder
+  if (-not $Collection) { $Collection = Join-Path $collectionFolder 'collection.json' }
 }
-if (-not (Test-Path -LiteralPath $Collection -PathType Leaf)) { Stop-Check "no collection.json at $Collection" }
+else {
+  $collectionFolder = Split-Path -Parent $Collection
+}
+$readFrom = $script:CollectionJsonFrom
+if (-not (Test-Path -LiteralPath $Collection -PathType Leaf)) {
+  $archives = @(Get-CollectionExportArchive $collectionFolder)
+  if ($archives.Count -gt 0) {
+    $why = 'that archive holds no collection.json'
+    if (-not (Get-SevenZipPath)) { $why = 'reading a .7z needs 7-Zip and this machine has none' }
+    Stop-Check ("no loose collection.json in {0}, and none could be read out of {1}: {2}. Unpack it and pass the collection.json with -Collection." -f $collectionFolder, $archives[0].Name, $why)
+  }
+  Stop-Check "no collection.json at $Collection"
+}
 if ($revision -le 0) {
-  $m = [regex]::Match((Split-Path -Leaf (Split-Path -Parent $Collection)), '^collection_[A-Za-z0-9]+_(\d+)_')
+  $folderName = Split-Path -Leaf (Split-Path -Parent $Collection)
+  if ($collectionFolder) { $folderName = Split-Path -Leaf $collectionFolder }
+  $m = [regex]::Match($folderName, '^collection_[A-Za-z0-9]+_(\d+)_')
   if ($m.Success) { $revision = [int]$m.Groups[1].Value }
 }
 
@@ -204,6 +240,9 @@ function Show([string]$n) {
 $revText = if ($revision -gt 0) { "revision $revision" } else { 'revision unknown' }
 Say ("  collection  {0}, {1} rules naming {2} plugins" -f $revText, $rules.Count, $named.Count) 'DarkGray'
 Say ("              {0}" -f $Collection) 'DarkGray'
+if ($readFrom) {
+  Say ("              unpacked from {0}, which is the only copy on this machine" -f $readFrom) 'DarkGray'
+}
 Say ("  list        {0} enabled, {1} full, {2} light" -f $lineOf.Count, $full.Count, $lightCount) 'DarkGray'
 Say ("              {0}" -f $List) 'DarkGray'
 Say ("  data        {0}" -f $Data) 'DarkGray'
