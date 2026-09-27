@@ -26,7 +26,7 @@ release, launcher, game files and server together, are in CONTRIBUTING.md.
 | Piece | Where | What it is |
 | --- | --- | --- |
 | Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
-| Releases repo | github.com/EvilPatrick06/Thornswood-Releases (public), clone beside the source repo as `Thornswood-Releases`, dev branch as a worktree `Thornswood-Releases-dev` | `version.json` per branch (main, dev) and the release assets: packs and launcher exes |
+| Releases repo | github.com/EvilPatrick06/Thornswood-Releases (public), clone beside the source repo as `Thornswood-Releases`, dev branch as a worktree `Thornswood-Releases-dev` | `version.json` and `published.json` (pack baseline) per branch (main, dev), and the release assets: packs and launcher exes |
 | Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Play page Server dropdown | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Staff roles only (Owner, Dev, Gamemaster, Moderator, Loremaster) |
 | Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
@@ -63,7 +63,7 @@ untestable, or for work Patrick has said goes live, and it is his call.
 
 That is the dev release: version 1.1.36.1, .2, .3, pack ids ending `-dev`, the
 dev worktree and branch of the releases repo, the dev baseline
-(`published-dev.json`), the dev ports, and the dev server told. It runs from
+(`published.json` in that worktree), the dev ports, and the dev server told. It runs from
 any branch on any developer's machine. There is no installer for it, and it
 posts to the dev updates channel in Discord and the dev launcher's News tab,
 never #news. There is one dev feed and the last dev Ship wins, so say in #staff-general
@@ -101,8 +101,8 @@ launcher, checks that the game folder holds the recorded client build
 (`Sync-Client.ps1 -Check`), then runs
 `scripts\release\Publish-Update.ps1`, which
 scans the game folder for loose files that are not Vortex's, not vanilla, not
-runtime and not per machine, diffs them against this machine's baseline
-(`%LOCALAPPDATA%\Thornswood\published.json`), zips the difference as a pack,
+runtime and not per machine, diffs them against this channel's baseline
+(`published.json` in the releases clone), zips the difference as a pack,
 uploads pack and launcher as a GitHub release in the releases repo, rewrites
 `version.json` and pushes it.
 
@@ -229,8 +229,9 @@ Several people, several machines, one repo. The short rules are in
 - **The publisher pulls the feed** before `version.json` is edited, so a
   release is added on top of whatever another machine just published; a
   refused push means NOT SHIPPED, pull and run Ship again.
-- **The baseline is per machine.** A machine that did not ship the last
-  release ships those files again once; wasted bytes, never wrong files.
+- **The baseline is per channel in Thornswood-Releases.** Every shipping machine
+  pulls the same published.json, so a Dev Ship from a second machine packs the
+  same difference. Pending unfinished-push notes stay per machine under LOCALAPPDATA.
 - **Keep puts its kept copies back at every Play**, on every machine. Go.ps1,
   which Ship runs to put the plugins and overlays in, makes what it installs
   the kept copy, the way a pack does, so a Ship is never undone by the next
@@ -301,16 +302,18 @@ set up does for you: Patrick adds you as a collaborator on
 you the dev news webhook privately, which `.\scripts\ops\Set-DevNews.ps1`
 stores on this machine (without it a dev Ship publishes and posts nothing).
 
-The first publish from a new machine needs a baseline:
+The pack baseline lives in the releases clone. Pull `Thornswood-Releases` (and the
+dev worktree) before the first Ship so `published.json` is there. If this machine
+still has a legacy copy under `%LOCALAPPDATA%\Thornswood\`, the first Ship copies
+it into Releases and leaves the legacy file alone. To rebuild a baseline by hand:
 
 ```
 .\scripts\release\Publish-Update.ps1 -Baseline
 ```
 
-which records what the game folder holds right now without shipping
-anything. Do it straight after the launcher has brought the game up to date,
-so the baseline is the current release and the first real Ship carries only
-what you changed.
+which records what the game folder holds right now without shipping anything. Do it
+straight after the launcher has brought the game up to date, so the baseline is the
+current release and the first real Ship carries only what you changed.
 
 `Publish-Discord.ps1` reads the #news webhook from `bot\news-webhook.txt`,
 which is not in the repo. Patrick gives it to you if you will ship main releases

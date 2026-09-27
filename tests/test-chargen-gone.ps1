@@ -458,12 +458,16 @@ if (Test-Path -LiteralPath $steamFile) {
 } else {
     Write-Host ("SKIP  no {0} in the Steam copy at {1}" -f $name, $Steam)
 }
-$stateDir = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Thornswood' } else { '' }
+$releasesMain = Join-Path (Split-Path -Parent $repoRoot) 'Thornswood-Releases'
+$releasesDev  = Join-Path (Split-Path -Parent $repoRoot) 'Thornswood-Releases-dev'
+$legacyDir = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Thornswood' } else { '' }
 foreach ($ch in @(
-    @{ Label = 'main'; Base = 'published.json';     Root = $Root },
-    @{ Label = 'dev';  Base = 'published-dev.json'; Root = ($Root + '-DevBuild') }
+    @{ Label = 'main'; Base = 'published.json'; Rel = $releasesMain; Legacy = 'published.json';     Root = $Root },
+    @{ Label = 'dev';  Base = 'published.json'; Rel = $releasesDev;  Legacy = 'published-dev.json'; Root = ($Root + '-DevBuild') }
 )) {
-    $base = if ($stateDir) { Join-Path $stateDir $ch.Base } else { '' }
+    $base = ''
+    if ($ch.Rel -and (Test-Path -LiteralPath (Join-Path $ch.Rel $ch.Base))) { $base = Join-Path $ch.Rel $ch.Base }
+    elseif ($legacyDir -and (Test-Path -LiteralPath (Join-Path $legacyDir $ch.Legacy))) { $base = Join-Path $legacyDir $ch.Legacy }
     if ($base -and (Test-Path -LiteralPath $base)) {
         $keys = @(((Get-Content -LiteralPath $base -Raw) -replace '^\uFEFF', '' | ConvertFrom-Json).PSObject.Properties.Name)
         if ($keys -contains $rel) {

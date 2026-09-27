@@ -105,9 +105,9 @@ packs and as its own asset named in the feed's `clientRuntime`
   client runtime are release assets in that same repository. FEED.md has every
   field.
 - **Who writes it.** `Ship.ps1` runs `Publish-Update.ps1`, which diffs the game
-  folder against this machine's baseline
-  (`%LOCALAPPDATA%\Thornswood\published.json`, or `published-dev.json` for dev,
-  `Ship.ps1:780`), zips the difference, uploads it with `gh release`, rewrites
+  folder against this channel's baseline
+  (`published.json` in the releases clone for that channel), zips the
+  difference, uploads it with `gh release`, rewrites
   `version.json` and pushes it. Then `Publish-News.ps1` (main only), then
   `Publish-Discord.ps1` (#news, or the dev updates channel), then
   `Request-Restart.ps1`, which warns the room for five minutes
