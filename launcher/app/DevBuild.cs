@@ -168,10 +168,10 @@ namespace Thornswood
                             closed++;
                         }
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("DevBuild.Remove, closing a process under the root", ex); }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("DevBuild.Remove, enumerating processes", ex); }
             try
             {
                 Directory.Delete(root, true);
@@ -183,7 +183,7 @@ namespace Thornswood
             // Its Start menu and desktop entries, if it made them.
             foreach (string lnk in Icons.ShortcutPaths("Thornswood Dev"))
             {
-                try { if (File.Exists(lnk)) File.Delete(lnk); } catch { }
+                try { if (File.Exists(lnk)) File.Delete(lnk); } catch (Exception ex) { Swallow.Note("DevBuild.Remove, deleting shortcut", ex); }
             }
             return "Removed the dev build" + (closed > 0 ? " (closed it first)" : "") + ". Your characters on the dev server are still on the server.";
         }
@@ -230,7 +230,7 @@ namespace Thornswood
                 foreach (string d in Directory.GetDirectories(from))
                     CopyDir(d, Path.Combine(to, Path.GetFileName(d)));
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("DevBuild.CopyDir", ex); }
         }
     }
 }
