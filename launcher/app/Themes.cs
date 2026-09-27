@@ -70,7 +70,7 @@ namespace Thornswood
                 "Bg","#100D0A", "Panel","#171310", "Card","#1D1813",
                 "CardHover","#262019", "Deep","#0A0807", "Line","#2C251D",
                 "Edge","#3A3126", "Ink","#EDE5D8", "Muted","#9C8D79",
-                "Faint","#66594A", "Accent","#C8763A", "AccentSoft","#3CC8763A",
+                "Faint","#66594A", "Accent","#D9892A", "AccentSoft","#3CD9892A",
                 "AccentInk","#1B1205", "Ok","#7A9A55", "Warn","#C79A3E",
                 "Bad","#BC5039" }),
 
@@ -78,23 +78,23 @@ namespace Thornswood
                 "Bg","#0E1216", "Panel","#141A20", "Card","#182028",
                 "CardHover","#1E2830", "Deep","#090C0F", "Line","#232E36",
                 "Edge","#2F3D47", "Ink","#E4EAEE", "Muted","#7E8D97",
-                "Faint","#4E5A63", "Accent","#C8763A", "AccentSoft","#3CC8763A",
-                "AccentInk","#1B1205", "Ok","#5C9C66", "Warn","#B9903F",
+                "Faint","#4E5A63", "Accent","#6A8FA8", "AccentSoft","#3C6A8FA8",
+                "AccentInk","#061018", "Ok","#5C9C66", "Warn","#B9903F",
                 "Bad","#B8483C" }),
 
             Make("Slate", "Neutral graphite with a cold accent.", false, new string[] {
                 "Bg","#0F1113", "Panel","#16191C", "Card","#1B1F23",
                 "CardHover","#22272C", "Deep","#0A0B0D", "Line","#262C31",
                 "Edge","#333A41", "Ink","#E6E9EC", "Muted","#858E96",
-                "Faint","#545C63", "Accent","#5B8FB9", "AccentSoft","#3C5B8FB9",
-                "AccentInk","#06131D", "Ok","#5C9C66", "Warn","#B9903F",
+                "Faint","#545C63", "Accent","#8A93A0", "AccentSoft","#3C8A93A0",
+                "AccentInk","#0C1016", "Ok","#5C9C66", "Warn","#B9903F",
                 "Bad","#B8483C" }),
 
             Make("Ember", "Banked coals.", false, new string[] {
                 "Bg","#12100F", "Panel","#1A1614", "Card","#201B18",
                 "CardHover","#29221E", "Deep","#0C0A09", "Line","#2E2724",
                 "Edge","#3D342F", "Ink","#EDE7E3", "Muted","#96877F",
-                "Faint","#5E524C", "Accent","#C04A2E", "AccentSoft","#3CC04A2E",
+                "Faint","#5E524C", "Accent","#E04528", "AccentSoft","#3CE04528",
                 "AccentInk","#FFEDE6", "Ok","#6E9457", "Warn","#C99A46",
                 "Bad","#E0765E" }),
 
@@ -110,7 +110,7 @@ namespace Thornswood
                 "Bg","#0B0F14", "Panel","#111721", "Card","#161E2A",
                 "CardHover","#1C2634", "Deep","#070A0E", "Line","#223047",
                 "Edge","#2E4056", "Ink","#E2EBF5", "Muted","#7D8DA3",
-                "Faint","#4D5B6D", "Accent","#6FB7D8", "AccentSoft","#3C6FB7D8",
+                "Faint","#4D5B6D", "Accent","#3EC6E0", "AccentSoft","#3C3EC6E0",
                 "AccentInk","#04161E", "Ok","#5C9C8A", "Warn","#B9903F",
                 "Bad","#C05C50" }),
 
@@ -126,7 +126,7 @@ namespace Thornswood
                 "Bg","#0F0D0A", "Panel","#15120D", "Card","#1B1710",
                 "CardHover","#241E15", "Deep","#090705", "Line","#2B2418",
                 "Edge","#3B3320", "Ink","#EFE6CE", "Muted","#9C8E6C",
-                "Faint","#645A42", "Accent","#C9A227", "AccentSoft","#3CC9A227",
+                "Faint","#645A42", "Accent","#B8922E", "AccentSoft","#3CB8922E",
                 "AccentInk","#171200", "Ok","#7D9A4A", "Warn","#D2762A",
                 "Bad","#BF4436" }),
 
@@ -166,8 +166,18 @@ namespace Thornswood
             t.Name = CustomName;
             t.Note = "Your own colours. Change them below.";
             t.Light = light;
-            foreach (KeyValuePair<string, string> kv in All[0].Colors)
-                t.Colors[kv.Key] = kv.Value;
+            // Starter palette is its own look (orchid copper), not a copy of
+            // Forge or Dwemer, so the DIY card does not twin a preset swatch
+            // the first time somebody opens it.
+            string[] diy = new string[] {
+                "Bg","#120E14", "Panel","#1A141E", "Card","#211925",
+                "CardHover","#2A2030", "Deep","#0B080E", "Line","#32283A",
+                "Edge","#413348", "Ink","#F0E6F4", "Muted","#9A879F",
+                "Faint","#645066", "Accent","#C56B9A", "AccentSoft","#3CC56B9A",
+                "AccentInk","#1A0612", "Ok","#6E9A66", "Warn","#C79A3E",
+                "Bad","#BC5039"
+            };
+            for (int i = 0; i < diy.Length; i += 2) t.Colors[diy[i]] = diy[i + 1];
             if (pairs != null)
                 for (int i = 0; i + 1 < pairs.Length; i += 2)
                     if (!string.IsNullOrEmpty(pairs[i]) && !string.IsNullOrEmpty(pairs[i + 1]))

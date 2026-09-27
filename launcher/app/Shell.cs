@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Text;
@@ -128,10 +129,15 @@ namespace Thornswood
         static Button btnVoiceTest;
         static TextBlock txtVoiceState;
         static Button btnUninstall, btnServerStart, btnServerStop;
-        static Button btnServerMain, btnServerDev, btnServerPick;
+        static Button btnServerMain, btnServerDev, btnServerPick, btnCheckDiagnostics;
         static Popup serverPickPopup;
-        static TextBlock txtBrandSmall, txtBrandBig, txtServerPick;
+        static TextBlock txtBrandSmall, txtBrandBig, txtServerPick, txtServerPickMeta;
+        static TextBlock txtServerMainMeta, txtServerDevMeta;
+        static Ellipse dotServerPick;
         static TextBlock txtServerState;
+        static string pingMsText = "";
+        static string awakeMineText = "";
+        static string awakeOtherText = "";
         static Border updateBar, mineCard;
         static Border downgradeBar;
         static TextBlock txtDowngradeNote, txtDowngradeTitle;
@@ -144,8 +150,9 @@ namespace Thornswood
         static TextBlock txtNoticeTitle, txtNoticeNote;
         static FeedNotice feedNotice = new FeedNotice();
         static Grid titleBar;
-        static Button buttonDiscord, buttonDiscordForget;
-        static TextBlock labelDiscord, noteDiscord;
+        static Button buttonDiscord;
+        static TextBlock labelDiscord;
+        static Ellipse discordAvatar;
         static Button btnPlay, btnRecheck, btnCopy, btnUpdate, btnMin, btnMax, btnClose,
                       btnSaveServer, btnCheckNow, btnFolder, btnOpenLog, btnOpenSaves,
                       btnRepair, btnRestore, btnIcons, tabPlugins, tabSkse, tabMine, tabAddons,
@@ -613,6 +620,11 @@ namespace Thornswood
             btnServerMain = F<Button>("BtnServerMain"); btnServerDev = F<Button>("BtnServerDev");
             btnServerPick = F<Button>("BtnServerPick"); serverPickPopup = F<Popup>("ServerPickPopup");
             txtServerPick = F<TextBlock>("TxtServerPick");
+            txtServerPickMeta = F<TextBlock>("TxtServerPickMeta");
+            txtServerMainMeta = F<TextBlock>("TxtServerMainMeta");
+            txtServerDevMeta = F<TextBlock>("TxtServerDevMeta");
+            dotServerPick = F<Ellipse>("DotServerPick");
+            btnCheckDiagnostics = F<Button>("BtnCheckDiagnostics");
             txtBrandSmall = F<TextBlock>("TxtBrandSmall"); txtBrandBig = F<TextBlock>("TxtBrandBig");
             btnUninstall = F<Button>("BtnUninstall"); chkKeepSaves = F<CheckBox>("ChkKeepSaves");
             chkDeleteMods = F<CheckBox>("ChkDeleteMods");
@@ -677,10 +689,9 @@ namespace Thornswood
                 if (navButtons[p] != null)
                     navButtons[p].Visibility = Visibility.Collapsed;
 
-            buttonDiscord       = F<Button>("ButtonDiscord");
-            buttonDiscordForget = F<Button>("ButtonDiscordForget");
-            labelDiscord        = F<TextBlock>("LabelDiscord");
-            noteDiscord         = F<TextBlock>("NoteDiscord");
+            buttonDiscord  = F<Button>("ButtonDiscord");
+            labelDiscord   = F<TextBlock>("LabelDiscord");
+            discordAvatar  = F<Ellipse>("DiscordAvatar");
 
             // Discord.cs keeps the ticket beside launcher.log rather than in
             // config.json, so a config that gets copied between machines does
@@ -708,7 +719,7 @@ namespace Thornswood
             if (linkingDiscord) return;
             linkingDiscord = true;
             SetLinkButtons(false);
-            labelDiscord.Text = "Discord: waiting for your browser";
+            if (labelDiscord != null) labelDiscord.Text = "Waiting…";
             Log("Waiting for your browser. Sign in to Discord and it closes itself.");
 
             ThreadPool.QueueUserWorkItem(delegate
@@ -726,7 +737,7 @@ namespace Thornswood
                             Door.Forget();          // re-ask with the new ticket
                             if (!ok)
                             {
-                                labelDiscord.Text = "Discord: " + who;
+                                if (labelDiscord != null) labelDiscord.Text = who;
                                 Log("Discord: " + who);
                                 DrawStatus();       // so the collection card offers it again
                             }
@@ -778,7 +789,7 @@ namespace Thornswood
                 btnInstallNow.IsEnabled = on;
         }
 
-        /// <summary>The Discord card on the Play page. Called whenever it changes.</summary>
+        /// <summary>The Discord account block above Settings. Called whenever it changes.</summary>
         static void RefreshDiscord()
         {
             if (labelDiscord == null) return;
@@ -788,24 +799,78 @@ namespace Thornswood
             if (Discord.Linked)
             {
                 string who = Discord.Name;
-                labelDiscord.Text = "Discord: " + (who != null && who.Length > 0 ? who : "linked");
-                buttonDiscord.Content = "Reconnect";
-                if (noteDiscord != null)
-                    noteDiscord.Text = "Every launch asks whether this account is still allowed in. " +
-                                       "Nothing else to do.";
-                if (buttonDiscordForget != null)
-                    buttonDiscordForget.Visibility = Visibility.Visible;
+                labelDiscord.Text = (who != null && who.Length > 0) ? who : "Linked";
+                if (buttonDiscord != null) buttonDiscord.Content = "Reconnect";
+                LoadDiscordAvatar();
             }
             else
             {
-                labelDiscord.Text = "Discord: not linked";
-                buttonDiscord.Content = "Connect Discord";
-                if (noteDiscord != null)
-                    noteDiscord.Text = "Thornswood asks Discord who you are. One click, your browser " +
-                                       "opens, and it closes itself.";
-                if (buttonDiscordForget != null)
-                    buttonDiscordForget.Visibility = Visibility.Collapsed;
+                labelDiscord.Text = "Not linked";
+                if (buttonDiscord != null) buttonDiscord.Content = "Connect Discord";
+                ClearDiscordAvatar();
             }
+        }
+
+        /// <summary>Empty circle while unlinked, or while a picture is still loading.</summary>
+        static void ClearDiscordAvatar()
+        {
+            if (discordAvatar == null) return;
+            discordAvatar.Fill = Res("Line");
+        }
+
+        /// <summary>
+        /// Discord profile picture into the sidebar circle. Fetched off the UI
+        /// thread so a slow CDN does not freeze the window; a miss leaves the
+        /// empty circle.
+        /// </summary>
+        static void LoadDiscordAvatar()
+        {
+            if (discordAvatar == null) return;
+            string url = "";
+            try { url = Discord.AvatarUrl; } catch { url = ""; }
+            if (string.IsNullOrEmpty(url)) { ClearDiscordAvatar(); return; }
+            string want = url;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                BitmapImage bi = null;
+                try
+                {
+                    byte[] raw = null;
+                    try
+                    {
+                        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                        using (var wc = new System.Net.WebClient())
+                        {
+                            wc.Headers["User-Agent"] = "ThornswoodLauncher/" + Updater.Version;
+                            raw = wc.DownloadData(want);
+                        }
+                    }
+                    catch { raw = null; }
+                    if (raw == null || raw.Length == 0) return;
+                    bi = new BitmapImage();
+                    bi.BeginInit();
+                    bi.CacheOption = BitmapCacheOption.OnLoad;
+                    bi.StreamSource = new MemoryStream(raw);
+                    bi.EndInit();
+                    bi.Freeze();
+                }
+                catch { bi = null; }
+                if (bi == null) return;
+                BitmapImage pic = bi;
+                try
+                {
+                    win.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        if (discordAvatar == null || !Discord.Linked) return;
+                        // Stale answer: Reconnect or Forget may have changed the account.
+                        string now = "";
+                        try { now = Discord.AvatarUrl; } catch { }
+                        if (now != want) return;
+                        discordAvatar.Fill = new ImageBrush(pic) { Stretch = Stretch.UniformToFill };
+                    }));
+                }
+                catch { }
+            });
         }
 
         static Brush Res(string key) { return (Brush)win.Resources[key]; }
@@ -990,7 +1055,9 @@ namespace Thornswood
         /// a puzzle rather than a mood. Off entirely when the person has turned
         /// it off in Settings, which is what MusicDecide reads.
         /// </summary>
-        static MediaPlayer music;
+        // Menu theme plays through MenuMusic (WebView2 HTML5). WPF MediaPlayer
+        // failed on the ship PC with "Windows Media Player version 10 or later
+        // is required" while Voice's WebView2 still carried audio.
         static void StartMenuMusic()
         {
             // Not for somebody who opened this from Windows Settings to
@@ -998,21 +1065,23 @@ namespace Thornswood
             // launcher has started up to play when that is not why it opened.
             if (cfg == null || askedToUninstall) return;
             string src = Path.Combine(Paths.Game, "Data\\Platform\\UI\\thornswood-theme.mp3");
-            if (!File.Exists(src)) return;
+            if (!File.Exists(src))
+            {
+                string alt = Path.Combine(Paths.Game, "Data\\Platform\\UI\\thornswood-dev-theme.mp3");
+                if (File.Exists(alt)) src = alt;
+                else return;
+            }
 
-            // Played from a copy under Profile, never from the game folder. A
-            // MediaPlayer holds its file open, and the first dev pack that
-            // carried this track could not be installed over the copy the
-            // launcher was playing: "being used by another process", 20
-            // September 14:27, four times in a row, Play switched off. The copy
-            // is refreshed from the game folder on every start, so an updated
-            // track is heard the next time the launcher opens.
+            // Played from a copy under Profile, never from the game folder. The
+            // copy is refreshed from the game folder on every start, so an
+            // updated track is heard the next time the launcher opens, and a
+            // pack install is not blocked by a held file handle.
             string file;
             try
             {
                 string dir = Path.Combine(Paths.ProfileDir, "Music");
                 Directory.CreateDirectory(dir);
-                file = Path.Combine(dir, "thornswood-theme.mp3");
+                file = Path.Combine(dir, Path.GetFileName(src));
                 var a = new FileInfo(src);
                 var b = new FileInfo(file);
                 if (!b.Exists || b.Length != a.Length || b.LastWriteTimeUtc != a.LastWriteTimeUtc)
@@ -1025,26 +1094,14 @@ namespace Thornswood
             }
             try
             {
-                music = new MediaPlayer();
-                music.Volume = Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
-                music.MediaEnded += delegate
-                {
-                    try { music.Position = TimeSpan.Zero; music.Play(); } catch { }
-                };
-                music.MediaFailed += delegate(object s, ExceptionEventArgs e)
-                {
-                    Stamp("Menu music: did not play (" + (e.ErrorException == null ? "no reason given" : e.ErrorException.Message) + ")");
-                    music = null;
-                };
-                music.Open(new Uri(file));
+                double vol = Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
+                MenuMusic.Start(file, vol, Stamp);
                 MusicDecide();
                 win.StateChanged += delegate { MusicDecide(); };
-                Stamp("Menu music: the theme is on, from " + file);
             }
             catch (Exception ex)
             {
                 Stamp("Menu music: " + ex.Message);
-                music = null;
             }
         }
 
@@ -1055,14 +1112,10 @@ namespace Thornswood
         /// </summary>
         static void MusicDecide()
         {
-            if (music == null) return;
-            bool want = cfg.MusicOn && cfg.MusicVolume > 0 && !playing && win.WindowState != WindowState.Minimized;
-            try
-            {
-                music.Volume = Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
-                if (want) music.Play(); else music.Pause();
-            }
-            catch { }
+            bool want = cfg != null && cfg.MusicOn && cfg.MusicVolume > 0 && !playing
+                && win != null && win.WindowState != WindowState.Minimized;
+            double vol = cfg == null ? 0 : Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
+            try { MenuMusic.Decide(want, vol); } catch { }
         }
 
         static void MusicLabel()
@@ -1181,8 +1234,8 @@ namespace Thornswood
             {
                 txtServer.Text = "Thornswood Dev";
                 txtVersion.Text = "launcher " + Updater.Version + "  \u00b7  dev build";
-                if (txtBrandSmall != null) txtBrandSmall.Text = "ThornsWood Dev";
-                if (txtBrandBig != null) txtBrandBig.Text = "ThornsWood Dev";
+                if (txtBrandSmall != null) txtBrandSmall.Text = "Thornswood Dev";
+                if (txtBrandBig != null) txtBrandBig.Text = "Thornswood Dev";
                 try { win.Title = "Thornswood Dev"; } catch { }
             }
             DrawServerPick();
@@ -1306,16 +1359,6 @@ namespace Thornswood
                 StartPlay();
             };
             if (buttonDiscord != null) buttonDiscord.Click += delegate { ConnectDiscord(); };
-            if (buttonDiscordForget != null)
-            {
-                buttonDiscordForget.Click += delegate
-                {
-                    Discord.Forget();
-                    Door.Forget();
-                    RefreshDiscord();
-                    Log("Unlinked. Connect Discord again before you can play.");
-                };
-            }
 
             btnUpdate.Click += delegate { RunUpdate(); };
             if (btnDowngrade != null) btnDowngrade.Click += delegate { RunDowngrade(); };
@@ -1379,6 +1422,7 @@ namespace Thornswood
             if (btnServerPick != null) btnServerPick.Click += delegate { ToggleServerPick(); };
             if (btnServerDev != null) btnServerDev.Click += delegate { CloseServerPick(); SwitchToDev(); };
             if (btnServerMain != null) btnServerMain.Click += delegate { CloseServerPick(); SwitchToMain(); };
+            if (btnCheckDiagnostics != null) btnCheckDiagnostics.Click += delegate { ShowPage(PageDiag); };
 
             btnOpenSaveFolder.Click += delegate { Open(Files.SaveDir); };
             btnOpenLogFolder.Click += delegate { Open(Files.SkseLogDir); };
@@ -2179,11 +2223,15 @@ namespace Thornswood
             }
             if (txtReadyTitle != null)
             {
-                string t = all ? "Everything checks out"
-                         : problems == 1 ? "1 thing needs attention"
-                         : problems + " things need attention";
-                if (txtReadyTitle.Text != t) txtReadyTitle.Text = t;
+                // Pass: "Everything checks out". Fail: red "Check Diagnostics"
+                // (capital C) and a button that opens the Diagnostics page.
+                string title = all ? "Everything checks out" : "Check Diagnostics";
+                if (txtReadyTitle.Text != title) txtReadyTitle.Text = title;
+                Brush ink = Res(all ? "Ink" : "Bad");
+                if (!ReferenceEquals(txtReadyTitle.Foreground, ink)) txtReadyTitle.Foreground = ink;
             }
+            if (btnCheckDiagnostics != null)
+                btnCheckDiagnostics.Visibility = all ? Visibility.Collapsed : Visibility.Visible;
         }
 
         /// <summary>
@@ -2737,7 +2785,7 @@ namespace Thornswood
                 b.IsEnabled = false;
                 b.Content = "Apply first";
                 b.ToolTip = "The collection opens once your application is accepted and you have " +
-                            "connected Discord below.";
+                            "connected Discord in the sidebar.";
                 var gate = new TextBlock();
                 gate.Text = "Connect Discord first. The collection opens once you have been accepted.";
                 gate.FontSize = 11.5;
@@ -3072,7 +3120,9 @@ namespace Thornswood
             if (Themes.HasCustom(cfg.CustomColors))
                 swatchHex = Themes.Custom(cfg.CustomColors, cfg.CustomLight).Swatch;
             else
-                swatchHex = Themes.Resolve(cfg).Swatch;
+                // No saved DIY yet: show the DIY starter accent, not the live
+                // preset, so the card does not twin Dwemer (or Forge) at a glance.
+                swatchHex = Themes.Custom(null, false).Swatch;
 
             var sw = new Border();
             sw.Width = 15; sw.Height = 15;
@@ -3961,6 +4011,7 @@ namespace Thornswood
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     string now = up ? ms + " ms" : "no reply";
+                    pingMsText = now;
                     // Keep who is on until the next count comes back, so the line
                     // does not shrink and grow again every refresh.
                     string was = txtPing.Text ?? "";
@@ -3970,6 +4021,7 @@ namespace Thornswood
                     if (txtPing.Text != want) txtPing.Text = want;
                     dotServer.Fill = Res(up ? (serving ? "Ok" : "Warn") : "Warn");
                     RecordPing(up ? ms : -1, serving);
+                    PaintServerChip();
                     AskOnline();
                 }));
             });
@@ -4065,22 +4117,46 @@ namespace Thornswood
         static void DrawServerPick()
         {
             if (btnServerMain == null || btnServerDev == null || txtServerPick == null) return;
+            // Do not assign Content: the XAML holds the status chip layout.
             if (cfg.IsDev)
             {
                 txtServerPick.Text = "Dev";
                 btnServerDev.IsEnabled = false;
-                btnServerDev.Content = "Dev";
                 btnServerMain.IsEnabled = true;
-                btnServerMain.Content = "Main";
-                return;
             }
-            txtServerPick.Text = "Main";
-            btnServerMain.IsEnabled = false;
-            btnServerMain.Content = "Main";
-            btnServerDev.IsEnabled = true;
-            // Label stays Dev in the list; SwitchToDev still opens an installed
-            // build or runs the staff-role gate and install offer when it is not.
-            btnServerDev.Content = "Dev";
+            else
+            {
+                txtServerPick.Text = "Main";
+                btnServerMain.IsEnabled = false;
+                btnServerDev.IsEnabled = true;
+            }
+            PaintServerChip();
+        }
+
+        /// <summary>
+        /// Status chip on the server button: dot, name, ms, "N of M awake".
+        /// Dropdown rows show the other server's awake line too.
+        /// </summary>
+        static void PaintServerChip()
+        {
+            string meta = "";
+            if (!string.IsNullOrEmpty(pingMsText)) meta = pingMsText;
+            if (!string.IsNullOrEmpty(awakeMineText))
+                meta = meta.Length == 0 ? awakeMineText : meta + "   \u00b7   " + awakeMineText;
+            if (txtServerPickMeta != null && txtServerPickMeta.Text != meta) txtServerPickMeta.Text = meta;
+
+            if (txtServerMainMeta != null)
+            {
+                string m = cfg != null && cfg.IsDev ? awakeOtherText : "";
+                if (txtServerMainMeta.Text != m) txtServerMainMeta.Text = m;
+            }
+            if (txtServerDevMeta != null)
+            {
+                string d = cfg != null && !cfg.IsDev ? awakeOtherText : "";
+                if (txtServerDevMeta.Text != d) txtServerDevMeta.Text = d;
+            }
+            if (dotServerPick != null && dotServer != null)
+                dotServerPick.Fill = dotServer.Fill;
         }
 
         static void ToggleServerPick()
@@ -4120,7 +4196,7 @@ namespace Thornswood
             if (!Discord.Linked)
             {
                 MessageBox.Show(win,
-                    "Connect Discord on the Play page first. The launcher checks your Discord roles before it installs the dev build.",
+                    "Connect Discord in the sidebar first. The launcher checks your Discord roles before it installs the dev build.",
                     "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -4156,7 +4232,7 @@ namespace Thornswood
                         if (st.Why == "link")
                         {
                             MessageBox.Show(win,
-                                "Connect Discord on the Play page first, then try again.",
+                                "Connect Discord in the sidebar first, then try again.",
                                 "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
                             return;
                         }
@@ -4751,13 +4827,19 @@ namespace Thornswood
             ThreadPool.QueueUserWorkItem(delegate
             {
                 Online.Count c = null;
+                Online.Count other = null;
                 try { c = Online.Ask(cfg); } catch { }
+                try { other = Online.AskOther(cfg); } catch { }
                 Online.Count got = c;
+                Online.Count gotOther = other;
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     string extra = Online.Line(got);
+                    awakeMineText = extra;
+                    awakeOtherText = Online.Line(gotOther);
                     string want = extra.Length > 0 ? pingText + "   \u00b7   " + extra : pingText;
                     if (txtPing.Text != want) txtPing.Text = want;
+                    PaintServerChip();
                     if (playing && got != null)
                     {
                         try { Presence.Update(got.Known ? got.Now : -1, got.Max); } catch { }

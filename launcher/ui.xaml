@@ -1,6 +1,6 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="ThornsWood" Width="1220" Height="800" MinWidth="1020" MinHeight="670"
+        Title="Thornswood" Width="1220" Height="800" MinWidth="1020" MinHeight="670"
         WindowStyle="None" ResizeMode="CanResize" WindowStartupLocation="Manual"
         Background="#100D0A" FontFamily="Segoe UI" TextOptions.TextFormattingMode="Display">
 
@@ -468,7 +468,9 @@
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-          <Border Style="{StaticResource Slab}" Padding="12,5" VerticalAlignment="Center" Margin="0,0,14,0">
+          <!-- Status chip lives on the Play server button now. Names kept so
+               Shell.cs lookups still resolve; collapsed so the title bar stays clean. -->
+          <Border x:Name="TitleServerChip" Style="{StaticResource Slab}" Padding="12,5" VerticalAlignment="Center" Margin="0,0,14,0" Visibility="Collapsed">
             <StackPanel Orientation="Horizontal">
               <Ellipse x:Name="DotServer" Width="7" Height="7" Fill="{DynamicResource Faint}" VerticalAlignment="Center" Margin="0,0,9,0"/>
               <TextBlock x:Name="TxtServer" Style="{StaticResource Mono}" Foreground="{DynamicResource Ink}" FontSize="12" VerticalAlignment="Center"/>
@@ -493,6 +495,21 @@
           <DockPanel>
             <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,14">
               <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="20,10,18,10"/>
+              <!-- Discord account sits above Settings: username, profile picture,
+                   Reconnect only. No Forget, no headers, no how-it-works notes. -->
+              <StackPanel x:Name="DiscordCard" Margin="18,2,14,10">
+                <StackPanel Orientation="Horizontal">
+                  <Ellipse x:Name="DiscordAvatar" Width="32" Height="32" Margin="0,0,10,0"
+                           VerticalAlignment="Center" Fill="{DynamicResource Line}"/>
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="LabelDiscord" FontSize="12.5"
+                               Foreground="{DynamicResource Ink}" Text="Not linked"
+                               TextTrimming="CharacterEllipsis" MaxWidth="120"/>
+                    <Button x:Name="ButtonDiscord" Style="{StaticResource Link}"
+                            Content="Connect Discord" HorizontalAlignment="Left" Margin="0,2,0,0"/>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
               <Button x:Name="NavSettings" Style="{StaticResource Nav}">
                 <StackPanel Orientation="Horizontal">
                   <Path Width="15" Height="15" Stretch="Uniform" Margin="0,0,13,0" VerticalAlignment="Center"
@@ -511,7 +528,7 @@
                 <StackPanel Orientation="Horizontal" Margin="22,16,18,0">
                   <Image x:Name="EmblemSmall" Width="28" Height="28" Margin="0,0,12,0" VerticalAlignment="Center"
                          RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed"/>
-                  <TextBlock x:Name="TxtBrandSmall" Text="ThornsWood" FontFamily="Constantia, Georgia" FontSize="17"
+                  <TextBlock x:Name="TxtBrandSmall" Text="Thornswood" FontFamily="Constantia, Georgia" FontSize="17"
                              Typography.Capitals="SmallCaps" TextOptions.TextFormattingMode="Ideal"
                              Foreground="{DynamicResource Ink}" VerticalAlignment="Center"/>
                 </StackPanel>
@@ -655,11 +672,12 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                   </Grid.ColumnDefinitions>
-                  <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                  <!-- Logo and title text over the hero art were clutter; collapsed so Shell lookups still resolve. -->
+                  <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                     <Image x:Name="Emblem" Width="84" Height="84" Margin="0,0,22,0" VerticalAlignment="Center"
                            RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed"/>
                     <StackPanel x:Name="BannerTitle" VerticalAlignment="Center">
-                      <TextBlock x:Name="TxtBrandBig" Text="ThornsWood" Style="{StaticResource Display}"/>
+                      <TextBlock x:Name="TxtBrandBig" Text="Thornswood" Style="{StaticResource Display}"/>
                       <!-- The dash and the plugins / game / launcher line under the name are not shown
                            on the banner (#596). Kept in the tree because the code still fills the line. -->
                       <StackPanel Orientation="Horizontal" Margin="2,8,0,0" Visibility="Collapsed">
@@ -693,84 +711,25 @@
                        not flash or re-say itself when nothing has changed. -->
                   <Border Style="{StaticResource Slab}" Padding="20,17">
                     <Grid>
-                      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
                       <Ellipse x:Name="DotReady" Grid.Column="0" Width="10" Height="10" Fill="{DynamicResource Faint}"
                                VerticalAlignment="Center" Margin="0,0,15,0"/>
-                      <StackPanel Grid.Column="1">
-                        <TextBlock x:Name="TxtReadyTitle" Style="{StaticResource H2}" Text="Checking..."/>
-                        <TextBlock x:Name="TxtReadyNote" Style="{StaticResource Small}" Margin="0,2,0,0" TextWrapping="Wrap"
-                                   Text="The full checklist and Scan and Fix are on the Diagnostics page. Recheck runs them all."/>
-                      </StackPanel>
+                      <TextBlock x:Name="TxtReadyTitle" Grid.Column="1" Style="{StaticResource H2}" Text="Checking..."
+                                 VerticalAlignment="Center"/>
+                      <!-- Kept collapsed; Shell still looks it up. Subtitle under the ready line is gone. -->
+                      <TextBlock x:Name="TxtReadyNote" Visibility="Collapsed"/>
+                      <Button x:Name="BtnCheckDiagnostics" Grid.Column="2" Style="{StaticResource Ghost}"
+                              Content="Diagnostics" Margin="14,0,0,0" VerticalAlignment="Center"
+                              Visibility="Collapsed"/>
                     </Grid>
                   </Border>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
-                  <!-- Compact Server selector. One control shows the current
-                       server and opens a dropdown (Main / Dev for now). The two
-                       servers are two launcher installs: picking Dev opens the
-                       second launcher when it is already here, or checks the
-                       person's Discord roles and offers to install it only when
-                       they may (#605). More servers later are more rows in the
-                       popup list. -->
-                  <StackPanel x:Name="ServerPickCard" Margin="0,0,0,26">
-                    <TextBlock Text="Server" Style="{StaticResource Eyebrow}"/>
-                    <Grid>
-                      <Button x:Name="BtnServerPick" Style="{StaticResource Ghost}"
-                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                              Padding="12,8">
-                        <Grid>
-                          <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                          </Grid.ColumnDefinitions>
-                          <TextBlock x:Name="TxtServerPick" Grid.Column="0" Text="Main"
-                                     VerticalAlignment="Center"/>
-                          <TextBlock Grid.Column="1" Text="▾" Margin="12,0,0,0"
-                                     VerticalAlignment="Center" Foreground="{DynamicResource Muted}"/>
-                        </Grid>
-                      </Button>
-                      <Popup x:Name="ServerPickPopup" Placement="Bottom"
-                             PlacementTarget="{Binding ElementName=BtnServerPick}"
-                             StaysOpen="False" AllowsTransparency="True">
-                        <Border Background="{DynamicResource Card}" BorderBrush="{DynamicResource Line}"
-                                BorderThickness="1" CornerRadius="2" Padding="4">
-                          <StackPanel>
-                            <Button x:Name="BtnServerMain" Style="{StaticResource Ghost}"
-                                    Content="Main" HorizontalAlignment="Stretch"
-                                    HorizontalContentAlignment="Left" Margin="0,0,0,2"/>
-                            <Button x:Name="BtnServerDev" Style="{StaticResource Ghost}"
-                                    Content="Dev" HorizontalAlignment="Stretch"
-                                    HorizontalContentAlignment="Left"/>
-                          </StackPanel>
-                        </Border>
-                      </Popup>
-                    </Grid>
-                  </StackPanel>
-
-                  <!-- Discord is the door. The launcher asks the site who you are
-                       every time you press Play, so this has to be linked before
-                       the game will start. -->
-                  <StackPanel x:Name="DiscordCard" Margin="0,0,0,26">
-                    <TextBlock Text="Your account" Style="{StaticResource Eyebrow}"/>
-                    <Border Style="{StaticResource Slab}">
-                      <StackPanel>
-                        <TextBlock x:Name="LabelDiscord" Style="{StaticResource Body}"
-                                   Text="Discord: not linked"/>
-                        <TextBlock x:Name="NoteDiscord" Style="{StaticResource Small}"
-                                   Foreground="{DynamicResource Muted}" TextWrapping="Wrap"
-                                   Margin="0,6,0,0"
-                                   Text="Thornswood asks Discord who you are. One click, your browser opens, and it closes itself."/>
-                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                          <Button x:Name="ButtonDiscord" Style="{StaticResource Ghost}"
-                                  Content="Connect Discord"/>
-                          <Button x:Name="ButtonDiscordForget" Style="{StaticResource Link}"
-                                  Content="Forget it" Margin="12,0,0,0" Visibility="Collapsed"/>
-                        </StackPanel>
-                      </StackPanel>
-                    </Border>
-                  </StackPanel>
-
                   <!-- This card told a new person to name the character after
                        themselves and to save before connecting, both left over
                        from Skyrim Together. The name is what everybody sees over
@@ -880,6 +839,55 @@
               <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="BtnQuitGame" Style="{StaticResource Ghost}" Content="Quit Skyrim" Margin="0,0,8,0" Visibility="Collapsed"/>
                 <Button x:Name="BtnRecheck" Style="{StaticResource Ghost}" Content="Recheck" Margin="0,0,8,0"/>
+                <Grid x:Name="ServerPickCard" Margin="0,0,8,0">
+                  <Button x:Name="BtnServerPick" Style="{StaticResource Ghost}"
+                          HorizontalAlignment="Left" HorizontalContentAlignment="Stretch"
+                          Padding="10,8" MinWidth="210">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <Ellipse x:Name="DotServerPick" Grid.Column="0" Width="7" Height="7"
+                               Fill="{DynamicResource Faint}" VerticalAlignment="Center" Margin="0,0,9,0"/>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtServerPick" Text="Main" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TxtServerPickMeta" Margin="10,0,0,0" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Muted}" FontSize="11"/>
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="▾" Margin="12,0,0,0"
+                                 VerticalAlignment="Center" Foreground="{DynamicResource Muted}"/>
+                    </Grid>
+                  </Button>
+                  <Popup x:Name="ServerPickPopup" Placement="Bottom"
+                         PlacementTarget="{Binding ElementName=BtnServerPick}"
+                         StaysOpen="False" AllowsTransparency="True">
+                    <Border Background="{DynamicResource Card}" BorderBrush="{DynamicResource Line}"
+                            BorderThickness="1" CornerRadius="2" Padding="4" MinWidth="220">
+                      <StackPanel>
+                        <Button x:Name="BtnServerMain" Style="{StaticResource Ghost}"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,0,0,2"
+                                Padding="10,8">
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Main" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtServerMainMeta" Margin="12,0,0,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Muted}" FontSize="11"/>
+                          </StackPanel>
+                        </Button>
+                        <Button x:Name="BtnServerDev" Style="{StaticResource Ghost}"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Padding="10,8">
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Dev" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtServerDevMeta" Margin="12,0,0,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Muted}" FontSize="11"/>
+                          </StackPanel>
+                        </Button>
+                      </StackPanel>
+                    </Border>
+                  </Popup>
+                </Grid>
                 <Button x:Name="BtnCopy"    Style="{StaticResource Ghost}" Content="Copy address"/>
               </StackPanel>
             </Grid>
@@ -1302,13 +1310,13 @@
                          page (#605). Choosing the dev server there installs or opens
                          the dev build, after the same Discord role check. -->
 
-                    <TextBlock Style="{StaticResource H2}" Text="Uninstall ThornsWood"/>
+                    <TextBlock Style="{StaticResource H2}" Text="Uninstall Thornswood"/>
                     <TextBlock Style="{StaticResource Body}" Text="Puts your Windows Skyrim folders back, then deletes this build and the launcher with it. Your own Skyrim in Steam is never touched: this is a separate copy and Steam does not know it exists. There is no undo, and the whole thing has to be downloaded again afterwards."/>
                     <CheckBox x:Name="ChkDeleteMods" Content="Delete Thornswood's copy of the game as well" Margin="0,13,0,0" IsChecked="True"/>
                     <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0" Text="This is Thornswood's own Game folder, built from what Vortex deployed. It is not the mods themselves and it is not your Skyrim in Steam, neither of which this can touch: taking the mods off is Purge in Vortex and nothing here does it for you. Untick this and the folder stays exactly where it is, so reinstalling reuses what is already on the disk instead of pulling the collection down again, which is the difference between a few minutes and an evening."/>
                     <CheckBox x:Name="ChkKeepSaves" Content="Keep this build's saves and settings" Margin="0,13,0,0" IsChecked="True"/>
                     <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0" Text="Leaves the Profile folder where it is, so a reinstall picks your characters and settings back up."/>
-                    <Button x:Name="BtnUninstall" Style="{StaticResource Ghost}" Content="Uninstall ThornsWood" HorizontalAlignment="Left" Margin="0,15,0,0"/>
+                    <Button x:Name="BtnUninstall" Style="{StaticResource Ghost}" Content="Uninstall Thornswood" HorizontalAlignment="Left" Margin="0,15,0,0"/>
                   </StackPanel>
                 </Border>
               </StackPanel>
