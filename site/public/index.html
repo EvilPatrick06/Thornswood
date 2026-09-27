@@ -2134,18 +2134,11 @@ function drawNews() {
 
 /* ------------------------------------------------------------- uploads -- */
 /*
-  Hub Gallery used to host a raw file drop, an uploaded-files list, and gallery
-  reports. Uploads and the public send form live on /gallery (and the launcher);
-  bug and idea reports live in Inbox. Staff still approve the pending gallery
-  queue here.
+  Hub Gallery is staff pending-queue only. Uploads and the public send form live
+  on /gallery (and the launcher); bug and idea reports live in Inbox.
 */
 function drawUploads() {
   var out = head() +
-    '<div class="empty">' +
-      '<p>Approved pictures live on the public <a href="/gallery">Gallery</a>. ' +
-      'Send one in there or from the launcher.</p>' +
-      '<p>Bug and idea reports go to <a href="' + PATHS.inbox + '">Inbox</a>.</p>' +
-    '</div>' +
     (S.me.dev || S.me.admin ? '<div id="galqueue"></div>' : '');
   el('page').innerHTML = out;
   if (S.me.dev || S.me.admin) loadGalleryQueue();
