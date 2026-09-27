@@ -1,0 +1,153 @@
+﻿/*
+  test-feed-serve.js
+
+      node .\tests\test-feed-serve.js
+
+  The ship feed (#649) is served from /feed/ and /feed-dev/ on the site:
+  version.json anonymously, and assets named only by lowercase sha256 with
+  the same Range resume as /file/. It lifts those routes and rangeReply out
+  of site\server.js by text and serves them from a real node http server on
+  a loopback port against files in a temp folder.
+*/
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const http = require('http');
+
+const CR = String.fromCharCode(13);
+const SRC = path.join(__dirname, '..', 'site', 'server.js');
+const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
+
+let pass = 0, fail = 0;
+function yes(what, cond) {
+  if (cond) { pass++; console.log('PASS  ' + what); }
+  else { fail++; console.log('FAIL  ' + what); }
+}
+
+function block(at) {
+  const b = src.indexOf('{', at);
+  let d = 0;
+  for (let i = b; i < src.length; i++) {
+    if (src[i] === '{') d++;
+    else if (src[i] === '}') { d--; if (d === 0) return i + 1; }
+  }
+  throw new Error('unbalanced braces in site/server.js');
+}
+function grab(head) {
+  const at = src.indexOf(head);
+  if (at < 0) return '';
+  return src.slice(at, block(at));
+}
+function route(first, guard) {
+  const at = src.indexOf(first);
+  if (at < 0) return '';
+  const g = src.indexOf(guard, at);
+  if (g < 0) return '';
+  return src.slice(at, block(g));
+}
+
+const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-feed-'));
+fs.mkdirSync(path.join(ROOT, 'feed', 'assets'), { recursive: true });
+fs.mkdirSync(path.join(ROOT, 'feed-dev', 'assets'), { recursive: true });
+
+const sendSrc = grab('function send(');
+yes('server.js still has send()', !!sendSrc);
+eval(sendSrc);
+
+const rangeSrc = grab('function rangeReply(');
+yes('server.js has rangeReply()', !!rangeSrc);
+if (rangeSrc) eval(rangeSrc);
+
+const verSrc = route('const feedVer = p.match(', "if (feedVer && req.method === 'GET')");
+const assetSrc = route('const feedAsset = p.match(', "if (feedAsset && req.method === 'GET')");
+yes('the /feed/version.json route is where this expects it', !!verSrc);
+yes('the /feed/assets/ route is where this expects it', !!assetSrc);
+yes('assets answer ranges through rangeReply', /rangeReply\(/.test(assetSrc));
+yes('rangeReply keeps a caller cache-control on 206',
+   /headers\['cache-control'\] \|\| 'no-store'/.test(rangeSrc));
+
+const verRoute = eval('(function (p, req, res, head) {\n' + verSrc + '\n})');
+const assetRoute = eval('(function (p, req, res, head) {\n' + assetSrc + '\n})');
+
+const SHA = 'a'.repeat(64);
+const BODY = Buffer.from('pack-bytes-for-feed-test-0123456789');
+fs.writeFileSync(path.join(ROOT, 'feed', 'version.json'),
+  JSON.stringify({ launcherUrl: 'https://thornswood.net/feed/assets/' + SHA }));
+fs.writeFileSync(path.join(ROOT, 'feed', 'assets', SHA), BODY);
+fs.writeFileSync(path.join(ROOT, 'feed-dev', 'version.json'),
+  JSON.stringify({ launcherUrl: 'https://thornswood.net/feed-dev/assets/' + SHA }));
+fs.writeFileSync(path.join(ROOT, 'feed-dev', 'assets', SHA), BODY);
+
+const server = http.createServer((req, res) => {
+  const url = new URL(req.url, 'http://x');
+  const p = decodeURIComponent(url.pathname);
+  const head = req.method === 'HEAD';
+  if (head) req.method = 'GET';
+  try {
+    verRoute(p, req, res, head);
+    if (!res.headersSent) assetRoute(p, req, res, head);
+  } catch (e) {
+    if (!res.headersSent) { res.writeHead(500); res.end(String(e && e.message)); }
+    return;
+  }
+  if (!res.headersSent) { res.writeHead(404); res.end('no'); }
+});
+
+function ask(method, p, headers) {
+  return new Promise((resolve) => {
+    const req = http.request({ host: '127.0.0.1', port: server.address().port, path: p,
+                               method: method, headers: headers || {}, agent: false }, (res) => {
+      const parts = [];
+      res.on('data', (d) => parts.push(d));
+      res.on('end', () => resolve({ code: res.statusCode, h: res.headers, body: Buffer.concat(parts) }));
+    });
+    req.on('error', (e) => resolve({ code: 0, h: {}, body: Buffer.alloc(0), error: e.message }));
+    req.end();
+  });
+}
+
+async function main() {
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+
+  const v = await ask('GET', '/feed/version.json');
+  yes('GET /feed/version.json is 200', v.code === 200);
+  yes('version.json is application/json', /^application\/json/.test(v.h['content-type'] || ''));
+  yes('version.json Cache-Control is no-cache', v.h['cache-control'] === 'no-cache');
+  yes('version.json holds the rewritten launcherUrl',
+      /thornswood\.net\/feed\/assets\//.test(v.body.toString('utf8')));
+
+  const missing = await ask('GET', '/feed/assets/' + 'b'.repeat(64));
+  yes('a missing asset is 404', missing.code === 404);
+
+  const bad = await ask('GET', '/feed/assets/not-a-sha');
+  yes('a non-sha256 asset name is 404 (route miss)', bad.code === 404);
+
+  const a = await ask('GET', '/feed/assets/' + SHA);
+  yes('GET /feed/assets/<sha256> is 200', a.code === 200);
+  yes('asset is the whole file', a.body.equals(BODY));
+  yes('asset Accept-Ranges: bytes', a.h['accept-ranges'] === 'bytes');
+  yes('asset Cache-Control is long immutable',
+      a.h['cache-control'] === 'public, max-age=31536000, immutable');
+
+  const part = await ask('GET', '/feed/assets/' + SHA, { Range: 'bytes=0-3' });
+  yes('asset Range is 206', part.code === 206);
+  yes('asset Range body is the first four bytes', part.body.equals(BODY.subarray(0, 4)));
+  yes('asset 206 keeps immutable Cache-Control',
+      part.h['cache-control'] === 'public, max-age=31536000, immutable');
+
+  const dv = await ask('GET', '/feed-dev/version.json');
+  yes('GET /feed-dev/version.json is 200', dv.code === 200);
+  yes('feed-dev version.json Cache-Control is no-cache', dv.h['cache-control'] === 'no-cache');
+
+  const da = await ask('GET', '/feed-dev/assets/' + SHA);
+  yes('GET /feed-dev/assets/<sha256> is 200', da.code === 200);
+
+  server.close();
+  try { fs.rmSync(ROOT, { recursive: true, force: true }); } catch (e) { }
+
+  console.log('');
+  console.log(pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+}
+
+main().catch((e) => { console.error(e); process.exit(1); });
