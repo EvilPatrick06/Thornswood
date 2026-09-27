@@ -31,7 +31,9 @@
 // moves it, and the name is the anchor the page tells people to search for.
 // Each NOTE says where the line is now, so updating the page is a copy. Where
 // a name is on several lines (a method's declaration and its call), the one
-// meant is the one that moved with the references around it, not the nearest;
+// meant is the one that moved with the references around it, not the nearest,
+// and the chosen lines stay in the order the page lists them so a rename whose
+// old name still appears elsewhere fails instead of reading as a move;
 // settle() below says why, and a check after the order check proves it
 // against the code on every run.
 //
@@ -232,30 +234,54 @@ function hitsOf(lines, r) {
 // A step picked on another line with its name costs twice, once to jump there
 // and once to jump back, so it only wins where the references around it moved
 // that way too. A name on one line settles itself, and it settles the names on
-// several lines around it. `spots` are one file's references, one per line the
-// page gives and name, sorted by that line, each with at least one hit; each
-// gets .now, the line it settled on.
+// several lines around it.
+//
+// The chosen lines must also stay in page order: each spot's .now is strictly
+// after the previous spot's .now. Without that, a step renamed or taken out of
+// Play whose name is still called earlier in the same file settles on that
+// earlier call and reads as a moved line (a NOTE) rather than a failure (#496).
+// Additive line-only edits keep relative order, so they still settle and only
+// NOTE the new numbers. A spot that has hits but no order-preserving choice is
+// left without .now and counts as gone.
+// `spots` are one file's references, one per line the page gives and name,
+// sorted by that line, each with at least one hit; each gets .now, the line it
+// settled on, or no .now when order cannot place it.
 function settle(spots) {
-  let prev = [{ shift: 0, cost: 0 }];
-  const rows = spots.map(function (s) {
-    const row = s.hits.map(function (h) { return { at: h, shift: h - s.line, cost: 0, from: 0 }; });
+  let prev = [{ shift: 0, at: 0, cost: 0 }];
+  const rows = [];
+  const aliveAt = [];
+  spots.forEach(function (s) { s.now = undefined; });
+  spots.forEach(function (s, si) {
+    const row = s.hits.map(function (h) { return { at: h, shift: h - s.line, cost: Infinity, from: 0 }; });
     // Nearest first, so that of two choices that cost the same, the line
     // nearer to where the page says wins, as it did before.
     row.sort(function (a, b) { return Math.abs(a.shift) - Math.abs(b.shift) || a.at - b.at; });
     row.forEach(function (c) {
-      c.cost = Infinity;
       prev.forEach(function (p, j) {
+        if (!(p.at < c.at) || !(p.cost < Infinity)) return;
         const d = Math.abs(c.shift - p.shift);
         const v = p.cost + d + (d ? 1 : 0);
         if (v < c.cost) { c.cost = v; c.from = j; }
       });
     });
+    if (!row.some(function (c) { return c.cost < Infinity; })) {
+      rows.push(null);
+      return;
+    }
+    rows.push(row);
+    aliveAt.push(si);
     prev = row;
-    return row;
   });
+  const live = [];
+  for (let i = 0; i < rows.length; i++) if (rows[i]) live.push(i);
+  if (!live.length) return;
+  const last = rows[live[live.length - 1]];
   let k = 0;
-  prev.forEach(function (c, j) { if (c.cost < prev[k].cost) k = j; });
-  for (let i = rows.length - 1; i >= 0; i--) { spots[i].now = rows[i][k].at; k = rows[i][k].from; }
+  last.forEach(function (c, j) { if (c.cost < last[k].cost) k = j; });
+  for (let li = live.length - 1; li >= 0; li--) {
+    spots[aliveAt[li]].now = rows[live[li]][k].at;
+    k = rows[live[li]][k].from;
+  }
 }
 function bySpot(a, b) { return a.line - b.line || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0); }
 
@@ -284,6 +310,12 @@ Object.keys(spotsIn).forEach(function (file) { settle(spotsOf(file)); });
 let exact = 0, moved = 0;
 refs.forEach(function (r) {
   if (!r.spot) return;
+  if (r.spot.now === undefined) {
+    gone.push(r.text + ' (page line ' + r.pageLine + '): ' +
+      (r.decl ? 'no method of that name is declared in ' : 'that name is no longer in the code of ') + r.file +
+      ' at a line that keeps page order with the other references');
+    return;
+  }
   r.now = r.spot.now;
   if (r.now === r.line) exact++;
   else {
@@ -344,7 +376,7 @@ yes('the steps the page lists inside each method are in the order the code runs 
   const wrong = [];
   let files = 0;
   Object.keys(spotsIn).forEach(function (file) {
-    const real = spotsOf(file);
+    const real = spotsOf(file).filter(function (s) { return s.now !== undefined; });
     if (!real.some(function (s) { return s.hits.length === 1; })) return;
     files++;
     let top = Infinity;
@@ -379,6 +411,25 @@ yes('the steps the page lists inside each method are in the order the code runs 
   settle(fixture);
   yes('a call moved 40 lines past its own declaration is found at the call, 170, not the declaration: ' + fixture[2].now,
       fixture[0].now === 100 && fixture[1].now === 115 && fixture[2].now === 170 && fixture[3].now === 180);
+}
+
+// Proof that a renamed step whose name still appears earlier fails to settle,
+// rather than reading as a moved line on that earlier call (#496). Hold.Take
+// in Play at 200, with the same name still at 50 in Run: after the Play call
+// is removed, the Play reference has no order-preserving hit.
+{
+  const fixture = [
+    { key: '40 Door.Check', line: 40, hits: [40] },
+    { key: '50 Hold.Take', line: 50, hits: [50] },
+    { key: '60 Keep.Seed', line: 60, hits: [60] },
+    { key: '180 Keep.Restore', line: 180, hits: [180] },
+    { key: '200 Hold.Take', line: 200, hits: [50] },
+    { key: '220 Swap.Apply', line: 220, hits: [220] }
+  ];
+  settle(fixture);
+  yes('a Play Hold.Take renamed away, with Run still calling Hold.Take, does not settle: ' + fixture[4].now,
+      fixture[0].now === 40 && fixture[1].now === 50 && fixture[2].now === 60 &&
+      fixture[3].now === 180 && fixture[4].now === undefined && fixture[5].now === 220);
 }
 
 // ------------------------------------------------------------ 6. shape
