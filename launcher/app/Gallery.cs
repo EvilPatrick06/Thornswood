@@ -253,9 +253,9 @@ namespace Thornswood
         /// the site's receiveUpload path.
         ///
         /// "" when the site took it, and a sentence to show the person when it
-        /// did not. Allowed kinds match the site's GALLERY_ALLOW today: png,
-        /// jpg, jpeg, webp, gif. Screen recordings are not accepted yet; the
-        /// Website lane must widen that list before the launcher can send one.
+        /// did not. Allowed kinds match the site's GALLERY_ALLOW: png, jpg,
+        /// jpeg, webp, gif, mp4, webm. Cap stays 25 MB until recordings that
+        /// need more get their own decision.
         /// </summary>
         public static string Submit(string path, string by, string note)
         {
@@ -269,7 +269,7 @@ namespace Thornswood
             string offered = Path.GetFileName(path);
             string ext = Path.GetExtension(offered).ToLowerInvariant();
             if (Array.IndexOf(AllowExt, ext) < 0)
-                return "That kind of file is not allowed. Send a png, jpg, jpeg, webp or gif.";
+                return "That kind of file is not allowed. Send a png, jpg, jpeg, webp, gif, mp4 or webm.";
 
             // Cap matches the site's GALLERY_CAP (25 MB). Cut here so a huge
             // file is refused before the bytes leave the machine.
@@ -322,12 +322,12 @@ namespace Thornswood
             if (code == 401) return "The site would not take this copy's Discord link. Connect Discord again and try once more.";
             if (code == 403) return "That Discord account is not allowed to send pictures.";
             if (code == 413) return "That file is over 25 MB.";
-            if (code == 415) return "That kind of file is not allowed. Send a png, jpg, jpeg, webp or gif.";
+            if (code == 415) return "That kind of file is not allowed. Send a png, jpg, jpeg, webp, gif, mp4 or webm.";
             return "The site answered " + code + ", so the picture was not kept.";
         }
 
         /// <summary>Extensions the site's GALLERY_ALLOW accepts today.</summary>
-        static readonly string[] AllowExt = new string[] { ".png", ".jpg", ".jpeg", ".webp", ".gif" };
+        static readonly string[] AllowExt = new string[] { ".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm" };
 
         static string ContentTypeFor(string ext)
         {
@@ -335,6 +335,8 @@ namespace Thornswood
             if (ext == ".jpg" || ext == ".jpeg") return "image/jpeg";
             if (ext == ".webp") return "image/webp";
             if (ext == ".gif") return "image/gif";
+            if (ext == ".mp4") return "video/mp4";
+            if (ext == ".webm") return "video/webm";
             return "application/octet-stream";
         }
 
