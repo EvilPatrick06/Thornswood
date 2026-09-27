@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 127 of them, by area: `release` builds and
+Every `.ps1` under this folder, 131 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -64,7 +64,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [mods/Add-Accuracy.ps1](mods/Add-Accuracy.ps1) | Localised combat damage. Where you hit somebody starts to matter, on top of what Precision already does for where your weapon actually is. |
 | [mods/Add-Bodies.ps1](mods/Add-Bodies.ps1) | Bodies, genitals and physics. Skeleton, female body, male body, and the jiggle that hangs off both. |
 | [mods/Add-CartTravel.ps1](mods/Add-CartTravel.ps1) | Carriages and ferries between the holds, so turning fast travel off leaves people with a way to get about. |
-| [mods/Add-Characters.ps1](mods/Add-Characters.ps1) | RETIRED. Installed Start On Save by hand. **It refuses to run.** Launcher #394/#490 strip landed; Nexus collection drop still Patrick. |
+| [mods/Add-Characters.ps1](mods/Add-Characters.ps1) | RETIRED. DO NOT RUN. Launcher #394 / #490 stripped Auto load and StartOnSaveInstalled on Dev tip 20260927-1435-dev (1.1.101.11). |
 | [mods/Add-McmShortcut.ps1](mods/Add-McmShortcut.ps1) | Installs MCM Shortcut NG, which is what lets Skyrim Unbound open its own config menu. |
 | [mods/Align-LoadOrder.ps1](mods/Align-LoadOrder.ps1) | The client counts its own plugins with Game.GetModCount, which skips every ESL-flagged one because Skyrim gives those no normal index. |
 | [mods/Audit-Leftovers.ps1](mods/Audit-Leftovers.ps1) | Measures. Deletes nothing, moves nothing, renames nothing. |
@@ -128,6 +128,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Repair-Manifest.ps1](release/Repair-Manifest.ps1) | Takes packs with no download url back out of version.json and pushes the fix. |
 | [release/Set-UpdateToken.ps1](release/Set-UpdateToken.ps1) | Puts the GitHub token the launcher uses to see releases into this machine's config.json, then proves it works before you walk away. |
 | [release/Ship-Rules.ps1](release/Ship-Rules.ps1) | The one list of what never leaves a machine inside a Thornswood pack or installer. |
+| [release/Ship-Stack.ps1](release/Ship-Stack.ps1) | One Dev or Main command that runs gamemode deploy, the installer package, and the host feed remirror. |
 | [release/Ship.ps1](release/Ship.ps1) | Builds the launcher and publishes everything that changed, launcher and mods both, in a single release, to the main build or the dev build. |
 | [release/Sign-Artifact.ps1](release/Sign-Artifact.ps1) | Signs a built binary, or says plainly that it is not signing and carries on. |
 | [release/Sync-Client.ps1](release/Sync-Client.ps1) | Puts the client runtime built from the fork into the game folder, and refuses any file that is not the recorded build. |
