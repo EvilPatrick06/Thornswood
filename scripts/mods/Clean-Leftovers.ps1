@@ -43,10 +43,10 @@ $roots = @(
     'C:\Thornswood'
     (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Engine)
     'C:\SkyrimRP'
-    'C:\Users\you\Downloads'
-    'C:\Users\you\AppData\Roaming\skyrim-rp-launcher'
-    'C:\Users\you\AppData\Roaming\com.bstar.skymp-launcher'
-    'C:\Users\you\AppData\Local\Temp\Skyrim Platform'
+    (Join-Path $env:USERPROFILE 'Downloads')
+    (Join-Path $env:USERPROFILE 'AppData\Roaming\skyrim-rp-launcher')
+    (Join-Path $env:USERPROFILE 'AppData\Roaming\com.bstar.skymp-launcher')
+    (Join-Path $env:LOCALAPPDATA 'Temp\Skyrim Platform')
     'C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition'
 )
 

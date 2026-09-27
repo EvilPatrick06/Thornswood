@@ -61,7 +61,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Data = 'C:\Users\you\Downloads\Thornswood-Repo\tools',
+    [string]$Data,
     [string]$Plugin = 'Thornswood-Content.esp',
     # Editor id prefixes to remove. NOT a knob to widen casually: every name
     # here was checked against the live gamemode before it was added.
@@ -71,6 +71,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not $Data) {
+    $repo = & (Join-Path $PSScriptRoot '..\release\Where.ps1') Repo
+    $Data = Join-Path $repo 'game\content'
+}
 
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
