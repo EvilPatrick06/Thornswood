@@ -62,7 +62,7 @@ a secret: the hashes are public and `discordAppId` is a public application id
   ],
   "updateRepo": "EvilPatrick06/Thornswood-Releases",
   "voicePort": "7778",
-  "collectionUrl": "https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a",
+  "collectionUrl": "https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf",
   "maxOnline": 25,
   "mainVersion": "",
   "voiceUrl": "https://thornswood.net/voice",

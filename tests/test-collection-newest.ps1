@@ -145,13 +145,13 @@ try {
 
   # ---- what the callers see ------------------------------------------------
   Clear-State; Put '000124.log' (Plain 5)
-  $st = Get-CollectionState 'https://next.nexusmods.com/skyrimspecialedition/collections/ombo2a'
+  $st = Get-CollectionState 'https://next.nexusmods.com/skyrimspecialedition/collections/7essxf'
   Yes 'Get-CollectionState carries the newest through' ($st.Newest -eq 5)
   Yes 'and says it knew both numbers when it did' `
     (($st.Have -gt 0 -and $st.Known) -or (-not $st.Have -and -not $st.Known))
 
   Clear-State
-  $blind = Get-CollectionState 'https://next.nexusmods.com/skyrimspecialedition/collections/ombo2a'
+  $blind = Get-CollectionState 'https://next.nexusmods.com/skyrimspecialedition/collections/7essxf'
   Yes 'with nothing readable, Known is false' (-not $blind.Known)
   Yes 'and Behind is false too, so the bool alone cannot tell them apart' (-not $blind.Behind)
 }

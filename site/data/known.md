@@ -45,8 +45,8 @@ by its plugin file as well, because that is what your plugin list shows.
 Immersive Armors, for one, is Hothtrooper44_ArmorCompilation.esp, and a
 search for the words Immersive Armors finds nothing.
 
-If a file marked Out is still in your plugin list, your collection is older
-than revision 5. Update it in Vortex.
+If a file marked Out is still in your plugin list, your collection is out of
+date. Update it in Vortex.
 
 | Mod | Plugin file | Where it stands |
 |---|---|---|
