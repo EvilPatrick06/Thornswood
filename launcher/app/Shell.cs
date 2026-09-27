@@ -2512,6 +2512,11 @@ namespace Thornswood
                 if (named.Count > shown)
                     Log("  and " + (named.Count - shown) + " more, not written out to keep the log readable.");
             }
+
+            // Same Issue list the card just painted (Verify.LastIssues). Without
+            // this, Scan could go green while Ready to launch Mods / Mod list
+            // still showed the previous Run, or the reverse after Fix.
+            DrawStatus();
         }
 
         /// <summary>

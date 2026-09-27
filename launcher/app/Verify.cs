@@ -60,6 +60,17 @@ namespace Thornswood
         /// was no list to compare against.</summary>
         public static int Expected;
 
+        /// <summary>
+        /// The issues the last Run produced. Checks.All (Ready to launch Mods /
+        /// Mod list) and the Scan and Fix card both read this so they cannot
+        /// disagree: one Run, one truth. Null until the first Run.
+        /// </summary>
+        public static List<Issue> LastIssues;
+
+        /// <summary>True when the last Run was given a Config, so load order and
+        /// bytes were judged against the server the same way Scan does.</summary>
+        public static bool LastUsedServer;
+
         public static List<Issue> Run() { return Run(null); }
 
         /// <summary>
@@ -274,6 +285,19 @@ namespace Thornswood
             // can pass every line of it and still be red in the game.
             try { issues.AddRange(Bytes(cfg)); } catch { }
 
+            // Only a server-aware Run is remembered as the shared truth. A
+            // local-only Run(null) from Checks.All must not overwrite a Scan,
+            // or the checklist drifts from the card on the next redraw.
+            if (cfg != null)
+            {
+                LastIssues = issues;
+                LastUsedServer = true;
+            }
+            else if (LastIssues == null)
+            {
+                LastIssues = issues;
+                LastUsedServer = false;
+            }
             return issues;
         }
 
