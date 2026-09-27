@@ -20,6 +20,22 @@
 $script:LoadOrderMasters = 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm'
 
 <#
+  Read one Vortex state.v2 file as Latin1 text. Every byte becomes one character
+  so the LevelDB length bytes (controls) survive for the regexes below.
+  [Text.Encoding]::Latin1 is null on Windows PowerShell 5.1; code page 28591 is
+  the same mapping on 5.1 and on PowerShell 7 (#527).
+#>
+function Get-VortexStateText([string]$Path) {
+    $raw = [IO.File]::ReadAllBytes($Path)
+    return [Text.Encoding]::GetEncoding(28591).GetString($raw)
+}
+
+function Get-VortexStateDir {
+    return (Join-Path $env:APPDATA 'Vortex\state.v2')
+}
+
+
+<#
   Which revision of the collection this machine has installed, or 0.
 
   The same rule as Checks.CollectionRevision in the launcher, and it is here
@@ -91,7 +107,7 @@ function Get-CollectionRevision([string]$Slug) {
 #>
 function Get-CollectionRevisionFromState([string]$Slug) {
     if (-not $Slug) { return 0 }
-    $st = Join-Path $env:APPDATA 'Vortex\state.v2'
+    $st = Get-VortexStateDir
     if (-not (Test-Path -LiteralPath $st)) { return 0 }
     $slugRe = 'mods###skyrimse###([^#]+)###attributes###collectionSlug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
     $revRe = 'mods###skyrimse###([^#]+)###attributes###revisionNumber[\x00-\x1F]{1,4}(\d+)'
@@ -99,7 +115,7 @@ function Get-CollectionRevisionFromState([string]$Slug) {
     $rev = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::Ordinal)
     foreach ($f in (Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)) {
         try {
-            $txt = [Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($f.FullName))
+            $txt = Get-VortexStateText $f.FullName
             foreach ($m in [regex]::Matches($txt, $slugRe)) { [void]$mine.Add($m.Groups[1].Value) }
             foreach ($m in [regex]::Matches($txt, $revRe)) {
                 $id = $m.Groups[1].Value
@@ -146,13 +162,13 @@ function Get-CollectionRevisionFromFolder([string]$Slug) {
 function Get-CollectionModIds([string]$Slug) {
     $ids = New-Object Collections.Generic.List[string]
     if (-not $Slug) { return , [string[]]$ids.ToArray() }
-    $st = Join-Path $env:APPDATA 'Vortex\state.v2'
+    $st = Get-VortexStateDir
     if (-not (Test-Path -LiteralPath $st)) { return , [string[]]$ids.ToArray() }
     $slugRe = 'mods###skyrimse###([^#]+)###attributes###collectionSlug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
     $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($f in (Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)) {
         try {
-            $txt = [Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($f.FullName))
+            $txt = Get-VortexStateText $f.FullName
             foreach ($m in [regex]::Matches($txt, $slugRe)) {
                 if ($seen.Add($m.Groups[1].Value)) { [void]$ids.Add($m.Groups[1].Value) }
             }
@@ -173,21 +189,24 @@ function Get-CollectionInstalledFolder([string]$Slug) {
     $dir = Join-Path $env:APPDATA 'Vortex\skyrimse\mods'
     if (-not (Test-Path -LiteralPath $dir)) { return $null }
 
-    # New naming: the folder is the mod id Vortex made up, which state ties to
-    # the slug. Newest by write time, since the id carries no number.
-    $new = New-Object Collections.Generic.List[object]
+    # New naming: folder is the mod id from state. Prefer collection.json when
+    # present; otherwise the staging folder itself (draft installs often omit
+    # collection.json). Never invent a revision from the opaque folder name.
+    $withJson = New-Object Collections.Generic.List[object]
+    $without = New-Object Collections.Generic.List[object]
     foreach ($id in (Get-CollectionModIds $Slug)) {
         foreach ($d in (Get-ChildItem -LiteralPath $dir -Directory -Filter ($id + '*') -EA SilentlyContinue)) {
-            if (Test-Path -LiteralPath (Join-Path $d.FullName 'collection.json')) { [void]$new.Add($d) }
+            if (Test-Path -LiteralPath (Join-Path $d.FullName 'collection.json')) { [void]$withJson.Add($d) }
+            else { [void]$without.Add($d) }
         }
     }
-    if ($new.Count -gt 0) { return ($new | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1) }
+    if ($withJson.Count -gt 0) { return ($withJson | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1) }
+    if ($without.Count -gt 0) { return ($without | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1) }
 
     # Legacy naming: collection_<slug>_<rev>_<when>, highest revision wins.
     $best = $null
     $bestRev = -1
     foreach ($d in (Get-ChildItem -LiteralPath $dir -Directory -Filter ('collection_' + $Slug + '_*') -EA SilentlyContinue)) {
-        if (-not (Test-Path -LiteralPath (Join-Path $d.FullName 'collection.json'))) { continue }
         $m = [regex]::Match($d.Name, '^collection_' + [regex]::Escape($Slug) + '_(\d+)_')
         if (-not $m.Success) { continue }
         $r = [int]$m.Groups[1].Value
@@ -197,68 +216,57 @@ function Get-CollectionInstalledFolder([string]$Slug) {
 }
 
 <#
-  The newest collection revision VORTEX KNOWS ABOUT, or 0.
+  The newest collection revision VORTEX KNOWS ABOUT for a slug, or 0.
 
-  This is the half that was missing, and it is the answer to "why was the
-  server derived from something out of date".
+  Sources, highest wins (same as Checks.CollectionNewest in the launcher):
+    1. newestVersion transition: "newestVersion","from":"3","to":"4"
+    2. plain newestVersion value (key, length byte, "N")
+    3. collections###revisions###<id>###info###revisionNumber tied to the slug
+    4. when -Slug is set, the installed revisionNumber for that slug (floor so
+       Known stays true on a current draft with no newestVersion key)
 
-  The server's load order and the reference plugin list are both derived from
-  whatever Vortex has DEPLOYED on the shipping machine. Nothing ever asked
-  whether that deployment was current. It did not have to go and look: Vortex
-  polls Nexus itself and writes down what it finds, and on 22 September its
-  own state held, in order:
-
-      "newestVersion","from":"2","to":"3"
-      "newestVersion","from":"3","to":"4"
-
-  So the machine knew revision 4 existed, and had known for days, while every
-  release went out built against revision 2. The information was there and
-  nothing read it.
-
-  Read out of Vortex's state as text rather than by opening the database,
-  because this only needs a number and must never be the reason a deploy
-  fails. Every transition is scanned and the highest destination wins, since
-  the log holds the whole history. 0 when nothing can be read, which means say
-  nothing: a wrong number here would stop a deploy that is perfectly correct.
+  Pass the slug from Get-CollectionState so two collections on one machine
+  never mix numbers. 0 when nothing can be read.
 #>
-function Get-CollectionNewest {
-    $st = Join-Path $env:APPDATA 'Vortex\state.v2'
+function Get-CollectionNewest([string]$Slug = '') {
+    $st = Get-VortexStateDir
     if (-not (Test-Path -LiteralPath $st)) { return 0 }
     $best = 0
-    foreach ($f in (Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)) {
+    $revIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $files = @(Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)
+    foreach ($f in $files) {
         try {
-            $txt = [Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($f.FullName))
-
-            # SHAPE ONE, the transition Vortex writes the moment it notices a
-            # newer revision than the one installed:
-            #     "newestVersion","from":"3","to":"4"
+            $txt = Get-VortexStateText $f.FullName
             foreach ($m in [regex]::Matches($txt, '"newestVersion"\s*,\s*"from"\s*:\s*"(\d+)"\s*,\s*"to"\s*:\s*"(\d+)"')) {
                 $n = 0
                 if ([int]::TryParse($m.Groups[2].Value, [ref]$n) -and $n -gt $best) { $best = $n }
             }
-
-            # SHAPE TWO, THE PLAIN CURRENT VALUE, and this is what is actually
-            # there once the machine is ON the newest revision, because there
-            # is no transition left to record. Only shape one was read until
-            # 22 September, so the moment revision 5 was installed the newest
-            # went back to 0 and the deploy gate stopped checking anything,
-            # which is the exact failure the gate was added for a day earlier.
-            #
-            # LevelDB writes the key, then ONE length byte, then that many
-            # bytes of JSON. Measured on this machine:
-            #
-            #   6E 65 77 65 73 74 56 65 72 73 69 6F 6E 03 22 35 22
-            #   n  e  w  e  s  t  V  e  r  s  i  o  n  len "  5  "
-            #
-            # A deleted key writes a length of 0 and no value, and is simply
-            # not matched. The length byte is any control character, so the
-            # class is bounded rather than a wildcard: a bare .{1,4} would
-            # happily match a quote and read somebody else's number.
             foreach ($m in [regex]::Matches($txt, 'newestVersion[\x00-\x1F]{1,4}"(\d+)"')) {
                 $n = 0
                 if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -gt $best) { $best = $n }
             }
+            if ($Slug) {
+                $slugRe = 'collections###revisions###([^#]+)###info###collection###slug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
+                foreach ($m in [regex]::Matches($txt, $slugRe)) { [void]$revIds.Add($m.Groups[1].Value) }
+            }
         } catch { }
+    }
+    if ($Slug -and $revIds.Count -gt 0) {
+        foreach ($f in $files) {
+            try {
+                $txt = Get-VortexStateText $f.FullName
+                foreach ($id in $revIds) {
+                    foreach ($m in [regex]::Matches($txt, ('collections###revisions###' + [regex]::Escape($id) + '###info###revisionNumber[\x00-\x1F]{1,4}(\d+)'))) {
+                        $n = 0
+                        if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -gt $best) { $best = $n }
+                    }
+                }
+            } catch { }
+        }
+    }
+    if ($Slug) {
+        $have = Get-CollectionRevisionFromState $Slug
+        if ($have -gt $best) { $best = $have }
     }
     return $best
 }
@@ -268,12 +276,14 @@ function Get-CollectionNewest {
 
   Returns a small object rather than a bool, because every caller wants to
   say the two numbers and a bool cannot. Behind is $false when either number
-  is unknown: silence beats a guess in both directions.
+  is unknown: silence beats a guess in both directions. Newest is asked for
+  this collection's slug so a second collection on the same machine cannot
+  make Known false or Behind true by accident.
 #>
 function Get-CollectionState([string]$Url) {
     $slug = Get-CollectionSlug $Url
     $have = Get-CollectionRevision $slug
-    $newest = Get-CollectionNewest
+    $newest = Get-CollectionNewest $slug
     return [pscustomobject]@{
         Slug     = $slug
         Have     = $have
@@ -281,6 +291,78 @@ function Get-CollectionState([string]$Url) {
         Behind   = ($have -gt 0 -and $newest -gt 0 -and $have -lt $newest)
         Known    = ($have -gt 0 -and $newest -gt 0)
     }
+}
+
+<#
+  The Vortex profile folder whose name is $Name (default Thornswood), or $null.
+  Bake and Ship must read this profile, never whichever profile last wrote
+  Windows' live plugins.txt (#557).
+#>
+function Get-VortexProfileDir([string]$Name = 'Thornswood') {
+    if (-not $Name) { return $null }
+    $profilesRoot = Join-Path $env:APPDATA 'Vortex\skyrimse\profiles'
+    if (-not (Test-Path -LiteralPath $profilesRoot)) { return $null }
+    $st = Get-VortexStateDir
+    $ids = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    if (Test-Path -LiteralPath $st) {
+        $pairRe = '"profileId"\s*:\s*"([^"]+)"\s*,\s*"profileName"\s*:\s*"' + [regex]::Escape($Name) + '"'
+        $pairRe2 = '"profileName"\s*:\s*"' + [regex]::Escape($Name) + '"\s*,\s*"profileId"\s*:\s*"([^"]+)"'
+        foreach ($f in (Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)) {
+            try {
+                $txt = Get-VortexStateText $f.FullName
+                foreach ($m in [regex]::Matches($txt, $pairRe)) { [void]$ids.Add($m.Groups[1].Value) }
+                foreach ($m in [regex]::Matches($txt, $pairRe2)) { [void]$ids.Add($m.Groups[1].Value) }
+            } catch { }
+        }
+    }
+    foreach ($id in $ids) {
+        $dir = Join-Path $profilesRoot $id
+        if (Test-Path -LiteralPath (Join-Path $dir 'plugins.txt')) { return $dir }
+        if (Test-Path -LiteralPath $dir) { return $dir }
+    }
+    return $null
+}
+
+<#
+  Require the named Vortex profile. Throws when missing — bake and Ship must
+  not fall through to another profile's list.
+#>
+function Assert-VortexProfile([string]$Name = 'Thornswood') {
+    $dir = Get-VortexProfileDir $Name
+    if ($dir) { return $dir }
+    throw ("Vortex profile '$Name' was not found. In Vortex, create or switch to a profile named $Name, deploy the collection, then try again. Looked under %APPDATA%\Vortex\skyrimse\profiles and state.v2.")
+}
+
+<#
+  Compare plugins.txt / loadorder.txt copies that must agree on a ship machine.
+  Returns difference lines (empty when they match or fewer than two exist).
+#>
+function Get-LoadOrderCopyDiffs([hashtable]$Copies) {
+    $diffs = New-Object Collections.Generic.List[string]
+    if (-not $Copies -or $Copies.Count -lt 2) { return , [string[]]$diffs.ToArray() }
+    $names = @($Copies.Keys | Sort-Object)
+    for ($i = 0; $i -lt $names.Count; $i++) {
+        for ($j = $i + 1; $j -lt $names.Count; $j++) {
+            $aName = $names[$i]; $bName = $names[$j]
+            $aPath = [string]$Copies[$aName]; $bPath = [string]$Copies[$bName]
+            if (-not $aPath -or -not $bPath) { continue }
+            if (-not (Test-Path -LiteralPath $aPath)) { continue }
+            if (-not (Test-Path -LiteralPath $bPath)) { continue }
+            $aLines = @(Get-Content -LiteralPath $aPath -ErrorAction SilentlyContinue)
+            $bLines = @(Get-Content -LiteralPath $bPath -ErrorAction SilentlyContinue)
+            $aEn = @($aLines | ForEach-Object { Get-LoadOrderEnabledName $_ } | Where-Object { $_ })
+            $bEn = @($bLines | ForEach-Object { Get-LoadOrderEnabledName $_ } | Where-Object { $_ })
+            $mismatch = Get-LoadOrderFirstMismatch $aEn $bEn
+            if ($mismatch -ge 0) {
+                $aAt = if ($mismatch -lt $aEn.Count) { $aEn[$mismatch] } else { '(end)' }
+                $bAt = if ($mismatch -lt $bEn.Count) { $bEn[$mismatch] } else { '(end)' }
+                [void]$diffs.Add(("$aName vs $bName first differ at index {0}: {1} vs {2}" -f $mismatch, $aAt, $bAt))
+            } elseif ($aEn.Count -ne $bEn.Count) {
+                [void]$diffs.Add(("$aName vs $bName length {0} vs {1}" -f $aEn.Count, $bEn.Count))
+            }
+        }
+    }
+    return , [string[]]$diffs.ToArray()
 }
 
 # "7essxf" out of https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf

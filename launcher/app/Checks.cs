@@ -203,15 +203,7 @@ namespace Thornswood
                 foreach (string f in Directory.GetFiles(dir))
                 {
                     string txt;
-                    try
-                    {
-                        // Latin1: every byte maps to one char, so the control
-                        // length bytes survive for the regex to bound on.
-                        byte[] raw = File.ReadAllBytes(f);
-                        var sb = new StringBuilder(raw.Length);
-                        foreach (byte b in raw) sb.Append((char)b);
-                        txt = sb.ToString();
-                    }
+                    try { txt = VortexStateText(f); }
                     catch { continue; }
 
                     foreach (Match m in slugRe.Matches(txt)) mine.Add(m.Groups[1].Value);
@@ -305,6 +297,217 @@ namespace Thornswood
         /// install clears it easily and an empty list does not come near it.
         /// </summary>
         public const int MostPluginsWithoutCollection = 40;
+
+        /// <summary>
+        /// Read one Vortex state.v2 file as Latin1 text (every byte one char).
+        /// Same as Get-VortexStateText in scripts\mods\LoadOrder.ps1.
+        /// </summary>
+        static string VortexStateText(string path)
+        {
+            byte[] raw = File.ReadAllBytes(path);
+            var sb = new StringBuilder(raw.Length);
+            foreach (byte b in raw) sb.Append((char)b);
+            return sb.ToString();
+        }
+
+        static string VortexStateDir()
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Vortex\\state.v2");
+        }
+
+        /// <summary>
+        /// Newest collection revision Vortex knows for a slug, or 0. Same as
+        /// Get-CollectionNewest in LoadOrder.ps1.
+        /// </summary>
+        public static int CollectionNewest(string slug)
+        {
+            try
+            {
+                string dir = VortexStateDir();
+                if (!Directory.Exists(dir)) return 0;
+                int best = 0;
+                var revIds = new HashSet<string>(StringComparer.Ordinal);
+                string[] files = Directory.GetFiles(dir);
+                var transRe = new Regex("\"newestVersion\"\\s*,\\s*\"from\"\\s*:\\s*\"(\\d+)\"\\s*,\\s*\"to\"\\s*:\\s*\"(\\d+)\"");
+                var plainRe = new Regex("newestVersion[\\x00-\\x1F]{1,4}\"(\\d+)\"");
+                Regex slugRe = null;
+                if (!string.IsNullOrEmpty(slug))
+                    slugRe = new Regex(
+                        "collections###revisions###([^#]+)###info###collection###slug[\\x00-\\x1F]{1,4}\"" +
+                        Regex.Escape(slug) + "\"");
+                foreach (string f in files)
+                {
+                    string txt;
+                    try { txt = VortexStateText(f); } catch { continue; }
+                    foreach (Match m in transRe.Matches(txt))
+                    {
+                        int n;
+                        if (int.TryParse(m.Groups[2].Value, out n) && n > best) best = n;
+                    }
+                    foreach (Match m in plainRe.Matches(txt))
+                    {
+                        int n;
+                        if (int.TryParse(m.Groups[1].Value, out n) && n > best) best = n;
+                    }
+                    if (slugRe != null)
+                        foreach (Match m in slugRe.Matches(txt)) revIds.Add(m.Groups[1].Value);
+                }
+                if (!string.IsNullOrEmpty(slug) && revIds.Count > 0)
+                {
+                    foreach (string f in files)
+                    {
+                        string txt;
+                        try { txt = VortexStateText(f); } catch { continue; }
+                        foreach (string id in revIds)
+                        {
+                            var revRe = new Regex(
+                                "collections###revisions###" + Regex.Escape(id) +
+                                "###info###revisionNumber[\\x00-\\x1F]{1,4}(\\d+)");
+                            foreach (Match m in revRe.Matches(txt))
+                            {
+                                int n;
+                                if (int.TryParse(m.Groups[1].Value, out n) && n > best) best = n;
+                            }
+                        }
+                    }
+                }
+                if (!string.IsNullOrEmpty(slug))
+                {
+                    int have = CollectionRevisionFromState(slug);
+                    if (have > best) best = have;
+                }
+                return best;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>Have/Newest/Behind/Known — same as Get-CollectionState.</summary>
+        public static void CollectionState(Config cfg, out int have, out int newest, out bool behind, out bool known)
+        {
+            have = 0; newest = 0; behind = false; known = false;
+            try
+            {
+                string slug = CollectionSlug(cfg);
+                have = CollectionRevision(cfg);
+                newest = CollectionNewest(slug);
+                behind = have > 0 && newest > 0 && have < newest;
+                known = have > 0 && newest > 0;
+            }
+            catch (Exception ex) { Swallow.Note("Checks.CollectionState", ex); }
+        }
+
+        /// <summary>Mod ids for a collection slug from state.v2.</summary>
+        public static List<string> CollectionModIds(string slug)
+        {
+            var ids = new List<string>();
+            try
+            {
+                if (string.IsNullOrEmpty(slug)) return ids;
+                string dir = VortexStateDir();
+                if (!Directory.Exists(dir)) return ids;
+                var slugRe = new Regex(
+                    "mods###skyrimse###([^#]+)###attributes###collectionSlug[\\x00-\\x1F]{1,4}\"" +
+                    Regex.Escape(slug) + "\"");
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string f in Directory.GetFiles(dir))
+                {
+                    string txt;
+                    try { txt = VortexStateText(f); } catch { continue; }
+                    foreach (Match m in slugRe.Matches(txt))
+                        if (seen.Add(m.Groups[1].Value)) ids.Add(m.Groups[1].Value);
+                }
+            }
+            catch (Exception ex) { Swallow.Note("Checks.CollectionModIds", ex); }
+            return ids;
+        }
+
+        /// <summary>
+        /// Staging folder for the installed collection, or null. Same as
+        /// Get-CollectionInstalledFolder. Does not invent revision from opaque names.
+        /// </summary>
+        public static string CollectionInstalledFolder(string slug)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(slug)) return null;
+                string dir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Vortex\\skyrimse\\mods");
+                if (!Directory.Exists(dir)) return null;
+                string bestJson = null; DateTime bestJsonT = DateTime.MinValue;
+                string bestBare = null; DateTime bestBareT = DateTime.MinValue;
+                foreach (string id in CollectionModIds(slug))
+                {
+                    foreach (string d in Directory.GetDirectories(dir, id + "*"))
+                    {
+                        DateTime t = Directory.GetLastWriteTimeUtc(d);
+                        if (File.Exists(Path.Combine(d, "collection.json")))
+                        {
+                            if (t >= bestJsonT) { bestJsonT = t; bestJson = d; }
+                        }
+                        else if (t >= bestBareT) { bestBareT = t; bestBare = d; }
+                    }
+                }
+                if (bestJson != null) return bestJson;
+                if (bestBare != null) return bestBare;
+                string best = null; int bestRev = -1;
+                foreach (string d in Directory.GetDirectories(dir, "collection_" + slug + "_*"))
+                {
+                    Match m = Regex.Match(Path.GetFileName(d),
+                        "^collection_" + Regex.Escape(slug) + "_(\\d+)_");
+                    if (!m.Success) continue;
+                    int r;
+                    if (!int.TryParse(m.Groups[1].Value, out r)) continue;
+                    if (r > bestRev) { bestRev = r; best = d; }
+                }
+                return best;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Vortex profile folder named <paramref name="name"/> (default Thornswood),
+        /// or null. Same as Get-VortexProfileDir (#557).
+        /// </summary>
+        public static string VortexProfileDir(string name)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(name)) name = "Thornswood";
+                string profilesRoot = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Vortex\\skyrimse\\profiles");
+                if (!Directory.Exists(profilesRoot)) return null;
+                string stateDir = VortexStateDir();
+                var ids = new HashSet<string>(StringComparer.Ordinal);
+                if (Directory.Exists(stateDir))
+                {
+                    var pairRe = new Regex(
+                        "\"profileId\"\\s*:\\s*\"([^\"]+)\"\\s*,\\s*\"profileName\"\\s*:\\s*\"" +
+                        Regex.Escape(name) + "\"");
+                    var pairRe2 = new Regex(
+                        "\"profileName\"\\s*:\\s*\"" + Regex.Escape(name) +
+                        "\"\\s*,\\s*\"profileId\"\\s*:\\s*\"([^\"]+)\"");
+                    foreach (string f in Directory.GetFiles(stateDir))
+                    {
+                        string txt;
+                        try { txt = VortexStateText(f); } catch { continue; }
+                        foreach (Match m in pairRe.Matches(txt)) ids.Add(m.Groups[1].Value);
+                        foreach (Match m in pairRe2.Matches(txt)) ids.Add(m.Groups[1].Value);
+                    }
+                }
+                foreach (string id in ids)
+                {
+                    string p = Path.Combine(profilesRoot, id);
+                    if (File.Exists(Path.Combine(p, "plugins.txt"))) return p;
+                    if (Directory.Exists(p)) return p;
+                }
+            }
+            catch (Exception ex) { Swallow.Note("Checks.VortexProfileDir", ex); }
+            return null;
+        }
 
         public static int EnabledPlugins()
         {
