@@ -1132,25 +1132,31 @@ namespace Thornswood
             // file exists, and a bundle that is present but not ours is
             // what leaves somebody sitting on the backdrop.
             l.Add(new Check("Client", ClientRuntime.Good(), ClientDetail()));
-            l.Add(new Check("Mods", plugins > MostPluginsWithoutCollection, plugins + " plugins"));
-
-            // The server does not police plugin lists, so this does. A list that
-            // does not match the one this build shipped with desyncs everyone,
-            // which is worse than a blocked button with a one click fix.
-            int blocking = 0;
-            try { foreach (Issue i in Verify.Run()) if (i.Blocking) blocking++; } catch { }
-            l.Add(new Check("Mod list",
-                            blocking == 0,
-                            blocking == 0 ? "matches the server"
-                                          : (blocking == 1 ? "1 problem, open Mods" : blocking + " problems, open Mods")));
+            // Mods and Mod list share Verify.LastIssues (filled by Scan, Fix,
+            // Play, and Diagnostics open) so they cannot disagree with the
+            // Scan and Fix card. A fresh Run(cfg) here would freeze the UI on
+            // the server round trip every page change; LastIssues is that
+            // same Run, remembered. Until the first Run, fall back to a
+            // local-only pass so the rows still say something.
+            List<Issue> issues;
+            if (Verify.LastUsedServer && Verify.LastIssues != null)
+                issues = Verify.LastIssues;
+            else
+            {
+                try { issues = Verify.Run(null); }
+                catch { issues = new List<Issue>(); }
+            }
+            l.Add(ModsRow(plugins, issues));
+            l.Add(ModListRow(issues));
 
             string[] foreign = ForeignClients();
             l.Add(new Check("Other servers",
                             foreign.Length == 0,
                             foreign.Length == 0
                                 ? "none"
-                                : (foreign.Length == 1 ? "1 client file, open Mods"
-                                                       : foreign.Length + " client files, open Mods")));
+                                : (foreign.Length == 1
+                                    ? Path.GetFileName(foreign[0])
+                                    : foreign.Length + " client files")));
 
             // The plugin that walks past the main menu.
             //
@@ -1172,6 +1178,85 @@ namespace Thornswood
 
             l.Add(new Check("Steam", SteamRunning(), "running"));
             return l;
+        }
+
+        /// <summary>
+        /// Ready to launch Mods row. Names the plugin files that are in the
+        /// list but not in Data (Verify FileMissing), because the Mods page
+        /// is gone and "94 plugins" / "1 missing" without names was not enough.
+        /// Falls back to the enabled-plugin count when nothing is missing.
+        /// </summary>
+        static Check ModsRow(int plugins, List<Issue> issues)
+        {
+            var missing = new List<string>();
+            if (issues != null)
+            {
+                foreach (Issue i in issues)
+                {
+                    if (!i.FileMissing) continue;
+                    string name = i.Plugin;
+                    if (string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(i.Text))
+                    {
+                        int cut = i.Text.IndexOf(' ');
+                        if (cut > 0) name = i.Text.Substring(0, cut);
+                    }
+                    if (string.IsNullOrEmpty(name)) continue;
+                    if (!missing.Contains(name)) missing.Add(name);
+                }
+            }
+            if (missing.Count > 0)
+                return new Check("Mods", false, MissingDetail(missing));
+            if (plugins <= MostPluginsWithoutCollection)
+                return new Check("Mods", false, plugins + " plugins");
+            return new Check("Mods", true, plugins + " plugins");
+        }
+
+        /// <summary>
+        /// Ready to launch Mod list row. Same Issue list as Scan and Fix, so
+        /// a green Scan cannot sit next to a red Mod list (or the reverse).
+        /// Names the problems; does not say "open Mods" (that page is gone).
+        /// </summary>
+        static Check ModListRow(List<Issue> issues)
+        {
+            var blocking = new List<Issue>();
+            if (issues != null)
+                foreach (Issue i in issues) if (i.Blocking) blocking.Add(i);
+            if (blocking.Count == 0)
+                return new Check("Mod list", true, "matches the server");
+            return new Check("Mod list", false, ProblemDetail(blocking));
+        }
+
+        static string MissingDetail(List<string> missing)
+        {
+            const int show = 3;
+            var shown = new List<string>();
+            for (int i = 0; i < missing.Count && i < show; i++) shown.Add(missing[i]);
+            string names = string.Join(", ", shown.ToArray());
+            if (missing.Count == 1) return "1 missing: " + names;
+            if (missing.Count <= show) return missing.Count + " missing: " + names;
+            return missing.Count + " missing: " + names + " and " + (missing.Count - show) + " more";
+        }
+
+        static string ProblemDetail(List<Issue> blocking)
+        {
+            // Prefer plugin file names when the issue carries them; otherwise
+            // the first short clause of the issue text.
+            var bits = new List<string>();
+            foreach (Issue i in blocking)
+            {
+                if (bits.Count >= 3) break;
+                if (!string.IsNullOrEmpty(i.Plugin)) { bits.Add(i.Plugin); continue; }
+                if (string.IsNullOrEmpty(i.Text)) continue;
+                string t = i.Text;
+                int dot = t.IndexOf('.');
+                if (dot > 0 && dot < 80) t = t.Substring(0, dot);
+                if (t.Length > 70) t = t.Substring(0, 67) + "...";
+                bits.Add(t);
+            }
+            string joined = string.Join("; ", bits.ToArray());
+            if (blocking.Count == 1) return joined;
+            if (bits.Count >= blocking.Count) return blocking.Count + " problems: " + joined;
+            return blocking.Count + " problems: " + joined + " and more";
         }
 
         public static bool SteamRunning()

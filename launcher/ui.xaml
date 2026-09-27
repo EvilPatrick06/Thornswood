@@ -1133,32 +1133,9 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto">
               <StackPanel Margin="36,30,36,30" MaxWidth="900" HorizontalAlignment="Left">
 
-                <Border Style="{StaticResource Slab}" Padding="24,22">
-                  <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                      <TextBlock Style="{StaticResource H1}" Text="One file that answers every question"/>
-                      <TextBlock Style="{StaticResource Body}" Margin="0,7,0,0"
-                                 Text="Gathers the newest crash log, the script extender log, your plugin list, the launcher's own log and a summary of this machine into a single zip. Send that instead of answering twenty questions in Discord. Nothing personal goes in it beyond your Windows user name, which appears in file paths."/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="18,0,0,0">
-                      <Button x:Name="BtnDiagBundle" Style="{StaticResource Solid}" Content="Build the report"/>
-                      <Button x:Name="BtnDiagOpen" Style="{StaticResource Ghost}" Content="Open the folder" Margin="0,8,0,0"/>
-                    </StackPanel>
-                  </Grid>
-                </Border>
-
-                <TextBlock x:Name="TxtDiagNote" Style="{StaticResource Small}" Margin="2,13,0,0"/>
-
-                <!-- ============ Ready to launch (moved from Play, #607) ============
-                     The gate rows that used to sit on the Play page. Play shows
-                     a one line summary; Diagnostics Check now redraws them here.
-                     DrawStatus fills this list in place. -->
-                <TextBlock Text="Ready to launch" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
-                <StackPanel x:Name="StatusList"/>
-
-                <!-- ============ Scan and Fix (moved from Mods and Settings, #607) ==== -->
-                <TextBlock Text="Scan and Fix" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
+                <!-- Scan and Fix first: one truth for plugins / load order / Data.
+                     Ready to launch stays below and reads the same Verify.LastIssues. -->
+                <TextBlock Text="Scan and Fix" Style="{StaticResource Eyebrow}" Margin="0,0,0,11"/>
                 <Border x:Name="VerifyCard" Style="{StaticResource Slab}" Padding="20,17">
                   <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -1175,6 +1152,10 @@
                     </StackPanel>
                   </Grid>
                 </Border>
+
+                <!-- Ready to launch (kept). Mods / Mod list share Scan and Fix's Issue list. -->
+                <TextBlock Text="Ready to launch" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
+                <StackPanel x:Name="StatusList"/>
 
                 <Border Style="{StaticResource Slab}" Padding="20,18" Margin="0,16,0,0">
                   <StackPanel>
@@ -1204,6 +1185,24 @@
 
                 <TextBlock Text="What the launcher can see right now" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
                 <StackPanel x:Name="DiagReadings"/>
+
+                <!-- Support zip: was the top card; kept at the bottom so Build the report still exists. -->
+                <TextBlock Text="Support report" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
+                <Border Style="{StaticResource Slab}" Padding="20,17">
+                  <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                      <TextBlock Style="{StaticResource H2}" Text="One zip for Discord"/>
+                      <TextBlock Style="{StaticResource Small}" Margin="0,4,0,0"
+                                 Text="Newest crash log, script extender log, plugin list, launcher log and a short machine summary. Nothing personal beyond your Windows user name in file paths."/>
+                      <TextBlock x:Name="TxtDiagNote" Style="{StaticResource Small}" Margin="0,8,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="18,0,0,0">
+                      <Button x:Name="BtnDiagBundle" Style="{StaticResource Solid}" Content="Build the report"/>
+                      <Button x:Name="BtnDiagOpen" Style="{StaticResource Ghost}" Content="Open the folder" Margin="0,8,0,0"/>
+                    </StackPanel>
+                  </Grid>
+                </Border>
               </StackPanel>
             </ScrollViewer>
           </Grid>
