@@ -23,23 +23,20 @@ using System.Runtime.InteropServices;
 // rest of it, so the window a stranger meets first says what the program is
 // instead of showing a path.
 //
-// Kept in the source the installer owns, and kept stable on purpose. A product
-// name that is rewritten every build is a new identity every build, which is
-// the same reputation problem the download further down was written to escape:
-// a name SmartScreen has never seen before earns no trust. The build date rides
-// in the file NAME (Thornswood-Setup-<date>.exe); the product identity below
-// does not move with it. Because these attributes are here, Build-Launcher.ps1
-// leaves the stub's version resource alone rather than generating one of its
-// own, so what a person sees in UAC is decided here and the Downloads page and
-// FAQ can be written to match it.
+// Product NAME stays stable on purpose. A name that is rewritten every build is
+// a new identity every build, which is the same reputation problem the download
+// further down was written to escape: a name SmartScreen has never seen before
+// earns no trust. The build date rides in the file NAME
+// (Thornswood-Setup-<date>.exe); the product name / company / copyright below
+// do not move with it. FileVersion and ProductVersion are NOT hardcoded here -
+// Build-Launcher.ps1 stamps them at compile time from launcher\app\Updater.cs
+// (Version = "x.y.z") so the stub tracks the launcher release number. The
+// Downloads page and FAQ can still match on the stable name strings.
 [assembly: AssemblyTitle("Thornswood Setup")]
 [assembly: AssemblyDescription("Installs Thornswood, the Skyrim multiplayer client, from thornswood.net.")]
 [assembly: AssemblyProduct("Thornswood Setup")]
 [assembly: AssemblyCompany("Thornswood")]
 [assembly: AssemblyCopyright("Copyright (c) Thornswood")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
-[assembly: AssemblyInformationalVersion("1.0.0")]
 [assembly: ComVisible(false)]
 
 namespace SkyrimTogetherSetup
