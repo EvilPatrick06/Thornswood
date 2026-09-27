@@ -124,7 +124,7 @@ namespace Thornswood
                     if (TryReadCopied(out copied))
                     {
                         long exeBytes = 0;
-                        try { exeBytes = new FileInfo(exe).Length; } catch { }
+                        try { exeBytes = new FileInfo(exe).Length; } catch (Exception ex) { Swallow.Note("Register.Ensure, measuring the launcher", ex); }
                         long kb = (copied + exeBytes + 1023L) / 1024L;
                         if (kb > 0 && kb <= int.MaxValue)
                             k.SetValue("EstimatedSize", (int)kb, RegistryValueKind.DWord);
@@ -154,7 +154,7 @@ namespace Thornswood
                     return true;
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Register.TryReadCopied, reading OwnGame record", ex); }
             return false;
         }
 
