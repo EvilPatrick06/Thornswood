@@ -1,4 +1,4 @@
-﻿<#
+<#
   Publish-Installer.ps1
 
   Puts the current installer on the docs site so friends always have the newest
@@ -47,7 +47,7 @@ param(
   [string]$OutDir = (& (Join-Path $PSScriptRoot 'Where.ps1') Package),
   [string]$Version,
   [string]$Note,
-  [string]$Vps  = '192.135.112.23',
+  [string]$Vps  = '',
   [string]$User = 'Administrator',
   [string]$Root = 'C:/Thornswood-Docs',
   [switch]$KeepOld,
@@ -61,6 +61,8 @@ $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $rootWin = $Root.Replace('/','\')
 
 function Remote($script) {

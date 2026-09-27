@@ -63,7 +63,7 @@ param(
   # A file named by its own sha256 is taken at its name; a .zip or .exe is
   # hashed to find out what it is.
   [string[]]$AssetDir,
-  [string]$Vps  = '192.135.112.23',
+  [string]$Vps  = '',
   [string]$User = 'Administrator',
   [string]$Root = 'C:/Thornswood-Docs',
   # Says what it would send and sends nothing. It still asks the VPS what is
@@ -80,6 +80,8 @@ $ErrorActionPreference = 'Stop'
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $rootWin = $Root.Replace('/','\')
 $prefix  = if ($Dev) { 'feed-dev' } else { 'feed' }
 

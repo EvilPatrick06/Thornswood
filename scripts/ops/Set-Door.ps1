@@ -10,7 +10,7 @@
       .\scripts\ops\Set-Door.ps1 -Log 40      the last 40 lines it wrote
 
   Why this exists: the server has had no access control at all. Anyone who knows
-  192.135.112.23:7777 can connect, and that address is on a public website.
+  the live address:port can connect, and that address is on a public website.
 
   How the door works:
 
@@ -27,7 +27,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Vps  = '192.135.112.23',
+  [string]$Vps  = '',
   [string]$User = 'Administrator',
   [string]$Site = 'https://thornswood.net',
   [string]$DocsRoot = 'C:/Thornswood-Docs',
@@ -42,6 +42,11 @@ param(
   [switch]$NoPause
 )
 
+
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $docsWin = $DocsRoot.Replace('/','\')

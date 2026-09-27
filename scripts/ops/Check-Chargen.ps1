@@ -35,10 +35,15 @@ param(
     [string]$Data = 'C:\Thornswood\Game\Data',
     # Whose settings to read: the build on this machine, or a server's own.
     [ValidateSet('build', 'live', 'dev')][string]$From = 'build',
-    [string]$Vps  = '192.135.112.23',
+    [string]$Vps  = '',
     [string]$User = 'Administrator'
 )
 
+
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $fail = 0
 function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
 function Bad ($m) { Write-Host "  FAIL  $m" -ForegroundColor Red; $script:fail++ }
