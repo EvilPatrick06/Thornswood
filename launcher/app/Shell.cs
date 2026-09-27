@@ -556,6 +556,37 @@ namespace Thornswood
             {
                 try { Log("Fault on the launcher's own thread: " + fault.Exception.GetType().Name + ": " + fault.Exception.Message); } catch { }
                 try { File.AppendAllText(Paths.LogFile, fault.Exception.ToString() + Environment.NewLine); } catch { }
+                // IL offsets let a pdb kept on the shipping machine map a
+                // customer's report to a source line without shipping symbols
+                // (issue #462). StackTrace(..., false) skips file/line lookup
+                // so a missing pdb on the customer machine does not cost.
+                try
+                {
+                    StackTrace st = new StackTrace(fault.Exception, false);
+                    StringBuilder il = new StringBuilder();
+                    il.AppendLine("IL offsets:");
+                    for (int fi = 0; fi < st.FrameCount; fi++)
+                    {
+                        StackFrame fr = st.GetFrame(fi);
+                        if (fr == null) continue;
+                        MethodBase mb = fr.GetMethod();
+                        string name = "?";
+                        if (mb != null)
+                        {
+                            if (mb.DeclaringType != null)
+                                name = mb.DeclaringType.FullName + "." + mb.Name;
+                            else
+                                name = mb.Name;
+                        }
+                        il.Append("  ");
+                        il.Append(name);
+                        il.Append(" IL_");
+                        il.Append(fr.GetILOffset().ToString("x4"));
+                        il.AppendLine();
+                    }
+                    File.AppendAllText(Paths.LogFile, il.ToString());
+                }
+                catch (Exception ilEx) { Swallow.Note("Shell.DispatcherUnhandledException, IL offsets", ilEx); }
                 fault.Handled = true;
             };
             StartStallWatch();
