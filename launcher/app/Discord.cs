@@ -20,6 +20,7 @@
 //   Discord.Join()           -> ask the site: allowed in, and the password
 //   Discord.Forget()         -> unlink
 //   Discord.AccountId        -> the Discord id the ticket is for
+//   Discord.AvatarUrl        -> CDN URL for the profile picture
 //   Discord.NewSession()     -> one id for this Play
 //   Discord.SessionStart/End -> both ends of a session, for the site's log
 
@@ -59,6 +60,7 @@ namespace Thornswood
         public static string Folder = @"C:\Thornswood\Profile";
         static string TicketFile { get { return Path.Combine(Folder, "discord.txt"); } }
         static string NameFile   { get { return Path.Combine(Folder, "discord-name.txt"); } }
+        static string AvatarFile { get { return Path.Combine(Folder, "discord-avatar.txt"); } }
         static string DevFile    { get { return Path.Combine(Folder, "dev-allowed.txt"); } }
 
         /// <summary>Which build is asking: "" for the main build, "dev" for the dev build. Set by the shell.</summary>
@@ -86,6 +88,7 @@ namespace Thornswood
 
         static string ticket;
         static string name;
+        static string avatar;
 
         public static string Ticket
         {
@@ -117,6 +120,60 @@ namespace Thornswood
         }
 
         public static bool Linked { get { return Ticket != null; } }
+        /// <summary>
+        /// Discord avatar hash last saved for this ticket, or "" when unknown.
+        /// Used with AccountId to build AvatarUrl. Empty means the default
+        /// Discord portrait for that id.
+        /// </summary>
+        public static string Avatar
+        {
+            get
+            {
+                if (avatar == null)
+                {
+                    try { avatar = File.Exists(AvatarFile) ? File.ReadAllText(AvatarFile).Trim() : ""; }
+                    catch { avatar = ""; }
+                }
+                return avatar;
+            }
+        }
+
+        /// <summary>
+        /// HTTPS address of the profile picture for the linked account, or ""
+        /// when not linked. A saved hash uses the custom avatar CDN; otherwise
+        /// Discord's default portrait for that id.
+        /// </summary>
+        public static string AvatarUrl
+        {
+            get
+            {
+                string id = AccountId;
+                if (id.Length == 0) return "";
+                string hash = Avatar;
+                if (hash != null && hash.Length > 0)
+                {
+                    // Hashes are hex; refuse anything else so a bad file cannot
+                    // point the ImageBrush at a stranger.
+                    foreach (char c in hash)
+                        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+                            return DefaultAvatarUrl(id);
+                    return "https://cdn.discordapp.com/avatars/" + id + "/" + hash + ".png?size=64";
+                }
+                return DefaultAvatarUrl(id);
+            }
+        }
+
+        static string DefaultAvatarUrl(string id)
+        {
+            // New Discord usernames: (user_id >> 22) % 6.
+            try
+            {
+                ulong n = ulong.Parse(id);
+                int idx = (int)((n >> 22) % 6UL);
+                return "https://cdn.discordapp.com/embed/avatars/" + idx + ".png";
+            }
+            catch { return "https://cdn.discordapp.com/embed/avatars/0.png"; }
+        }
 
         /// <summary>
         /// The Discord id inside the ticket this copy holds, or "" when it is
@@ -156,23 +213,47 @@ namespace Thornswood
         {
             try { if (File.Exists(TicketFile)) File.Delete(TicketFile); } catch { }
             try { if (File.Exists(NameFile)) File.Delete(NameFile); } catch { }
-            ticket = ""; name = "";
+            try { if (File.Exists(AvatarFile)) File.Delete(AvatarFile); } catch (Exception ex) { Swallow.Note("Discord.Forget", ex); }
+            ticket = ""; name = ""; avatar = "";
         }
 
         static void Save(string t, string who)
+        {
+            Save(t, who, Avatar);
+        }
+
+        static void Save(string t, string who, string pic)
         {
             try
             {
                 Directory.CreateDirectory(Folder);
                 File.WriteAllText(TicketFile, Secrets.Protect(t ?? ""));
                 File.WriteAllText(NameFile, who ?? "");
+                File.WriteAllText(AvatarFile, pic ?? "");
                 // The ticket is as good as the password: anything holding it
                 // can ask the site for the real one. Nobody else on this PC
                 // gets to read the file.
                 Secrets.LockDown(TicketFile);
             }
             catch { }
-            ticket = t ?? ""; name = who ?? "";
+            ticket = t ?? ""; name = who ?? ""; avatar = pic ?? "";
+        }
+
+        /// <summary>Remember a fresh avatar hash from the site without touching the ticket.</summary>
+        public static void NoteAvatar(string pic)
+        {
+            if (pic == null) pic = "";
+            // Same hex guard as AvatarUrl.
+            foreach (char c in pic)
+                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+                    return;
+            try
+            {
+                Directory.CreateDirectory(Folder);
+                File.WriteAllText(AvatarFile, pic);
+            }
+            catch (Exception ex) { Swallow.Note("Discord.NoteAvatar", ex); }
+            avatar = pic;
         }
 
         // ------------------------------------------------------------ link --
@@ -237,7 +318,7 @@ namespace Thornswood
             }
 
             var done = new ManualResetEvent(false);
-            string gotTicket = null, gotName = null, error = null;
+            string gotTicket = null, gotName = null, gotAvatar = null, error = null;
 
             // A loop rather than one shot, so a stray or hostile request is
             // answered and ignored instead of ending the attempt. The listener
@@ -266,6 +347,7 @@ namespace Thornswood
                         {
                             gotTicket = t;
                             gotName = q["name"];
+                            gotAvatar = q["avatar"] ?? "";
                         }
 
                         string page = good
@@ -302,7 +384,7 @@ namespace Thornswood
                 return;
             }
 
-            Save(gotTicket, gotName);
+            Save(gotTicket, gotName, gotAvatar);
             if (onDone != null) onDone(true, gotName ?? "");
         }
 
@@ -388,6 +470,8 @@ namespace Thornswood
             if (reply.Contains("\"dev\"")) NoteDev(st.Dev);
 
             if (st.Ok && st.Name.Length > 0 && st.Name != Name) Save(Ticket, st.Name);
+            string av = Field(reply, "avatar");
+            if (st.Ok && av.Length > 0 && av != Avatar) NoteAvatar(av);
             if (!st.Ok && st.Message.Length == 0) st.Message = "Not allowed in.";
             return st;
         }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Net;
 
 namespace Thornswood
@@ -37,15 +37,34 @@ namespace Thornswood
         public static Count Ask(Config cfg)
         {
             if (cached != null && (DateTime.UtcNow - cachedAt).TotalSeconds < 10) return cached;
+            Count got = AskPort(cfg, SkyMp.ResourcePortFor(cfg));
+            cached = got;
+            cachedAt = DateTime.UtcNow;
+            return got;
+        }
 
+        /// <summary>
+        /// Who is awake on the other build's server (Main from Dev, or Dev from
+        /// Main). Not cached with Ask, so the dropdown can refresh both sides.
+        /// </summary>
+        public static Count AskOther(Config cfg)
+        {
+            if (cfg == null) return new Count();
+            int mine = SkyMp.ResourcePortFor(cfg);
+            // Main resources are on 3000; Dev is game-port+1 (7788 when Dev is 7787).
+            int other = mine == 3000 ? 7788 : 3000;
+            return AskPort(cfg, other);
+        }
+
+        static Count AskPort(Config cfg, int resourcePort)
+        {
             var got = new Count();
-            got.Max = cfg.MaxOnline > 0 ? cfg.MaxOnline : 0;
-
+            got.Max = cfg != null && cfg.MaxOnline > 0 ? cfg.MaxOnline : 0;
             try
             {
-                if (!string.IsNullOrEmpty(cfg.ServerAddress))
+                if (cfg != null && !string.IsNullOrEmpty(cfg.ServerAddress) && resourcePort > 0)
                 {
-                    string url = "http://" + cfg.ServerAddress + ":" + SkyMp.ResourcePortFor(cfg) + "/online.json";
+                    string url = "http://" + cfg.ServerAddress + ":" + resourcePort + "/online.json";
                     using (var wc = new WebClient())
                     {
                         wc.Headers["User-Agent"] = "ThornswoodLauncher/" + Updater.Version;
@@ -68,9 +87,6 @@ namespace Thornswood
                 }
             }
             catch { }
-
-            cached = got;
-            cachedAt = DateTime.UtcNow;
             return got;
         }
 
