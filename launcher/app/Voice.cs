@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -227,6 +227,20 @@ namespace Thornswood
         /// Returns quietly on any failure: a launcher that will not open
         /// because voice did not start is a worse outcome than silent voice.
         /// </summary>
+
+        /// <summary>
+        /// Places WebView2Loader.dll beside the exe. Menu music needs this
+        /// before CreateAsync; Voice.Start already calls it, but music can be
+        /// queued first at ApplicationIdle.
+        /// </summary>
+        public static bool EnsureLoader(Action<string> say)
+        {
+            Prepare();
+            string why;
+            if (PlaceLoader(out why)) return true;
+            if (say != null) say("Voice: could not place " + LoaderDll + ": " + why);
+            return false;
+        }
         public static void Start(Action<string> log, Config config)
         {
             if (started) return;

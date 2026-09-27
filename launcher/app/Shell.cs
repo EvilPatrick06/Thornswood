@@ -507,7 +507,15 @@ namespace Thornswood
             */
             Voice.Prepare();
             win.Dispatcher.BeginInvoke(
-                new Action(delegate { Voice.Start(delegate (string m) { Log(m); }, cfg); }),
+                new Action(delegate
+                {
+                    // PlaceLoader runs inside Voice.Start before CreateAsync.
+                    // Menu music must not CreateAsync until that file exists;
+                    // a separate ApplicationIdle item used to run first and
+                    // fail with "Unable to load DLL WebView2Loader.dll".
+                    Voice.Start(delegate (string m) { Log(m); }, cfg);
+                    StartMenuMusic();
+                }),
                 System.Windows.Threading.DispatcherPriority.ApplicationIdle);
 
             // The self update's way back. A launcher that got as far as drawing
@@ -2062,9 +2070,8 @@ namespace Thornswood
                 if (band != null && picture != null) { picture.Background = headerArt; band.Visibility = Visibility.Visible; }
                 StartHeaderVideo();
             }
-            win.Dispatcher.BeginInvoke(
-                new Action(delegate { StartMenuMusic(); }),
-                System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            // Menu music starts from the Voice ApplicationIdle callback after
+            // WebView2Loader.dll is placed (see Voice.Start above).
 
             titleBar.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
             {

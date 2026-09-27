@@ -194,6 +194,12 @@ namespace Thornswood
                 }
             };
 
+            if (!Voice.EnsureLoader(Stamp))
+            {
+                Stamp("Menu music: WebView2Loader.dll is not beside the exe");
+                return;
+            }
+
             string profile = Path.Combine(Paths.ProfileDir, "MusicBrowser");
             try { Directory.CreateDirectory(profile); } catch (Exception ex) { Swallow.Note("MenuMusic.CreateProfile", ex); }
 
