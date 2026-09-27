@@ -1,7 +1,8 @@
 ﻿// test-gallery-ux.js
 //
-// Public gallery themed like the site, home link + slideshow, staff queue and
-// reports inbox only on the hub. Per-image report stays on live public shots.
+// Public gallery themed like the site, home link + slideshow, staff queue on
+// the hub Gallery page. Hub member upload/list/reports UI removed; public
+// send form and per-image report stay on /gallery.
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -92,12 +93,21 @@ yes('public gallery has no Reports inbox',
 yes('public gallery has no staff Delete on cards',
     !/data-galdel/.test(home));
 yes('public gallery copy says staff tools are not here',
-    /Staff queue, approve, reject, delete and the reports inbox live on the/.test(home));
+    /Staff queue, approve, reject and delete live on the hub Gallery page/.test(home));
 
-yes('hub Gallery still has queue and reports mounts',
-    /id="galqueue"/.test(hub) && /id="galreports"/.test(hub));
-yes('hub still calls gallery pending and reports APIs',
-    /\/api\/gallery\/pending/.test(hub) && /\/api\/gallery\/reports/.test(hub));
+yes('hub Gallery keeps staff queue mount only',
+    /id="galqueue"/.test(hub) && !/id="galreports"/.test(hub));
+yes('hub Gallery has no member upload drop or uploaded list',
+    !/Drop files here/.test(hub) && !/Nothing uploaded yet/.test(hub) && !/function sendAll/.test(hub));
+yes('hub Gallery has no open-reports empty state',
+    !/No open reports/.test(hub) && !/loadGalleryReports/.test(hub));
+yes('hub still calls gallery pending API',
+    /\/api\/gallery\/pending/.test(hub));
+yes('hub Gallery no longer loads gallery reports API on this page',
+    !/\/api\/gallery\/reports/.test(hub));
+yes('hub Gallery points members to public gallery and Inbox',
+    /Approved pictures live on the public/.test(hub) && /href="\/gallery">Gallery</.test(hub) &&
+    /Bug and idea reports go to/.test(hub));
 
 yes('new gallery copy has no em dash', !/[\u2014\u2013]/.test(
   (home.match(/Send a picture[\s\S]{0,400}/) || [''])[0] +
