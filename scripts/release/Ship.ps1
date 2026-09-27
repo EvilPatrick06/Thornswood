@@ -38,15 +38,20 @@
       Get-Help .\scripts\release\Ship.ps1 -Parameter Channel
 
   TWO THINGS FOLLOW A SUCCESSFUL TIP, and one script runs both of them:
-  .\scripts\release\Publish-PostShip.ps1, keyed off -Channel.
+  .\scripts\release\Publish-PostShip.ps1, keyed off -Channel. It implements
+  neither of them; each belongs to the lane whose work it is.
 
-      the host feed mirror   thornswood.net/feed for main, /feed-dev for dev,
-                             gets the tip's version.json and the assets it
-                             names (Publish-SiteFeed.ps1, Website's)
-      VirusTotal             every download the site's Downloads page offers has
-                             a report, so the link it prints beside a SHA-256 is
-                             not item-not-found (Publish-VirusTotal.ps1,
-                             Installer's and Website's)
+      the host feed remirror   thornswood.net/feed for main, /feed-dev for dev,
+                               gets the tip's version.json and the assets it
+                               names (scripts\deploy\Remirror-Site-Feed.ps1,
+                               the website lane's)
+      VirusTotal               the installer the Downloads page offers has a
+                               report, so the link it prints beside the SHA-256
+                               is not item-not-found
+                               (scripts\release\Publish-VirusTotal.ps1, the
+                               installer lane's). A dev release does not touch
+                               the installer, so the dev channel leaves it
+                               alone.
 
   THERE IS NO THIRD STEP FOR THE LAUNCHER. The tip customers get is
   version.json, and launchers poll the feed url in it and update themselves, so
@@ -196,13 +201,13 @@
   all, and a site feed that answers with yesterday's release is the release
   people are offered. So this is for getting a tip out while the VPS is
   unreachable, or for a release nobody is waiting on, and
-  .\scripts\release\Publish-SiteFeed.ps1 is the thing to run as soon as it can be.
+  .\scripts\deploy\Remirror-Site-Feed.ps1 is the thing to run as soon as it can be.
 
 .PARAMETER SkipVirusTotal
-  Ships without asking VirusTotal about the downloads the site's Downloads page
-  offers. This is the one to reach for when a tip is wanted now and nobody wants
-  to wait on an upload: the report the page links stays whatever it was.
-  .\scripts\release\Publish-VirusTotal.ps1 does it afterwards.
+  Ships without asking VirusTotal about the installer the Downloads page offers.
+  This is the one to reach for when a tip is wanted now and nobody wants to wait
+  on an upload of most of a gigabyte: the report the page links stays whatever
+  it was. .\scripts\release\Publish-VirusTotal.ps1 does it afterwards.
 
 .PARAMETER SkipPostShip
   Both of the above at once, for a release that has to go out with nothing after
@@ -1335,7 +1340,7 @@ else {
   feed names thornswood.net assets the bytes have to be up there too or the
   download answers 404.
 
-  VirusTotal. The Downloads page prints each download's SHA-256 and a link to
+  VirusTotal. The Downloads page prints the installer's SHA-256 and a link to
   the VirusTotal report on that hash, and Publish-Installer.ps1's own note says
   what is wrong with it: a file nobody has sent there has no report, so the link
   lands on a page saying so. That is the only answer we give somebody who does
@@ -1346,10 +1351,12 @@ else {
   remirror is how a launcher update reaches anybody, and Install-Launcher.ps1
   above refreshed this machine's own install before the publish.
 
-  ONE SCRIPT, KEYED OFF THE CHANNEL. Publish-PostShip.ps1 runs both halves, so
-  Website and Installer have one command to run by hand and Ship reads one exit
-  code. Both halves ask before they act, so running it again after a failure
-  does nothing the first run already did.
+  ONE SCRIPT, KEYED OFF THE CHANNEL, AND IT OWNS NEITHER HALF.
+  Publish-PostShip.ps1 calls the website lane's Remirror-Site-Feed.ps1 and the
+  installer lane's Publish-VirusTotal.ps1, which is the call the first of those
+  asked for in its own header. Ship reads one exit code, Website and Installer
+  have one command to run by hand, and both halves ask before they act, so
+  running it again after a failure does nothing the first run already did.
 
   ORDER. Before the site news, the Discord post and the server's countdown, on
   purpose: those three tell people to update, and the feed has to serve the
@@ -1522,7 +1529,7 @@ if (-not $DryRun -and -not $Dev -and -not $hotfix) {
                 # feed in git, and a second mirror inside it would be a fourth
                 # thing that can fail after a live release is already out.
                 Say '  the site copy of the dev feed is not reset with it:' 'DarkGray'
-                Say '  .\scripts\release\Publish-SiteFeed.ps1 -Channel dev   puts that right' 'DarkGray'
+                Say '  .\scripts\deploy\Remirror-Site-Feed.ps1 -Dev   puts that right' 'DarkGray'
             } finally { Pop-Location; $ErrorActionPreference = $old }
             $stateDir = Join-Path $env:LOCALAPPDATA 'Thornswood'
             $mainState = Join-Path $stateDir 'published.json'

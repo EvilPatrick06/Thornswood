@@ -111,20 +111,23 @@ it. So two things follow the tip, both run by
 `scripts\release\Publish-PostShip.ps1`, which Ship calls once with the channel
 it shipped, before anybody is told to go and get the release:
 
-- **The host feed remirror**, `scripts\release\Publish-SiteFeed.ps1`
-  (Website's). `thornswood.net/feed/version.json` for main, from the
+- **The host feed remirror**, `scripts\deploy\Remirror-Site-Feed.ps1`, the
+  website lane's script. `thornswood.net/feed/version.json` for main, from the
   Thornswood-Releases tip, and `thornswood.net/feed-dev/version.json` for dev,
   from the Thornswood-Releases-dev tip, plus the assets those feeds name. That
   is the feed a launcher polls since the #649 host cutover (`docs\FEED.md`), and
   a launcher falls back to the GitHub feed only when the site feed does not
   answer at all, so an unmirrored site feed offers people the release it last
   held rather than this one.
-- **VirusTotal**, `scripts\release\Publish-VirusTotal.ps1` (Installer's and
-  Website's). It reads what the Downloads page offers from the site's own
-  `/api/public`, and for each download with a SHA-256 it makes sure VirusTotal
-  has a report, uploading from this machine only when VirusTotal has never seen
-  the file. That is what stops the link the page prints saying item-not-found.
-  The key is in the secrets table below.
+- **VirusTotal**, `scripts\release\Publish-VirusTotal.ps1`, the installer
+  lane's script. The installer is what the Downloads page offers and the hash it
+  prints a VirusTotal link for, so that exe is the file it sends, and it asks
+  VirusTotal first because a rerun is normal and the file is most of a gigabyte.
+  `Publish-Installer.ps1` already asks when it publishes a new installer, so this
+  is for the releases that did not rebuild one. It never fails a release: a
+  machine without the key says it is skipping. The key is in the secrets table
+  below. The dev channel leaves this alone, because a dev release does not touch
+  the installer.
 
 There is no third step for the launcher. A launcher updates itself from the feed
 it polls, so the remirror is how a launcher update reaches anybody, and the
@@ -136,11 +139,13 @@ Then the site's news, the Discord #news webhook and the game server are told;
 the server warns the room for five minutes and puts everyone back to the
 launcher to update.
 
-A failure in either half leaves the release published, says which half it was
-with the command that puts it right, and makes Ship exit 1: the tip and its
-follow-ons are meant to go out together. `-SkipRemirror`, `-SkipVirusTotal` and
-`-SkipPostShip` are the escape hatches, a `-DryRun` runs none of it, and both
-halves ask before they act, so `Publish-PostShip.ps1` can be run again by hand.
+A half that does not complete leaves the release published, says which half it
+was with the command that puts it right, and makes Ship exit 1: the tip and its
+follow-ons are meant to go out together. In practice that is the remirror, which
+refuses rather than publish a feed naming bytes the site does not hold.
+`-SkipRemirror`, `-SkipVirusTotal` and `-SkipPostShip` are the escape hatches, a
+`-DryRun` runs none of it, and both halves ask before they act, so
+`Publish-PostShip.ps1` can be run again by hand.
 
 **A hotfix** is the one live release that does not come off main (decided by
 Patrick on 24 Sep). A branch named `hotfix/...` starts from the commit the live
@@ -320,7 +325,7 @@ says **not enforced** where nothing checks it.
 | Backup passphrase | `C:\Thornswood-Backup\key.txt` on the VPS and `Documents\thornswood-backup-key.txt` on Patrick's machine, one copy in each on purpose | The nightly backups, which hold the site's `config.json`, `bot.env.json` and the live game server's `private` folder: every VPS secret above except the voice service's files. | `Install-Backup.ps1` makes one when `key.txt` is missing and copies it down when the Documents copy is missing. Keep the old one until the backups made with it have aged out. |
 | GitHub access | your own `gh auth login`, kept in Windows' credential store | Pushing branches and opening pull requests here, and every release: `Publish-Update.ps1` uploads to the releases repo with `gh`, and every launcher installs what that feed says. | You: `gh auth logout`, then `gh auth login`, or revoke it on GitHub under Settings, Applications. Collaborator access to both repos is Patrick's to give or take away. |
 | VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, and its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. None of the scripts needs the Administrator password; `Add-VpsKey.ps1` exists so nobody else has to hold it. | You. First move the old key aside: rename both `.ssh\thornswood_ed25519` and `.ssh\thornswood_ed25519.pub`, say by adding `.old`. While the old key still opens the VPS, `Setup-SshKey.ps1` says it already works and stops, and while the `.pub` is there it uses that one again rather than making a new one. Passing `-KeyPath` a new file does not get round this, because that first check goes through your ssh config, which still names the old key. Then `Setup-SshKey.ps1 -KeyOnly` makes a new key at the same path and prints its public line. Patrick adds it with `Add-VpsKey.ps1 -PublicKey '<the new line>'` and takes the old one off with `Add-VpsKey.ps1 -PublicKey '<the line in the .old .pub>' -Remove`. For his own key, Patrick runs `Setup-SshKey.ps1` without `-KeyOnly`, which asks for the Administrator password once and puts the new key on itself, and then removes the old line the same way. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes and the old line is off. |
-| VirusTotal API key | `tools\virustotal.txt` in the repository folder on a machine that ships, one line, kept out by `.gitignore`; or the environment variable `THORNSWOOD_VIRUSTOTAL_KEY` on that machine | Reading and uploading under our VirusTotal account, for anybody holding it: the quota and whatever that account can see. It publishes nothing about the game, and the files it sends are ones already downloaded from the site. | Whoever owns the VirusTotal account, in the account's own API key page, then puts the new line in that file. Without it `Publish-VirusTotal.ps1` stops and says so, and `Ship.ps1 -SkipVirusTotal` ships without it. |
+| VirusTotal API key | the environment variable `VT_API_KEY` on the machine that ships, and nowhere in this repository: `Publish-VirusTotal.ps1` reads it from there only, so it has no file to be committed in and no parameter to be typed on a command line | Reading and uploading under our VirusTotal account, for anybody holding it: the quota and whatever that account can see. The files it sends are ones the site is already handing out. | Whoever owns the VirusTotal account, in the account's own API key page, then sets the variable on that machine. A machine without it says it is skipping and publishes exactly as before, and `Ship.ps1 -SkipVirusTotal` ships without asking at all. |
 | Code signing | `tools\signing.json` on a machine that signs. It names the setup and holds no key: the credential is the Azure account behind Artifact Signing, or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Whoever owns the Azure signing account, in Azure. Without the file `Sign-Artifact.ps1` signs nothing and the build carries on unsigned. |
 
 **The rule for this table.** A control that does not exist is listed as

@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 129 of them, by area: `release` builds and
+Every `.ps1` under this folder, 127 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -119,11 +119,9 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Package-Thornswood.ps1](release/Package-Thornswood.ps1) | Turns the built install at C:\Thornswood into the single file your friends run. |
 | [release/Publish-Installer.ps1](release/Publish-Installer.ps1) | Puts the current installer on the docs site so friends always have the newest one without anybody sending files around. |
 | [release/Publish-Pack.ps1](release/Publish-Pack.ps1) | Builds the optional packs listed in optional-packs.txt, uploads them as release assets, and adds them to version.json so the Add-ons tab in every launcher offers them. |
-| [release/Publish-PostShip.ps1](release/Publish-PostShip.ps1) | Runs the two things that follow a published tip, the host feed remirror and the VirusTotal report for what the Downloads page offers, and says which of them did not complete. |
+| [release/Publish-PostShip.ps1](release/Publish-PostShip.ps1) | Runs what follows a published tip, the host feed remirror and the VirusTotal report for what the Downloads page offers, and says which of them did not complete. |
 | [release/Publish-Server.ps1](release/Publish-Server.ps1) | Run this ON YOUR LAPTOP. It packs the server, sends it to the VPS, installs it there and checks it came up. |
-| [release/Publish-SiteFeed.ps1](release/Publish-SiteFeed.ps1) | Mirrors the tip of the update feed onto the site, so thornswood.net/feed and thornswood.net/feed-dev serve the version.json and the assets every launcher reads after the #649 host cutover. |
 | [release/Publish-Update.ps1](release/Publish-Update.ps1) | Diffs the current build against the last published state, packs only what changed, uploads it as a release asset, and updates version.json so everyone's launcher picks it up. |
-| [release/Publish-VirusTotal.ps1](release/Publish-VirusTotal.ps1) | Makes sure VirusTotal holds a report for every download the site's Downloads page offers, so the link the page prints beside a file's SHA-256 lands on a report rather than on item-not-found. |
 | [release/Repair-Manifest.ps1](release/Repair-Manifest.ps1) | Takes packs with no download url back out of version.json and pushes the fix. |
 | [release/Set-UpdateToken.ps1](release/Set-UpdateToken.ps1) | Puts the GitHub token the launcher uses to see releases into this machine's config.json, then proves it works before you walk away. |
 | [release/Ship-Rules.ps1](release/Ship-Rules.ps1) | The one list of what never leaves a machine inside a Thornswood pack or installer. |

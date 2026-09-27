@@ -52,7 +52,7 @@ Confirmed with Website. Signing / `ExpectedSigner` is still **off**.
   `Thornswood-Releases` on `main`, and the worktree `Thornswood-Releases-dev` on
   `dev` (`Publish-Update.ps1`). The same `version.json`, and the assets it names
   by sha256, are mirrored onto the site paths above by
-  `scripts\release\Publish-SiteFeed.ps1`, which
+  `scripts\deploy\Remirror-Site-Feed.ps1`, which
   `scripts\release\Publish-PostShip.ps1` runs at the end of every release for
   the channel that shipped. `-SkipRemirror` leaves it out, and then the site
   goes on serving the feed it last had, which is the release launchers are
@@ -60,7 +60,7 @@ Confirmed with Website. Signing / `ExpectedSigner` is still **off**.
   feed does not answer at all. Assets go up first and `version.json` last, so
   the feed never names bytes the site does not hold; an asset the feed sends
   launchers to thornswood.net for that is neither on the site nor on the
-  publishing machine stops the mirror before `version.json` moves. `-Plan` says
+  publishing machine stops the mirror before `version.json` moves. `-Check` says
   what it would send and sends nothing.
 
 ## A real entry, trimmed
