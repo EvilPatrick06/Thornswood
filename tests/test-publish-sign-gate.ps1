@@ -1,0 +1,100 @@
+<#
+  test-publish-sign-gate.ps1
+
+  Ship and Publish-Installer must refuse an unsigned tip (and a machine that
+  cannot sign), not only print "not signing". Local Build-Launcher may still
+  soft-skip; the gate is on publish to the site / feed (#825).
+
+  Static wiring plus helper behaviour against temp unsigned files and a fake
+  signing.json. No Azure, no network, no real Ship.
+#>
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$repo = Split-Path -Parent $Here
+$Utf8 = New-Object Text.UTF8Encoding($false)
+
+$script:pass = 0
+$script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" }
+}
+
+$assert = Join-Path $repo 'scripts\release\Assert-PublishSigned.ps1'
+$ship = Join-Path $repo 'scripts\release\Ship.ps1'
+$pub = Join-Path $repo 'scripts\release\Publish-Installer.ps1'
+$build = Join-Path $repo 'scripts\release\Build-Launcher.ps1'
+
+Yes 'Assert-PublishSigned.ps1 is there' (Test-Path -LiteralPath $assert)
+Yes 'Ship.ps1 is there' (Test-Path -LiteralPath $ship)
+Yes 'Publish-Installer.ps1 is there' (Test-Path -LiteralPath $pub)
+Yes 'Build-Launcher.ps1 is there' (Test-Path -LiteralPath $build)
+if (-not (Test-Path -LiteralPath $assert)) {
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    exit 1
+}
+
+. $assert
+
+$shipSrc = [IO.File]::ReadAllText($ship, $Utf8)
+$pubSrc = [IO.File]::ReadAllText($pub, $Utf8)
+$buildSrc = [IO.File]::ReadAllText($build, $Utf8)
+
+Yes 'Ship dotsources Assert-PublishSigned' ($shipSrc -match 'Assert-PublishSigned\.ps1')
+Yes 'Ship calls Get-SigningConfigRefusal' ($shipSrc -match 'Get-SigningConfigRefusal')
+Yes 'Ship calls Get-PublishSignRefusal for the launcher' ($shipSrc -match 'Get-PublishSignRefusal')
+Yes 'Publish-Installer dotsources Assert-PublishSigned' ($pubSrc -match 'Assert-PublishSigned\.ps1')
+Yes 'Publish-Installer calls Get-PublishSignRefusal' ($pubSrc -match 'Get-PublishSignRefusal')
+Yes 'Build-Launcher still leaves setup-stub unsigned' (
+    ($buildSrc -match 'Do NOT sign setup-stub' -or $buildSrc -match 'Do not sign setup-stub') -and
+    $buildSrc -match '& \$signer -Path \$exe\b' -and
+    $buildSrc -notmatch '\$toSign \+= \$stub')
+
+$frag = Get-ExpectedSignerFragment -RepoRoot $repo
+Yes 'ExpectedSigner fragment is Gavin Knotts' ($frag -eq 'Gavin Knotts')
+
+$work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-sign-gate-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Force -Path $work | Out-Null
+try {
+    $missing = Get-SigningConfigRefusal -ConfigPath (Join-Path $work 'no-such-signing.json') -RepoRoot $repo
+    Yes 'missing signing.json refuses Ship' ($missing -match 'signing\.json' -and $missing -match 'Nothing was published')
+
+    $off = Join-Path $work 'signing-off.json'
+    [IO.File]::WriteAllText($off, '{"enabled":false,"method":"artifactsigning"}', $Utf8)
+    $disabled = Get-SigningConfigRefusal -ConfigPath $off -RepoRoot $repo
+    Yes 'enabled false refuses Ship' ($disabled -match 'enabled')
+
+    $on = Join-Path $work 'signing-on.json'
+    [IO.File]::WriteAllText($on, '{"enabled":true,"method":"thumbprint","thumbprint":"ABC"}', $Utf8)
+    $ready = Get-SigningConfigRefusal -ConfigPath $on -RepoRoot $repo
+    Yes 'enabled true with no placeholder metadata is ready' ($ready -eq '')
+
+    $unsigned = Join-Path $work 'Thornswood.exe'
+    [IO.File]::WriteAllBytes($unsigned, [byte[]](0x4D, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00))
+    $refuse = Get-PublishSignRefusal -Path $unsigned -ExpectedSigner $frag
+    Yes 'unsigned launcher tip is refused' ($refuse -match 'not Authenticode Valid' -and $refuse -match 'Nothing was published')
+
+    $missingFile = Get-PublishSignRefusal -Path (Join-Path $work 'gone.exe') -ExpectedSigner $frag
+    Yes 'missing tip file is refused' ($missingFile -match 'missing file')
+
+    $sys = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    if (Test-Path -LiteralPath $sys) {
+        $wrong = Get-PublishSignRefusal -Path $sys -ExpectedSigner $frag
+        Yes 'Valid signature without ExpectedSigner is refused' (
+            $wrong -match 'ExpectedSigner' -or $wrong -match 'does not contain')
+    } else {
+        Yes 'Valid signature without ExpectedSigner is refused' $false
+    }
+}
+finally {
+    Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host ''
+Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+if ($script:fail) { exit 1 }
+exit 0
