@@ -41,7 +41,7 @@ namespace Thornswood
         {
             string root = "";
             try { root = Paths.Root; }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Register.KeyName, Paths.Root", ex); }
             if (string.IsNullOrEmpty(root)) return "Thornswood";
 
             // A short stable hash of the folder, the same shape MutexName uses.
@@ -67,7 +67,7 @@ namespace Thornswood
                 Version v = Assembly.GetExecutingAssembly().GetName().Version;
                 if (v != null) return v.ToString();
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Register.Version", ex); }
             return "";
         }
 
@@ -131,7 +131,7 @@ namespace Thornswood
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Register.Ensure", ex); }
         }
 
         /// <summary>
@@ -163,7 +163,7 @@ namespace Thornswood
         public static void Forget()
         {
             try { Registry.CurrentUser.DeleteSubKeyTree(Root + "\\" + KeyName(), false); }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Register.Forget", ex); }
         }
     }
 }
