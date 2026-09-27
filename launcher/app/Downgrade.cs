@@ -56,6 +56,16 @@ namespace Thornswood
         /// <summary>SkyrimSE.exe at 1.7.104, the Steam build we never want.</summary>
         public const long NewerExeBytes = 37910440;
 
+        // How many stretches the bar under the button is divided into: one for
+        // each of the three downloads, then one for the copy into the game.
+        //
+        // The downloads used to have the whole bar to themselves, so it filled
+        // to the end when the last part came down and then started again at
+        // nothing for the copy. Somebody watching it saw a finished job undone.
+        // Four stretches means the downloads take it to three quarters and the
+        // copy takes it the rest of the way, which is what the bar is for.
+        static readonly int Stages = Depots.Length + 1;
+
         // The processes whose windows are Steam's. Only "steam" was looked for
         // until 24 September, and a tester on 1.1.91 got every part on the
         // clipboard with Steam's console open behind the launcher: "its not
@@ -222,6 +232,13 @@ namespace Thornswood
 
         static bool Run(Config cfg, Action<string> log, Action<string> status)
         {
+            // The bar is up from the first moment, moving without a number.
+            // Opening Steam, signing in and getting the console to take the
+            // first command can take three or four minutes between them, and
+            // until now the bar appeared only once bytes started landing, so
+            // the longest wait in the whole run was the one with nothing on
+            // screen moving. Every early stop hides it again through Stop.
+            Progress(-2);
             string steam = Steam.Path_();
             if (string.IsNullOrEmpty(steam) || !Directory.Exists(steam))
                 return Stop("Could not find where Steam is installed, so Steam cannot be asked for the files. Open Steam once, then press the button again.", log, status);
@@ -272,6 +289,8 @@ namespace Thornswood
                 if (Directory.Exists(folder) && MarkerIs(folder, manifest))
                 {
                     log("Part " + (i + 1) + " of 3 (depot " + depot + ") is already downloaded.");
+                    status("Part " + (i + 1) + " of 3 was already downloaded, so Steam is not asked for it again.");
+                    Progress((i + 1) * 100 / Stages);
                     continue;
                 }
                 if (!ClearLeftover(folder, i + 1, log, status)) return false;
@@ -279,6 +298,10 @@ namespace Thornswood
                 SteamLog steamLog = new SteamLog(steam);
                 bool hadFolder = Directory.Exists(folder);
 
+                // Nothing to measure while Steam's window is being brought
+                // forward and the command typed, so the bar moves without a
+                // number rather than sitting at whatever the last part left it.
+                Progress(-2);
                 status("Part " + (i + 1) + " of 3: asking Steam for depot " + depot + "...");
                 log("Part " + (i + 1) + " of 3, depot " + depot + ": " + cmd);
                 bool typed = TypeIntoConsole(cmd, log);
@@ -307,23 +330,46 @@ namespace Thornswood
                     if (Directory.Exists(folder) || sawStart) { started = true; break; }
                     Thread.Sleep(1000);
                 }
-                if (!started && typed)
+                // Nothing has reached Steam. Bring the console back and try the
+                // command line once more.
+                //
+                // This used to run only when the first attempt had typed. The
+                // attempt that fails is the one made while the person is in
+                // another window, which is every part after the first: they
+                // press Downgrade, part 1 goes in with the launcher in front,
+                // and twenty minutes later part 2 is asked for with a browser
+                // or a game over the top. That is exactly the case that used to
+                // go straight to the clipboard and sit there, and a second go
+                // at the console is what it needed. So the retry happens either
+                // way, and the clipboard is what is left after it.
+                if (!started)
                 {
                     // Typed into the wrong place, most likely a console whose
-                    // command line did not have the focus. Click it and try once
-                    // more, then fall back to the clipboard.
+                    // command line did not have the focus, or into no console
+                    // at all because Steam's window would not come forward.
                     log("Steam has not started the download. Trying the console's command line once more.");
                     FocusConsole(log);
                     Thread.Sleep(400);
-                    typed = TypeIntoConsole(cmd, log);
-                    askedAt = DateTime.Now;
-                    while ((DateTime.Now - askedAt).TotalSeconds < 30)
+                    // Nothing is typed a second time if Steam took a command
+                    // while the console was being brought back. On the fallback
+                    // path the command is on the person's clipboard and they
+                    // may have pasted it themselves in the meantime, and a
+                    // pasted download_depot and a typed one would both run.
+                    string sinceCmd = steamLog.Since();
+                    if (Refused(sinceCmd, depot, i + 1, cmd, log, status)) return false;
+                    if (LogStarted(sinceCmd, depot) || Directory.Exists(folder)) { sawStart = true; started = true; }
+                    if (!started)
                     {
-                        string said = steamLog.Since();
-                        if (Refused(said, depot, i + 1, cmd, log, status)) return false;
-                        if (LogStarted(said, depot) || (!hadFolder && Directory.Exists(folder))) sawStart = true;
-                        if (Directory.Exists(folder) || sawStart) { started = true; break; }
-                        Thread.Sleep(1000);
+                        typed = TypeIntoConsole(cmd, log);
+                        askedAt = DateTime.Now;
+                        while ((DateTime.Now - askedAt).TotalSeconds < 30)
+                        {
+                            string said = steamLog.Since();
+                            if (Refused(said, depot, i + 1, cmd, log, status)) return false;
+                            if (LogStarted(said, depot) || (!hadFolder && Directory.Exists(folder))) sawStart = true;
+                            if (Directory.Exists(folder) || sawStart) { started = true; break; }
+                            Thread.Sleep(1000);
+                        }
                     }
                     if (!started)
                     {
@@ -334,8 +380,14 @@ namespace Thornswood
                         string tail = steamLog.Tail(12);
                         if (tail.Length > 0) log("Steam's log since the command:" + Environment.NewLine + tail);
                         else log("Steam wrote nothing to its logs, so the command did not reach the console's command line. Steam's console has to be the window in front with its command line clicked.");
-                        OnClipboard(cmd, i + 1, "", log, status);
-                        pasted = true;
+                        // Said once. A part whose first attempt already fell
+                        // back has the command on the clipboard and the card
+                        // already says where to paste it.
+                        if (!pasted)
+                        {
+                            OnClipboard(cmd, i + 1, "", log, status);
+                            pasted = true;
+                        }
                     }
                 }
 
@@ -357,7 +409,7 @@ namespace Thornswood
                     // then the bar moves without a number.
                     if (total <= 0) total = DepotBytes(said, depot);
                     status(SizedLine(i + 1, Depots.Length, size, total, pasted));
-                    Progress(total > 0 ? Percent(i, Depots.Length, size, total) : -2);
+                    Progress(total > 0 ? Percent(i, Stages, size, total) : -2);
                     double quiet = (DateTime.Now - lastGrowth).TotalMinutes;
                     if (!warned && quiet > 10)
                     {
@@ -415,19 +467,24 @@ namespace Thornswood
                     */
                     if (quiet > GiveUpMinutes)
                     {
-                        log("Steam has done nothing for " + GiveUpMinutes + " minutes and this part is still " + (size / 1048576).ToString("n0") + " MB, so it is being given up on rather than waited on for ever.");
                         if (size == 0)
                             log("Nothing was downloaded at all, which usually means Steam refused the command. Its console window says why: look for a line about a manifest, a licence or no connection.");
                         log(ByHand(cmd));
-                        status("Steam did not answer. See the log for what to do by hand.");
-                        Progress(-1);
-                        return false;
+                        // The card says the whole of it, not "see the log". The
+                        // launcher log is a file somebody has to know about,
+                        // find and open, and this line is the one they are
+                        // already looking at.
+                        return Stop("Steam did nothing for " + GiveUpMinutes + " minutes on part " + (i + 1) + " of 3, which is still " +
+                            (size / 1048576).ToString("n0") + " MB, so it was given up on. " +
+                            (size == 0
+                                ? "Nothing came down at all, so Steam most likely refused the command; its console window says why. Check Steam is open and signed in, then press Try again."
+                                : "Check Steam is open and signed in, then press Try again. What is already down is kept, so it carries on from here."), log, status);
                     }
                     Thread.Sleep(2000);
                 }
-                try { File.WriteAllText(Path.Combine(folder, ".thornswood-complete"), manifest); } catch { }
+                WriteMarker(folder, manifest);
                 log("Part " + (i + 1) + " of 3 is down (depot " + depot + ", " + (FolderSize(folder) / 1048576).ToString("n0") + " MB).");
-                Progress((i + 1) * 100 / Depots.Length);
+                Progress((i + 1) * 100 / Stages);
             }
 
             // ---- apply ------------------------------------------------------
@@ -452,10 +509,9 @@ namespace Thornswood
                     if (gotExe.Length > 0 && !SameFolder(Path.GetDirectoryName(gotExe), folder)) continue;
                     try { File.Delete(Path.Combine(folder, ".thornswood-complete")); } catch (Exception ex) { Swallow.Note("Downgrade, dropping the marker in " + folder, ex); }
                 }
-                log("Press the button again and Steam is asked for the files once more. If it ends here again, send your launcher log to the Discord.");
-                status("The download was not the 1.6.1170 build. Nothing was replaced; see the log.");
-                Progress(-1);
-                return false;
+                return Stop("Steam's download is not the build we need: " +
+                    (gotExe.Length == 0 ? "none of the three parts has SkyrimSE.exe in it" : "the SkyrimSE.exe in it is " + Describe(cfg, gotExe)) +
+                    ". Nothing in " + target + " was replaced. Press Try again and Steam is asked for the files once more. If it ends here twice, send your launcher log to the Discord.", log, status);
             }
 
             status("Putting the 1.6.1170 files in place...");
@@ -463,7 +519,10 @@ namespace Thornswood
             // downloads hold.
             long toCopy = 0;
             foreach (string[] d in Depots) toCopy += FolderSize(Path.Combine(content, "depot_" + d[0]));
-            Progress(0);
+            // The last stretch of the same bar, not a new one: the three
+            // downloads have taken it to three quarters and the copy takes it
+            // from there.
+            Progress(Percent(Depots.Length, Stages, 0, toCopy));
             // A file a mod replaces is the collection's, and in the Steam copy it
             // is a hard link to Vortex's own copy: writing the vanilla file over
             // it would change the mod inside Vortex. Those are left as they are.
@@ -506,7 +565,7 @@ namespace Thornswood
                         if (files % 25 == 0)
                         {
                             status("Putting the 1.6.1170 files in place: " + (copied / 1048576).ToString("n0") + " of " + (toCopy / 1048576).ToString("n0") + " MB");
-                            if (toCopy > 0) Progress((int)Math.Min(99, copied * 100 / toCopy));
+                            Progress(Percent(Depots.Length, Stages, copied, toCopy));
                         }
                     }
                     catch (Exception ex)
@@ -621,7 +680,11 @@ namespace Thornswood
             {
                 log("Steam is not running. Starting it; sign in if it asks.");
                 status("Starting Steam. Sign in if it asks...");
-                AskSteam("steam://open/main", log);
+                // AskSteam handed back false and nothing read it, so a machine
+                // where neither the link nor steam.exe can be reached spent
+                // ninety seconds waiting for a Steam nobody had asked for.
+                if (!AskSteam("steam://open/main", log))
+                    return Stop("Steam could not be started: Windows would not open its link and steam.exe is not where Steam's install says it is. Start Steam yourself, sign in, then press the button again.", log, status);
                 DateTime t = DateTime.Now;
                 while (SteamProcess() == null && (DateTime.Now - t).TotalSeconds < 90) Thread.Sleep(1000);
                 if (SteamProcess() == null) { Stop("Steam did not start. Start Steam yourself, sign in, then press the button again.", log, status); return false; }
@@ -965,11 +1028,30 @@ namespace Thornswood
         /// </summary>
         static void OnClipboard(string cmd, int part, string why, Action<string> log, Action<string> status)
         {
-            TryClipboard(cmd);
-            string line = ClipboardLine(part, Depots.Length);
+            // What is said depends on whether the clipboard actually took it.
+            // It said "press Ctrl+V" either way until now, and a Ctrl+V after a
+            // clipboard that refused the command pastes whatever was on it
+            // before: the part before this one, or something from another
+            // program, into Steam's console.
+            string line = TryClipboard(cmd) ? ClipboardLine(part, Depots.Length) : TypeItLine(cmd, part, Depots.Length);
             log(why + line + " This keeps watching for it.");
             status(line);
             FlashLauncher();
+        }
+
+        /// <summary>
+        /// What the log and the card say when the clipboard would not take the
+        /// command: the command itself, to type in by hand. Never "press
+        /// Ctrl+V", because the thing to paste is not there.
+        /// </summary>
+        static string TypeItLine(string cmd, int part, int of)
+        {
+            string before = part > 1 ? Parts(1, part - 1, "is down.", "are down.") + " " : "";
+            // The command goes last, with nothing after it, so the line does
+            // not run "8042843504692938467 Part 3 follows" together and leave
+            // somebody copying it wondering where it ends.
+            return before + "The clipboard would not take part " + part + " of " + of + ". " + Next(part, of) +
+                " Type this into the command line at the bottom of Steam's console and press Enter: " + cmd;
         }
 
         /// <summary>What the log and the card say when part <paramref name="part"/> of <paramref name="of"/> is on the clipboard.</summary>
@@ -1069,9 +1151,32 @@ namespace Thornswood
             catch (Exception ex) { Swallow.Note("Downgrade.FlashLauncher", ex); }
         }
 
-        static void TryClipboard(string text)
+        /// <summary>
+        /// Puts the command on the clipboard and says whether it is really
+        /// there.
+        ///
+        /// Clipboard.SetText fails whenever another program has the clipboard
+        /// open, which on a machine with a clipboard manager, a browser or a
+        /// remote desktop on it is often enough to matter. The failure used to
+        /// be thrown away and the card said "press Ctrl+V" all the same, which
+        /// is the worst of both: the person follows the instruction and Steam's
+        /// console gets whatever was on the clipboard before. So it is tried a
+        /// few times, a moment apart, and the text is read back before it is
+        /// claimed.
+        /// </summary>
+        static bool TryClipboard(string text)
         {
-            try { System.Windows.Clipboard.SetText(text); } catch { }
+            for (int i = 0; i < 5; i++)
+            {
+                try
+                {
+                    System.Windows.Clipboard.SetText(text);
+                    if (string.Equals(System.Windows.Clipboard.GetText(), text, StringComparison.Ordinal)) return true;
+                }
+                catch (Exception ex) { Swallow.Note("Downgrade.TryClipboard", ex); }
+                Thread.Sleep(120);
+            }
+            return false;
         }
 
         // ---------------------------------------------------------- watching
@@ -1242,8 +1347,23 @@ namespace Thornswood
             log("Steam could not download part " + part + " of 3 (depot " + depot + "). Steam's log says: " + line);
             log("Nothing in the game folder has been replaced. Press the button again in a few minutes to ask Steam once more. If it fails the same way twice, send your launcher log to the Discord.");
             log(ByHand(cmd));
-            status("Steam could not download part " + part + " of 3. See the log.");
+            // Steam's own words on the card, not "see the log". A refusal is
+            // nearly always something the person can act on (no connection, a
+            // licence, the wrong manifest), and it is no use to them in a file.
+            status("Steam could not download part " + part + " of 3. Steam says: " + Reason(line) +
+                " Nothing in the game folder has been replaced. Press Try again in a few minutes; if it stops the same way twice, send your launcher log to the Discord.");
             return true;
+        }
+
+        /// <summary>
+        /// Steam's line without the timestamp it starts with, for the line
+        /// under the button. The launcher log keeps the whole line.
+        /// </summary>
+        static string Reason(string line)
+        {
+            if (line == null) return "";
+            Match m = Regex.Match(line, @"^\[[^\]]*\]\s*");
+            return m.Success ? line.Substring(m.Length) : line;
         }
 
         /// <summary>
@@ -1272,11 +1392,33 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// Writes the marker that says this folder holds the build being asked
+        /// for: the manifest on the first line, then how many bytes the folder
+        /// held when the download finished. MarkerIs reads both.
+        /// </summary>
+        static void WriteMarker(string folder, string manifest)
+        {
+            try { File.WriteAllText(Path.Combine(folder, ".thornswood-complete"), manifest + Environment.NewLine + FolderSize(folder)); }
+            catch (Exception ex) { Swallow.Note("Downgrade, writing the marker in " + folder, ex); }
+        }
+
+        /// <summary>
         /// True when this depot folder's completion marker was written for the
-        /// manifest being asked for now. The marker holds the manifest id, so a
-        /// folder from an attempt at another build reads as not downloaded and
-        /// is fetched again. An empty or unreadable marker is the same answer:
-        /// nothing in it says these are the files being asked for.
+        /// manifest being asked for now AND the files it was written for are
+        /// still there. The marker holds the manifest id, so a folder from an
+        /// attempt at another build reads as not downloaded and is fetched
+        /// again. An empty or unreadable marker is the same answer: nothing in
+        /// it says these are the files being asked for.
+        ///
+        /// The size is checked as well because a marker on its own said the
+        /// part was downloaded even when the folder had been emptied since, by
+        /// a disk cleaner, by Steam, or by somebody clearing space part way
+        /// through eleven gigabytes. The part was then skipped rather than
+        /// cleared and fetched again, and the copy put nothing of it into the
+        /// game while the exe from another part made the game read as 1.6.1170.
+        /// That is the mixed build this is meant to stop. A marker from before
+        /// the size was written holds the manifest alone; for one of those the
+        /// folder only has to still have something in it.
         /// </summary>
         static bool MarkerIs(string folder, string manifest)
         {
@@ -1284,7 +1426,15 @@ namespace Thornswood
             {
                 string mark = Path.Combine(folder, ".thornswood-complete");
                 if (!File.Exists(mark)) return false;
-                return string.Equals(File.ReadAllText(mark).Trim(), manifest, StringComparison.Ordinal);
+                string[] lines = File.ReadAllText(mark).Replace("\r", "").Split('\n');
+                if (!string.Equals(lines[0].Trim(), manifest, StringComparison.Ordinal)) return false;
+                long was = 0;
+                if (lines.Length > 1) long.TryParse(lines[1].Trim(), out was);
+                // The marker itself is not one of the downloaded files, so a
+                // folder holding nothing but the marker measures zero here and
+                // does not pass as a part that is down.
+                long now = FolderSize(folder) - new FileInfo(mark).Length;
+                return now >= Math.Max(was, 1L);
             }
             catch { return false; }
         }

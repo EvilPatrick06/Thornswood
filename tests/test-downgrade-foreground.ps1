@@ -117,6 +117,34 @@ Yes 'InFront names the program and never reads a window title, which can be priv
 Yes 'when nothing was typed the log says which program was in front' ($text.Contains("Steam's window would not come to the front (the window in front belongs to "" + InFront() + ""), so nothing was typed. "))
 Yes 'IsHungAppWindow is declared' ([regex]::IsMatch($text, 'DllImport\("user32\.dll"\)\]\s*static extern bool IsHungAppWindow\(IntPtr hWnd\);'))
 
+# ---- the second go at the console, read off Run's text -------------------------
+#
+# BringToFront getting Steam forward is only half of it. Run used to try the
+# console a second time with `if (!started && typed)`, so a part whose first
+# attempt never reached the console at all got no second go and went straight
+# to the clipboard to sit there. That is every part after the first: part 1 is
+# asked for with the launcher in front, the moment the button is pressed, and
+# the rest twenty minutes apart with whatever the person has opened since over
+# the top. So the second go happens either way now.
+$run = Get-Member $text 'static bool Run(Config cfg, Action<string> log, Action<string> status)'
+Yes 'Run is there' ($null -ne $run)
+if ($null -ne $run) {
+    Yes 'the console is tried again whether the first attempt typed or fell back to the clipboard' ($run -notmatch 'if \(!started && typed\)')
+    # Past the first attempt's own "bool typed = TypeIntoConsole(cmd, log);",
+    # which holds the same words.
+    $atFocus = $run.IndexOf('FocusConsole(log);')
+    $atRetype = if ($atFocus -ge 0) { $run.IndexOf('typed = TypeIntoConsole(cmd, log);', $atFocus) } else { -1 }
+    Yes 'the second go brings the console back before it types' ($atFocus -ge 0 -and $atRetype -gt $atFocus)
+    # A part on the clipboard may have been pasted by the person while the
+    # console was being brought back, and a pasted download_depot and a typed
+    # one would both run.
+    Yes 'and types nothing if Steam took a command while the console was coming back' (
+        $run -match 'string sinceCmd = steamLog\.Since\(\);' -and
+        $run -match 'if \(LogStarted\(sinceCmd, depot\) \|\| Directory\.Exists\(folder\)\) \{ sawStart = true; started = true; \}')
+    Yes 'the clipboard is what is left after the second go, and is said once' (
+        $run -match 'if \(!pasted\)\s*\{\s*OnClipboard\(cmd, i \+ 1, "", log, status\);\s*pasted = true;')
+}
+
 # ---- the stand-in desktop -------------------------------------------------------
 $probe = @'
 using System;
