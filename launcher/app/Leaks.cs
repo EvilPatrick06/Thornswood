@@ -44,7 +44,7 @@ namespace Thornswood
                     if (src.Length > 0) games.Add(src);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Leaks.Clean, OwnGame.Source", ex); }
 
             int n = 0;
             foreach (string game in games)
@@ -59,7 +59,7 @@ namespace Thornswood
                     File.Delete(p);
                     n++;
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Leaks.Clean, deleting " + Path.Combine(game, s[0]), ex); }
             }
             if (n == 0) return null;
             return "Removed " + n + " saved sign in " + (n == 1 ? "file" : "files") +

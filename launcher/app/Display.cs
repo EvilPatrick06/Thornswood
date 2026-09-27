@@ -72,7 +72,7 @@ namespace Thornswood
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Fov.Get, reading " + IniPath, ex); }
             return Default;
         }
 
@@ -90,7 +90,7 @@ namespace Thornswood
                 if (!File.Exists(IniPath))
                 {
                     if (fov <= 0 || fov == Default) return true;   // nothing to record
-                    try { Directory.CreateDirectory(Path.GetDirectoryName(IniPath)); } catch { }
+                    try { Directory.CreateDirectory(Path.GetDirectoryName(IniPath)); } catch (Exception ex) { Swallow.Note("Fov.Set, creating " + Path.GetDirectoryName(IniPath), ex); }
                     File.WriteAllLines(IniPath, new string[] { "Fov=" + fov });
                     return true;
                 }
@@ -265,7 +265,7 @@ namespace Thornswood
                     if (m.Success) return m.Groups[1].Value;
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Display.Get, reading " + IniPath, ex); }
             return null;
         }
 

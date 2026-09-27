@@ -96,7 +96,7 @@ namespace Thornswood
                 Directory.CreateDirectory(Path.GetDirectoryName(flag));
                 File.WriteAllText(flag, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("ThornIni.Mark, " + flag, ex); }
         }
     }
 }

@@ -89,7 +89,7 @@ namespace Thornswood
                     AccessControlType.Allow));
                 File.SetAccessControl(path, acl);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Secrets.LockDown, " + path, ex); }
         }
     }
 }

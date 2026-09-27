@@ -59,7 +59,7 @@ namespace Thornswood
                 Directory.CreateDirectory(Discord.Folder);
                 File.WriteAllText(AnswerFile, (ok ? "yes" : "no") + "|" + DateTime.UtcNow.Ticks);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Door.Remember", ex); }
         }
 
         /// <summary>
@@ -222,7 +222,7 @@ namespace Thornswood
                         psi.UseShellExecute = true;
                         System.Diagnostics.Process.Start(psi);
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Door.Explain, opening invite", ex); }
                 }
                 return;
             }

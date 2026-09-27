@@ -270,7 +270,7 @@ namespace Thornswood
                     done += TakeFrom(zip, want, "the client runtime", log);
                 }
                 catch (Exception ex) { log("  the client runtime download failed: " + ex.Message); }
-                finally { if (zip != null) { try { File.Delete(zip); } catch { } } }
+                finally { if (zip != null) { try { File.Delete(zip); } catch (Exception ex) { Swallow.Note("ClientRuntime.Heal, deleting temp zip", ex); } } }
             }
             if (want.Count == 0) { log("The client runtime is back to the recorded build."); return done; }
 
@@ -315,7 +315,7 @@ namespace Thornswood
                         done += TakeFrom(zip, want, p.Title, log);
                     }
                     catch (Exception ex) { log("  " + p.Title + ": " + ex.Message); }
-                    finally { if (zip != null) { try { File.Delete(zip); } catch { } } }
+                    finally { if (zip != null) { try { File.Delete(zip); } catch (Exception ex) { Swallow.Note("ClientRuntime.Heal, deleting temp zip", ex); } } }
                 }
             }
             catch (Exception ex) { log("  could not ask the update feed: " + ex.Message); }
@@ -354,7 +354,7 @@ namespace Thornswood
                         // linked file rewrites Vortex's copy in the Steam
                         // install with it. Updater.Install breaks the link
                         // first for exactly this and so does this.
-                        if (File.Exists(dest)) { try { OwnGame.Unshare(dest); } catch { } }
+                        if (File.Exists(dest)) { try { OwnGame.Unshare(dest); } catch (Exception ex) { Swallow.Note("ClientRuntime.TakeFrom, Unshare " + dest, ex); } }
                         en.ExtractToFile(dest, true);
                     }
                     catch (Exception ex)

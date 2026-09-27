@@ -30,7 +30,7 @@ namespace Thornswood
                     else if (k == "lastUpdate") LastUpdate = v;
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Stats.Load", ex); }
         }
 
         public static void Save()
@@ -44,7 +44,7 @@ namespace Thornswood
                     "lastPlayed=" + (LastPlayed == DateTime.MinValue ? "" : LastPlayed.ToString("o")) + Environment.NewLine +
                     "lastUpdate=" + LastUpdate + Environment.NewLine);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Stats.Save", ex); }
         }
 
         public static void StartedPlaying()

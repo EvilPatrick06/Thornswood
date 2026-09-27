@@ -52,12 +52,12 @@ namespace Thornswood
                     finally
                     {
                         done.Set();
-                        try { win.Dispatcher.BeginInvoke(new Action(delegate { frame.Continue = false; })); } catch { }
+                        try { win.Dispatcher.BeginInvoke(new Action(delegate { frame.Continue = false; })); } catch (Exception ex) { Swallow.Note("Shell.Waiting, ending frame", ex); }
                     }
                 });
 
                 try { Dispatcher.PushFrame(frame); }
-                catch (InvalidOperationException) { }
+                catch (InvalidOperationException ex) { Swallow.Note("Shell.Waiting, PushFrame", ex); }
                 // PushFrame is refused while the dispatcher is suspended, during
                 // layout for one. The work still finishes; wait for it plainly.
                 done.WaitOne();
