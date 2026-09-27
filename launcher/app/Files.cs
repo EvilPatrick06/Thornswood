@@ -79,11 +79,11 @@ namespace Thornswood
                     {
                         // Put it back rather than leave a preset stranded under
                         // a name the game will not read.
-                        try { if (File.Exists(temp)) File.Move(temp, full); } catch { }
+                        try { if (File.Exists(temp)) File.Move(temp, full); } catch (Exception ex) { Swallow.Note("Files.FixPresetNames, putting a preset back", ex); }
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Files.FixPresetNames", ex); }
             return fixedUp;
         }
 
@@ -106,7 +106,7 @@ namespace Thornswood
                     l.Add(new Entry { Name = "launcher.log", Detail = "this launcher   ·   " + Size(fi.Length), FullPath = fi.FullName, When = fi.LastWriteTime, Bytes = fi.Length });
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Files.Logs", ex); }
             return l;
         }
 
@@ -133,7 +133,7 @@ namespace Thornswood
                     l.Add(new Entry { Name = n, Detail = kind + "   ·   " + Ago(fi.LastWriteTime) + "   ·   " + Size(fi.Length), FullPath = fi.FullName, When = fi.LastWriteTime, Bytes = fi.Length });
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Files.Saves", ex); }
             return l;
         }
 
@@ -162,7 +162,7 @@ namespace Thornswood
                 foreach (FileInfo fi in files)
                     l.Add(new Entry { Name = fi.Name, Detail = "backup   ·   " + Ago(fi.LastWriteTime) + "   ·   " + Size(fi.Length), FullPath = fi.FullName, When = fi.LastWriteTime, Bytes = fi.Length });
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Files.Backups", ex); }
             return l;
         }
     }

@@ -126,8 +126,8 @@ namespace Thornswood
                                 Send(pipe, OpFrame, "{\"cmd\":\"SET_ACTIVITY\",\"args\":{\"pid\":" + Pid() + ",\"activity\":null},\"nonce\":\"" + Nonce() + "\"}");
                                 Read(pipe);
                             }
-                            catch { }
-                            try { pipe.Dispose(); } catch { }
+                            catch (Exception ex) { Swallow.Note("Presence.Loop, clearing activity", ex); }
+                            try { pipe.Dispose(); } catch (Exception ex) { Swallow.Note("Presence.Loop, disposing pipe", ex); }
                             pipe = null;
                             said = false;
                         }
@@ -180,7 +180,7 @@ namespace Thornswood
                     {
                         // Discord closed, or the pipe broke. Dropped, and picked
                         // up again from the top next time round.
-                        try { pipe.Dispose(); } catch { }
+                        try { pipe.Dispose(); } catch (Exception disposeEx) { Swallow.Note("Presence.Loop, disposing broken pipe", disposeEx); }
                         pipe = null;
                         nextTry = DateTime.UtcNow.AddSeconds(10);
                         lock (gate) { dirty = true; }
@@ -237,7 +237,7 @@ namespace Thornswood
                 }
                 catch
                 {
-                    if (p != null) { try { p.Dispose(); } catch { } }
+                    if (p != null) { try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Presence.Connect, disposing failed pipe", ex); } }
                 }
             }
             return null;
@@ -319,7 +319,7 @@ namespace Thornswood
         {
             Action<string> s = say;
             if (s == null) return;
-            try { s(m); } catch { }
+            try { s(m); } catch (Exception ex) { Swallow.Note("Presence.Say", ex); }
         }
     }
 }

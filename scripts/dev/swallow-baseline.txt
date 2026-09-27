@@ -78,22 +78,25 @@
 # dropped from this list (an unlisted file is allowed none). No baseline
 # number was raised. Behaviour of Config.Save / Swap.Restore / Hold.Release /
 # Keep.Unpark is still log-only; stop-swallowing remains later work.
+#
+# Issue #461 next2 slice, 27 Sep. Converted every empty catch in the four-
+# and five-count files: DevBuild, Keys, Register, Files and Presence. That
+# is 22 fewer silent catches, 332 down to 310. Files that reached zero are
+# dropped from this list (an unlisted file is allowed none). No baseline
+# number was raised. Behaviour of Config.Save / Swap.Restore / Hold.Release /
+# Keep.Unpark is still log-only; stop-swallowing remains later work. Giant
+# files (Shell, Voice, Icons, Checks, ...) are left for later slices.
 Chars.cs 18
 Checks.cs 20
-DevBuild.cs 4
 Diag.cs 9
 Discord.cs 12
 Downgrade.cs 11
-Files.cs 5
 Hold.cs 8
 Icons.cs 21
 Keep.cs 12
-Keys.cs 4
 Mics.cs 6
 OwnGame.cs 18
 Pages.cs 8
-Presence.cs 5
-Register.cs 4
 Shell.cs 76
 ShellOwnGame.cs 6
 SkyMp.cs 7
