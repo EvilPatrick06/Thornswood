@@ -3546,6 +3546,38 @@ function chopWood(actorId, refrId, fromSwing) {
 }
 
 /*
+  AND THE SERVER HOLDS THE THREE BLOCKS DISABLED (#495).
+
+  thornswood-front.js has taken them out of the world on each person's own
+  machine since 24 September, and had to do it again every four seconds:
+  the client re-enabled every Skyrim.esm reference the server streamed that
+  the server did not say was disabled, because the server said so as
+  "isDisabled" and the client read "disabled". Fork ccf71644 reads the right
+  name. With the server itself holding the three disabled, every client on
+  that build is told so when the block streams in, and it stays gone without
+  the loop. The disabled flag is on the reference's change form, so it
+  survives a restart; setting it again at every start costs one read each.
+  The plugin's loop stays for launchers from before that client.
+*/
+const BLOCKS_OFF_REFS = ['d6ae9:Skyrim.esm', 'a9ee1:Skyrim.esm', 'abf83:Skyrim.esm'];
+
+function disableBlocksOff() {
+  let took = 0;
+  for (let i = 0; i < BLOCKS_OFF_REFS.length; i++) {
+    const id = idOf(BLOCKS_OFF_REFS[i]);
+    if (!id) { log('chopping block', BLOCKS_OFF_REFS[i], 'is not in this load order, left alone'); continue; }
+    try {
+      if (!mp.get(id, 'isDisabled')) { mp.set(id, 'isDisabled', true); took++; }
+    } catch (e) {
+      log('could not hold chopping block', BLOCKS_OFF_REFS[i], 'disabled:', e);
+    }
+  }
+  if (took) { log('the server holds', took, 'chopping block(s) out of the world'); }
+  return took;
+}
+disableBlocksOff();
+
+/*
   Who has been told what a kiln will cost them, and when. See burnCharcoal.
 */
 const KILN_ARMED = {};
