@@ -158,9 +158,11 @@ namespace Thornswood
         /// NOBODY IS LEFT WITHOUT A WAY FORWARD. WhyNot names the one thing
         /// stopping the folder being made, and every one of its answers says
         /// what to do: downgrade first, turn the Thornswood profile on in
-        /// Vortex, or install on the same drive as Skyrim. When it names
-        /// nothing, the offer is put up here and now rather than pointing at a
-        /// button in another screen.
+        /// Vortex, or, with Skyrim on one drive and Thornswood on another, the
+        /// two ways to put them on one, each named down to the drive letter and
+        /// the buttons to press (OwnGame.OneDriveOnly). When it names nothing,
+        /// the offer is put up here and now rather than pointing at a button in
+        /// another screen.
         /// </summary>
         static bool OwnGameRequired()
         {
@@ -184,7 +186,11 @@ namespace Thornswood
                 "other server on this machine. They all write the same client settings file and " +
                 "the game believes whichever wrote last, which is how their menus and logins get " +
                 "into Thornswood and Thornswood's get into theirs.\n\n" +
-                "The folder cannot be made yet:\n\n    " + why;
+                // Not indented any more: WhyNot's answer can be a long sentence
+                // (a drive apart names both ways out and their paths), and an
+                // indent the box only applies to the first wrapped line reads
+                // as a stray gap in the middle of it.
+                "The folder cannot be made yet:\n\n" + why;
             Log("Not starting: Thornswood would run out of the shared Skyrim, and the own folder " +
                 "cannot be made yet. " + why);
             try

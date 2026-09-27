@@ -391,15 +391,25 @@ namespace Thornswood
                        ", so Vortex has another profile deployed, or deploys Thornswood into another folder. In Vortex, enable the Thornswood profile and let it deploy. " +
                        "If it is deployed, Mods, Open, Open Game Folder in Vortex shows where, and Choose Vortex's folder in Settings points Thornswood at it.";
 
+            // Two drives, which is where this used to stop. Both of these said
+            // "Thornswood has to be installed on the same drive as Skyrim for
+            // this" and ended there: a rule, with nothing to press and nothing
+            // to do. Since Play began refusing a shared Skyrim
+            // (Shell.OwnGameRequired) that sentence was the whole game for
+            // anybody who keeps Steam on a second drive, and plenty of people
+            // do. It is still a refusal, because a hard link cannot cross a
+            // volume, but OneDriveOnly names both ways out and the paths.
             if (!SameVolume(game, Paths.Root))
-                return "Skyrim is on " + Volume(game) + " and Thornswood is on " + Volume(Paths.Root) +
-                       ". Links only work inside one drive, so Thornswood has to be installed on the same drive as Skyrim for this.";
+                return OneDriveOnly("Skyrim is in " + game, Volume(game),
+                    "move Skyrim to " + Volume(Paths.Root) + ", in Steam, Settings, Storage: choose " + Volume(game) +
+                    " at the top, tick Skyrim Special Edition, press Move and pick " + Volume(Paths.Root));
             if (apart)
             {
                 foreach (string dir in rec.Staging)
                     if (!SameVolume(dir, Paths.Root))
-                        return "Vortex keeps its mods in " + dir + " on " + Volume(dir) + " and Thornswood is on " + Volume(Paths.Root) +
-                               ". Links only work inside one drive, so Thornswood has to be installed on the same drive as Vortex's mods for this.";
+                        return OneDriveOnly("Vortex keeps its mods in " + dir, Volume(dir),
+                            "move Vortex's mods to " + Volume(Paths.Root) + ", in Vortex, Settings, Mods: set the mod staging folder to one on " +
+                            Volume(Paths.Root) + " and let Vortex move what is there");
             }
             return null;
         }
@@ -1845,6 +1855,38 @@ namespace Thornswood
         static bool SameVolume(string a, string b)
         {
             return string.Equals(Volume(a), Volume(b), StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// WhyNot's answer when the folder would have to link across two
+        /// drives: which drive each side is on, and the two things that put
+        /// them on one.
+        ///
+        /// The links stay. A hard link is the same file under a second name and
+        /// Windows will not make one across volumes, so this is a real refusal
+        /// and not a message that could be argued out of; whether the launcher
+        /// may copy instead, at the 26 to 41 GB measured in a built folder on
+        /// 24 September, is the team's call and not this method's. What it stops
+        /// is ending the road. Both ways out are somebody else's screen, so
+        /// each is named down to the drive letter, the path it lands in and the
+        /// buttons to press.
+        ///
+        /// One sentence, no line breaks: the same string goes to a MessageBox,
+        /// to the card in Settings, to the one line status strip on the Play
+        /// page and to Profile\launcher.log, which is one entry to a line.
+        /// </summary>
+        /// <param name="where">Where the other side is, "Skyrim is in D:\SteamLibrary\...".</param>
+        /// <param name="theirs">The drive that side is on, "D:".</param>
+        /// <param name="move">The second way out: moving that side to Thornswood's drive.</param>
+        static string OneDriveOnly(string where, string theirs, string move)
+        {
+            string here = Volume(Paths.Root);
+            return where + ", on " + theirs + ", and Thornswood is in " + Paths.Root + ", on " + here +
+                   ". A hard link is the same file under a second name, and Windows cannot make one across two drives, " +
+                   "so the folder cannot be made while they are apart. Either of these puts them on one drive. " +
+                   "Install Thornswood on " + theirs + " by running the Thornswood setup program again, the one from the " +
+                   "Downloads page, and choosing " + theirs + " when it asks where to put it, which installs it in " +
+                   theirs + "\\Thornswood. Or " + move + ".";
         }
 
         static long FreeSpace(string p)
