@@ -19,7 +19,7 @@
                     and restarts it). That is the existing Main path in
                     scripts\deploy. -SkipGameMode leaves this step out.
 
-      2  installer  Package-Thornswood.ps1 -Root -OutDir DistRoot -NoPause.
+      2  installer  Package-Thornswood.ps1 -Root C:\Thornswood (MAIN even when Channel=dev) -OutDir DistRoot -NoPause.
                     Publish-Installer runs from Package unless -NoPublish is
                     used on Package itself; this stack does not pass
                     -NoPublish. -SkipInstaller leaves this step out.
@@ -61,8 +61,9 @@
   in-world restart warning.
 
 .PARAMETER Root
-  The play install Package builds from. C:\Thornswood by default, the same
-  default Ship and Publish-PostShip use.
+  The MAIN play install Package builds from (C:\Thornswood by default). Always
+  the main Root for packaging, including when Channel=dev: Dev umbrella does
+  not package from a DevBuild folder. Same default Ship uses for the main install.
 
 .PARAMETER DistRoot
   Where Package stages the installer (passed as -OutDir) and where PostShip
