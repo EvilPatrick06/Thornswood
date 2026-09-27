@@ -271,11 +271,11 @@ const BOARDS = {
    and read half of it. Downloads and Report a problem went to the public site
    instead, so a playtester never needs this page at all and the gate can be
    one role check rather than two tiers. */
+/* Hub trimmed (#433): Gallery (uploads), Sessions, Linked Accounts, Inbox.
+   Issue boards, tests, help, roadmap, news, link, archive, todo left the hub.
+   Public /known /help /roadmap /news stay as PUBLIC_PAGES. */
 const LEVEL = {
-  tests: 'admin', help: 'admin', known: 'admin', roadmap: 'admin',
-  suggestions: 'admin', files: 'admin', uploads: 'admin', report: 'admin',
-  news: 'admin', link: 'admin', linked: 'admin', sessions: 'admin',
-  active: 'admin', archive: 'admin', todo: 'admin', inbox: 'admin'
+  uploads: 'admin', linked: 'admin', sessions: 'admin', inbox: 'admin'
 };
 
 /* The public front lives at / and needs no password. The working area moved
@@ -467,19 +467,9 @@ function pageMarkdown(name) {
 
 const PAGES = {
   '/hub':         'home',
-  '/hub/help':    'help',
-  '/hub/known':   'known',
-  '/roadmap':     'roadmap',
-  '/suggestions': 'suggestions',
-  '/news':        'news',
-  '/testthese':   'tests',
   '/uploads':     'uploads',
-  '/link':        'link',
   '/linked':      'linked',
   '/sessions':    'sessions',
-  '/active':      'active',
-  '/patrick':     'todo',
-  '/archive':     'archive',
   '/inbox':       'inbox'
 };
 
