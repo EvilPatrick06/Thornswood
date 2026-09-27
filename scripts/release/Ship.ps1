@@ -37,39 +37,32 @@
       Get-Help .\scripts\release\Ship.ps1 -Full
       Get-Help .\scripts\release\Ship.ps1 -Parameter Channel
 
-  THREE THINGS FOLLOW A SUCCESSFUL TIP, in one Ship rather than in whatever
-  somebody remembers afterwards:
+  TWO THINGS FOLLOW A SUCCESSFUL TIP, and one script runs both of them:
+  .\scripts\release\Publish-PostShip.ps1, keyed off -Channel.
 
-      the site feed mirror   Publish-SiteFeed.ps1     thornswood.net/feed, or
-                                                      /feed-dev on the dev
-                                                      channel, gets the tip's
-                                                      version.json and the
-                                                      assets it names
-      the launcher update    Update-Launcher.ps1      the feed a launcher
-                                                      really reads offers this
-                                                      release and its download
-                                                      answers
-      VirusTotal             Publish-VirusTotal.ps1   the launcher, and on a
-                                                      main release the
-                                                      installer, have a report,
-                                                      so the link the Downloads
-                                                      page prints is not
-                                                      item-not-found
+      the host feed mirror   thornswood.net/feed for main, /feed-dev for dev,
+                             gets the tip's version.json and the assets it
+                             names (Publish-SiteFeed.ps1, Website's)
+      VirusTotal             every download the site's Downloads page offers has
+                             a report, so the link it prints beside a SHA-256 is
+                             not item-not-found (Publish-VirusTotal.ps1,
+                             Installer's and Website's)
 
-  DEV AND MAIN TAKE THE SAME THREE, on their own channel: dev mirrors to
-  /feed-dev and checks the dev feed, and its VirusTotal step is the launcher
-  exe only, because a dev release never touches the installer. A main release
-  adds the installer exe, which is the file the Downloads page links. A
-  -ModsOnly release publishes no launcher, so the launcher update is the one
-  step it leaves out.
+  THERE IS NO THIRD STEP FOR THE LAUNCHER. The tip customers get is
+  version.json, and launchers poll the feed url in it and update themselves, so
+  the mirror IS the launcher update reaching people. Install-Launcher.ps1 runs
+  in the middle of this script, before the publish, and refreshes the install on
+  this machine only: re-running it afterwards would refresh the same one install
+  again. Answered by the Launcher lane on 27 September, after this section
+  briefly described a post-tip launcher step that does not exist.
 
   THE TIP STAYS PUBLISHED WHATEVER THEY DO. They run after the release is on
-  the feed, so a failure here cannot unpublish anything, and Ship still tells
-  the site, the Discord and the server. What it does instead is say which of
-  the three did not complete, with the line that puts it right, and exit 1, so
-  the standing order that the three go out together is either met or reported.
-  -SkipRemirror, -SkipLauncherUpdate, -SkipVirusTotal and -SkipPostShip are the
-  escape hatches, and a dry run runs none of them.
+  the feed, so a failure there cannot unpublish anything, and Ship still tells
+  the site, the Discord and the server. What it does instead is say which half
+  did not complete, with the line that puts it right, and exit 1, so the
+  standing order that the tip and its follow-ons go out together is either met
+  or reported. -SkipRemirror, -SkipVirusTotal and -SkipPostShip are the escape
+  hatches, and a dry run runs none of it.
 
   This header used to carry a hand-written list of five options, laid out as
   if it were all of them, while the param block declared thirteen. -Channel,
@@ -205,21 +198,15 @@
   unreachable, or for a release nobody is waiting on, and
   .\scripts\release\Publish-SiteFeed.ps1 is the thing to run as soon as it can be.
 
-.PARAMETER SkipLauncherUpdate
-  Ships without checking that the feed a launcher reads offers this release and
-  that the launcher download answers. Nothing is installed or published by that
-  step, so skipping it only means nobody looked.
-  .\scripts\release\Update-Launcher.ps1 does it afterwards.
-
 .PARAMETER SkipVirusTotal
-  Ships without sending the launcher, or on a main release the installer, to
-  VirusTotal. This is the one to reach for when a tip is wanted now and nobody
-  wants to wait on an upload: the report the Downloads page links stays
-  whatever it was. .\scripts\release\Publish-VirusTotal.ps1 does it afterwards.
+  Ships without asking VirusTotal about the downloads the site's Downloads page
+  offers. This is the one to reach for when a tip is wanted now and nobody wants
+  to wait on an upload: the report the page links stays whatever it was.
+  .\scripts\release\Publish-VirusTotal.ps1 does it afterwards.
 
 .PARAMETER SkipPostShip
-  All three of the above at once, for a release that has to go out with nothing
-  after it. Ship says which three were skipped and the command for each.
+  Both of the above at once, for a release that has to go out with nothing after
+  it. Ship says what was skipped and the command that does it later.
 
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
@@ -287,11 +274,10 @@ param(
     # dev first and gets broken there; a plain Ship afterwards promotes it all
     # to main and resets dev to match.
     ,[ValidateSet('main', 'dev')][string]$Channel = 'main'
-    # The three follow-ons a tip gets, and the escape hatches from them. The
-    # header's own section says what each one is and why the tip stays
-    # published when one fails.
+    # The two things that follow a tip, and the escape hatches from them. The
+    # header's own section says what each one is, why there is no third one for
+    # the launcher, and why the tip stays published when one fails.
     ,[switch]$SkipRemirror
-    ,[switch]$SkipLauncherUpdate
     ,[switch]$SkipVirusTotal
     ,[switch]$SkipPostShip
 )
@@ -394,11 +380,6 @@ $hotfix = $false
 # section and by the exit code at the end. Empty on every release that went out
 # whole, which is the usual one, so it is seeded here like the two above.
 $script:PostShipFailed = @()
-# Where the exe this release published was taken from: the build output, or the
-# folder the verified exe CI built was downloaded into. Update-Launcher.ps1 is
-# given it so a stale install can be put right from the same bytes that
-# shipped. Empty on a -ModsOnly release, which builds no launcher.
-$script:LauncherFrom = ''
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -815,9 +796,6 @@ if (-not $ModsOnly) {
     # then closes the game and the launcher, puts the exe in place and does
     # the shortcut and the icon, which is everything the build used to do.
     $buildOut = Join-Path ([IO.Path]::GetTempPath()) ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
-    # Kept for the launcher update step at the end, which is the one thing after
-    # the publish that may need the exe this release was made from.
-    $script:LauncherFrom = $buildOut
 
     if (-not $Dev -and -not $DryRun) {
         # A MAIN RELEASE TAKES THE EXE CI BUILT, and verifies it, since issue
@@ -1345,43 +1323,46 @@ else {
 
 # ------------------------------------------------------- after the tip is out
 <#
-  THE THREE THINGS THAT FOLLOW A TIP, and until now not one of them was part of
-  shipping.
+  THE TWO THINGS THAT FOLLOW A TIP, and until now neither was part of shipping.
 
-  The site feed. Since the #649 host cutover a launcher asks
-  thornswood.net/feed for version.json before it asks GitHub for anything
-  (Config.AfterLoad, Updater.Check, docs\FEED.md), and Publish-Update.ps1
-  -HostAssetUrls can write thornswood.net asset urls into the feed. The bytes
-  behind those urls are files on the VPS that somebody had to copy across by
-  hand after every release. A feed that names bytes the site does not hold
-  answers 404, and then the update stops and Play stays off.
+  The host feed. Since the #649 cutover the tip customers get is version.json,
+  and launchers poll the feed url in it, which is thornswood.net/feed, or
+  /feed-dev on the dev channel (Config.AfterLoad, Updater.Check, docs\FEED.md).
+  Publish-Update.ps1 writes that file and pushes it to the releases repository;
+  the copy the site serves is a file on the VPS that somebody had to remirror by
+  hand after every release. Until it is remirrored the site answers with the
+  release it last held, which is the release people are offered, and where the
+  feed names thornswood.net assets the bytes have to be up there too or the
+  download answers 404.
 
-  The launcher update. Nothing read back whether the release that had just gone
-  out was actually offered. A feed on this disk that names a launcher is not the
-  same fact as a launcher being offered that version and being able to download
-  it, and 1.1.76.1 on 21 September is what the difference looks like: published,
-  uploaded, announced in Discord, and unreachable, because the number was lower
-  than the one main had published (see the version section above).
-
-  VirusTotal. The Downloads page prints the installer's SHA-256 and a link to
+  VirusTotal. The Downloads page prints each download's SHA-256 and a link to
   the VirusTotal report on that hash, and Publish-Installer.ps1's own note says
   what is wrong with it: a file nobody has sent there has no report, so the link
   lands on a page saying so. That is the only answer we give somebody who does
   not want to run an unsigned installer, and it has been empty since the day it
   was added.
 
+  AND NOTHING FOR THE LAUNCHER, which the header says at more length: the
+  remirror is how a launcher update reaches anybody, and Install-Launcher.ps1
+  above refreshed this machine's own install before the publish.
+
+  ONE SCRIPT, KEYED OFF THE CHANNEL. Publish-PostShip.ps1 runs both halves, so
+  Website and Installer have one command to run by hand and Ship reads one exit
+  code. Both halves ask before they act, so running it again after a failure
+  does nothing the first run already did.
+
   ORDER. Before the site news, the Discord post and the server's countdown, on
   purpose: those three tell people to update, and the feed has to serve the
   release before anybody is told to go and get it.
 
-  WHAT A FAILURE DOES. The tip is already on the feed by the time any of this
-  runs, so none of it can unpublish anything, and dying here would leave a
-  release out with #news, the site and the server never told, which the
-  installer note further up calls the worse half state. So each one reports what
-  happened, the release is announced either way, the Done section names the ones
-  that did not complete with the line that puts each right, and Ship exits 1.
-  That is the standing order kept: the three go out with the tip, or Ship says
-  so loudly enough that a script chaining it stops too.
+  WHAT A FAILURE DOES. The tip is already on the feed by the time this runs, so
+  none of it can unpublish anything, and dying here would leave a release out
+  with #news, the site and the server never told, which the installer note
+  further up calls the worse half state. So it reports what happened, the
+  release is announced either way, the Done section names what did not complete
+  with the line that puts it right, and Ship exits 1. That is the standing order
+  kept: the follow-ons go out with the tip, or Ship says so loudly enough that a
+  script chaining it stops too.
 #>
 function Invoke-PostShip([string]$what, [string]$leaf, [hashtable]$withArgs, [string]$putRight) {
     $path = Join-Path $Here $leaf
@@ -1413,42 +1394,20 @@ if (-not $DryRun) {
     $chanArg = if ($Dev) { ' -Channel dev' } else { '' }
     Head 'After the tip'
     if ($SkipPostShip) {
-        Say '  -SkipPostShip, so none of the three ran. The tip is published and nothing follows it:' 'Yellow'
-        Say ("  .\scripts\release\Publish-SiteFeed.ps1$chanArg") 'DarkGray'
-        Say ("  .\scripts\release\Update-Launcher.ps1$chanArg") 'DarkGray'
-        Say ("  .\scripts\release\Publish-VirusTotal.ps1$chanArg") 'DarkGray'
+        Say '  -SkipPostShip, so nothing followed the tip. It is published, and the site still' 'Yellow'
+        Say '  serves the feed it had, so anybody reading it is offered that release:' 'Yellow'
+        Say ("  .\scripts\release\Publish-PostShip.ps1$chanArg   does both halves") 'DarkGray'
     }
     else {
-        if ($SkipRemirror) {
-            Say '  -SkipRemirror, so the site goes on serving the feed it had, and anybody reading' 'Yellow'
-            Say '  it is offered that release rather than this one.' 'Yellow'
-            Say ("  .\scripts\release\Publish-SiteFeed.ps1$chanArg   mirrors it") 'DarkGray'
-        } else {
-            Invoke-PostShip 'the site feed mirror' 'Publish-SiteFeed.ps1' `
-                @{ Channel = $chan; ReleaseDir = $ReleaseDir; Root = $Root; DistRoot = $DistRoot; NoPause = $true } `
-                ".\scripts\release\Publish-SiteFeed.ps1$chanArg"
-        }
-
-        if ($ModsOnly) {
-            Say '  mods only, so there was no launcher to update and that step was not run.' 'DarkGray'
-        } elseif ($SkipLauncherUpdate) {
-            Say '  -SkipLauncherUpdate, so nobody read back whether this release is offered.' 'Yellow'
-            Say ("  .\scripts\release\Update-Launcher.ps1$chanArg   reads it back") 'DarkGray'
-        } else {
-            $upArgs = @{ Channel = $chan; ReleaseDir = $ReleaseDir; Root = $Root; NoPause = $true }
-            if ($script:LauncherFrom) { $upArgs['From'] = $script:LauncherFrom }
-            Invoke-PostShip 'the launcher update' 'Update-Launcher.ps1' $upArgs `
-                ".\scripts\release\Update-Launcher.ps1$chanArg"
-        }
-
-        if ($SkipVirusTotal) {
-            Say '  -SkipVirusTotal, so the report the Downloads page links is whatever it was.' 'Yellow'
-            Say ("  .\scripts\release\Publish-VirusTotal.ps1$chanArg   sends it") 'DarkGray'
-        } else {
-            Invoke-PostShip 'the VirusTotal report' 'Publish-VirusTotal.ps1' `
-                @{ Channel = $chan; Root = $Root; DistRoot = $DistRoot; NoPause = $true } `
-                ".\scripts\release\Publish-VirusTotal.ps1$chanArg"
-        }
+        $postArgs = @{ Channel = $chan; ReleaseDir = $ReleaseDir; Root = $Root; DistRoot = $DistRoot; NoPause = $true }
+        # Passed on rather than read again there: one switch, one meaning,
+        # whichever of the two scripts a person runs.
+        if ($SkipRemirror) { $postArgs['SkipRemirror'] = $true }
+        if ($SkipVirusTotal) { $postArgs['SkipVirusTotal'] = $true }
+        Invoke-PostShip 'what follows the tip' 'Publish-PostShip.ps1' $postArgs `
+            (".\scripts\release\Publish-PostShip.ps1$chanArg" +
+             $(if ($SkipRemirror) { ' -SkipRemirror' } else { '' }) +
+             $(if ($SkipVirusTotal) { ' -SkipVirusTotal' } else { '' }))
     }
 }
 
@@ -1618,14 +1577,14 @@ if ($global:ThornswoodDiscordResult -eq 'failed') {
 # the last screen is the one that gets looked at, and one red line in the middle
 # of a release log is a line nobody reads.
 if ($script:PostShipFailed.Count) {
-    Say ("The tip is published and stays published, but $($script:PostShipFailed.Count) of the three things that follow it did NOT complete:") 'Red'
+    Say 'The tip is published and stays published, but what follows it did NOT complete:' 'Red'
     foreach ($f in $script:PostShipFailed) {
         Say ("  $($f.What)") 'Red'
         Say ("    $($f.PutRight)") 'Yellow'
     }
-    Say '  Until they do, the site may serve the older feed, nobody has read back whether' 'DarkGray'
-    Say '  this release is offered, or the VirusTotal link on the Downloads page says' 'DarkGray'
-    Say '  item-not-found. Each line above runs on its own and changes nothing else.' 'DarkGray'
+    Say '  Until it does, the site may be serving the feed it had, which is the release' 'DarkGray'
+    Say '  people are offered, or the VirusTotal link on the Downloads page says' 'DarkGray'
+    Say '  item-not-found. The line above asks before it acts, so it can be run twice.' 'DarkGray'
     Write-Host ''
 }
 if ($DryRun) { Say 'Dry run finished. Nothing left your machine.' 'Yellow' }
@@ -1636,8 +1595,8 @@ else {
 }
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-# NON-ZERO WHEN ONE OF THE THREE DID NOT COMPLETE, and only then. The release is
-# out either way, so this is not "the release failed": it is the standing order
-# that the tip, the mirror, the launcher update and the VirusTotal report go out
-# together, said in the one way a script that chains Ship can read.
+# NON-ZERO WHEN WHAT FOLLOWS THE TIP DID NOT COMPLETE, and only then. The
+# release is out either way, so this is not "the release failed": it is the
+# standing order that the tip, the host feed mirror and the VirusTotal report go
+# out together, said in the one way a script that chains Ship can read.
 if ($script:PostShipFailed.Count) { exit 1 }

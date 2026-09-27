@@ -16,9 +16,10 @@
   across by hand. A feed that names bytes the site does not hold answers 404
   to every launcher, and then Play stays off.
 
-  So this is the remirror, as one command Ship runs at the end of a release.
-  It is Website's to own; it calls nothing of its own invention and it reads
-  the same Feed-Rules.ps1 the publisher does.
+  So this is the remirror, one of the two halves Publish-PostShip.ps1 runs at
+  the end of every release, and a command to run on its own when one release
+  needs it again. It is Website's to own; it calls nothing of its own invention
+  and it reads the same Feed-Rules.ps1 the publisher does.
 
   IN WHAT ORDER, AND WHY IT MATTERS. Assets first, version.json last. A
   version.json that arrives before the bytes it names is a feed that offers an
@@ -87,8 +88,8 @@
   Faster on a big release, and then nothing has proved the mirror works.
 
 .PARAMETER NoPause
-  Exits without waiting for Enter, so Ship can call this without stopping for
-  a keypress nobody is there to give.
+  Exits without waiting for Enter, so Publish-PostShip.ps1 and Ship can call
+  this without stopping for a keypress nobody is there to give.
 
 .EXAMPLE
   .\scripts\release\Publish-SiteFeed.ps1 -Channel dev
@@ -98,8 +99,8 @@
 
 .NOTES
   Exit codes: 0 the site serves the tip, 1 something stopped and the message
-  says which asset or which step. Ship.ps1 reads that code and says at the end
-  which of its three follow-ons did not complete.
+  says which asset or which step. Publish-PostShip.ps1 reads that code, and
+  Ship says on its last screen that what follows the tip did not complete.
 #>
 [CmdletBinding()]
 param(
@@ -431,5 +432,5 @@ Say ("thornswood.net/$FeedName serves launcher $tip and the assets it names.") '
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 # Said out loud, because scp and ssh leave their own exit codes behind and
-# Ship.ps1 reads this one to decide whether the release is complete.
+# Publish-PostShip.ps1 reads this one to decide whether the release is complete.
 exit 0

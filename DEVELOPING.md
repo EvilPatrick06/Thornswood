@@ -106,35 +106,41 @@ runtime and not per machine, diffs them against this machine's baseline
 uploads pack and launcher as a GitHub release in the releases repo, rewrites
 `version.json` and pushes it.
 
-Three things then follow the tip, in this order and before anybody is told to
-go and get it:
+The tip customers get is that `version.json`, and launchers poll the feed url in
+it. So two things follow the tip, both run by
+`scripts\release\Publish-PostShip.ps1`, which Ship calls once with the channel
+it shipped, before anybody is told to go and get the release:
 
-- `scripts\release\Publish-SiteFeed.ps1` mirrors the tip onto the site, so
-  `thornswood.net/feed` serves the new `version.json` and the assets it names.
-  That is the feed a launcher asks first since the #649 host cutover
-  (`docs\FEED.md`), and a launcher falls back to the GitHub feed only when the
-  site feed does not answer at all, so an unmirrored site feed offers people
-  the release it last held rather than this one. The dev channel mirrors to
-  `/feed-dev`.
-- `scripts\release\Update-Launcher.ps1` reads that feed back: it offers this
-  release, its `launcherUrl` answers, and the install on this machine is
-  running the exe that shipped. A `-ModsOnly` release skips it, having
-  published no launcher.
-- `scripts\release\Publish-VirusTotal.ps1` makes sure VirusTotal holds a report
-  for the launcher exe and, on a main release, the installer exe, so the link
-  the Downloads page prints beside the SHA-256 is a report rather than
-  item-not-found. It asks first and uploads only what VirusTotal has never
-  seen. The key is in the secrets table below.
+- **The host feed remirror**, `scripts\release\Publish-SiteFeed.ps1`
+  (Website's). `thornswood.net/feed/version.json` for main, from the
+  Thornswood-Releases tip, and `thornswood.net/feed-dev/version.json` for dev,
+  from the Thornswood-Releases-dev tip, plus the assets those feeds name. That
+  is the feed a launcher polls since the #649 host cutover (`docs\FEED.md`), and
+  a launcher falls back to the GitHub feed only when the site feed does not
+  answer at all, so an unmirrored site feed offers people the release it last
+  held rather than this one.
+- **VirusTotal**, `scripts\release\Publish-VirusTotal.ps1` (Installer's and
+  Website's). It reads what the Downloads page offers from the site's own
+  `/api/public`, and for each download with a SHA-256 it makes sure VirusTotal
+  has a report, uploading from this machine only when VirusTotal has never seen
+  the file. That is what stops the link the page prints saying item-not-found.
+  The key is in the secrets table below.
+
+There is no third step for the launcher. A launcher updates itself from the feed
+it polls, so the remirror is how a launcher update reaches anybody, and the
+`Install-Launcher.ps1` that Ship runs in the middle of a release refreshes the
+install on the shipping machine only (`C:\Thornswood` for main,
+`C:\Thornswood-DevBuild` for dev).
 
 Then the site's news, the Discord #news webhook and the game server are told;
 the server warns the room for five minutes and puts everyone back to the
 launcher to update.
 
-A failure in any of those three leaves the release published, says which one it
-was with the command that puts it right, and makes Ship exit 1: the tip and its
-three follow-ons are meant to go out together. `-SkipRemirror`,
-`-SkipLauncherUpdate`, `-SkipVirusTotal` and `-SkipPostShip` are the escape
-hatches, and a `-DryRun` runs none of them.
+A failure in either half leaves the release published, says which half it was
+with the command that puts it right, and makes Ship exit 1: the tip and its
+follow-ons are meant to go out together. `-SkipRemirror`, `-SkipVirusTotal` and
+`-SkipPostShip` are the escape hatches, a `-DryRun` runs none of it, and both
+halves ask before they act, so `Publish-PostShip.ps1` can be run again by hand.
 
 **A hotfix** is the one live release that does not come off main (decided by
 Patrick on 24 Sep). A branch named `hotfix/...` starts from the commit the live
