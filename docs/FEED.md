@@ -9,7 +9,7 @@ who reads it, and what goes wrong when it is wrong.
 
 ## Where it is and how a launcher reads it
 
-### Host cutover (#649) — live URL shape
+### Host cutover (#649) - live URL shape
 
 Confirmed with Website. Signing / `ExpectedSigner` is still **off**.
 
@@ -21,8 +21,8 @@ Confirmed with Website. Signing / `ExpectedSigner` is still **off**.
 | Dev assets | `https://thornswood.net/feed-dev/assets/<sha256>` |
 
 - **Primary request.** The launcher prefers `config.json` `UpdateFeedUrl` (a
-  direct https GET of `version.json`). Defaults in `Config.AfterLoad`: main →
-  live URL above; `Channel` or `UpdateBranch` `dev` → dev URL
+  direct https GET of `version.json`). Defaults in `Config.AfterLoad`: main ->
+  live URL above; `Channel` or `UpdateBranch` `dev` -> dev URL
   (`Config.cs`, `Updater.Check`). Host allowlist already includes
   `thornswood.net`.
 - **Conditional, since #445.** `Updater.FromSite` keeps the last document it
@@ -39,7 +39,7 @@ Confirmed with Website. Signing / `ExpectedSigner` is still **off**.
 - **Fallback / rollback.** If the site feed fails (or `UpdateFeedUrl` is
   empty), `Updater.Check` falls back to the GitHub Contents API on
   `UpdateRepo`/`UpdateBranch` (`EvilPatrick06/Thornswood-Releases`). Do **not**
-  delete that repository yet — it stays hot for rollback until the cutover
+  delete that repository yet - it stays hot for rollback until the cutover
   sticks. Publishers still upload release assets there; `-HostAssetUrls` on
   `Publish-Update.ps1` only rewrites the urls written into `version.json`.
 - **The fallback waits, since #445.** That fallback is the request with a quota
@@ -261,7 +261,7 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
   land on Thornswood-Releases for rollback. `Check-Secrets.ps1` scans every zip
   and exe before upload. Nothing is written to the feed if any asset failed to
   upload, and `version.json` is written without a byte order mark.
-- **Signing.** `ExpectedSigner` is still empty/absent — Azure Artifact Signing
+- **Signing.** `ExpectedSigner` is still empty/absent - Azure Artifact Signing
   is out of scope for the #649 cutover. Do not invent secrets.
 
 ## Main and dev
