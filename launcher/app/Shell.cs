@@ -2805,7 +2805,7 @@ namespace Thornswood
         }
 
         // ------------------------------------------------------------- settings
-        // Ten of them now, so they wrap instead of running off the side, and
+        // Nine of them now, so they wrap instead of running off the side, and
         // each one says what it is rather than making you click to find out.
         static void BuildThemeRow()
         {
