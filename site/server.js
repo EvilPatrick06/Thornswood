@@ -2357,6 +2357,10 @@ async function handle(req, res) {
         html = fillPage(html, md === null
           ? '<h1>Not here</h1><p>That page does not exist yet.</p>'
           : pageHtml(md));
+      } else if (route !== '/') {
+        // The remaining public pages draw themselves after an API fetch. Do not
+        // paint the home landing while that request is in flight.
+        html = html.replace('<div id="landing">', () => '<div id="landing" hidden>');
       }
       return send(res, 200, html, TYPES['.html']);
     } catch (e) { return send(res, 500, 'no home.html', 'text/plain'); }
