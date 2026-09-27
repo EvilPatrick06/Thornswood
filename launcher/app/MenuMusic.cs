@@ -18,7 +18,7 @@ namespace Thornswood
     /// NavigateToString document cannot load a file:// audio src (Chromium
     /// blocks it); that showed up in launcher.log as "HTML5 audio failed"
     /// after the ApplicationIdle deferral fixed the earlier event-loop error.
-    /// Autoplay is allowed without a gesture so play() works in a hidden host.
+    /// Autoplay uses WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS so play() works in a hidden host.
     /// </summary>
     static class MenuMusic
     {
@@ -197,28 +197,58 @@ namespace Thornswood
             string profile = Path.Combine(Paths.ProfileDir, "MusicBrowser");
             try { Directory.CreateDirectory(profile); } catch (Exception ex) { Swallow.Note("MenuMusic.CreateProfile", ex); }
 
-            Microsoft.Web.WebView2.Core.CoreWebView2EnvironmentOptions opts = null;
+            // Hidden host has no user gesture. CoreWebView2EnvironmentOptions
+            // with AdditionalBrowserArguments makes CreateAsync fault on the
+            // ship PC (launcher.log: "no WebView2 runtime") while Voice's
+            // null-options CreateAsync succeeds on the same run. Set the
+            // documented WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS env var instead,
+            // then create the environment the same way Voice does.
             try
             {
-                // Hidden host has no user gesture; Chromium would otherwise
-                // refuse a.play() even after the track loads cleanly.
-                opts = new Microsoft.Web.WebView2.Core.CoreWebView2EnvironmentOptions(
-                    "--autoplay-policy=no-user-gesture-required");
+                string key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
+                string cur = Environment.GetEnvironmentVariable(key);
+                string flag = "--autoplay-policy=no-user-gesture-required";
+                if (string.IsNullOrEmpty(cur))
+                    Environment.SetEnvironmentVariable(key, flag);
+                else if (cur.IndexOf("autoplay-policy", StringComparison.OrdinalIgnoreCase) < 0)
+                    Environment.SetEnvironmentVariable(key, cur + " " + flag);
             }
             catch (Exception ex)
             {
-                Stamp("Menu music: could not set autoplay policy (" + ex.Message + ")");
+                Stamp("Menu music: could not set autoplay env (" + ex.Message + ")");
             }
 
             var envTask = Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
-                null, profile, opts);
+                null, profile, null);
 
             envTask.ContinueWith(delegate (
                 System.Threading.Tasks.Task<Microsoft.Web.WebView2.Core.CoreWebView2Environment> t)
             {
-                if (t.IsFaulted || t.Result == null)
+                if (t.IsFaulted)
                 {
-                    Stamp("Menu music: no WebView2 runtime on this machine");
+                    string why = "unknown";
+                    try
+                    {
+                        if (t.Exception != null)
+                            why = t.Exception.GetBaseException().Message;
+                    }
+                    catch { }
+                    Stamp("Menu music: WebView2 environment failed (" + why + "); trying default");
+                    host.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        try { view.EnsureCoreWebView2Async(); }
+                        catch (Exception ex) { Stamp("Menu music: " + ex.Message); }
+                    }));
+                    return;
+                }
+                if (t.Result == null)
+                {
+                    Stamp("Menu music: WebView2 environment was empty; trying default");
+                    host.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        try { view.EnsureCoreWebView2Async(); }
+                        catch (Exception ex) { Stamp("Menu music: " + ex.Message); }
+                    }));
                     return;
                 }
                 host.Dispatcher.BeginInvoke(new Action(delegate
