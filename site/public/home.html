@@ -329,6 +329,26 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .gal-box .form .btn.gal-pick:hover{background:var(--gold);color:#120F07}
 .gal-box .form .file-name{font:400 14px/1.4 var(--serif);color:var(--quiet);
   text-transform:none;letter-spacing:0}
+.gal-box .form .gal-chosen{list-style:none;margin:16px 0 0;padding:0;
+  display:flex;flex-direction:column;gap:8px;text-align:left}
+.gal-box .form .gal-chosen-item{display:flex;align-items:center;gap:12px;
+  padding:8px 10px;background:var(--iron);border:1px solid var(--edge);
+  border-radius:2px}
+.gal-box .form .gal-chosen-thumb{flex:0 0 56px;width:56px;height:56px;
+  border:1px solid var(--edge2);border-radius:2px;overflow:hidden;
+  background:var(--night)}
+.gal-box .form .gal-chosen-thumb img{display:block;width:100%;height:100%;
+  object-fit:cover}
+.gal-box .form .gal-chosen-meta{flex:1 1 auto;min-width:0}
+.gal-box .form .gal-chosen-name{font:500 14px/1.35 var(--sans);color:var(--page);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  text-transform:none;letter-spacing:0}
+.gal-box .form .gal-chosen-size{font:400 12px/1.4 var(--serif);color:var(--quiet);
+  text-transform:none;letter-spacing:0;margin-top:2px}
+.gal-box .form .btn.gal-chosen-x{flex:0 0 auto;padding:6px 12px;font-size:12px;
+  border-color:var(--edge2);color:var(--gold)}
+.gal-box .form .btn.gal-chosen-x:hover{border-color:var(--gold);
+  background:rgba(201,162,75,.12);color:var(--gold)}
 .gal-box .form input[type=text]{background:var(--night)}
 .gal-box .form .gal-drop.drag{border-color:var(--gold);background:rgba(201,162,75,.1);
   box-shadow:inset 0 0 0 1px rgba(201,162,75,.28)}
@@ -966,6 +986,8 @@ if (AGE_PATHS[here] && !ageOk()) {
         '<div class="file-pick">' +
         '<button class="btn gal-pick" type="button" id="galPick">Choose pictures</button>' +
         '<span class="file-name" id="galFileName">No file chosen</span>' +
+        '</div>' +
+        '<ul class="gal-chosen" id="galChosen" hidden></ul>' +
         '</div></div></div>' +
         '<label>By<input type="text" id="galBy" maxlength="40" placeholder="a name for the caption"></label>' +
         '<label>Note<span class="hint">optional</span><input type="text" id="galNote" maxlength="300"></label>' +
@@ -1013,14 +1035,87 @@ if (AGE_PATHS[here] && !ageOk()) {
     var f = document.getElementById('galFile');
     var pick = document.getElementById('galPick');
     var nameEl = document.getElementById('galFileName');
+    var chosenEl = document.getElementById('galChosen');
     var box = document.getElementById('galDrop');
     var picked = [];
+    var previewUrls = [];
+
+    function clearPreviews() {
+      previewUrls.forEach(function (u) {
+        try { URL.revokeObjectURL(u); } catch (e) {}
+      });
+      previewUrls = [];
+    }
+
+    function fmtSize(n) {
+      if (n == null || isNaN(n)) return '';
+      if (n < 1024) return n + ' B';
+      if (n < 1024 * 1024) {
+        var kb = n / 1024;
+        return (kb < 10 ? kb.toFixed(1) : Math.round(kb)) + ' KB';
+      }
+      return (n / (1024 * 1024)).toFixed(1) + ' MB';
+    }
 
     function showPicked() {
       if (!nameEl) return;
       if (!picked.length) nameEl.textContent = 'No file chosen';
       else if (picked.length === 1) nameEl.textContent = picked[0].name;
       else nameEl.textContent = picked.length + ' files chosen';
+
+      if (!chosenEl) return;
+      clearPreviews();
+      chosenEl.innerHTML = '';
+      if (!picked.length) {
+        chosenEl.hidden = true;
+        return;
+      }
+      chosenEl.hidden = false;
+      picked.forEach(function (file, idx) {
+        var li = document.createElement('li');
+        li.className = 'gal-chosen-item';
+
+        var thumb = document.createElement('div');
+        thumb.className = 'gal-chosen-thumb';
+        if (/^image\//.test(file.type || '') ||
+            /\.(png|jpe?g|webp|gif)$/i.test(file.name || '')) {
+          var img = document.createElement('img');
+          var url = URL.createObjectURL(file);
+          previewUrls.push(url);
+          img.src = url;
+          img.alt = '';
+          thumb.appendChild(img);
+        }
+
+        var meta = document.createElement('div');
+        meta.className = 'gal-chosen-meta';
+        var nm = document.createElement('div');
+        nm.className = 'gal-chosen-name';
+        nm.textContent = file.name || 'picture';
+        var sz = document.createElement('div');
+        sz.className = 'gal-chosen-size';
+        sz.textContent = fmtSize(file.size);
+        meta.appendChild(nm);
+        meta.appendChild(sz);
+
+        var rm = document.createElement('button');
+        rm.className = 'btn ghost gal-chosen-x';
+        rm.type = 'button';
+        rm.setAttribute('aria-label', 'Remove ' + (file.name || 'picture'));
+        rm.textContent = 'Remove';
+        rm.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          picked.splice(idx, 1);
+          if (f) f.value = '';
+          showPicked();
+        });
+
+        li.appendChild(thumb);
+        li.appendChild(meta);
+        li.appendChild(rm);
+        chosenEl.appendChild(li);
+      });
     }
 
     function takeFiles(list) {
