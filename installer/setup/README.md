@@ -67,9 +67,10 @@ skip and the fail-soft paths to what is written here.
 
 ### What Windows shows, for the Downloads page and the FAQ to match
 
-`Thornswood-Setup.exe` is not signed yet (that is issue #390), so until it is,
-Windows cannot show a verified publisher and the UAC prompt's publisher line
-reads `Unknown`. The product NAME strings the prompt and the file's Properties
+`Thornswood-Setup.exe` is signed since 27 September (issue #390, closed), through
+Azure Artifact Signing, so Windows shows a verified publisher: the name on the
+signing certificate, which is the person the certificate was issued to rather
+than Thornswood. Builds from before that day are unsigned and show `Unknown`. The product NAME strings the prompt and the file's Properties
 show come from a version resource `Bootstrap.cs` carries itself, and those names
 are kept stable so they do not change from one build to the next. File version
 and Product version are not hardcoded in Bootstrap; `Build-Launcher.ps1` stamps
@@ -79,7 +80,7 @@ Product version `1.1.95` when the launcher is at 1.1.95). The build date rides
 in the file name, never in the product name. Website owns the Downloads and FAQ
 copy; these are the exact strings to write it against: Program name
 (`FileDescription`), the UAC prompt's first line, is `Thornswood Setup`;
-Verified publisher is `Unknown` until #390 signs it; Product name, shown in
+Verified publisher is the name on the signing certificate; Product name, shown in
 Properties and to SmartScreen, is `Thornswood Setup`; Company is `Thornswood`;
 Copyright is `Copyright (c) Thornswood`; File version and Product version match
 the current launcher release from Updater.cs; and the Original file name is
@@ -103,8 +104,9 @@ Product version.
 That resource being filled and honest is worth having, but on its own it does
 not clear the machine-learning engines that make up most of the VirusTotal
 flags (CrowdStrike Falcon, APEX, Trapmine), and a hash-intel hit like McAfeeD
-moves only when the file's reputation does. Code signing (issue #390, held) is
-the real fix and the lever to re-measure on once it is turned on. The
+moves only when the file's reputation does. Code signing is
+the real fix, and it is on since 27 September (issue #390, closed): re-measure
+the flags on a signed build. The
 friend-facing side of the same story, the SmartScreen soft-block, the Defender
 warning and the VirusTotal report link, is on the site: the Downloads page and
 the Help page's "Why does Windows or Defender warn about the installer?"
