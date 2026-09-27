@@ -364,7 +364,10 @@ Skyrim), Online.cs (the headcount the server publishes), Slots.cs (the one
 rule for moving a character's slot), Art.cs (the art inside the exe),
 Themes.cs, Help.cs (the Help page's text), Links.cs (the Nexus page behind
 each mod name), Gallery.cs (the pictures the site shows from the world, read
-from `/api/public` and turned through on the Play page, read only), Swallow.cs
+from `/api/public` and turned through on the Play page; the card's Report
+button is the one thing it writes, to `/api/gallery/report` over this copy's
+own Discord ticket, and approving or taking a picture down stays on the site
+because those doors read a browser sign in), Swallow.cs
 (a caught exception written to `launcher.log` instead of dropped, section 1).
 
 A new class gets a line on this page in the pull request that adds it.
