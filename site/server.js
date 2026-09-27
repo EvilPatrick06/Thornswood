@@ -295,7 +295,7 @@ const PUBLIC_PAGES = ['/', '/world', '/rules', '/credits', '/join',
                       // agreeing to cannot sit behind a sign in, because
                       // the person deciding whether to sign up is the one
                       // who needs to read them.
-                      '/privacy', '/terms'];
+                      '/privacy', '/terms', '/cookies'];
 const PUBLIC_DOCS = ['known', 'help'];
 /* The public pages are markdown on disk like everything else here, so the
    wording can be fixed from the site rather than by a deploy. */
@@ -321,7 +321,8 @@ const BLURB = {
   '/report':    ['Report a problem', 'Something broken, or an idea. No account needed.'],
   '/gallery':   ['From the world', 'Pictures taken by people playing.'],
   '/privacy':   ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no analytics.'],
-  '/terms':     ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.']
+  '/terms':     ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.'],
+  '/cookies':   ['Cookies', 'The cookies this site sets: sign-in and the eighteen-and-over gate. No advertising cookie.']
 };
 const escAttr = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -437,7 +438,7 @@ function fillPage(html, body) {
 /* The addresses that are a markdown page. The same list as PAGES in
    home.html, and tools/test-site-render.js checks that the two agree. */
 const MD_PAGES = ['/world', '/rules', '/join', '/credits', '/classes',
-                  '/known', '/help', '/privacy', '/terms'];
+                  '/known', '/help', '/privacy', '/terms', '/cookies'];
 const MARKED = 'marked-12.0.2.min.js';
 let renderMd = null;
 try { renderMd = makePageRenderer(require(path.join(PUBLIC, MARKED))); }
