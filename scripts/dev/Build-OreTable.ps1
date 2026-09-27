@@ -852,7 +852,7 @@ if ($fail -gt 0) {
 
 $lines = New-Object 'System.Collections.Generic.List[string]'
 $lines.Add('  /* Built by scripts\dev\Build-OreTable.ps1 out of the game''s own records. Do not hand edit.')
-$lines.Add('     ' + $table.Count + ' ore veins, the same table as tools\ores.json.')
+$lines.Add('     ' + $table.Count + ' ore veins, the same table as game\data\ores.json.')
 $lines.Add('')
 $lines.Add('     Vein base -> the ore it gives, that ore''s name, the rank it takes to')
 $lines.Add('     work it, and what it gives at novice, advanced, expert and master.')
@@ -875,7 +875,7 @@ $literal = $lines -join [Environment]::NewLine
 # ---------------------------------------------------------------- install --
 #
 # The gamemode carries the table, because the server is deployed as one file
-# and cannot read tools\ores.json. Nothing hand edits that block: this writes
+# and cannot read game\data\ores.json. Nothing hand edits that block: this writes
 # it between its own markers, the way the other generated blocks in this repo
 # are written. -NoInstall prints it and leaves the file alone, and so does a
 # gamemode.js that has no markers yet: this never invents a place to put it.

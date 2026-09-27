@@ -84,16 +84,16 @@ place, or it writes fresh empty characters over the top.
    use an older one. That is exactly the state the 15 September backups were in
    and the reason any of this exists.
 4. **Put the pieces back**, with every Thornswood task stopped:
-   - `C:\restore\game\world` → `C:\Thornswood-Server\world`
-   - `C:\restore\game\private` → `C:\Thornswood-Server\private`
-   - `C:\restore\game\data` → `C:\Thornswood-Server\data`
-   - `C:\restore\game\server-settings.json` → the server root
-   - `C:\restore\site\data` → `C:\Thornswood-Docs\data`
-   - `C:\restore\bot\bot.env.json`, `C:\restore\site\config.json` → their roots
-   - `C:\restore\bot\joins.json` → `C:\Thornswood-Bot\joins.json`, before the
+   - `C:\restore\game\world` -> `C:\Thornswood-Server\world`
+   - `C:\restore\game\private` -> `C:\Thornswood-Server\private`
+   - `C:\restore\game\data` -> `C:\Thornswood-Server\data`
+   - `C:\restore\game\server-settings.json` -> the server root
+   - `C:\restore\site\data` -> `C:\Thornswood-Docs\data`
+   - `C:\restore\bot\bot.env.json`, `C:\restore\site\config.json` -> their roots
+   - `C:\restore\bot\joins.json` -> `C:\Thornswood-Bot\joins.json`, before the
      bot starts, or the join cards start counting again
-   - `C:\restore\voice\choices.json` → `C:\Thornswood-Voice\choices.json`
-   - `C:\restore\web\Caddyfile` → `C:\Thornswood-Caddy\Caddyfile`
+   - `C:\restore\voice\choices.json` -> `C:\Thornswood-Voice\choices.json`
+   - `C:\restore\web\Caddyfile` -> `C:\Thornswood-Caddy\Caddyfile`
 5. **The rest comes from the repository, not from the backup.** `Ship.ps1`
    publishes the launcher and the packs and deploys none of these, so each
    goes back with its own command, from main on Patrick's machine, in this

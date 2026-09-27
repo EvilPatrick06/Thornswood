@@ -44,7 +44,7 @@
 // gamemode.js, the same split as the warmth and weather tables.
 //
 // Read only. It opens the plugins of the build, writes game\data\waters.json and
-// installs the compact table into tools\gamemode.js.
+// installs the compact table into game\gamemode.js.
 //
 // Usage:
 //   node scripts\dev\Build-WaterTable.js
