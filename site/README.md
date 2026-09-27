@@ -117,13 +117,24 @@ never read the queue.
 | --- | --- | --- | --- | --- |
 | `/api/gallery/who` | GET | anybody | none | `200 {signed,canSubmit,staff,admin,name}` for the public gallery page |
 | `/api/gallery/submit` | POST | a signed-in Discord account that may play (or the hub member cookie), or the launcher with the same signed ticket it sends `/api/play/join` | the file is the body, the way `/api/upload` takes it; `name`, `by`, `note` and, for the launcher, `ticket` are in the query | `200 {ok,name}`; `401 {why:'link'}` with neither door; `403`/`503` for a launcher ticket the door would also refuse; `415` for anything but png, jpg, jpeg, webp or gif; `413` over 25 MB |
-| `/api/gallery/pending` | GET | staff (`access.dev`) | none | `200 {pending:[...]}`; `403` otherwise |
+| `/api/gallery/pending` | GET | staff (`access.dev`), by the hub cookie or a launcher ticket | none | `200 {pending:[...]}`; `403` otherwise |
 | `/api/gallery/approve` | POST | staff | `{name, by?}` | `200 {ok,approved}`; upserts the name onto `gallery.json`, removes it from the queue, idempotent; `400` with no name |
 | `/api/gallery/reject` | POST | staff | `{name, deleteFile?}` | `200 {ok,removed}`; drops it from the queue and unlinks the upload when `deleteFile` is set; `gallery.json` is untouched; `400` with no name |
 | `/api/gallery/approved` | DELETE | staff | `{name, deleteFile?}` | `200 {ok,removed}`; takes an approved shot off `gallery.json` (not the same as reject); clears reports on that name; unlinks when asked |
 | `/api/gallery/report` | POST | signed-in play member, or launcher ticket | `{name, why?}` | `200 {ok,id}`; writes to `gallery-reports.json`; does not take the shot down; `404` if the name is not approved |
 | `/api/gallery/reports` | GET | staff | none | `200 {reports:[...]}` |
 | `/api/gallery/report/dismiss` | POST | staff | `{id}` | `200 {ok,removed}` |
+
+Every staff row above goes through one gate, `galleryStaff` in `server.js`,
+and takes either of two things (#743). The hub's `twa` cookie is one, which is
+what the Gallery page sends. A signed launcher ticket in the query,
+`?ticket=<the ticket>`, is the other, read and re-checked against Discord the
+way `/api/gallery/submit` and `/api/gallery/report` read theirs, with `st.dev`
+asked of it rather than `st.play`: these doors approve, reject and delete
+rather than send something in. A ticket for an account that is not staff is
+`403 {why:'role'}`, one that has left the Discord `403 {why:'guild'}`, a banned
+one `403 {why:'banned'}`, and a Discord that could not be asked `503`. Neither
+cookie nor ticket is the `403 {error:'staff only'}` these doors always sent.
 
 A submission lands in `uploads\` under the same stamped name `/api/upload` uses
 (`receiveUpload` in `server.js` is the one helper both go through) and adds

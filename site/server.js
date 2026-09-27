@@ -906,6 +906,41 @@ async function who(req) {
 const allowed = (key, w) =>
   LEVEL[key] === 'admin' ? w.admin : w.member;
 
+/*
+  Staff at a gallery door, by either of the two things that can prove it (#743).
+
+  The hub's twa cookie is one: who(req) reads it and w.dev is the access.dev
+  roles. The launcher has no cookie to offer, because the Discord callback
+  mints the cookie on the browser and hands the launcher a signed ticket
+  instead, so every staff door answered a launcher 403 however senior the
+  account behind it was.
+
+  So a ticket in the query is the other, read and re-checked against Discord
+  exactly the way /api/gallery/submit and /api/gallery/report read theirs, with
+  one bar higher: st.dev rather than st.play, because these doors approve,
+  reject and delete rather than send something in.
+
+  It answers { ok: true, from, discordId } or { ok: false, code, body }. With
+  neither cookie nor ticket the refusal is the 403 'staff only' these doors
+  have always sent, so nothing about the hub page changes.
+*/
+async function galleryStaff(url, w) {
+  if (w.dev) return { ok: true, from: 'web', discordId: w.id || '' };
+  const t = readTicket(url.searchParams.get('ticket'));
+  if (!t) return { ok: false, code: 403, body: { error: 'staff only' } };
+  const st = await standing(t.d);
+  standCache.delete(String(t.d));
+  if (st.lookupFailed && !st.admin) return { ok: false, code: 503, body: { ok: false, why: 'could not ask Discord', error:
+    'Thornswood could not ask Discord about that account just now. Try again in a minute.' } };
+  if (!st.inGuild) return { ok: false, code: 403, body: { ok: false, why: 'guild', error:
+    'That Discord account is not in the Thornswood Discord.' } };
+  if (st.banned) return { ok: false, code: 403, body: { ok: false, why: 'banned', error:
+    'That Discord account is banned from Thornswood.' } };
+  if (!st.dev) return { ok: false, code: 403, body: { ok: false, why: 'role', error:
+    'That Discord account has no staff role, so it cannot work the gallery queue.' } };
+  return { ok: true, from: 'launcher', discordId: String(t.d) };
+}
+
 // ----------------------------------------------------------------- plumb --
 function send(res, code, payload, type, extra) {
   res.writeHead(code, Object.assign({
@@ -2798,6 +2833,9 @@ async function handle(req, res) {
     uses at /api/play/join, so a person can send a shot from the game without
     a site sign in.
 
+    The staff side takes the same two, through galleryStaff, and asks st.dev of
+    the ticket rather than st.play (#743).
+
     The body IS the file, the /api/upload way, so the ticket and the note ride in
     the query, not in the body. The file lands in uploads/ under a stamped name
     through the shared helper, exactly as an /api/upload file does, and an entry
@@ -2863,9 +2901,12 @@ async function handle(req, res) {
   }
 
   // The queue, for staff (access.dev) to look through. Never public, so it is
-  // its own door rather than a field on /api/public.
+  // its own door rather than a field on /api/public. galleryStaff takes the hub
+  // cookie or a launcher ticket for a staff account; everything below it does
+  // the same, so the six staff doors have one gate between them.
   if (p === '/api/gallery/pending' && req.method === 'GET') {
-    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    const gs = await galleryStaff(url, w);
+    if (!gs.ok) return sendJson(res, gs.code, gs.body);
     return sendJson(res, 200, { pending: jsonFile(GPENDING, []) });
   }
 
@@ -2873,7 +2914,8 @@ async function handle(req, res) {
   // so approving the same name twice is a 200 that changed nothing the second
   // time, and a name already on the gallery is left where it is.
   if (p === '/api/gallery/approve' && req.method === 'POST') {
-    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    const gs = await galleryStaff(url, w);
+    if (!gs.ok) return sendJson(res, gs.code, gs.body);
     let o = {};
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
     const name = String(o.name || '');
@@ -2904,7 +2946,8 @@ async function handle(req, res) {
   // Reject: take it off the queue, and unlink the upload when asked. gallery.json
   // is not touched, because a rejected shot was never on it.
   if (p === '/api/gallery/reject' && req.method === 'POST') {
-    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    const gs = await galleryStaff(url, w);
+    if (!gs.ok) return sendJson(res, gs.code, gs.body);
     let o = {};
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
     const name = String(o.name || '');
@@ -2943,7 +2986,8 @@ async function handle(req, res) {
   // Take an approved shot off the public gallery. Not the same as reject:
   // reject only clears the pending queue. Staff only (access.dev).
   if (p === '/api/gallery/approved' && req.method === 'DELETE') {
-    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    const gs = await galleryStaff(url, w);
+    if (!gs.ok) return sendJson(res, gs.code, gs.body);
     let o = {};
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
     const name = String(o.name || '');
@@ -3019,12 +3063,14 @@ async function handle(req, res) {
   }
 
   if (p === '/api/gallery/reports' && req.method === 'GET') {
-    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    const gs = await galleryStaff(url, w);
+    if (!gs.ok) return sendJson(res, gs.code, gs.body);
     return sendJson(res, 200, { reports: jsonFile(GREPORTS, []) });
   }
 
   if (p === '/api/gallery/report/dismiss' && req.method === 'POST') {
-    if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+    const gs = await galleryStaff(url, w);
+    if (!gs.ok) return sendJson(res, gs.code, gs.body);
     let o = {};
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
     const id = String(o.id || '');
