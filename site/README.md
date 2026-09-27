@@ -113,6 +113,18 @@ array that starts `[]`, deployed by the same rule as every other data JSON
 queue is never overwritten once it exists there). `/api/public` and `/shot`
 never read the queue.
 
+A shot that is still in that queue is not on `/shot` yet, so the only address
+that serves it is `GET /up/<name>`, the uploads door. That door asked for the
+hub member cookie alone, which left the queue page and the launcher showing
+broken pictures to the very roles allowed to decide on them, so a name on
+`gallery-pending.json` now goes through `galleryStaff` there as well (#755):
+the hub cookie of an `access.dev` account, or a launcher ticket for one, and
+`st.play` on its own is not enough. Everything else in `uploads\` is the member
+cookie exactly as before, and anyone with neither a staff cookie nor a ticket
+gets the same `401 sign in first` for a queued name as for any other, so the
+refusal says nothing about what is in the queue. Once a shot is approved it
+leaves the queue and is public at `/shot`, and `/up` closes behind it.
+
 | Route | Method | Who | Body | Answers |
 | --- | --- | --- | --- | --- |
 | `/api/gallery/who` | GET | anybody | none | `200 {signed,canSubmit,staff,admin,name}` for the public gallery page |

@@ -76,6 +76,10 @@ yes('the member lists in /api/all are held back from staff who are not members',
     /results: w\.member \?/.test(SERVER) && /files: w\.member \?/.test(SERVER) &&
     /uploads: w\.member \?/.test(SERVER));
 
+yes('the uploads door sends a waiting shot through the one staff gate, not a second check of its own',
+    /const gs = waiting \? await galleryStaff\(url, w\) : null;/.test(SERVER) &&
+    (SERVER.match(/await galleryStaff\(url, w\)/g) || []).length === 7);
+
 yes('the hub page knows a staff page from an admin one',
     /if \(S\.level\[k\] === 'staff'\) return !!\(S\.me\.dev \|\| S\.me\.admin\);/.test(HUB));
 yes('and has one answer for who the hub opens for at all',
@@ -121,12 +125,15 @@ fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
   gameCheckPort: 1,
   onlineFile: path.join(dir, 'online.json')
 }, null, 2));
-// One file in uploads, so "the member list came back" and "it came back empty"
-// are two different answers.
+// Two files in uploads, so "the member list came back" and "it came back empty"
+// are two different answers, and so the shot waiting on a decision and a file
+// that is nobody's business but a member's are two different names (#755).
 fs.mkdirSync(path.join(dir, 'uploads'), { recursive: true });
 fs.writeFileSync(path.join(dir, 'uploads', 'a-shot.png'), Buffer.from('89504e470d0a1a0a', 'hex'));
+fs.writeFileSync(path.join(dir, 'uploads', 'a-log.txt'), 'a launcher log, not a gallery shot\n');
 fs.writeFileSync(path.join(dir, 'uploads', 'uploads.json'), JSON.stringify({
-  'a-shot.png': { orig: 'a-shot.png', by: 'Djinn', note: '', at: Date.now() }
+  'a-shot.png': { orig: 'a-shot.png', by: 'Djinn', note: '', at: Date.now() },
+  'a-log.txt': { orig: 'launcher.log', by: 'Djinn', note: '', at: Date.now() }
 }));
 fs.writeFileSync(path.join(dir, 'data', 'gallery-pending.json'), JSON.stringify([
   { name: 'a-shot.png', by: 'Djinn', note: '', at: Date.now(), from: 'web' }
@@ -308,9 +315,10 @@ const asJson = { 'content-type': 'application/json' };
     const owner = r.json || {};
     yes('an Owner still gets the whole hub (' + r.status + ')',
         r.status === 200 && owner.me && owner.me.admin === true);
-    yes('the uploads list among it, the one this copy has on disk',
-        Array.isArray(owner.uploads) && owner.uploads.length === 1 &&
-        owner.uploads[0].name === 'a-shot.png');
+    yes('the uploads list among it, the two this copy has on disk',
+        Array.isArray(owner.uploads) && owner.uploads.length === 2 &&
+        owner.uploads.some((u) => u.name === 'a-shot.png') &&
+        owner.uploads.some((u) => u.name === 'a-log.txt'));
 
     // The doors under the hub gate that are not staff doors stay where they were.
     r = await ask('PUT', '/api/results', { cookie: cookieFor(LORE_ID, 'Lore'), 'content-type': 'application/json' },
@@ -348,6 +356,43 @@ const asJson = { 'content-type': 'application/json' };
     yes('a ticket for somebody the Discord has never heard of is refused (' + r.status + ')',
         r.status === 403 && r.json && r.json.why === 'guild');
 
+    // ---- the picture itself, /up (#755) --------------------------------------
+    // The queue page draws every waiting shot as /up/<name>, and the launcher
+    // asks for the same address with its ticket. Both were refused while this
+    // door asked w.member alone.
+    r = await ask('GET', '/up/a-shot.png', { cookie: cookieFor(LORE_ID, 'Lore') });
+    yes('a Loremaster cookie loads the shot that is waiting (' + r.status + ')',
+        r.status === 200 && r.body.indexOf('PNG') >= 0);
+    r = await ask('GET', '/up/a-shot.png' + q(LORE_ID, 'Lore'));
+    yes('a Loremaster ticket with no cookie at all loads it too (' + r.status + ')',
+        r.status === 200 && r.body.indexOf('PNG') >= 0);
+    r = await ask('GET', '/up/a-shot.png' + q(TESTER_ID, 'Tester'));
+    yes('a Playtester ticket does not, and is told it is the role (' + r.status + ')',
+        r.status === 403 && /staff role/.test(r.body));
+    r = await ask('GET', '/up/a-shot.png' + q(STRANGER_ID, 'Stranger'));
+    yes('nor a ticket for somebody the Discord has never heard of (' + r.status + ')',
+        r.status === 403 && /not in the Thornswood Discord/.test(r.body));
+    r = await ask('GET', '/up/a-shot.png');
+    yes('nor nobody at all (' + r.status + ')',
+        r.status === 401 && r.body === 'sign in first');
+    r = await ask('GET', '/up/a-shot.png', { cookie: cookieFor(TESTER_ID, 'Tester') });
+    yes('nor a Playtester cookie (' + r.status + ')',
+        r.status === 401 && r.body === 'sign in first');
+
+    // Only the queue opens. The rest of uploads is the member cookie it always
+    // was, and a name nobody is waiting on tells a stranger nothing either.
+    r = await ask('GET', '/up/a-log.txt', { cookie: cookieFor(LORE_ID, 'Lore') });
+    yes('a Loremaster still cannot read a file that is not a waiting shot (' + r.status + ')',
+        r.status === 401 && r.body === 'sign in first');
+    r = await ask('GET', '/up/a-log.txt' + q(LORE_ID, 'Lore'));
+    yes('and neither can that Loremaster ticket (' + r.status + ')',
+        r.status === 401 && r.body === 'sign in first');
+    r = await ask('GET', '/up/a-log.txt', { cookie: cookieFor(OWNER_ID, 'Owner') });
+    yes('an Owner reads it the way it always did (' + r.status + ')',
+        r.status === 200 && /launcher log/.test(r.body));
+    r = await ask('GET', '/up/a-shot.png', { cookie: cookieFor(OWNER_ID, 'Owner') });
+    yes('and the shot with it (' + r.status + ')', r.status === 200);
+
     r = await ask('POST', '/api/gallery/approve' + q(LORE_ID, 'Lore'), asJson,
                   JSON.stringify({ name: 'a-shot.png' }));
     yes('a Loremaster ticket approves what is waiting (' + r.status + ')',
@@ -355,6 +400,12 @@ const asJson = { 'content-type': 'application/json' };
     let gal = [];
     try { gal = JSON.parse(fs.readFileSync(path.join(dir, 'data', 'gallery.json'), 'utf8')); } catch (e) { }
     yes('and the shot is on the public gallery', gal.some((g) => g.name === 'a-shot.png'));
+    // Off the queue, so /up closes behind it again and /shot is where it lives.
+    r = await ask('GET', '/up/a-shot.png' + q(LORE_ID, 'Lore'));
+    yes('once approved it is no longer a waiting shot, so /up closes again (' + r.status + ')',
+        r.status === 401 && r.body === 'sign in first');
+    r = await ask('GET', '/shot/a-shot.png');
+    yes('and anybody at all reads it at /shot (' + r.status + ')', r.status === 200);
     r = await ask('DELETE', '/api/gallery/approved' + q(TESTER_ID, 'Tester'), asJson,
                   JSON.stringify({ name: 'a-shot.png' }));
     yes('a Playtester ticket cannot take it back down (' + r.status + ')', r.status === 403);
