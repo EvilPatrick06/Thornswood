@@ -368,46 +368,6 @@
         ],
         "rows": [
           {
-            "id": "r50",
-            "done": false,
-            "cells": {
-              "c48": "SunHelm Survival",
-              "c49": "Polls on a timer, the one script type still running. Writes health, stamina, magicka and carry weight against a server that crops and corrects them"
-            },
-            "at": 0,
-            "by": ""
-          },
-          {
-            "id": "r51",
-            "done": false,
-            "cells": {
-              "c48": "SunHelm Diseases",
-              "c49": "Same, and depends on SunHelm"
-            },
-            "at": 0,
-            "by": ""
-          },
-          {
-            "id": "r52",
-            "done": false,
-            "cells": {
-              "c48": "Respawn - Death Overhaul",
-              "c49": "Sets you essential and runs its own death handler. Death cannot complete locally and the server owns respawn"
-            },
-            "at": 0,
-            "by": ""
-          },
-          {
-            "id": "r53",
-            "done": false,
-            "cells": {
-              "c48": "Tavern Games",
-              "c49": "Creates gold client side"
-            },
-            "at": 0,
-            "by": ""
-          },
-          {
             "id": "r54",
             "done": false,
             "cells": {
