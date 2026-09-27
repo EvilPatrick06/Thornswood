@@ -16,7 +16,8 @@ namespace Thornswood
     /// The site still keeps the queue and gallery.json. Play's rotating card
     /// and the Gallery page both ask /api/public for what is already public.
     /// Upload, Report, Accept and Delete live on the Gallery page; Play keeps
-    /// the spotlight only (#731, Gavin 2026-09-27).
+    /// the approved spotlight only. Reject is not offered in the launcher UI;
+    /// unaccepted items sit in the Gallery grid until Accept or Delete (#731).
     ///
     /// WHAT THE LAUNCHER MAY DO AT THE SITE (#731).
     /// /api/gallery/submit and /api/gallery/report take the launcher's signed
@@ -41,7 +42,7 @@ namespace Thornswood
     ///
     /// Waiting pictures are fetched from /up/&lt;name&gt;?ticket=... when the
     /// site has #755 (galleryStaff on that door). Older sites refuse without
-    /// a cookie; the queue still shows Accept / Reject / name / note either way.
+    /// a cookie; the queue still shows Accept / Delete / name / note either way.
     ///
     /// Reading fails quietly. A site that is down, a picture that will not
     /// load, an empty list: each leaves Play's card hidden with nothing said.
@@ -87,7 +88,7 @@ namespace Thornswood
 
         /// <summary>
         /// Site uploads page. Not shown as a launcher placeholder: Accept /
-        /// Reject / Delete live as real buttons on the Gallery page (#731).
+        /// Delete live as real buttons on the Gallery page (#731).
         /// </summary>
         public static string StaffPage { get { return Discord.Site + "/uploads"; } }
 
@@ -177,7 +178,7 @@ namespace Thornswood
         /// Blocking. Call it off the UI thread. The bytes of one waiting picture
         /// at /up/&lt;name&gt;, with this copy's ticket in the query so staff can
         /// see it without a browser cookie (#755). Null when the site refuses
-        /// or the picture will not load; the card still shows Accept / Reject.
+        /// or the picture will not load; the card still shows Accept / Delete.
         /// </summary>
         public static BitmapImage FetchPending(Pending item)
         {

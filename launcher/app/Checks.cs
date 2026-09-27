@@ -27,21 +27,6 @@ namespace Thornswood
     static class Checks
     {
         /// <summary>
-        /// Whether the plugin that walks past the main menu is present. Without
-        /// it the character picker still decides which saves exist, the game
-        /// just asks one more question on the way in.
-        /// </summary>
-        public static bool StartOnSaveInstalled()
-        {
-            try
-            {
-                string dll = System.IO.Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\po3_StartOnSave.dll");
-                return System.IO.File.Exists(dll);
-            }
-            catch { return false; }
-        }
-
-        /// <summary>
         /// The Address Library row on the Play page.
         ///
         /// Script extender plugins look the game's addresses up in this file,
@@ -1158,25 +1143,7 @@ namespace Thornswood
                                     ? Path.GetFileName(foreign[0])
                                     : foreign.Length + " client files")));
 
-            // The plugin that walks past the main menu.
-            //
-            // This helper has existed the whole time and nothing ever showed
-            // its answer, so the launcher said everything checks out while the
-            // one thing that actually puts somebody into the world was missing.
-            // The symptom is not an error: the game opens on NEW, LOAD, QUIT
-            // and waits, which reads as the server ignoring you.
-            //
-            // It is worth its own row rather than folding into Mods, because
-            // neither the installer nor the collection delivers it. The
-            // launcher writes po3_StartOnSave.ini on every Play, so the config
-            // for it is always present and proves nothing about the dll.
-            l.Add(new Check("Auto load",
-                            StartOnSaveInstalled(),
-                            StartOnSaveInstalled()
-                                ? "walks past the main menu"
-                                : "Start On Save is missing, install it in Vortex"));
-
-            l.Add(new Check("Steam", SteamRunning(), "running"));
+l.Add(new Check("Steam", SteamRunning(), "running"));
             return l;
         }
 
