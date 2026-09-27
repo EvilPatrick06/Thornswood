@@ -548,7 +548,7 @@ namespace Thornswood
             File.WriteAllLines(FilesList, lines.ToArray());
             File.WriteAllLines(LeftOutFile, left.ToArray());
             Directory.Move(temp, Folder);
-            WriteMade(src);
+            WriteMade(src, SumCopied(lines));
             SettleSettings(true);
 
             string said = "Thornswood's own Skyrim folder is ready at " + Folder + ": " +
@@ -667,7 +667,7 @@ namespace Thornswood
 
             File.WriteAllLines(FilesList, lines.ToArray());
             File.WriteAllLines(LeftOutFile, left.ToArray());
-            WriteMade(src);
+            WriteMade(src, SumCopied(lines));
             SettleSettings(false);
 
             string own = "";
@@ -1467,13 +1467,32 @@ namespace Thornswood
             return newest;
         }
 
-        static void WriteMade(string src)
+        /// <summary>
+        /// Sum of sizes for files this folder holds as its own copies (C lines
+        /// in files.txt). Hard-linked Vortex files are left out on purpose so
+        /// Installed apps does not show forty gigabytes of shared collection.
+        /// </summary>
+        static long SumCopied(List<string> lines)
+        {
+            long n = 0;
+            foreach (string line in lines)
+            {
+                string[] p = line.Split(new char[] { '|' }, 5);
+                if (p.Length < 3 || p[0] != "C") continue;
+                long s;
+                if (long.TryParse(p[2], out s)) n += s;
+            }
+            return n;
+        }
+
+        static void WriteMade(string src, long copied)
         {
             File.WriteAllLines(MadeFile, new string[] {
                 "source=" + src,
                 "game=" + GameFor(src),
                 "deployment=" + DeploymentStamp(src),
                 "rules=" + Rules,
+                "copied=" + copied,
                 "at=" + DateTime.Now.ToString("o")
             });
         }
