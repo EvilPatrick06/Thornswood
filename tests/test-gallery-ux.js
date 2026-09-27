@@ -84,6 +84,25 @@ yes('submit box accepts drag-and-drop',
     /getElementById\('galDrop'\)/.test(home) &&
     /dataTransfer/.test(home) &&
     /\.gal-box \.form \.gal-drop\.drag\{/.test(home));
+yes('By and Note stack as full-width gal-fields with labels above',
+    /for="galBy">By</.test(home) &&
+    /for="galNote">Note/.test(home) &&
+    /\.gal-box \.form \.gal-field\{[^}]*flex-direction:column/.test(home) &&
+    !/<label>By<input/.test(home) &&
+    !/<label>Note<span class="hint">/.test(home));
+yes('By and Note stay inside the themed .form grid',
+    /id="galChosen"[\s\S]{0,200}gal-field[\s\S]{0,200}galBy[\s\S]{0,300}galNote[\s\S]{0,200}galSend/.test(home) &&
+    !/'<\/div><\/div><\/div>' \+[\s\S]{0,40}<label>By/.test(home));
+yes('By and Note inputs use charcoal iron night theme',
+    /\.gal-box \.form input\[type=text\]\{[^}]*background:var\(--iron\)/.test(home) &&
+    /\.gal-box \.form input\[type=text\]\{[^}]*color-scheme:dark/.test(home) &&
+    /\.gal-box \.form input\[type=text\]:focus\{[^}]*border-color:var\(--gold\)/.test(home) &&
+    /::placeholder\{[^}]*color:var\(--faint\)/.test(home) &&
+    /placeholder="a name for the caption"/.test(home) &&
+    /placeholder="a short note for staff"/.test(home));
+yes('form gap keeps By Note off the drop zone and Send it',
+    /\.gal-box \.form\{gap:22px\}/.test(home));
+
 yes('public gallery keeps per-image Report',
     /data-galreport/.test(home));
 yes('public gallery has no Waiting for approval queue',
