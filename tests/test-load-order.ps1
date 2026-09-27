@@ -181,6 +181,28 @@ try {
         $null -eq (Get-LoadOrderEnabledName '*') -and
         $null -eq (Get-LoadOrderEnabledName ''))
 
+    # ---- load-order copies that must agree (Ship gate) -----------------------
+    #
+    # Get-LoadOrderCopyDiffs used to return , [string[]]... so an empty
+    # result was one nested empty array. Ship wraps with @() and treats
+    # Count -gt 0 as diverge: identical copies looked like a difference.
+    $emptyCopies = @(Get-LoadOrderCopyDiffs @{})
+    Yes 'fewer than two copies is no difference (Count 0, not a nested empty)' ($emptyCopies.Count -eq 0)
+    $oneCopy = @(Get-LoadOrderCopyDiffs @{ 'only' = (Join-Path $tmp 'missing-plugins.txt') })
+    Yes 'one copy is no difference' ($oneCopy.Count -eq 0)
+
+    $copyA = Join-Path $tmp 'copy-a-plugins.txt'
+    $copyB = Join-Path $tmp 'copy-b-plugins.txt'
+    [IO.File]::WriteAllText($copyA, "*SkyUI_SE.esp`r`n*Immersive Armors.esp`r`n")
+    [IO.File]::WriteAllText($copyB, "*SkyUI_SE.esp`r`n*Immersive Armors.esp`r`n")
+    $agree = @(Get-LoadOrderCopyDiffs @{ 'A\plugins.txt' = $copyA; 'B\plugins.txt' = $copyB })
+    Yes 'matching copies agree with Count 0, not a nested empty array' ($agree.Count -eq 0)
+
+    [IO.File]::WriteAllText($copyB, "*Immersive Armors.esp`r`n*SkyUI_SE.esp`r`n")
+    $disagree = @(Get-LoadOrderCopyDiffs @{ 'A\plugins.txt' = $copyA; 'B\plugins.txt' = $copyB })
+    Yes 'swapped plugins are one difference line' ($disagree.Count -eq 1)
+    Yes 'the difference line names both copies' ($disagree[0] -match 'A\\plugins\.txt vs B\\plugins\.txt')
+
     # ---- the order the game counts -------------------------------------------
     $g = GameOf $fixed
     Yes 'the game order comes back as one list, not nested' ($g -is [string[]])
