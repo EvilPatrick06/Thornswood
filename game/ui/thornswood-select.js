@@ -19,7 +19,10 @@
   on a taken slot plays that character at once and a click on an empty slot
   makes a new one at once; there is no Play bar. The keys stay: up, down or
   a number lights a slot, Enter plays the lit one, Delete asks to forget it.
-  The slots are fixed by number too, see slots() below.
+  They only count while the game is the window Windows is sending keys to,
+  see keysCount below, because keys typed into another program reach this
+  page and were taking people past the start screen. The slots are fixed by
+  number too, see slots() below.
 
   The pick is one message, to skymp5-client rather than to our plugin:
 
@@ -293,11 +296,20 @@
   var elShade = root.querySelector('.shade');
   var introPhase = 0;       // 0 not showing, 1 on the ledge, 2 opened
   var introSay = '';        // 'intro off' or 'intro on', said again with the pick
+  var introWent = false;    // Continue was pressed, so the choice has started
   function introEnd(why) {
     if (!introPhase) return;
     introPhase = 0;
     var box = root.querySelector('.intro .skipnext');
-    if (box && box.checked) { introSay = 'intro off'; tell(introSay); }
+    /*
+      Ticking "Start without the scroll next time" and then walking into the
+      slots used to be a one way door for the rest of the start: the way back
+      is drawn only when the scroll was already off, so the person who had
+      just switched it off had nothing to switch it on with until the next
+      start. The same tick box goes up here, unticked, so the scroll can be
+      brought back in the same sitting.
+    */
+    if (box && box.checked) { introSay = 'intro off'; tell(introSay); showBackBox(); }
     elIntro.style.display = 'none';
     elPanel.style.display = '';
     elShade.style.display = '';
@@ -319,12 +331,48 @@
     another window reached the game (thornswood-input.log, fg another
     window, keys 4). So while the scroll is up every key is swallowed and
     only the mouse opens it, ticks the box and presses Continue.
+
+    Swallowed and written down. Nothing said so the first time, so the only
+    evidence that stray keys were reaching the page at all was a count in
+    another log that happened to be running that evening. strayKey puts one
+    line in the front log the first time a key is ignored here.
   */
   function introKey(ev) {
     if (!introPhase) return false;
     ev.preventDefault();
+    strayKey('the sealed scroll only opens for a click');
     return true;
   }
+
+  /*
+    Bring the scroll back, Djinn, 25 September: the faint hint line that did
+    this was easy to miss, and a full button looked more important than
+    Close the game. So it is a small inked tick box on a black strip, red
+    lettering in the page's own italic, like the tick box on the open scroll.
+    Ticked says 'intro on', unticked 'intro off', each time it changes.
+
+    Up when the scroll was off at this start, and up when it was switched off
+    on the scroll a moment ago (see introEnd). Never up otherwise: with the
+    scroll already coming back next time there is nothing here to ask for.
+  */
+  var backShown = false;
+  function showBackBox() {
+    if (backShown) return;
+    backShown = true;
+    var backRow = el('div', 'backrow');
+    var backBox = el('label', 'backbox');
+    var backTick = document.createElement('input');
+    backTick.type = 'checkbox';
+    backBox.appendChild(backTick);
+    backBox.appendChild(document.createTextNode('Show the sealed scroll next time'));
+    backTick.onchange = function () {
+      introSay = backTick.checked ? 'intro on' : 'intro off';
+      tell(introSay);
+    };
+    backRow.appendChild(backBox);
+    root.querySelector('.foot').insertBefore(backRow, root.querySelector('.quitrow'));
+  }
+
   if (elIntro && LIST.intro !== false) {
     introPhase = 1;
     elPanel.style.display = 'none';
@@ -341,32 +389,27 @@
       and not from the game reaching the menu, so time on the scroll is not
       time taken from choosing. Told to the client as 'thornswood',
       'choosing'; a client from before that change ignores it.
+
+      SAID ONCE WAS NOT ENOUGH, and that is why the three minutes still ran
+      from the menu on the build people were given. This page is up about
+      fifteen seconds before any plugin is, and the client only starts
+      listening for the choice when the server has asked it to sign in, so a
+      word sent on the click can land before anybody is listening and be gone.
+      The pick has been repeated for that reason since 21 September. So has
+      'stay' since the day it was added. This is repeated on the same beat
+      now, until a character is picked, and the front repeats it too.
     */
     elIntro.querySelector('.go').onclick = function () {
+      introWent = true;
       try { window.skyrimPlatform.sendMessage('thornswood', 'choosing'); } catch (e) { }
+      // The front hears this and says the same word to the client from its
+      // own tick, so the wait survives the page being reloaded or dying.
+      tell('choosing');
       introEnd('continue clicked, the choice starts now');
     };
     tell('intro: the scroll is up');
   } else if (LIST.intro === false) {
-    /*
-      Bring the scroll back, Djinn, 25 September: the faint hint line that did
-      this was easy to miss, and a full button looked more important than
-      Close the game. So it is a small inked tick box on a black strip, red
-      lettering in the page's own italic, like the tick box on the open scroll.
-      Ticked says 'intro on', unticked 'intro off', each time it changes.
-    */
-    var backRow = el('div', 'backrow');
-    var backBox = el('label', 'backbox');
-    var backTick = document.createElement('input');
-    backTick.type = 'checkbox';
-    backBox.appendChild(backTick);
-    backBox.appendChild(document.createTextNode('Show the sealed scroll next time'));
-    backTick.onchange = function () {
-      introSay = backTick.checked ? 'intro on' : 'intro off';
-      tell(introSay);
-    };
-    backRow.appendChild(backBox);
-    root.querySelector('.foot').insertBefore(backRow, root.querySelector('.quitrow'));
+    showBackBox();
   }
 
   /*
@@ -655,9 +698,54 @@
     setTimeout(function () { root.className = 'gone'; }, 1200);
   }
 
+  /*
+    THE KEYBOARD ONLY COUNTS WHILE THE GAME IS THE WINDOW WINDOWS IS TYPING
+    INTO.
+
+    The sealed scroll was made click only on 25 September because it opened
+    at 16:23:50 with nobody at the game: four key presses typed into another
+    program reached it (thornswood-input.log for that window, fg another
+    window, keys 4). The slots behind it were left exactly as they were, and
+    they answer Enter by playing the lit one, so the same stray keys still
+    took somebody past the start screen and into the world as whoever was lit.
+    That half was written down as not fixed at the time and is fixed here.
+
+    A page cannot see which window has the keyboard. The front can:
+    sp.win32.foregroundWindow is what the pulse already asks every five
+    seconds in the world, and the choice block asks it once a second while
+    this page is up and calls keys(true) or keys(false) below. Until it has
+    said, and while it says the game is behind something else, every key here
+    is swallowed. Nothing on this page needs one: a click plays a character, a
+    click opens the scroll, a click presses Continue.
+
+    A client too old to have win32, or a game with no front plugin, never
+    calls keys at all. Then the keys work from the first mouse move on this
+    page, which is the game handing the browser the mouse and so is somebody
+    at the game, and is what they did before this.
+  */
+  var keysHere = false;
+  var keysSaidAt = 0;
+  var strayAt = 0;
+  function keysCount() {
+    if (!keysSaidAt) return moved;
+    return keysHere && (Date.now() - keysSaidAt) < 5000;
+  }
+  /* One line in the front log, and not one every keystroke. */
+  function strayKey(why) {
+    var now = Date.now();
+    if (strayAt && now - strayAt < 10000) return;
+    strayAt = now;
+    tell('a key was ignored: ' + why);
+  }
+
   function onKey(ev) {
     if (root.className === 'gone') return;
     if (introKey(ev)) return;
+    if (!keysCount()) {
+      ev.preventDefault();
+      strayKey('the keys are going to another window, not the game');
+      return;
+    }
     var list = slots();
     var n = list.length;
     if (asking) {
@@ -740,16 +828,32 @@
   // falls back this session (the fork's AuthService). Repeated because the
   // page is up before the client listens. With the scroll off it stays quiet
   // and the three minute fallback works as before.
+  //
+  // And Continue's word with it. 'choosing' restarts the client's three
+  // minutes from the moment the scroll is closed, and it was sent once, on
+  // the click, into a client that may not have been listening yet. It goes on
+  // the same ten seconds now, until a character is picked.
   var beats = 0;
   var beat = setInterval(function () {
     if (sent || root.className === 'gone') { clearInterval(beat); return; }
     tell('alive ' + seen());
-    if (LIST.intro !== false && beats++ % 5 === 0) {
+    if (LIST.intro !== false && beats % 5 === 0) {
       try { window.skyrimPlatform.sendMessage('thornswood', 'stay'); } catch (e) { }
+      if (introWent) {
+        try { window.skyrimPlatform.sendMessage('thornswood', 'choosing'); } catch (e) { }
+      }
     }
+    beats++;
   }, 2000);
 
-  window.thornswoodSelect = { play: play, acked: onAcked, close: function () { root.className = 'gone'; } };
+  window.thornswoodSelect = {
+    play: play,
+    acked: onAcked,
+    // The front, once a second while this page is up: whether the game is the
+    // window Windows is sending the keys to. See keysCount above.
+    keys: function (on) { keysHere = !!on; keysSaidAt = Date.now(); },
+    close: function () { root.className = 'gone'; }
+  };
   fit();
   draw();
   // When the page itself started, so the front log shows how long it sat
