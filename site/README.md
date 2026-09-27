@@ -36,7 +36,7 @@ It needs node and nothing else. Run it from a copy of this folder rather than
 from the checkout, because it writes beside itself: `config.json` with a fresh
 cookie secret, `site.log`, the `files\` and `uploads\` folders, and anything
 typed into a board or a page in the browser goes into `data\`, which git
-tracks. Copy `config.sample.json` into the copy as `config.json` first. It is
+tracks. Copy `config.example.json` into the copy as `config.json` first. It is
 every setting `server.js` reads, holding what it runs on when there is no
 `config.json` at all: the member password written in `server.js`, the roles,
 and every Discord setting, the bot's key and the cookie secret empty. Empty is
