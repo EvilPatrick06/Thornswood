@@ -214,41 +214,46 @@ if (Test-Path -LiteralPath $OldDist) {
 # which Ship runs to put the plugins and overlays in, now refreshes the kept
 # copies of what it installs, the way a pack does, so nothing here needs it.
 
-# The baseline. What this machine last published, so the next run can pack the
-# difference instead of everything.
+# The baseline. What the last release on this channel published, so the next
+# run can pack the difference instead of everything.
 #
-# It used to live in _dist, which is inside the folder the uninstaller clears.
-# One uninstall took it, and the next ship stopped dead with 'No baseline yet'
-# on a machine that had published fine an hour earlier. It is a record about
-# this computer rather than part of any install, so it lives where neither an
-# uninstall nor a rebuild can reach it, and out of the repo so git never sees
-# it.
-$StateDir   = Join-Path $env:LOCALAPPDATA 'Thornswood'
-$StateFile  = Join-Path $StateDir 'published.json'
-if (-not (Test-Path $StateDir)) { New-Item -ItemType Directory -Path $StateDir -Force | Out-Null }
+# It used to live in _dist (cleared by uninstall), then under LOCALAPPDATA
+# (per machine, so a Dev Ship from a second machine started from nothing). It
+# now lives in the releases clone for this channel, beside version.json, and
+# is committed with the feed so every machine that ships reads the same
+# baseline. Pending notes stay under LOCALAPPDATA: they are about this
+# machine's unfinished push, not about the channel.
+$StateFile = Join-Path $ReleaseDir 'published.json'
 
-# The dev channel keeps its own baseline. It starts as a copy of main's, so
-# the first dev pack is exactly what changed since the last main release, and
-# a main release copies its baseline back over this one (Ship does that), so
-# dev never re-ships what main has already sent everyone.
-if ($Dev) {
-    $devState = Join-Path $StateDir 'published-dev.json'
-    if (-not (Test-Path $devState) -and (Test-Path $StateFile)) {
-        Copy-Item $StateFile $devState -Force
-        Write-Host "  dev baseline started from main's" -ForegroundColor DarkGray
+# Migrate without deleting. Prefer Releases; copy from LOCALAPPDATA or the
+# old DistDir spot the first time this machine runs the new layout. Dev still
+# starts from main's baseline when it has none of its own.
+$legacyDir = Join-Path $env:LOCALAPPDATA 'Thornswood'
+$legacyChannel = Join-Path $legacyDir $(if ($Dev) { 'published-dev.json' } else { 'published.json' })
+$legacyMain = Join-Path $legacyDir 'published.json'
+$oldDistState = Join-Path $DistDir 'published.json'
+if (-not (Test-Path -LiteralPath $StateFile)) {
+    $src = $null
+    if (Test-Path -LiteralPath $legacyChannel) { $src = $legacyChannel }
+    elseif ($Dev -and (Test-Path -LiteralPath $legacyMain)) { $src = $legacyMain }
+    elseif ($Dev) {
+        $mainRel = Join-Path (Split-Path -Parent $ReleaseDir) 'Thornswood-Releases'
+        $mainBase = Join-Path $mainRel 'published.json'
+        if (Test-Path -LiteralPath $mainBase) { $src = $mainBase }
     }
-    $StateFile = $devState
+    if (-not $src -and (Test-Path -LiteralPath $oldDistState)) { $src = $oldDistState }
+    if ($src) {
+        try {
+            Copy-Item -LiteralPath $src -Destination $StateFile -Force
+            Write-Host "  baseline copied to $StateFile from $src (legacy left in place)" -ForegroundColor DarkGray
+        } catch { }
+    }
 }
 
-# Carried over from the old spot the first time this runs, so nobody has to
-# re-baseline just because it moved.
-$oldState = Join-Path $DistDir 'published.json'
-if (-not (Test-Path $StateFile) -and (Test-Path $oldState)) {
-    try {
-        Move-Item $oldState $StateFile -Force
-        Write-Host "  baseline moved to $StateFile, out of reach of the uninstaller" -ForegroundColor DarkGray
-    } catch { }
-}
+# Pending resume notes stay per-machine under LOCALAPPDATA.
+$PendingDir = $legacyDir
+if (-not (Test-Path -LiteralPath $PendingDir)) { New-Item -ItemType Directory -Path $PendingDir -Force | Out-Null }
+$script:PendingFile = Join-Path $PendingDir $(if ($Dev) { 'published-dev-pending.json' } else { 'published-pending.json' })
 $VersionFile = Join-Path $ReleaseDir 'version.json'
 
 # ---- which Skyrim this release is made out of -----------------------------
@@ -578,11 +583,14 @@ function Save-State {
 # already there, and a new id would orphan a set of assets and grow the feed
 # by a release nobody can install.
 #
-# It lives beside the baseline, under LOCALAPPDATA, for the same reason: it
-# is a note about this machine, not part of any install, and the uninstaller
-# cannot reach it. The dev channel has its own baseline and so has its own
-# note.
+# It lives under LOCALAPPDATA, not beside the shared baseline in Releases, for
+# the same reason: it is a note about this machine's unfinished push, not part
+# of the channel, and the uninstaller cannot reach it. The dev channel has its
+# own note.
 function Get-PendingFile([string]$stateFile) {
+    # Pending is machine-local under LOCALAPPDATA; the baseline ($stateFile) is
+    # in the releases clone and is shared.
+    if ($script:PendingFile) { return $script:PendingFile }
     if (-not $stateFile) { return '' }
     return ($stateFile -replace '\.json$', '') + '-pending.json'
 }
@@ -749,7 +757,7 @@ if ($removed.Count -gt $MaxRemovals -and -not $AcceptRemovals) {
     Write-Host ''
     Say ("This release would delete {0:n0} files from every machine that takes it." -f $removed.Count) 'Red'
     Say 'That is almost always a baseline problem rather than a real removal:' 'Red'
-    Say "$StateFile describes the last build this machine published," 'Yellow'
+    Say "$StateFile describes the last build this channel published," 'Yellow'
     Say 'and if what counts as "the build" has moved, everything outside the new' 'Yellow'
     Say 'scope looks deleted at once.' 'Yellow'
     Write-Host ''
@@ -1890,11 +1898,12 @@ if (-not $NoPush) {
             Write-Host ''
             Say 'Then run Ship again, or just push this by hand:' 'Yellow'
             Say ("  cd {0}" -f $ReleaseDir) 'Green'
-            Say '  git add version.json; git commit -m "Update ' + $Id + '"; git push' 'Green'
+            Say '  git add version.json published.json; git commit -m "Update ' + $Id + '"; git push' 'Green'
             $pushFailed = 'no git identity'
         }
         else {
             & git add version.json
+            if (Test-Path -LiteralPath $StateFile) { & git add published.json }
             # The title as the subject and the rest as the body, which is what
             # a commit message is. A note has a body and bullets now, and
             # flattening the lot onto the subject line gave the 1.1.80 release

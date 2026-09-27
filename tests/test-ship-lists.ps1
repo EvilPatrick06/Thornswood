@@ -44,7 +44,7 @@
        and every file whose fate changed is listed by name.
 
   Read only. The game folder, the launcher's record and the baselines under
-  LOCALAPPDATA are read and never written. -Before writes the old scripts and
+  Thornswood-Releases (and legacy LOCALAPPDATA copies) are read and never written. -Before writes the old scripts and
   client-build.json into a temp folder of its own and removes it.
 
   About a minute on the machine that ships, nearly all of it the installer's
@@ -480,17 +480,31 @@ if (-not (Test-Path -LiteralPath (Join-Path $Game 'SkyrimSE.exe')) -or -not (Tes
     # filter. Anything that comes out the other side would be deleted from
     # every tester by the next release.
     $instVanilla = $inst.Module
-    foreach ($name in 'published.json', 'published-dev.json') {
-        $baseline = Join-Path $env:LOCALAPPDATA ('Thornswood\' + $name)
-        if (-not (Test-Path -LiteralPath $baseline)) {
-            Write-Host ("SKIP  no {0} on this machine" -f $name) -ForegroundColor Yellow
+    $repoRoot = Split-Path -Parent $Tools
+    $relSibling = Split-Path -Parent $repoRoot
+    $baselinePaths = @(
+        @{ Name = 'main Releases'; Path = (Join-Path $relSibling 'Thornswood-Releases\published.json') },
+        @{ Name = 'dev Releases';  Path = (Join-Path $relSibling 'Thornswood-Releases-dev\published.json') },
+        @{ Name = 'legacy main';   Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\published.json') },
+        @{ Name = 'legacy dev';    Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\published-dev.json') }
+    )
+    $seen = @{}
+    foreach ($cand in $baselinePaths) {
+        if (-not (Test-Path -LiteralPath $cand.Path)) {
+            Write-Host ("SKIP  no {0} baseline at {1}" -f $cand.Name, $cand.Path) -ForegroundColor Yellow
             continue
         }
-        $keys = [string[]]@(((Get-Content -LiteralPath $baseline -Raw) -replace '^\uFEFF', '' | ConvertFrom-Json).PSObject.Properties.Name)
+        $fp = (Get-FileHash -LiteralPath $cand.Path -Algorithm SHA256).Hash
+        if ($seen.ContainsKey($fp)) {
+            Write-Host ("SKIP  {0} is the same bytes as {1}" -f $cand.Name, $seen[$fp]) -ForegroundColor DarkGray
+            continue
+        }
+        $seen[$fp] = $cand.Name
+        $keys = [string[]]@(((Get-Content -LiteralPath $cand.Path -Raw) -replace '^\uFEFF', '' | ConvertFrom-Json).PSObject.Properties.Name)
         $theirs = [string[]]@(& $instVanilla { param($k) $k | Where-Object { $_ -notlike ':*' -and (Test-Vanilla $_) } } $keys)
         $wouldGo = Invoke-Removed $pack $theirs
-        Write-Host ("      {0}: {1:n0} paths, {2} of them Bethesda's or somebody else's" -f $name, $keys.Count, $theirs.Count) -ForegroundColor DarkGray
-        Yes ("none of those would be deleted from testers by the next release ({0})" -f $name) ($wouldGo.Count -eq 0)
+        Write-Host ("      {0}: {1:n0} paths, {2} of them Bethesda's or somebody else's" -f $cand.Name, $keys.Count, $theirs.Count) -ForegroundColor DarkGray
+        Yes ("none of those would be deleted from testers by the next release ({0})" -f $cand.Name) ($wouldGo.Count -eq 0)
         if ($wouldGo.Count) { Show-Groups $wouldGo 'Red' }
     }
 

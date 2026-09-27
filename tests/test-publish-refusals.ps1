@@ -28,7 +28,8 @@
   with the two files it dot-sources, and the third, Close-Launcher.ps1, is
   replaced by a stub: the real Stop-Game closes any Skyrim on the machine,
   whatever folder it runs from, and nothing here may do that. LOCALAPPDATA
-  points into the temp folder, so the real baseline is never read or written.
+  points into the temp folder for pending notes; the baseline lives in the
+  stand-in releases clone under -ReleaseDir, so the real one is never read or written.
   -NoUpload and -NoPush, no config.json and no gh, so it cannot reach GitHub
   or a server. Every case stops before the pack is built.
 #>
@@ -72,7 +73,7 @@ function New-Install([string]$name, [string[]]$record, [int64]$bytes) {
     [IO.File]::WriteAllText((Join-Path $root 'rel\version.json'), '{"packs":[],"news":[]}')
     # A baseline, so the run is not stopped for having none, naming one file
     # that is gone so the release has something to remove.
-    [IO.File]::WriteAllText((Join-Path $root 'appdata\Thornswood\published.json'), '{"Data\\gone.esp":"10:1"}')
+    [IO.File]::WriteAllText((Join-Path $root 'rel\published.json'), '{"Data\\gone.esp":"10:1"}')
     if ($null -ne $record) {
         [IO.File]::WriteAllLines((Join-Path $root 'Profile\OwnGame\files.txt'), $record)
     }
@@ -85,7 +86,7 @@ function New-Install([string]$name, [string[]]$record, [int64]$bytes) {
 function Invoke-Publish([string]$root, [string[]]$extra) {
     $before = @{
         feed     = Hash (Join-Path $root 'rel\version.json')
-        baseline = Hash (Join-Path $root 'appdata\Thornswood\published.json')
+        baseline = Hash (Join-Path $root 'rel\published.json')
     }
     $oldAppData = $env:LOCALAPPDATA
     $oldEap = $ErrorActionPreference
@@ -112,7 +113,7 @@ function Invoke-Publish([string]$root, [string[]]$extra) {
         Code      = $code
         Out       = $out
         FeedSame  = ($before.feed -eq (Hash (Join-Path $root 'rel\version.json')))
-        BaseSame  = ($before.baseline -eq (Hash (Join-Path $root 'appdata\Thornswood\published.json')))
+        BaseSame  = ($before.baseline -eq (Hash (Join-Path $root 'rel\published.json')))
         Zips      = $zips.Count
         StoppedGame = (Test-Path -LiteralPath (Join-Path $root 'stop-game-was-called.txt'))
     }
@@ -134,6 +135,14 @@ try {
         $to = Join-Path (Split-Path -Parent $tools) $f
         New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
         if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $to -Force }
+    }
+    # Publish-Update places game\required-data into the game folder before the
+    # scan; without the folder the size-gate cases die before the gate.
+    $reqFrom = Join-Path $repoRoot 'game\required-data'
+    $reqTo = Join-Path (Split-Path -Parent $tools) 'game\required-data'
+    if (Test-Path -LiteralPath $reqFrom) {
+        New-Item -ItemType Directory -Path $reqTo -Force | Out-Null
+        Copy-Item -Path (Join-Path $reqFrom '*') -Destination $reqTo -Force
     }
     New-Item -ItemType Directory -Path (Join-Path $tools '..\scripts\dev') -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $tools '..\scripts\dev\Close-Launcher.ps1'), (
@@ -181,7 +190,7 @@ try {
     Yes 'with -AcceptSize the same release goes past the size gate' ($r.Out -notmatch 'the cap is' -and $r.Out -match 'would delete')
     Unchanged $r
 
-    $r = Invoke-Publish (New-Install 'under-cap' $vortex $small) @('-MaxReleaseMB', '1', '-MaxRemovals', '0')
+    $r = Invoke-Publish (New-Install 'under-cap' $vortex $small) @('-MaxReleaseMB', '5', '-MaxRemovals', '0')
     Yes 'a release under the cap goes past the size gate' ($r.Out -notmatch 'the cap is' -and $r.Out -match 'would delete')
     Unchanged $r
 }

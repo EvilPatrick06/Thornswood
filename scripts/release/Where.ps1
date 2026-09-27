@@ -32,7 +32,7 @@
 
 .PARAMETER What
   Which place: Repo, Engine, ServerDist, ClientDist, ServerSettings,
-  ChangeForms, Out, Dist, Package, Payload or ServerZip.
+  ChangeForms, Out, Dist, Package, Payload, ServerZip, Releases or ReleasesDev.
 
 .PARAMETER OldRoot
   The folder the old layout lived in. C:\Thornswood-Dev; tests\test-where.ps1
@@ -42,7 +42,8 @@
 param(
     [Parameter(Mandatory = $true, Position = 0)]
     [ValidateSet('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
-                 'Out', 'Dist', 'Package', 'Payload', 'ServerZip')]
+                 'Out', 'Dist', 'Package', 'Payload', 'ServerZip',
+                 'Releases', 'ReleasesDev')]
     [string]$What,
     [string]$OldRoot = 'C:\Thornswood-Dev'
 )
@@ -80,4 +81,6 @@ switch ($What) {
     'Package'        { Join-Path (Get-Out) 'dist\Thornswood\_dist' }
     'Payload'        { Join-Path (Get-Out) '_payload' }
     'ServerZip'      { Join-Path (Get-Out) 'thornswood-server.zip' }
+    'Releases'       { Join-Path (Split-Path -Parent $repo) 'Thornswood-Releases' }
+    'ReleasesDev'    { Join-Path (Split-Path -Parent $repo) 'Thornswood-Releases-dev' }
 }

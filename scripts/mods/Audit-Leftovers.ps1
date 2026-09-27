@@ -42,12 +42,12 @@ $roots = @(
     @{ Path = 'C:\Thornswood';                                                       Note = 'the live build' }
     @{ Path = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Engine);                                             Note = 'the SkyMP source and build tree' }
     @{ Path = 'C:\SkyrimRP';                                                         Note = 'older attempt?' }
-    @{ Path = 'C:\Users\you\Downloads';                                            Note = 'downloads and the repo' }
-    @{ Path = 'C:\Users\you\AppData\Roaming\skyrim-rp-launcher';                   Note = 'an old launcher''s data' }
-    @{ Path = 'C:\Users\you\AppData\Roaming\com.bstar.skymp-launcher';             Note = 'an old launcher''s data' }
-    @{ Path = 'C:\Users\you\Documents\My Games\Skyrim Special Edition';            Note = 'saves and ini. CAREFUL' }
-    @{ Path = 'C:\Users\you\OneDrive\Documents\My Games\Skyrim Special Edition';   Note = 'the OneDrive copy of the same' }
-    @{ Path = 'C:\Users\you\AppData\Local\Temp\Skyrim Platform';                   Note = 'CEF caches and logs' }
+    @{ Path = (Join-Path $env:USERPROFILE 'Downloads');                                            Note = 'downloads and the repo' }
+    @{ Path = (Join-Path $env:USERPROFILE 'AppData\Roaming\skyrim-rp-launcher');                   Note = 'an old launcher''s data' }
+    @{ Path = (Join-Path $env:USERPROFILE 'AppData\Roaming\com.bstar.skymp-launcher');             Note = 'an old launcher''s data' }
+    @{ Path = (Join-Path $env:USERPROFILE 'Documents\My Games\Skyrim Special Edition');            Note = 'saves and ini. CAREFUL' }
+    @{ Path = (Join-Path $env:USERPROFILE 'OneDrive\Documents\My Games\Skyrim Special Edition');   Note = 'the OneDrive copy of the same' }
+    @{ Path = (Join-Path $env:LOCALAPPDATA 'Temp\Skyrim Platform');                   Note = 'CEF caches and logs' }
     @{ Path = 'C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition'; Note = 'vanilla Steam copy. DO NOT TOUCH' }
 )
 

@@ -221,8 +221,8 @@ try {
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.93`";`r`n")
     [IO.File]::WriteAllText((Join-Path $rel 'version.json'), '{"launcherVersion":"1.1.93","packs":[]}')
     [IO.File]::WriteAllText((Join-Path $relDev 'version.json'), '{"launcherVersion":"1.1.93.2","packs":[],"serverPort":7001}')
-    [IO.File]::WriteAllText((Join-Path $appdata 'Thornswood\published.json'), '{"main":"as last published"}')
-    [IO.File]::WriteAllText((Join-Path $appdata 'Thornswood\published-dev.json'), '{"dev":"as last published"}')
+    [IO.File]::WriteAllText((Join-Path $rel 'published.json'), '{"main":"as last published"}')
+    [IO.File]::WriteAllText((Join-Path $relDev 'published.json'), '{"dev":"as last published"}')
     # An hour old, so the stand-in install is newer and Ship calls it built.
     foreach ($r in $root, $rootDev) {
         $exe = Join-Path $r 'Launcher\Thornswood.exe'
@@ -245,8 +245,7 @@ $vf = Join-Path $ReleaseDir 'version.json'
 $was = [string]((Get-Content -LiteralPath $vf -Raw | ConvertFrom-Json).launcherVersion)
 $now = if ($VersionOverride) { $VersionOverride } else { $was }
 [IO.File]::WriteAllText($vf, '{"launcherVersion":"' + $now + '","packs":[{"id":"20990101-0000"}]}')
-$sn = if ($Channel -eq 'dev') { 'published-dev.json' } else { 'published.json' }
-[IO.File]::WriteAllText((Join-Path (Join-Path $env:LOCALAPPDATA 'Thornswood') $sn), '{"written":"by the publisher"}')
+[IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"written":"by the publisher"}')
 if (-not $NoUpload) { & gh release create 20990101-0000 }
 if (-not $NoPush) { & git -C $ReleaseDir push -u origin HEAD }
 '@
@@ -300,8 +299,8 @@ if ($dir) {
 
     $feed = Join-Path $rel 'version.json'
     $devFeed = Join-Path $relDev 'version.json'
-    $base = Join-Path $appdata 'Thornswood\published.json'
-    $devBase = Join-Path $appdata 'Thornswood\published-dev.json'
+    $base = Join-Path $rel 'published.json'
+    $devBase = Join-Path $relDev 'published.json'
     $distDir = Join-Path $dist 'Play\_dist'
 
     # ---- D: -DryRun -Package on main ------------------------------------------------

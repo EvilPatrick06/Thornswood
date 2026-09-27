@@ -1,7 +1,9 @@
 # Expand the roster seed here-string exactly as Publish-Server would and parse
 # the text that would actually be sent. Same idea as Check-VoiceInstall.ps1:
 # a mistake in a remote block parses perfectly here and fails on the box.
-$src = Get-Content 'C:\Users\you\Downloads\Thornswood-Repo\scripts\release\Publish-Server.ps1' -Raw
+$here = $PSScriptRoot
+if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$src = Get-Content (Join-Path $here '..\release\Publish-Server.ps1') -Raw
 $m = [regex]::Match($src, "(?s)\`$seed = @'\r?\n(.*?)\r?\n'@")
 if (-not $m.Success) { throw 'could not find the roster seed here-string' }
 

@@ -392,8 +392,14 @@ Yes 'one folder is still a list of one' ($one.Count -eq 1 -and $one[0].Folder -e
 Yes 'the three files Go.ps1 writes are the three called ours' ((@($ShipOwnArt) | Where-Object { (Get-Content -LiteralPath (Join-Path $Here '..\scripts\release\Go.ps1') -Raw).Contains("'" + $_ + "'") }).Count -eq 3)
 
 # ---- measured on this machine, where it can be ------------------------------------
-$baseline = Join-Path $env:LOCALAPPDATA 'Thornswood\published.json'
-if ($env:LOCALAPPDATA -and (Test-Path -LiteralPath $baseline)) {
+$baseline = $null
+foreach ($cand in @(
+    (Join-Path (Split-Path -Parent (Split-Path -Parent $Here)) 'Thornswood-Releases\published.json'),
+    (Join-Path $env:LOCALAPPDATA 'Thornswood\published.json')
+)) {
+    if ($cand -and (Test-Path -LiteralPath $cand)) { $baseline = $cand; break }
+}
+if ($baseline) {
     $keys = @(((Get-Content -LiteralPath $baseline -Raw) -replace '^\uFEFF', '' | ConvertFrom-Json).PSObject.Properties.Name)
     if ($keys -contains $bsa) {
         Write-Host "      this machine's last pack carried $bsa, so a vanilla rule would have deleted it"
