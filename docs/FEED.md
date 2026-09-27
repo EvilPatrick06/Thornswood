@@ -1,32 +1,57 @@
 # The update feed
 
 Every Thornswood launcher decides what to download from one file:
-`version.json` in the public repository `EvilPatrick06/Thornswood-Releases`.
-This page is every field in it, who writes each one, who reads it, and what
-goes wrong when it is wrong. File and line references are to the source repo
-on 25 September (main at 044b737) unless they say otherwise.
+`version.json`. After the #649 host cutover that file is served from
+**thornswood.net** (`/feed/version.json` live, `/feed-dev/version.json` for
+dev), with `EvilPatrick06/Thornswood-Releases` kept as the GitHub Contents API
+fallback and rollback. This page is every field in it, who writes each one,
+who reads it, and what goes wrong when it is wrong.
 
 ## Where it is and how a launcher reads it
 
-- **One file per branch.** The `main` branch is the live feed. The `dev`
-  branch is the dev build's feed. A launcher reads the branch in its
-  `config.json` `UpdateBranch`, `main` when empty (`Config.cs:135,280`); the dev
-  build is installed with `UpdateBranch` and `Channel` set to `dev`
-  (`DevBuild.cs:100-101`).
-- **The request.** `GET https://api.github.com/repos/<UpdateRepo>/contents/version.json?ref=<branch>`
+### Host cutover (#649) — live URL shape
+
+Confirmed with Website. Signing / `ExpectedSigner` is still **off**.
+
+| What | URL |
+| --- | --- |
+| Live `version.json` | `https://thornswood.net/feed/version.json` |
+| Dev `version.json` | `https://thornswood.net/feed-dev/version.json` |
+| Live assets | `https://thornswood.net/feed/assets/<sha256>` |
+| Dev assets | `https://thornswood.net/feed-dev/assets/<sha256>` |
+
+- **Primary request.** The launcher prefers `config.json` `UpdateFeedUrl` (a
+  direct https GET of `version.json`). Defaults in `Config.AfterLoad`: main →
+  live URL above; `Channel` or `UpdateBranch` `dev` → dev URL
+  (`Config.cs`, `Updater.Check`). Host allowlist already includes
+  `thornswood.net`.
+- **Fallback / rollback.** If the site feed fails (or `UpdateFeedUrl` is
+  empty), `Updater.Check` falls back to the GitHub Contents API on
+  `UpdateRepo`/`UpdateBranch` (`EvilPatrick06/Thornswood-Releases`). Do **not**
+  delete that repository yet — it stays hot for rollback until the cutover
+  sticks. Publishers still upload release assets there; `-HostAssetUrls` on
+  `Publish-Update.ps1` only rewrites the urls written into `version.json`.
+- **Announce a move.** The feed field `updateFeedUrl` works like `updateRepo`:
+  publish the new URL under the old feed first, then move. Shell saves it
+  quietly into `config.json`.
+- **One file per channel on GitHub (fallback).** The `main` branch of
+  Thornswood-Releases is the live fallback feed; `dev` is the dev fallback. A
+  launcher reads `UpdateBranch`, `main` when empty; the dev build is installed
+  with `UpdateBranch` and `Channel` set to `dev` (`DevBuild.cs`).
+- **GitHub request (fallback).** `GET https://api.github.com/repos/<UpdateRepo>/contents/version.json?ref=<branch>`
   with `Accept: application/vnd.github.raw`, no token unless the config holds
-  one (`Updater.cs:42-55,157-169`). With no token, GitHub allows sixty of these
-  an hour per address; a 403 or 429 is reported as a rate limit, not a fault
-  (`Updater.cs:195-209`). While the game is running the launcher checks every
-  30 seconds (`Shell.cs:1517,1534`).
-- **Parsing.** `VersionDoc.Parse` with the .NET `DataContractJsonSerializer`
-  (`Config.cs:569-578`). A byte order mark is skipped. A value of the wrong JSON
-  type can make the serializer throw, and then the whole document is unread and
-  every launcher reports no answer from the update source and shuts Play
-  (`Config.cs:537-543`). Unknown fields are ignored.
+  one. With no token, GitHub allows sixty of these an hour per address; a 403
+  or 429 is reported as a rate limit, not a fault. While the game is running
+  the launcher checks every 30 seconds (`Shell.cs`).
+- **Parsing.** `VersionDoc.Parse` with the .NET `DataContractJsonSerializer`.
+  A byte order mark is skipped. A value of the wrong JSON type can make the
+  serializer throw, and then the whole document is unread and every launcher
+  reports no answer from the update source and shuts Play. Unknown fields are
+  ignored.
 - **On disk.** Publishers keep a clone beside the source repo:
   `Thornswood-Releases` on `main`, and the worktree `Thornswood-Releases-dev` on
-  `dev` (`Publish-Update.ps1:111-129`).
+  `dev` (`Publish-Update.ps1`). Mirror the same `version.json` (and assets by
+  sha256) onto the site paths above for the host cutover.
 
 ## A real entry, trimmed
 
@@ -104,7 +129,8 @@ launcher.
 | `maxOnline` | number | `Publish-Update.ps1:1348-1352` | `Shell.cs:4551` | Saved when above 0. Written as a number because a quoted `"25"` reads as 0 (`Publish-Update.ps1:1344-1347`). |
 | `collectionUrl` | string | `Set-Collection.ps1:98-101` only; Ship carries it forward untouched | `Shell.cs:4549` | Saved. Where the Collection button sends people. |
 | `collectionRevision` | number | `Publish-Update.ps1:1371-1379`, read off the shipping machine's Vortex | `Shell.cs:4564`, then `Shell.cs:4814-4860` | Not saved. 0 or missing: the launcher says nothing about the collection being behind or ahead. Wrong: tells people to reinstall a collection that is fine. |
-| `updateRepo` | string `owner/name` | `Publish-Update.ps1:1316-1321` from `UpdateRepo` | `Shell.cs:4573-4576`, `Feed-Rules.ps1:43-49` | Saved, quietly. Wrong: every launcher asks the wrong repository next time and may never find its way back. This is how a rename is announced (`Config.cs:505-507`). |
+| `updateRepo` | string `owner/name` | `Publish-Update.ps1` from `UpdateRepo` | `Shell.cs`, `Feed-Rules.ps1` | Saved, quietly. Wrong: every launcher asks the wrong repository next time and may never find its way back. This is how a rename is announced. GitHub Contents API fallback (#649). |
+| `updateFeedUrl` | string, https | `Publish-Update.ps1` from `UpdateFeedUrl` (defaults to the site live/dev URL by channel) | `Shell.cs`, `Updater.Check` | Saved, quietly. Primary `version.json` fetch after #649. Same announce-a-move pattern as `updateRepo`. Empty/absent: keep the launcher default / fall back to GitHub. |
 | `voicePort` | string | from `VoicePort` | `Shell.cs:4569-4572` | Saved, quietly. Used when `voiceUrl` is empty. |
 | `voiceUrl` | string or absent | `Publish-Update.ps1:1328-1342`; `-dev` appended on the dev channel | `Shell.cs:4581-4585` | Saved, quietly. The one field that can be cleared: `""` sends launchers back to the raw port, absent changes nothing (`Config.cs:511-526`). |
 | `discordAppId`, `siteUrl`, `presenceImage` | string | from config, `Publish-Update.ps1:1316-1321` | `Shell.cs:4579-4586` | Saved, quietly. The Discord presence card and its buttons. |
@@ -123,7 +149,7 @@ launcher.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | `yyyyMMdd-HHmm`, `-dev` added on the dev channel, `-<part>` added when a release is split to stay under GitHub's 2 GiB asset limit (`Publish-Update.ps1:762,768-804`). Compared case-insensitively with `applied.txt`. An empty id is never offered. |
-| `url` | string | The asset's API address in the feed's own `updateRepo` (`Feed-Rules.ps1:8-14,55-64`). Empty: the launcher skips it and writes it off as applied (`Shell.cs:4925-4941`). A url that answers 404 fails the whole update and Play stays off (`Shell.cs:4969-4984`). |
+| `url` | string | A GitHub release asset in the feed's `updateRepo`, **or** a thornswood.net host asset under `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>` (`Feed-Rules.ps1`). Empty: the launcher skips it and writes it off as applied. A url that answers 404 fails the whole update and Play stays off. |
 | `sha256` | string, 64 hex | Mandatory; checked after download (`Updater.cs:436-448`). |
 | `notes` | string | The whole Ship note, first line first. The update card shows it (`Shell.cs:4669-4670`). |
 | `name`, `bytes` | string, number | Optional packs only: the Add-ons tab shows them (`Config.cs:354-360`). Publish-Pack also writes `notes` as a file count. |
@@ -176,12 +202,16 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
   one refuses the download (`Updater.cs:428-451`).
 - **Signature.** `ExpectedSigner` is empty, so the launcher exe's signature is
   not checked yet (`Updater.cs:881-901`).
-- **Publish side.** `Feed-Rules.ps1` refuses a new pack whose url is not a
-  release asset in `updateRepo` (`Publish-Update.ps1:1216-1220`).
-  `Check-Secrets.ps1` scans every zip and exe before upload
-  (`Publish-Update.ps1:1039-1047`). Nothing is written to the feed if any asset
-  failed to upload (`Publish-Update.ps1:1139-1172`), and `version.json` is
-  written without a byte order mark (`Publish-Update.ps1:1601-1605`).
+- **Publish side.** `Feed-Rules.ps1` refuses a new pack whose url is neither a
+  release asset in `updateRepo` nor a thornswood.net feed asset under
+  `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>`. Pass `-HostAssetUrls`
+  on `Publish-Update.ps1` to rewrite uploaded pack (and launcher /
+  clientRuntime) urls to the site shape after the GitHub upload; assets still
+  land on Thornswood-Releases for rollback. `Check-Secrets.ps1` scans every zip
+  and exe before upload. Nothing is written to the feed if any asset failed to
+  upload, and `version.json` is written without a byte order mark.
+- **Signing.** `ExpectedSigner` is still empty/absent — Azure Artifact Signing
+  is out of scope for the #649 cutover. Do not invent secrets.
 
 ## Main and dev
 
