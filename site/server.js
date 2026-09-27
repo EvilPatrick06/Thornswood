@@ -263,9 +263,10 @@ const BOARDS = {
   todo:        'Patrick'
 };
 
-/* Who may see what. 'member' is the password, 'admin' is Discord. The server
-   decides this, not the page: a section left out here is not sent at all,
-   rather than sent and hidden. */
+/* Who may see what. 'member' is the password, 'admin' is Discord (the
+   access.admin pair), 'staff' is every access.dev role. The server decides
+   this, not the page: a section left out here is not sent at all, rather than
+   sent and hidden. */
 /* Everything behind /hub is admin now. The tester tier used to live in here,
    which meant anybody allowed into the game could open the same panel he does
    and read half of it. Downloads and Report a problem went to the public site
@@ -274,8 +275,14 @@ const BOARDS = {
 /* Hub trimmed (#433): Gallery (uploads), Sessions, Linked Accounts, Inbox.
    Issue boards, tests, help, roadmap, news, link, archive, todo left the hub.
    Public /known /help /roadmap /news stay as PUBLIC_PAGES. */
+/* The Gallery page is 'staff' rather than 'admin' (#742). Every gallery door
+   it calls asks for w.dev, so a Gamemaster, Moderator or Loremaster could
+   approve and delete by API while the page that does it sent them back to the
+   hub home, and the launcher's Manage on the site button opens this address.
+   The page now matches the doors behind it. The other three stay 'admin':
+   they are the linked accounts, the play sessions and the report inbox. */
 const LEVEL = {
-  uploads: 'admin', linked: 'admin', sessions: 'admin', inbox: 'admin'
+  uploads: 'staff', linked: 'admin', sessions: 'admin', inbox: 'admin'
 };
 
 /* The public front lives at / and needs no password. The working area moved
@@ -903,8 +910,13 @@ async function who(req) {
   };
 }
 
+/* 'staff' is w.dev, which already folds admin in, so widening access.dev
+   widens the pages marked staff with it. Anything with no level named is the
+   hub member cookie, as it always was. */
 const allowed = (key, w) =>
-  LEVEL[key] === 'admin' ? w.admin : w.member;
+  LEVEL[key] === 'admin' ? !!w.admin
+  : LEVEL[key] === 'staff' ? !!w.dev
+  : !!w.member;
 
 /*
   Staff at a gallery door, by either of the two things that can prove it (#743).
@@ -3708,7 +3720,10 @@ async function handle(req, res) {
 
   // ------------------------------------------------------------------- api
   if (p.startsWith('/api/')) {
-    if (!w.member) return sendJson(res, 401, { error: 'sign in first' });
+    // Staff as well as hub members, so the Gallery page can boot (#742). What
+    // they get is still decided by LEVEL below: for staff who are not admins
+    // that is the pages marked 'staff' and nothing else.
+    if (!w.member && !w.dev) return sendJson(res, 401, { error: 'sign in first' });
 
     if (p === '/api/all' && req.method === 'GET') {
       const docs = {}, boards = {};
@@ -3720,9 +3735,12 @@ async function handle(req, res) {
         titles: Object.assign({}, DOCS, BOARDS),
         level: LEVEL,
         docs, boards,
-        results: jsonFile(RESULTS, {}),
-        files: listFiles(),
-        uploads: listUploads(),
+        // Member and admin material, held back from staff who are neither.
+        // They are here for the Gallery page, which reads none of these: the
+        // queue and the live list are their own doors.
+        results: w.member ? jsonFile(RESULTS, {}) : {},
+        files: w.member ? listFiles() : [],
+        uploads: w.member ? listUploads() : [],
         news: jsonFile(NEWS, { launcher:'', news: [] }),
         invite: cfg.discord.invite || '',
         linked: w.admin ? Object.values(jsonFile(LINKED, {})) : [],
@@ -3732,6 +3750,9 @@ async function handle(req, res) {
     }
 
     if (p === '/api/results' && req.method === 'PUT') {
+      // A hub door, not a staff one: the gate above now lets staff in as far
+      // as the pages LEVEL marks 'staff', and this writes the test marks.
+      if (!w.member) return sendJson(res, 403, { error: 'hub members only' });
       let obj;
       try { obj = JSON.parse(await body(req)); }
       catch (e) { return sendJson(res, 400, { error: 'bad json' }); }

@@ -566,14 +566,16 @@ tr.adder .plus{color:var(--faint);font-size:16px;line-height:38px}
   left". The server hands the same file to every address and this reads the
   address and draws that section.
 
-  Two tiers. The password gets you in; Discord makes you an admin. The server
-  decides which is which and simply does not send what you may not see, so the
-  page only has to decide what to draw, never what to hide.
+  Three tiers. The password gets you in; Discord makes you staff or an admin.
+  The server decides which is which and simply does not send what you may not
+  see, so the page only has to decide what to draw, never what to hide. Staff
+  is the access.dev roles and it opens the pages the server marks 'staff',
+  which is the Gallery page and the gallery doors under it (#742).
 */
 
 /* ---------------------------------------------------------------- state -- */
 var S = {
-  me:{member:false,admin:false,name:''}, titles:{}, level:{},
+  me:{member:false,admin:false,dev:false,name:''}, titles:{}, level:{},
   docs:{}, boards:{}, results:{}, files:[], uploads:[], inbox:[], linked:[],
   sessions:[],
   news:{news:[]}, invite:'', at:'home', editing:false, discord:false
@@ -619,9 +621,24 @@ function label(k) {
   if (k === 'sessions') return 'Play sessions';
   return S.titles[k] || k;
 }
+/* The level the server sent for this page, against who the server says we are.
+   'staff' is the access.dev roles (Owner, Dev, Gamemaster, Moderator,
+   Loremaster), which is who the gallery doors behind /uploads let in (#742).
+   The server's dev already folds admin in; admin is named here as well so the
+   page does not quietly depend on that being true at the other end. */
 function maySee(k) {
   if (k === 'home') return true;
-  return S.level[k] === 'admin' ? S.me.admin : true;
+  if (S.level[k] === 'admin') return !!S.me.admin;
+  if (S.level[k] === 'staff') return !!(S.me.dev || S.me.admin);
+  return true;
+}
+/* Staff of any kind: who the hub opens for at all. */
+function inHub() { return !!(S.me.admin || S.me.dev); }
+/* The word the server put on this page, shown beside its name so a tab says
+   whether it is an admin page or a staff one rather than always saying admin. */
+function levelTag(k, cls) {
+  if (!S.level[k]) return '';
+  return '<span class="' + cls + '">' + esc(S.level[k]) + '</span>';
 }
 
 function api(path, opts) {
@@ -736,13 +753,14 @@ function chrome() {
     if (g.label) out += '<div class="group">' + esc(g.label) + '</div>';
     keys.forEach(function (k) {
       out += '<a class="tab" data-k="' + k + '" href="' + PATHS[k] + '">' + esc(label(k)) +
-             (S.level[k] === 'admin' ? '<span class="key">admin</span>' : '') + '</a>';
+             levelTag(k, 'key') + '</a>';
     });
   });
   el('tabs').innerHTML = out;
 
-  el('whoami').innerHTML = S.me.admin
-    ? '<div class="me">Signed in as <b>' + esc(S.me.name || 'admin') + '</b><br>admin</div>' +
+  el('whoami').innerHTML = inHub()
+    ? '<div class="me">Signed in as <b>' + esc(S.me.name || (S.me.admin ? 'admin' : 'staff')) +
+      '</b><br>' + (S.me.admin ? 'admin' : 'staff') + '</div>' +
       '<button class="out" id="out">sign out</button>'
     : '<a class="discord ghost" href="/auth/discord?back=' +
       encodeURIComponent(location.pathname) + '">Sign in with Discord</a>' +
@@ -1575,7 +1593,7 @@ function crumb() {
 function head(extra, noLede) {
   return crumb() +
     '<div class="bar"><h2>' + esc(label(S.at)) +
-    (S.level[S.at] === 'admin' ? ' <span class="tagline">admin</span>' : '') + '</h2>' +
+    ' ' + levelTag(S.at, 'tagline') + '</h2>' +
     '<span class="said" id="said"></span>' + (extra || '') + '</div>' +
     (ABOUT[S.at] && !noLede ? '<p class="lede">' + esc(ABOUT[S.at]) + '</p>' : '');
 }
@@ -1631,7 +1649,7 @@ function card(k, lead) {
   return '<a class="card' + (lead ? ' lead' : '') + '" href="' + PATHS[k] + '">' +
     '<div class="t">' + esc(label(k)) +
       (lead ? ' <span class="mark">start here</span>' : '') +
-      (S.level[k] === 'admin' ? ' <span class="mark">admin</span>' : '') + '</div>' +
+      ' ' + levelTag(k, 'mark') + '</div>' +
     '<div class="d">' + esc(ABOUT[k] || '') + '</div>' +
     '<div class="n">' + esc(countFor(k)) + '</div>' +
   '</a>';
@@ -1647,7 +1665,9 @@ function drawHome() {
     '</div>' +
     '<div class="rule"></div>';
 
-  if (S.me.admin) {
+  // Staff as well as admins, and card() drops the ones they may not open, so
+  // a Gamemaster lands on a home page with Gallery on it and nothing else.
+  if (inHub()) {
     out += '<div class="cards">' +
       card('uploads') + card('sessions') + card('linked') + card('inbox') +
       '</div>';

@@ -1,4 +1,4 @@
-﻿/*
+/*
   test-gallery-report.js
 
       node .\tests\test-gallery-report.js
@@ -110,6 +110,13 @@ yes('neither cookie nor ticket is the 403 staff only these doors always sent',
 yes('who(req) is still the twa cookie and nothing else, so a cookie is not the ticket',
     /const ADMIN\s+= 'twa';/.test(SERVER) &&
     /function identity\(req\) \{\s*\n\s*const raw = cookies\(req\)\[ADMIN\] \|\| '';/.test(SERVER));
+
+// The page the card sends staff to has to be open to the roles the doors let
+// in, or Manage on the site lands a Gamemaster back on the hub home (#742).
+yes('the hub Gallery page is a staff page, matching the doors',
+    /const LEVEL = \{\s*\n\s*uploads: 'staff',/.test(SERVER));
+yes('and the page gate knows what a staff page is',
+    /LEVEL\[key\] === 'staff' \? !!w\.dev/.test(SERVER));
 
 // ---- Gallery.cs API ---------------------------------------------------------
 const report = body(GALLERY, 'public static string Report(string name, string why)');

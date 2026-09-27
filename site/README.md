@@ -144,7 +144,13 @@ images are taken: `/shot` serves with a plain `Content-Length` and no range,
 which a browser needs before it will play an mp4, so video waits until `/shot`
 honours a range. Staff means the `access.dev` roles (Owner, Dev, Gamemaster,
 Moderator, Loremaster), not Owner/Dev-only `w.admin`. The public `/gallery`
-page has the member submit form; the hub Uploads page shows the queue and
-reports. `tests\test-gallery.js` drives the routes end to end against a copy.
+page has the member submit form; the hub Gallery page, `/uploads`, shows the
+queue and the live list. That page is `LEVEL.uploads: 'staff'` (#742), so the
+roles that may call the doors are the roles that may open the page it is called
+from, and the launcher's Manage on the site button keeps working for them. The
+hub's other three pages stay `'admin'`.
+`tests\test-gallery.js` drives the routes end to end against a copy, and
+`tests\test-hub-staff-gallery.js` drives both gates with a stub standing in for
+Discord, so a Loremaster exists without anybody being in a real server.
 Deploy with `.\scripts\deploy\Deploy-Docs.ps1`, which sends `server.js`, the
 public and hub pages, and the empty queue and reports files.
