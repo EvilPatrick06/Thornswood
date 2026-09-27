@@ -364,7 +364,7 @@ try {
     $r = Run @('-Collection', $col5, '-List', $newFull, '-Data', $data)
     Yes 'a full plugin added with no rule fails (exit 1)' ($r.Code -eq 1)
     Yes 'and says it floats and which rule the next upload needs' `
-        (Has $r.Out 'New Plugin.esp (line 15): no rule names it, so LOOT may put it anywhere. The next upload needs a rule loading it after Playable Rieklings.esp.')
+        (Has $r.Out 'New Plugin.esp (line 15): no rule names it, so LOOT may put it anywhere. The next upload needs a rule loading it after Playable Rieklings.esp. Exact next after-rule: { "name": "new plugin.esp", "after": ["playable rieklings.esp"] }')
 
     $r = Run @('-Collection', $col5, '-List', $newLight, '-Data', $data)
     Yes 'a plugin carrying the ESL flag needs no rule (exit 0)' ($r.Code -eq 0)
@@ -377,7 +377,7 @@ try {
 
     $r = Run @('-Collection', $siblings, '-List', $abg, '-Data', $data)
     Yes 'two plugins both named but not ordered against each other fail (exit 1)' ($r.Code -eq 1)
-    Yes 'and the pair is named' (Has $r.Out 'Beta.esp (line 3) then Gamma.esp (line 4): no rule orders the two, so LOOT may swap them.')
+    Yes 'and the pair is named' (Has $r.Out 'Beta.esp (line 3) then Gamma.esp (line 4): no rule orders the two, so LOOT may swap them. Exact next after-rule: { "name": "gamma.esp", "after": ["beta.esp"] }')
 
     $r = Run @('-Collection', $throughLight, '-List', $withMid, '-Data', $data)
     Yes 'a chain through an enabled light plugin holds (exit 0)' ($r.Code -eq 0)

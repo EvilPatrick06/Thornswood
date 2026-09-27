@@ -252,6 +252,11 @@ if ($absent.Count) {
 Write-Host ''
 
 $script:problems = 0
+# Exact collection.json pluginRules line for the next Nexus upload.
+# Names are lower case the way Vortex writes them.
+function AfterRuleLine([string]$before, [string]$after) {
+  return ('Exact next after-rule: { "name": "' + $after.ToLowerInvariant() + '", "after": ["' + $before.ToLowerInvariant() + '"] }')
+}
 function Verdict([string]$what, [string[]]$lines) {
   if ($null -eq $lines -or $lines.Count -eq 0) { Say ("  yes   " + $what) 'Green'; return }
   $script:problems += $lines.Count
@@ -270,7 +275,7 @@ if ($edges.Count -eq 0) {
     if ($named.Contains($full[$i])) { continue }
     [void]$floating.Add($full[$i])
     if ($i -gt 0) {
-      [void]$out.Add((Show $full[$i]) + ': no rule names it, so LOOT may put it anywhere. The next upload needs a rule loading it after ' + $full[$i - 1] + '.')
+      [void]$out.Add((Show $full[$i]) + ': no rule names it, so LOOT may put it anywhere. The next upload needs a rule loading it after ' + $full[$i - 1] + '. ' + (AfterRuleLine $full[$i - 1] $full[$i]))
     } else {
       [void]$out.Add((Show $full[$i]) + ': no rule names it, so LOOT may put it anywhere.')
     }
@@ -321,7 +326,7 @@ if ($edges.Count -eq 0) {
     if (Test-Reaches $b $a) {
       [void]$out.Add((Show $a) + ' then ' + (Show $b) + ': the rules put them the other way round.')
     } else {
-      [void]$out.Add((Show $a) + ' then ' + (Show $b) + ': no rule orders the two, so LOOT may swap them.')
+      [void]$out.Add((Show $a) + ' then ' + (Show $b) + ': no rule orders the two, so LOOT may swap them. ' + (AfterRuleLine $a $b))
     }
   }
   Verdict ("every pair of full plugins next to each other is held in that order ({0} pairs)" -f $pairs) $out.ToArray()
