@@ -349,30 +349,26 @@ them, names the SIL Open Font License, Version 1.1.
 ## On our servers
 
 - The game server's native module, `scam_native.node`, recorded in
-  `records\server-build.json`. That record pins `skymp5-server` in the fork at
+  `records\server-build.json`. That record names `skymp5-server` in the fork at
   `5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df`, the same commit
   `records\client-build.json` names, and it is AGPL-3.0. The binary running on
-  the VPS has not been rebuilt against that pin yet: it is still the earlier
-  build from `3cbf2f8779f512ab571009e9bcbd1274c39d9874`, and `Deploy-Server.ps1`
-  refuses a rebuilt module until the record names its sha256. Section 13 of the
-  AGPL asks that everybody who connects to a modified server over a network be
-  offered its source. The next section is that offer.
+  the VPS is that build: the record hashes it as
+  `e5d85ed8038b5bfc8e896ab6addc757709d5f272765fba7c418374ca2aedd53f`, built
+  2026-09-27T05:19:54Z and recorded after the Deploy-Server that sent it, and
+  `Deploy-Server.ps1` refuses any module whose sha256 the record does not name.
+  Section 13 of the AGPL asks that everybody who connects to a modified server
+  over a network be offered its source. The next section is that offer.
 
 ## Where the source is
 
-For the six client files, the Corresponding Source is the fork at the recorded
-commit:
+For the six client files and for the game server module running on the VPS, the
+Corresponding Source is the fork at the one commit both records name:
 
 https://github.com/EvilPatrick06/skymp/tree/5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df
 
-The game server module running on the VPS is the earlier build, so its
-Corresponding Source is the fork at the commit that binary was built from:
-
-https://github.com/EvilPatrick06/skymp/tree/3cbf2f8779f512ab571009e9bcbd1274c39d9874
-
-Both are on the branch `thornswood/engine-changes`, they are public, and the
-branch answered an anonymous request on 24 September. It builds with CMake and
-vcpkg from the fork's `vcpkg.json`. The licence texts are in each tree:
+It is on the branch `thornswood/engine-changes`, it is public, and the branch
+answered an anonymous request on 24 September. It builds with CMake and
+vcpkg from the fork's `vcpkg.json`. The licence texts are in that tree:
 `skymp5-client/LICENSE`, `skyrim-platform/LICENSE` and `skymp5-server/LICENSE`.
 
 That covers what Thornswood built. It does not cover
