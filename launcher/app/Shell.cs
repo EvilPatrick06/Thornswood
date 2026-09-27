@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media;
@@ -127,8 +128,9 @@ namespace Thornswood
         static Button btnVoiceTest;
         static TextBlock txtVoiceState;
         static Button btnUninstall, btnServerStart, btnServerStop;
-        static Button btnServerMain, btnServerDev;
-        static TextBlock txtBrandSmall, txtBrandBig, txtServerPick, noteServerPick;
+        static Button btnServerMain, btnServerDev, btnServerPick;
+        static Popup serverPickPopup;
+        static TextBlock txtBrandSmall, txtBrandBig, txtServerPick;
         static TextBlock txtServerState;
         static Border updateBar, mineCard;
         static Border downgradeBar;
@@ -609,7 +611,8 @@ namespace Thornswood
             btnRepair = F<Button>("BtnRepair"); btnRestore = F<Button>("BtnRestore");
             btnIcons = F<Button>("BtnIcons");
             btnServerMain = F<Button>("BtnServerMain"); btnServerDev = F<Button>("BtnServerDev");
-            txtServerPick = F<TextBlock>("TxtServerPick"); noteServerPick = F<TextBlock>("NoteServerPick");
+            btnServerPick = F<Button>("BtnServerPick"); serverPickPopup = F<Popup>("ServerPickPopup");
+            txtServerPick = F<TextBlock>("TxtServerPick");
             txtBrandSmall = F<TextBlock>("TxtBrandSmall"); txtBrandBig = F<TextBlock>("TxtBrandBig");
             btnUninstall = F<Button>("BtnUninstall"); chkKeepSaves = F<CheckBox>("ChkKeepSaves");
             chkDeleteMods = F<CheckBox>("ChkDeleteMods");
@@ -1373,8 +1376,9 @@ namespace Thornswood
             {
                 btnUninstall.Click += delegate { DoUninstall(); };
             }
-            if (btnServerDev != null) btnServerDev.Click += delegate { SwitchToDev(); };
-            if (btnServerMain != null) btnServerMain.Click += delegate { SwitchToMain(); };
+            if (btnServerPick != null) btnServerPick.Click += delegate { ToggleServerPick(); };
+            if (btnServerDev != null) btnServerDev.Click += delegate { CloseServerPick(); SwitchToDev(); };
+            if (btnServerMain != null) btnServerMain.Click += delegate { CloseServerPick(); SwitchToMain(); };
 
             btnOpenSaveFolder.Click += delegate { Open(Files.SaveDir); };
             btnOpenLogFolder.Click += delegate { Open(Files.SkseLogDir); };
@@ -3970,45 +3974,49 @@ namespace Thornswood
         // draws. A settings page that freezes for most of a second every time
         // it is opened is worse than one that fills in a moment later.
         /// <summary>
-        /// The server selector on the Play page (#605): which server this build
-        /// joins, main or dev, and the buttons to switch. The two servers are two
-        /// launcher installs; the dev build is a second launcher in its own folder.
-        /// The button that is the build you are on is drawn greyed as the current
-        /// one, and the other switches: to dev by opening or installing the dev
-        /// build, to main by opening the main launcher beside it.
+        /// The compact Server control on Play: the closed label is the server
+        /// this build is on, and the dropdown lists Main and Dev. Picking the
+        /// other one opens or installs that build; picking the current one
+        /// just closes the list. More servers later are more rows (#605).
         /// </summary>
         static void DrawServerPick()
         {
             if (btnServerMain == null || btnServerDev == null || txtServerPick == null) return;
             if (cfg.IsDev)
             {
-                txtServerPick.Text = "You are on the dev build. It joins the dev server on port " + cfg.ServerPort + ".";
-                if (noteServerPick != null)
-                    noteServerPick.Text = "The main build is the one you installed first, and it is not touched from here. Switch back to it to play on the main server.";
+                txtServerPick.Text = "Dev";
                 btnServerDev.IsEnabled = false;
-                btnServerDev.Content = "Dev server";
+                btnServerDev.Content = "Dev";
                 btnServerMain.IsEnabled = true;
-                btnServerMain.Content = "Switch to the main server";
+                btnServerMain.Content = "Main";
                 return;
             }
-            txtServerPick.Text = "You are on the main server.";
-            bool have = DevBuild.Installed;
-            if (noteServerPick != null)
-                noteServerPick.Text = have
-                    ? "The dev build is installed at " + DevBuild.Root + ". Switch to it to test on the dev server; this build is not touched."
-                    : "The dev build is a second launcher for testing on the dev server. Staff roles only; the launcher checks your Discord roles before it installs it.";
+            txtServerPick.Text = "Main";
             btnServerMain.IsEnabled = false;
-            btnServerMain.Content = "Main server";
+            btnServerMain.Content = "Main";
             btnServerDev.IsEnabled = true;
-            btnServerDev.Content = have ? "Open the dev build" : "Switch to the dev server";
+            // Label stays Dev in the list; SwitchToDev still opens an installed
+            // build or runs the staff-role gate and install offer when it is not.
+            btnServerDev.Content = "Dev";
         }
 
-        /// <summary>
-        /// Switch to the dev server from the Play page. If the dev build is
-        /// already installed it is opened. If it is not, the site is asked
-        /// whether this account's Discord roles allow the dev build, and only a
-        /// yes offers the install. Kept off the window's thread for the check.
-        /// </summary>
+        static void ToggleServerPick()
+        {
+            if (serverPickPopup == null || btnServerPick == null) return;
+            if (!serverPickPopup.IsOpen)
+            {
+                // Match the closed control so the list lines up under it.
+                serverPickPopup.MinWidth = btnServerPick.ActualWidth;
+                serverPickPopup.IsOpen = true;
+            }
+            else serverPickPopup.IsOpen = false;
+        }
+
+        static void CloseServerPick()
+        {
+            if (serverPickPopup != null) serverPickPopup.IsOpen = false;
+        }
+
         static void SwitchToDev()
         {
             if (cfg.IsDev) return;
