@@ -16,20 +16,33 @@
   wrong object.
 
   MCMHelper.esp is not ESL flagged (its TES4 header flags are 0x00000000), so
-  it takes a real index. In plugins.txt it sits at line 80, between
-  SunHelmDiseases.esp at 79 and chfshVariousActions.esp at 86, which is index
-  41 and 42 of the server's list. So enabling it client side alone shifts
-  seventeen server entries by one. That is the whole reason this is a script
-  and not a tick box.
+  it takes a real index. Enabling it client side alone shifts every server
+  entry after it by one. That is the whole reason this is a script and not a
+  tick box.
 
   Both sides, or neither.
+
+  WHERE IT GOES. -After is the plugin the new entry is put behind, and the
+  default is SkyUI_SE.esp because that is MCMHelper.esp's own master: the
+  server's reader refuses a plugin whose masters are absent, so a server list
+  that can hold MCMHelper.esp holds SkyUI_SE.esp already, and right behind it
+  is the earliest place the entry is legal. Enable-MCM.ps1 is what clears
+  SkyUI_SE.esp's light flag so it takes a normal index and can be in that list
+  at all, so run that first.
+
+  The default used to be SunHelmDiseases.esp, read off line 79 of one
+  machine's plugins.txt in September. SunHelm left the collection with the
+  needs rebuild (issue #480), so that anchor is in no load order now and this
+  script would have stopped on it. Being behind the master is a rule rather
+  than a line number, so it does not go stale the next time the collection is
+  rebaked.
 #>
 
 [CmdletBinding()]
 param(
   [string] $Game     = 'C:\Thornswood',
   [string] $Settings = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerSettings),
-  [string] $After    = 'SunHelmDiseases.esp'
+  [string] $After    = 'SkyUI_SE.esp'
 )
 
 Set-StrictMode -Off
@@ -60,7 +73,16 @@ if ($already) {
   for ($i = 0; $i -lt $lo.Count; $i++) {
     if ([IO.Path]::GetFileName($lo[$i]) -ieq $After) { $at = $i; break }
   }
-  if ($at -lt 0) { throw "could not find $After in the server load order, not touching it" }
+  # Stopping here is the point. Putting MCMHelper.esp at a guessed position
+  # shifts every entry after it, and the client's check calls that "Expect
+  # EVERYTHING BREAK". A missing anchor is a list that is not ready for this
+  # script, not a list to insert into anyway.
+  if ($at -lt 0) {
+    throw ("$After is not in the server load order ($($lo.Count) entries), so there is nowhere " +
+           "safe to put MCMHelper.esp. Run Enable-MCM.ps1 to clear SkyUI_SE.esp's light flag and " +
+           "Sync-LoadOrder.ps1 to rebuild the list, then run this again. Pass -After <plugin> only " +
+           "if you know MCMHelper.esp's master sits at or before it.")
+  }
 
   $entry = ($lo[$at] -replace '[^/\\]+$', 'MCMHelper.esp')
   $new = @()
