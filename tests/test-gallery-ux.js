@@ -40,6 +40,15 @@ yes('slideshow has themed prev next arrows',
     /\.gal-show \.gal-nav\{[^}]*border:1px solid var\(--gold\)/.test(home) &&
     /aria-label', 'Previous picture'/.test(home) &&
     /aria-label', 'Next picture'/.test(home));
+yes('gallery cards use By or a descriptive fallback alt',
+    /esc\(g\.by \|\| 'Gallery image'\)/.test(home));
+yes('gallery slideshow uses By or a descriptive fallback alt',
+    /img\.alt = s\.by \|\| 'Gallery image';/.test(home));
+yes('hub gallery thumbnails use By or contextual fallback alts',
+    /esc\(g\.by \|\| 'Pending gallery image'\)/.test(hub) &&
+    /esc\(g\.by \|\| 'Live gallery image'\)/.test(hub));
+yes('selected upload previews document their decorative empty alt',
+    /decorative by design/.test(home) && /img\.alt = ''/.test(home));
 yes('slideshow pauses on hover and arrow use',
     /mouseenter/.test(home) && /mouseleave/.test(home) &&
     /function userStep\(n\)/.test(home) && /stopFlip\(\)/.test(home));
