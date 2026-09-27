@@ -23,6 +23,15 @@
 # Safe because the repository is private: nobody outside the team can open a
 # pull request that runs code on the box.
 #
+# WHY THE ACTIONS ARE PINNED. Every action is named by a full length commit
+# SHA, with the tag it was on the end of the line, the same as release.yml has
+# been since it was written. A tag on an action is a moving pointer its owner
+# can repoint at any commit, and these steps run on the VPS, beside the live
+# server: a repointed tag would be somebody else's code on that box without a
+# line changing here. The comment is what a person reads; the SHA is what runs.
+# To move one, look the tag up and replace both:
+#   gh api repos/actions/checkout/git/matching-refs/tags/v7
+#
 # FAST, SINCE 25 SEPTEMBER: every pull request and every push to main gets
 # the checks that take seconds (secrets, every script and file parses, the
 # writing rules, the launcher window) and the launcher build, about two
@@ -58,7 +67,7 @@ jobs:
     # About two minutes on the VPS. Past this it is stuck, not slow.
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Scan the tree for secrets
         shell: pwsh
@@ -167,7 +176,7 @@ jobs:
           exit $LASTEXITCODE
 
       - name: Keep the exe from this build
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: Thornswood.exe
           path: ${{ runner.temp }}/Thornswood/Launcher/Thornswood.exe
