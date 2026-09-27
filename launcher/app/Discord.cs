@@ -131,8 +131,14 @@ namespace Thornswood
             {
                 if (avatar == null)
                 {
-                    try { avatar = File.Exists(AvatarFile) ? File.ReadAllText(AvatarFile).Trim() : ""; }
-                    catch { avatar = ""; }
+                    try
+                    {
+                        avatar = File.Exists(AvatarFile) ? File.ReadAllText(AvatarFile).Trim() : "";
+                        // A quoted hash from an older hand-edit or JSON paste must not fail HashOk.
+                        if (avatar.Length >= 2 && avatar[0] == '"' && avatar[avatar.Length - 1] == '"')
+                            avatar = avatar.Substring(1, avatar.Length - 2).Trim();
+                    }
+                    catch (Exception ex) { Swallow.Note("Discord.Avatar", ex); avatar = ""; }
                 }
                 return avatar;
             }
@@ -189,7 +195,7 @@ namespace Thornswood
                 int idx = (int)((n >> 22) % 6UL);
                 return "https://cdn.discordapp.com/embed/avatars/" + idx + ".png";
             }
-            catch { return "https://cdn.discordapp.com/embed/avatars/0.png"; }
+            catch (Exception ex) { Swallow.Note("Discord.DefaultAvatarUrl", ex); return "https://cdn.discordapp.com/embed/avatars/0.png"; }
         }
 
         /// <summary>
@@ -241,6 +247,10 @@ namespace Thornswood
 
         static void Save(string t, string who, string pic)
         {
+            // Only a real Discord hash is kept. Empty or junk must not leave a
+            // bad file that blocks the default portrait, and must not paint
+            // the Clyde-style embed avatar when a custom one exists.
+            if (pic != null && pic.Length > 0 && !HashOk(pic)) pic = "";
             try
             {
                 Directory.CreateDirectory(Folder);
@@ -252,7 +262,7 @@ namespace Thornswood
                 // gets to read the file.
                 Secrets.LockDown(TicketFile);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Discord.Save", ex); }
             ticket = t ?? ""; name = who ?? ""; avatar = pic ?? "";
         }
 

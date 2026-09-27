@@ -667,9 +667,9 @@
                     </Rectangle.OpacityMask>
                   </Rectangle>
                 </Grid>
-                <!-- MinHeight keeps the animated strip at full emblem-era height
-                     (~84 emblem + 26/24 margins) after the title/logo were collapsed. -->
-                <Grid Margin="36,26,36,24" MinHeight="134">
+                <!-- Tall cinematic strip: emblem-era felt short once the logo was
+                     collapsed; ~195 matches the height the video brush once forced. -->
+                <Grid Margin="36,26,36,24" MinHeight="195">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -715,8 +715,10 @@
                     <RowDefinition Height="Auto"/>
                   </Grid.RowDefinitions>
                   <TextBlock Grid.Row="0" Text="From the world" Style="{StaticResource Eyebrow}"/>
-                  <Border Grid.Row="1" Style="{StaticResource Slab}" Padding="0" ClipToBounds="True">
+                  <Border Grid.Row="1" Style="{StaticResource Slab}" Padding="0" ClipToBounds="True"
+                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                     <Image x:Name="GalleryImage" Stretch="UniformToFill"
+                           HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                            RenderOptions.BitmapScalingMode="HighQuality"/>
                   </Border>
                   <TextBlock x:Name="GalleryBy" Grid.Row="2" Style="{StaticResource Small}"
@@ -839,7 +841,7 @@
                 <Grid x:Name="ServerPickCard" Margin="0,0,8,0">
                   <Button x:Name="BtnServerPick" Style="{StaticResource Ghost}"
                           HorizontalAlignment="Left" HorizontalContentAlignment="Stretch"
-                          Padding="10,8" MinWidth="210">
+                          Padding="10,8" MinWidth="280">
                     <Grid>
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -857,13 +859,14 @@
                                  VerticalAlignment="Center" Foreground="{DynamicResource Muted}"/>
                     </Grid>
                   </Button>
-                  <!-- Placement Top keeps the list inside the launcher window (chip sits on the bottom row).
-                       Exactly two rows: Main and Dev, each with status dot + ms + awake. -->
-                  <Popup x:Name="ServerPickPopup" Placement="Top"
+                  <!-- Placement Bottom: dropdown opens downward. Width matches the closed chip
+                       (MinWidth 280); Shell.ToggleServerPick keeps both in sync. Only the other
+                       server is shown (DrawServerPick collapses the current one). -->
+                  <Popup x:Name="ServerPickPopup" Placement="Bottom"
                          PlacementTarget="{Binding ElementName=BtnServerPick}"
                          StaysOpen="False" AllowsTransparency="True">
                     <Border Background="{DynamicResource Card}" BorderBrush="{DynamicResource Line}"
-                            BorderThickness="1" CornerRadius="2" Padding="4" MinWidth="220">
+                            BorderThickness="1" CornerRadius="2" Padding="4" MinWidth="280">
                       <StackPanel>
                         <Button x:Name="BtnServerMain" Style="{StaticResource Ghost}"
                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,0,0,2"
