@@ -270,6 +270,15 @@ the team before code; nobody settles it alone, and a Claude never does.
     decide on: ask them, and put it on the board if they cannot be asked.
     Check whether its work is already in main before deleting it; a
     squashed merge leaves the branch looking unmerged to git.
+- Code signing is on since 27 Sep (issue #390, closed): the launcher and the
+  setup program are signed through Azure Artifact Signing
+  (`records\signing\README.md`). `ExpectedSigner` in `launcher\app\Updater.cs`
+  is set, so every launcher from dev 1.1.101.17 on refuses an update that is
+  not signed by that certificate. **Only a machine that signs may Ship, dev
+  included.** A machine with no `tools\signing.json`, or a disabled one, still
+  builds and publishes and only prints "not signing", and its launcher would
+  be refused by everybody already on a signed one. The live main launcher,
+  1.1.101, predates signing; the next main Ship is the first signed one.
 - Every pull request gets the build check (.github/workflows/build.yml, about
   two minutes: the secret scan, every script and file parses, the writing
   rules, the ownership page (`tests\test-ownership.js`, the one harness fast

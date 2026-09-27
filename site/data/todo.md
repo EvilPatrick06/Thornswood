@@ -34,13 +34,10 @@ Data from staging and leaves nothing that was not deployed.
    connecting without the launcher at all, so it is not blocking testers.
    Do not run `-Enforce` until the list has names in it.
 
-5. Sign the installer. Windows warns on it because it is unsigned, and an
-   unsigned file builds reputation against its own hash, so a new build every
-   release means the warning never goes away. Azure Artifact Signing is about
-   ten dollars a month, no hardware token, and individuals are supported in the
-   USA. EV certificates stopped skipping SmartScreen in 2024, so the expensive
-   option buys nothing. The stub already scans backwards for its payload
-   trailer, so signing will not break the installer when you get to it.
+5. Sign the installer. Done 27 September: the launcher and the installer are
+   signed through Azure Artifact Signing. SmartScreen builds reputation for a
+   signed publisher across releases, so the warning should fade as signed
+   builds are downloaded rather than starting over with every build.
 
 6. The alt tabbed keyboard leak. Same cause as typing in Docs reaching game
    chat. Two people have reported it.
