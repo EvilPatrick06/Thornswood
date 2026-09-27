@@ -37,9 +37,9 @@
       Get-Help .\scripts\release\Ship.ps1 -Full
       Get-Help .\scripts\release\Ship.ps1 -Parameter Channel
 
-  TWO THINGS FOLLOW A SUCCESSFUL TIP, in this order, and one script runs both:
-  .\scripts\release\Publish-PostShip.ps1, keyed off -Channel. It implements
-  neither of them; each belongs to the lane whose work it is.
+  AFTER A SUCCESSFUL TIP the host feed is remirrored, then the site news and
+  Discord / server countdown tell people to update. Publish-PostShip.ps1, keyed
+  off -Channel, owns the remirror and calls the website lane's script:
 
       1  the host feed remirror   scripts\deploy\Remirror-Site-Feed.ps1, the
                                   website lane's. Main takes the
@@ -47,23 +47,22 @@
                                   thornswood.net/feed/, -Dev takes the
                                   Thornswood-Releases-dev tip to
                                   thornswood.net/feed-dev/.
-      2  VirusTotal               scripts\release\Publish-VirusTotal.ps1, the
-                                  installer lane's, on the installer exe the
-                                  Downloads page offers, so the link it prints
-                                  beside the SHA-256 is not item-not-found.
-      3  the site news            Publish-News.ps1, then the #news post and the
+      2  the site news            Publish-News.ps1, then the #news post and the
                                   server's countdown, all unchanged and the news
                                   main only, as they always were.
 
-  The feed is mirrored before any of those three tell people to update, because
+  VirusTotal is no longer part of publish (#802). Code signing covers trust
+  (#390). Publish-VirusTotal.ps1 stays as an optional manual tool.
+
+  The feed is mirrored before the news steps tell people to update, because
   they send everybody to fetch a release the feed has to be serving.
 
-  NO SWITCH TURNS EITHER OF THE TWO OFF, asked for by the website and launcher
+  NO SWITCH TURNS THE REMIRROR OFF, asked for by the website and launcher
   lanes on 27 September: the block runs on every release, dev and main, so the
   dev channel exercises it several times a week. A dry run runs none of it,
   because a dry run publishes nothing to follow.
 
-  AND NEITHER OF THEM CAN FAIL A RELEASE. They run after the release is on the
+  AND THE REMIRROR CANNOT FAIL A RELEASE. It runs after the release is on the
   feed, so nothing there can unpublish anything. A script another lane has not
   landed is a line naming it. A remirror that exits 1 has refused to publish a
   feed naming bytes the site does not hold, which leaves the site one release
@@ -1353,32 +1352,24 @@ else {
   feed names thornswood.net assets the bytes have to be up there too or the
   download answers 404.
 
-  VirusTotal. The Downloads page prints the installer's SHA-256 and a link to
-  the VirusTotal report on that hash, and Publish-Installer.ps1's own note says
-  what is wrong with it: a file nobody has sent there has no report, so the link
-  lands on a page saying so. That is the only answer we give somebody who does
-  not want to run an unsigned installer, and it has been empty since the day it
-  was added.
+  VirusTotal is no longer part of publish. Code signing covers trust for the
+  installer (#390). Publish-VirusTotal.ps1 stays as an optional manual tool.
 
   AND NOTHING FOR THE LAUNCHER, which the header says at more length: the
   remirror is how a launcher update reaches anybody, and Install-Launcher.ps1
   above refreshed this machine's own install before the publish.
 
-  ONE SCRIPT, KEYED OFF THE CHANNEL, AND IT OWNS NEITHER HALF.
-  Publish-PostShip.ps1 calls the website lane's Remirror-Site-Feed.ps1 and the
-  installer lane's Publish-VirusTotal.ps1, which is the call the first of those
-  asked for in its own header. It finds each by name under scripts\ and calls it
-  with the parameters it declares, so neither lane has to rename anything to fit,
-  and a hook that has not landed yet is a line rather than a failed release.
-  Ship reads one exit code, Website and Installer have one command to run by
-  hand, and both halves ask before they act, so running it again after a failure
-  does nothing the first run already did.
+  ONE SCRIPT, KEYED OFF THE CHANNEL, AND IT OWNS THE REMIRROR.
+  Publish-PostShip.ps1 calls the website lane's Remirror-Site-Feed.ps1. It finds
+  it by name under scripts\ and calls it with the parameters it declares, so
+  that lane does not have to rename anything to fit, and a hook that has not
+  landed yet is a line rather than a failed release. Ship reads one exit code,
+  Website has one command to run by hand, and the remirror asks before it acts,
+  so running it again after a failure does nothing the first run already did.
 
-  ORDER, pinned by the website lane: the remirror, then the VirusTotal upload,
-  then the site news, the Discord post and the server's countdown. Those three
-  tell people to update, and the feed has to be serving the release before
-  anybody is sent to fetch it. Both calls are the same script with -Only naming
-  the half, so the two headings on screen are the two things that happened.
+  ORDER, pinned by the website lane: the remirror, then the site news, the
+  Discord post and the server's countdown. Those tell people to update, and the
+  feed has to be serving the release before anybody is sent to fetch it.
 
   WHAT A FAILURE DOES. The tip is already on the feed by the time this runs, so
   none of it can unpublish anything, and dying here would leave a release out
@@ -1426,9 +1417,6 @@ if (-not $DryRun) {
     Invoke-PostShip 'the host feed remirror' 'Publish-PostShip.ps1' ($postArgs + @{ Only = 'Remirror' }) `
         ".\scripts\release\Publish-PostShip.ps1$chanArg -Only Remirror"
 
-    Head 'VirusTotal'
-    Invoke-PostShip 'the VirusTotal upload' 'Publish-PostShip.ps1' ($postArgs + @{ Only = 'VirusTotal' }) `
-        ".\scripts\release\Publish-PostShip.ps1$chanArg -Only VirusTotal"
 }
 
 # ------------------------------------------------------------------- news
@@ -1606,7 +1594,7 @@ if ($script:PostShipFailed.Count) {
         Say ("    $($f.PutRight)") 'Yellow'
     }
     Say '  Until they run, the site may be serving the feed it had, which is the release' 'DarkGray'
-    Say '  people are offered, or the VirusTotal link on the Downloads page says' 'DarkGray'
+    Say '  people are offered, or the Downloads page still shows an old build' 'DarkGray'
     Say '  item-not-found. Each line above asks before it acts, so it can be run twice.' 'DarkGray'
     Write-Host ''
 }

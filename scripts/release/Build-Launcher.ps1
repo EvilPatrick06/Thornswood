@@ -423,8 +423,15 @@ using System.Reflection;
 
 # ------------------------------------------------------------ signing
 #
-# Both binaries or neither. A signed launcher next to an unsigned installer
-# still warns on the thing a stranger runs first, which is the installer.
+# Sign the launcher here. Do NOT sign setup-stub.exe.
+#
+# Package-Thornswood.ps1 -OneFile copies the stub, appends the payload and a
+# trailer, then signs Thornswood-Setup.exe. Authenticode cannot survive that
+# append: a pre-signed stub makes the combined file un-signable (signtool
+# 0x800700C1). Measured 27 September on Main Package. The stub stays unsigned
+# on disk; Package signs the final Setup after attach, and the two-file path
+# signs the copied Setup the same way. A stranger still gets a signed installer
+# from the site; this machine's tools\setup-stub.exe is only a build input.
 #
 # This does nothing at all unless tools\signing.json exists, so Djinn's machine
 # and the pull request build carry on exactly as before. See the header of
@@ -433,9 +440,7 @@ using System.Reflection;
 $signer = Join-Path $Here 'Sign-Artifact.ps1'
 if (Test-Path -LiteralPath $signer) {
     Head 'Signing'
-    $toSign = @($exe)
-    if (Test-Path -LiteralPath $stub) { $toSign += $stub }
-    & $signer -Path $toSign
+    & $signer -Path $exe
     if ($LASTEXITCODE -ne 0) { Die 'Signing failed. Nothing was published.' }
 }
 
