@@ -112,11 +112,16 @@
 # Swap.Restore / Hold.Release / Keep.Unpark is still log-only; stop-
 # swallowing remains later work. Giant files (Shell, Voice, Icons,
 # Checks, ...) are left for later slices.
-Chars.cs 18
+#
+# Issue #461 next6 slice, 27 Sep. Converted every empty catch in the sixteen-
+# through eighteen-count files: Uninstall, Chars and OwnGame. That is 52
+# fewer silent catches, 210 down to 158. Files that reached zero are
+# dropped from this list (an unlisted file is allowed none). No baseline
+# number was raised. Behaviour of Config.Save / Swap.Restore / Hold.Release /
+# Keep.Unpark is still log-only; stop-swallowing remains later work. Giant
+# files (Shell, Voice, Icons, Checks, Updater) are left for later slices.
 Checks.cs 20
 Icons.cs 20
-OwnGame.cs 18
 Shell.cs 76
-Uninstall.cs 16
 Updater.cs 20
 Voice.cs 22
