@@ -114,17 +114,16 @@
   checks are skipped, and the feed, the baseline and the version number are
   put back afterwards.
 
-  IT STILL CHANGES THIS MACHINE, so do not run it while the game is open here.
-  It closes any running Skyrim, SKSE loader or SkyMP client, matched by name
-  wherever it runs from, and it does that even with -ModsOnly, because
-  the publisher closes the game before it reads a single file. Without
-  -ModsOnly it also closes the launcher and puts the new Thornswood.exe in
-  <Root>\Launcher. It copies the plugins into the game folder. The pack it
-  makes stays in -DistRoot, and every pack-*.zip there older than the ten
-  newest is deleted. The first -Channel dev run on a machine makes the dev
-  branch of the releases repo and pushes it to GitHub, so a dry run on a
-  machine whose releases repo has no dev branch stops rather than make one:
-  run -Channel dev once without -DryRun.
+  DryRun is non-destructive for close and prune (issue #494): it does not
+  close a running game or launcher, and it does not delete old pack-*.zip
+  under -DistRoot. It logs what a real Ship would close or prune. Without
+  -ModsOnly it still builds and may put the new Thornswood.exe in
+  <Root>\Launcher (without closing anything first) and copies the plugins
+  into the game folder. The pack it makes stays in -DistRoot. The first
+  -Channel dev run on a machine makes the dev branch of the releases repo
+  and pushes it to GitHub, so a dry run on a machine whose releases repo
+  has no dev branch stops rather than make one: run -Channel dev once
+  without -DryRun.
 
   With -Package the installer is not rebuilt, because Package-Thornswood.ps1
   puts what it builds on the site. The dry run says so and prints the
@@ -206,10 +205,10 @@
 .EXAMPLE
   .\scripts\release\Ship.ps1 -DryRun "The map marker points at the right door now"
 
-  Builds and works out what would ship without publishing it. It closes a
-  running game and puts the new launcher in place on this machine, so run it
-  with the game closed. Get-Help .\scripts\release\Ship.ps1 -Parameter DryRun lists
-  everything it still changes.
+  Builds and works out what would ship without publishing it. It does not
+  close a running game and does not prune old packs; it may still put the
+  new launcher in place without closing anything. Get-Help
+  .\scripts\release\Ship.ps1 -Parameter DryRun lists what a dry run still does.
 
 .EXAMPLE
   .\scripts\release\Ship.ps1 "The map marker points at the right door now"
@@ -826,7 +825,11 @@ if (-not $ModsOnly) {
         }
     }
 
-    & (Join-Path $Here 'Install-Launcher.ps1') -Root $Root -From $buildOut -NoPause
+    # DryRun is non-destructive for close/prune (#494): -NoClose skips Stop-Game
+    # and Stop-Launcher; prune is skipped via -NoClose / KeepPacks on Publish-Update.
+    $installArgs = @{ Root = $Root; From = $buildOut; NoPause = $true }
+    if ($DryRun) { $installArgs['NoClose'] = $true }
+    & (Join-Path $Here 'Install-Launcher.ps1') @installArgs
     $installCode = $LASTEXITCODE
     if ($installCode -ne 0) {
         Unbump 'the launcher could not be put in place'
@@ -1077,9 +1080,14 @@ if ($Dev) { $pubArgs['Channel'] = 'dev'; $pubArgs['VersionOverride'] = $target }
 # same on a real release whatever else changes here.
 $dryKeep = @()
 if ($DryRun) {
+    # DryRun is non-destructive for close/prune (issue #494): do not Stop-Game
+    # and do not delete old pack-*.zip; log what a real Ship would do instead.
     $pubArgs['NoUpload'] = $true
     $pubArgs['NoPush'] = $true
+    $pubArgs['NoClose'] = $true
+    $pubArgs['KeepPacks'] = 0
     Say '  dry run, nothing will be uploaded or pushed' 'Yellow'
+    Say '  dry run: will not close a running game and will not prune old packs' 'Yellow'
 
     $stateName = if ($Dev) { 'published-dev.json' } else { 'published.json' }
     foreach ($f in @(
