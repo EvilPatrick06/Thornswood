@@ -100,7 +100,7 @@ namespace Thornswood
 
             // ---- server
             l.Add(serverUp
-                ? new Reading(0, "The server answers", cfg.ServerAddress + ":" + cfg.ServerPort + ", round trip " + pingText + ".")
+                ? new Reading(0, "The server answers", "round trip " + pingText + ".")
                 : new Reading(1, "The server did not answer",
                     "That is not always a problem. Plenty of hosts drop the kind of packet this test uses, so try connecting before assuming it is down."));
 
