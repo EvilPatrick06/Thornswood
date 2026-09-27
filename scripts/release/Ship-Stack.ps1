@@ -67,7 +67,9 @@
 
 .PARAMETER DistRoot
   Where Package stages the installer (passed as -OutDir) and where PostShip
-  looks for it. Default is Where.ps1 Dist, matching Ship.
+  looks for it. Default is Where.ps1 Dist (repo out\dist), matching Ship.
+  Resolved after the script directory is known from PSCommandPath /
+  MyInvocation / PSScriptRoot, so an empty PSScriptRoot does not fail the default.
 
 .EXAMPLE
   .\scripts\release\Ship-Stack.ps1 -Channel dev -NoPause
@@ -87,7 +89,10 @@ param(
     [switch]$SkipGameMode,
     [switch]$NoPause,
     [string]$Root = 'C:\Thornswood',
-    [string]$DistRoot = (& (Join-Path $PSScriptRoot 'Where.ps1') Dist)
+    # Empty until after $Here is resolved. $PSScriptRoot can be empty when this
+    # script is invoked certain ways (dot-source, some hosts), which made the
+    # old Join-Path $PSScriptRoot default fail the first Dev Ship-Stack run.
+    [string]$DistRoot = ''
 )
 
 Set-StrictMode -Version Latest
@@ -103,8 +108,28 @@ function Die($m) {
     exit 1
 }
 
-$Here = $PSScriptRoot
-if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# Prefer $PSCommandPath / $MyInvocation path over $PSScriptRoot so DistRoot and
+# sibling script paths still resolve when $PSScriptRoot is empty.
+$Here = $null
+if ($PSCommandPath) { $Here = Split-Path -Parent $PSCommandPath }
+elseif ($MyInvocation.MyCommand.Path) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Path }
+elseif ($PSScriptRoot) { $Here = $PSScriptRoot }
+elseif ($MyInvocation.MyCommand.Definition) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+if (-not $Here) {
+    Die 'Could not resolve the scripts\release folder for Ship-Stack (PSCommandPath, MyInvocation, and PSScriptRoot were all empty).'
+}
+
+if ([string]::IsNullOrWhiteSpace($DistRoot)) {
+    $where = Join-Path $Here 'Where.ps1'
+    if (Test-Path -LiteralPath $where) {
+        $DistRoot = & $where Dist
+    }
+    else {
+        # Same place Where.ps1 Dist returns when out\ exists: repo out\dist.
+        $DistRoot = [System.IO.Path]::GetFullPath((Join-Path $Here '..\..\out\dist'))
+    }
+}
+
 $Deploy = Join-Path $Here '..\deploy'
 $script:RemirrorWarned = $false
 
