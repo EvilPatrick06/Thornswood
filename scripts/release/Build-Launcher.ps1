@@ -361,68 +361,66 @@ if (Test-Path -LiteralPath $oldExe) {
 
 # ------------------------------------------------------------ setup stub
 $stubSrc = Join-Path $Here '..\..\installer\setup\Bootstrap.cs'
-if (Test-Path $stubSrc) {
-    Head 'Setup stub'
-    # Built to a scratch name first. Deleting the old one up front meant a
-    # failed compile left no installer at all, and the only sign of it was a
-    # yellow line an hour before anyone noticed the package had no exe in it.
-    #
-    # The scratch name is the name it ships under, Thornswood-Setup.exe, not a
-    # setup-stub name, because csc writes the exe's OriginalFilename and
-    # InternalName version fields from the /out leaf. Package-Thornswood.ps1
-    # copies tools\setup-stub.exe to Thornswood-Setup.exe without recompiling,
-    # so if it were built as setup-stub.exe those two fields would read a name
-    # nobody ever downloads. Built under the shipped name in %TEMP% and then
-    # moved onto tools\setup-stub.exe, which is what packaging copies from.
-    $stub = Join-Path $Here '..\..\tools\setup-stub.exe'
-    $stubNew = Join-Path $env:TEMP 'Thornswood-Setup.exe'
-    if (Test-Path $stubNew) { Remove-Item $stubNew -Force }
-    $stubArgs = @('/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+', '/debug:pdbonly',
-                  "/out:$stubNew", "/win32icon:$((Resolve-Path $icon).Path)")
-    if (Test-Path $logoSml) { $stubArgs += "/resource:$((Resolve-Path $logoSml).Path),logo.png" }
-    foreach ($r in $refs) { $stubArgs += "/reference:$r" }
-    # Bootstrap.cs keeps the stable product NAME (Title/Product/Company/
-    # Copyright). FileVersion and ProductVersion are stamped here from
-    # Updater.cs ($ver / $verFour) so the stub tracks the launcher release.
-    # A version-only .cs is always generated; do NOT call New-Info for the
-    # stub (that would duplicate Title/Product and fail csc).
-    $stubVerCs = Join-Path $env:TEMP 'ThornswoodSetupVersion.cs'
-    $stubVerBody = @"
+if (-not (Test-Path $stubSrc)) { Die "Bootstrap.cs is not at $stubSrc. It is in the repository, so the path is wrong; a package built now would have no installer in it." }
+Head 'Setup stub'
+# Built to a scratch name first. Deleting the old one up front meant a
+# failed compile left no installer at all, and the only sign of it was a
+# red STOP an hour before anyone noticed the package had no exe in it.
+#
+# The scratch name is the name it ships under, Thornswood-Setup.exe, not a
+# setup-stub name, because csc writes the exe's OriginalFilename and
+# InternalName version fields from the /out leaf. Package-Thornswood.ps1
+# copies tools\setup-stub.exe to Thornswood-Setup.exe without recompiling,
+# so if it were built as setup-stub.exe those two fields would read a name
+# nobody ever downloads. Built under the shipped name in %TEMP% and then
+# moved onto tools\setup-stub.exe, which is what packaging copies from.
+$stub = Join-Path $Here '..\..\tools\setup-stub.exe'
+$stubNew = Join-Path $env:TEMP 'Thornswood-Setup.exe'
+if (Test-Path $stubNew) { Remove-Item $stubNew -Force }
+$stubArgs = @('/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+', '/debug:pdbonly',
+              "/out:$stubNew", "/win32icon:$((Resolve-Path $icon).Path)")
+if (Test-Path $logoSml) { $stubArgs += "/resource:$((Resolve-Path $logoSml).Path),logo.png" }
+foreach ($r in $refs) { $stubArgs += "/reference:$r" }
+# Bootstrap.cs keeps the stable product NAME (Title/Product/Company/
+# Copyright). FileVersion and ProductVersion are stamped here from
+# Updater.cs ($ver / $verFour) so the stub tracks the launcher release.
+# A version-only .cs is always generated; do NOT call New-Info for the
+# stub (that would duplicate Title/Product and fail csc).
+$stubVerCs = Join-Path $env:TEMP 'ThornswoodSetupVersion.cs'
+$stubVerBody = @"
 using System.Reflection;
 [assembly: AssemblyVersion("$verFour")]
 [assembly: AssemblyFileVersion("$verFour")]
 [assembly: AssemblyInformationalVersion("$ver")]
 "@
-    Set-Content -Path $stubVerCs -Value $stubVerBody -Encoding ASCII
-    $stubArgs += (Resolve-Path $stubSrc).Path
-    $stubArgs += $stubVerCs
+Set-Content -Path $stubVerCs -Value $stubVerBody -Encoding ASCII
+$stubArgs += (Resolve-Path $stubSrc).Path
+$stubArgs += $stubVerCs
 
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    & $csc @stubArgs
-    $rc2 = $LASTEXITCODE
-    $ErrorActionPreference = $old
-    if ($rc2 -ne 0 -or -not (Test-Path $stubNew)) {
-        Remove-Item $stubNew -Force -EA SilentlyContinue
-        Write-Host ''
-        Say "  csc exited with $rc2. The installer program did NOT build." 'Red'
-        if (Test-Path $stub) {
-            Say '  The last working setup-stub.exe is still here, so packaging carries on with that one.' 'Yellow'
-        } else {
-            Say '  There is no setup-stub.exe at all. A package built now would have no installer in it.' 'Red'
-        }
-        Write-Host ''
+$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+& $csc @stubArgs
+$rc2 = $LASTEXITCODE
+$ErrorActionPreference = $old
+if ($rc2 -ne 0 -or -not (Test-Path $stubNew)) {
+    Remove-Item $stubNew -Force -EA SilentlyContinue
+    Write-Host ''
+    Say "  csc exited with $rc2. The installer program did NOT build." 'Red'
+    if (Test-Path $stub) {
+        Die 'setup-stub.exe did not rebuild. The last working copy is still here, but a release must not ship on a failed stub build. Fix the compile error above and run Build-Launcher again.'
+    } else {
+        Die 'There is no setup-stub.exe at all. A package built now would have no installer in it. Fix the compile error above and run Build-Launcher again.'
     }
-    else {
-        if (Test-Path $stub) { Remove-Item $stub -Force }
-        Move-Item $stubNew $stub
-        Say ("  setup-stub.exe  {0:n0} KB" -f ((Get-Item $stub).Length / 1KB)) 'Green'
-        $stubPdbNew = [IO.Path]::ChangeExtension($stubNew, '.pdb')
-        $stubPdb = [IO.Path]::ChangeExtension($stub, '.pdb')
-        if (Test-Path -LiteralPath $stubPdbNew) {
-            if (Test-Path -LiteralPath $stubPdb) { Remove-Item -LiteralPath $stubPdb -Force }
-            Move-Item -LiteralPath $stubPdbNew -Destination $stubPdb
-            Say ("  setup-stub.pdb  {0:n0} KB (shipping machine only)" -f ((Get-Item $stubPdb).Length / 1KB)) 'DarkGray'
-        }
+}
+else {
+    if (Test-Path $stub) { Remove-Item $stub -Force }
+    Move-Item $stubNew $stub
+    Say ("  setup-stub.exe  {0:n0} KB" -f ((Get-Item $stub).Length / 1KB)) 'Green'
+    $stubPdbNew = [IO.Path]::ChangeExtension($stubNew, '.pdb')
+    $stubPdb = [IO.Path]::ChangeExtension($stub, '.pdb')
+    if (Test-Path -LiteralPath $stubPdbNew) {
+        if (Test-Path -LiteralPath $stubPdb) { Remove-Item -LiteralPath $stubPdb -Force }
+        Move-Item -LiteralPath $stubPdbNew -Destination $stubPdb
+        Say ("  setup-stub.pdb  {0:n0} KB (shipping machine only)" -f ((Get-Item $stubPdb).Length / 1KB)) 'DarkGray'
     }
 }
 

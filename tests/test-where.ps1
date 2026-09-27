@@ -49,6 +49,12 @@ try {
     $old = Join-Path $work 'Thornswood-Dev'
     New-Item -ItemType Directory -Force -Path (Join-Path $repo 'scripts\release') | Out-Null
     Copy-Item -LiteralPath $where -Destination (Join-Path $repo 'scripts\release\Where.ps1')
+    $layoutSrc = Join-Path (Split-Path -Parent $Tools) 'layout.json'
+    Yes 'layout.json is at the repository root' (Test-Path -LiteralPath $layoutSrc)
+    Copy-Item -LiteralPath $layoutSrc -Destination (Join-Path $repo 'layout.json')
+    $whereJsSrc = Join-Path (Split-Path -Parent $where) 'where.js'
+    Yes 'scripts\release\where.js is there' (Test-Path -LiteralPath $whereJsSrc)
+    Copy-Item -LiteralPath $whereJsSrc -Destination (Join-Path $repo 'scripts\release\where.js')
     $w = Join-Path $repo 'scripts\release\Where.ps1'
     function Ask([string]$what) { return [string](& $w $what -OldRoot $old) }
     function Same([string]$a, [string]$b) { return [IO.Path]::GetFullPath($a).TrimEnd('\', '/') -eq [IO.Path]::GetFullPath($b).TrimEnd('\', '/') }
@@ -129,6 +135,38 @@ try {
     Yes ('no script names C:\Thornswood-Dev for itself' + $(if ($named.Count) { ': ' + ($named -join ', ') } else { '' })) ($named.Count -eq 0)
     Yes ('the scripts ask Where.ps1 ({0} places)' -f $callers) ($callers -ge 30)
     Yes ('and only for places it knows' + $(if ($badKeys.Count) { ': ' + ($badKeys -join ', ') } else { '' })) ($badKeys.Count -eq 0)
+
+    # ---- layout.json moves and where.js ------------------------------------
+    Yes 'Where.ps1 bot prefers the new bot folder when it is there' (
+        (New-Item -ItemType Directory -Force -Path (Join-Path $repo 'bot') | Out-Null) -or $true
+    )
+    Yes '  bot resolves to bot' (Same (Ask 'bot') (Join-Path $repo 'bot'))
+    Remove-Item -LiteralPath (Join-Path $repo 'bot') -Recurse -Force
+    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'tools\discord') | Out-Null
+    Yes '  and falls back to tools\discord when bot is gone' (Same (Ask 'bot') (Join-Path $repo 'tools\discord'))
+    Remove-Item -LiteralPath (Join-Path $repo 'tools\discord') -Recurse -Force
+
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    if ($node) {
+        $wj = Join-Path $repo 'scripts\release\where.js'
+        function AskJs([string]$what) {
+            $prev = $env:WHERE_OLD_ROOT
+            # where.js takes oldRoot via opts only when required as a module; CLI uses layout default.
+            # Drive OldRoot by rewriting layout in the scratch for the node path tests below.
+            return [string](& node $wj $what).Trim()
+        }
+        # Point layout oldRootDefault at the scratch old folder for Engine/Out parity.
+        $lay = Get-Content -LiteralPath (Join-Path $repo 'layout.json') -Raw | ConvertFrom-Json
+        $lay.oldRootDefault = $old
+        ($lay | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath (Join-Path $repo 'layout.json') -Encoding UTF8
+        Yes 'where.js Engine matches Where.ps1 after the move' (Same (AskJs 'Engine') (Ask 'Engine'))
+        Yes 'where.js Out matches Where.ps1 after the move' (Same (AskJs 'Out') (Ask 'Out'))
+        Yes 'where.js Repo is the scratch repository' (Same (AskJs 'Repo') $repo)
+        New-Item -ItemType Directory -Force -Path (Join-Path $repo 'voice') | Out-Null
+        Yes 'where.js voice prefers voice\' (Same (AskJs 'voice') (Join-Path $repo 'voice'))
+    } else {
+        Yes 'node is available to check where.js' $false
+    }
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
