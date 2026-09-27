@@ -116,6 +116,7 @@ $wanted = [ordered]@{
     'WindowWords'       = 'static string WindowWords(IntPtr h)'
     'OnClipboard'       = 'static void OnClipboard(string cmd, int part, string why, Action<string> log, Action<string> status)'
     'ClipboardLine'     = 'static string ClipboardLine(int part, int of)'
+    'TypeItLine'        = 'static string TypeItLine(string cmd, int part, int of)'
     'ProgressLine'      = 'static string ProgressLine(int part, int of, long bytes, bool pasted)'
     'Next'              = 'static string Next(int part, int of)'
     'Parts'             = 'static string Parts(int from, int to, string one, string many)'
@@ -177,7 +178,7 @@ namespace Probe
 
         public static void Reset()
         {
-            Process.All.Clear(); Desktop.Clear(); Foreground = IntPtr.Zero; Clipboard.Clear(); Flashes = 0;
+            Process.All.Clear(); Desktop.Clear(); Foreground = IntPtr.Zero; Clipboard.Clear(); Flashes = 0; ClipboardTakes = true;
             System.Reflection.FieldInfo f = typeof(Downgrade).GetField("saidWindow", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
             if (f != null) f.SetValue(null, null);
         }
@@ -207,7 +208,12 @@ namespace Probe
         const uint GA_ROOT = 2;
         static IntPtr GetAncestor(IntPtr h, uint flags) { Win w = Find(h); return (w != null && w.Root != IntPtr.Zero) ? w.Root : h; }
         static int GetWindowText(IntPtr h, StringBuilder text, int max) { Win w = Find(h); if (w == null || w.Title == null) return 0; text.Append(w.Title); return w.Title.Length; }
-        static void TryClipboard(string text) { Clipboard.Add(text); }
+        // The real one tries a few times and reads the text back, because
+        // Clipboard.SetText fails while another program has the clipboard
+        // open. Here it is a switch: ClipboardTakes false is a clipboard that
+        // would not take the command.
+        public static bool ClipboardTakes = true;
+        static bool TryClipboard(string text) { if (!ClipboardTakes) return false; Clipboard.Add(text); return true; }
         static void FlashLauncher() { Flashes++; }
 
         // ---- lifted from launcher\app\Downgrade.cs ----
@@ -441,6 +447,29 @@ try {
             $cards.Count -eq 3 -and $cards[0] -ceq [string](Call 'ClipboardLine' @(1, 3)) -and $cards[1] -ceq [string](Call 'ClipboardLine' @(2, 3)) -and $cards[2] -ceq [string](Call 'ClipboardLine' @(3, 3)))
         Yes "each one flashes the launcher's taskbar button so the person notices" ([int]$T.GetField('Flashes').GetValue($null) -eq 3)
         $words += $lines
+
+        # A clipboard that will not take the command. Clipboard.SetText fails
+        # while another program has the clipboard open, and the card used to
+        # say "press Ctrl+V" all the same, so following it pasted whatever was
+        # on the clipboard before, the part before this one for one, into
+        # Steam's console.
+        Call 'Reset' @() | Out-Null
+        $T.GetField('ClipboardTakes').SetValue($null, $false)
+        $lines.Clear()
+        $cards = New-Object System.Collections.Generic.List[string]
+        $status = [Action[string]]{ param($s) $cards.Add($s) }
+        $cmd2 = [string](Call 'Command' @(, [string[]]$depots[1]))
+        Call 'OnClipboard' @($cmd2, 2, '', $log, $status) | Out-Null
+        $refused = if ($cards.Count -gt 0) { [string]$cards[0] } else { '' }
+        $words += $refused
+        Yes 'a clipboard that refuses the command is never called a clipboard that took it' ($refused -notmatch 'Ctrl\+V' -and $refused -notmatch 'on your clipboard')
+        Yes ('it gives the command to type instead, and where: ' + $refused) (
+            $refused -ceq [string](Call 'TypeItLine' @($cmd2, 2, 3)) -and
+            $refused.Contains('the command line at the bottom of Steam') -and $refused.StartsWith('Part 1 is down. ') -and
+            $refused.Contains('Part 3 follows here when it is down.') -and $refused.EndsWith($cmd2))
+        Yes 'and nothing was left on the clipboard for a Ctrl+V to find' (([System.Collections.Generic.List[string]]$T.GetField('Clipboard').GetValue($null)).Count -eq 0)
+        Yes 'and the log says the same as the card' ($lines.Count -eq 1 -and $lines[0].StartsWith($refused))
+        $T.GetField('ClipboardTakes').SetValue($null, $true)
     }
     # The en and em dash built from their codes, so this file stays ASCII and
     # reads the same in Windows PowerShell 5.1, which takes a file without a

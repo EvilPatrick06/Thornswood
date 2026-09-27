@@ -330,23 +330,46 @@ namespace Thornswood
                     if (Directory.Exists(folder) || sawStart) { started = true; break; }
                     Thread.Sleep(1000);
                 }
-                if (!started && typed)
+                // Nothing has reached Steam. Bring the console back and try the
+                // command line once more.
+                //
+                // This used to run only when the first attempt had typed. The
+                // attempt that fails is the one made while the person is in
+                // another window, which is every part after the first: they
+                // press Downgrade, part 1 goes in with the launcher in front,
+                // and twenty minutes later part 2 is asked for with a browser
+                // or a game over the top. That is exactly the case that used to
+                // go straight to the clipboard and sit there, and a second go
+                // at the console is what it needed. So the retry happens either
+                // way, and the clipboard is what is left after it.
+                if (!started)
                 {
                     // Typed into the wrong place, most likely a console whose
-                    // command line did not have the focus. Click it and try once
-                    // more, then fall back to the clipboard.
+                    // command line did not have the focus, or into no console
+                    // at all because Steam's window would not come forward.
                     log("Steam has not started the download. Trying the console's command line once more.");
                     FocusConsole(log);
                     Thread.Sleep(400);
-                    typed = TypeIntoConsole(cmd, log);
-                    askedAt = DateTime.Now;
-                    while ((DateTime.Now - askedAt).TotalSeconds < 30)
+                    // Nothing is typed a second time if Steam took a command
+                    // while the console was being brought back. On the fallback
+                    // path the command is on the person's clipboard and they
+                    // may have pasted it themselves in the meantime, and a
+                    // pasted download_depot and a typed one would both run.
+                    string sinceCmd = steamLog.Since();
+                    if (Refused(sinceCmd, depot, i + 1, cmd, log, status)) return false;
+                    if (LogStarted(sinceCmd, depot) || Directory.Exists(folder)) { sawStart = true; started = true; }
+                    if (!started)
                     {
-                        string said = steamLog.Since();
-                        if (Refused(said, depot, i + 1, cmd, log, status)) return false;
-                        if (LogStarted(said, depot) || (!hadFolder && Directory.Exists(folder))) sawStart = true;
-                        if (Directory.Exists(folder) || sawStart) { started = true; break; }
-                        Thread.Sleep(1000);
+                        typed = TypeIntoConsole(cmd, log);
+                        askedAt = DateTime.Now;
+                        while ((DateTime.Now - askedAt).TotalSeconds < 30)
+                        {
+                            string said = steamLog.Since();
+                            if (Refused(said, depot, i + 1, cmd, log, status)) return false;
+                            if (LogStarted(said, depot) || (!hadFolder && Directory.Exists(folder))) sawStart = true;
+                            if (Directory.Exists(folder) || sawStart) { started = true; break; }
+                            Thread.Sleep(1000);
+                        }
                     }
                     if (!started)
                     {
@@ -357,8 +380,14 @@ namespace Thornswood
                         string tail = steamLog.Tail(12);
                         if (tail.Length > 0) log("Steam's log since the command:" + Environment.NewLine + tail);
                         else log("Steam wrote nothing to its logs, so the command did not reach the console's command line. Steam's console has to be the window in front with its command line clicked.");
-                        OnClipboard(cmd, i + 1, "", log, status);
-                        pasted = true;
+                        // Said once. A part whose first attempt already fell
+                        // back has the command on the clipboard and the card
+                        // already says where to paste it.
+                        if (!pasted)
+                        {
+                            OnClipboard(cmd, i + 1, "", log, status);
+                            pasted = true;
+                        }
                     }
                 }
 
@@ -999,11 +1028,30 @@ namespace Thornswood
         /// </summary>
         static void OnClipboard(string cmd, int part, string why, Action<string> log, Action<string> status)
         {
-            TryClipboard(cmd);
-            string line = ClipboardLine(part, Depots.Length);
+            // What is said depends on whether the clipboard actually took it.
+            // It said "press Ctrl+V" either way until now, and a Ctrl+V after a
+            // clipboard that refused the command pastes whatever was on it
+            // before: the part before this one, or something from another
+            // program, into Steam's console.
+            string line = TryClipboard(cmd) ? ClipboardLine(part, Depots.Length) : TypeItLine(cmd, part, Depots.Length);
             log(why + line + " This keeps watching for it.");
             status(line);
             FlashLauncher();
+        }
+
+        /// <summary>
+        /// What the log and the card say when the clipboard would not take the
+        /// command: the command itself, to type in by hand. Never "press
+        /// Ctrl+V", because the thing to paste is not there.
+        /// </summary>
+        static string TypeItLine(string cmd, int part, int of)
+        {
+            string before = part > 1 ? Parts(1, part - 1, "is down.", "are down.") + " " : "";
+            // The command goes last, with nothing after it, so the line does
+            // not run "8042843504692938467 Part 3 follows" together and leave
+            // somebody copying it wondering where it ends.
+            return before + "The clipboard would not take part " + part + " of " + of + ". " + Next(part, of) +
+                " Type this into the command line at the bottom of Steam's console and press Enter: " + cmd;
         }
 
         /// <summary>What the log and the card say when part <paramref name="part"/> of <paramref name="of"/> is on the clipboard.</summary>
@@ -1103,9 +1151,32 @@ namespace Thornswood
             catch (Exception ex) { Swallow.Note("Downgrade.FlashLauncher", ex); }
         }
 
-        static void TryClipboard(string text)
+        /// <summary>
+        /// Puts the command on the clipboard and says whether it is really
+        /// there.
+        ///
+        /// Clipboard.SetText fails whenever another program has the clipboard
+        /// open, which on a machine with a clipboard manager, a browser or a
+        /// remote desktop on it is often enough to matter. The failure used to
+        /// be thrown away and the card said "press Ctrl+V" all the same, which
+        /// is the worst of both: the person follows the instruction and Steam's
+        /// console gets whatever was on the clipboard before. So it is tried a
+        /// few times, a moment apart, and the text is read back before it is
+        /// claimed.
+        /// </summary>
+        static bool TryClipboard(string text)
         {
-            try { System.Windows.Clipboard.SetText(text); } catch { }
+            for (int i = 0; i < 5; i++)
+            {
+                try
+                {
+                    System.Windows.Clipboard.SetText(text);
+                    if (string.Equals(System.Windows.Clipboard.GetText(), text, StringComparison.Ordinal)) return true;
+                }
+                catch (Exception ex) { Swallow.Note("Downgrade.TryClipboard", ex); }
+                Thread.Sleep(120);
+            }
+            return false;
         }
 
         // ---------------------------------------------------------- watching
