@@ -19,7 +19,10 @@
        planted in each shape the rule counts. Each one has to go red and name
        the file, and taking it out again has to go green.
     3. The shapes the rule does not count: a body holding only a comment, and
-       a body that logs.
+       a body that logs. And a count that falls, which since #756 is red the
+       same as a rise until the baseline line is lowered to what the file
+       holds, because a fall that passed with a yellow hint was left for
+       whoever came next.
     4. Swallow.Note, compiled from the real Swallow.cs with a stand-in for
        Paths, and called. It has to write the line, and it has to not throw
        with no log set, with the log's folder missing, or with the log held
@@ -147,15 +150,36 @@ try {
     Yes 'and is named as allowed none' ($r.Out -match 'Planted\.cs has 1 silent catches and the baseline allows 0')
     Remove-Item -LiteralPath $fresh -Force
 
-    # A count that falls passes and says to lower the baseline.
+    # A count that falls is red, and lowering that line is what puts it green.
+    # Issue #756: it used to pass with a yellow line, so the lowering the rule
+    # asks for in words could be left for somebody else, and Checks.cs and
+    # Verify.cs each sat a catch above their real count from #706 and #709
+    # until the two were found by eye and lowered in #753.
     $shell = Join-Path $copy 'Shell.cs'
     $shellText = [IO.File]::ReadAllText($shell)
     $rx = [regex]'catch \{ \}'
     [IO.File]::WriteAllText($shell, $rx.Replace($shellText, 'catch (Exception ex) { Swallow.Note("Shell", ex); }', 1))
     $r = Run-Check $copy $base
-    Yes 'a file that fell still passes' ($r.Code -eq 0)
-    Yes 'and says to lower its line' ($r.Out -match 'down\s+Shell\.cs' -and $r.Out -match 'Lower its line')
+    Yes 'a file that fell goes red' ($r.Code -eq 1)
+    Yes 'and says to lower its line' ($r.Out -match 'DOWN\s+Shell\.cs' -and $r.Out -match 'Lower its line')
+
+    $lowered = Join-Path $tmp 'lowered-baseline.txt'
+    $lines = foreach ($l in (Get-Content -LiteralPath $base)) {
+        if ($l -match '^(Shell\.cs\s+)(\d+)$') { $Matches[1] + ([int]$Matches[2] - 1) } else { $l }
+    }
+    [IO.File]::WriteAllText($lowered, (($lines -join "`r`n") + "`r`n"))
+    $r = Run-Check $copy $lowered
+    Yes 'lowering that line in the baseline is what puts it green again' ($r.Code -eq 0)
+    Yes 'and it then says the baseline matches' ($r.Out -match 'the baseline matches')
     [IO.File]::WriteAllText($shell, $shellText)
+
+    # A file the baseline still lists and the launcher no longer has is the
+    # same fall with nothing left to count, so it is red as well.
+    $goneBase = Join-Path $tmp 'gone-baseline.txt'
+    [IO.File]::WriteAllText($goneBase, [IO.File]::ReadAllText($base) + "Gone.cs 3`r`n")
+    $r = Run-Check $copy $goneBase
+    Yes 'a baseline line for a file that is not there any more goes red' ($r.Code -eq 1)
+    Yes 'and says to take its line out' ($r.Out -match 'GONE\s+Gone\.cs' -and $r.Out -match 'Take its line out')
 
     # -List prints the baseline's own format, so it can be pasted back in.
     # Three files whose counts are known: two on one line, one across lines,

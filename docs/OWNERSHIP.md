@@ -90,6 +90,12 @@ not in the table above. It also fails on a row with no second holder. A new
 secret file gets a row here in the same pull request that adds it. The names
 it ignores, and why, are listed in the test.
 
+Since issue #752 the build check runs it on every pull request, not only the
+nightly checks: `#697` added `discord-avatar.txt` with neither a row here nor a
+line saying it is not a secret, and nothing said so until it was found by hand
+days later (#750, #751). It reads files and runs in a tenth of a second, so the
+branch that adds a secret file is the one that is red for it.
+
 ## What would close it
 
 The entry's answer is a build toolchain in a repository with a documented

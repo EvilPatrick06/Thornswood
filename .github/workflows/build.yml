@@ -34,11 +34,17 @@
 #
 # FAST, SINCE 25 SEPTEMBER: every pull request and every push to main gets
 # the checks that take seconds (secrets, every script and file parses, the
-# writing rules, the launcher window) and the launcher build, about two
+# writing rules, the ownership page, the launcher window, the silent catch
+# count) and the launcher build, about two
 # minutes on the VPS. The ~190 test harnesses took over five minutes there
 # on their own, so they run every night instead, in nightly.yml, with the
 # rest of the security, file, GitHub and code checks (Patrick: "let's do
 # #1 and setup a nightly schedule"). A nightly failure opens an issue.
+# One of those harnesses is here as well, tests\test-ownership.js, added by
+# issue #752: it runs in a tenth of a second and what it guards, the page
+# naming where every credential lives, went wrong on a pull request that
+# nobody caught for days (#697, found in #750 and #751). A harness earns a
+# place here by being that fast and that cheap to be wrong about.
 #
 # ON AGAIN, ON THE VPS, 25 SEPTEMBER. It was off for part of that day while
 # no runner existed. Then Patrick: "I want it set so they can commit+merge
@@ -103,6 +109,30 @@ jobs:
           # hits had gone out in those files. Each hit is marked on its line.
           .\scripts\dev\Check-Words.ps1
 
+      - name: Check the ownership page
+        shell: pwsh
+        run: |
+          # Issue #752. docs\OWNERSHIP.md says where every credential file
+          # lives, who holds it and who the second holder is, and
+          # tests\test-ownership.js greps scripts\<area>\*.ps1 and
+          # launcher\app\*.cs for the file names rather than trusting the page.
+          # #697 added discord-avatar.txt with neither a row on that page nor a
+          # line saying it is not a secret, and nothing said so until #750 and
+          # #751 found it by hand. A tenth of a second, so it runs here on every
+          # pull request and not only in the nightly checks.
+          #
+          # Fail closed: no node on the runner is a check that did not happen,
+          # which is the failure this step exists to stop, so it is red.
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=tests/test-ownership.js::no node on this runner, so the ownership page was not checked'
+            exit 1
+          }
+          node tests\test-ownership.js
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=docs/OWNERSHIP.md::the ownership page does not match what the scripts and the launcher name; the FAIL lines above say which rows'
+            exit 1
+          }
+
       - name: Check the launcher window
         shell: powershell
         run: |
@@ -153,7 +183,10 @@ jobs:
           # Entry 239. A catch with nothing in it leaves no line in
           # launcher.log when it fires, and there were 386 of them on 24 Sep.
           # Red when any file in launcher\app has more than
-          # scripts\dev\swallow-baseline.txt allows; the script says what to do.
+          # scripts\dev\swallow-baseline.txt allows, and since #756 red when a
+          # file has fewer and its line has not been lowered with it, so the
+          # lowering lands in the branch that made the count fall rather than
+          # waiting for somebody to notice. The script says what to do.
           .\scripts\dev\Check-Swallow.ps1
 
       - name: Build the launcher
