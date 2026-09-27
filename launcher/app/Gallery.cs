@@ -39,10 +39,9 @@ namespace Thornswood
     /// one shape is told apart from a real refusal, so an old site is reported
     /// as an old site instead of as an account that was turned down.
     ///
-    /// The picture WAITING in the queue cannot be shown as a thumbnail here:
-    /// /up/&lt;name&gt;, the only door that serves one, takes the hub member
-    /// cookie. So the waiting list shows what was sent with it: the name, who
-    /// by, the note and when.
+    /// Waiting pictures are fetched from /up/&lt;name&gt;?ticket=... when the
+    /// site has #755 (galleryStaff on that door). Older sites refuse without
+    /// a cookie; the queue still shows Accept / Reject / name / note either way.
     ///
     /// Reading fails quietly. A site that is down, a picture that will not
     /// load, an empty list: each leaves Play's card hidden with nothing said.
@@ -87,9 +86,8 @@ namespace Thornswood
         static string Feed { get { return Discord.Site + "/api/public"; } }
 
         /// <summary>
-        /// The site page where staff can LOOK at a picture still waiting in the
-        /// queue (that needs the browser's own sign in) and the way through
-        /// when an older site will not take a launcher ticket yet.
+        /// Site uploads page. Not shown as a launcher placeholder: Accept /
+        /// Reject / Delete live as real buttons on the Gallery page (#731).
         /// </summary>
         public static string StaffPage { get { return Discord.Site + "/uploads"; } }
 
@@ -102,6 +100,8 @@ namespace Thornswood
             public string From = "";
             /// <summary>Local time it was sent, or MinValue when the site did not say.</summary>
             public DateTime When = DateTime.MinValue;
+            /// <summary>Loaded image once FetchPending has got it, or null.</summary>
+            public BitmapImage Image;
         }
 
         /// <summary>
@@ -171,6 +171,40 @@ namespace Thornswood
                 return bi;
             }
             catch { return null; }
+        }
+
+        /// <summary>
+        /// Blocking. Call it off the UI thread. The bytes of one waiting picture
+        /// at /up/&lt;name&gt;, with this copy's ticket in the query so staff can
+        /// see it without a browser cookie (#755). Null when the site refuses
+        /// or the picture will not load; the card still shows Accept / Reject.
+        /// </summary>
+        public static BitmapImage FetchPending(Pending item)
+        {
+            if (item == null || item.Name == null || item.Name.Length == 0) return null;
+            if (item.Image != null) return item.Image;
+            if (Discord.Ticket == null) return null;
+            try
+            {
+                string url = Discord.Site + "/up/" + Uri.EscapeDataString(item.Name) +
+                             "?ticket=" + Uri.EscapeDataString(Discord.Ticket);
+                byte[] raw = GetBytes(url, 8000);
+                if (raw == null || raw.Length == 0) return null;
+
+                var bi = new BitmapImage();
+                bi.BeginInit();
+                bi.CacheOption = BitmapCacheOption.OnLoad;
+                bi.StreamSource = new MemoryStream(raw);
+                bi.EndInit();
+                bi.Freeze();
+                item.Image = bi;
+                return bi;
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("Gallery.FetchPending", ex);
+                return null;
+            }
         }
 
         /// <summary>
@@ -476,7 +510,7 @@ namespace Thornswood
             if (code == 403 && Str(reply, "why").Length == 0 &&
                 Str(reply, "error") == "staff only")
                 return "This thornswood.net does not take staff work from the launcher yet. " +
-                       "Open the Gallery page on thornswood.net until it has been updated.";
+                       "Deploy the site update that lets a ticket work the gallery queue (#744), then try Accept again.";
 
             string said = Str(reply, "error");
             if (said.Length == 0) said = Str(reply, "message");

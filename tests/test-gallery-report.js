@@ -175,10 +175,23 @@ for (const name of ['BtnGalleryChoose', 'BtnGallerySend', 'BtnGalleryRefresh',
                     'BoxGalleryBy', 'BoxGalleryNote', 'BoxGalleryWhy',
                     'BtnGalleryReportSend', 'BtnGalleryReportCancel',
                     'GalleryApprovedList', 'GalleryPendingList', 'GalleryStaffBlock',
-                    'GalleryPageReportRow', 'TxtGalleryPageSaid']) {
+                    'GalleryPageReportRow', 'TxtGalleryPageSaid',
+                    'GalleryDrop', 'GalleryChosenList', 'TxtGalleryDropLead']) {
   yes('ui.xaml has ' + name, XAML.indexOf('x:Name="' + name + '"') > 0);
   yes('Shell.cs looks up ' + name, SHELL.indexOf('"' + name + '"') > 0);
 }
+
+yes('Gallery.FetchPending loads waiting thumbs with ticket',
+    /public static BitmapImage FetchPending\(Pending item\)/.test(GALLERY));
+yes('Shell wires the drop zone', /WireGalleryDrop\(\)/.test(SHELL));
+yes('approved list is a WrapPanel of image cards',
+    /WrapPanel x:Name="GalleryApprovedList"/.test(XAML));
+yes('pending list is a WrapPanel with Accept buttons in Shell',
+    /WrapPanel x:Name="GalleryPendingList"/.test(XAML) &&
+    /accept\.Content = "Accept"/.test(SHELL));
+yes('staff Accept is not gated on who.Answered',
+    /bool staff = GalleryStaff\(\);/.test(SHELL) &&
+    !/bool staff = doors && GalleryStaff\(\);/.test(SHELL));
 
 yes('PageGallery is index 11 at the end of the arrays',
     /PageGallery = 11/.test(SHELL) &&
