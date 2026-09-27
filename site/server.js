@@ -2787,9 +2787,41 @@ async function handle(req, res) {
     return fs.createReadStream(file).pipe(res);
   }
   // --------------------------------------------------------------- uploads
+  /*
+    The files themselves. The hub member cookie is the door for all of them, as
+    it always was, with one opening: a picture still waiting in the gallery
+    queue is read by staff as well (#755).
+
+    The queue page, /uploads, opens for the access.dev roles and its doors take
+    the hub cookie or a launcher ticket (#742, #743). The picture beside each
+    row in that queue is this address, and it asked w.member, so a Loremaster,
+    Gamemaster or Moderator was shown a page of broken pictures and asked to
+    decide on shots they could not see. The launcher has no cookie to offer at
+    all, so it could not show one either.
+
+    A name on gallery-pending.json therefore goes through galleryStaff, the one
+    gate the six staff doors already share, rather than a second check written
+    here that would drift from them: st.dev, so being allowed into the game
+    (st.play) is not enough. Everything else in uploads is the member cookie
+    exactly as before, and an approved shot leaves the queue and is public at
+    /shot, so this opening is only what is waiting on a decision.
+  */
   const up = p.match(/^\/up\/([A-Za-z0-9._ -]+)$/);
   if (up && req.method === 'GET') {
-    if (!w.member) return send(res, 401, 'sign in first', 'text/plain');
+    if (!w.member) {
+      // Nobody who has offered neither a staff cookie nor a ticket is told
+      // anything new: they get the 'sign in first' every other name gets,
+      // whether that name is in the queue or not.
+      const staffAsking = w.dev || url.searchParams.get('ticket');
+      const waiting = staffAsking &&
+        jsonFile(GPENDING, []).some((x) => String(x.name) === up[1]);
+      const gs = waiting ? await galleryStaff(url, w) : null;
+      if (!gs) return send(res, 401, 'sign in first', 'text/plain');
+      if (!gs.ok) {
+        return send(res, gs.code,
+                    String((gs.body && gs.body.error) || 'staff only'), 'text/plain');
+      }
+    }
     const file = path.join(UP, up[1]);
     if (!file.startsWith(UP + path.sep) || !fs.existsSync(file)) {
       return send(res, 404, 'no such file', 'text/plain');
