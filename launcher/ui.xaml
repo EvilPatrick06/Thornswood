@@ -641,7 +641,22 @@
 
                 <StackPanel Grid.Column="0">
                   <TextBlock Text="Ready to launch" Style="{StaticResource Eyebrow}"/>
-                  <StackPanel x:Name="StatusList"/>
+                  <!-- The full checklist and Scan and Fix live on the Diagnostics
+                       page now (#607). This is the one line summary of it; Recheck
+                       below runs the whole lot and updates it in place, so it does
+                       not flash or re-say itself when nothing has changed. -->
+                  <Border Style="{StaticResource Slab}" Padding="20,17">
+                    <Grid>
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                      <Ellipse x:Name="DotReady" Grid.Column="0" Width="10" Height="10" Fill="{DynamicResource Faint}"
+                               VerticalAlignment="Center" Margin="0,0,15,0"/>
+                      <StackPanel Grid.Column="1">
+                        <TextBlock x:Name="TxtReadyTitle" Style="{StaticResource H2}" Text="Checking..."/>
+                        <TextBlock x:Name="TxtReadyNote" Style="{StaticResource Small}" Margin="0,2,0,0" TextWrapping="Wrap"
+                                   Text="The full checklist and Scan and Fix are on the Diagnostics page. Recheck runs them all."/>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
@@ -839,22 +854,9 @@
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" x:Name="VerifyCard" Style="{StaticResource Slab}" Padding="20,17">
-              <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Ellipse x:Name="DotVerify" Grid.Column="0" Width="10" Height="10" Fill="{DynamicResource Faint}"
-                         VerticalAlignment="Center" Margin="0,0,15,0"/>
-                <StackPanel Grid.Column="1">
-                  <TextBlock x:Name="TxtVerifyTitle" Style="{StaticResource H2}" Text="Not checked yet"/>
-                  <TextBlock x:Name="TxtVerifyNote" Style="{StaticResource Small}" Margin="0,2,0,0"
-                             Text="Compares what you have against the list the server expects."/>
-                </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                  <Button x:Name="BtnScan" Style="{StaticResource Ghost}" Content="Scan" Margin="0,0,8,0"/>
-                  <Button x:Name="BtnFix"  Style="{StaticResource Solid}" Content="Fix" IsEnabled="False"/>
-                </StackPanel>
-              </Grid>
-            </Border>
+            <!-- The Scan and Fix card moved to the Diagnostics page (#607). This
+                 page is now the mod browser; the checks that gate Play, and the
+                 buttons that put things right, live together under Diagnostics. -->
 
             <Grid Grid.Row="1" Margin="0,22,0,0">
               <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -1014,6 +1016,58 @@
 
                 <TextBlock x:Name="TxtDiagNote" Style="{StaticResource Small}" Margin="2,13,0,0"/>
 
+                <!-- ============ Ready to launch (moved from Play, #607) ============
+                     The gate rows that used to sit on the Play page. Play now
+                     shows a one line summary of these and its Recheck button
+                     redraws them here. DrawStatus fills this list in place. -->
+                <TextBlock Text="Ready to launch" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
+                <StackPanel x:Name="StatusList"/>
+
+                <!-- ============ Scan and Fix (moved from Mods and Settings, #607) ==== -->
+                <TextBlock Text="Scan and Fix" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
+                <Border x:Name="VerifyCard" Style="{StaticResource Slab}" Padding="20,17">
+                  <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <Ellipse x:Name="DotVerify" Grid.Column="0" Width="10" Height="10" Fill="{DynamicResource Faint}"
+                             VerticalAlignment="Center" Margin="0,0,15,0"/>
+                    <StackPanel Grid.Column="1">
+                      <TextBlock x:Name="TxtVerifyTitle" Style="{StaticResource H2}" Text="Not checked yet"/>
+                      <TextBlock x:Name="TxtVerifyNote" Style="{StaticResource Small}" Margin="0,2,0,0"
+                                 Text="Compares what you have against the list the server expects."/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                      <Button x:Name="BtnScan" Style="{StaticResource Ghost}" Content="Scan" Margin="0,0,8,0"/>
+                      <Button x:Name="BtnFix"  Style="{StaticResource Solid}" Content="Fix" IsEnabled="False"/>
+                    </StackPanel>
+                  </Grid>
+                </Border>
+
+                <Border Style="{StaticResource Slab}" Padding="20,18" Margin="0,16,0,0">
+                  <StackPanel>
+                    <TextBlock Style="{StaticResource H2}" Text="Bring it up to date from Vortex"/>
+                    <TextBlock Style="{StaticResource Body}" Text="Thornswood runs from a Skyrim folder of its own, built from what Vortex has deployed. When Vortex deploys a newer collection, the launcher brings it in by itself the next time it starts. This does it now, on demand, without waiting for a restart."/>
+                    <Button x:Name="BtnOwnGameRefresh" Style="{StaticResource Ghost}" Content="Bring it up to date from Vortex" HorizontalAlignment="Left" Margin="0,13,0,0"/>
+
+                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
+
+                    <TextBlock Style="{StaticResource H2}" Text="Repair"/>
+                    <TextBlock Style="{StaticResource Body}" Text="Puts this build's own files back: the settings and load order that shipped with it, the client and the overlays under Data, the mod settings this build pins, and the class preset names. Another server's launcher can replace any of those, and an install that has never taken an update has never had a spare copy of them. This is everything Play does on the way in, done on demand, and it is safe to press twice. Close Skyrim first."/>
+                    <Button x:Name="BtnRepair" Style="{StaticResource Ghost}" Content="Repair" HorizontalAlignment="Left" Margin="0,13,0,0"/>
+
+                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
+
+                    <TextBlock Style="{StaticResource H2}" Text="Restore Windows folders"/>
+                    <TextBlock Style="{StaticResource Body}" Text="While the game runs, Windows' Skyrim settings and saves folders point at this build and are put back when you quit. If the game crashed hard and something still looks redirected, this undoes it by hand."/>
+                    <Button x:Name="BtnRestore" Style="{StaticResource Ghost}" Content="Restore" HorizontalAlignment="Left" Margin="0,13,0,0"/>
+
+                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
+
+                    <TextBlock Style="{StaticResource H2}" Text="Refresh the shortcut icon"/>
+                    <TextBlock Style="{StaticResource Body}" Text="The launcher repoints your shortcut at the current artwork every time it starts, which is usually enough. This is for when the desktop or the taskbar is still showing an old icon anyway. Explorer restarts, so the taskbar blinks once. Nothing is lost."/>
+                    <Button x:Name="BtnIcons" Style="{StaticResource Ghost}" Content="Refresh icon" HorizontalAlignment="Left" Margin="0,13,0,0"/>
+                  </StackPanel>
+                </Border>
+
                 <TextBlock Text="What the launcher can see right now" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
                 <StackPanel x:Name="DiagReadings"/>
               </StackPanel>
@@ -1121,9 +1175,9 @@
                       <TextBlock Style="{StaticResource Body}" Text="Runs Thornswood from a Skyrim folder of its own, made from what Vortex has deployed while the Thornswood profile is on. Any other Vortex profile can then use the Steam copy without reaching Thornswood, and switching profiles in Vortex no longer takes Thornswood's mods away. The big files are links to Vortex's copies, so the collection is not on the disk twice. When Vortex deploys a newer Thornswood collection, the launcher brings it in by itself the next time it starts. Windows asks for administrator once while this is set up, to write a firewall rule for the game's browser: Skyrim Platform draws the interface in a second program, and a rule is tied to a program's path, so moving the game into its own folder is what makes Windows ask about it. The rule is a block, because that program only ever talks to the game on this machine. Saying no is fine and only means Windows asks you about the browser on the first launch instead."/>
                       <TextBlock x:Name="TxtOwnGameState" Style="{StaticResource Small}" Margin="0,8,0,0"/>
                       <StackPanel Orientation="Horizontal" Margin="0,13,0,0">
-                        <Button x:Name="BtnOwnGameMake" Style="{StaticResource Ghost}" Content="Make it" Margin="0,0,8,0"/>
-                        <Button x:Name="BtnOwnGameRefresh" Style="{StaticResource Ghost}" Content="Bring it up to date from Vortex"/>
+                        <Button x:Name="BtnOwnGameMake" Style="{StaticResource Ghost}" Content="Make it"/>
                       </StackPanel>
+                      <!-- Bring it up to date from Vortex moved to Diagnostics, Scan and Fix (#607). -->
                       <TextBlock Style="{StaticResource Small}" Margin="0,13,0,0" Text="The launcher finds the folder Vortex deploys into when it is in a Steam library. If it is somewhere else, choose it here: in Vortex, Mods, Open, Open Game Folder shows which one. Only the files Vortex lists in it are used, and the game itself always comes from the Steam copy."/>
                       <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                         <Button x:Name="BtnOwnGamePick" Style="{StaticResource Ghost}" Content="Choose Vortex's folder" Margin="0,0,8,0"/>
@@ -1133,23 +1187,8 @@
                       <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
                     </StackPanel>
 
-                    <TextBlock Style="{StaticResource H2}" Text="Repair"/>
-                    <TextBlock Style="{StaticResource Body}" Text="Puts this build's own files back: the settings and load order that shipped with it, the client and the overlays under Data, the mod settings this build pins, and the class preset names. Another server's launcher can replace any of those, and an install that has never taken an update has never had a spare copy of them. This is everything Play does on the way in, done on demand, and it is safe to press twice. Close Skyrim first."/>
-                    <Button x:Name="BtnRepair" Style="{StaticResource Ghost}" Content="Repair" HorizontalAlignment="Left" Margin="0,13,0,0"/>
-
-                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
-
-                    <TextBlock Style="{StaticResource H2}" Text="Restore Windows folders"/>
-                    <TextBlock Style="{StaticResource Body}" Text="While the game runs, Windows' Skyrim settings and saves folders point at this build and are put back when you quit. If the game crashed hard and something still looks redirected, this undoes it by hand."/>
-                    <Button x:Name="BtnRestore" Style="{StaticResource Ghost}" Content="Restore" HorizontalAlignment="Left" Margin="0,13,0,0"/>
-
-                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
-
-                    <TextBlock Style="{StaticResource H2}" Text="Refresh the shortcut icon"/>
-                    <TextBlock Style="{StaticResource Body}" Text="The launcher repoints your shortcut at the current artwork every time it starts, which is usually enough. This is for when the desktop or the taskbar is still showing an old icon anyway. Explorer restarts, so the taskbar blinks once. Nothing is lost."/>
-                    <Button x:Name="BtnIcons" Style="{StaticResource Ghost}" Content="Refresh icon" HorizontalAlignment="Left" Margin="0,13,0,0"/>
-
-                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
+                    <!-- Repair, Restore Windows folders and Refresh the shortcut icon
+                         moved to Diagnostics, Scan and Fix (#607). -->
 
                     <StackPanel x:Name="PnlDev">
                       <TextBlock Style="{StaticResource H2}" Text="The dev build"/>

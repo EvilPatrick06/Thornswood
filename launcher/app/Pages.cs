@@ -567,6 +567,12 @@ namespace Thornswood
         static void BuildDiag()
         {
             if (diagReadings == null) return;
+
+            // The Ready to launch checklist lives on this page now (#607). Redraw
+            // it so it is current when the page is opened, the same way the other
+            // pages are rebuilt on open. DrawStatus fills the rows in place.
+            DrawStatus();
+
             diagReadings.Children.Clear();
 
             string ping = pingHistory.Count > 0 && pingHistory[pingHistory.Count - 1] >= 0
