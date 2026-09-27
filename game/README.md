@@ -14,9 +14,11 @@ scripts that build and ship it:
   Its own README too.
 - `data\`: the tables the gamemode's generated blocks are built from (doors,
   fires, food, harvests, hunts, ores, races, recipes, spells, stations,
-  warmth, water, weather, cast and the mine buildings). The `Build-*Table`
-  scripts in `scripts\dev\` read these and write the block between its markers in
-  `gamemode.js`; nothing reads them at run time.
+  warmth, water, weather, cast, the mine buildings, plus `data.json`,
+  `items.json` and `chargen.json` for the one-line `DATA` / `ITEMS` / `CHARGEN`
+  consts). The `Build-*Table` scripts in `scripts\dev\` and
+  `Install-GamemodeConsts.js` read these and write the matching block or const
+  line in `gamemode.js`; nothing reads them at run time.
 - `content\Thornswood-Content.esp`: our plugin file. People get it through
   the Nexus collection; the dev and live deploys send it to the server.
 - `required-data\`: plugins the load order names that Vortex does not yet

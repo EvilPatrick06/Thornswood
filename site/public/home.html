@@ -1006,7 +1006,7 @@ if (AGE_PATHS[here] && !ageOk()) {
   }).catch(function () { show('<h1>Every release</h1><p>Could not load it.</p>'); });
 } else if (here === '/gallery') {
   /* Public approved shots and a themed submit form for signed-in members.
-     Staff queue, approve, reject and delete live on the hub Gallery page.
+     Staff Accept and Delete live on the hub Gallery page.
      Public report is the per-image flag on live shots; bug reports go to Inbox. */
   Promise.all([
     fetch('/api/public').then(function (r) { return r.json(); }),

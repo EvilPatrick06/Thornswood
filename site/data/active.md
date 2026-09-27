@@ -1,6 +1,6 @@
 # Active Issues
 
-Every open bug and where it stands. Reference only, nothing here needs doing by a tester. Build 1.0.193.
+Every open bug and where it stands. Reference only, nothing here needs doing by a tester.
 
 **SHIPPED** published, not yet confirmed by anyone. **BUILT** fixed, not yet published. **OPEN** not started. **UNCONFIRMED** fixed a while ago, never verified either way.
 

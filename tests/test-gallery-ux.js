@@ -1,7 +1,6 @@
 // test-gallery-ux.js
 //
-// Public gallery themed like the site, home link + slideshow, staff queue +
-// compact live cleanup (small thumbs + Delete) on the hub Gallery page.
+// Public gallery themed like the site, home link + slideshow, one staff Accept/Delete grid on the hub Gallery page.
 // Hub member upload/list/reports UI removed; public send form and per-image
 // report stay on /gallery.
 const fs = require('fs');
@@ -138,10 +137,11 @@ yes('public gallery has no Reports inbox',
 yes('public gallery has no staff Delete on cards',
     !/data-galdel/.test(home));
 yes('public gallery copy says staff tools are not here',
-    /Staff queue, approve, reject and delete live on the hub Gallery page/.test(home));
+    /Staff Accept and Delete live on the hub Gallery page/.test(home));
 
-yes('hub Gallery keeps staff queue and live cleanup mounts',
-    /id="galqueue"/.test(hub) && /id="gallive"/.test(hub) &&
+yes('hub Gallery keeps one staff grid mount',
+    /id="galgrid"/.test(hub) &&
+    !/id="galqueue"/.test(hub) && !/id="gallive"/.test(hub) &&
     !/id="galreports"/.test(hub));
 yes('hub Gallery has no member upload drop or uploaded list',
     !/Drop files here/.test(hub) && !/Nothing uploaded yet/.test(hub) && !/function sendAll/.test(hub));
@@ -154,29 +154,31 @@ yes('hub Gallery no longer loads gallery reports API on this page',
 yes('hub Gallery has no dashed empty-state to public gallery and Inbox',
     !/Approved pictures live on the public/.test(hub) &&
     !/Bug and idea reports go to/.test(hub));
-yes('hub Gallery keeps staff approve + cleanup intro',
-    /Staff approve the queue and remove live gallery shots/.test(hub));
+yes('hub Gallery keeps staff Accept + Delete intro',
+    /Staff Accept waiting shots and Delete pending or live ones/.test(hub));
 
-yes('hub Gallery loads live gallery for cleanup',
-    /function loadGalleryLive\(\)/.test(hub) &&
+yes('hub Gallery loads one staff grid of pending + live',
+    /function loadGalleryStaff\(\)/.test(hub) &&
+    /\/api\/gallery\/pending/.test(hub) &&
     /\/api\/public/.test(hub) &&
     /method:'DELETE'/.test(hub) &&
     /\/api\/gallery\/approved/.test(hub));
 yes('hub live cleanup uses small thumbs and Delete',
     /thumb sm/.test(hub) && /file compact/.test(hub) &&
     /data-galdel/.test(hub) && /\.thumb\.sm\{/.test(hub));
-yes('hub still keeps pending approve/reject queue',
-    /data-galok/.test(hub) && /data-galno/.test(hub) &&
+yes('hub pending cards show Accept and Delete, no Reject',
+    /data-galok/.test(hub) && />Accept</.test(hub) &&
+    /data-galdel/.test(hub) && !/data-galno/.test(hub) &&
     /\/api\/gallery\/approve/.test(hub) &&
-    /\/api\/gallery\/reject/.test(hub));
-yes('approve refreshes live cleanup list',
-    /loadGalleryQueue\(\); loadGalleryLive\(\)/.test(hub));
+    !/\/api\/gallery\/reject/.test(hub) && !/>Reject</.test(hub));
+yes('Accept and Delete refresh the one staff grid',
+    /loadGalleryStaff\(\)/.test(hub) && !/loadGalleryQueue\(\)/.test(hub));
 
 yes('new gallery copy has no em dash', !/[\u2014\u2013]/.test(
   (home.match(/Send a picture[\s\S]{0,400}/) || [''])[0] +
   (home.match(/gal-show[\s\S]{0,200}/) || [''])[0] +
-  (hub.match(/Staff approve the queue[\s\S]{0,200}/) || [''])[0] +
-  (hub.match(/Live gallery[\s\S]{0,500}/) || [''])[0]
+  (hub.match(/Staff Accept waiting shots[\s\S]{0,200}/) || [''])[0] +
+  (hub.match(/Pending shots need Accept[\s\S]{0,500}/) || [''])[0]
 ));
 
 console.log('');
