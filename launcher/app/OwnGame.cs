@@ -710,7 +710,7 @@ namespace Thornswood
                 string livePlugins = Path.Combine(Paths.WinLocalAD, "plugins.txt");
                 if (tw == null)
                 {
-                    try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  OwnGame: Vortex profile Thornswood was not found; leaving Profile\\OwnGame plugin list alone rather than copying Windows' live list from another profile." + Environment.NewLine); } catch { }
+                    try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  OwnGame: Vortex profile Thornswood was not found; leaving Profile\\OwnGame plugin list alone rather than copying Windows' live list from another profile." + Environment.NewLine); } catch { /* the log is only a note; leaving OwnGame alone stands without it */ }
                 }
                 else
                 {
@@ -726,11 +726,11 @@ namespace Thornswood
                         string a = File.ReadAllText(livePlugins);
                         string b = File.ReadAllText(twPlugins);
                         if (!string.Equals(a, b, StringComparison.Ordinal))
-                            try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  OwnGame: Windows' live plugins.txt differs from the Thornswood Vortex profile at " + tw + "; baked OwnGame from Thornswood." + Environment.NewLine); } catch { }
+                            try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  OwnGame: Windows' live plugins.txt differs from the Thornswood Vortex profile at " + tw + "; baked OwnGame from Thornswood." + Environment.NewLine); } catch { /* the log is only a note; the bake stands without it */ }
                     }
                 }
             }
-            catch (Exception ex) { try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  OwnGame: baking Thornswood profile list failed: " + ex.Message + Environment.NewLine); } catch { } }
+            catch (Exception ex) { try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  OwnGame: baking Thornswood profile list failed: " + ex.Message + Environment.NewLine); } catch { /* the log itself failed; nowhere left to say so */ } }
 
             if (!first) return;
 
