@@ -28,7 +28,9 @@ Installing
 1. Run Thornswood-Setup.exe. Do not unzip anything yourself, it does that.
    If Windows says "Windows protected your PC", press "More info", then
    "Run anyway". It fetches Thornswood's own content while you watch and puts
-   the launcher and that content into your Skyrim.
+   the launcher in. Thornswood plays out of its own game folder, not out of
+   your Steam copy, and the launcher builds that folder the first time you
+   open it.
 
 2. Open Thornswood from the desktop shortcut. The server runs Skyrim build
    1.6.1170 and most copies are newer. If yours is, a card on the launcher's
