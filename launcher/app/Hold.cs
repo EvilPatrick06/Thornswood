@@ -61,7 +61,7 @@ namespace Thornswood
             lock (gate)
             {
                 var rels = new List<string>();
-                try { rels.AddRange(Keep.Held()); } catch { }
+                try { rels.AddRange(Keep.Held()); } catch (Exception ex) { Swallow.Note("Hold.Take, Keep.Held", ex); }
                 rels.AddRange(Extra);
                 foreach (string rel in rels)
                 {
@@ -74,7 +74,7 @@ namespace Thornswood
                 // loads it as a plugin that does nothing; the other launcher
                 // cannot write over it.
                 List<string> homes = new List<string>();
-                try { homes = Keep.ParkedHomes(); } catch { }
+                try { homes = Keep.ParkedHomes(); } catch (Exception ex) { Swallow.Note("Hold.Take, Keep.ParkedHomes", ex); }
                 foreach (string home in homes)
                 {
                     try
@@ -82,9 +82,9 @@ namespace Thornswood
                         if (File.Exists(home)) continue;
                         File.WriteAllText(home, "");
                         if (Grip(home)) { stubs.Add(home); n++; }
-                        else { try { File.Delete(home); } catch { } }
+                        else { try { File.Delete(home); } catch (Exception ex) { Swallow.Note("Hold.Take, deleting failed stub", ex); } }
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Hold.Take, stub for " + home, ex); }
                 }
             }
             Watch();
@@ -147,10 +147,10 @@ namespace Thornswood
                 {
                     if (string.Equals(fs.Name, full, StringComparison.OrdinalIgnoreCase)) { held = fs; break; }
                 }
-                if (held != null) { open.Remove(held); try { held.Dispose(); } catch { } }
+                if (held != null) { open.Remove(held); try { held.Dispose(); } catch (Exception ex) { Swallow.Note("Hold.Around, disposing held stream", ex); } }
             }
             // The launcher's own write is not news for the log.
-            lock (said) { try { said.Add(Rel(path)); } catch { } }
+            lock (said) { try { said.Add(Rel(path)); } catch (Exception ex) { Swallow.Note("Hold.Around, recording own write", ex); } }
             try { write(); }
             finally
             {
@@ -194,7 +194,7 @@ namespace Thornswood
         static string Rel(string full)
         {
             string game = Paths.Game.TrimEnd('\\') + "\\";
-            try { full = Path.GetFullPath(full); } catch { }
+            try { full = Path.GetFullPath(full); } catch (Exception ex) { Swallow.Note("Hold.Rel, GetFullPath", ex); }
             if (!full.StartsWith(game, StringComparison.OrdinalIgnoreCase)) return null;
             return full.Substring(game.Length);
         }
@@ -228,7 +228,7 @@ namespace Thornswood
                     s2("Something else " + what + " " + rel + " while " + Keep.Build() + " was running, another server's launcher most likely. " +
                        Keep.Build() + "'s own files are held and did not change.");
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Hold.Notice", ex); }
         }
     }
 }
