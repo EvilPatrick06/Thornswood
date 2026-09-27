@@ -220,7 +220,13 @@ if (Test-Path $updaterCs) {
 $verFour = $ver
 while (($verFour -split '\.').Count -lt 4) { $verFour = "$verFour.0" }
 
-function New-Info([string]$path, [string]$title, [string]$desc, [string]$v4, [string]$v) {
+# Product and company default to Thornswood, which is what the launcher wants.
+# The setup stub carries its own [assembly:] lines now (Bootstrap.cs), so this
+# is not written for it on a normal build; the product name is a parameter only
+# so the fallback below, for a stub that has lost its own attributes, still says
+# Thornswood Setup rather than the launcher's name.
+function New-Info([string]$path, [string]$title, [string]$desc, [string]$v4, [string]$v,
+                  [string]$product = 'Thornswood', [string]$company = 'Thornswood', [string]$copyright = 'Thornswood') {
     $body = @"
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -228,9 +234,9 @@ using System.Runtime.InteropServices;
 // Written by Build-Launcher.ps1 on every build. Editing it does nothing.
 [assembly: AssemblyTitle("$title")]
 [assembly: AssemblyDescription("$desc")]
-[assembly: AssemblyProduct("Thornswood")]
-[assembly: AssemblyCompany("Thornswood")]
-[assembly: AssemblyCopyright("Thornswood")]
+[assembly: AssemblyProduct("$product")]
+[assembly: AssemblyCompany("$company")]
+[assembly: AssemblyCopyright("$copyright")]
 [assembly: AssemblyVersion("$v4")]
 [assembly: AssemblyFileVersion("$v4")]
 [assembly: AssemblyInformationalVersion("$v")]
@@ -357,10 +363,18 @@ if (Test-Path $stubSrc) {
                   "/out:$stubNew", "/win32icon:$((Resolve-Path $icon).Path)")
     if (Test-Path $logoSml) { $stubArgs += "/resource:$((Resolve-Path $logoSml).Path),logo.png" }
     foreach ($r in $refs) { $stubArgs += "/reference:$r" }
+    # Bootstrap.cs carries its own version resource now: AssemblyProduct
+    # "Thornswood Setup", the company, the copyright and a stable version, so
+    # UAC and SmartScreen name the program instead of showing the bare file
+    # name, and the product identity does not change from one build to the next
+    # (Bootstrap.cs:18-43). When the source sets those, this generates nothing
+    # and lets csc read them off it; the block below is only for a stub that has
+    # somehow lost them, and it keeps the same product name so the fallback is
+    # not a second identity.
     $stubInfo = $null
     if ((Get-Content $stubSrc -Raw) -notmatch '(?m)^\s*\[assembly:') {
         $stubInfo = Join-Path $env:TEMP 'ThornswoodSetupInfo.cs'
-        New-Info $stubInfo 'Thornswood Setup' 'Thornswood setup' $verFour $ver
+        New-Info $stubInfo 'Thornswood Setup' 'Thornswood setup' $verFour $ver -product 'Thornswood Setup'
     }
     $stubArgs += (Resolve-Path $stubSrc).Path
     if ($stubInfo) { $stubArgs += $stubInfo }
@@ -394,7 +408,7 @@ if (Test-Path $stubSrc) {
 #
 # This does nothing at all unless tools\signing.json exists, so Djinn's machine
 # and the pull request build carry on exactly as before. See the header of
-# Sign-Artifact.ps1 for what that file holds, and Bootstrap.cs:75-95 for why
+# Sign-Artifact.ps1 for what that file holds, and Bootstrap.cs:112-121 for why
 # any of this matters.
 $signer = Join-Path $Here 'Sign-Artifact.ps1'
 if (Test-Path -LiteralPath $signer) {

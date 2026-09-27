@@ -12,6 +12,35 @@ using System.Windows.Controls;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Reflection;
+using System.Runtime.InteropServices;
+
+// What Windows reads off this exe before anybody runs it. csc gives an exe no
+// version resource at all unless these are set, so UAC's prompt, SmartScreen's
+// panel and Explorer's columns fall back to the bare file name and nothing
+// names the program at all. The blank "Unknown" on the publisher line is
+// Authenticode's to fill, and that is issue #390, still pending; this is the
+// rest of it, so the window a stranger meets first says what the program is
+// instead of showing a path.
+//
+// Kept in the source the installer owns, and kept stable on purpose. A product
+// name that is rewritten every build is a new identity every build, which is
+// the same reputation problem the download further down was written to escape:
+// a name SmartScreen has never seen before earns no trust. The build date rides
+// in the file NAME (Thornswood-Setup-<date>.exe); the product identity below
+// does not move with it. Because these attributes are here, Build-Launcher.ps1
+// leaves the stub's version resource alone rather than generating one of its
+// own, so what a person sees in UAC is decided here and the Downloads page and
+// FAQ can be written to match it.
+[assembly: AssemblyTitle("Thornswood Setup")]
+[assembly: AssemblyDescription("Installs Thornswood, the Skyrim multiplayer client, from thornswood.net.")]
+[assembly: AssemblyProduct("Thornswood Setup")]
+[assembly: AssemblyCompany("Thornswood")]
+[assembly: AssemblyCopyright("Thornswood")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyInformationalVersion("1.0.0")]
+[assembly: ComVisible(false)]
 
 namespace SkyrimTogetherSetup
 {
