@@ -312,9 +312,14 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
   margin:0 0 10px;color:var(--gold)}
 .gal-box .hint{color:var(--quiet);margin:0 0 16px;font:400 15.5px/1.55 var(--serif)}
 .gal-box .form label{color:var(--page)}
-.gal-box .form input[type=file]{display:block;width:100%;margin-top:8px;
-  padding:10px 12px;background:var(--night);border:1px solid var(--edge2);
-  color:var(--page);border-radius:2px;font:400 14px/1.4 var(--sans)}
+/* Native file control stays white on Windows; hide it and paint our own. */
+.gal-box .form input[type=file]{position:absolute;width:1px;height:1px;padding:0;
+  margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+.gal-box .form .file-pick{display:flex;flex-wrap:wrap;align-items:center;gap:12px;
+  margin-top:8px}
+.gal-box .form .file-pick .btn{padding:12px 22px}
+.gal-box .form .file-name{font:400 14px/1.4 var(--serif);color:var(--quiet);
+  text-transform:none;letter-spacing:0}
 .gal-box .form input[type=text]{background:var(--night)}
 
 /* Home gallery slideshow of approved public shots. */
@@ -893,10 +898,14 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
     if (who.canSubmit) {
       out += '<div class="gal-box" id="galSubmit">' +
         '<h2>Send a picture</h2>' +
-        '<p class="hint">Signed in as ' + esc(who.name || 'you') +
-        '. png, jpg, webp or gif, up to 25 MB. It goes to the queue, not live.</p>' +
+        '<p class="hint">png, jpg, webp or gif, up to 25 MB. It goes to the queue, not live.</p>' +
         '<div class="form">' +
-        '<label>Picture<input type="file" id="galFile" accept=".png,.jpg,.jpeg,.webp,.gif,image/*"></label>' +
+        '<label>Picture' +
+        '<input type="file" id="galFile" accept=".png,.jpg,.jpeg,.webp,.gif,image/*">' +
+        '<span class="file-pick">' +
+        '<button class="btn ghost" type="button" id="galPick">Choose file</button>' +
+        '<span class="file-name" id="galFileName">No file chosen</span>' +
+        '</span></label>' +
         '<label>By<input type="text" id="galBy" maxlength="40" placeholder="a name for the caption"></label>' +
         '<label>Note<span class="hint">optional</span><input type="text" id="galNote" maxlength="300"></label>' +
         '<div><button class="btn first" type="button" id="galSend">Send it</button></div>' +
@@ -940,10 +949,20 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
       el.style.color = bad ? 'var(--faint)' : 'var(--gold)';
     }
 
+    var f = document.getElementById('galFile');
+    var pick = document.getElementById('galPick');
+    var nameEl = document.getElementById('galFileName');
+    if (pick && f) {
+      pick.addEventListener('click', function () { f.click(); });
+      f.addEventListener('change', function () {
+        var file = f.files && f.files[0];
+        if (nameEl) nameEl.textContent = file ? file.name : 'No file chosen';
+      });
+    }
+
     var send = document.getElementById('galSend');
     if (send) {
       send.addEventListener('click', function () {
-        var f = document.getElementById('galFile');
         var file = f && f.files && f.files[0];
         if (!file) { said('Choose a picture first.', true); return; }
         var by = (document.getElementById('galBy').value || '').trim();
@@ -960,6 +979,7 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
             if (x.ok && x.j && x.j.ok) {
               said('Sent. Staff will look at it before it goes up.');
               if (f) f.value = '';
+              if (nameEl) nameEl.textContent = 'No file chosen';
             } else {
               said((x.j && (x.j.error || x.j.why)) || 'Could not send it.', true);
             }
