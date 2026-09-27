@@ -1800,7 +1800,7 @@ async function memberOf(discordId) {
    everything away at once, which is the whole reason for doing it this way. */
 async function standing(discordId) {
   const out = { id: String(discordId), inGuild: false, banned: false,
-                admin: false, play: false, dev: false, roles: [], name: '' };
+                admin: false, play: false, dev: false, roles: [], name: '', avatar: '' };
 
   /*
     THE FILE FIRST, AND BEFORE EVERY OTHER BRANCH.
@@ -1830,6 +1830,7 @@ async function standing(discordId) {
       if (r.ok) {
         const me = r.body;
         out.name = (me.nick || (me.user && (me.user.global_name || me.user.username)) || '');
+        if (me.user && me.user.avatar) out.avatar = String(me.user.avatar);
         const names = await roleNames();
         out.roles = (me.roles || []).map((id) => names[id]).filter(Boolean);
       } else if (r.status !== 404) {
@@ -1857,6 +1858,7 @@ async function standing(discordId) {
   const m = r.body;
   out.inGuild = true;
   out.name = (m.nick || (m.user && (m.user.global_name || m.user.username)) || '');
+  if (m.user && m.user.avatar) out.avatar = String(m.user.avatar);
   const names = await roleNames();
   out.roles = (m.roles || []).map((id) => names[id]).filter(Boolean);
   const has = (list) => (list || []).some((n) => out.roles.indexOf(n) >= 0);
@@ -2309,6 +2311,7 @@ async function handle(req, res) {
         Location: 'http://127.0.0.1:' + port + '/thornswood?ticket=' +
                   encodeURIComponent(makeTicket(me.id, name)) +
                   '&name=' + encodeURIComponent(name) +
+                  (me.avatar ? '&avatar=' + encodeURIComponent(String(me.avatar)) : '') +
                   (nonce ? '&nonce=' + encodeURIComponent(nonce) : ''),
         'Set-Cookie': cookies2
       });
@@ -3201,6 +3204,7 @@ async function handle(req, res) {
       ok: true,
       id: st.id,
       name: st.name || t.n,
+      avatar: st.avatar || '',
       admin: st.admin,
       dev: !!st.dev,
       roles: st.roles,
