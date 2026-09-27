@@ -29,6 +29,8 @@
 
 [CmdletBinding()]
 param(
+  # C:\Thornswood\Game on most machines; Find-Root below retargets when the
+  # launcher is on another drive. -Game and -Vortex still win.
   [string] $Game   = 'C:\Thornswood\Game',
   [string] $Vps    = '192.135.112.23',
   [string] $User   = 'Administrator',
@@ -39,6 +41,21 @@ param(
   [switch] $Vortex
 )
 
+# Same rule as Find-Root in Publish-Update.ps1 / Repair-Manifest.ps1. -Game and
+# -Vortex still win; this only fills the default when neither was passed, so a
+# machine whose launcher lives on another drive is not stuck on C:\Thornswood.
+function Find-Root {
+    $first = 'C:\Thornswood'
+    if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
+    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
+        $cand = Join-Path $d.Root 'Thornswood'
+        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
+    }
+    return $first
+}
+if (-not $Vortex -and -not $PSBoundParameters.ContainsKey('Game')) {
+  $Game = Join-Path (Find-Root) 'Game'
+}
 if ($Vortex) {
   $roots = @()
   foreach ($k in @('HKCU:\Software\Valve\Steam', 'HKLM:\SOFTWARE\Wow6432Node\Valve\Steam')) {
@@ -363,9 +380,13 @@ Head 'Load order'
 # that are genuinely not installed (Wyrmstooth, Mysticism, a couple of SunHelm
 # patches), and enabling a plugin whose masters are missing is how you get a
 # crash on load rather than a fixed menu.
+# Derived from the game folder's install root, not a fixed C:\Thornswood, so
+# the MCMHelper enable lands in the same Profile the launcher on this machine
+# reads when the install is on another drive.
+$installRoot = Split-Path -Parent $Game
 $orderFiles = @(
-  'C:\Thornswood\Profile\LocalAppData\Plugins.txt',
-  'C:\Thornswood\Profile\Default\plugins.txt'
+  (Join-Path $installRoot 'Profile\LocalAppData\Plugins.txt'),
+  (Join-Path $installRoot 'Profile\Default\plugins.txt')
 )
 foreach ($f in $orderFiles) {
   if (-not (Test-Path -LiteralPath $f)) { continue }
@@ -501,8 +522,8 @@ if (Test-Path 'C:\Thornswood-Server\server.log') {
 
 Head 'Next'
 Note 'Start the game from the launcher, play for a minute, quit, then paste:'
-Note '  Get-Content C:\Thornswood\Game\Data\Platform\thornswood-voice.log'
-Note '  Get-Content C:\Thornswood\Game\Data\Platform\thornswood-front.log'
+Note ("  Get-Content $(Join-Path $Game 'Data\Platform\thornswood-voice.log')")
+Note ("  Get-Content $(Join-Path $Game 'Data\Platform\thornswood-front.log')")
 
 if ($script:gone.Count) {
   Write-Host ''
