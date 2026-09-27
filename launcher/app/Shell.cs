@@ -4964,11 +4964,10 @@ namespace Thornswood
                         }
                         catch { }
 
+                        // where is still used to probe /health; do not show the URL (#797).
                         txtVoiceState.Text = fUp
-                            ? ("Running at " + where +
-                               ". It starts inside the game on its own." + keys)
-                            : ("Not answering at " + where +
-                               ", so nobody will hear anybody. It is not installed on the server, or not running.");
+                            ? ("Running. It starts inside the game on its own." + keys)
+                            : ("Not answering, so nobody will hear anybody. It is not installed on the server, or not running.");
                     }
                     catch { }
                 }));
@@ -5351,9 +5350,9 @@ namespace Thornswood
                     try
                     {
                         var sb = new StringBuilder();
-                        sb.Append(fUp ? "UP" : "not answering").Append("   ")
-                          .Append(fLocal ? "this machine" : c.ServerAddress)
-                          .Append(":").Append(c.ServerPort);
+                        // Host:port stays off the UI (see #797). Local still names this machine.
+                        sb.Append(fUp ? "UP" : "not answering");
+                        if (fLocal) sb.Append("   this machine");
                         if (fUp && fOurs) sb.Append("   started by this launcher");
                         if (fLocal)
                         {
@@ -5390,7 +5389,7 @@ namespace Thornswood
                 if (!SkyMp.IsLocal(cfg))
                 {
                     var r = MessageBox.Show(
-                        "The server at " + cfg.ServerAddress + " is not answering.\n\n" +
+                        "The server is not answering.\n\n" +
                         "Starting anyway gives you a long wait, a black screen and then Skyrim on your own: " +
                         "no character creation, and nothing anyone else can see.\n\nStart the game anyway?",
                         "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Warning);
