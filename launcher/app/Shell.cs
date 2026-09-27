@@ -1385,7 +1385,7 @@ namespace Thornswood
         /// One Gallery grid: approved cards for everyone, plus pending cards for
         /// staff (Door / DevAllowed) in the same WrapPanel. No separate waiting
         /// section. Accept and Delete are staff-only; Reject is gone; Report
-        /// stays on approved cards for linked players.
+        /// stays on approved cards for linked people.
         /// </summary>
         static void FillGalleryGrid(List<Gallery.Shot> shots, List<Gallery.Pending> pending, string pendingBad)
         {

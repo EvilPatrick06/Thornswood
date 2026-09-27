@@ -1221,7 +1221,7 @@
 
           <!-- ================ GALLERY ================ -->
           <!-- Upload (multi + drop), one Gallery grid of approved + staff pending,
-               Report for players, Accept / Delete for staff (#731). No Reject.
+               Report for people, Accept / Delete for staff (#731). No Reject.
                Play keeps the approved spotlight only. -->
           <Grid x:Name="PageGallery" Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
