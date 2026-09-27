@@ -131,17 +131,21 @@ namespace Thornswood
         static List<Gallery.Shot> galleryShots;
         static int galleryAt = -1;
         static DispatcherTimer galleryTimer;
-        // Report, and the way to the site's own staff page (#731). galleryWho
-        // is what /api/gallery/who answered at start up, null until it has;
-        // galleryReporting is the picture an open report is about, held so the
-        // report goes to that one even if the card has turned since.
-        static Button btnGalleryReport, btnGalleryManage,
-                      btnGalleryReportSend, btnGalleryReportCancel;
-        static FrameworkElement galleryReportRow;
-        static TextBox boxGalleryWhy;
-        static TextBlock txtGallerySaid;
+        // Gallery page tools (#731). Play keeps the rotating spotlight only.
+        // galleryWho is what /api/gallery/who answered at start up, null until
+        // it has; galleryReporting is the picture an open report on the Gallery
+        // page is about.
         static Gallery.Who galleryWho;
         static Gallery.Shot galleryReporting;
+        static string galleryChosenPath = "";
+        static Button btnGalleryChoose, btnGallerySend, btnGalleryRefresh,
+                      btnGalleryReportSend, btnGalleryReportCancel;
+        static TextBox boxGalleryBy, boxGalleryNote, boxGalleryWhy;
+        static TextBlock txtGalleryChosen, txtGalleryPageSaid,
+                         txtGalleryApprovedEmpty, txtGalleryPendingEmpty;
+        static FrameworkElement galleryStaffBlock, galleryPageReportRow;
+        static StackPanel galleryApprovedList, galleryPendingList;
+        static List<Gallery.Pending> galleryPending;
         static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
         static CheckBox chkMusic; static Slider sldMusic; static TextBlock txtMusic;
@@ -681,25 +685,36 @@ namespace Thornswood
             galleryCard = F<FrameworkElement>("GalleryCard");
             galleryImage = F<Image>("GalleryImage");
             galleryBy = F<TextBlock>("GalleryBy");
-            btnGalleryReport = F<Button>("BtnGalleryReport");
-            btnGalleryManage = F<Button>("BtnGalleryManage");
-            galleryReportRow = F<FrameworkElement>("GalleryReportRow");
-            boxGalleryWhy = F<TextBox>("BoxGalleryWhy");
+            btnGalleryChoose = F<Button>("BtnGalleryChoose");
+            btnGallerySend = F<Button>("BtnGallerySend");
+            btnGalleryRefresh = F<Button>("BtnGalleryRefresh");
             btnGalleryReportSend = F<Button>("BtnGalleryReportSend");
             btnGalleryReportCancel = F<Button>("BtnGalleryReportCancel");
-            txtGallerySaid = F<TextBlock>("TxtGallerySaid");
+            boxGalleryBy = F<TextBox>("BoxGalleryBy");
+            boxGalleryNote = F<TextBox>("BoxGalleryNote");
+            boxGalleryWhy = F<TextBox>("BoxGalleryWhy");
+            txtGalleryChosen = F<TextBlock>("TxtGalleryChosen");
+            txtGalleryPageSaid = F<TextBlock>("TxtGalleryPageSaid");
+            txtGalleryApprovedEmpty = F<TextBlock>("TxtGalleryApprovedEmpty");
+            txtGalleryPendingEmpty = F<TextBlock>("TxtGalleryPendingEmpty");
+            galleryStaffBlock = F<FrameworkElement>("GalleryStaffBlock");
+            galleryPageReportRow = F<FrameworkElement>("GalleryPageReportRow");
+            galleryApprovedList = F<StackPanel>("GalleryApprovedList");
+            galleryPendingList = F<StackPanel>("GalleryPendingList");
 
             // Same order as the PageXxx constants above, and as PageTitles.
+            // Gallery is appended at the end on purpose: renumbering the middle
+            // once sent people to the wrong page for weeks.
             navButtons = new Button[] {
                 F<Button>("NavPlay"), F<Button>("NavNews"), F<Button>("NavServer"),
                 F<Button>("NavMods"), F<Button>("NavBuild"), F<Button>("NavSaves"),
                 F<Button>("NavControls"), F<Button>("NavLogs"), F<Button>("NavDiag"),
-                F<Button>("NavHelp"), F<Button>("NavSettings") };
+                F<Button>("NavHelp"), F<Button>("NavSettings"), F<Button>("NavGallery") };
             pages = new UIElement[] {
                 F<Grid>("PagePlay"), F<Grid>("PageNews"), F<Grid>("PageServer"),
                 F<Grid>("PageMods"), F<Grid>("PageBuild"), F<Grid>("PageSaves"),
                 F<Grid>("PageControls"), F<Grid>("PageLogs"), F<Grid>("PageDiag"),
-                F<Grid>("PageHelp"), F<Grid>("PageSettings") };
+                F<Grid>("PageHelp"), F<Grid>("PageSettings"), F<Grid>("PageGallery") };
 
             /*
               Saves is gone, and with it Server, Mods, What is installed and
@@ -857,7 +872,7 @@ namespace Thornswood
             // staff. A report half written under the account that has just gone
             // is closed rather than sent under the new one.
             if (GalleryReportOpen && !Discord.Linked) CloseGalleryReport();
-            PaintGalleryTools();
+            PaintGalleryPage();
         }
 
         /// <summary>Empty circle while unlinked, or while a picture is still loading.</summary>
@@ -980,11 +995,11 @@ namespace Thornswood
         // weeks without anyone noticing.
         const int PagePlay = 0, PageNews = 1, PageServer = 2, PageMods = 3, PageBuild = 4,
                   PageSaves = 5, PageControls = 6, PageLogs = 7, PageDiag = 8,
-                  PageHelp = 9, PageSettings = 10;
+                  PageHelp = 9, PageSettings = 10, PageGallery = 11;
 
         static readonly string[] PageTitles = {
             "Play", "News", "Server", "Mods", "What is installed",
-            "Saves", "Controls", "Logs", "Diagnostics", "Help", "Settings" };
+            "Saves", "Controls", "Logs", "Diagnostics", "Help", "Settings", "Gallery" };
 
         static void ShowPage(int i)
         {
@@ -1006,9 +1021,11 @@ namespace Thornswood
             else if (i == PageControls) BuildControls();
             else if (i == PageLogs) BuildLogs();
             else if (i == PageDiag) BuildDiag();
+            else if (i == PageGallery) BuildGalleryPage();
 
-            // The gallery turns only on the Play page, so a page change starts
-            // or stops it, the way the title video follows what is on screen.
+            // The Play spotlight turns only on the Play page, so a page
+            // change starts or stops it, the way the title video follows
+            // what is on screen.
             GalleryDecide();
         }
 
@@ -1217,35 +1234,21 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The pictures the site is showing, turned through on the Play page.
+        /// The pictures the site is showing, turned through on the Play page
+        /// as a spotlight only. Upload, Report, Accept and Delete live on the
+        /// Gallery page (#731).
         ///
-        /// Gallery.Load asks /api/public, the same public feed the front page
-        /// reads, and the site keeps the queue and chooses what goes into the
-        /// gallery. The launcher shows what is already public. The one thing it
-        /// sends is a report on the picture on the card (#731), over the same
-        /// signed ticket the door uses; approving, rejecting and taking an
-        /// approved picture down are the site's doors and want a browser sign
-        /// in, so BtnGalleryManage opens the site page for staff rather than
-        /// pretending to do it from here.
+        /// Gallery.Load asks /api/public. The list is fetched once on a pool
+        /// thread at start up with /api/gallery/who, so the Gallery page knows
+        /// whether the site has the doors at all.
         ///
-        /// The list is fetched once on a pool thread at start up, and
-        /// /api/gallery/who is asked in the same trip, only to find out whether
-        /// this site has the gallery doors at all: a site older than them has
-        /// no address to report to and the button stays hidden.
-        ///
-        /// The card stays hidden until the first picture has loaded, so a site
-        /// that is down, or a build shown before anybody has sent a picture,
-        /// leaves the page exactly as it was. It fails the way the online count
-        /// and the roster do: quietly, with nothing said.
+        /// The Play card stays hidden until the first picture has loaded.
         /// </summary>
         static void StartGallery()
         {
             if (galleryCard == null) return;
             ThreadPool.QueueUserWorkItem(delegate
             {
-                // Load fails to an empty list on its own, and AskWho to an
-                // unanswered Who, so nothing here throws and there is no catch
-                // to swallow: the same shape as AskOnline.
                 List<Gallery.Shot> shots = Gallery.Load();
                 Gallery.Who who = Gallery.AskWho();
                 win.Dispatcher.BeginInvoke(new Action(delegate
@@ -1253,6 +1256,7 @@ namespace Thornswood
                     galleryWho = who;
                     galleryShots = (shots != null && shots.Count > 0) ? shots : null;
                     galleryAt = -1;
+                    PaintGalleryPage();
                     if (galleryShots == null) return;
 
                     if (galleryTimer == null)
@@ -1260,24 +1264,12 @@ namespace Thornswood
                         galleryTimer = new DispatcherTimer();
                         galleryTimer.Interval = TimeSpan.FromSeconds(7);
                         galleryTimer.Tick += delegate { ShowNextShot(); };
-                        // Turn only while somebody can see it: off the Play
-                        // page, minimised or in game it stands still, the way
-                        // the menu music and the title video do.
                         win.StateChanged += delegate { GalleryDecide(); };
                     }
                     ShowNextShot();
                     GalleryDecide();
                 }));
             });
-        }
-
-        /// <summary>
-        /// The picture the card is showing, or null before the first one.
-        /// </summary>
-        static Gallery.Shot CurrentShot()
-        {
-            if (galleryShots == null || galleryAt < 0 || galleryAt >= galleryShots.Count) return null;
-            return galleryShots[galleryAt];
         }
 
         /// <summary>
@@ -1298,55 +1290,246 @@ namespace Thornswood
             return Discord.DevAllowed;
         }
 
-        /// <summary>
-        /// Which of the two buttons under the picture apply right now. Report
-        /// for anybody whose copy is linked, once the site has shown it has the
-        /// gallery doors and the picture on the card has a name to report;
-        /// Manage on the site for staff.
-        /// </summary>
-        static void PaintGalleryTools()
-        {
-            bool doors = galleryWho != null && galleryWho.Answered;
-            Gallery.Shot shot = CurrentShot();
-            bool named = shot != null && shot.Name != null && shot.Name.Length > 0;
-
-            if (btnGalleryReport != null)
-                btnGalleryReport.Visibility = (doors && named && Discord.Linked && !GalleryReportOpen)
-                    ? Visibility.Visible : Visibility.Collapsed;
-            if (btnGalleryManage != null)
-                btnGalleryManage.Visibility = (doors && GalleryStaff())
-                    ? Visibility.Visible : Visibility.Collapsed;
-        }
-
         static bool GalleryReportOpen
         {
-            get { return galleryReportRow != null && galleryReportRow.Visibility == Visibility.Visible; }
+            get { return galleryPageReportRow != null && galleryPageReportRow.Visibility == Visibility.Visible; }
         }
 
         /// <summary>
-        /// One line under the picture, or nothing when there is nothing to say.
+        /// One line on the Gallery page, or nothing when there is nothing to say.
         /// </summary>
         static void SayGallery(string line)
         {
-            if (txtGallerySaid == null) return;
+            if (txtGalleryPageSaid == null) return;
             if (string.IsNullOrEmpty(line))
             {
-                txtGallerySaid.Text = "";
-                txtGallerySaid.Visibility = Visibility.Collapsed;
+                txtGalleryPageSaid.Text = "";
+                txtGalleryPageSaid.Visibility = Visibility.Collapsed;
                 return;
             }
-            txtGallerySaid.Text = line;
-            txtGallerySaid.Visibility = Visibility.Visible;
+            txtGalleryPageSaid.Text = line;
+            txtGalleryPageSaid.Visibility = Visibility.Visible;
         }
 
         /// <summary>
-        /// Opens the box for saying what is wrong with the picture on the card,
-        /// and holds the rotation where it is so the picture cannot change
-        /// under somebody halfway through writing.
+        /// Staff block visibility and whether upload is offered, from who and
+        /// Discord link state. Called when the Gallery page is built and when
+        /// Discord link state changes.
         /// </summary>
-        static void OpenGalleryReport()
+        static void PaintGalleryPage()
         {
-            Gallery.Shot shot = CurrentShot();
+            bool doors = galleryWho != null && galleryWho.Answered;
+            bool staff = doors && GalleryStaff();
+            if (galleryStaffBlock != null)
+                galleryStaffBlock.Visibility = staff ? Visibility.Visible : Visibility.Collapsed;
+            if (btnGallerySend != null)
+                btnGallerySend.IsEnabled = doors && Discord.Linked &&
+                    galleryChosenPath != null && galleryChosenPath.Length > 0;
+            if (btnGalleryChoose != null)
+                btnGalleryChoose.IsEnabled = doors;
+        }
+
+        /// <summary>
+        /// Rebuilds the Gallery page lists from the public feed and, for staff,
+        /// the pending queue. Call on the UI thread after a pool trip, or from
+        /// ShowPage which kicks the trip itself.
+        /// </summary>
+        static void BuildGalleryPage()
+        {
+            PaintGalleryPage();
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                List<Gallery.Shot> shots = Gallery.Load();
+                Gallery.Who who = Gallery.AskWho();
+                string pendingBad = "";
+                List<Gallery.Pending> pending = null;
+                bool staff = false;
+                if (who != null && who.Answered)
+                {
+                    // Staff is the door's word (or last saved), not who.Staff,
+                    // which is a browser session the launcher does not have.
+                    staff = Discord.Linked && ((Door.Last != null && Door.Last.Dev) || Discord.DevAllowed);
+                    if (staff) pending = Gallery.Queue(out pendingBad);
+                }
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    galleryWho = who;
+                    // Keep Play's rotation in step with what the Gallery page
+                    // just learnt, without forcing a turn mid-page.
+                    if (shots != null && shots.Count > 0)
+                    {
+                        galleryShots = shots;
+                        if (galleryAt < 0 || galleryAt >= galleryShots.Count) galleryAt = -1;
+                        if (galleryTimer == null)
+                        {
+                            galleryTimer = new DispatcherTimer();
+                            galleryTimer.Interval = TimeSpan.FromSeconds(7);
+                            galleryTimer.Tick += delegate { ShowNextShot(); };
+                            win.StateChanged += delegate { GalleryDecide(); };
+                        }
+                        if (galleryAt < 0) ShowNextShot();
+                        GalleryDecide();
+                    }
+                    else
+                    {
+                        galleryShots = null;
+                        galleryAt = -1;
+                        if (galleryCard != null) galleryCard.Visibility = Visibility.Collapsed;
+                    }
+
+                    galleryPending = pending;
+                    PaintGalleryPage();
+                    FillGalleryApproved(shots);
+                    FillGalleryPending(pending, pendingBad);
+                }));
+            });
+        }
+
+        static void FillGalleryApproved(List<Gallery.Shot> shots)
+        {
+            if (galleryApprovedList == null) return;
+            galleryApprovedList.Children.Clear();
+            bool any = shots != null && shots.Count > 0;
+            if (txtGalleryApprovedEmpty != null)
+                txtGalleryApprovedEmpty.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
+            if (!any) return;
+
+            bool doors = galleryWho != null && galleryWho.Answered;
+            bool staff = doors && GalleryStaff();
+            for (int i = 0; i < shots.Count; i++)
+            {
+                Gallery.Shot shot = shots[i];
+                if (shot == null) continue;
+                var row = new Border();
+                row.Style = (Style)win.FindResource("Slab");
+                row.Padding = new Thickness(14, 10, 14, 10);
+                if (i > 0) row.Margin = new Thickness(0, 8, 0, 0);
+
+                var grid = new Grid();
+                grid.ColumnDefinitions.Add(new ColumnDefinition());
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var label = new TextBlock();
+                label.Style = (Style)win.FindResource("Body");
+                label.TextWrapping = TextWrapping.Wrap;
+                string by = (shot.By != null && shot.By.Length > 0) ? shot.By : "somebody";
+                string shown = (shot.Name != null && shot.Name.Length > 0) ? shot.Name : "picture";
+                label.Text = shown + "  ·  by " + by;
+                Grid.SetColumn(label, 0);
+                grid.Children.Add(label);
+
+                if (doors && Discord.Linked && shot.Name != null && shot.Name.Length > 0)
+                {
+                    var report = new Button();
+                    report.Style = (Style)win.FindResource("Ghost");
+                    report.Content = "Report";
+                    report.Padding = new Thickness(10, 4, 10, 4);
+                    report.Margin = new Thickness(10, 0, 0, 0);
+                    report.VerticalAlignment = VerticalAlignment.Center;
+                    Gallery.Shot hold = shot;
+                    report.Click += delegate { OpenGalleryReport(hold); };
+                    Grid.SetColumn(report, 1);
+                    grid.Children.Add(report);
+                }
+
+                if (staff && shot.Name != null && shot.Name.Length > 0)
+                {
+                    var del = new Button();
+                    del.Style = (Style)win.FindResource("Ghost");
+                    del.Content = "Delete";
+                    del.Padding = new Thickness(10, 4, 10, 4);
+                    del.Margin = new Thickness(8, 0, 0, 0);
+                    del.VerticalAlignment = VerticalAlignment.Center;
+                    string name = shot.Name;
+                    del.Click += delegate { GalleryTakeDown(name); };
+                    Grid.SetColumn(del, 2);
+                    grid.Children.Add(del);
+                }
+
+                row.Child = grid;
+                galleryApprovedList.Children.Add(row);
+            }
+        }
+
+        static void FillGalleryPending(List<Gallery.Pending> pending, string bad)
+        {
+            if (galleryPendingList == null) return;
+            galleryPendingList.Children.Clear();
+            if (!string.IsNullOrEmpty(bad))
+            {
+                if (txtGalleryPendingEmpty != null)
+                {
+                    txtGalleryPendingEmpty.Text = bad;
+                    txtGalleryPendingEmpty.Visibility = Visibility.Visible;
+                }
+                return;
+            }
+            bool any = pending != null && pending.Count > 0;
+            if (txtGalleryPendingEmpty != null)
+            {
+                txtGalleryPendingEmpty.Text = "Nothing is waiting.";
+                txtGalleryPendingEmpty.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
+            }
+            if (!any) return;
+
+            for (int i = 0; i < pending.Count; i++)
+            {
+                Gallery.Pending item = pending[i];
+                if (item == null || item.Name == null || item.Name.Length == 0) continue;
+                var row = new Border();
+                row.Style = (Style)win.FindResource("Slab");
+                row.Padding = new Thickness(14, 10, 14, 10);
+                if (i > 0) row.Margin = new Thickness(0, 8, 0, 0);
+
+                var stack = new StackPanel();
+                var label = new TextBlock();
+                label.Style = (Style)win.FindResource("Body");
+                label.TextWrapping = TextWrapping.Wrap;
+                string by = (item.By != null && item.By.Length > 0) ? item.By : "somebody";
+                string line = item.Name + "  ·  by " + by;
+                if (item.When != DateTime.MinValue)
+                    line += "  ·  " + item.When.ToString("g");
+                label.Text = line;
+                stack.Children.Add(label);
+                if (item.Note != null && item.Note.Length > 0)
+                {
+                    var note = new TextBlock();
+                    note.Style = (Style)win.FindResource("Small");
+                    note.TextWrapping = TextWrapping.Wrap;
+                    note.Margin = new Thickness(0, 4, 0, 0);
+                    note.Text = item.Note;
+                    stack.Children.Add(note);
+                }
+
+                var buttons = new StackPanel();
+                buttons.Orientation = Orientation.Horizontal;
+                buttons.Margin = new Thickness(0, 8, 0, 0);
+
+                var accept = new Button();
+                accept.Style = (Style)win.FindResource("Solid");
+                accept.Content = "Accept";
+                accept.Padding = new Thickness(12, 4, 12, 4);
+                string name = item.Name;
+                accept.Click += delegate { GalleryAccept(name); };
+                buttons.Children.Add(accept);
+
+                var reject = new Button();
+                reject.Style = (Style)win.FindResource("Ghost");
+                reject.Content = "Reject";
+                reject.Padding = new Thickness(10, 4, 10, 4);
+                reject.Margin = new Thickness(8, 0, 0, 0);
+                reject.Click += delegate { GalleryReject(name); };
+                buttons.Children.Add(reject);
+
+                stack.Children.Add(buttons);
+                row.Child = stack;
+                galleryPendingList.Children.Add(row);
+            }
+        }
+
+        static void OpenGalleryReport(Gallery.Shot shot)
+        {
             if (shot == null || shot.Name == null || shot.Name.Length == 0) return;
             if (!Discord.Linked)
             {
@@ -1355,28 +1538,20 @@ namespace Thornswood
             }
 
             galleryReporting = shot;
-            SayGallery("Say what is wrong with this picture. Staff read it; nothing comes off the gallery until one of them takes it off.");
+            SayGallery("Say what is wrong with " + shot.Name + ". Staff read it; nothing comes off the gallery until one of them takes it off.");
             if (boxGalleryWhy != null) boxGalleryWhy.Text = "";
-            if (galleryReportRow != null) galleryReportRow.Visibility = Visibility.Visible;
-            PaintGalleryTools();
-            GalleryDecide();
+            if (galleryPageReportRow != null) galleryPageReportRow.Visibility = Visibility.Visible;
             if (boxGalleryWhy != null) boxGalleryWhy.Focus();
         }
 
         static void CloseGalleryReport()
         {
             galleryReporting = null;
-            if (galleryReportRow != null) galleryReportRow.Visibility = Visibility.Collapsed;
+            if (galleryPageReportRow != null) galleryPageReportRow.Visibility = Visibility.Collapsed;
             if (boxGalleryWhy != null) boxGalleryWhy.Text = "";
             if (btnGalleryReportSend != null) btnGalleryReportSend.IsEnabled = true;
-            PaintGalleryTools();
-            GalleryDecide();
         }
 
-        /// <summary>
-        /// Sends the report the box holds. The picture stays up either way:
-        /// the report goes to staff, and only staff take one down.
-        /// </summary>
         static void SendGalleryReport()
         {
             Gallery.Shot shot = galleryReporting;
@@ -1406,10 +1581,119 @@ namespace Thornswood
             });
         }
 
+        static void GalleryChooseFile()
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog();
+            dlg.Title = "Choose a picture for the gallery";
+            dlg.Filter = "Pictures|*.png;*.jpg;*.jpeg;*.webp;*.gif|All files|*.*";
+            dlg.CheckFileExists = true;
+            bool? ok = dlg.ShowDialog(win);
+            if (ok != true || string.IsNullOrEmpty(dlg.FileName)) return;
+            galleryChosenPath = dlg.FileName;
+            if (txtGalleryChosen != null) txtGalleryChosen.Text = Path.GetFileName(galleryChosenPath);
+            PaintGalleryPage();
+            SayGallery("");
+        }
+
+        static void GallerySendChosen()
+        {
+            if (!Discord.Linked)
+            {
+                SayGallery("Connect Discord first, so the site knows who is sending this.");
+                return;
+            }
+            string path = galleryChosenPath;
+            if (path == null || path.Length == 0)
+            {
+                SayGallery("Choose a picture to send first.");
+                return;
+            }
+            string by = boxGalleryBy == null ? "" : boxGalleryBy.Text;
+            string note = boxGalleryNote == null ? "" : boxGalleryNote.Text;
+            if (btnGallerySend != null) btnGallerySend.IsEnabled = false;
+            SayGallery("Sending that to thornswood.net...");
+
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string bad = Gallery.Submit(path, by, note);
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (bad.Length == 0)
+                    {
+                        galleryChosenPath = "";
+                        if (txtGalleryChosen != null) txtGalleryChosen.Text = "No file chosen yet.";
+                        if (boxGalleryNote != null) boxGalleryNote.Text = "";
+                        SayGallery("Sent. It is waiting for staff to Accept it onto the gallery.");
+                        BuildGalleryPage();
+                    }
+                    else
+                    {
+                        SayGallery(bad);
+                        PaintGalleryPage();
+                    }
+                }));
+            });
+        }
+
+        static void GalleryAccept(string name)
+        {
+            SayGallery("Accepting " + name + "...");
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string bad = Gallery.Approve(name);
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (bad.Length == 0)
+                    {
+                        SayGallery("Accepted. It is on the gallery and will show on Play.");
+                        BuildGalleryPage();
+                    }
+                    else SayGallery(bad);
+                }));
+            });
+        }
+
+        static void GalleryReject(string name)
+        {
+            SayGallery("Rejecting " + name + "...");
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string bad = Gallery.Reject(name);
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (bad.Length == 0)
+                    {
+                        SayGallery("Rejected. It is off the waiting list.");
+                        BuildGalleryPage();
+                    }
+                    else SayGallery(bad);
+                }));
+            });
+        }
+
+        static void GalleryTakeDown(string name)
+        {
+            SayGallery("Taking " + name + " down...");
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string bad = Gallery.TakeDown(name);
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (bad.Length == 0)
+                    {
+                        SayGallery("Taken down. It is no longer on the gallery or on Play.");
+                        BuildGalleryPage();
+                    }
+                    else SayGallery(bad);
+                }));
+            });
+        }
+
         /// <summary>
-        /// Turns to the next picture. Its image is fetched on a pool thread the
-        /// first time it is shown and kept after that; a picture that will not
-        /// load leaves the one before it up and the next tick turns past it.
+        /// Turns to the next picture on the Play spotlight. Its image is
+        /// fetched on a pool thread the first time it is shown and kept after
+        /// that; a picture that will not load leaves the one before it up and
+        /// the next tick turns past it.
         /// </summary>
         static void ShowNextShot()
         {
@@ -1421,9 +1705,6 @@ namespace Thornswood
 
             ThreadPool.QueueUserWorkItem(delegate
             {
-                // Fetch returns null rather than throwing, so there is no catch
-                // to swallow here either. A picture that will not load leaves
-                // the one before it up and the next tick turns past it.
                 BitmapImage bi = Gallery.Fetch(shot);
                 if (bi == null) return;
                 win.Dispatcher.BeginInvoke(new Action(delegate { ShowShot(shot); }));
@@ -1446,25 +1727,18 @@ namespace Thornswood
                     : "From the world";
             if (galleryCard != null && galleryCard.Visibility != Visibility.Visible)
                 galleryCard.Visibility = Visibility.Visible;
-            // What was said about the picture before belongs to that picture.
-            SayGallery("");
-            PaintGalleryTools();
         }
 
         /// <summary>
-        /// Runs the rotation only when the Play page is up, the window is not
-        /// minimised, no game is running and nobody is part way through
-        /// reporting the picture that is up, so nothing is fetched or turned
-        /// behind a page nobody is looking at, and the picture a report is
-        /// about cannot change under whoever is writing it.
+        /// Runs the Play spotlight rotation only when the Play page is up, the
+        /// window is not minimised and no game is running.
         /// </summary>
         static void GalleryDecide()
         {
             if (galleryTimer == null || galleryShots == null) return;
             bool seen = pages != null && pages[PagePlay] != null &&
                         pages[PagePlay].IsVisible &&
-                        win.WindowState != WindowState.Minimized && !playing &&
-                        !GalleryReportOpen;
+                        win.WindowState != WindowState.Minimized && !playing;
             if (seen) { if (!galleryTimer.IsEnabled) galleryTimer.Start(); }
             else { if (galleryTimer.IsEnabled) galleryTimer.Stop(); }
         }
@@ -1790,12 +2064,10 @@ namespace Thornswood
 
             btnAllControls.Click += delegate { ShowPage(PageControls); };
 
-            // The gallery card's two buttons (#731). Report writes to the site
-            // over this copy's own ticket; Manage on the site opens the page
-            // where staff approve the queue and take an approved picture down,
-            // because those doors read a browser sign in and the launcher has
-            // none to give them.
-            if (btnGalleryReport != null) btnGalleryReport.Click += delegate { OpenGalleryReport(); };
+            // Gallery page (#731): upload, refresh, report send/cancel.
+            if (btnGalleryChoose != null) btnGalleryChoose.Click += delegate { GalleryChooseFile(); };
+            if (btnGallerySend != null) btnGallerySend.Click += delegate { GallerySendChosen(); };
+            if (btnGalleryRefresh != null) btnGalleryRefresh.Click += delegate { BuildGalleryPage(); };
             if (btnGalleryReportCancel != null) btnGalleryReportCancel.Click += delegate { CloseGalleryReport(); };
             if (btnGalleryReportSend != null) btnGalleryReportSend.Click += delegate { SendGalleryReport(); };
             if (boxGalleryWhy != null)
@@ -1803,12 +2075,6 @@ namespace Thornswood
                 {
                     if (e.Key == Key.Enter) { e.Handled = true; SendGalleryReport(); }
                     else if (e.Key == Key.Escape) { e.Handled = true; CloseGalleryReport(); }
-                };
-            if (btnGalleryManage != null)
-                btnGalleryManage.Click += delegate
-                {
-                    SayGallery("Opening the gallery page on thornswood.net. Sign in there with Discord to approve what is waiting or take a picture down.");
-                    Open(Gallery.StaffPage);
                 };
 
             WirePages();
