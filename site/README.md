@@ -115,10 +115,15 @@ never read the queue.
 
 | Route | Method | Who | Body | Answers |
 | --- | --- | --- | --- | --- |
-| `/api/gallery/submit` | POST | a hub member (the `/api/upload` cookie), or the launcher with the same signed ticket it sends `/api/play/join` | the file is the body, the way `/api/upload` takes it; `name`, `by`, `note` and, for the launcher, `ticket` are in the query | `200 {ok,name}`; `401 {why:'link'}` with neither door; `403`/`503` for a launcher ticket the door would also refuse; `415` for anything but png, jpg, jpeg, webp or gif; `413` over 25 MB |
-| `/api/gallery/pending` | GET | admin | none | `200 {pending:[...]}`; `403` otherwise |
-| `/api/gallery/approve` | POST | admin | `{name, by?}` | `200 {ok,approved}`; upserts the name onto `gallery.json`, removes it from the queue, idempotent; `400` with no name |
-| `/api/gallery/reject` | POST | admin | `{name, deleteFile?}` | `200 {ok,removed}`; drops it from the queue and unlinks the upload when `deleteFile` is set; `gallery.json` is untouched; `400` with no name |
+| `/api/gallery/who` | GET | anybody | none | `200 {signed,canSubmit,staff,admin,name}` for the public gallery page |
+| `/api/gallery/submit` | POST | a signed-in Discord account that may play (or the hub member cookie), or the launcher with the same signed ticket it sends `/api/play/join` | the file is the body, the way `/api/upload` takes it; `name`, `by`, `note` and, for the launcher, `ticket` are in the query | `200 {ok,name}`; `401 {why:'link'}` with neither door; `403`/`503` for a launcher ticket the door would also refuse; `415` for anything but png, jpg, jpeg, webp or gif; `413` over 25 MB |
+| `/api/gallery/pending` | GET | staff (`access.dev`) | none | `200 {pending:[...]}`; `403` otherwise |
+| `/api/gallery/approve` | POST | staff | `{name, by?}` | `200 {ok,approved}`; upserts the name onto `gallery.json`, removes it from the queue, idempotent; `400` with no name |
+| `/api/gallery/reject` | POST | staff | `{name, deleteFile?}` | `200 {ok,removed}`; drops it from the queue and unlinks the upload when `deleteFile` is set; `gallery.json` is untouched; `400` with no name |
+| `/api/gallery/approved` | DELETE | staff | `{name, deleteFile?}` | `200 {ok,removed}`; takes an approved shot off `gallery.json` (not the same as reject); clears reports on that name; unlinks when asked |
+| `/api/gallery/report` | POST | signed-in play member, or launcher ticket | `{name, why?}` | `200 {ok,id}`; writes to `gallery-reports.json`; does not take the shot down; `404` if the name is not approved |
+| `/api/gallery/reports` | GET | staff | none | `200 {reports:[...]}` |
+| `/api/gallery/report/dismiss` | POST | staff | `{id}` | `200 {ok,removed}` |
 
 A submission lands in `uploads\` under the same stamped name `/api/upload` uses
 (`receiveUpload` in `server.js` is the one helper both go through) and adds
@@ -126,7 +131,9 @@ A submission lands in `uploads\` under the same stamped name `/api/upload` uses
 cap is 25 MB rather than the 200 MB `/api/upload` takes for logs, and only
 images are taken: `/shot` serves with a plain `Content-Length` and no range,
 which a browser needs before it will play an mp4, so video waits until `/shot`
-honours a range. The Uploads page in the hub shows the queue to an admin with
-Approve and Reject on each. `tests\test-gallery.js` drives all four routes end
-to end against a copy. Deploy with `.\scripts\deploy\Deploy-Docs.ps1`, which
-sends `server.js`, the hub page and the empty queue file.
+honours a range. Staff means the `access.dev` roles (Owner, Dev, Gamemaster,
+Moderator, Loremaster), not Owner/Dev-only `w.admin`. The public `/gallery`
+page has the member submit form; the hub Uploads page shows the queue and
+reports. `tests\test-gallery.js` drives the routes end to end against a copy.
+Deploy with `.\scripts\deploy\Deploy-Docs.ps1`, which sends `server.js`, the
+public and hub pages, and the empty queue and reports files.

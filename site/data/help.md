@@ -51,6 +51,11 @@ what the file is before you run it.
 The real fix is code signing, which is being worked on. Once the installer is
 signed the warning goes on its own, and none of this is needed.
 
+Setup may also show as **Thornswood Setup** with publisher **Unknown** in the
+User Account Control prompt. That is the same unsigned state as the Defender
+line above, not a different problem, and it clears with Authenticode signing
+(#390).
+
 ## Starting it after that
 
 Open Thornswood from the desktop shortcut. Not Skyrim, not Steam, not SKSE.
