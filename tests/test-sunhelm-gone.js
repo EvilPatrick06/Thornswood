@@ -330,6 +330,21 @@ yes('and it throws before it looks for an archive or writes anything',
 yes('and it says why, which is the mod it installed leaving the collection',
     stopAt >= 0 && goneIn(TEMPLE.slice(stopAt, stopAt + 600)).length > 0);
 
+const CHARS = read(['..', 'scripts', 'mods', 'Add-Characters.ps1']);
+const charsStopAt = CHARS.indexOf('throw (\'STOP.');
+const charsInstallAt = CHARS.indexOf('Head \'Making room\'');
+yes('Add-Characters.ps1 throws a STOP', charsStopAt >= 0);
+yes('and it throws before it looks for an archive or writes anything',
+    charsStopAt >= 0 && charsInstallAt > charsStopAt);
+yes('and it says why, which is Start On Save after the launcher #394 / #490 strip',
+    charsStopAt >= 0 && /Start On Save|#394|#490/i.test(CHARS.slice(charsStopAt, charsStopAt + 700)));
+
+const RUN_EVERYTHING = read(['..', 'scripts', 'oneoff', 'Run-Everything.ps1']);
+yes('Run-Everything.ps1 no longer runs Add-Characters as a step',
+    !/Script\s*=\s*'Add-Characters\.ps1'/.test(RUN_EVERYTHING));
+yes('and it no longer wants po3_StartOnSave.dll',
+    !/po3_StartOnSave\.dll/.test(RUN_EVERYTHING));
+
 // ------------------------------------------------------- this machine
 const ROOT = process.env.TS_ROOT || ('C:' + BS + 'Thornswood');
 const PLUGINS = path.join(ROOT, 'Profile', 'Default', 'plugins.txt');
