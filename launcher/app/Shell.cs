@@ -137,14 +137,16 @@ namespace Thornswood
         // page is about.
         static Gallery.Who galleryWho;
         static Gallery.Shot galleryReporting;
-        static string galleryChosenPath = "";
+        static List<string> galleryChosenPaths = new List<string>();
         static Button btnGalleryChoose, btnGallerySend, btnGalleryRefresh,
                       btnGalleryReportSend, btnGalleryReportCancel;
         static TextBox boxGalleryBy, boxGalleryNote, boxGalleryWhy;
-        static TextBlock txtGalleryChosen, txtGalleryPageSaid,
+        static TextBlock txtGalleryChosen, txtGalleryPageSaid, txtGalleryDropLead,
                          txtGalleryApprovedEmpty, txtGalleryPendingEmpty;
         static FrameworkElement galleryStaffBlock, galleryPageReportRow;
-        static StackPanel galleryApprovedList, galleryPendingList;
+        static Border galleryDrop;
+        static StackPanel galleryChosenList;
+        static WrapPanel galleryApprovedList, galleryPendingList;
         static List<Gallery.Pending> galleryPending;
         static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
@@ -694,13 +696,16 @@ namespace Thornswood
             boxGalleryNote = F<TextBox>("BoxGalleryNote");
             boxGalleryWhy = F<TextBox>("BoxGalleryWhy");
             txtGalleryChosen = F<TextBlock>("TxtGalleryChosen");
+            txtGalleryDropLead = F<TextBlock>("TxtGalleryDropLead");
             txtGalleryPageSaid = F<TextBlock>("TxtGalleryPageSaid");
             txtGalleryApprovedEmpty = F<TextBlock>("TxtGalleryApprovedEmpty");
             txtGalleryPendingEmpty = F<TextBlock>("TxtGalleryPendingEmpty");
             galleryStaffBlock = F<FrameworkElement>("GalleryStaffBlock");
             galleryPageReportRow = F<FrameworkElement>("GalleryPageReportRow");
-            galleryApprovedList = F<StackPanel>("GalleryApprovedList");
-            galleryPendingList = F<StackPanel>("GalleryPendingList");
+            galleryDrop = F<Border>("GalleryDrop");
+            galleryChosenList = F<StackPanel>("GalleryChosenList");
+            galleryApprovedList = F<WrapPanel>("GalleryApprovedList");
+            galleryPendingList = F<WrapPanel>("GalleryPendingList");
 
             // Same order as the PageXxx constants above, and as PageTitles.
             // Gallery is appended at the end on purpose: renumbering the middle
@@ -1319,14 +1324,16 @@ namespace Thornswood
         static void PaintGalleryPage()
         {
             bool doors = galleryWho != null && galleryWho.Answered;
-            bool staff = doors && GalleryStaff();
+            bool staff = GalleryStaff();
             if (galleryStaffBlock != null)
                 galleryStaffBlock.Visibility = staff ? Visibility.Visible : Visibility.Collapsed;
             if (btnGallerySend != null)
                 btnGallerySend.IsEnabled = doors && Discord.Linked &&
-                    galleryChosenPath != null && galleryChosenPath.Length > 0;
+                    galleryChosenPaths != null && galleryChosenPaths.Count > 0;
             if (btnGalleryChoose != null)
                 btnGalleryChoose.IsEnabled = doors;
+            if (galleryDrop != null)
+                galleryDrop.IsEnabled = doors;
         }
 
         /// <summary>
@@ -1343,14 +1350,9 @@ namespace Thornswood
                 Gallery.Who who = Gallery.AskWho();
                 string pendingBad = "";
                 List<Gallery.Pending> pending = null;
-                bool staff = false;
-                if (who != null && who.Answered)
-                {
-                    // Staff is the door's word (or last saved), not who.Staff,
-                    // which is a browser session the launcher does not have.
-                    staff = Discord.Linked && ((Door.Last != null && Door.Last.Dev) || Discord.DevAllowed);
-                    if (staff) pending = Gallery.Queue(out pendingBad);
-                }
+                // Staff queue is Door / DevAllowed, not who.Answered.
+                bool staff = Discord.Linked && ((Door.Last != null && Door.Last.Dev) || Discord.DevAllowed);
+                if (staff) pending = Gallery.Queue(out pendingBad);
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     galleryWho = who;
@@ -1385,7 +1387,7 @@ namespace Thornswood
             });
         }
 
-        static void FillGalleryApproved(List<Gallery.Shot> shots)
+﻿        static void FillGalleryApproved(List<Gallery.Shot> shots)
         {
             if (galleryApprovedList == null) return;
             galleryApprovedList.Children.Clear();
@@ -1395,60 +1397,91 @@ namespace Thornswood
             if (!any) return;
 
             bool doors = galleryWho != null && galleryWho.Answered;
-            bool staff = doors && GalleryStaff();
+            bool staff = GalleryStaff();
             for (int i = 0; i < shots.Count; i++)
             {
                 Gallery.Shot shot = shots[i];
                 if (shot == null) continue;
-                var row = new Border();
-                row.Style = (Style)win.FindResource("Slab");
-                row.Padding = new Thickness(14, 10, 14, 10);
-                if (i > 0) row.Margin = new Thickness(0, 8, 0, 0);
 
-                var grid = new Grid();
-                grid.ColumnDefinitions.Add(new ColumnDefinition());
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var card = new Border();
+                card.Style = (Style)win.FindResource("Slab");
+                card.Padding = new Thickness(0);
+                card.Margin = new Thickness(0, 0, 14, 14);
+                card.Width = 280;
+                card.ClipToBounds = true;
+
+                var stack = new StackPanel();
+
+                var frame = new Border();
+                frame.Height = 200;
+                frame.Background = (Brush)win.FindResource("Line");
+                frame.ClipToBounds = true;
+
+                var img = new Image();
+                img.Stretch = Stretch.UniformToFill;
+                img.HorizontalAlignment = HorizontalAlignment.Stretch;
+                img.VerticalAlignment = VerticalAlignment.Stretch;
+                RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+                if (shot.Image != null) img.Source = shot.Image;
+                frame.Child = img;
+                stack.Children.Add(frame);
+
+                if (shot.Image == null && shot.ImageUrl != null && shot.ImageUrl.Length > 0)
+                {
+                    Gallery.Shot hold = shot;
+                    Image holdImg = img;
+                    ThreadPool.QueueUserWorkItem(delegate
+                    {
+                        BitmapImage bi = Gallery.Fetch(hold);
+                        if (bi == null) return;
+                        win.Dispatcher.BeginInvoke(new Action(delegate
+                        {
+                            if (holdImg != null) holdImg.Source = bi;
+                        }));
+                    });
+                }
+
+                var meta = new StackPanel();
+                meta.Margin = new Thickness(12, 10, 12, 12);
 
                 var label = new TextBlock();
                 label.Style = (Style)win.FindResource("Body");
                 label.TextWrapping = TextWrapping.Wrap;
-                string by = (shot.By != null && shot.By.Length > 0) ? shot.By : "somebody";
-                string shown = (shot.Name != null && shot.Name.Length > 0) ? shot.Name : "picture";
-                label.Text = shown + "  ·  by " + by;
-                Grid.SetColumn(label, 0);
-                grid.Children.Add(label);
+                string by = (shot.By != null && shot.By.Length > 0) ? shot.By : "";
+                label.Text = by.Length > 0 ? ("By " + by) : "From the world";
+                meta.Children.Add(label);
 
                 if (doors && Discord.Linked && shot.Name != null && shot.Name.Length > 0)
                 {
+                    var acts = new StackPanel();
+                    acts.Orientation = Orientation.Horizontal;
+                    acts.Margin = new Thickness(0, 8, 0, 0);
+
                     var report = new Button();
                     report.Style = (Style)win.FindResource("Ghost");
                     report.Content = "Report";
                     report.Padding = new Thickness(10, 4, 10, 4);
-                    report.Margin = new Thickness(10, 0, 0, 0);
-                    report.VerticalAlignment = VerticalAlignment.Center;
-                    Gallery.Shot hold = shot;
-                    report.Click += delegate { OpenGalleryReport(hold); };
-                    Grid.SetColumn(report, 1);
-                    grid.Children.Add(report);
+                    Gallery.Shot holdShot = shot;
+                    report.Click += delegate { OpenGalleryReport(holdShot); };
+                    acts.Children.Add(report);
+
+                    if (staff)
+                    {
+                        var del = new Button();
+                        del.Style = (Style)win.FindResource("Ghost");
+                        del.Content = "Delete";
+                        del.Padding = new Thickness(10, 4, 10, 4);
+                        del.Margin = new Thickness(8, 0, 0, 0);
+                        string name = shot.Name;
+                        del.Click += delegate { GalleryTakeDown(name); };
+                        acts.Children.Add(del);
+                    }
+                    meta.Children.Add(acts);
                 }
 
-                if (staff && shot.Name != null && shot.Name.Length > 0)
-                {
-                    var del = new Button();
-                    del.Style = (Style)win.FindResource("Ghost");
-                    del.Content = "Delete";
-                    del.Padding = new Thickness(10, 4, 10, 4);
-                    del.Margin = new Thickness(8, 0, 0, 0);
-                    del.VerticalAlignment = VerticalAlignment.Center;
-                    string name = shot.Name;
-                    del.Click += delegate { GalleryTakeDown(name); };
-                    Grid.SetColumn(del, 2);
-                    grid.Children.Add(del);
-                }
-
-                row.Child = grid;
-                galleryApprovedList.Children.Add(row);
+                stack.Children.Add(meta);
+                card.Child = stack;
+                galleryApprovedList.Children.Add(card);
             }
         }
 
@@ -1477,21 +1510,50 @@ namespace Thornswood
             {
                 Gallery.Pending item = pending[i];
                 if (item == null || item.Name == null || item.Name.Length == 0) continue;
-                var row = new Border();
-                row.Style = (Style)win.FindResource("Slab");
-                row.Padding = new Thickness(14, 10, 14, 10);
-                if (i > 0) row.Margin = new Thickness(0, 8, 0, 0);
+
+                var card = new Border();
+                card.Style = (Style)win.FindResource("Slab");
+                card.Padding = new Thickness(0);
+                card.Margin = new Thickness(0, 0, 14, 14);
+                card.Width = 280;
+                card.ClipToBounds = true;
 
                 var stack = new StackPanel();
+
+                var frame = new Border();
+                frame.Height = 180;
+                frame.Background = (Brush)win.FindResource("Line");
+                frame.ClipToBounds = true;
+
+                var img = new Image();
+                img.Stretch = Stretch.UniformToFill;
+                RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+                if (item.Image != null) img.Source = item.Image;
+                frame.Child = img;
+                stack.Children.Add(frame);
+
+                Gallery.Pending holdItem = item;
+                Image holdImg = img;
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    BitmapImage bi = Gallery.FetchPending(holdItem);
+                    if (bi == null) return;
+                    win.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        if (holdImg != null) holdImg.Source = bi;
+                    }));
+                });
+
+                var meta = new StackPanel();
+                meta.Margin = new Thickness(12, 10, 12, 12);
+
                 var label = new TextBlock();
                 label.Style = (Style)win.FindResource("Body");
                 label.TextWrapping = TextWrapping.Wrap;
                 string by = (item.By != null && item.By.Length > 0) ? item.By : "somebody";
-                string line = item.Name + "  ·  by " + by;
-                if (item.When != DateTime.MinValue)
-                    line += "  ·  " + item.When.ToString("g");
-                label.Text = line;
-                stack.Children.Add(label);
+                label.Text = "By " + by;
+                meta.Children.Add(label);
+
                 if (item.Note != null && item.Note.Length > 0)
                 {
                     var note = new TextBlock();
@@ -1499,17 +1561,17 @@ namespace Thornswood
                     note.TextWrapping = TextWrapping.Wrap;
                     note.Margin = new Thickness(0, 4, 0, 0);
                     note.Text = item.Note;
-                    stack.Children.Add(note);
+                    meta.Children.Add(note);
                 }
 
                 var buttons = new StackPanel();
                 buttons.Orientation = Orientation.Horizontal;
-                buttons.Margin = new Thickness(0, 8, 0, 0);
+                buttons.Margin = new Thickness(0, 10, 0, 0);
 
                 var accept = new Button();
                 accept.Style = (Style)win.FindResource("Solid");
                 accept.Content = "Accept";
-                accept.Padding = new Thickness(12, 4, 12, 4);
+                accept.Padding = new Thickness(14, 6, 14, 6);
                 string name = item.Name;
                 accept.Click += delegate { GalleryAccept(name); };
                 buttons.Children.Add(accept);
@@ -1517,14 +1579,15 @@ namespace Thornswood
                 var reject = new Button();
                 reject.Style = (Style)win.FindResource("Ghost");
                 reject.Content = "Reject";
-                reject.Padding = new Thickness(10, 4, 10, 4);
+                reject.Padding = new Thickness(12, 6, 12, 6);
                 reject.Margin = new Thickness(8, 0, 0, 0);
                 reject.Click += delegate { GalleryReject(name); };
                 buttons.Children.Add(reject);
 
-                stack.Children.Add(buttons);
-                row.Child = stack;
-                galleryPendingList.Children.Add(row);
+                meta.Children.Add(buttons);
+                stack.Children.Add(meta);
+                card.Child = stack;
+                galleryPendingList.Children.Add(card);
             }
         }
 
@@ -1581,18 +1644,174 @@ namespace Thornswood
             });
         }
 
-        static void GalleryChooseFile()
+﻿        static void GalleryChooseFile()
         {
             var dlg = new Microsoft.Win32.OpenFileDialog();
-            dlg.Title = "Choose a picture for the gallery";
+            dlg.Title = "Choose pictures for the gallery";
             dlg.Filter = "Pictures|*.png;*.jpg;*.jpeg;*.webp;*.gif|All files|*.*";
             dlg.CheckFileExists = true;
+            dlg.Multiselect = true;
             bool? ok = dlg.ShowDialog(win);
-            if (ok != true || string.IsNullOrEmpty(dlg.FileName)) return;
-            galleryChosenPath = dlg.FileName;
-            if (txtGalleryChosen != null) txtGalleryChosen.Text = Path.GetFileName(galleryChosenPath);
+            if (ok != true || dlg.FileNames == null || dlg.FileNames.Length == 0) return;
+            GalleryAddChosen(dlg.FileNames);
+        }
+
+        static bool GalleryAllowedPath(string path)
+        {
+            if (path == null || path.Length == 0) return false;
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+            return ext == ".png" || ext == ".jpg" || ext == ".jpeg" ||
+                   ext == ".webp" || ext == ".gif";
+        }
+
+        static void GalleryAddChosen(System.Collections.IEnumerable paths)
+        {
+            if (galleryChosenPaths == null) galleryChosenPaths = new List<string>();
+            foreach (string path in paths)
+            {
+                if (!GalleryAllowedPath(path)) continue;
+                if (!File.Exists(path)) continue;
+                bool have = false;
+                for (int i = 0; i < galleryChosenPaths.Count; i++)
+                    if (string.Equals(galleryChosenPaths[i], path, StringComparison.OrdinalIgnoreCase))
+                    { have = true; break; }
+                if (!have) galleryChosenPaths.Add(path);
+            }
+            PaintGalleryChosen();
             PaintGalleryPage();
             SayGallery("");
+        }
+
+        static void GalleryRemoveChosen(string path)
+        {
+            if (galleryChosenPaths == null) return;
+            for (int i = galleryChosenPaths.Count - 1; i >= 0; i--)
+                if (string.Equals(galleryChosenPaths[i], path, StringComparison.OrdinalIgnoreCase))
+                    galleryChosenPaths.RemoveAt(i);
+            PaintGalleryChosen();
+            PaintGalleryPage();
+        }
+
+        static void PaintGalleryChosen()
+        {
+            if (galleryChosenList == null) return;
+            galleryChosenList.Children.Clear();
+            int n = galleryChosenPaths == null ? 0 : galleryChosenPaths.Count;
+            if (txtGalleryChosen != null)
+                txtGalleryChosen.Text = n == 0 ? "No file chosen"
+                    : (n == 1 ? Path.GetFileName(galleryChosenPaths[0])
+                              : (n + " pictures chosen"));
+            if (n == 0) return;
+
+            for (int i = 0; i < galleryChosenPaths.Count; i++)
+            {
+                string path = galleryChosenPaths[i];
+                var row = new Border();
+                row.Style = (Style)win.FindResource("Slab");
+                row.Padding = new Thickness(8, 8, 8, 8);
+                if (i > 0) row.Margin = new Thickness(0, 8, 0, 0);
+
+                var grid = new Grid();
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                grid.ColumnDefinitions.Add(new ColumnDefinition());
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var thumb = new Border();
+                thumb.Width = 56; thumb.Height = 56;
+                thumb.ClipToBounds = true;
+                thumb.Background = (Brush)win.FindResource("Line");
+                var img = new Image();
+                img.Stretch = Stretch.UniformToFill;
+                try
+                {
+                    var bi = new BitmapImage();
+                    bi.BeginInit();
+                    bi.CacheOption = BitmapCacheOption.OnLoad;
+                    bi.UriSource = new Uri(path);
+                    bi.DecodePixelWidth = 112;
+                    bi.EndInit();
+                    bi.Freeze();
+                    img.Source = bi;
+                }
+                catch (Exception ex) { Swallow.Note("Shell.PaintGalleryChosen thumb", ex); }
+                thumb.Child = img;
+                Grid.SetColumn(thumb, 0);
+                grid.Children.Add(thumb);
+
+                var meta = new StackPanel();
+                meta.Margin = new Thickness(12, 0, 0, 0);
+                meta.VerticalAlignment = VerticalAlignment.Center;
+                var name = new TextBlock();
+                name.Style = (Style)win.FindResource("Body");
+                name.Text = Path.GetFileName(path);
+                name.TextTrimming = TextTrimming.CharacterEllipsis;
+                meta.Children.Add(name);
+                try
+                {
+                    long len = new FileInfo(path).Length;
+                    var size = new TextBlock();
+                    size.Style = (Style)win.FindResource("Small");
+                    size.Margin = new Thickness(0, 2, 0, 0);
+                    if (len < 1024) size.Text = len + " B";
+                    else if (len < 1024 * 1024) size.Text = (len / 1024) + " KB";
+                    else size.Text = (len / (1024.0 * 1024.0)).ToString("0.0") + " MB";
+                    meta.Children.Add(size);
+                }
+                catch (Exception ex) { Swallow.Note("Shell.PaintGalleryChosen size", ex); }
+                Grid.SetColumn(meta, 1);
+                grid.Children.Add(meta);
+
+                var rem = new Button();
+                rem.Style = (Style)win.FindResource("Ghost");
+                rem.Content = "Remove";
+                rem.Padding = new Thickness(10, 4, 10, 4);
+                rem.VerticalAlignment = VerticalAlignment.Center;
+                string hold = path;
+                rem.Click += delegate { GalleryRemoveChosen(hold); };
+                Grid.SetColumn(rem, 2);
+                grid.Children.Add(rem);
+
+                row.Child = grid;
+                galleryChosenList.Children.Add(row);
+            }
+        }
+
+        static void WireGalleryDrop()
+        {
+            if (galleryDrop == null) return;
+            galleryDrop.DragEnter += GalleryDropOver;
+            galleryDrop.DragOver += GalleryDropOver;
+            galleryDrop.DragLeave += delegate
+            {
+                galleryDrop.BorderBrush = (Brush)win.FindResource("Edge");
+                galleryDrop.Background = new SolidColorBrush(Color.FromArgb(0x8C, 0x0B, 0x0E, 0x0A));
+            };
+            galleryDrop.Drop += delegate (object s, DragEventArgs e)
+            {
+                galleryDrop.BorderBrush = (Brush)win.FindResource("Edge");
+                galleryDrop.Background = new SolidColorBrush(Color.FromArgb(0x8C, 0x0B, 0x0E, 0x0A));
+                if (e.Data == null || !e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+                string[] files = e.Data.GetData(DataFormats.FileDrop) as string[];
+                if (files == null || files.Length == 0) return;
+                GalleryAddChosen(files);
+            };
+            galleryDrop.MouseLeftButtonUp += delegate (object s, MouseButtonEventArgs e)
+            {
+                if (e.OriginalSource is Button) return;
+                GalleryChooseFile();
+            };
+        }
+
+        static void GalleryDropOver(object s, DragEventArgs e)
+        {
+            if (e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effects = DragDropEffects.Copy;
+                galleryDrop.BorderBrush = (Brush)win.FindResource("Accent");
+                galleryDrop.Background = new SolidColorBrush(Color.FromArgb(0x28, 0xC9, 0xA2, 0x4B));
+            }
+            else e.Effects = DragDropEffects.None;
+            e.Handled = true;
         }
 
         static void GallerySendChosen()
@@ -1602,33 +1821,51 @@ namespace Thornswood
                 SayGallery("Connect Discord first, so the site knows who is sending this.");
                 return;
             }
-            string path = galleryChosenPath;
-            if (path == null || path.Length == 0)
+            if (galleryChosenPaths == null || galleryChosenPaths.Count == 0)
             {
                 SayGallery("Choose a picture to send first.");
                 return;
             }
+            string[] paths = galleryChosenPaths.ToArray();
             string by = boxGalleryBy == null ? "" : boxGalleryBy.Text;
             string note = boxGalleryNote == null ? "" : boxGalleryNote.Text;
             if (btnGallerySend != null) btnGallerySend.IsEnabled = false;
-            SayGallery("Sending that to thornswood.net...");
+            SayGallery(paths.Length == 1
+                ? "Sending that to thornswood.net..."
+                : ("Sending " + paths.Length + " pictures to thornswood.net..."));
 
             ThreadPool.QueueUserWorkItem(delegate
             {
-                string bad = Gallery.Submit(path, by, note);
+                int ok = 0;
+                string firstBad = "";
+                for (int i = 0; i < paths.Length; i++)
+                {
+                    string bad = Gallery.Submit(paths[i], by, note);
+                    if (bad.Length == 0) ok++;
+                    else if (firstBad.Length == 0) firstBad = bad;
+                }
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
-                    if (bad.Length == 0)
+                    if (ok == paths.Length)
                     {
-                        galleryChosenPath = "";
-                        if (txtGalleryChosen != null) txtGalleryChosen.Text = "No file chosen yet.";
+                        galleryChosenPaths.Clear();
+                        PaintGalleryChosen();
                         if (boxGalleryNote != null) boxGalleryNote.Text = "";
-                        SayGallery("Sent. It is waiting for staff to Accept it onto the gallery.");
+                        SayGallery(ok == 1
+                            ? "Sent. It is waiting for staff to Accept it onto the gallery."
+                            : ("Sent " + ok + " pictures. They are waiting for staff to Accept."));
+                        BuildGalleryPage();
+                    }
+                    else if (ok > 0)
+                    {
+                        galleryChosenPaths.Clear();
+                        PaintGalleryChosen();
+                        SayGallery("Sent " + ok + " of " + paths.Length + ". " + firstBad);
                         BuildGalleryPage();
                     }
                     else
                     {
-                        SayGallery(bad);
+                        SayGallery(firstBad.Length > 0 ? firstBad : "Nothing was sent.");
                         PaintGalleryPage();
                     }
                 }));
@@ -1819,7 +2056,9 @@ namespace Thornswood
                 if (band != null && picture != null) { picture.Background = headerArt; band.Visibility = Visibility.Visible; }
                 StartHeaderVideo();
             }
-            StartMenuMusic();
+            win.Dispatcher.BeginInvoke(
+                new Action(delegate { StartMenuMusic(); }),
+                System.Windows.Threading.DispatcherPriority.ApplicationIdle);
 
             titleBar.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
             {
@@ -2065,6 +2304,7 @@ namespace Thornswood
             btnAllControls.Click += delegate { ShowPage(PageControls); };
 
             // Gallery page (#731): upload, refresh, report send/cancel.
+            WireGalleryDrop();
             if (btnGalleryChoose != null) btnGalleryChoose.Click += delegate { GalleryChooseFile(); };
             if (btnGallerySend != null) btnGallerySend.Click += delegate { GallerySendChosen(); };
             if (btnGalleryRefresh != null) btnGalleryRefresh.Click += delegate { BuildGalleryPage(); };
