@@ -113,7 +113,9 @@ namespace Thornswood
         static Ellipse dotServer, dotVerify, dotReady;
         static StackPanel statusList, modList, themeRow, themeEditor, pathRows, helpList,
                           newsList, saveList, logList, statRow, displayModeRow,
-                          firstRunCard, quickKeysCard, quickKeys, galleryCard;
+                          firstRunCard, quickKeysCard, quickKeys;
+        // GalleryCard is a Grid that fills the Play centre; only Visibility is touched.
+        static FrameworkElement galleryCard;
         static Image galleryImage; static TextBlock galleryBy;
         // The pictures /api/public is showing and where the card is in turning
         // through them. Null until the feed has answered with at least one.
@@ -133,11 +135,18 @@ namespace Thornswood
         static Popup serverPickPopup;
         static TextBlock txtBrandSmall, txtBrandBig, txtServerPick, txtServerPickMeta;
         static TextBlock txtServerMainMeta, txtServerDevMeta;
-        static Ellipse dotServerPick;
+        static Ellipse dotServerPick, dotServerMain, dotServerDev;
         static TextBlock txtServerState;
         static string pingMsText = "";
         static string awakeMineText = "";
         static string awakeOtherText = "";
+        // Per-server chip lines for the dropdown (Main and Dev each once).
+        static string pingMainText = "";
+        static string pingDevText = "";
+        static string awakeMainText = "";
+        static string awakeDevText = "";
+        static string dotMainKey = "Faint";
+        static string dotDevKey = "Faint";
         static Border updateBar, mineCard;
         static Border downgradeBar;
         static TextBlock txtDowngradeNote, txtDowngradeTitle;
@@ -624,6 +633,8 @@ namespace Thornswood
             txtServerMainMeta = F<TextBlock>("TxtServerMainMeta");
             txtServerDevMeta = F<TextBlock>("TxtServerDevMeta");
             dotServerPick = F<Ellipse>("DotServerPick");
+            dotServerMain = F<Ellipse>("DotServerMain");
+            dotServerDev = F<Ellipse>("DotServerDev");
             btnCheckDiagnostics = F<Button>("BtnCheckDiagnostics");
             txtBrandSmall = F<TextBlock>("TxtBrandSmall"); txtBrandBig = F<TextBlock>("TxtBrandBig");
             btnUninstall = F<Button>("BtnUninstall"); chkKeepSaves = F<CheckBox>("ChkKeepSaves");
@@ -642,7 +653,7 @@ namespace Thornswood
             quickKeysCard = F<StackPanel>("QuickKeysCard");
             quickKeys = F<StackPanel>("QuickKeys");
             btnAllControls = F<Button>("BtnAllControls");
-            galleryCard = F<StackPanel>("GalleryCard");
+            galleryCard = F<FrameworkElement>("GalleryCard");
             galleryImage = F<Image>("GalleryImage");
             galleryBy = F<TextBlock>("GalleryBy");
 
@@ -827,7 +838,8 @@ namespace Thornswood
         {
             if (discordAvatar == null) return;
             string url = "";
-            try { url = Discord.AvatarUrl; } catch { url = ""; }
+            try { url = Discord.AvatarUrl; }
+            catch (Exception ex) { Swallow.Note("Shell.LoadDiscordAvatar", ex); url = ""; }
             if (string.IsNullOrEmpty(url)) { ClearDiscordAvatar(); return; }
             string want = url;
             ThreadPool.QueueUserWorkItem(delegate
@@ -845,7 +857,7 @@ namespace Thornswood
                             raw = wc.DownloadData(want);
                         }
                     }
-                    catch { raw = null; }
+                    catch (Exception ex) { Swallow.Note("Shell.LoadDiscordAvatar", ex); raw = null; }
                     if (raw == null || raw.Length == 0) return;
                     bi = new BitmapImage();
                     bi.BeginInit();
@@ -854,7 +866,7 @@ namespace Thornswood
                     bi.EndInit();
                     bi.Freeze();
                 }
-                catch { bi = null; }
+                catch (Exception ex) { Swallow.Note("Shell.LoadDiscordAvatar", ex); bi = null; }
                 if (bi == null) return;
                 BitmapImage pic = bi;
                 try
@@ -3975,43 +3987,46 @@ namespace Thornswood
             string host = cfg.ServerAddress;
             if (string.IsNullOrEmpty(host)) { txtPing.Text = "no address"; return; }
 
+            // Main resources are on 3000; Dev on 7788 (same pair Online.AskOther uses).
+            int mainPort = 3000;
+            int devPort = 7788;
+            int minePort = SkyMp.ResourcePortFor(cfg);
+
             ThreadPool.QueueUserWorkItem(delegate
             {
                 long icmp = -1;
                 try
                 {
-                    using (var p = new Ping())
+                    using (var ping = new Ping())
                     {
-                        PingReply r = p.Send(host, 2000);
+                        PingReply r = ping.Send(host, 2000);
                         if (r != null && r.Status == IPStatus.Success) icmp = r.RoundtripTime;
                     }
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Shell.StartPing", ex); }
 
-                long tcp = -1;
-                try
-                {
-                    var sw = System.Diagnostics.Stopwatch.StartNew();
-                    using (var c = new System.Net.Sockets.TcpClient())
-                    {
-                        IAsyncResult ar = c.BeginConnect(host, SkyMp.ResourcePortFor(cfg), null, null);
-                        if (ar.AsyncWaitHandle.WaitOne(2000) && c.Connected)
-                        {
-                            c.EndConnect(ar);
-                            tcp = sw.ElapsedMilliseconds;
-                        }
-                    }
-                }
-                catch { }
+                long tcpMain = TcpMs(host, mainPort);
+                long tcpDev = TcpMs(host, devPort);
+                long tcpMine = TcpMs(host, minePort);
 
-                bool up = tcp >= 0 || icmp >= 0;
-                long ms = icmp >= 0 ? icmp : tcp;
-                bool serving = tcp >= 0;
+                bool up = tcpMine >= 0 || icmp >= 0;
+                long ms = icmp >= 0 ? icmp : tcpMine;
+                bool serving = tcpMine >= 0;
+
+                // Prefer ICMP for latency when that port answers; "no reply" when TCP missed.
+                string mainNow = tcpMain < 0 ? "no reply" : (icmp >= 0 ? icmp + " ms" : tcpMain + " ms");
+                string devNow = tcpDev < 0 ? "no reply" : (icmp >= 0 ? icmp + " ms" : tcpDev + " ms");
+                string mainKey = tcpMain >= 0 ? "Ok" : "Warn";
+                string devKey = tcpDev >= 0 ? "Ok" : "Warn";
 
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     string now = up ? ms + " ms" : "no reply";
                     pingMsText = now;
+                    pingMainText = mainNow;
+                    pingDevText = devNow;
+                    dotMainKey = mainKey;
+                    dotDevKey = devKey;
                     // Keep who is on until the next count comes back, so the line
                     // does not shrink and grow again every refresh.
                     string was = txtPing.Text ?? "";
@@ -4027,6 +4042,26 @@ namespace Thornswood
             });
         }
 
+        /// <summary>TCP connect time to a resources port, or -1 when it does not answer.</summary>
+        static long TcpMs(string host, int port)
+        {
+            if (string.IsNullOrEmpty(host) || port <= 0) return -1;
+            try
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                using (var c = new System.Net.Sockets.TcpClient())
+                {
+                    IAsyncResult ar = c.BeginConnect(host, port, null, null);
+                    if (ar.AsyncWaitHandle.WaitOne(2000) && c.Connected)
+                    {
+                        c.EndConnect(ar);
+                        return sw.ElapsedMilliseconds;
+                    }
+                }
+            }
+            catch (Exception ex) { Swallow.Note("Shell.TcpMs", ex); }
+            return -1;
+        }
         // ------------------------------------------------------------- play
         /// <summary>
         /// <summary>
@@ -4135,7 +4170,7 @@ namespace Thornswood
 
         /// <summary>
         /// Status chip on the server button: dot, name, ms, "N of M awake".
-        /// Dropdown rows show the other server's awake line too.
+        /// Dropdown rows are exactly Main and Dev; each shows its own dot + ms + awake.
         /// </summary>
         static void PaintServerChip()
         {
@@ -4145,16 +4180,19 @@ namespace Thornswood
                 meta = meta.Length == 0 ? awakeMineText : meta + "   \u00b7   " + awakeMineText;
             if (txtServerPickMeta != null && txtServerPickMeta.Text != meta) txtServerPickMeta.Text = meta;
 
-            if (txtServerMainMeta != null)
-            {
-                string m = cfg != null && cfg.IsDev ? awakeOtherText : "";
-                if (txtServerMainMeta.Text != m) txtServerMainMeta.Text = m;
-            }
-            if (txtServerDevMeta != null)
-            {
-                string d = cfg != null && !cfg.IsDev ? awakeOtherText : "";
-                if (txtServerDevMeta.Text != d) txtServerDevMeta.Text = d;
-            }
+            string mainMeta = "";
+            if (!string.IsNullOrEmpty(pingMainText)) mainMeta = pingMainText;
+            if (!string.IsNullOrEmpty(awakeMainText))
+                mainMeta = mainMeta.Length == 0 ? awakeMainText : mainMeta + "   \u00b7   " + awakeMainText;
+            string devMeta = "";
+            if (!string.IsNullOrEmpty(pingDevText)) devMeta = pingDevText;
+            if (!string.IsNullOrEmpty(awakeDevText))
+                devMeta = devMeta.Length == 0 ? awakeDevText : devMeta + "   \u00b7   " + awakeDevText;
+            if (txtServerMainMeta != null && txtServerMainMeta.Text != mainMeta) txtServerMainMeta.Text = mainMeta;
+            if (txtServerDevMeta != null && txtServerDevMeta.Text != devMeta) txtServerDevMeta.Text = devMeta;
+
+            if (dotServerMain != null) dotServerMain.Fill = Res(dotMainKey);
+            if (dotServerDev != null) dotServerDev.Fill = Res(dotDevKey);
             if (dotServerPick != null && dotServer != null)
                 dotServerPick.Fill = dotServer.Fill;
         }
@@ -4837,6 +4875,16 @@ namespace Thornswood
                     string extra = Online.Line(got);
                     awakeMineText = extra;
                     awakeOtherText = Online.Line(gotOther);
+                    if (cfg != null && cfg.IsDev)
+                    {
+                        awakeDevText = extra;
+                        awakeMainText = awakeOtherText;
+                    }
+                    else
+                    {
+                        awakeMainText = extra;
+                        awakeDevText = awakeOtherText;
+                    }
                     string want = extra.Length > 0 ? pingText + "   \u00b7   " + extra : pingText;
                     if (txtPing.Text != want) txtPing.Text = want;
                     PaintServerChip();

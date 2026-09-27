@@ -150,17 +150,34 @@ namespace Thornswood
                 string id = AccountId;
                 if (id.Length == 0) return "";
                 string hash = Avatar;
-                if (hash != null && hash.Length > 0)
+                if (hash != null && hash.Length > 0 && HashOk(hash))
                 {
-                    // Hashes are hex; refuse anything else so a bad file cannot
-                    // point the ImageBrush at a stranger.
-                    foreach (char c in hash)
-                        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
-                            return DefaultAvatarUrl(id);
-                    return "https://cdn.discordapp.com/avatars/" + id + "/" + hash + ".png?size=64";
+                    // Animated Discord hashes begin with a_; those need .gif.
+                    bool anim = hash.Length > 2 && (hash[0] == 'a' || hash[0] == 'A') && hash[1] == '_';
+                    string ext = anim ? ".gif" : ".png";
+                    return "https://cdn.discordapp.com/avatars/" + id + "/" + hash + ext + "?size=64";
                 }
                 return DefaultAvatarUrl(id);
             }
+        }
+
+        /// <summary>
+        /// Discord avatar hashes are hex, or a_ plus hex for animated ones.
+        /// Anything else must not become a CDN URL.
+        /// </summary>
+        static bool HashOk(string hash)
+        {
+            if (hash == null || hash.Length == 0) return false;
+            int i = 0;
+            if (hash.Length > 2 && (hash[0] == 'a' || hash[0] == 'A') && hash[1] == '_') i = 2;
+            if (i >= hash.Length) return false;
+            for (; i < hash.Length; i++)
+            {
+                char c = hash[i];
+                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+                    return false;
+            }
+            return true;
         }
 
         static string DefaultAvatarUrl(string id)
@@ -243,10 +260,8 @@ namespace Thornswood
         public static void NoteAvatar(string pic)
         {
             if (pic == null) pic = "";
-            // Same hex guard as AvatarUrl.
-            foreach (char c in pic)
-                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
-                    return;
+            // Same hash guard as AvatarUrl (hex, or a_ + hex for animated).
+            if (!HashOk(pic)) return;
             try
             {
                 Directory.CreateDirectory(Folder);
