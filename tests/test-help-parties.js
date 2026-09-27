@@ -213,7 +213,7 @@ yes('and the page says ' + spoken(LAPSE) + ' seconds', says(text, LAPSE, '', ' s
       /ref\.addToMap\(false\)/.test(f));
   yes('the strip: green for the same place, gold for somewhere else',
       /Green on the strip means the same place as you, gold means somewhere else/.test(text) &&
-      /sameRoom \? '#8fb85e' : '#d9ab52'/.test(code(panel)));
+      /sameRoom \? '#9fcf92' : '#e9d19b'/.test(code(panel)));
 }
 
 // ------------------------------------------------ run the real party block
