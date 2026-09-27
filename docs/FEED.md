@@ -30,33 +30,33 @@ on 25 September (main at 044b737) unless they say otherwise.
 
 ## A real entry, trimmed
 
-From `/home/user/thornswood-releases/version.json` (main, commit 51d1968).
-`packs` holds 229 entries and `news` 40; one of each is shown. Nothing here is
-a secret: the hashes are public and `discordAppId` is a public application id
-(`Config.cs:160-164`).
+From the live feed on `EvilPatrick06/Thornswood-Releases` (main, commit a22e4ef).
+`packs` holds 69 entries and `news` 40; one of each is shown, trimmed. Nothing
+here is a secret: the hashes are public and `discordAppId` is a public
+application id (`Config.cs:160-164`).
 
 ```json
 {
-  "launcherVersion": "1.1.94",
-  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/587122255",
-  "launcherSha256": "8d5ffda17c740f340c431236fb15df74fd83abc5e5dd742db85a21bdda09f950",
+  "launcherVersion": "1.1.95",
+  "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/591560398",
+  "launcherSha256": "8dc36e32eb3dde35691e7a68e46195c6354968c3ea01585d03eb53289dca3070",
   "serverAddress": "192.135.112.23",
   "serverPort": "7777",
   "message": "",
   "packs": [
     {
-      "id": "20260924-1810",
-      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/587122257",
-      "sha256": "1a67e3c99b1d6a7c4fc06be90a96795afefde0a40a105bf512e90c2f6b84b2c8",
-      "notes": "The Downgrade button works on its own again.\nIt finds Steam's window however your Steam draws it, ..."
+      "id": "20260915-0030",
+      "url": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/565069058",
+      "sha256": "5bf7ff5c7009e24a8c21e599bb732ba11402035a7a4199d91cdf3180360cf1b3",
+      "notes": "Connect your Discord from the launcher"
     }
   ],
   "news": [
     {
-      "date": "9-24-2026 6:10 PM",
-      "title": "The Downgrade button works on its own again.",
-      "body": "It finds Steam's window however your Steam draws it, ...",
-      "details": ["Launcher 1.1.94", "21 files to download, 17.4 MB"],
+      "date": "9-26-2026 10:09 PM",
+      "title": "What arrived with launcher 1.1.95",
+      "body": "The last main note only said demoting was promoted. This is what players actually got ...",
+      "details": ["A sealed scroll opens Thornswood: click to open, Continue to characters; ...", "5 files to download, 48.4 MB"],
       "channel": ""
     }
   ],
@@ -71,18 +71,19 @@ a secret: the hashes are public and `discordAppId` is a public application id
   "presenceImage": "https://thornswood.net/presence.png",
   "collectionRevision": 5,
   "clientRuntime": {
-    "url": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/583111894",
-    "sha256": "3fb5bb91f773e065b85be1ce190e341e5394e059673bfcda1a0268a524f1ce5c",
-    "bytes": 6538349,
-    "forkCommit": "c8832519"
+    "url": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/591302878",
+    "sha256": "efc8debfc3cd480183ab5d229b241e198f06f942b99a50baa50b172891b35726",
+    "bytes": 6356315,
+    "forkCommit": "d0006351"
   }
 }
 ```
 
-The dev feed (branch `dev`, commit d00a6f7) has the same shape with
+The dev feed (branch `dev`, commit 12f71c8) has the same shape with
 `serverPort` `"7787"`, `voicePort` `"7789"`, `voiceUrl`
-`"https://thornswood.net/voice-dev"`, `launcherVersion` `"1.1.92.1"`, pack ids
-ending `-dev`, and a non-empty `mainVersion`.
+`"https://thornswood.net/voice-dev"`, `launcherVersion` `"1.1.95.11"`,
+`collectionUrl` ending `7essxf` rather than main's `ombo2a`, pack ids ending
+`-dev`, and a non-empty `mainVersion`.
 
 ## Top-level fields
 
@@ -211,20 +212,26 @@ is what happened on 21 September, when 1.1.76 was undone by 1.1.77
 
 ## What looks wrong in the feeds today
 
-- **The live feed still lists 164 packs no launcher can download**, ids
-  `20260910-2345` to `20260914-1917`, all under the private source repository.
-  Read off the clone: 164 of 229 `packs` urls are
-  `repos/EvilPatrick06/Thornswood/releases/assets/...`. The dev feed had them
-  removed on 24 September (dev commit e42a112). `Repair-Manifest.ps1` has not
-  been run on main. Any launcher whose `applied.txt` is lost or incomplete
-  fails on the first one and Play stays off (`Feed-Rules.ps1:15-26`).
-- **The dev feed's `mainVersion` is `"1.1.37"`; main is on 1.1.94**, and all
-  40 dev news entries are marked `"dev"`, 30 of which main has. On a dev Ship,
-  `Publish-Update.ps1:1557-1561` reads `Thornswood-Releases\version.json`
-  from disk without pulling it, so a machine with an old main clone writes an
-  old number and marks everything dev. The dev launcher's News tab says so to
-  testers (`Shell.cs:2999-3001`).
-- **`Updater.cs:13` on main says 1.1.92** while the live feed says 1.1.94,
-  from the two hotfix branches. `Bump-Version.ps1:66-112` reads the live feed
-  and climbs past it, so the next main number is safe as long as the releases
-  clone is pulled first.
+Re-checked against the live feed (main commit a22e4ef, dev commit 12f71c8):
+the three problems this section used to list have all cleared.
+
+- **The dead private packs are gone.** The live feed once carried 164 packs
+  under the private source repository that no launcher could download; the
+  main feed now holds 69 packs and 0 of them point at
+  `repos/EvilPatrick06/Thornswood/...`. Every pack url is a release asset in
+  `updateRepo` (`Feed-Rules.ps1:8-14,55-64`), so a launcher with a lost or
+  incomplete `applied.txt` can fetch them all.
+- **Main and dev launcher versions agree.** The dev feed's `mainVersion` is
+  `"1.1.95"`, matching main's `launcherVersion` `1.1.95` (it used to be stuck
+  on `"1.1.37"`), and only 1 of the 40 dev news entries is marked `"dev"`. The
+  stale-main-clone hazard in `Publish-Update.ps1:1557-1561` still exists, so
+  keep the releases clone pulled before a dev Ship.
+- **`Updater.cs:13` and the live feed match.** The launcher's `Version` is
+  `1.1.95` and so is the feed's `launcherVersion`. `Bump-Version.ps1:66-112`
+  reads the live feed and climbs past it, so the next main number stays safe as
+  long as the releases clone is pulled first.
+
+The one standing gap is not new and is by design for now: `ExpectedSigner` is
+still empty/absent in the feed, so the launcher exe's signature is not checked
+(`Updater.cs:881-901`, and "Checks on every download" above). Do not read that
+as a signer that failed to publish; no signer has been set yet.
