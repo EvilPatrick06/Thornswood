@@ -681,12 +681,8 @@
                      1.1.96 logo-band height. No MinHeight-only (image/video stretch
                      was expanding the Auto row). Logo and title stay collapsed. -->
                 <Grid Margin="36,8,36,8" Height="84" MaxHeight="84">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                  </Grid.ColumnDefinitions>
                   <!-- Logo and title text over the hero art were clutter; collapsed so Shell lookups still resolve. -->
-                  <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                     <Image x:Name="Emblem" Width="84" Height="84" Margin="0,0,22,0" VerticalAlignment="Center"
                            RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed"/>
                     <StackPanel x:Name="BannerTitle" VerticalAlignment="Center">
@@ -699,11 +695,12 @@
                       </StackPanel>
                     </StackPanel>
                   </StackPanel>
-                  <StackPanel x:Name="StatRow" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <StackPanel.Effect>
+                  <!-- Played / Sessions / Last played fill the strip evenly. Updated was removed. -->
+                  <UniformGrid x:Name="StatRow" Columns="3" VerticalAlignment="Center">
+                    <UniformGrid.Effect>
                       <DropShadowEffect Color="Black" ShadowDepth="0" BlurRadius="8" Opacity="0.95"/>
-                    </StackPanel.Effect>
-                  </StackPanel>
+                    </UniformGrid.Effect>
+                  </UniformGrid>
                 </Grid>
               </Grid>
             </Border>

@@ -121,8 +121,10 @@ namespace Thornswood
                          txtReadyTitle, txtReadyNote;
         static Ellipse dotServer, dotVerify, dotReady;
         static StackPanel statusList, modList, themeRow, themeEditor, pathRows, helpList,
-                          newsList, saveList, logList, statRow, displayModeRow,
+                          newsList, saveList, logList, displayModeRow,
                           firstRunCard, quickKeysCard, quickKeys;
+        // Play hero stats strip: three equal columns (Played / Sessions / Last played).
+        static UniformGrid statRow;
         // GalleryCard is a Grid that fills the Play centre; only Visibility is touched.
         static FrameworkElement galleryCard;
         static Image galleryImage; static TextBlock galleryBy;
@@ -678,7 +680,7 @@ namespace Thornswood
             txtSaveNote = F<TextBlock>("TxtSaveNote"); txtSaveCount = F<TextBlock>("TxtSaveCount");
             txtLogCount = F<TextBlock>("TxtLogCount"); txtDisplayNote = F<TextBlock>("TxtDisplayNote");
             newsList = F<StackPanel>("NewsList"); saveList = F<StackPanel>("SaveList");
-            logList = F<StackPanel>("LogList"); statRow = F<StackPanel>("StatRow");
+            logList = F<StackPanel>("LogList"); statRow = F<UniformGrid>("StatRow");
             displayModeRow = F<StackPanel>("DisplayModeRow");
             boxResolution = F<TextBox>("BoxResolution"); boxFrameLimit = F<TextBox>("BoxFrameLimit");
             boxFov = F<TextBox>("BoxFov");
@@ -4239,7 +4241,6 @@ namespace Thornswood
             AddStat("Played", Stats.PlayedText);
             AddStat("Sessions", Stats.Sessions.ToString());
             AddStat("Last played", Stats.LastPlayedText);
-            AddStat("Updated", string.IsNullOrEmpty(Stats.LastUpdate) ? "never" : Stats.LastUpdate);
             BuildSideCard();
         }
 
@@ -4321,7 +4322,8 @@ namespace Thornswood
         static void AddStat(string label, string value)
         {
             var sp = new StackPanel();
-            sp.Margin = new Thickness(0, 0, 30, 0);
+            sp.HorizontalAlignment = HorizontalAlignment.Center;
+            sp.VerticalAlignment = VerticalAlignment.Center;
 
             var l = new TextBlock();
             l.Text = label; l.FontSize = 11.5;
