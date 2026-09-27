@@ -157,12 +157,13 @@
     /*
       The scroll in front of the choice, Djinn, 24 September. The painting
       plays with the sealed "To Start" scroll resting on the ledge by the
-      warrior; clicking it (or Enter) breaks the seal, the scroll rises and
-      unrolls, and Continue brings up the slots. The stage below is 16:9 and
-      covers the window the way the loop does (object-fit:cover), so the
-      scroll sits on the same spot of the ledge at any size. Same rules as
-      the rest of this page: no hover, no cursor rules, no transitions; the
-      only motion is keyframes started by the click.
+      warrior; clicking it breaks the seal, the scroll rises and unrolls, and
+      clicking Continue brings up the slots. No key does either, see introKey.
+      The stage below is 16:9 and covers the window the way the loop does
+      (object-fit:cover), so the scroll sits on the same spot of the ledge at
+      any size. Same rules as the rest of this page: no hover, no cursor
+      rules, no transitions; the only motion is the glow below and the
+      keyframes the click starts.
     */
     '#ts-select .intro{position:absolute;inset:0;z-index:1;overflow:hidden}',
     '#ts-select .intro .stage{position:absolute;left:50%;top:50%;width:max(100vw,177.778vh);height:max(56.25vw,100vh);transform:translate(-50%,-50%)}',
@@ -322,8 +323,8 @@
     elIntro.className = 'intro opening';
     tell('intro: the scroll was opened');
   }
-  // Keys while the scroll is up. The slots are not on screen yet, so no
-  // other key reaches them; Space on the checkbox still ticks it.
+  // Keys while the scroll is up. Every one of them, the tick box's Space
+  // included: the mouse is the only thing that moves this screen.
   /*
     The scroll moves only for a click, Djinn, 25 September. Enter, Space and
     Escape used to open it, continue or skip it, and on 25 September at
