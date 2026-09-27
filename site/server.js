@@ -720,6 +720,21 @@ function listFiles() {
    name, and anyone with ssh reads that folder directly, which is the point: a
    log nobody can fetch is a log nobody reads. */
 const UPMETA = path.join(UP, 'uploads.json');
+// The two lists the gallery keeps in data/, deployed by the same rule as every
+// other data JSON (Deploy-Docs sends a data JSON only when the VPS is missing
+// it, so neither is ever overwritten once it exists there). gallery.json is the
+// approved list /api/public and /shot read; gallery-pending.json is what is
+// waiting for an admin to approve or reject, and is never public.
+const GALLERY = path.join(DATA, 'gallery.json');
+const GPENDING = path.join(DATA, 'gallery-pending.json');
+// What the gallery accepts and how big. Images first, on purpose: /shot serves
+// with a plain Content-Length and no range, which a browser needs before it
+// will play an mp4, so video waits until /shot honours a range (noted on #603).
+// 25 MB rather than the 200 MB /api/upload takes for logs: a screenshot that
+// big is a mistake, and a smaller cap is a smaller thing for the launcher's
+// door to hand a stranger who verified with a ticket.
+const GALLERY_ALLOW = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
+const GALLERY_CAP = 25 * 1024 * 1024;
 const KIND = {
   '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.gif':'image/gif',
   '.webp':'image/webp', '.bmp':'image/bmp',
@@ -749,6 +764,51 @@ function listUploads() {
   }
   out.sort((a, b) => b.at - a.at);
   return out;
+}
+
+/* One place that takes a file off a request and lands it in uploads/ under a
+   stamped name, so /api/upload and /api/gallery/submit stamp and cap the same
+   way and a change to either is a change to both. The request body IS the file,
+   the way /api/upload has always worked, so the name and any note ride in the
+   query. asked is the name the caller offered; cap is the byte ceiling; allow
+   is null for any kind or a list of lower case extensions (with the dot) when a
+   route only wants some. It answers 413 or 415 itself and returns; on a good
+   file it calls saved(name) and leaves the reply to the route, because /upload
+   and /gallery/submit write different things once the bytes are down. */
+function receiveUpload(req, res, asked, cap, allow, saved) {
+  if (Number(req.headers['content-length'] || 0) > cap) {
+    return sendJson(res, 413, { error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' });
+  }
+  const offered = String(asked || 'file').split(/[\\/]/).pop();
+  const safe = offered.replace(/[^A-Za-z0-9._ -]/g, '_').replace(/^[. ]+/, '')
+                      .slice(0, 90) || 'file';
+  if (allow) {
+    const ext = path.extname(safe).toLowerCase();
+    if (allow.indexOf(ext) < 0) {
+      req.resume();
+      return sendJson(res, 415, { error: 'that kind of file is not allowed here', allowed: allow });
+    }
+  }
+  const d = new Date();
+  const two = (n) => String(n).padStart(2, '0');
+  const stamp = d.getFullYear() + two(d.getMonth() + 1) + two(d.getDate()) + '-' +
+                two(d.getHours()) + two(d.getMinutes());
+  let name = stamp + '-' + safe, n = 2;
+  while (fs.existsSync(path.join(UP, name))) { name = stamp + '-' + n + '-' + safe; n++; }
+  const dest = path.join(UP, name);
+
+  let got = 0, over = false;
+  const out = fs.createWriteStream(dest);
+  req.on('data', (c) => { got += c.length; if (got > cap) { over = true; req.destroy(); out.destroy(); } });
+  req.on('error', () => { over = true; });
+  req.pipe(out);
+  out.on('close', () => {
+    if (over) {
+      try { fs.unlinkSync(dest); } catch (e) { }
+      return sendJson(res, 413, { error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' });
+    }
+    saved(name);
+  });
 }
 
 // ------------------------------------------------------------------ auth --
@@ -2317,7 +2377,7 @@ async function handle(req, res) {
       invite: cfg.discord.invite || '',
       patreon: cfg.patreon || '',
       status: { up: gameStatus.up, online: gameStatus.online },
-      gallery: jsonFile(path.join(DATA, 'gallery.json'), []),
+      gallery: jsonFile(GALLERY, []),
       launcher: feed.launcher || '',
       collection: feed.collection || '',
       files: listFiles(),
@@ -2489,7 +2549,7 @@ async function handle(req, res) {
   // not, which is why this is a separate door with its own list.
   const shot = route.match(/^\/shot\/([a-z0-9._ -]+)$/);
   if (shot && req.method === 'GET') {
-    const ok = jsonFile(path.join(DATA, 'gallery.json'), [])
+    const ok = jsonFile(GALLERY, [])
       .some((g) => String(g.name).toLowerCase() === shot[1]);
     const file = path.join(UP, shot[1]);
     if (!ok || !file.startsWith(UP + path.sep) || !fs.existsSync(file)) {
@@ -2623,31 +2683,8 @@ async function handle(req, res) {
 
   if (p === '/api/upload' && req.method === 'POST') {
     if (!w.member) return sendJson(res, 401, { error: 'sign in first' });
-    const CAP = 200 * 1024 * 1024;
-    if (Number(req.headers['content-length'] || 0) > CAP) {
-      return sendJson(res, 413, { error: 'that file is over 200 MB' });
-    }
     const asked = (url.searchParams.get('name') || 'file').split(/[\\/]/).pop();
-    const safe = asked.replace(/[^A-Za-z0-9._ -]/g, '_').replace(/^[. ]+/, '')
-                      .slice(0, 90) || 'file';
-    const d = new Date();
-    const two = (n) => String(n).padStart(2, '0');
-    const stamp = d.getFullYear() + two(d.getMonth() + 1) + two(d.getDate()) + '-' +
-                  two(d.getHours()) + two(d.getMinutes());
-    let name = stamp + '-' + safe, n = 2;
-    while (fs.existsSync(path.join(UP, name))) { name = stamp + '-' + n + '-' + safe; n++; }
-    const dest = path.join(UP, name);
-
-    let got = 0, over = false;
-    const out = fs.createWriteStream(dest);
-    req.on('data', (c) => { got += c.length; if (got > CAP) { over = true; req.destroy(); out.destroy(); } });
-    req.on('error', () => { over = true; });
-    req.pipe(out);
-    return out.on('close', () => {
-      if (over) {
-        try { fs.unlinkSync(dest); } catch (e) { }
-        return sendJson(res, 413, { error: 'that file is over 200 MB' });
-      }
+    return receiveUpload(req, res, asked, 200 * 1024 * 1024, null, (name) => {
       const meta = jsonFile(UPMETA, {});
       meta[name] = {
         orig: asked,
@@ -2670,6 +2707,130 @@ async function handle(req, res) {
     delete meta[rm[1]];
     putJson(UPMETA, meta);
     return sendJson(res, 200, { ok: true });
+  }
+
+  // ------------------------------------------------------------- gallery --
+  /*
+    Somebody sends a picture in, an admin decides whether it goes on the public
+    gallery. Two doors in: a member signed in to the hub (the /api/upload door),
+    or the launcher with the same signed Discord ticket it uses at /api/play/join,
+    so a person can send a shot from the game without a site sign in.
+
+    The body IS the file, the /api/upload way, so the ticket and the note ride in
+    the query, not in the body. The file lands in uploads/ under a stamped name
+    through the shared helper, exactly as an /api/upload file does, and an entry
+    goes on gallery-pending.json. Nothing here touches gallery.json: a submission
+    is not public until an admin approves it, and /api/public and /shot read only
+    gallery.json, so a pending shot is not reachable by either.
+  */
+  if (p === '/api/gallery/submit' && req.method === 'POST') {
+    // Who is asking. A hub member, or a launcher ticket verified the way the
+    // door verifies it: read it, ask Discord for the standing, and hold it to
+    // the same answers /api/play/join gives, so a banned or departed account
+    // cannot put a picture in the queue.
+    let from = '', discordId = '';
+    if (w.member) {
+      from = 'web';
+      discordId = w.id || '';
+    } else {
+      const t = readTicket(url.searchParams.get('ticket'));
+      if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
+        'Sign in to the hub, or send a valid launcher ticket.' });
+      const st = await standing(t.d);
+      standCache.delete(String(t.d));
+      if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
+        'Thornswood could not ask Discord about that account just now. Try again in a minute.' });
+      if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
+        'That Discord account is not in the Thornswood Discord.' });
+      if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', error:
+        'That Discord account is banned from Thornswood.' });
+      if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', error:
+        'That Discord account has no role that lets it in yet.' });
+      from = 'launcher';
+      discordId = String(t.d);
+    }
+
+    const asked = (url.searchParams.get('name') || 'shot.png').split(/[\\/]/).pop();
+    const by = (url.searchParams.get('by') || '').slice(0, 40);
+    const note = (url.searchParams.get('note') || '').slice(0, 300);
+    return receiveUpload(req, res, asked, GALLERY_CAP, GALLERY_ALLOW, (name) => {
+      // The uploads.json note too, so this shot reads the same as any other
+      // file in the uploads listing (the orig name, who by, the note).
+      const meta = jsonFile(UPMETA, {});
+      meta[name] = { orig: asked, by: by, note: note, at: Date.now() };
+      putJson(UPMETA, meta);
+
+      const pending = jsonFile(GPENDING, []);
+      const entry = { name: name, by: by, note: note, at: Date.now(), from: from };
+      if (discordId) entry.discordId = discordId;
+      pending.push(entry);
+      putJson(GPENDING, pending);
+      sendJson(res, 200, { ok: true, name: name });
+    });
+  }
+
+  // The queue, for an admin to look through. Never public, so it is its own
+  // door rather than a field on /api/public.
+  if (p === '/api/gallery/pending' && req.method === 'GET') {
+    if (!w.admin) return sendJson(res, 403, { error: 'admins only' });
+    return sendJson(res, 200, { pending: jsonFile(GPENDING, []) });
+  }
+
+  // Approve: take it off the queue and put it on the public list. Idempotent,
+  // so approving the same name twice is a 200 that changed nothing the second
+  // time, and a name already on the gallery is left where it is.
+  if (p === '/api/gallery/approve' && req.method === 'POST') {
+    if (!w.admin) return sendJson(res, 403, { error: 'admins only' });
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const name = String(o.name || '');
+    if (!name) return sendJson(res, 400, { error: 'no name' });
+
+    const pending = jsonFile(GPENDING, []);
+    const hit = pending.find((x) => String(x.name) === name);
+    // "by" from the call wins, then the pending entry's, then empty. The url is
+    // built here so gallery.json holds exactly the shape /api/public hands out.
+    const by = (o.by !== undefined && o.by !== null) ? String(o.by).slice(0, 40)
+             : (hit ? String(hit.by || '') : '');
+
+    const gallery = jsonFile(GALLERY, []);
+    const already = gallery.find((g) => String(g.name) === name);
+    if (already) {
+      already.url = '/shot/' + name;
+      if (by) already.by = by;
+    } else {
+      gallery.push({ name: name, url: '/shot/' + name, by: by });
+    }
+    putJson(GALLERY, gallery);
+
+    const left = pending.filter((x) => String(x.name) !== name);
+    if (left.length !== pending.length) putJson(GPENDING, left);
+    return sendJson(res, 200, { ok: true, name: name, approved: true });
+  }
+
+  // Reject: take it off the queue, and unlink the upload when asked. gallery.json
+  // is not touched, because a rejected shot was never on it.
+  if (p === '/api/gallery/reject' && req.method === 'POST') {
+    if (!w.admin) return sendJson(res, 403, { error: 'admins only' });
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const name = String(o.name || '');
+    if (!name) return sendJson(res, 400, { error: 'no name' });
+
+    const pending = jsonFile(GPENDING, []);
+    const left = pending.filter((x) => String(x.name) !== name);
+    putJson(GPENDING, left);
+
+    if (o.deleteFile) {
+      const file = path.join(UP, name);
+      if (file.startsWith(UP + path.sep)) {
+        try { fs.unlinkSync(file); } catch (e) { }
+        const meta = jsonFile(UPMETA, {});
+        delete meta[name];
+        putJson(UPMETA, meta);
+      }
+    }
+    return sendJson(res, 200, { ok: true, name: name, removed: pending.length - left.length });
   }
 
   // -------------------------------------------------------------- the door
