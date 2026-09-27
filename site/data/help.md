@@ -48,7 +48,8 @@ every build's SHA-256 is printed on the [Downloads](/downloads) page next to the
 button, so you can compare it with the file you have before you run it. When a
 build has been sent to VirusTotal, that page links its report on the same hash;
 until then it says there is no report yet rather than pointing you at an empty
-one.
+one. Builds over VirusTotal's 650 MB upload cap cannot be sent there, and the
+Downloads page says so rather than implying a report is still coming.
 
 The real fix is code signing, which is being worked on. Once the installer is
 signed the warning goes on its own, and none of this is needed.
