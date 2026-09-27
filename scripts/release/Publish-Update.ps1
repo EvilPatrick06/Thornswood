@@ -439,6 +439,18 @@ function Test-FromCollection([string]$rel) {
     if ($Dev -and ($DevShipsOurs -contains $rel)) { return $false }
     return $vortexFiles.Contains($rel)
 }
+# Place plugins the load order names that Vortex does not deploy under that
+# name (game\required-data). Without this, ElysiumEstateSSE.esp only existed on
+# the machine that copied it by hand and packs never carried it.
+try {
+    $req = @(Ensure-ShipRequiredData $GameDir $RepoDir)
+    if ($req.Count) {
+        Say ("  required data placed into the game folder: {0}" -f ($req -join ', ')) 'Green'
+    }
+} catch {
+    Die ("Could not place game\required-data into $GameDir : " + $_.Exception.Message)
+}
+
 $null = New-Item -ItemType Directory -Force -Path $DistDir
 
 . (Join-Path $Here '..\dev\Close-Launcher.ps1')

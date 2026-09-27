@@ -1,4 +1,4 @@
-﻿<#
+<#
   Ship-Rules.ps1
 
   The one list of what never leaves a machine inside a Thornswood pack or
@@ -26,6 +26,8 @@
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
       Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
+      Get-ShipRequiredDataRoot     game\required-data in the repo
+      Ensure-ShipRequiredData      place those files into Data\ before a pack or installer scan
 
   Paths are relative to the game folder, with backslashes.
 #>
@@ -687,3 +689,50 @@ $ShipDeleteAlways = @(
 )
 
 function Get-ShipDeleteAlways { return $ShipDeleteAlways }
+
+# REQUIRED DATA THE COLLECTION DOES NOT YET DEPLOY UNDER THE LOAD ORDER NAME.
+#
+# game\required-data holds plugins (today: ElysiumEstateSSE.esp) that plugins.txt
+# and the server enable by exact filename, while Vortex still deploys a different
+# name (ElysiumEstate.esp 4.3.5). OwnGame links only what Vortex deployed, so the
+# SSE file was only on one machine until it was copied by hand, and every other
+# player hit the same missing-plugin warning.
+#
+# Go.ps1, Publish-Update and Package-Thornswood call Ensure-ShipRequiredData so
+# each file here lands at Data\<name> before the pack / installer scan. They are
+# not origin V in files.txt, so packs carry them. Take a file out of
+# game\required-data when the collection deploys that same Data\ path.
+function Get-ShipRequiredDataRoot([string]$RepoDir) {
+    return (Join-Path $RepoDir 'game\required-data')
+}
+
+# Places every file under game\required-data (except README.md) at Data\<name>
+# in $GameDir. Breaks an existing hard link first so a write never goes through
+# into Vortex staging. Returns the relative paths placed. Throws when the
+# folder is missing a file that was expected to be tracked, or when copy fails.
+function Ensure-ShipRequiredData([string]$GameDir, [string]$RepoDir) {
+    $srcRoot = Get-ShipRequiredDataRoot $RepoDir
+    if (-not (Test-Path -LiteralPath $srcRoot)) {
+        throw "game\required-data is missing under $RepoDir"
+    }
+    $placed = New-Object System.Collections.Generic.List[string]
+    foreach ($f in @(Get-ChildItem -LiteralPath $srcRoot -File -EA Stop)) {
+        if ($f.Name -eq 'README.md') { continue }
+        $rel = 'Data\' + $f.Name
+        $dst = Join-Path $GameDir $rel
+        $dir = Split-Path -Parent $dst
+        if (-not (Test-Path -LiteralPath $dir)) {
+            $null = New-Item -ItemType Directory -Force -Path $dir
+        }
+        # OwnGame.Unshare pattern: drop the name if it is a hard link so the
+        # copy is this folder's own bytes, not Vortex's.
+        if (Test-Path -LiteralPath $dst) {
+            try { Remove-Item -LiteralPath $dst -Force -EA Stop } catch {
+                throw ("Could not replace $rel in the game folder (is the game open?): " + $_.Exception.Message)
+            }
+        }
+        Copy-Item -LiteralPath $f.FullName -Destination $dst -Force -EA Stop
+        $placed.Add($rel)
+    }
+    return ,$placed.ToArray()
+}

@@ -19,6 +19,9 @@ scripts that build and ship it:
   `gamemode.js`; nothing reads them at run time.
 - `content\Thornswood-Content.esp`: our plugin file. People get it through
   the Nexus collection; the dev and live deploys send it to the server.
+- `required-data\`: plugins the load order names that Vortex does not yet
+  deploy under that exact filename. Go.ps1 and Ship place them into `Data\`.
+  Its own README says when to take one out.
 - `menu\`: the two logo meshes and the wallpaper behind Skyrim's main menu,
   which `Go.ps1` copies into the game folder.
 
