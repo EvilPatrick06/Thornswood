@@ -1090,6 +1090,35 @@ if ($scanZips.Count -or $scanExes.Count) {
     if ($LASTEXITCODE -ne 0) { Die 'Something that must never ship is in what was just built. The lines above name each file and rule. Nothing was uploaded.' }
 }
 
+# Short source directions for GitHub release pages (partial #421). The installer
+# already carries SOURCE CODE.txt and the licence texts; update packs on
+# Thornswood-Releases did not point at source at all. This footer is plain words
+# read from the two build records and the live credits page. It invents no
+# licence claim of its own.
+function Get-ReleaseSourceFooter([string]$ClientRecord, [string]$ServerRecord) {
+    foreach ($p in @($ClientRecord, $ServerRecord)) {
+        if (-not (Test-Path -LiteralPath $p)) { throw "$p is missing" }
+    }
+    $c = (Get-Content -LiteralPath $ClientRecord -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $s = (Get-Content -LiteralPath $ServerRecord -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $fork  = ([string]$c.fork).TrimEnd('/')
+    $sRepo = ([string]$s.source.repo) -replace '\.git$', ''
+    if (-not $fork -or -not $c.forkCommit) { throw 'client-build.json names no fork or no commit' }
+    if (-not $sRepo -or -not $s.source.commit) { throw 'server-build.json names no repository or commit' }
+    $lines = @(
+        '',
+        '---',
+        'Source for the SkyMP files Thornswood ships',
+        '',
+        ('Client runtime: ' + $fork + '/tree/' + $c.forkCommit + ' (branch ' + $c.forkBranch + ')'),
+        ('Server engine:  ' + $sRepo + '/tree/' + $s.source.commit),
+        'Licences and file list: https://thornswood.net/credits#source',
+        'The installer puts SOURCE CODE.txt, GPL-3.0.txt, AGPL-3.0.txt and',
+        'WebView2-LICENSE.txt in the install folder.',
+        ''
+    )
+    return ($lines -join "`n")
+}
 if (-not $NoUpload -and $gh) {
     Head 'Uploading'
     $assets = @()
@@ -1122,7 +1151,15 @@ if (-not $NoUpload -and $gh) {
     # the fallback, and it gets the same treatment.
     $tries = 3
     for ($try = 1; $try -le $tries; $try++) {
-        & gh release create $Id @assets @repoArg @pre --title "Update $Id" --notes $(if ($Notes) { $Notes } else { "Update $Id" }) 2>&1 | Out-Host
+                $clientRec = Join-Path $PSScriptRoot '..\..\records\client-build.json'
+        $serverRec = Join-Path $PSScriptRoot '..\..\records\server-build.json'
+        $releaseNotes = if ($Notes) { $Notes } else { "Update $Id" }
+        try {
+            $releaseNotes = ($releaseNotes.TrimEnd() + "`n" + (Get-ReleaseSourceFooter $clientRec $serverRec)).TrimEnd() + "`n"
+        } catch {
+            Say ("  source footer could not be built: " + $_.Exception.Message) 'Yellow'
+        }
+        & gh release create $Id @assets @repoArg @pre --title "Update $Id" --notes $releaseNotes 2>&1 | Out-Host
         if ($LASTEXITCODE -eq 0) { break }
 
         Say '  Release exists, uploading into it instead.' 'DarkGray'

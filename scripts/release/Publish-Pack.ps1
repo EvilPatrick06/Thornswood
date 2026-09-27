@@ -195,8 +195,16 @@ if (-not $token) {
 $tag = 'packs-' + (Get-Date -Format 'yyyyMMdd-HHmm')
 $hdr = @{ Authorization = "Bearer $token"; 'User-Agent' = 'thornswood'; Accept = 'application/vnd.github+json' }
 
+# Partial #421: optional-pack release pages name where SkyMP source is, the same
+# way Publish-Update.ps1 does for update packs.
+$packBody = @(
+    'Optional packs',
+    '',
+    'Source for the SkyMP files Thornswood ships: https://thornswood.net/credits#source',
+    'The installer puts SOURCE CODE.txt, GPL-3.0.txt, AGPL-3.0.txt and WebView2-LICENSE.txt in the install folder.'
+) -join "`n"
 $rel = Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$Repo/releases" -Headers $hdr -Body (@{
-    tag_name = $tag; name = $tag; body = 'Optional packs'; draft = $false; prerelease = $false
+    tag_name = $tag; name = $tag; body = $packBody; draft = $false; prerelease = $false
 } | ConvertTo-Json) -ContentType 'application/json'
 
 $upload = $rel.upload_url -replace '\{.*$', ''
