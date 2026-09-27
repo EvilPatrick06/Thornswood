@@ -70,9 +70,11 @@ const C = creditsRaw || '';
 const OURS = {
   'ui.xaml': 'the launcher window, launcher\\ui.xaml',
   'logo.png': 'the emblem, launcher\\logo.png and logo-192.png for the setup stub',
+  'logo-dev.png': 'the emblem the dev build shows instead, launcher\\logo-dev.png',
   'launcher-header.jpg': 'a strip of the Thornswood backdrop, launcher\\art',
   'launcher-header.mp4': 'the same strip moving',
   'app.ico': 'the icon',
+  'app-dev.ico': 'the icon the dev build\'s shortcuts carry, launcher\\app-dev.ico',
   'voice-host.html': 'the voice page, launcher',
   'Thornswood.ini': 'the key template, launcher',
   'client-build.json': 'the record of the client runtime'
