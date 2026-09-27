@@ -317,6 +317,16 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
   color:var(--page);border-radius:2px;font:400 14px/1.4 var(--sans)}
 .gal-box .form input[type=text]{background:var(--night)}
 
+/* Eighteen-and-over door for /downloads and /join only. Statement, not a check. */
+.age-gate{max-width:34rem;margin:48px auto;padding:32px 34px;border:1px solid var(--edge);
+  background:var(--stone);border-radius:2px;
+  box-shadow:inset 0 1px 0 rgba(201,162,75,.08)}
+.age-gate h1{font:600 clamp(26px,3vw,34px)/1.2 var(--carve);letter-spacing:.03em;
+  margin:0 0 14px;color:var(--gold)}
+.age-gate p{font:400 16.5px/1.55 var(--serif);color:var(--page);margin:0 0 12px}
+.age-gate .quiet{color:var(--quiet)}
+.age-gate .acts{justify-content:flex-start;margin-top:26px}
+
 /* Home gallery slideshow of approved public shots. */
 .gal-show{position:relative;margin-top:34px;border:1px solid var(--edge);
   background:var(--stone);border-radius:2px;overflow:hidden;
@@ -801,7 +811,44 @@ function show(html) {
     : 'Thornswood';
 }
 
-if (PAGES[here] && document.getElementById('pagebody').children.length) {
+/* Hard eighteen-and-over door on /downloads and /join only. Remembered in
+   localStorage, with a cookie fallback. Confirming is a statement kept as a
+   record, not verification of age. The rest of the site stays open. */
+var AGE_KEY = 'tw-age-18';
+var AGE_PATHS = { '/downloads': 1, '/join': 1 };
+function ageOk() {
+  try { if (localStorage.getItem(AGE_KEY) === '1') return true; } catch (e) {}
+  return /(?:^|;\s*)tw-age-18=1(?:;|$)/.test(document.cookie || '');
+}
+function ageRemember() {
+  try { localStorage.setItem(AGE_KEY, '1'); } catch (e) {}
+  var exp = new Date();
+  exp.setFullYear(exp.getFullYear() + 1);
+  document.cookie = 'tw-age-18=1; path=/; expires=' + exp.toUTCString() + '; SameSite=Lax';
+}
+function showAgeGate() {
+  show(
+    '<div class="age-gate" id="ageGate">' +
+    '<h1>Eighteen and over</h1>' +
+    '<p>Thornswood is an adult roleplay server. It contains sexual content between adult characters, violence, and language that is not written for children.</p>' +
+    '<p>Confirming here is you stating that you are eighteen or older. That ' +
+    'statement is kept as a record of what you said, not as verification of your age.</p>' +
+    '<p class="quiet">The <a href="/rules">rules</a> and <a href="/terms">terms</a> say the same.</p>' +
+    '<div class="acts">' +
+    '<button class="btn first" type="button" id="ageYes">I am eighteen or older</button>' +
+    '<a class="btn ghost" href="/">Leave</a>' +
+    '</div></div>'
+  );
+  var yes = document.getElementById('ageYes');
+  if (yes) yes.addEventListener('click', function () {
+    ageRemember();
+    location.reload();
+  });
+}
+
+if (AGE_PATHS[here] && !ageOk()) {
+  showAgeGate();
+} else if (PAGES[here] && document.getElementById('pagebody').children.length) {
   /* The server sent this page with its words already in it (entry 247), so
      there is nothing to fetch. The browser finds /world#accord on its own
      now; this is for the reflow once the fonts land. */
