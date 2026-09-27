@@ -451,7 +451,7 @@ namespace Thornswood
             catch { return 0; }
         }
 
-        /// <summary>Have/Newest/Behind/Known — same as Get-CollectionState.</summary>
+        /// <summary>Have/Newest/Behind/Known â€” same as Get-CollectionState.</summary>
         public static void CollectionState(Config cfg, out int have, out int newest, out bool behind, out bool known)
         {
             have = 0; newest = 0; behind = false; known = false;
@@ -706,7 +706,7 @@ namespace Thornswood
                     if (File.Exists(f) || Directory.Exists(f)) found.Add(f);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Checks.ForeignClients", ex); }
             return found.ToArray();
         }
 
@@ -800,7 +800,7 @@ namespace Thornswood
                 if (string.IsNullOrEmpty(n)) continue;
                 if (l.Contains(n)) continue;
                 string p = Path.Combine(data, n);
-                try { if (File.Exists(p) && !IsLight(p)) l.Add(n); } catch { }
+                try { if (File.Exists(p) && !IsLight(p)) l.Add(n); } catch (Exception ex) { Swallow.Note("Checks.NotLight", ex); }
             }
             return l;
         }
@@ -831,7 +831,7 @@ namespace Thornswood
                     // copy, which every other server's folder may link too.
                     // Flagging it there would flag it for all of them.
                     OwnGame.Separate(p);
-                    try { File.SetAttributes(p, FileAttributes.Normal); } catch { }
+                    try { File.SetAttributes(p, FileAttributes.Normal); } catch (Exception ex) { Swallow.Note("Checks.FlagLight, attributes", ex); }
                     using (var fs = new FileStream(p, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
                     {
                         var b = new byte[4];
@@ -913,7 +913,7 @@ namespace Thornswood
             }
             else
             {
-                try { File.SetAttributes(f, FileAttributes.Normal); } catch { }
+                try { File.SetAttributes(f, FileAttributes.Normal); } catch (Exception ex) { Swallow.Note("Checks.MoveAside, attributes", ex); }
                 File.Move(f, off);
             }
 
@@ -925,7 +925,7 @@ namespace Thornswood
                 if (isDir) Directory.Move(off, dest); else File.Move(off, dest);
                 landed = dest;
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Checks.MoveAside", ex); }
 
             NoteIsolated(bin, f, landed);
             return landed;
@@ -940,7 +940,7 @@ namespace Thornswood
                     DateTime.Now.ToString("s") + "  was: " + from + Environment.NewLine +
                     "                     now: " + to + Environment.NewLine);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Checks.NoteIsolated", ex); }
         }
 
         /// <summary>Old name. Kept so nothing that still calls it deletes
@@ -993,7 +993,7 @@ namespace Thornswood
                     l.Add(n);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Checks.StrayCreations", ex); }
             return l;
         }
 
@@ -1103,7 +1103,7 @@ namespace Thornswood
         public static List<Check> All(Config cfg)
         {
             long bytes = 0;
-            try { if (File.Exists(Paths.Exe)) bytes = new FileInfo(Paths.Exe).Length; } catch { }
+            try { if (File.Exists(Paths.Exe)) bytes = new FileInfo(Paths.Exe).Length; } catch (Exception ex) { Swallow.Note("Checks.All, exe size", ex); }
             int plugins = EnabledPlugins();
 
             var l = new List<Check>();
@@ -1257,7 +1257,7 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
                     return (cut > 0 ? p.Substring(0, cut) : p).TrimEnd('\\');
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Checks.LastRunFrom", ex); }
             return "";
         }
 
@@ -1334,7 +1334,7 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
                     // holding the profile folder is what makes the next launch
                     // fail with access denied.
                     if (!skip && Where(p) == false) skip = true;
-                    if (skip) { try { p.Dispose(); } catch { } }
+                    if (skip) { try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Checks.GameProcesses, dispose", ex); } }
                     else l.Add(p);
                 }
             }
@@ -1343,7 +1343,7 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
 
         static void Release(List<Process> ps)
         {
-            foreach (Process p in ps) { try { p.Dispose(); } catch { } }
+            foreach (Process p in ps) { try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Checks.Release, dispose", ex); } }
         }
 
         /// <summary>
@@ -1360,7 +1360,7 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
             foreach (Process p in ps)
             {
                 try { if (p.MainWindowHandle != IntPtr.Zero) { seen = true; break; } }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Checks.GameVisible", ex); }
             }
             Release(ps);
             return seen;
@@ -1387,7 +1387,7 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
                     p.CloseMainWindow();
                     asked = true;
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Checks.CloseGame, close", ex); }
             }
 
             if (asked)
@@ -1396,12 +1396,12 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
                 {
                     Thread.Sleep(250);
                     bool any = false;
-                    foreach (Process p in ps) { try { if (!p.HasExited) any = true; } catch { } }
+                    foreach (Process p in ps) { try { if (!p.HasExited) any = true; } catch (Exception ex) { Swallow.Note("Checks.CloseGame, has exited", ex); } }
                     if (!any) break;
                 }
             }
 
-            foreach (Process p in ps) { try { if (!p.HasExited) p.Kill(); } catch { } }
+            foreach (Process p in ps) { try { if (!p.HasExited) p.Kill(); } catch (Exception ex) { Swallow.Note("Checks.CloseGame, kill", ex); } }
             Release(ps);
 
             // A process that has been ended can sit in the table for a moment
@@ -1428,7 +1428,7 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
             var names = new List<string>();
             foreach (Process p in ps)
             {
-                try { names.Add(p.ProcessName + ".exe (process " + p.Id + ")"); } catch { }
+                try { names.Add(p.ProcessName + ".exe (process " + p.Id + ")"); } catch (Exception ex) { Swallow.Note("Checks.StuckReport, name", ex); }
             }
             Release(ps);
 
@@ -1442,9 +1442,9 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
                 {
                     Process[] w = Process.GetProcessesByName(n);
                     if (w.Length > 0) reporting = true;
-                    foreach (Process x in w) { try { x.Dispose(); } catch { } }
+                    foreach (Process x in w) { try { x.Dispose(); } catch (Exception ex) { Swallow.Note("Checks.StuckReport, dispose", ex); } }
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Checks.StuckReport", ex); }
             }
 
             string said = "Still running: " + string.Join(", ", names.ToArray()) + ".";
@@ -1483,7 +1483,7 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
             string got = null;
             try
             {
-                var t = new Thread(delegate() { try { got = p.MainModule.FileName; } catch { } });
+                var t = new Thread(delegate() { try { got = p.MainModule.FileName; } catch (Exception ex) { Swallow.Note("Checks.PathOf, MainModule", ex); } });
                 t.IsBackground = true;
                 t.Start();
                 if (!t.Join(1500)) got = null;
@@ -1551,7 +1551,7 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
                     // Only a path we could actually read counts as somebody
                     // else's game. Anything else stays our problem.
                     bool foreign = Where(p) == false;
-                    try { p.Dispose(); } catch { }
+                    try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Checks.OtherSkyrimRunning, dispose", ex); }
                     if (foreign) return true;
                 }
             }

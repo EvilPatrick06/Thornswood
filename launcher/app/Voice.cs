@@ -79,7 +79,7 @@ namespace Thornswood
                 File.AppendAllText(Paths.LogFile,
                     DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + m + Environment.NewLine);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Voice.Quiet, log", ex); }
         }
 
         static void Say(string m)
@@ -92,13 +92,13 @@ namespace Thornswood
                 {
                     d.BeginInvoke(new Action(delegate
                     {
-                        try { logger(m); } catch { }
+                        try { logger(m); } catch (Exception ex) { Swallow.Note("Voice.Say, invoke logger", ex); }
                     }));
                     return;
                 }
                 logger(m);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Voice.Say", ex); }
         }
 
         // Held by reference, not copied. The launcher rewrites these in place
@@ -138,12 +138,12 @@ namespace Thornswood
             {
                 if (view != null) { view.Dispose(); view = null; }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Voice.Stop, dispose view", ex); }
             try
             {
                 if (hostWindow != null) { hostWindow.Close(); hostWindow = null; }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Voice.Stop, close host", ex); }
         }
 
         /// <summary>
@@ -335,7 +335,7 @@ namespace Thornswood
                             args.State = Microsoft.Web.WebView2.Core.CoreWebView2PermissionState.Allow;
                             args.Handled = true;
                         }
-                        catch { }
+                        catch (Exception ex) { Swallow.Note("Voice.Begin, new window", ex); }
                     };
 
                     // The page reports back: status, peer count, talking,
@@ -347,7 +347,7 @@ namespace Thornswood
                         Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs a)
                     {
                         try { OnPageMessage(a.TryGetWebMessageAsString(), log); }
-                        catch { }
+                        catch (Exception ex) { Swallow.Note("Voice.Begin, page message", ex); }
                     };
 
                     core.NavigationCompleted += delegate { Configure(log); };
@@ -367,7 +367,7 @@ namespace Thornswood
             };
 
             string profile = Path.Combine(Paths.ProfileDir, "VoiceBrowser");
-            try { Directory.CreateDirectory(profile); } catch { }
+            try { Directory.CreateDirectory(profile); } catch (Exception ex) { Swallow.Note("Voice.Begin, create profile", ex); }
 
             var envTask = Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
                 null, profile, null);
@@ -430,7 +430,7 @@ namespace Thornswood
                     // TLS 1.2, because .NET Framework 4 defaults to versions
                     // Microsoft's servers stopped accepting years ago and the
                     // failure looks like a network outage rather than a policy.
-                    try { ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; } catch { }
+                    try { ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; } catch (Exception ex) { Swallow.Note("Voice.Bootstrap, TLS", ex); }
 
                     using (var web = new WebClient())
                     {
@@ -457,7 +457,7 @@ namespace Thornswood
                 }
                 finally
                 {
-                    try { File.Delete(exe); } catch { }
+                    try { File.Delete(exe); } catch (Exception ex) { Swallow.Note("Voice.Bootstrap, delete installer", ex); }
                 }
 
                 string v = RuntimeVersion();
@@ -477,7 +477,7 @@ namespace Thornswood
                         try { Begin(delegate { }); } catch (Exception ex) { Say("Voice: " + ex.Message); }
                     }));
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Voice.Bootstrap", ex); }
             });
         }
 
@@ -534,10 +534,10 @@ namespace Thornswood
                 if (view == null) return;
                 view.Dispatcher.BeginInvoke(new Action(delegate
                 {
-                    try { view.CoreWebView2.PostWebMessageAsString(json); } catch { }
+                    try { view.CoreWebView2.PostWebMessageAsString(json); } catch (Exception ex) { Swallow.Note("Voice.Post, web message", ex); }
                 }));
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Voice.Post", ex); }
         }
 
         /// <summary>
@@ -700,7 +700,7 @@ namespace Thornswood
                 return;
             }
             tokenGot = DateTime.UtcNow;
-            try { WriteChannel("voice-token.txt", fresh); } catch { }
+            try { WriteChannel("voice-token.txt", fresh); } catch (Exception ex) { Swallow.Note("Voice.RenewToken, write channel", ex); }
             Post("{\"t\":\"token\",\"token\":\"" + JsonEscape(fresh) + "\"}");
             Say("Voice: join token renewed");
         }
@@ -769,7 +769,7 @@ namespace Thornswood
             // share for push to talk. Short lived on purpose: five minutes, for
             // one profile, and worth nothing to anybody who is not already on
             // this machine as this person.
-            try { WriteChannel("voice-token.txt", token); } catch { }
+            try { WriteChannel("voice-token.txt", token); } catch (Exception ex) { Swallow.Note("Voice.Configure, write token", ex); }
 
             // base and socket are what the page should use. host and port stay on
             // the message so an older page, or one that has not been rebuilt,
@@ -812,7 +812,7 @@ namespace Thornswood
         public static void Reconfigure(int profileId)
         {
             if (profileId > 0) profileOverride = profileId;
-            try { Configure(null, false); } catch { }
+            try { Configure(null, false); } catch (Exception ex) { Swallow.Note("Voice.Reconfigure", ex); }
         }
 
         static void OnPageMessage(string raw, Action<string> log)
@@ -910,7 +910,7 @@ namespace Thornswood
         static string[] ChannelDirs()
         {
             string game = "";
-            try { game = Path.Combine(Paths.Game, "Data\\Platform"); } catch { }
+            try { game = Path.Combine(Paths.Game, "Data\\Platform"); } catch (Exception ex) { Swallow.Note("Voice.ChannelDirs, game path", ex); }
             if (game.Length > 0 && Directory.Exists(game)) return new string[] { game, Paths.ProfileDir };
             return new string[] { Paths.ProfileDir };
         }
@@ -919,7 +919,7 @@ namespace Thornswood
         {
             foreach (string d in ChannelDirs())
             {
-                try { File.WriteAllText(Path.Combine(d, name), text); } catch { }
+                try { File.WriteAllText(Path.Combine(d, name), text); } catch (Exception ex) { Swallow.Note("Voice.WriteChannel, write", ex); }
             }
         }
 
@@ -941,7 +941,7 @@ namespace Thornswood
                 lastStatusLine = line;
                 WriteChannel("voice-status.txt", line);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Voice.PublishStatus", ex); }
         }
 
         /// <summary>
@@ -1056,7 +1056,7 @@ namespace Thornswood
                             Post("{\"t\":\"mode\",\"mode\":\"" + voiceMode + "\"}");
                         }
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Voice.StartFileChannel", ex); }
                 }
             });
         }
@@ -1090,7 +1090,7 @@ namespace Thornswood
                 {
                     WriteChannel("voice-port.txt", port.ToString(CultureInfo.InvariantCulture));
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Voice.StartPttListener, write port", ex); }
                 Say("Voice: listening for push to talk on 127.0.0.1:" + port);
 
                 while (true)
@@ -1148,7 +1148,7 @@ namespace Thornswood
                         c.Response.OutputStream.Write(ok, 0, ok.Length);
                         c.Response.OutputStream.Close();
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Voice.StartPttListener, request", ex); }
                 }
             });
         }
