@@ -321,6 +321,8 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .gal-box .form .file-name{font:400 14px/1.4 var(--serif);color:var(--quiet);
   text-transform:none;letter-spacing:0}
 .gal-box .form input[type=text]{background:var(--night)}
+.gal-box.drag{border-color:var(--gold);
+  box-shadow:inset 0 1px 0 rgba(201,162,75,.08),0 0 0 1px rgba(201,162,75,.35)}
 
 /* Home gallery slideshow of approved public shots. */
 .gal-show{position:relative;margin-top:34px;border:1px solid var(--edge);
@@ -898,12 +900,12 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
     if (who.canSubmit) {
       out += '<div class="gal-box" id="galSubmit">' +
         '<h2>Send a picture</h2>' +
-        '<p class="hint">png, jpg, webp or gif, up to 25 MB. It goes to the queue, not live.</p>' +
+        '<p class="hint">png, jpg, webp or gif, up to 25 MB each. Pick one or several, or drop them on this box; they go to the queue, not live.</p>' +
         '<div class="form">' +
-        '<label>Picture' +
-        '<input type="file" id="galFile" accept=".png,.jpg,.jpeg,.webp,.gif,image/*">' +
+        '<label>Pictures' +
+        '<input type="file" id="galFile" accept=".png,.jpg,.jpeg,.webp,.gif,image/*" multiple>' +
         '<span class="file-pick">' +
-        '<button class="btn ghost" type="button" id="galPick">Choose file</button>' +
+        '<button class="btn ghost" type="button" id="galPick">Choose files</button>' +
         '<span class="file-name" id="galFileName">No file chosen</span>' +
         '</span></label>' +
         '<label>By<input type="text" id="galBy" maxlength="40" placeholder="a name for the caption"></label>' +
@@ -952,40 +954,104 @@ if (PAGES[here] && document.getElementById('pagebody').children.length) {
     var f = document.getElementById('galFile');
     var pick = document.getElementById('galPick');
     var nameEl = document.getElementById('galFileName');
+    var box = document.getElementById('galSubmit');
+    var picked = [];
+
+    function showPicked() {
+      if (!nameEl) return;
+      if (!picked.length) nameEl.textContent = 'No file chosen';
+      else if (picked.length === 1) nameEl.textContent = picked[0].name;
+      else nameEl.textContent = picked.length + ' files chosen';
+    }
+
+    function takeFiles(list) {
+      var add = Array.prototype.slice.call(list || []).filter(function (file) {
+        if (!file) return false;
+        if (/^image\//.test(file.type || '')) return true;
+        return /\.(png|jpe?g|webp|gif)$/i.test(file.name || '');
+      });
+      if (!add.length) return;
+      picked = picked.concat(add);
+      showPicked();
+    }
+
     if (pick && f) {
       pick.addEventListener('click', function () { f.click(); });
       f.addEventListener('change', function () {
-        var file = f.files && f.files[0];
-        if (nameEl) nameEl.textContent = file ? file.name : 'No file chosen';
+        picked = Array.prototype.slice.call((f.files && f.files) || []);
+        showPicked();
+      });
+    }
+
+    if (box) {
+      ['dragenter', 'dragover'].forEach(function (ev) {
+        box.addEventListener(ev, function (e) {
+          e.preventDefault(); e.stopPropagation();
+          box.classList.add('drag');
+        });
+      });
+      ['dragleave', 'drop'].forEach(function (ev) {
+        box.addEventListener(ev, function (e) {
+          e.preventDefault(); e.stopPropagation();
+          if (ev === 'dragleave') box.classList.remove('drag');
+        });
+      });
+      box.addEventListener('drop', function (e) {
+        box.classList.remove('drag');
+        var dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length) takeFiles(dt.files);
       });
     }
 
     var send = document.getElementById('galSend');
     if (send) {
       send.addEventListener('click', function () {
-        var file = f && f.files && f.files[0];
-        if (!file) { said('Choose a picture first.', true); return; }
+        var list = picked.length ? picked.slice() :
+          (f && f.files ? Array.prototype.slice.call(f.files) : []);
+        if (!list.length) { said('Choose a picture first.', true); return; }
         var by = (document.getElementById('galBy').value || '').trim();
         var note = (document.getElementById('galNote').value || '').trim();
-        var q = '/api/gallery/submit?name=' + encodeURIComponent(file.name) +
-          (by ? '&by=' + encodeURIComponent(by) : '') +
-          (note ? '&note=' + encodeURIComponent(note) : '');
         send.disabled = true; send.textContent = 'Sending';
-        fetch(q, { method: 'POST', credentials: 'same-origin',
-          headers: { 'content-type': file.type || 'application/octet-stream' },
-          body: file })
-          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-          .then(function (x) {
-            if (x.ok && x.j && x.j.ok) {
-              said('Sent. Staff will look at it before it goes up.');
+        // One request per file, in order. The submit door writes gallery-pending.json
+        // as read-modify-write, so parallel posts could drop an entry.
+        var i = 0, names = [], fail = null;
+        function next() {
+          if (fail || i >= list.length) {
+            if (fail) said(fail, true);
+            else {
+              said(names.length === 1
+                ? 'Sent. Staff will look at it before it goes up.'
+                : ('Sent ' + names.length + '. Staff will look at them before they go up.'));
+              picked = [];
               if (f) f.value = '';
-              if (nameEl) nameEl.textContent = 'No file chosen';
-            } else {
-              said((x.j && (x.j.error || x.j.why)) || 'Could not send it.', true);
+              showPicked();
             }
-          })
-          .catch(function () { said('Could not send it.', true); })
-          .then(function () { send.disabled = false; send.textContent = 'Send it'; });
+            send.disabled = false; send.textContent = 'Send it';
+            return;
+          }
+          var file = list[i++];
+          var q = '/api/gallery/submit?name=' + encodeURIComponent(file.name) +
+            (by ? '&by=' + encodeURIComponent(by) : '') +
+            (note ? '&note=' + encodeURIComponent(note) : '');
+          fetch(q, { method: 'POST', credentials: 'same-origin',
+            headers: { 'content-type': file.type || 'application/octet-stream' },
+            body: file })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (x) {
+              if (x.ok && x.j && x.j.ok) { names.push(x.j.name); next(); }
+              else {
+                fail = (x.j && (x.j.error || x.j.why)) || 'Could not send it.';
+                if (names.length) fail = 'Sent ' + names.length + ', then stopped: ' + fail;
+                next();
+              }
+            })
+            .catch(function () {
+              fail = 'Could not send it.';
+              if (names.length) fail = 'Sent ' + names.length + ', then stopped: ' + fail;
+              next();
+            });
+        }
+        next();
       });
     }
 
