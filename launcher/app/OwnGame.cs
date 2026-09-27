@@ -681,6 +681,174 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// Puts collection plugins the golden list expects but Game\Data does not
+        /// have back into Data, from what Vortex has deployed (or its staging).
+        /// Does not remove anything from plugins.txt: Gavin's Diagnostics case
+        /// (CFTO-Lanterns, CFTO-CoveredCarriages, BeardMaskFix and the like) is
+        /// light plugins the person wants kept on, and the server never serves
+        /// light plugins, so Fix cannot fetch them. Refreshing the own folder,
+        /// or linking/copying each missing file from Vortex, is how Fix clears
+        /// "in the list but the file is not in Data". Returns how many were
+        /// restored. Works for Main (C:\Thornswood) and DevBuild the same way,
+        /// because Paths.Game and DeploysInto already follow this install.
+        /// </summary>
+        public static int RestoreMissingPlugins(Config cfg, Action<string> say)
+        {
+            if (say == null) say = delegate(string m) { };
+
+            List<string> want = ShippedPlugins();
+            if (want.Count == 0) return 0;
+
+            string data = Path.Combine(Paths.Game, "Data");
+            var missing = new List<string>();
+            foreach (string p in want)
+            {
+                try
+                {
+                    if (!File.Exists(Path.Combine(data, p))) missing.Add(p);
+                }
+                catch (Exception ex)
+                {
+                    Swallow.Note("OwnGame.RestoreMissingPlugins, asking whether " + p + " is in Data", ex);
+                    missing.Add(p);
+                }
+            }
+            if (missing.Count == 0) return 0;
+
+            // Own folder: Refresh brings every missing plugin from Vortex and
+            // keeps files.txt honest. Targeted Place alone would leave the
+            // record short and the next NeedsRefresh confused.
+            if (Active)
+            {
+                string srcOwn = "";
+                try { srcOwn = DeploysInto(cfg); }
+                catch (Exception ex) { Swallow.Note("OwnGame.RestoreMissingPlugins, asking which folder Vortex deploys into", ex); }
+                string why = null;
+                if (srcOwn.Length > 0)
+                {
+                    try { why = WhyNot(cfg, srcOwn); }
+                    catch (Exception ex)
+                    {
+                        Swallow.Note("OwnGame.RestoreMissingPlugins, asking whether the own folder can refresh", ex);
+                        why = ex.Message;
+                    }
+                }
+                else why = "Vortex has no folder Thornswood can refresh from.";
+
+                if (why == null)
+                {
+                    try
+                    {
+                        say(Refresh(cfg, say));
+                        int got = 0;
+                        foreach (string p in missing)
+                        {
+                            try { if (File.Exists(Path.Combine(data, p))) got++; }
+                            catch (Exception ex) { Swallow.Note("OwnGame.RestoreMissingPlugins, checking " + p + " after refresh", ex); }
+                        }
+                        if (got < missing.Count)
+                            say((missing.Count - got) + " plugin" + (missing.Count - got == 1 ? "" : "s") +
+                                " still missing from Data after refresh. In Vortex, enable the Thornswood profile and press Deploy.");
+                        return got;
+                    }
+                    catch (Exception ex)
+                    {
+                        Swallow.Note("OwnGame.RestoreMissingPlugins, refreshing the own folder", ex);
+                        say("Could not refresh Thornswood's own folder (" + ex.Message.TrimEnd('.') + "). Trying Vortex's files one by one.");
+                    }
+                }
+                else
+                {
+                    say("Could not refresh Thornswood's own folder: " + why + " Trying Vortex's files one by one.");
+                }
+            }
+
+            string src = "";
+            try { src = DeploysInto(cfg); }
+            catch (Exception ex) { Swallow.Note("OwnGame.RestoreMissingPlugins, asking which folder Vortex deploys into for a one-by-one restore", ex); }
+            if (string.IsNullOrEmpty(src))
+            {
+                say("Fix could not find Vortex's deploy folder, so the missing plugins were not put back. In Vortex, Mods, Open, Open Game Folder shows which folder it uses.");
+                return 0;
+            }
+
+            string game = GameFor(src);
+            bool apart = game.Length > 0 && !SameFolder(game, src);
+            Record rec = null;
+            if (apart)
+            {
+                try { rec = Staged(src); }
+                catch (Exception ex)
+                {
+                    Swallow.Note("OwnGame.RestoreMissingPlugins, reading Vortex's staging records", ex);
+                    say("Vortex's staging record for " + src + " could not be read (" + ex.Message.TrimEnd('.') + ").");
+                }
+            }
+
+            HashSet<string> deployed = null;
+            try { deployed = Deployed(src); }
+            catch (Exception ex)
+            {
+                Swallow.Note("OwnGame.RestoreMissingPlugins, reading what Vortex deployed", ex);
+                deployed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            int n = 0;
+            foreach (string p in missing)
+            {
+                try { if (File.Exists(Path.Combine(data, p))) continue; }
+                catch (Exception ex) { Swallow.Note("OwnGame.RestoreMissingPlugins, re-checking " + p + " before place", ex); }
+
+                string rel = "Data\\" + p;
+                string from = null;
+                if (rec != null)
+                {
+                    string staged;
+                    if (rec.From.TryGetValue(rel, out staged) && !string.IsNullOrEmpty(staged) && File.Exists(staged))
+                        from = staged;
+                }
+                if (from == null)
+                {
+                    string direct = Path.Combine(src, "Data", p);
+                    try { if (File.Exists(direct)) from = direct; }
+                    catch (Exception ex) { Swallow.Note("OwnGame.RestoreMissingPlugins, looking for " + p + " under Vortex's deploy folder", ex); }
+                }
+                if (from == null && game.Length > 0 && apart)
+                {
+                    string steamCopy = Path.Combine(game, "Data", p);
+                    try
+                    {
+                        if (File.Exists(steamCopy) && (deployed == null || !deployed.Contains(rel)))
+                            from = steamCopy;
+                    }
+                    catch (Exception ex) { Swallow.Note("OwnGame.RestoreMissingPlugins, looking for " + p + " under the Steam copy", ex); }
+                }
+                if (from == null)
+                {
+                    say(p + " is still missing: Vortex does not have a copy to put back. In Vortex, enable the Thornswood profile and press Deploy.");
+                    continue;
+                }
+
+                string dest = Path.Combine(data, p);
+                try
+                {
+                    bool copy = MustCopy(rel, deployed);
+                    bool linked;
+                    if (File.Exists(dest)) DropName(dest);
+                    Place(from, dest, copy, out linked);
+                    say(p + " was put back into Data from Vortex" + (linked ? " (linked)." : "."));
+                    n++;
+                }
+                catch (Exception ex)
+                {
+                    Swallow.Note("OwnGame.RestoreMissingPlugins, placing " + p, ex);
+                    say(p + " could not be put back (" + ex.Message.TrimEnd('.') + "). Close Skyrim and Vortex and press Fix again.");
+                }
+            }
+            return n;
+        }
+
+        /// <summary>
         /// Settings that live outside the game folder. Under the collection the
         /// launcher left Windows' own Skyrim folders alone; from here on it points
         /// them at Profile for each session (Swap), so those need something in
