@@ -122,17 +122,18 @@ channel it shipped, in this order:
    before anybody is told.
 2. **The site news, the #news post and the server's countdown**, as they always
    were. Those tell people to update, which is why the feed is mirrored first.
-3. **The VirusTotal upload**, `scripts\release\Publish-VirusTotal.ps1`, the
-   installer lane's hook (the name is theirs to settle; anything like it under
-   `scripts\` that takes a file is found). The installer is what the Downloads
-   page offers and the hash it prints a VirusTotal link for, so that exe is the
-   file it is handed, and the hook asks VirusTotal before sending anything
-   because a rerun is normal and the file is most of a gigabyte. It needs
-   `VT_API_KEY` and skips itself without one, so it never fails a release; the
-   key is in the secrets table below. `Publish-Installer.ps1` already calls the
-   same hook when it publishes a new installer, so this covers the releases that
-   did not rebuild one. It goes last because nothing but a link on the Downloads
-   page is waiting on it, and an upload that size must not hold up a five minute
+3. **The VirusTotal upload**, the installer lane's hook, called as
+   `.\scripts\release\Publish-VirusTotal.ps1 -Path <file> [-Sha256 <hex>]`.
+   The installer is what the Downloads page offers and the hash it prints a
+   VirusTotal link for, so that exe is the file it is handed, with the hash this
+   machine measured, and the hook asks VirusTotal before sending anything because
+   a rerun is normal and the file is most of a gigabyte. It reads the key from the
+   environment variable `VT_API_KEY` and nowhere else, and a missing key or an
+   answer it cannot use is one line and exit 0, never a stopped release; the key
+   is in the secrets table below. `Publish-Installer.ps1` calls the same hook
+   after it hashes and sends a new installer, so this covers the releases that did
+   not rebuild one. It goes last because nothing but a link on the Downloads page
+   is waiting on it, and an upload that size must not hold up a five minute
    warning. The website lane owns the page wiring for those download urls.
 
 There is no third step for the launcher. A launcher updates itself from the feed

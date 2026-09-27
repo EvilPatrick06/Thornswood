@@ -122,9 +122,9 @@ foreach ($p in 'Channel', 'SkipRemirror', 'SkipVirusTotal', 'NoPause') {
 $helperSrc = [IO.File]::ReadAllText($HelperPath, $Utf8)
 Yes '  it looks for the website lane''s remirror at the expected path' (
     $helperSrc -match "'Remirror-Site-Feed\.ps1'" -and $helperSrc -match "deploy\\Remirror-Site-Feed\.ps1")
-Yes '  and the installer lane''s upload hook at its own, whatever they name it' (
-    $helperSrc -match "release\\Publish-VirusTotal\.ps1" -and $helperSrc -match "\*VirusTotal\*\.ps1")
-Yes '  and never a script whose name says it writes a comment' ($helperSrc -match "notmatch '\(\?i\)comment'")
+Yes '  and the installer lane''s upload hook at its own' (
+    $helperSrc -match "'Publish-VirusTotal\.ps1'" -and $helperSrc -match "release\\Publish-VirusTotal\.ps1")
+Yes '  by the settled name and never by a guess at one' ($helperSrc -notmatch '\*VirusTotal\*')
 Yes '  and either of them can be named outright' ($declared -contains 'RemirrorScript' -and $declared -contains 'VirusTotalScript')
 Yes '  and it takes -Only, so Ship can run one half at a time' ($declared -contains 'Only')
 # Neither half is reimplemented here, so nothing in it talks to the VPS or to
@@ -292,7 +292,7 @@ try {
     Yes '  and it says which file the remirror would be, and whose it is' (
         $none.Out -match 'Remirror-Site-Feed\.ps1 is not on this branch' -and $none.Out -match 'website lane')
     Yes '  and the same for the VirusTotal upload' (
-        $none.Out -match 'no VirusTotal upload script is on this branch' -and $none.Out -match 'installer lane')
+        $none.Out -match 'Publish-VirusTotal\.ps1 is not on this branch' -and $none.Out -match 'installer lane')
     Yes '  and says what is still to come rather than that everything is done' ($none.Out -match 'still to come')
 
     # ---- both landed, main -------------------------------------------------
@@ -319,24 +319,33 @@ try {
         $two.Code -eq 0 -and $two.Out -match 'Publish-VirusTotal ran' -and $two.Out -notmatch 'Remirror-Site-Feed ran')
     Yes '  and says the feed was the first call' ($two.Out -match 'first call, before anybody was told')
 
-    # ---- whatever the installer lane names their upload --------------------
+    # ---- the locked call shape, and nothing guessed at ---------------------
     #
-    # The name is not settled, so anything like it that takes a file will do.
-    # Add-VirusTotalComment.ps1 also takes -Path and is a different job: it
-    # writes a comment on a report rather than sending a file, and picking it
-    # would be a release quietly commenting instead of uploading.
+    # -Path <file> and an optional -Sha256 <hex>, which is the installer lane's
+    # contract. The hash goes with it because that script measures the file
+    # itself and says so when the two disagree, which proves the file it read is
+    # the file this picked.
+    $hash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLower()
+    $shaRun = Run $release @('-Only', 'VirusTotal', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("the upload is given the file and its hash (exit $($shaRun.Code))") (
+        $shaRun.Code -eq 0 -and $shaRun.Out -match ('Path=' + [regex]::Escape($setup)) -and
+        $shaRun.Out -match ('Sha256=' + $hash))
+    # Add-VirusTotalComment.ps1 also takes a -Path and writes a comment on a
+    # report rather than sending a file. Nothing here may pick it up, and the
+    # only thing that keeps that true is looking for the settled name.
     Remove-Item -LiteralPath (Join-Path $release 'Publish-VirusTotal.ps1') -Force
     Hook $release 'Add-VirusTotalComment' '[string]$Path, [string]$Sha256, [string]$Text' 0
-    $commentOnly = Run $release @('-Only', 'VirusTotal', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
-    Yes ("a comment script is never taken for the upload (exit $($commentOnly.Code))") (
-        $commentOnly.Code -eq 0 -and $commentOnly.Out -notmatch 'Add-VirusTotalComment ran' -and
-        $commentOnly.Out -match 'no VirusTotal upload script is on this branch')
-    Hook $release 'Send-VirusTotal' '[string]$File, [switch]$NoPause' 0
-    $otherName = Run $release @('-Only', 'VirusTotal', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
-    Yes ("an upload under another name is found (exit $($otherName.Code))") (
-        $otherName.Code -eq 0 -and $otherName.Out -match 'Send-VirusTotal ran')
-    Yes '  and given the file under the parameter it declares' (
-        $otherName.Out -match ('File=' + [regex]::Escape($setup)) -and $otherName.Out -notmatch 'Path=')
+    Hook $release 'Send-VirusTotal' '[string]$Path, [switch]$NoPause' 0
+    $notNamed = Run $release @('-Only', 'VirusTotal', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("another VirusTotal script is never taken for the upload (exit $($notNamed.Code))") (
+        $notNamed.Code -eq 0 -and $notNamed.Out -notmatch 'Add-VirusTotalComment ran' -and
+        $notNamed.Out -notmatch 'Send-VirusTotal ran' -and
+        $notNamed.Out -match 'Publish-VirusTotal\.ps1 is not on this branch')
+    Yes '  and it says the key comes from VT_API_KEY' ($notNamed.Out -match 'VT_API_KEY')
+    $named = Run $release @('-Only', 'VirusTotal', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist,
+                            '-VirusTotalScript', (Join-Path $release 'Send-VirusTotal.ps1'), '-NoPause')
+    Yes ("-VirusTotalScript names one outright (exit $($named.Code))") (
+        $named.Code -eq 0 -and $named.Out -match 'Send-VirusTotal ran' -and $named.Out -notmatch 'Sha256=')
     Remove-Item -LiteralPath (Join-Path $release 'Send-VirusTotal.ps1') -Force
     Remove-Item -LiteralPath (Join-Path $release 'Add-VirusTotalComment.ps1') -Force
     Hook $release 'Publish-VirusTotal' $vtParams 0
