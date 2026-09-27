@@ -474,6 +474,57 @@ if ($repairFind -ne '') {
     Yes 'Publish-Update answers the same, on the same drives' ((Run-FindRoot $publishFind @($onD + '\Launcher\Thornswood.exe') $drives) -eq $onD)
 }
 
+
+# Sync-Client, Go and Deploy-Gamemode find the install the same way now (#546).
+# Their Find-Root is the Publish-Update one word for word, and each fills its
+# path default from it when the caller did not pass one. No shared helper yet.
+$sync = Join-Path $here '..\scripts\release\Sync-Client.ps1'
+$go = Join-Path $here '..\scripts\release\Go.ps1'
+$deploy = Join-Path $here '..\scripts\deploy\Deploy-Gamemode.ps1'
+$syncFind = Get-Fn $sync 'Find-Root'
+$goFind = Get-Fn $go 'Find-Root'
+$deployFind = Get-Fn $deploy 'Find-Root'
+Yes 'Sync-Client.ps1 has a Find-Root' ($syncFind -ne '')
+Yes 'Go.ps1 has a Find-Root' ($goFind -ne '')
+Yes 'Deploy-Gamemode.ps1 has a Find-Root' ($deployFind -ne '')
+Yes 'Sync-Client Find-Root matches Publish-Update' (($syncFind -ne '') -and ((Flat $syncFind) -eq (Flat $publishFind)))
+Yes 'Go Find-Root matches Publish-Update' (($goFind -ne '') -and ((Flat $goFind) -eq (Flat $publishFind)))
+Yes 'Deploy-Gamemode Find-Root matches Publish-Update' (($deployFind -ne '') -and ((Flat $deployFind) -eq (Flat $publishFind)))
+$syncSrc = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $sync).Path)
+$goSrc = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $go).Path)
+$deploySrc = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $deploy).Path)
+Yes 'Sync-Client fills -Game from Find-Root when it was not passed' (
+    $syncSrc -match "ContainsKey\('Game'\)" -and $syncSrc -match 'Join-Path \(Find-Root\) ''Game''')
+Yes 'Go fills -Game from Find-Root when neither -Game nor -Vortex was passed' (
+    $goSrc.Contains('-not $Vortex -and -not $PSBoundParameters.ContainsKey') -and
+    $goSrc -match 'Join-Path \(Find-Root\) ''Game''')
+Yes 'Deploy-Gamemode fills -Data and -Plugins from Find-Root when not passed' (
+    $deploySrc -match "ContainsKey\('Data'\)" -and $deploySrc -match "ContainsKey\('Plugins'\)" -and
+    $deploySrc -match "Join-Path \(Find-Root\) 'Game\\Data'" -and
+    $deploySrc -match "Join-Path \(Find-Root\) 'Profile\\Default\\plugins\.txt'")
+$onD2 = 'D:\Thornswood'
+$drives2 = @('C:\', 'D:\', '/')
+if ($syncFind -ne '') {
+    Yes 'Sync-Client Find-Root answers the same on another drive' ((Run-FindRoot $syncFind @($onD2 + '\Launcher\Thornswood.exe') $drives2) -eq $onD2)
+}
+
+# A Dev Ship pulls main's releases clone before it reads mainVersion, so the
+# Dev News tab cannot keep showing a stale main (1.1.37 while main had moved
+# on; #546). The pull is the same shape Publish-Pack uses for its own feed.
+$puSrc = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $pubUpd).Path)
+$mainPull = [regex]::Match($puSrc, '(?s)if \(\$Dev\) \{.*?Set-Prop \$doc ''mainVersion''')
+Yes 'the Dev mainVersion block is still in Publish-Update' $mainPull.Success
+if ($mainPull.Success) {
+    $block = $mainPull.Value
+    Yes 'it names the main releases clone as mainRelDir' ($block.Contains('$mainRelDir ='))
+    Yes 'it pulls that clone before reading version.json' (
+        $block.Contains('git -C $mainRelDir pull --rebase') -and
+        $block.IndexOf('git -C $mainRelDir pull') -ge 0 -and
+        $block.IndexOf('git -C $mainRelDir pull') -lt $block.IndexOf('Get-Content -LiteralPath $mainJson'))
+    Yes 'a pull that fails leaves the dev marks alone rather than shipping a stale mainVersion' (
+        $block -match "could not pull main's feed, so the dev marks were left alone")
+}
+
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
 if ($script:fail) { exit 1 }
