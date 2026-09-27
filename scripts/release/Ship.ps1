@@ -474,6 +474,21 @@ if ($placeholder -or @($noteTitle -split '\s+' | Where-Object { $_ }).Count -lt 
     Say '      - After you press Continue you get the whole three minutes to pick one."' 'DarkGray'
     exit 1
 }
+
+# And what the words may be. Note-Rules.ps1 says why: on 26 and 27 September
+# notes went out saying players, naming PR #239, env variables, code names and
+# the shipping machine, and one list said "Launcher 1.1.101" twice.
+. (Join-Path $PSScriptRoot 'Note-Rules.ps1')
+$noteProblems = @(Get-NoteProblems $Notes)
+if ($noteProblems.Count) {
+    Write-Host ''
+    Say '  STOP. These notes are for the people who play, and they say things only' 'Red'
+    Say '  we would understand. Nothing was built. Rewrite these:' 'Red'
+    foreach ($p in $noteProblems) { Say "    $p" 'Yellow' }
+    Write-Host ''
+    Say '  Say what somebody will notice in the game or the launcher, in plain words.' 'DarkGray'
+    exit 1
+}
 Write-Host "  $Notes" -ForegroundColor DarkGray
 
 # ------------------------------------------------------------ git

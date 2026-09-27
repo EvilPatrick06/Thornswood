@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 131 of them, by area: `release` builds and
+Every `.ps1` under this folder, 132 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -118,6 +118,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Install-SkyMPClient.ps1](release/Install-SkyMPClient.ps1) | Switches the game folder from Skyrim Together Reborn to SkyMP. |
 | [release/New-ClientBuildRecord.ps1](release/New-ClientBuildRecord.ps1) | Records what the client runtime is and which fork commit it was built from, into records\client-build.json. |
 | [release/New-ServerBuildRecord.ps1](release/New-ServerBuildRecord.ps1) | Records what the server binary is and which commit it was built from, into records\server-build.json. |
+| [release/Note-Rules.ps1](release/Note-Rules.ps1) | What release notes may say. Ship.ps1 dot-sources this and refuses notes that break it, before anything is built. tests\test-note-rules.ps1 drives the same function, so the rule and its test cannot disagree. |
 | [release/Package-Thornswood.ps1](release/Package-Thornswood.ps1) | Turns the built install at C:\Thornswood into the single file your friends run. |
 | [release/Publish-Installer.ps1](release/Publish-Installer.ps1) | Puts the current installer on the docs site so friends always have the newest one without anybody sending files around. |
 | [release/Publish-Pack.ps1](release/Publish-Pack.ps1) | Builds the optional packs listed in optional-packs.txt, uploads them as release assets, and adds them to version.json so the Add-ons tab in every launcher offers them. |
