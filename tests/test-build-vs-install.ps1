@@ -162,7 +162,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Build-Launcher.ps1') -Destination (Join-Path $fakeRepo 'scripts\release')
     $haveInstall = Test-Path -LiteralPath (Join-Path $realRepo 'scripts\release\Install-Launcher.ps1')
     if ($haveInstall) { Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Install-Launcher.ps1') -Destination (Join-Path $fakeRepo 'scripts\release') }
-    foreach ($f in 'app.ico', 'ui.xaml', 'logo.png', 'logo-192.png', 'launcher-header.jpg', 'launcher-header.mp4', 'Thornswood.ini', 'voice-host.html') {
+    foreach ($f in 'app.ico', 'app-dev.ico', 'ui.xaml', 'logo.png', 'logo-dev.png', 'logo-192.png', 'launcher-header.jpg', 'launcher-header.mp4', 'Thornswood.ini', 'voice-host.html') {
         $from = Join-Path $realRepo ('launcher\' + $f)
         if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination (Join-Path $fakeRepo 'launcher') }
     }
@@ -203,7 +203,7 @@ try {
     }
     $stepText = $stepLines -join "`n"
     Yes 'the CI step that builds the launcher is in build.yml' ($stepLines.Count -gt 0)
-    Yes 'CI still calls Build-Launcher.ps1 with -Root and -NoPause, and nothing else' ($stepText -match '(?m)^\.\\tools\\Build-Launcher\.ps1 -Root \$root -NoPause\s*$')
+    Yes 'CI still calls Build-Launcher.ps1 with -Root and -NoPause, and nothing else' ($stepText -match '(?m)^\.\\scripts\\release\\Build-Launcher\.ps1 -Root \$root -NoPause\s*$')
     Yes 'CI does not install anything' ($stepText -notmatch 'Install-Launcher')
     Yes 'CI still looks for the exe in <root>\Launcher' ($stepText -match "Launcher\\Thornswood\.exe")
 
@@ -221,7 +221,10 @@ try {
     Yes 'B2 Thornswood.exe is where CI uploads it from' (Test-Path -LiteralPath $ciExe)
     Yes 'B3 the setup stub is still built by the build, beside the script, where packaging looks for it' (Test-Path -LiteralPath (Join-Path $tools 'setup-stub.exe'))
     $ciFiles = @(Get-ChildItem -LiteralPath $ciRoot -Recurse -Force -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName.Substring($ciRoot.Length + 1) })
-    Yes ('B4 the build wrote Thornswood.exe and nothing else under the root, found: ' + ($ciFiles -join ', ')) (($ciFiles.Count -eq 1) -and ($ciFiles[0] -eq 'Launcher\Thornswood.exe'))
+    # Thornswood.pdb beside the exe is intentional since #462 (pdbonly symbols for
+    # the shipping machine). Packs and the installer still leave it out.
+    $b4extra = @($ciFiles | Where-Object { $_ -ne 'Launcher\Thornswood.exe' -and $_ -ne 'Launcher\Thornswood.pdb' })
+    Yes ('B4 the build wrote Thornswood.exe under the root (and optionally its pdb), found: ' + ($ciFiles -join ', ')) (($ciFiles -contains 'Launcher\Thornswood.exe') -and ($b4extra.Count -eq 0))
     $asked = @(Read-Log $closeLog)
     Yes ('B5 the build asked to close nothing, asked: ' + ($asked -join ' ; ')) ($asked.Count -eq 0)
 
@@ -362,10 +365,11 @@ try {
         Set-Content -LiteralPath (Join-Path $shipTools 'Install-Launcher.ps1') -Value $stubInstall -Encoding ASCII
         $sb = [scriptblock]::Create(
             'param($Root, $Here) ' +
-            '$ModsOnly = $false; $Dev = $false; $target = "1.0.0"; $current = "1.0.0"; $updaterCs = ""; ' +
+            '$ModsOnly = $false; $Dev = $true; $DryRun = $false; $target = "1.0.0"; $current = "1.0.0"; $updaterCs = ""; ' +
             'function Say($m, $c) { }; function Head($m) { }; ' +
             'function Die($m) { throw ("DIE: " + $m) }; ' +
             'function Unbump([string]$why) { Add-Content -LiteralPath $env:TS_TEST_CALLS -Value ("unbump|" + $why) }; ' +
+            'function Save-ShipSymbols($FromDir, $Version) { @() }; function Get-ShipSymbolDir($Version) { "symbols" }; ' +
             $getExe[0].Extent.Text + "`n" + $body)
 
         # The root's leaf is unique, so the staging folder Ship names after it
@@ -417,19 +421,25 @@ try {
     if ($gameOpen) {
         Skip 'T Install-Thornswood runs, because a game is open on this machine and that script will not run beside one'
     } else {
-        $itTools = Join-Path $work 'it\tools'
+        # Laid out like the real tree after issue #440 phase 8: Install-Thornswood
+        # lives in scripts\dev and reaches Build/Install/Ship/Where via ..\release,
+        # and Vps.ps1 via ..\vps. Flat tools\ copies broke those relatives.
+        $itDev = Join-Path $work 'it\scripts\dev'
+        $itRel = Join-Path $work 'it\scripts\release'
+        $itVps = Join-Path $work 'it\scripts\vps'
         $itRoot = Join-Path $work 'it\root'
-        foreach ($d in @($itTools, $itRoot)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
-        Copy-Item -LiteralPath (Join-Path $Here '..\scripts\dev\Install-Thornswood.ps1') -Destination $itTools
-        # Its -Server and -Client default to what scripts\release\Where.ps1 answers.
-        Copy-Item -LiteralPath (Join-Path $Here '..\scripts\release\Where.ps1') -Destination $itTools
-        Set-Content -LiteralPath (Join-Path $itTools 'Build-Launcher.ps1') -Value $stubBuild -Encoding ASCII
-        Set-Content -LiteralPath (Join-Path $itTools 'Install-Launcher.ps1') -Value $stubInstall -Encoding ASCII
+        foreach ($d in @($itDev, $itRel, $itVps, $itRoot)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
+        Copy-Item -LiteralPath (Join-Path $Here '..\scripts\dev\Install-Thornswood.ps1') -Destination $itDev
+        Copy-Item -LiteralPath (Join-Path $Here '..\scripts\vps\Vps.ps1') -Destination $itVps
+        Copy-Item -LiteralPath (Join-Path $Here '..\scripts\vps\vps.json') -Destination $itVps
+        Set-Content -LiteralPath (Join-Path $itRel 'Build-Launcher.ps1') -Value $stubBuild -Encoding ASCII
+        Set-Content -LiteralPath (Join-Path $itRel 'Install-Launcher.ps1') -Value $stubInstall -Encoding ASCII
         $env:TS_TEST_BUILD_EXIT = '0'
         $env:TS_TEST_INSTALL_EXIT = '0'
 
         Remove-Item -LiteralPath $callLog -Force -ErrorAction SilentlyContinue
-        $t = Invoke-Child $ps (Join-Path $itTools 'Install-Thornswood.ps1') @('-Root', $itRoot, '-Only', 'launcher', '-NoShip', '-NoPause')
+        # -Server/-Client skip Where.ps1 defaults; the launcher steps do not use them.
+        $t = Invoke-Child $ps (Join-Path $itDev 'Install-Thornswood.ps1') @('-Root', $itRoot, '-Only', 'launcher', '-NoShip', '-NoPause', '-Server', $itRoot, '-Client', $itRoot)
         $calls = @(Read-Log $callLog | ForEach-Object { Split-Call $_ })
         Yes "T1 Install-Thornswood -Only launcher -NoShip passes (exit $($t.Code))" ($t.Code -eq 0)
         if ($t.Code -ne 0) { Write-Host $t.Out }
@@ -438,9 +448,9 @@ try {
         Yes 'T4 so the new exe ends up in the root, as it always did' (Test-Path -LiteralPath (Join-Path $itRoot 'Launcher\Thornswood.exe'))
 
         # With Ship beside it and no -NoShip, Ship does both and this does neither.
-        Set-Content -LiteralPath (Join-Path $itTools 'Ship.ps1') -Value $stubShip -Encoding ASCII
+        Set-Content -LiteralPath (Join-Path $itRel 'Ship.ps1') -Value $stubShip -Encoding ASCII
         Remove-Item -LiteralPath $callLog -Force -ErrorAction SilentlyContinue
-        $t = Invoke-Child $ps (Join-Path $itTools 'Install-Thornswood.ps1') @('-Root', $itRoot, '-Only', 'launcher', '-NoPause', '-Notes', 'test')
+        $t = Invoke-Child $ps (Join-Path $itDev 'Install-Thornswood.ps1') @('-Root', $itRoot, '-Only', 'launcher', '-NoPause', '-Notes', 'test', '-Server', $itRoot, '-Client', $itRoot)
         $calls = @(Read-Log $callLog | ForEach-Object { Split-Call $_ })
         Yes "T5 without -NoShip it passes (exit $($t.Code))" ($t.Code -eq 0)
         Yes 'T6 and hands the launcher to Ship alone, once' (($calls.Count -eq 1) -and ($calls[0].What -eq 'ship'))
@@ -453,13 +463,23 @@ try {
     # script a call names the file in a string; a .cmd or a workflow has no
     # comments worth the distinction.
     $callers = @()
-    foreach ($f in @(Get-ChildItem -LiteralPath $Here -File -Filter '*.ps1')) {
-        if ($f.Name -in 'Install-Launcher.ps1', 'test-build-vs-install.ps1') { continue }
-        $names = @((Get-Ast $f.FullName).FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) |
-                   Where-Object { $_.Value -match 'Install-Launcher\.ps1' })
-        if ($names.Count) { $callers += $f.Name }
+    # scripts\dev and scripts\release since the #440 move; tools\ only kept
+    # forwarding shims, and Install-Launcher callers live under scripts now.
+    $callerDirs = @(
+        (Join-Path $RepoDir 'scripts\dev'),
+        (Join-Path $RepoDir 'scripts\release'),
+        $Here
+    )
+    foreach ($dir in $callerDirs) {
+        if (-not (Test-Path -LiteralPath $dir)) { continue }
+        foreach ($f in @(Get-ChildItem -LiteralPath $dir -File -Filter '*.ps1')) {
+            if ($f.Name -in 'Install-Launcher.ps1', 'Build-Launcher.ps1', 'test-build-vs-install.ps1') { continue }
+            $names = @((Get-Ast $f.FullName).FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) |
+                       Where-Object { $_.Value -match 'Install-Launcher\.ps1' })
+            if ($names.Count) { $callers += $f.Name }
+        }
     }
-    $plain = @(Get-ChildItem -LiteralPath $Here -File -Filter '*.cmd') +
+    $plain = @(Get-ChildItem -LiteralPath $Here -File -Filter '*.cmd' -ErrorAction SilentlyContinue) +
              @(Get-ChildItem -LiteralPath (Join-Path $RepoDir '.github\workflows') -File -ErrorAction SilentlyContinue)
     foreach ($f in $plain) {
         if ((Get-Content -LiteralPath $f.FullName -Raw) -match 'Install-Launcher\.ps1') { $callers += $f.Name }
