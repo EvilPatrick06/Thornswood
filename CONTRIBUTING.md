@@ -275,9 +275,11 @@ the team before code; nobody settles it alone, and a Claude never does.
   (`records\signing\README.md`). `ExpectedSigner` in `launcher\app\Updater.cs`
   is set, so every launcher from dev 1.1.101.17 on refuses an update that is
   not signed by that certificate. **Only a machine that signs may Ship, dev
-  included.** A machine with no `tools\signing.json`, or a disabled one, still
-  builds and publishes and only prints "not signing", and its launcher would
-  be refused by everybody already on a signed one. The live main launcher,
+  included.** `Ship.ps1` and `Publish-Installer.ps1` refuse (non-zero exit) when
+  `tools\signing.json` is missing or disabled, or when the launcher / Setup tip
+  is not Authenticode Valid under `ExpectedSigner`. Local `Build-Launcher` /
+  `Package -NoPublish` may still print "not signing" and leave an unsigned
+  intermediate; that soft skip must not reach the site or the feed. The live main launcher,
   1.1.101, predates signing; the next main Ship is the first signed one.
 - Every pull request gets the build check (.github/workflows/build.yml, about
   two minutes: the secret scan, every script and file parses, the writing
