@@ -1292,27 +1292,48 @@ if (AGE_PATHS[here] && !ageOk()) {
       if (b >= 1048576)    return Math.round(b / 1048576) + ' MB';
       return Math.max(1, Math.round(b / 1024)) + ' KB';
     }
-    // The installer's SHA-256, under the size and date, and a link to
-    // VirusTotal's report on that hash. To Do entry 176 asked for exactly this
-    // "rather than instructions for running one": somebody who wants to know
-    // what the file is before running it reads a report instead of uploading
-    // it. It is not a signature, and signing is still entry 2. An installer
-    // published before Publish-Installer wrote a hash has none, and then
-    // nothing shows rather than a link to nothing.
+    // The installer's SHA-256, under the size and date. To Do entry 176 asked
+    // for the hash and for a VirusTotal report on it "rather than instructions
+    // for running one": somebody who wants to know what the file is before
+    // running it reads a report instead of uploading it. It is not a signature,
+    // and signing is still entry 2. An installer published before
+    // Publish-Installer wrote a hash has none, and then nothing shows rather
+    // than a link to nothing.
+    function hash(f) {
+      return f && /^[0-9a-f]{64}$/.test(f.sha256 || '') ? f.sha256 : '';
+    }
+    // The report link, and only when there is a report.
+    //
+    // This used to be built from the hash alone, so every build claimed a
+    // report that nobody had ever asked VirusTotal for, and the link landed on
+    // its item-not-found page. Checked live on 27 September. listFiles in
+    // server.js now sends vt only when files.json says the file has been sent
+    // to VirusTotal, and sends it as the address for that file's own hash, so
+    // this compares the two and shows nothing if they disagree.
+    function vt(f) {
+      var h = hash(f);
+      if (!h) return '';
+      var want = 'https://www.virustotal.com/gui/file/' + h;
+      return (f.vt || '') === want ? want : '';
+    }
     function sum(f) {
-      var h = f && /^[0-9a-f]{64}$/.test(f.sha256 || '') ? f.sha256 : '';
+      var h = hash(f);
       if (!h) return '';
       // Three lines, not four. The label is held together with white-space:nowrap
       // so the browser cannot soft-break it at the ASCII hyphen (SHA- / 256), the
       // orphaning that a plain &nbsp; alone did not stop. The non-breaking space
       // then keeps the whole label riding on the same line as the hash's start,
       // the hash wraps within itself if the column is narrow (overflow-wrap only
-      // on the hash, never the label), and the VirusTotal link stands alone on
-      // its own line rather than trailing the hash's last row after a middot.
+      // on the hash, never the label), and the third line, the report or the
+      // line saying there is not one yet, stands alone rather than trailing the
+      // hash's last row after a middot.
+      var report = vt(f)
+        ? '<a href="' + vt(f) + '" target="_blank" rel="noopener">VirusTotal report</a>'
+        : 'No VirusTotal report for this build yet. One shows here once the file ' +
+          'has been sent to VirusTotal, and a new file takes a few minutes to scan.';
       return '<br><span style="white-space:nowrap">SHA-256</span>&nbsp;' +
              '<span style="overflow-wrap:anywhere">' + h + '</span>' +
-             '<br><a href="https://www.virustotal.com/gui/file/' + h + '" target="_blank" ' +
-             'rel="noopener">VirusTotal report</a>';
+             '<br>' + report;
     }
     // hidden is the payload: on the site because the installer fetches it,
     // never on this page, because clicking it gets you 700 MB that does
@@ -1356,16 +1377,18 @@ if (AGE_PATHS[here] && !ageOk()) {
     // VirusTotal work while code signing is pending. The Alpha installer is
     // unsigned, so Windows SmartScreen may soft-block it and Defender may warn.
     // The fix is More info then Run anyway, never turning protection off or
-    // adding an exclusion. The SHA-256 and the VirusTotal report below are how
-    // you check the file instead, and the FAQ says why it happens. The
-    // reference to the hash only goes in when there is one to show, since sum()
-    // prints nothing without one and a line pointing below at nothing would lie.
+    // adding an exclusion. The SHA-256 below is how you check the file instead,
+    // and the FAQ says why it happens. What this sentence names is only what is
+    // actually below it: the hash when there is one, the report as well when
+    // there is one of those, and neither when sum() has nothing to print.
     function warnLine(f) {
-      var signed = f && /^[0-9a-f]{64}$/.test(f.sha256 || '');
-      var check = signed
-        ? 'The SHA-256 and VirusTotal report below let you check the file is the ' +
-          'one we published. '
-        : '';
+      var check = '';
+      if (hash(f) && vt(f)) {
+        check = 'The SHA-256 and VirusTotal report below let you check the file is ' +
+                'the one we published. ';
+      } else if (hash(f)) {
+        check = 'The SHA-256 below lets you check the file is the one we published. ';
+      }
       return '<p class="also">The installer is not signed yet, so Windows may ' +
              'soft-block it and Defender may warn. If Windows says it protected ' +
              'your PC, press More info and then Run anyway. Do not turn Defender ' +
