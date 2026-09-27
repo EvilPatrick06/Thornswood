@@ -83,7 +83,7 @@ namespace Thornswood
                 if (allowed) { Directory.CreateDirectory(Folder); File.WriteAllText(DevFile, "yes"); }
                 else if (File.Exists(DevFile)) File.Delete(DevFile);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Discord.NoteDev", ex); }
         }
 
         static string ticket;
@@ -234,8 +234,8 @@ namespace Thornswood
 
         public static void Forget()
         {
-            try { if (File.Exists(TicketFile)) File.Delete(TicketFile); } catch { }
-            try { if (File.Exists(NameFile)) File.Delete(NameFile); } catch { }
+            try { if (File.Exists(TicketFile)) File.Delete(TicketFile); } catch (Exception ex) { Swallow.Note("Discord.Forget, TicketFile", ex); }
+            try { if (File.Exists(NameFile)) File.Delete(NameFile); } catch (Exception ex) { Swallow.Note("Discord.Forget, NameFile", ex); }
             try { if (File.Exists(AvatarFile)) File.Delete(AvatarFile); } catch (Exception ex) { Swallow.Note("Discord.Forget", ex); }
             ticket = ""; name = ""; avatar = "";
         }
@@ -323,7 +323,7 @@ namespace Thornswood
                     listener = l;
                     port = tryPort;
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Discord.Connect, binding port", ex); }
             }
             if (listener == null)
             {
@@ -337,7 +337,7 @@ namespace Thornswood
             }
             catch
             {
-                try { listener.Stop(); } catch { }
+                try { listener.Stop(); } catch (Exception ex) { Swallow.Note("Discord.Connect, stopping listener after browser fail", ex); }
                 if (onDone != null) onDone(false, "Could not open your browser.");
                 return;
             }
@@ -396,7 +396,7 @@ namespace Thornswood
             // Two minutes is long enough to sign in to Discord and short enough
             // that a forgotten browser tab does not leave a port open all night.
             bool answered = done.WaitOne(TimeSpan.FromMinutes(2));
-            try { listener.Stop(); } catch { }
+            try { listener.Stop(); } catch (Exception ex) { Swallow.Note("Discord.Connect, stopping listener", ex); }
 
             if (!answered)
             {
@@ -554,13 +554,13 @@ namespace Thornswood
                 Directory.CreateDirectory(Folder);
                 File.WriteAllText(PendingFile, id);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Discord.MarkPending", ex); }
         }
 
         static void ClearPending()
         {
             try { if (File.Exists(PendingFile)) File.Delete(PendingFile); }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Discord.ClearPending", ex); }
         }
 
         /// <summary>
@@ -593,7 +593,7 @@ namespace Thornswood
                 }
                 finally { session = was; }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Discord.SendPendingLogs", ex); }
         }
 
         /// <summary>
@@ -756,7 +756,7 @@ namespace Thornswood
                     if (n >= 100) break;   // a list this long is one fault, not a hundred
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Discord.IssuesJson", ex); }
             sb.Append("]");
             return sb.ToString();
         }
@@ -784,7 +784,7 @@ namespace Thornswood
                     if (n >= 40) break;
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Discord.ChecksJson", ex); }
             sb.Append("]");
             return sb.ToString();
         }
@@ -956,7 +956,7 @@ namespace Thornswood
                 File.AppendAllText(Path.Combine(Folder, "launcher.log"),
                     DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + line + Environment.NewLine);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Discord.Note", ex); }
         }
 
         public static int PostJson(string url, string json, out string reply)

@@ -190,7 +190,7 @@ namespace Thornswood
                 try { ok = Run(cfg, log, status); }
                 catch (Exception ex) { Stop("The downgrade stopped: " + ex.Message, log, status); }
                 finally { running = false; }
-                try { done(ok); } catch { }
+                try { done(ok); } catch (Exception ex) { Swallow.Note("Downgrade.Start, done callback", ex); }
             });
             worker.IsBackground = true;
             worker.SetApartmentState(ApartmentState.STA);   // the clipboard fallback needs it
@@ -605,9 +605,9 @@ namespace Thornswood
             foreach (string[] d in Depots)
             {
                 string folder = Path.Combine(content, "depot_" + d[0]);
-                try { freed += FolderSize(folder); Directory.Delete(folder, true); } catch { }
+                try { freed += FolderSize(folder); Directory.Delete(folder, true); } catch (Exception ex) { Swallow.Note("Downgrade.Run, deleting depot folder", ex); }
             }
-            try { if (Directory.Exists(content) && Directory.GetFileSystemEntries(content).Length == 0) Directory.Delete(content); } catch { }
+            try { if (Directory.Exists(content) && Directory.GetFileSystemEntries(content).Length == 0) Directory.Delete(content); } catch (Exception ex) { Swallow.Note("Downgrade.Run, deleting empty content folder", ex); }
             log("Skyrim is on 1.6.1170. " + (freed / 1048576).ToString("n0") + " MB of downloaded copies removed from Steam's folder.");
             log("Do not start Skyrim through Steam from here on: Steam would update it back, and you would be here again. Play from this launcher.");
             status("Done. Skyrim is on 1.6.1170.");
@@ -623,7 +623,7 @@ namespace Thornswood
             {
                 foreach (Process p in Process.GetProcessesByName("steam")) return p;
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Downgrade.SteamProcess", ex); }
             return null;
         }
 
@@ -633,7 +633,7 @@ namespace Thornswood
         /// open it, through steam.exe itself with the link as its argument,
         /// which is the command Windows runs for a steam:// link anyway.
         ///
-        /// Every request used to be a bare Process.Start inside catch { }. On a
+        /// Every request used to be a bare Process.Start inside an empty catch. On a
         /// machine whose steam:// link does not open (the association missing,
         /// or taken by something else), that threw, the throw was thrown away,
         /// Steam was never asked anything, and nothing was written anywhere:
@@ -837,7 +837,7 @@ namespace Thornswood
                     if (joined) AttachThreadInput(me, fgThread, false);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Downgrade.BringToFront", ex); }
         }
 
         /// <summary>
@@ -903,7 +903,7 @@ namespace Thornswood
                 uint system = GetDpiForSystem();
                 if (steam > 0 && system > 0) scale = steam / (double)system;
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Downgrade.ClickCommandLine, DPI scale", ex); }
             int x = (r.Left + r.Right) / 2;
             int y = r.Bottom - (int)Math.Round(72 * scale);
             SetCursorPos(x, y);
@@ -960,7 +960,7 @@ namespace Thornswood
             IntPtr best = IntPtr.Zero;
             long bestArea = 0;
             var pids = new HashSet<uint>();
-            try { foreach (string name in SteamNames) foreach (Process p in Process.GetProcessesByName(name)) pids.Add((uint)p.Id); } catch { }
+            try { foreach (string name in SteamNames) foreach (Process p in Process.GetProcessesByName(name)) pids.Add((uint)p.Id); } catch (Exception ex) { Swallow.Note("Downgrade.MainWindow, listing Steam processes", ex); }
             if (pids.Count == 0) return IntPtr.Zero;
             EnumWindows(delegate (IntPtr h, IntPtr l)
             {
@@ -975,7 +975,7 @@ namespace Thornswood
                     long area = (long)Math.Max(0, r.Right - r.Left) * Math.Max(0, r.Bottom - r.Top);
                     if (area > bestArea) { bestArea = area; best = h; }
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Downgrade.MainWindow, measuring window", ex); }
                 return true;
             }, IntPtr.Zero);
             return best;
@@ -1489,10 +1489,10 @@ namespace Thornswood
                 if (!Directory.Exists(folder)) return 0;
                 foreach (string f in Directory.GetFiles(folder, "*", SearchOption.AllDirectories))
                 {
-                    try { n += new FileInfo(f).Length; } catch { }
+                    try { n += new FileInfo(f).Length; } catch (Exception ex) { Swallow.Note("Downgrade.FolderSize, file length", ex); }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Downgrade.FolderSize", ex); }
             return n;
         }
 

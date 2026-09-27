@@ -102,12 +102,19 @@
 # was raised. Behaviour of Config.Save / Swap.Restore / Hold.Release /
 # Keep.Unpark is still log-only; stop-swallowing remains later work. Giant
 # files (Shell, Voice, Icons, Checks, ...) are left for later slices.
+#
+# Issue #461 next5 slice, 27 Sep. Converted every empty catch in the ten-
+# through twelve-count files: Downgrade, Discord and Keep. That is 35
+# fewer silent catches, 246 down to 211. The Downgrade XML comment that
+# spelled out catch { } was reworded so it no longer matches the count.
+# Files that reached zero are dropped from this list (an unlisted file is
+# allowed none). No baseline number was raised. Behaviour of Config.Save /
+# Swap.Restore / Hold.Release / Keep.Unpark is still log-only; stop-
+# swallowing remains later work. Giant files (Shell, Voice, Icons,
+# Checks, ...) are left for later slices.
 Chars.cs 18
 Checks.cs 20
-Discord.cs 12
-Downgrade.cs 11
 Icons.cs 21
-Keep.cs 12
 OwnGame.cs 18
 Shell.cs 76
 Uninstall.cs 16
