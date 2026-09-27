@@ -47,6 +47,8 @@ foreach ($n in 'logo.png', 'launcher-header.jpg', 'launcher-header.mp4', 'Thorns
     Yes "Build-Launcher stops when $n is not found" ($b -match ('Die "' + [regex]::Escape($n) + ' is not at'))
 }
 Yes '  and no longer only warns about any of them' ($b -notmatch "is missing, the launcher will run without its emblem' 'Yellow'" -and $b -notmatch "client-build\.json is missing; the launcher will not be able")
+Yes 'Build-Launcher stops when Bootstrap.cs is not found' ($b -match 'Die "Bootstrap\.cs is not at')
+Yes 'Build-Launcher stops when the setup stub fails to rebuild' ($b -match "Die 'setup-stub\.exe did not rebuild" -and $b -notmatch "packaging carries on with that one")
 
 # ---- Package-Thornswood.ps1 ----------------------------------------------------
 $p = Read 'Package-Thornswood.ps1'
@@ -75,7 +77,7 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
     foreach ($f in 'launcher/logo.png', 'launcher/launcher-header.jpg', 'launcher/launcher-header.mp4', 'launcher/Thornswood.ini',
                    'records/client-build.json', 'installer/Setup-Thornswood.ps1', 'installer/Install.bat', 'installer/Setup.bat', 'installer/READ ME FIRST.txt',
                    'game/ui/index.html', 'site/public/banner.webm', 'site/public/banner.mp4', 'site/public/banner.jpg',
-                   'game/menu/logo.nif', 'game/menu/logo01ae.nif', 'game/menu/Mainmenuwallpaper.dds', 'scripts/release/Sync-Client.ps1') {
+                   'game/menu/logo.nif', 'game/menu/logo01ae.nif', 'game/menu/Mainmenuwallpaper.dds', 'scripts/release/Sync-Client.ps1', 'installer/setup/Bootstrap.cs') {
         Yes "$f is tracked, so its absence is a wrong path" ($tracked -contains $f)
     }
 }
