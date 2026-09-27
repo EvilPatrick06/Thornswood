@@ -1384,21 +1384,6 @@ if (AGE_PATHS[here] && !ageOk()) {
     // The button belongs under the step that tells you to take it, not above
     // the list where it is the first thing you meet and the instructions are
     // something you scroll past afterwards.
-    //
-    // Above the button: signed Setup may still get a soft SmartScreen ask on a
-    // brand-new hash. The SHA-256 below is how you check the file, and the FAQ
-    // says why a soft block can still appear.
-    function warnLine(f) {
-      var check = '';
-      if (hash(f)) {
-        check = 'The SHA-256 below lets you check the file is the one we published. ';
-      }
-      return '<p class="also">The installer is signed as Gavin Knotts. Windows may still ' +
-             'ask More info and then Run anyway on a brand-new download, because SmartScreen ' +
-             'has not seen that file hash before. The publisher should show as Gavin Knotts. ' +
-             check +
-             '<a href="/help#defender">Why this happens</a>.</p>';
-    }
     var grab = '';
     if (!exe) {
       grab = '<p style="color:var(--faint)">' + (zip
@@ -1406,14 +1391,12 @@ if (AGE_PATHS[here] && !ageOk()) {
                  'Only the payload is up.'
                : 'Nothing uploaded yet.') + '</p>';
     } else if (single || !zip || zip.hidden) {
-      grab = '<div class="grab">' + warnLine(exe) +
-             '<a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
+      grab = '<div class="grab"><a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
              'Download the installer</a>' +
              '<p class="also faintly">Published by Thornswood<br>' + esc(human(exe.size)) +
              (exe.version ? ' · ' + esc(clock(exe.version)) : '') + sum(exe) + '</p></div>';
     } else {
-      grab = '<div class="grab">' + warnLine(exe) +
-             '<a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
+      grab = '<div class="grab"><a class="btn first" href="/file/' + encodeURIComponent(exe.name) + '">' +
              'Download the installer</a>' +
              '<p class="also">and its payload, <a href="/file/' +
              encodeURIComponent(zip.name) + '">' + esc(zip.name) + '</a>, ' +
