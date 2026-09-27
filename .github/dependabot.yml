@@ -1,20 +1,22 @@
 # What this repository depends on, watched rather than remembered.
 #
-# ONE ECOSYSTEM, because one is what actually has a manifest here.
+# TWO ECOSYSTEMS, because two manifests exist here.
 #
-# github-actions: the build check pins actions by major version, and a pinned
-# action is a thing that goes stale quietly.
+# github-actions: every workflow pins actions by full length commit SHA (see
+# build.yml), and a pinned action still goes stale quietly when the tag it
+# was taken from moves. Dependabot opens a pull request that updates the SHA
+# and the tag comment together.
 #
-# NOT pip and NOT npm, and this is the honest reason rather than an oversight:
-# there is no requirements.txt and no package.json anywhere in this repository.
-# The bot's three libraries are named in the pip line inside Install-Bot.ps1 and
-# again in the build check; the site and the voice service are deliberately
-# written against node's own library and depend on nothing. Pointing dependabot
-# at a folder with no manifest gives an error on the Dependabot tab that reads
-# like a fault and watches nothing, which is worse than not configuring it.
+# pip: bot\requirements.txt names the three libraries the bot and its
+# harnesses install (discord.py, pillow, certifi). Nightly installs from that
+# file into a per-run venv; Install-Bot.ps1 installs the same file on the VPS.
+# Watching /bot keeps those versions from going stale without a hand check.
 #
-# When the bot grows a requirements.txt, add a pip entry here pointing at
-# /bot and it starts working the same day.
+# NOT npm: there is no package.json anywhere in this repository. The site and
+# the voice service are deliberately written against node's own library and
+# depend on nothing. Pointing dependabot at a folder with no manifest gives
+# an error on the Dependabot tab that reads like a fault and watches nothing,
+# which is worse than not configuring it.
 #
 # The launcher is C# built with the .NET Framework csc and has no package
 # manager at all, by design, so there is nothing here for it.
@@ -29,3 +31,10 @@ updates:
       interval: weekly
     commit-message:
       prefix: "ci"
+
+  - package-ecosystem: pip
+    directory: /bot
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "bot"
