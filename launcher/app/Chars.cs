@@ -143,7 +143,7 @@ namespace Thornswood
                     long ticks;
                     if (p.Length > 2 && long.TryParse(p[2], out ticks))
                     {
-                        try { r.Played = new DateTime(ticks); } catch { }
+                        try { r.Played = new DateTime(ticks); } catch (Exception ex) { Swallow.Note("Chars.Rows, datetime", ex); }
                     }
                     long secs;
                     if (p.Length > 3 && long.TryParse(p[3], out secs) && secs >= 0) r.Seconds = secs;
@@ -153,7 +153,7 @@ namespace Thornswood
                     l.Add(r);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Chars.Rows", ex); }
             return l;
         }
 
@@ -170,7 +170,7 @@ namespace Thornswood
                 }
                 File.WriteAllText(ProfileFile, sb.ToString());
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Chars.Save, write", ex); }
         }
 
         static string Dash(string s)
@@ -373,7 +373,7 @@ namespace Thornswood
                 Directory.CreateDirectory(Home);
                 File.AppendAllText(RetiredFile, profileId + Environment.NewLine);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Chars.Retire, write", ex); }
         }
 
         static List<int> Retired()
@@ -388,7 +388,7 @@ namespace Thornswood
                     if (int.TryParse(line.Trim(), out id) && id > 0) l.Add(id);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Chars.Retired", ex); }
             return l;
         }
 
@@ -409,7 +409,7 @@ namespace Thornswood
                     if (int.TryParse(line.Trim(), out id) && id > 0 && !l.Contains(id)) l.Add(id);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Chars.ReadForgets", ex); }
             return l;
         }
 
@@ -593,7 +593,7 @@ namespace Thornswood
             // The roster first, so the names are as fresh as the server can
             // make them. Its own two and a half second timeout, and a server
             // that does not answer costs the names and nothing else.
-            try { Roster.Refresh(cfg); } catch { }
+            try { Roster.Refresh(cfg); } catch (Exception ex) { Swallow.Note("Chars.WriteCharacters, roster", ex); }
 
             var sb = new StringBuilder();
             sb.Append("{\"v\":1,\"last\":").Append(last)
@@ -767,7 +767,7 @@ namespace Thornswood
                 // aside whole, next to where it was, under a name that says
                 // what it is. Only an empty one is removed.
                 bool empty = false;
-                try { empty = Directory.GetFileSystemEntries(live).Length == 0; } catch { }
+                try { empty = Directory.GetFileSystemEntries(live).Length == 0; } catch (Exception ex) { Swallow.Note("Chars.Prepare, entries", ex); }
                 if (empty)
                 {
                     try { Directory.Delete(live); }
@@ -797,7 +797,7 @@ namespace Thornswood
             }
             else
             {
-                try { Directory.CreateDirectory(live); } catch { }
+                try { Directory.CreateDirectory(live); } catch (Exception ex) { Swallow.Note("Chars.Prepare, create dir", ex); }
                 Scrub(live);
                 note = "Could not point the save folder at Thornswood's own saves folder: " + (trouble ?? why) +
                        ". Skyrim is using the ordinary Saves folder on this computer instead. Your character lives on the server, so nothing is lost." +
@@ -853,7 +853,7 @@ namespace Thornswood
             {
                 if (Door.Last != null && Door.Last.Slots > 0) { slots = Door.Last.Slots; answered = true; }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Chars.Prepare, Door.Last.Slots", ex); }
 
             // A character numbered above that allowance comes down into a
             // free number under it before the list goes out, so the menu
@@ -871,8 +871,8 @@ namespace Thornswood
 
             // A choice or a forget left over from the last session would be
             // read as this session's the moment the game was up.
-            try { if (File.Exists(ChoiceFile)) File.Delete(ChoiceFile); } catch { }
-            try { if (File.Exists(ForgetFile)) File.Delete(ForgetFile); } catch { }
+            try { if (File.Exists(ChoiceFile)) File.Delete(ChoiceFile); } catch (Exception ex) { Swallow.Note("Chars.Prepare, delete leftover choice", ex); }
+            try { if (File.Exists(ForgetFile)) File.Delete(ForgetFile); } catch (Exception ex) { Swallow.Note("Chars.Prepare, delete leftover forget", ex); }
 
             if (setAside != null) note = (note == null ? "" : note + " ") + setAside;
             // Shell logs the note; its Log is its own, so the tidy's line
@@ -914,15 +914,15 @@ namespace Thornswood
                 if (!Directory.Exists(dir)) return;
                 foreach (string f in Directory.GetFiles(dir, "TESMODPLATFORM-*.ess"))
                 {
-                    try { File.Delete(f); } catch { }
+                    try { File.Delete(f); } catch (Exception ex) { Swallow.Note("Chars.Scrub, delete", ex); }
                 }
                 // The .skse companion Skyrim writes beside each save.
                 foreach (string f in Directory.GetFiles(dir, "TESMODPLATFORM-*.skse"))
                 {
-                    try { File.Delete(f); } catch { }
+                    try { File.Delete(f); } catch (Exception ex) { Swallow.Note("Chars.Scrub, delete", ex); }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Chars.Scrub, delete", ex); }
         }
 
         // Written fresh every launch, and what it writes is "do nothing".
@@ -1006,7 +1006,7 @@ namespace Thornswood
                 sb.AppendLine("bDisableMissingContentWarning = true");
                 File.WriteAllText(StartIni, sb.ToString());
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Chars.WriteStartIni, write", ex); }
         }
 
         static string PlatformIni
@@ -1119,7 +1119,7 @@ namespace Thornswood
                 // the encoding of a file this launcher does not own.
                 File.WriteAllText(PlatformIni, next, new UTF8Encoding(true));
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Chars.WriteBrowserBackend, write", ex); }
         }
 
         /// <summary>
@@ -1164,7 +1164,7 @@ namespace Thornswood
 
                 File.WriteAllText(PlatformIni, next, new UTF8Encoding(true));
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Chars.KeepPlatformLogReadable, write", ex); }
         }
     }
 }

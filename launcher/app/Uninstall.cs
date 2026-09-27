@@ -89,17 +89,17 @@ namespace Thornswood
             var seen  = new System.Collections.Generic.List<string>();
             var roots = new System.Collections.Generic.List<string>();
 
-            try { roots.Add(Path.GetPathRoot(Paths.Root)); } catch { }
-            try { roots.Add(Path.GetTempPath()); } catch { }
+            try { roots.Add(Path.GetPathRoot(Paths.Root)); } catch (Exception ex) { Swallow.Note("Uninstall.Scratch, path root", ex); }
+            try { roots.Add(Path.GetTempPath()); } catch (Exception ex) { Swallow.Note("Uninstall.Scratch, temp path", ex); }
             try
             {
                 foreach (DriveInfo d in DriveInfo.GetDrives())
                 {
                     try { if (d.DriveType == DriveType.Fixed && d.IsReady) roots.Add(d.RootDirectory.FullName); }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Uninstall.Scratch, drive ready", ex); }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Uninstall.Scratch, listing drives", ex); }
 
             foreach (string r in roots)
             {
@@ -149,13 +149,13 @@ namespace Thornswood
                 try { link = (new DirectoryInfo(sub).Attributes & FileAttributes.ReparsePoint) != 0; }
                 catch { link = true; }   // unreadable is treated as do not enter
 
-                if (link) { try { Directory.Delete(sub, false); } catch { } }
+                if (link) { try { Directory.Delete(sub, false); } catch (Exception ex) { Swallow.Note("Uninstall.DeleteTree, delete dir", ex); } }
                 else DeleteTree(sub);
             }
             foreach (string f in Directory.GetFiles(dir))
             {
-                try { File.SetAttributes(f, FileAttributes.Normal); } catch { }
-                try { File.Delete(f); } catch { }
+                try { File.SetAttributes(f, FileAttributes.Normal); } catch (Exception ex) { Swallow.Note("Uninstall.DeleteTree, attributes", ex); }
+                try { File.Delete(f); } catch (Exception ex) { Swallow.Note("Uninstall.DeleteTree, delete", ex); }
             }
             Directory.Delete(dir, false);
         }
@@ -175,7 +175,7 @@ namespace Thornswood
                 {
                     if ((new DirectoryInfo(dir).Attributes & FileAttributes.ReparsePoint) != 0)
                     {
-                        try { Directory.Delete(dir, false); } catch { }
+                        try { Directory.Delete(dir, false); } catch (Exception ex) { Swallow.Note("Uninstall.DropScratch, delete dir", ex); }
                         continue;
                     }
                 }
@@ -204,7 +204,7 @@ namespace Thornswood
             long total = 0;
             try
             {
-                foreach (string f in Directory.GetFiles(dir)) { try { total += new FileInfo(f).Length; files++; } catch { } }
+                foreach (string f in Directory.GetFiles(dir)) { try { total += new FileInfo(f).Length; files++; } catch (Exception ex) { Swallow.Note("Uninstall.Measure, file length", ex); } }
                 foreach (string d in Directory.GetDirectories(dir))
                 {
                     // Never walk through a junction while measuring either.
@@ -212,7 +212,7 @@ namespace Thornswood
                     total += Measure(d, ref files);
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Uninstall.Measure", ex); }
             return total;
         }
 
@@ -265,7 +265,7 @@ namespace Thornswood
                 if (!full.StartsWith(game, StringComparison.OrdinalIgnoreCase)) continue;
                 if (!File.Exists(full)) continue;
 
-                try { bytes += new FileInfo(full).Length; } catch { }
+                try { bytes += new FileInfo(full).Length; } catch (Exception ex) { Swallow.Note("Uninstall.OurGameFiles, file length", ex); }
                 count++;
                 outp.Add(full);
             }
@@ -294,7 +294,7 @@ namespace Thornswood
             {
                 if (OwnGame.Active) return OwnGame.Source(cfg);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Uninstall.InstalledInto, OwnGame source", ex); }
             return "";
         }
 
@@ -317,7 +317,7 @@ namespace Thornswood
                     gone++;
                     if (!string.IsNullOrEmpty(d)) dirs.Add(d);
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Uninstall.RemoveOurGameFiles", ex); }
             }
 
             // Deepest first, so a folder that only held other empty folders goes
@@ -348,7 +348,7 @@ namespace Thornswood
 
         static void Kill()
         {
-            try { Checks.CloseGame(); } catch { }
+            try { Checks.CloseGame(); } catch (Exception ex) { Swallow.Note("Uninstall.Kill, process", ex); }
         }
 
         static void DropShortcuts()
@@ -365,7 +365,7 @@ namespace Thornswood
                 foreach (string name in new[] { "Thornswood.lnk", "Skyrim Together.lnk" })
                 {
                     string p = Path.Combine(spot, name);
-                    try { if (File.Exists(p)) File.Delete(p); } catch { }
+                    try { if (File.Exists(p)) File.Delete(p); } catch (Exception ex) { Swallow.Note("Uninstall.DropShortcuts, delete", ex); }
                 }
             }
         }
@@ -572,7 +572,7 @@ namespace Thornswood
             // what is actually there rather than what was expected to be.
             string note = null;
             try { note = WriteFarewell(keepSaves, deleteMods); }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Uninstall.Finish, farewell", ex); }
             if (note != null)
             {
                 sb.AppendLine("powershell -NoProfile -ExecutionPolicy Bypass -File \"" + note + "\" >nul 2>&1");
