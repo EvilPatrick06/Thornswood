@@ -1102,10 +1102,9 @@ if ($DryRun) {
     Say '  dry run, nothing will be uploaded or pushed' 'Yellow'
     Say '  dry run: will not close a running game and will not prune old packs' 'Yellow'
 
-    $stateName = if ($Dev) { 'published-dev.json' } else { 'published.json' }
     foreach ($f in @(
         (Join-Path $ReleaseDir 'version.json'),
-        (Join-Path (Join-Path $env:LOCALAPPDATA 'Thornswood') $stateName)
+        (Join-Path $ReleaseDir 'published.json')
     )) {
         if (Test-Path -LiteralPath $f) {
             $tmp = [IO.Path]::GetTempFileName()
@@ -1515,11 +1514,17 @@ if (-not $DryRun -and -not $Dev -and -not $hotfix) {
             $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
             Push-Location $devRel
             try {
+                $mainState = Join-Path $MainReleaseDir 'published.json'
+                if (Test-Path -LiteralPath $mainState) {
+                    Copy-Item -LiteralPath $mainState -Destination (Join-Path $devRel 'published.json') -Force
+                }
                 & git add version.json 2>&1 | Out-Null
+                if (Test-Path -LiteralPath (Join-Path $devRel 'published.json')) { & git add published.json 2>&1 | Out-Null }
                 & git commit -m "Dev follows main $target" 2>&1 | Out-Null
                 & git push -u origin HEAD 2>&1 | Out-Null
                 if ($LASTEXITCODE -ne 0) { Say '  the dev feed did not push, run Ship -Channel dev once to sort it' 'Yellow' }
                 else { Say "  dev feed now matches main $target, dev ports kept" 'Green' }
+                if (Test-Path -LiteralPath (Join-Path $devRel 'published.json')) { Say '  dev baseline is now main''s' 'Green' }
                 # The site's copy of the dev feed is not this step's to write.
                 # The mirror above ran for the channel that shipped, which is
                 # main, so thornswood.net/feed-dev still serves the dev tip from
@@ -1530,9 +1535,6 @@ if (-not $DryRun -and -not $Dev -and -not $hotfix) {
                 Say '  the site copy of the dev feed is not reset with it:' 'DarkGray'
                 Say '  .\scripts\deploy\Remirror-Site-Feed.ps1 -Dev   puts that right' 'DarkGray'
             } finally { Pop-Location; $ErrorActionPreference = $old }
-            $stateDir = Join-Path $env:LOCALAPPDATA 'Thornswood'
-            $mainState = Join-Path $stateDir 'published.json'
-            if (Test-Path $mainState) { Copy-Item $mainState (Join-Path $stateDir 'published-dev.json') -Force; Say '  dev baseline is now main''s' 'Green' }
         } catch {
             Say "  could not reset the dev feed: $_" 'Yellow'
         }

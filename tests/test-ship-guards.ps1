@@ -115,10 +115,12 @@ $oldAppData = $env:LOCALAPPDATA
 try {
     New-Item -ItemType Directory -Path $work -Force | Out-Null
     $script:rel = Join-Path $work 'Thornswood-Releases'
+    $script:relDev = Join-Path $work 'Thornswood-Releases-dev'
     $state = Join-Path $work 'appdata\Thornswood'
-    New-Item -ItemType Directory -Path $script:rel, $state -Force | Out-Null
-    # The baseline lives under LOCALAPPDATA; this one is the temp folder's.
+    New-Item -ItemType Directory -Path $script:rel, $script:relDev, $state -Force | Out-Null
+    # Pending notes still use LOCALAPPDATA; the baseline is in the releases clone.
     $env:LOCALAPPDATA = Join-Path $work 'appdata'
+    [IO.File]::WriteAllText((Join-Path $script:relDev 'version.json'), '{"launcherVersion":"1.1.67","packs":[]}')
 
     # Updater.cs as it stands after a -Version bump, which is when there is a
     # number to put back.
@@ -131,16 +133,17 @@ try {
     # in the release clone and records the release in its baseline.
     $publish = {
         param([string]$name)
-        [IO.File]::WriteAllText((Join-Path $script:rel 'version.json'), '{"launcherVersion":"1.1.68","packs":[{"id":"20260917-2200"}]}')
-        [IO.File]::WriteAllText((Join-Path $state $name), '{"Data\\Platform\\Plugins\\thornswood-chat.js":"123:456"}')
-        $script:during = @{ feed = (Hash (Join-Path $script:rel 'version.json')); base = (Hash (Join-Path $state $name)) }
+        $rd = if ($name -eq 'published-dev.json') { $script:relDev } else { $script:rel }
+        [IO.File]::WriteAllText((Join-Path $rd 'version.json'), '{"launcherVersion":"1.1.68","packs":[{"id":"20260917-2200"}]}')
+        [IO.File]::WriteAllText((Join-Path $rd 'published.json'), '{"Data\\Platform\\Plugins\\thornswood-chat.js":"123:456"}')
+        $script:during = @{ feed = (Hash (Join-Path $rd 'version.json')); base = (Hash (Join-Path $rd 'published.json')) }
     }
 
     function Invoke-DryRun([bool]$dev, [scriptblock]$publisher, [string]$baselineName) {
         $DryRun = $true
         $Dev = $dev
         $pubArgs = @{ Notes = 'a dry run' }
-        $ReleaseDir = $script:rel
+        $ReleaseDir = if ($dev) { $script:relDev } else { $script:rel }
         $dryKeep = @()
         Invoke-Expression $script:dryBefore
         & $publisher $baselineName
@@ -153,7 +156,7 @@ try {
     # Bytes chosen to be easy to disturb: a byte order mark, no newline at the
     # end, and a baseline written the way Save-State writes one.
     $feed = Join-Path $script:rel 'version.json'
-    $base = Join-Path $state 'published.json'
+    $base = Join-Path $script:rel 'published.json'
     [IO.File]::WriteAllText($feed, '{"launcherVersion":"1.1.67","packs":[]}', (New-Object Text.UTF8Encoding($true)))
     [IO.File]::WriteAllText($base, '{"Data\\Platform\\Plugins\\thornswood-chat.js":"100:200"}')
     $feedWas = Hash $feed
@@ -172,7 +175,7 @@ try {
     #
     # A file that was not there before must not be there after, or the next
     # real dev Ship reads a baseline nobody published.
-    $devBase = Join-Path $state 'published-dev.json'
+    $devBase = Join-Path $script:relDev 'published.json'
     if (Test-Path -LiteralPath $devBase) { Remove-Item -LiteralPath $devBase -Force }
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.68`";`r`n")
     $r = Invoke-DryRun $true $publish 'published-dev.json'

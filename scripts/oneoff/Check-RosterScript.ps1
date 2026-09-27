@@ -2,7 +2,9 @@
 # text that would actually be sent. Same check as Check-VoiceInstall.ps1 and
 # Check-DevRosterSeed.ps1: a mistake in a remote block parses perfectly here
 # and fails on the box.
-$src = Get-Content 'C:\Users\evilp\Downloads\Thornswood-Repo\scripts\ops\Check-Roster.ps1' -Raw
+$here = $PSScriptRoot
+if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$src = Get-Content (Join-Path $here '..\ops\Check-Roster.ps1') -Raw
 $m = [regex]::Match($src, "(?s)\`$script = @'\r?\n(.*?)\r?\n'@")
 if (-not $m.Success) { throw 'could not find the remote here-string' }
 
