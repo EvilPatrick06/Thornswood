@@ -215,6 +215,14 @@ function rig(opts) {
     'const loadedAt = Date.now();\n' +
     "const CHOICE_FILE = 'Data/Platform/thornswood-choice.txt';\n" +
     "const CHARACTERS_FILE = 'Data/Platform/thornswood-characters.json';\n" +
+    "const INTRO_FILE = 'Data/Platform/thornswood-intro.txt';\n" +
+    // What menuWatch keeps between ticks: the scroll setting this start began
+    // under, whether Continue has been pressed, and when it last spoke.
+    'let menuIntroOff = false;\n' +
+    'let menuWent = false;\n' +
+    'let menuStayAt = 0;\n' +
+    'let menuFgAt = 0;\n' +
+    'let menuFgWas = null;\n' +
     "const UI_URL = '" + PAGE + "';\n" +
     'let PROFILE = ' + (opts.fallback || 0) + ';\n' +
     'let menuChosenId = 0, menuChosenAt = 0, menuSaidAt = 0, menuSaidTimes = 0;\n' +
