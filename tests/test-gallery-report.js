@@ -1,4 +1,4 @@
-﻿/*
+/*
   test-gallery-report.js
 
       node .\tests\test-gallery-report.js
@@ -10,6 +10,13 @@
   to the site's gallery doors. Gavin's ask on 2026-09-27 moved those tools off
   the Play card onto a real Gallery tab/page, and stripped Report / Manage from
   Play.
+
+  THE SITE GREW THAT TICKET DOOR, #743. The six staff doors now share one gate,
+  galleryStaff in site\server.js, and it takes the hub cookie or a signed
+  launcher ticket whose account is staff (st.dev, a bar higher than the st.play
+  the report door asks). So a staff button in the launcher is possible now. It
+  is not built: Manage on the site still opens the site page, and this harness
+  holds the launcher to that until the launcher lane changes it on purpose.
 
   The launcher cannot be started from here (CLAUDE.md), so this reads the
   source, the window and site\server.js and checks the shape:
@@ -69,6 +76,9 @@ yes('gallery submit allowlist is images only today',
 yes('the site serves GET /api/gallery/who',
     /p === '\/api\/gallery\/who' && req\.method === 'GET'/.test(SERVER));
 
+// Every staff door, through the one gate they share since #743. A door that
+// wandered off it, or a gate that stopped asking for staff, is what this
+// catches, because either would change what the launcher may do.
 const staffDoors = [
   ["p === '/api/gallery/pending' && req.method === 'GET'", '/api/gallery/pending'],
   ["p === '/api/gallery/approve' && req.method === 'POST'", '/api/gallery/approve'],
@@ -77,18 +87,36 @@ const staffDoors = [
   ["p === '/api/gallery/reports' && req.method === 'GET'", '/api/gallery/reports'],
   ["p === '/api/gallery/report/dismiss' && req.method === 'POST'", '/api/gallery/report/dismiss']
 ];
-const ticketed = /async function galleryStaff\(/.test(SERVER);
-console.log('NOTE  site\\server.js has ' + (ticketed
-  ? 'galleryStaff (ticket path live)'
-  : 'no galleryStaff yet: staff doors are cookie only until #744 + Deploy-Docs'));
 for (const [needle, name] of staffDoors) {
   const at = SERVER.indexOf(needle);
   const door = at < 0 ? '' : SERVER.slice(at, at + 400);
-  yes(name + ' is there and is staff only',
-      at > 0 && (ticketed
-        ? /galleryStaff\(/.test(door)
-        : /if \(!w\.dev\) return sendJson\(res, 403/.test(door)));
+  yes(name + ' is there and goes through galleryStaff, the one staff gate',
+      at > 0 &&
+      /const gs = await galleryStaff\(url, w\);\s*\n\s*if \(!gs\.ok\) return sendJson\(res, gs\.code, gs\.body\);/.test(door));
 }
+const gate = body(SERVER, 'async function galleryStaff(url, w)');
+yes('the gate is there', gate.length > 0);
+yes('it takes the hub cookie who(req) reads', /if \(w\.dev\) return \{ ok: true/.test(gate));
+yes('and a launcher ticket out of the query, the way the report door reads one',
+    /readTicket\(url\.searchParams\.get\('ticket'\)\)/.test(gate));
+yes('a ticket has to be staff: st.dev, not the st.play the report door asks',
+    /if \(!st\.dev\) return \{ ok: false, code: 403/.test(gate) && !/st\.play/.test(gate));
+yes('it re-asks Discord rather than trusting the ticket on its own',
+    /await standing\(t\.d\)/.test(gate) && /standCache\.delete\(String\(t\.d\)\)/.test(gate));
+yes('an account that left, is banned, or could not be looked up is refused',
+    /!st\.inGuild/.test(gate) && /st\.banned/.test(gate) && /st\.lookupFailed/.test(gate));
+yes('neither cookie nor ticket is the 403 staff only these doors always sent',
+    /if \(!t\) return \{ ok: false, code: 403, body: \{ error: 'staff only' \} \};/.test(gate));
+yes('who(req) is still the twa cookie and nothing else, so a cookie is not the ticket',
+    /const ADMIN\s+= 'twa';/.test(SERVER) &&
+    /function identity\(req\) \{\s*\n\s*const raw = cookies\(req\)\[ADMIN\] \|\| '';/.test(SERVER));
+
+// The page the card sends staff to has to be open to the roles the doors let
+// in, or Manage on the site lands a Gamemaster back on the hub home (#742).
+yes('the hub Gallery page is a staff page, matching the doors',
+    /const LEVEL = \{\s*\n\s*uploads: 'staff',/.test(SERVER));
+yes('and the page gate knows what a staff page is',
+    /LEVEL\[key\] === 'staff' \? !!w\.dev/.test(SERVER));
 
 // ---- Gallery.cs API ---------------------------------------------------------
 const report = body(GALLERY, 'public static string Report(string name, string why)');
