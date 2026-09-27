@@ -275,11 +275,19 @@ $folders = @($folders |
 
 $found = @{}
 $wanted = @($need.Keys | Where-Object { -not $there.ContainsKey($_) })
+# StillWanted is read as @(StillWanted).Count / $missing = @(StillWanted).
+# Publish-PostShip.ps1 sets StrictMode -Version Latest and & this script, so
+# StrictMode is inherited. return @() unwraps to nothing and return @('one')
+# unwraps to a string; under StrictMode reading .Count on either throws
+# "The property 'Count' cannot be found" (same shape as the KeepPacks tidy
+# note in Publish-Update.ps1). The @() at every call site is the defence.
+# Do not lead with a comma here: ,@() makes @(StillWanted).Count answer 1
+# when nothing is wanted, and the script refuses to publish an empty plan.
 function StillWanted { return @($wanted | Where-Object { -not $found.ContainsKey($_) }) }
 foreach ($f in $folders) {
-  if (-not (StillWanted).Count) { break }
+  if (-not @(StillWanted).Count) { break }
   foreach ($file in @(Get-ChildItem -LiteralPath $f -File -ErrorAction SilentlyContinue)) {
-    if (-not (StillWanted).Count) { break }
+    if (-not @(StillWanted).Count) { break }
     $byName = $file.Name.ToLowerInvariant()
     if ($byName -match '^[a-f0-9]{64}$') {
       if ($wanted -contains $byName) { $found[$byName] = $file.FullName }
