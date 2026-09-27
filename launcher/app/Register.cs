@@ -115,15 +115,49 @@ namespace Thornswood
                     if (cfg != null && !string.IsNullOrEmpty(cfg.SiteUrl))
                         k.SetValue("URLInfoAbout", cfg.SiteUrl);
 
-                    // EstimatedSize is deliberately not written. It is in KB and
-                    // Windows shows it in the Size column, and working it out
-                    // means walking thirty thousand files on every launch. An
-                    // empty column is honest; a number invented once and left to
-                    // rot is not.
+                    // EstimatedSize in KB from OwnGame's build record (copied= in
+                    // Profile\OwnGame\made.txt), plus this launcher exe. That is the
+                    // bytes Thornswood holds as its own copies, not the Game folder
+                    // walk (Vortex hard-links would inflate it) and not a number
+                    // invented here. When the record is absent, write nothing.
+                    long copied;
+                    if (TryReadCopied(out copied))
+                    {
+                        long exeBytes = 0;
+                        try { exeBytes = new FileInfo(exe).Length; } catch (Exception ex) { Swallow.Note("Register.Ensure, measuring the launcher", ex); }
+                        long kb = (copied + exeBytes + 1023L) / 1024L;
+                        if (kb > 0 && kb <= int.MaxValue)
+                            k.SetValue("EstimatedSize", (int)kb, RegistryValueKind.DWord);
+                    }
                 }
             }
             catch { }
         }
+
+        /// <summary>
+        /// OwnGame's copied= figure from Profile\OwnGame\made.txt, or false when
+        /// the record is missing or unreadable. No invented number.
+        /// </summary>
+        static bool TryReadCopied(out long copied)
+        {
+            copied = 0;
+            try
+            {
+                string path = Path.Combine(Paths.ProfileDir, "OwnGame", "made.txt");
+                if (!File.Exists(path)) return false;
+                foreach (string line in File.ReadAllLines(path))
+                {
+                    if (!line.StartsWith("copied=", StringComparison.Ordinal)) continue;
+                    long v;
+                    if (!long.TryParse(line.Substring(7), out v) || v < 0) return false;
+                    copied = v;
+                    return true;
+                }
+            }
+            catch (Exception ex) { Swallow.Note("Register.TryReadCopied, reading OwnGame record", ex); }
+            return false;
+        }
+
 
         /// <summary>Takes the entry out. Called on the way through an uninstall.</summary>
         public static void Forget()
