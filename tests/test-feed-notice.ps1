@@ -216,7 +216,7 @@ if ($n) {
 $n = Holds 'S3 maintenance true and no message' '{"maintenance":true}'
 if ($n) { Yes 'S3 the bar still says something' ($n.Text.Length -gt 20) }
 $n = Holds 'S3 maintenance with a message that has no full stop' '{"maintenance":true,"message":"Steam broke SKSE"}'
-if ($n) { Yes 'S3 the reason still reads as a sentence' ($n.Text.StartsWith('Steam broke SKSE. Press Recheck')) }
+if ($n) { Yes 'S3 the reason still reads as a sentence' ($n.Text.StartsWith('Steam broke SKSE. Open Diagnostics')) }
 $n = Says 'S3 the same message with no maintenance' '{"message":"Steam broke SKSE"}'
 if ($n) { Yes 'S3 is shown exactly as it was written' ($n.Text -eq 'Steam broke SKSE') }
 $n = Holds 'S3 maintenance "true" as a string' '{"maintenance":"true"}'
