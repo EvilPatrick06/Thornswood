@@ -568,10 +568,10 @@ namespace Thornswood
         {
             if (diagReadings == null) return;
 
-            // The Ready to launch checklist lives on this page now (#607). Redraw
-            // it so it is current when the page is opened, the same way the other
-            // pages are rebuilt on open. DrawStatus fills the rows in place.
-            DrawStatus();
+            // Scan and Fix and Ready to launch share one Verify.Run(cfg).
+            // RunScan paints the card, stores LastIssues, then DrawStatus
+            // fills the checklist from that same list so they cannot disagree.
+            RunScan();
 
             diagReadings.Children.Clear();
 
