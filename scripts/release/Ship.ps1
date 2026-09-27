@@ -51,6 +51,12 @@
                                (scripts\release\Publish-VirusTotal.ps1, the
                                installer lane's upload hook)
 
+  IN THIS ORDER: the remirror, then the site news, the #news post and the
+  server's countdown, then the VirusTotal upload. The feed has to be serving the
+  release before anybody is sent to fetch it, and an upload of most of a gigabyte
+  that nobody is waiting on must not hold up a five minute warning to everybody
+  in the world.
+
   THE SAME BLOCK RUNS ON DEV. Everything goes to dev first, so the dev channel
   is where this is exercised several times a week rather than once a fortnight.
   A hook that is not on the branch yet is a line saying which file it looked
@@ -1365,9 +1371,12 @@ else {
   hand, and both halves ask before they act, so running it again after a failure
   does nothing the first run already did.
 
-  ORDER. Before the site news, the Discord post and the server's countdown, on
-  purpose: those three tell people to update, and the feed has to serve the
-  release before anybody is told to go and get it.
+  ORDER. The remirror goes before the site news, the Discord post and the
+  server's countdown, on purpose: those three tell people to update, and the feed
+  has to serve the release before anybody is told to go and get it. The VirusTotal
+  upload goes after all of them, in its own section further down, because it can
+  be most of a gigabyte and nothing but a link on the Downloads page is waiting
+  on it. Both calls are the same script with -Only naming the half.
 
   WHAT A FAILURE DOES. The tip is already on the feed by the time this runs, so
   none of it can unpublish anything, and dying here would leave a release out
@@ -1403,25 +1412,27 @@ function Invoke-PostShip([string]$what, [string]$leaf, [hashtable]$withArgs, [st
     Say "  $what done" 'Green'
 }
 
+$chan = if ($Dev) { 'dev' } else { 'main' }
+$chanArg = if ($Dev) { ' -Channel dev' } else { '' }
+# What both calls give it. The second one adds nothing: the same channel, the
+# same clone, the same staging folder, one half each.
+$postArgs = @{ Channel = $chan; ReleaseDir = $ReleaseDir; Root = $Root; DistRoot = $DistRoot; NoPause = $true }
+
 if (-not $DryRun) {
-    $chan = if ($Dev) { 'dev' } else { 'main' }
-    $chanArg = if ($Dev) { ' -Channel dev' } else { '' }
     Head 'After the tip'
     if ($SkipPostShip) {
         Say '  -SkipPostShip, so nothing followed the tip. It is published, and the site still' 'Yellow'
         Say '  serves the feed it had, so anybody reading it is offered that release:' 'Yellow'
         Say ("  .\scripts\release\Publish-PostShip.ps1$chanArg   does both halves") 'DarkGray'
     }
+    elseif ($SkipRemirror) {
+        Say '  -SkipRemirror, so the site goes on serving the feed it had, and anybody reading' 'Yellow'
+        Say '  it is offered that release rather than this one.' 'Yellow'
+        Say ("  .\scripts\deploy\Remirror-Site-Feed.ps1" + $(if ($Dev) { ' -Dev' } else { '' }) + '   mirrors it') 'DarkGray'
+    }
     else {
-        $postArgs = @{ Channel = $chan; ReleaseDir = $ReleaseDir; Root = $Root; DistRoot = $DistRoot; NoPause = $true }
-        # Passed on rather than read again there: one switch, one meaning,
-        # whichever of the two scripts a person runs.
-        if ($SkipRemirror) { $postArgs['SkipRemirror'] = $true }
-        if ($SkipVirusTotal) { $postArgs['SkipVirusTotal'] = $true }
-        Invoke-PostShip 'what follows the tip' 'Publish-PostShip.ps1' $postArgs `
-            (".\scripts\release\Publish-PostShip.ps1$chanArg" +
-             $(if ($SkipRemirror) { ' -SkipRemirror' } else { '' }) +
-             $(if ($SkipVirusTotal) { ' -SkipVirusTotal' } else { '' }))
+        Invoke-PostShip 'the host feed remirror' 'Publish-PostShip.ps1' ($postArgs + @{ Only = 'Remirror' }) `
+            ".\scripts\release\Publish-PostShip.ps1$chanArg -Only Remirror"
     }
 }
 
@@ -1491,6 +1502,33 @@ if (-not $DryRun -and -not $NoAnnounce) {
         }
     } else {
         Say '  Request-Restart.ps1 is missing, nobody was told.' 'Yellow'
+    }
+}
+
+# --------------------------------------------------------- the VirusTotal half
+# THE SECOND HALF OF WHAT FOLLOWS THE TIP, and it is down here for one reason:
+# an upload of most of a gigabyte that nobody is waiting on must not hold up the
+# feed, the news, the #news post or a five minute warning to everybody in the
+# world. The remirror went first, before any of those, because they send people
+# to fetch a release the feed has to be serving. This goes last, because the
+# only thing waiting on it is a link on the Downloads page.
+#
+# The installer lane's script asks VirusTotal before it sends anything and needs
+# VT_API_KEY, which it skips itself without, so on most releases this is one read.
+if (-not $DryRun) {
+    Head 'VirusTotal'
+    if ($SkipPostShip) {
+        Say '  -SkipPostShip, so nothing was sent. The link the Downloads page prints is' 'Yellow'
+        Say '  whatever it was, which is item-not-found for a file nobody has sent.' 'Yellow'
+        Say ("  .\scripts\release\Publish-PostShip.ps1$chanArg   does both halves") 'DarkGray'
+    }
+    elseif ($SkipVirusTotal) {
+        Say '  -SkipVirusTotal, so the report the Downloads page links is whatever it was.' 'Yellow'
+        Say '  .\scripts\release\Publish-VirusTotal.ps1 -Path <the installer exe>   sends it' 'DarkGray'
+    }
+    else {
+        Invoke-PostShip 'the VirusTotal upload' 'Publish-PostShip.ps1' ($postArgs + @{ Only = 'VirusTotal' }) `
+            ".\scripts\release\Publish-PostShip.ps1$chanArg -Only VirusTotal"
     }
 }
 

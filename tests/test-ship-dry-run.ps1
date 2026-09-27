@@ -258,12 +258,13 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     Stub 'Publish-News' '' ''
     Stub 'Publish-Discord' '[switch]$Dev' ''
     Stub 'Request-Restart' '[double]$Minutes, [string]$Mode, [string]$Why, [string]$Data' ''
-    # What follows a tip: the host feed remirror and the VirusTotal report, both
-    # run by one script. The real one reaches the VPS, the site and VirusTotal,
-    # so a dry run must not call it and a real Ship must. Ship reads its exit
-    # code and says at the end whether it completed, so this hands back 0 like
-    # the rest.
+    # What follows a tip: the host feed remirror and the VirusTotal upload, one
+    # script run once per half. The real one reaches the VPS, the site and
+    # VirusTotal, so a dry run must not call it at all and a real Ship calls it
+    # twice. Ship reads each exit code and says at the end whether they
+    # completed, so this hands back 0 like the rest.
     Stub 'Publish-PostShip' ('[string]$Channel, [string]$ReleaseDir, [string]$Root, [string]$DistRoot, ' +
+                             '[string]$Only, [string]$Installer, [switch]$AlsoLauncher, ' +
                              '[switch]$SkipRemirror, [switch]$SkipVirusTotal, [switch]$NoPause') ''
     foreach ($n in 'git', 'gh', 'ssh', 'scp') {
         [IO.File]::WriteAllText((Join-Path $bin ($n + '.cmd')), "@echo off`r`n>>`"%TS_DRY_CALLS%`" echo %~n0 %*`r`nexit /b 0`r`n")
@@ -356,14 +357,18 @@ if ($dir) {
     foreach ($n in 'Publish-News', 'Publish-Discord', 'Request-Restart') {
         Yes "R $n.ps1 is called" ((Called $r $n).Count -eq 1)
     }
-    # What follows the tip, once, on the main channel, with the releases clone
-    # and the staging folder, because that is where the tip and its bytes are.
-    # Neither -SkipRemirror nor -SkipVirusTotal was given, so neither is passed.
+    # What follows the tip: one call per half, on the main channel, each with the
+    # releases clone and the staging folder, because that is where the tip and
+    # its bytes are. Neither -SkipRemirror nor -SkipVirusTotal was given, so
+    # neither is passed.
     $post = Called $r 'Publish-PostShip'
-    Yes ('R what follows the tip runs, for main, with the releases clone and the staging folder' +
+    Yes ('R what follows the tip runs twice, one half each, for main, with the releases clone and the staging folder' +
          $(if ($post.Count) { ' (' + ($post -join '; ') + ')' } else { '' })) (
-        $post.Count -eq 1 -and $post[0] -match ' -Channel main\b' -and $post[0].Contains(' -ReleaseDir ' + $rel) -and
-        $post[0].Contains(' -DistRoot ' + $dist) -and $post[0] -notmatch ' -Skip')
+        $post.Count -eq 2 -and
+        @($post | Where-Object { $_ -match ' -Channel main\b' -and $_.Contains(' -ReleaseDir ' + $rel) -and
+                                 $_.Contains(' -DistRoot ' + $dist) -and $_ -notmatch ' -Skip' }).Count -eq 2 -and
+        @($post | Where-Object { $_ -match ' -Only Remirror\b' }).Count -eq 1 -and
+        @($post | Where-Object { $_ -match ' -Only VirusTotal\b' }).Count -eq 1)
     # And the only launcher install is the mid-release one, into the root this
     # release was built from, before the publisher: there is no second one after
     # the tip, because a launcher updates itself from the feed it polls.

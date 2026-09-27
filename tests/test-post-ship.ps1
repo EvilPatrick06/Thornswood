@@ -25,12 +25,13 @@
       on the machine that shipped. This fails if a second launcher step is ever
       added after the publish, and it checks the mid-release one is still there,
       before the publisher, with the root and the build output.
-    - Ship runs the helper inside the one block a dry run never reaches, so a
-      dry run cannot touch the VPS, the site or VirusTotal, and passes its own
-      -Skip switches on rather than giving them a second meaning.
-    - It sits after the publisher and before the site news, because the news,
-      the Discord post and the server countdown all tell people to update, and
-      the feed has to be serving the release before that.
+    - Ship runs the helper twice, both times inside a block a dry run never
+      reaches, so a dry run cannot touch the VPS, the site or VirusTotal.
+    - The remirror call sits after the publisher and before the site news,
+      because the news, the Discord post and the server countdown all tell
+      people to update and the feed has to be serving the release before that.
+      The VirusTotal call sits after all three, because an upload of most of a
+      gigabyte that nobody is waiting on must not hold up a five minute warning.
     - A failure leaves the release published and makes Ship exit non-zero, which
       is the standing order that the follow-ons go out with the tip.
     - The helper reads each half's exit code, runs the second half even when the
@@ -121,9 +122,11 @@ foreach ($p in 'Channel', 'SkipRemirror', 'SkipVirusTotal', 'NoPause') {
 $helperSrc = [IO.File]::ReadAllText($HelperPath, $Utf8)
 Yes '  it looks for the website lane''s remirror at the expected path' (
     $helperSrc -match "'Remirror-Site-Feed\.ps1'" -and $helperSrc -match "deploy\\Remirror-Site-Feed\.ps1")
-Yes '  and the installer lane''s upload hook at its own' (
-    $helperSrc -match "'Publish-VirusTotal\.ps1'" -and $helperSrc -match "release\\Publish-VirusTotal\.ps1")
+Yes '  and the installer lane''s upload hook at its own, whatever they name it' (
+    $helperSrc -match "release\\Publish-VirusTotal\.ps1" -and $helperSrc -match "\*VirusTotal\*\.ps1")
+Yes '  and never a script whose name says it writes a comment' ($helperSrc -match "notmatch '\(\?i\)comment'")
 Yes '  and either of them can be named outright' ($declared -contains 'RemirrorScript' -and $declared -contains 'VirusTotalScript')
+Yes '  and it takes -Only, so Ship can run one half at a time' ($declared -contains 'Only')
 # Neither half is reimplemented here, so nothing in it talks to the VPS or to
 # VirusTotal itself.
 Yes '  and does neither job itself: no ssh, no scp, no virustotal.com' (
@@ -170,31 +173,47 @@ foreach ($sw in 'SkipRemirror', 'SkipVirusTotal', 'SkipPostShip') {
 }
 Yes '  and no switch for a launcher step that does not exist' ($shipDeclared -notcontains 'SkipLauncherUpdate')
 
-# One post-publish script, run through Invoke-PostShip, which is what reads its
+# Two post-publish calls, both through Invoke-PostShip, which is what reads an
 # exit code and remembers a failure. Named in a Say line is not running it, so
-# the AST is read for the call rather than the file for the name.
+# the AST is read for the calls rather than the file for the name.
 $calls = @($ship.Ast.FindAll({ param($n) $n -is $CmdAst -and $n.GetCommandName() -eq 'Invoke-PostShip' }, $true))
-Yes ("  Ship has one Invoke-PostShip call ({0})" -f $calls.Count) ($calls.Count -eq 1)
+Yes ("  Ship has two Invoke-PostShip calls, one per half ({0})" -f $calls.Count) ($calls.Count -eq 2)
 $atPublish = $shipSrc.IndexOf("& (Join-Path `$Here 'Publish-Update.ps1') @pubArgs")
 $atNews = $shipSrc.IndexOf("'..\ops\Publish-News.ps1'")
-if ($calls.Count -eq 1) {
-    Yes '  and it runs Publish-PostShip.ps1' ($calls[0].Extent.Text.Contains('Publish-PostShip.ps1'))
-    $conds = @(Conditions $calls[0])
-    Yes ('  inside the block a dry run never reaches' + $(if ($conds.Count) { ' (' + ($conds -join ' / ') + ')' } else { '' })) (
+$atAnnounce = $shipSrc.IndexOf("'..\vps\Request-Restart.ps1'")
+$mirrorCall = @($calls | Where-Object { $_.Extent.Text -match "Only = 'Remirror'" })
+$vtCall = @($calls | Where-Object { $_.Extent.Text -match "Only = 'VirusTotal'" })
+Yes '  one for the remirror and one for the upload' ($mirrorCall.Count -eq 1 -and $vtCall.Count -eq 1)
+foreach ($pair in @(@('the remirror', $mirrorCall), @('the upload', $vtCall))) {
+    if ($pair[1].Count -ne 1) { continue }
+    $call = $pair[1][0]
+    Yes ("  $($pair[0]) runs Publish-PostShip.ps1") ($call.Extent.Text.Contains('Publish-PostShip.ps1'))
+    $conds = @(Conditions $call)
+    Yes ("    inside a block a dry run never reaches" + $(if ($conds.Count) { ' (' + ($conds -join ' / ') + ')' } else { '' })) (
         @($conds | Where-Object { $_ -match '-not \$DryRun\b' }).Count -gt 0)
-    Yes '  and behind -SkipPostShip' (@($conds | Where-Object { $_ -match 'else of: .*\$SkipPostShip\b' }).Count -gt 0)
-    Yes '  with the channel it shipped' ($shipSrc -match '\$postArgs = @\{[^\r\n]*Channel = \$chan')
-    Yes '  and the releases clone and the staging folder' (
-        $shipSrc -match '\$postArgs = @\{[^\r\n]*ReleaseDir = \$ReleaseDir' -and $shipSrc -match '\$postArgs = @\{[^\r\n]*DistRoot = \$DistRoot')
-    Yes '  and -SkipRemirror and -SkipVirusTotal passed on' (
-        $shipSrc -match "\`$postArgs\['SkipRemirror'\] = \`$true" -and $shipSrc -match "\`$postArgs\['SkipVirusTotal'\] = \`$true")
+    Yes '    and behind -SkipPostShip' (@($conds | Where-Object { $_ -match 'else of: .*\$SkipPostShip\b' }).Count -gt 0)
+}
+if ($mirrorCall.Count -eq 1) {
+    Yes '    and behind -SkipRemirror' (
+        @(Conditions $mirrorCall[0] | Where-Object { $_ -match 'else of: .*\$SkipRemirror\b' }).Count -gt 0)
+}
+if ($vtCall.Count -eq 1) {
+    Yes '    and behind -SkipVirusTotal' (
+        @(Conditions $vtCall[0] | Where-Object { $_ -match 'else of: .*\$SkipVirusTotal\b' }).Count -gt 0)
+}
+Yes '  both are given the channel it shipped' ($shipSrc -match '\$postArgs = @\{[^\r\n]*Channel = \$chan')
+Yes '  and the releases clone and the staging folder' (
+    $shipSrc -match '\$postArgs = @\{[^\r\n]*ReleaseDir = \$ReleaseDir' -and $shipSrc -match '\$postArgs = @\{[^\r\n]*DistRoot = \$DistRoot')
 
-    # The order on screen is the order it happens in, and this one matters: the
-    # feed has to serve the release before the news, the Discord post and the
-    # server's countdown send anybody to get it.
-    $at = $calls[0].Extent.StartOffset
-    Yes 'what follows the tip follows the publisher' ($atPublish -gt 0 -and $at -gt $atPublish)
-    Yes '  and comes before the site news, the Discord post and the countdown' ($atNews -gt 0 -and $at -lt $atNews)
+# The order on screen is the order it happens in, and this one matters: the feed
+# has to serve the release before the news, the Discord post and the countdown
+# send anybody to get it, and the upload must not hold any of those up.
+if ($mirrorCall.Count -eq 1 -and $vtCall.Count -eq 1) {
+    Yes 'the remirror follows the publisher' ($atPublish -gt 0 -and $mirrorCall[0].Extent.StartOffset -gt $atPublish)
+    Yes '  and comes before the site news, the Discord post and the countdown' (
+        $atNews -gt 0 -and $mirrorCall[0].Extent.StartOffset -lt $atNews)
+    Yes '  and the upload comes after all three' (
+        $atAnnounce -gt 0 -and $vtCall[0].Extent.StartOffset -gt $atAnnounce)
 }
 
 # The one launcher install Ship does is the mid-release one, before the publish,
@@ -273,7 +292,7 @@ try {
     Yes '  and it says which file the remirror would be, and whose it is' (
         $none.Out -match 'Remirror-Site-Feed\.ps1 is not on this branch' -and $none.Out -match 'website lane')
     Yes '  and the same for the VirusTotal upload' (
-        $none.Out -match 'Publish-VirusTotal\.ps1 is not on this branch' -and $none.Out -match 'installer lane')
+        $none.Out -match 'no VirusTotal upload script is on this branch' -and $none.Out -match 'installer lane')
     Yes '  and says what is still to come rather than that everything is done' ($none.Out -match 'still to come')
 
     # ---- both landed, main -------------------------------------------------
@@ -284,16 +303,62 @@ try {
     Yes '  the remirror ran, told the live feed and the clone that was published' (
         $ok.Out -match 'Remirror-Site-Feed ran' -and $ok.Out -match 'Dev=False' -and
         $ok.Out -match ('FeedDir=' + [regex]::Escape($rel)))
-    Yes '  and it says where the tip is going' ($ok.Out -match 'the main tip to thornswood\.net/feed/')
+    Yes '  and it says where the tip is going' ($ok.Out -match 'the main tip to https://thornswood\.net/feed/')
     Yes '  the upload ran, on the installer in the staging folder' (
         $ok.Out -match 'Publish-VirusTotal ran' -and $ok.Out -match ('Path=' + [regex]::Escape($setup)))
     Yes '  and it does not pass a parameter the hook never declared' ($ok.Out -notmatch 'NoPause=')
     Yes '  and says everything that follows the tip is done' ($ok.Out -match 'Everything that follows the main tip is done')
 
+    # ---- one half at a time, which is how Ship runs it ---------------------
+    $one = Run $release @('-Only', 'Remirror', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("-Only Remirror runs the feed and not the upload (exit $($one.Code))") (
+        $one.Code -eq 0 -and $one.Out -match 'Remirror-Site-Feed ran' -and $one.Out -notmatch 'Publish-VirusTotal ran')
+    Yes '  and says the upload is the second call' ($one.Out -match 'second call, after everybody has been told')
+    $two = Run $release @('-Only', 'VirusTotal', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("-Only VirusTotal runs the upload and not the feed (exit $($two.Code))") (
+        $two.Code -eq 0 -and $two.Out -match 'Publish-VirusTotal ran' -and $two.Out -notmatch 'Remirror-Site-Feed ran')
+    Yes '  and says the feed was the first call' ($two.Out -match 'first call, before anybody was told')
+
+    # ---- whatever the installer lane names their upload --------------------
+    #
+    # The name is not settled, so anything like it that takes a file will do.
+    # Add-VirusTotalComment.ps1 also takes -Path and is a different job: it
+    # writes a comment on a report rather than sending a file, and picking it
+    # would be a release quietly commenting instead of uploading.
+    Remove-Item -LiteralPath (Join-Path $release 'Publish-VirusTotal.ps1') -Force
+    Hook $release 'Add-VirusTotalComment' '[string]$Path, [string]$Sha256, [string]$Text' 0
+    $commentOnly = Run $release @('-Only', 'VirusTotal', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("a comment script is never taken for the upload (exit $($commentOnly.Code))") (
+        $commentOnly.Code -eq 0 -and $commentOnly.Out -notmatch 'Add-VirusTotalComment ran' -and
+        $commentOnly.Out -match 'no VirusTotal upload script is on this branch')
+    Hook $release 'Send-VirusTotal' '[string]$File, [switch]$NoPause' 0
+    $otherName = Run $release @('-Only', 'VirusTotal', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes ("an upload under another name is found (exit $($otherName.Code))") (
+        $otherName.Code -eq 0 -and $otherName.Out -match 'Send-VirusTotal ran')
+    Yes '  and given the file under the parameter it declares' (
+        $otherName.Out -match ('File=' + [regex]::Escape($setup)) -and $otherName.Out -notmatch 'Path=')
+    Remove-Item -LiteralPath (Join-Path $release 'Send-VirusTotal.ps1') -Force
+    Remove-Item -LiteralPath (Join-Path $release 'Add-VirusTotalComment.ps1') -Force
+    Hook $release 'Publish-VirusTotal' $vtParams 0
+
+    # ---- the launcher exe, only when asked --------------------------------
+    New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
+    $launcher = Join-Path $root 'Launcher\Thornswood.exe'
+    [IO.File]::WriteAllText($launcher, 'the launcher this release published')
+    $noLauncher = Run $release @('-Only', 'VirusTotal', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    Yes 'the launcher exe is not sent by default, because the page does not offer it' (
+        $noLauncher.Out -notmatch [regex]::Escape($launcher))
+    $withLauncher = Run $release @('-Only', 'VirusTotal', '-AlsoLauncher', '-ReleaseDir', $rel, '-Root', $root,
+                                  '-DistRoot', $dist, '-NoPause')
+    Yes ("-AlsoLauncher sends it as well (exit $($withLauncher.Code))") (
+        $withLauncher.Code -eq 0 -and $withLauncher.Out -match ('Path=' + [regex]::Escape($setup)) -and
+        $withLauncher.Out -match ('Path=' + [regex]::Escape($launcher)))
+    Remove-Item -LiteralPath $launcher -Force
+
     # ---- the same block on dev, which is where it gets exercised -----------
     $dev = Run $release @('-Channel', 'dev', '-ReleaseDir', $rel, '-Root', $root, '-DistRoot', $dist, '-NoPause')
     Yes ("the same block runs on dev (exit $($dev.Code))") ($dev.Code -eq 0)
-    Yes '  the remirror is told it is the dev feed' ($dev.Out -match 'Dev=True' -and $dev.Out -match 'thornswood\.net/feed-dev/')
+    Yes '  the remirror is told it is the dev feed' ($dev.Out -match 'Dev=True' -and $dev.Out -match 'https://thornswood\.net/feed-dev/')
     Yes '  and the upload runs there too, on the installer this machine holds' (
         $dev.Out -match 'Publish-VirusTotal ran' -and $dev.Out -match 'did not rebuild the installer')
 

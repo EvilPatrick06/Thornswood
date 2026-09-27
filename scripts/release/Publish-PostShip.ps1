@@ -28,15 +28,20 @@
   call in its own header: "After the release is published and before the news
   step, one line."
 
-  WHERE IT LOOKS FOR THEM, so no lane has to rename anything. The expected paths
-  are scripts\deploy\Remirror-Site-Feed.ps1 and
-  scripts\release\Publish-VirusTotal.ps1. Each is looked for there first, then
-  in the other release and deploy folder, then anywhere under scripts\ by file
-  name, and -RemirrorScript and -VirusTotalScript name one outright. Whatever is
-  found is called with the parameters it actually declares, read off its own
-  param block: -Dev or -Channel, -FeedDir or -ReleaseDir, -Path or -File. So a
-  script that lands under another folder, or with the other name for the same
-  thing, still runs.
+  WHERE IT LOOKS FOR THEM, so no lane has to rename anything. The website lane
+  has settled its name and place: scripts\deploy\Remirror-Site-Feed.ps1, taking
+  -Dev or -Channel, main by default. The installer lane's upload is expected at
+  scripts\release\Publish-VirusTotal.ps1 and its name is not settled yet, so that
+  one is also looked for as any *VirusTotal*.ps1 under scripts\ whose name begins
+  Publish, Send, Upload or Invoke and that takes a -Path or a -File. A name
+  holding "comment" is never taken: Add-VirusTotalComment.ps1 writes a comment on
+  a report and is a different job. -RemirrorScript and -VirusTotalScript name one
+  outright when it lands outside all of that.
+
+  Whatever is found is called with the parameters it actually declares, read off
+  its own param block: -Dev or -Channel, -FeedDir or -ReleaseDir, -Path or
+  -File. So a script that lands under another folder, or with the other name for
+  the same thing, still runs.
 
   A HOOK THAT IS NOT ON THE MACHINE IS A LINE, NOT A FAILURE. The remirror
   script is the website lane's to land and this one cannot do its job, so a
@@ -59,12 +64,20 @@
   machine, which a dev release did not rebuild: the hook asks VirusTotal before
   it sends anything, so on most dev releases that is one read and nothing else.
 
+  ONE HALF AT A TIME, WHICH IS WHY -Only EXISTS. Ship runs this twice: -Only
+  Remirror before the site news, the Discord post and the server's countdown,
+  because those three send people to fetch a release the feed has to be serving
+  first, and -Only VirusTotal after them, because an upload of most of a gigabyte
+  that nobody is waiting on must not hold up a five minute warning to everybody
+  in the world. Run by hand with neither, both halves run in that order.
+
   Both halves ask before they act, so running this again after a failure does
   nothing the first run already did.
 
     .\scripts\release\Publish-PostShip.ps1                     after a main release
     .\scripts\release\Publish-PostShip.ps1 -Channel dev        after a dev release
-    .\scripts\release\Publish-PostShip.ps1 -SkipVirusTotal     the remirror only
+    .\scripts\release\Publish-PostShip.ps1 -Only Remirror      the feed, nothing else
+    .\scripts\release\Publish-PostShip.ps1 -SkipVirusTotal     the same, said the other way
 
 .PARAMETER Channel
   main or dev. main remirrors the Thornswood-Releases tip to
@@ -90,6 +103,17 @@
   The file to hand the VirusTotal hook, when it is not the Thornswood-Setup.exe
   in the staging folder. That exe is what the Downloads page offers, so its hash
   is the one the page prints a VirusTotal link for.
+
+.PARAMETER AlsoLauncher
+  Hands the shipped launcher exe to the VirusTotal hook as well. Off, because the
+  Downloads page lists the installer and not the launcher, so no page link is
+  waiting on a launcher report and version.json needs nothing from VirusTotal
+  either. On for the day the page offers the launcher on its own.
+
+.PARAMETER Only
+  Remirror or VirusTotal, to run that half and not the other. Ship uses it to put
+  the feed before the announcements and the upload after them. Left out, both
+  halves run, the feed first.
 
 .PARAMETER RemirrorScript
   The remirror script outright, for a machine or a branch where it is somewhere
@@ -130,6 +154,8 @@ param(
     [string]$Root = 'C:\Thornswood',
     [string]$DistRoot = (& (Join-Path $PSScriptRoot 'Where.ps1') Dist),
     [string]$Installer,
+    [switch]$AlsoLauncher,
+    [ValidateSet('Both', 'Remirror', 'VirusTotal')][string]$Only = 'Both',
     [string]$RemirrorScript,
     [string]$VirusTotalScript,
     [switch]$SkipRemirror,
@@ -152,24 +178,6 @@ $devArg = if ($Dev) { ' -Dev' } else { '' }
 $failed = New-Object System.Collections.ArrayList
 $waiting = New-Object System.Collections.ArrayList
 
-# Where a hook is. The expected path first, then the other obvious folder, then
-# anywhere under scripts\ by name, so the lane that owns it can land it wherever
-# it belongs without this script being edited to match.
-function Find-Hook([string]$given, [string]$leaf, [string[]]$expected) {
-    if ($given) {
-        if (Test-Path -LiteralPath $given) { return (Resolve-Path -LiteralPath $given).ProviderPath }
-        return ''
-    }
-    foreach ($rel in $expected) {
-        $p = Join-Path $ScriptsDir $rel
-        if (Test-Path -LiteralPath $p) { return (Resolve-Path -LiteralPath $p).ProviderPath }
-    }
-    $found = @(Get-ChildItem -LiteralPath $ScriptsDir -Filter $leaf -File -Recurse -EA SilentlyContinue |
-               Sort-Object FullName)
-    if ($found.Count) { return $found[0].FullName }
-    return ''
-}
-
 # What a script declares it takes, read off its own param block. A hook is
 # called with those and nothing else, so two lanes calling the same thing by
 # different names, -FeedDir against -ReleaseDir, is not a reason for either to
@@ -180,6 +188,42 @@ function Get-Accepts([string]$path) {
     try { $ast = [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors) } catch { return @() }
     if ($null -eq $ast -or $null -eq $ast.ParamBlock) { return @() }
     return @($ast.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
+}
+
+# Where a hook is. Named outright, else the expected path, else the other
+# obvious folder, else anywhere under scripts\ by the pattern, so the lane that
+# owns it can land it where it belongs without this script being edited to match.
+#
+# $needs keeps the pattern search honest where a name is not settled: a
+# candidate has to declare one of those parameters, and a name holding "comment"
+# is never a candidate, because Add-VirusTotalComment.ps1 also takes a -Path and
+# writes a comment rather than sending a file.
+function Find-Hook([string]$given, [string[]]$expected, [string]$pattern, [string[]]$verbs, [string[]]$needs) {
+    if ($given) {
+        if (Test-Path -LiteralPath $given) { return (Resolve-Path -LiteralPath $given).ProviderPath }
+        return ''
+    }
+    foreach ($rel in $expected) {
+        $p = Join-Path $ScriptsDir $rel
+        if (Test-Path -LiteralPath $p) { return (Resolve-Path -LiteralPath $p).ProviderPath }
+    }
+    $hits = @(Get-ChildItem -LiteralPath $ScriptsDir -Filter $pattern -File -Recurse -EA SilentlyContinue |
+              Where-Object { $_.Name -notmatch '(?i)comment' } |
+              Sort-Object FullName)
+    if ($verbs.Count) {
+        $hits = @($hits | Where-Object {
+            $name = $_.Name
+            @($verbs | Where-Object { $name -like ($_ + '-*') }).Count -gt 0
+        })
+    }
+    if ($needs.Count) {
+        $hits = @($hits | Where-Object {
+            $accepts = Get-Accepts $_.FullName
+            @($needs | Where-Object { $accepts -contains $_ }).Count -gt 0
+        })
+    }
+    if ($hits.Count) { return $hits[0].FullName }
+    return ''
 }
 
 # One half, and what its exit code meant. Reading that code is the whole point
@@ -202,17 +246,27 @@ function Invoke-Half([string]$what, [string]$path, [hashtable]$withArgs, [string
 }
 
 Write-Host ''
-Write-Host "  AFTER THE TIP, $Channel" -ForegroundColor White
+$what = switch ($Only) {
+    'Remirror'   { 'THE HOST FEED' }
+    'VirusTotal' { 'VIRUSTOTAL' }
+    default      { 'THE HOST FEED AND VIRUSTOTAL' }
+}
+Write-Host "  AFTER THE TIP, $Channel : $what" -ForegroundColor White
 
 # ------------------------------------------------------------ the remirror
-Head 'The host feed'
-if ($SkipRemirror) {
+if ($Only -eq 'VirusTotal') {
+    Say '  the host feed was this release''s first call, before anybody was told' 'DarkGray'
+}
+elseif ($SkipRemirror) {
+    Head 'The host feed'
     Say '  -SkipRemirror, so the site goes on serving the feed it had, and anybody' 'Yellow'
     Say '  reading it is offered that release rather than this one.' 'Yellow'
     Say ("  .\scripts\deploy\Remirror-Site-Feed.ps1$devArg   mirrors it") 'DarkGray'
 }
 else {
-    $mirror = Find-Hook $RemirrorScript 'Remirror-Site-Feed.ps1' @('deploy\Remirror-Site-Feed.ps1', 'release\Remirror-Site-Feed.ps1')
+    Head 'The host feed'
+    $mirror = Find-Hook $RemirrorScript @('deploy\Remirror-Site-Feed.ps1', 'release\Remirror-Site-Feed.ps1') `
+                        'Remirror-Site-Feed.ps1' @() @()
     if (-not $mirror) {
         # The website lane's script, and nothing here can mirror a feed without
         # it. Said with the path it looked for, so their pull request lands
@@ -224,7 +278,10 @@ else {
         [void]$waiting.Add('the host feed remirror, waiting on Remirror-Site-Feed.ps1')
     }
     else {
-        $where = if ($Dev) { 'thornswood.net/feed-dev/' } else { 'thornswood.net/feed/' }
+        # Main takes the Thornswood-Releases tip to /feed/, dev takes the
+        # Thornswood-Releases-dev tip to /feed-dev/. That is the website lane's
+        # contract for this script, and -Dev or -Channel is how it is said.
+        $where = if ($Dev) { 'https://thornswood.net/feed-dev/' } else { 'https://thornswood.net/feed/' }
         Say "  $mirror" 'DarkGray'
         Say "  the $Channel tip to $where" 'DarkGray'
         $accepts = Get-Accepts $mirror
@@ -249,12 +306,16 @@ else {
 # what the page offers may still have no report. The hook asks VirusTotal before
 # it sends anything, which is why running this on every release, dev included,
 # costs one read.
-Head 'VirusTotal'
-if ($SkipVirusTotal) {
+if ($Only -eq 'Remirror') {
+    Say '  VirusTotal is this release''s second call, after everybody has been told' 'DarkGray'
+}
+elseif ($SkipVirusTotal) {
+    Head 'VirusTotal'
     Say '  -SkipVirusTotal, so the report the Downloads page links is whatever it was.' 'Yellow'
     Say '  .\scripts\release\Publish-VirusTotal.ps1 -Path <the installer exe>   sends it' 'DarkGray'
 }
 else {
+    Head 'VirusTotal'
     if (-not $Installer) {
         # The same two places Ship.ps1 measures the installer in: the staging
         # folder for this root, and the old spot under the play install for a
@@ -266,28 +327,41 @@ else {
             if (Test-Path -LiteralPath $candidate) { $Installer = $candidate; break }
         }
     }
-    $vt = Find-Hook $VirusTotalScript 'Publish-VirusTotal.ps1' @('release\Publish-VirusTotal.ps1', 'deploy\Publish-VirusTotal.ps1')
-    if (-not $Installer) {
+    # The launcher exe too, only when asked: the Downloads page lists the
+    # installer, so no link on it is waiting on a launcher report, and
+    # version.json needs nothing from VirusTotal either.
+    $send = @()
+    if ($Installer) { $send += $Installer }
+    if ($AlsoLauncher) {
+        foreach ($n in 'Thornswood.exe', 'SkyrimTogether.exe') {
+            $p = Join-Path (Join-Path $Root 'Launcher') $n
+            if (Test-Path -LiteralPath $p) { $send += $p; break }
+        }
+    }
+    # The name is the installer lane's to settle, so any *VirusTotal*.ps1 that
+    # reads like an upload and takes a file will do. A name holding "comment" is
+    # a different job and is never taken.
+    $vt = Find-Hook $VirusTotalScript @('release\Publish-VirusTotal.ps1', 'deploy\Publish-VirusTotal.ps1') `
+                    '*VirusTotal*.ps1' @('Publish', 'Send', 'Upload', 'Invoke') @('Path', 'File')
+    if (-not $send.Count) {
         Say '  there is no Thornswood-Setup.exe on this machine, so there is nothing to send.' 'Yellow'
         Say '  Whoever built the installer the site is serving runs the upload there:' 'DarkGray'
         Say '  .\scripts\release\Publish-VirusTotal.ps1 -Path <the installer exe>' 'DarkGray'
     }
     elseif (-not $vt) {
-        Say '  Publish-VirusTotal.ps1 is not on this branch, so the link the Downloads page' 'Yellow'
+        Say '  no VirusTotal upload script is on this branch, so the link the Downloads page' 'Yellow'
         Say '  prints stays whatever it was, item-not-found for a file nobody has sent.' 'Yellow'
-        Say '  Expected at scripts\release\Publish-VirusTotal.ps1 (the installer lane owns it);' 'DarkGray'
-        Say '  anywhere under scripts\ is found too, or pass -VirusTotalScript.' 'DarkGray'
-        [void]$waiting.Add('the VirusTotal upload, waiting on Publish-VirusTotal.ps1')
+        Say '  Expected at scripts\release\Publish-VirusTotal.ps1 (the installer lane owns it,' 'DarkGray'
+        Say '  and the name is theirs to settle); anything like it under scripts\ is found too,' 'DarkGray'
+        Say '  or pass -VirusTotalScript. It needs VT_API_KEY and skips itself without one.' 'DarkGray'
+        [void]$waiting.Add('the VirusTotal upload, waiting on the installer lane''s script')
     }
     else {
         Say "  $vt" 'DarkGray'
-        Say "  on $Installer" 'DarkGray'
+        if ($Dev) { Say '  a dev release did not rebuild the installer, so this is the one on disk' 'DarkGray' }
         $accepts = Get-Accepts $vt
-        $vtArgs = @{}
-        if ($accepts -contains 'Path') { $vtArgs['Path'] = $Installer }
-        elseif ($accepts -contains 'File') { $vtArgs['File'] = $Installer }
-        if ($accepts -contains 'NoPause') { $vtArgs['NoPause'] = $true }
-        if (-not $vtArgs.Count) {
+        $names = @($accepts | Where-Object { $_ -eq 'Path' -or $_ -eq 'File' })
+        if (-not $names.Count) {
             Say '  it takes neither -Path nor -File, so this cannot tell it which file to send.' 'Red'
             [void]$failed.Add([pscustomobject]@{
                 What = 'The VirusTotal upload'
@@ -295,8 +369,13 @@ else {
             })
         }
         else {
-            if ($Dev) { Say '  a dev release did not rebuild the installer, so this is the one on disk' 'DarkGray' }
-            Invoke-Half 'The VirusTotal upload' $vt $vtArgs ".\scripts\release\Publish-VirusTotal.ps1 -Path `"$Installer`""
+            $which = if ($accepts -contains 'Path') { 'Path' } else { 'File' }
+            foreach ($file in $send) {
+                Say "  on $file" 'DarkGray'
+                $vtArgs = @{ $which = $file }
+                if ($accepts -contains 'NoPause') { $vtArgs['NoPause'] = $true }
+                Invoke-Half 'The VirusTotal upload' $vt $vtArgs ".\scripts\release\Publish-VirusTotal.ps1 -Path `"$file`""
+            }
         }
     }
 }
@@ -314,8 +393,11 @@ elseif ($waiting.Count) {
     Say "Everything this branch can do after the $Channel tip is done." 'Yellow'
     foreach ($w in $waiting) { Say "  still to come: $w" 'Yellow' }
 }
-else {
+elseif ($Only -eq 'Both') {
     Say "Everything that follows the $Channel tip is done." 'Green'
+}
+else {
+    Say "This half of what follows the $Channel tip is done." 'Green'
 }
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

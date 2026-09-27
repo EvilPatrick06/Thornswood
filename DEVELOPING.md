@@ -108,26 +108,32 @@ uploads pack and launcher as a GitHub release in the releases repo, rewrites
 
 The tip customers get is that `version.json`, and launchers poll the feed url in
 it. So two things follow the tip, both run by
-`scripts\release\Publish-PostShip.ps1`, which Ship calls once with the channel
-it shipped, before anybody is told to go and get the release:
+`scripts\release\Publish-PostShip.ps1`, which Ship calls once per half with the
+channel it shipped, in this order:
 
-- **The host feed remirror**, `scripts\deploy\Remirror-Site-Feed.ps1`, the
-  website lane's script. `thornswood.net/feed/version.json` for main, from the
-  Thornswood-Releases tip, and `thornswood.net/feed-dev/version.json` for dev,
-  from the Thornswood-Releases-dev tip, plus the assets those feeds name. That
-  is the feed a launcher polls since the #649 host cutover (`docs\FEED.md`), and
-  a launcher falls back to the GitHub feed only when the site feed does not
-  answer at all, so an unmirrored site feed offers people the release it last
-  held rather than this one.
-- **VirusTotal**, `scripts\release\Publish-VirusTotal.ps1`, the installer
-  lane's upload hook. The installer is what the Downloads page offers and the
-  hash it prints a VirusTotal link for, so that exe is the file it is handed, and
-  it asks VirusTotal first because a rerun is normal and the file is most of a
-  gigabyte. `Publish-Installer.ps1` already calls the same hook when it publishes
-  a new installer, so this is for the releases that did not rebuild one. It never
-  fails a release: a machine without the key says it is skipping. The key is in
-  the secrets table below. The website lane owns the page wiring for those
-  download urls.
+1. **The host feed remirror**, `scripts\deploy\Remirror-Site-Feed.ps1`, the
+   website lane's script, run with `-Dev` on a dev Ship. The
+   Thornswood-Releases tip goes to `https://thornswood.net/feed/` and the
+   Thornswood-Releases-dev tip to `https://thornswood.net/feed-dev/`, with the
+   assets each feed names. That is the feed a launcher polls since the #649 host
+   cutover (`docs\FEED.md`), and a launcher falls back to the GitHub feed only
+   when the site feed does not answer at all, so an unmirrored site feed offers
+   people the release it last held rather than this one. This one goes first,
+   before anybody is told.
+2. **The site news, the #news post and the server's countdown**, as they always
+   were. Those tell people to update, which is why the feed is mirrored first.
+3. **The VirusTotal upload**, `scripts\release\Publish-VirusTotal.ps1`, the
+   installer lane's hook (the name is theirs to settle; anything like it under
+   `scripts\` that takes a file is found). The installer is what the Downloads
+   page offers and the hash it prints a VirusTotal link for, so that exe is the
+   file it is handed, and the hook asks VirusTotal before sending anything
+   because a rerun is normal and the file is most of a gigabyte. It needs
+   `VT_API_KEY` and skips itself without one, so it never fails a release; the
+   key is in the secrets table below. `Publish-Installer.ps1` already calls the
+   same hook when it publishes a new installer, so this covers the releases that
+   did not rebuild one. It goes last because nothing but a link on the Downloads
+   page is waiting on it, and an upload that size must not hold up a five minute
+   warning. The website lane owns the page wiring for those download urls.
 
 There is no third step for the launcher. A launcher updates itself from the feed
 it polls, so the remirror is how a launcher update reaches anybody, and the
@@ -141,10 +147,6 @@ once a fortnight. `Publish-PostShip.ps1` finds each hook by name under
 `scripts\` and calls it with the parameters it declares, so neither lane has to
 rename anything to fit, and a hook that is not on the branch yet is a line
 saying which file it looked for rather than a failed release.
-
-Then the site's news, the Discord #news webhook and the game server are told;
-the server warns the room for five minutes and puts everyone back to the
-launcher to update.
 
 A half that is there and stops leaves the release published, says which half it
 was with the command that puts it right, and makes Ship exit 1: the tip and its
