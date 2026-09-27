@@ -961,18 +961,37 @@ namespace Thornswood
 
         public static int PostJson(string url, string json, out string reply)
         {
+            return Send("POST", url, json, out reply);
+        }
+
+        /// <summary>
+        /// One call to the site and whatever it answered: the status code, and
+        /// the body in reply, refusals included. 0 is the site not reached at
+        /// all, which is not a refusal and is never read as one.
+        ///
+        /// The method is the caller's, because not every door the launcher may
+        /// use is a POST: the gallery queue is a GET and taking an approved
+        /// picture off the gallery is a DELETE (#731). json is the body when
+        /// there is one and null when there is none, so a GET asks with
+        /// nothing rather than with an empty object.
+        /// </summary>
+        public static int Send(string method, string url, string json, out string reply)
+        {
             reply = "";
             try
             {
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
                 var req = (HttpWebRequest)WebRequest.Create(url);
-                req.Method = "POST";
-                req.ContentType = "application/json";
+                req.Method = method;
                 req.Timeout = 15000;
                 req.UserAgent = "Thornswood";
-                var bytes = Encoding.UTF8.GetBytes(json);
-                req.ContentLength = bytes.Length;
-                using (var s = req.GetRequestStream()) s.Write(bytes, 0, bytes.Length);
+                if (json != null)
+                {
+                    req.ContentType = "application/json";
+                    var bytes = Encoding.UTF8.GetBytes(json);
+                    req.ContentLength = bytes.Length;
+                    using (var s = req.GetRequestStream()) s.Write(bytes, 0, bytes.Length);
+                }
                 using (var res = (HttpWebResponse)req.GetResponse())
                 using (var r = new StreamReader(res.GetResponseStream()))
                 {
@@ -991,12 +1010,64 @@ namespace Thornswood
                     {
                         using (var r = new StreamReader(res.GetResponseStream())) reply = r.ReadToEnd();
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("Discord.Send, reading refusal body", ex); }
                     return (int)res.StatusCode;
                 }
                 return 0;
             }
-            catch { return 0; }
+            catch (Exception ex)
+            {
+                Swallow.Note("Discord.Send", ex);
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// POST raw bytes as the request body. The gallery submit path uses
+        /// this: the body IS the file, and the ticket and note ride in the
+        /// query, matching /api/gallery/submit on the site. timeoutMs of 0
+        /// means sixty seconds, enough for a large screenshot.
+        /// </summary>
+        public static int PostBytes(string url, byte[] data, string contentType, int timeoutMs, out string reply)
+        {
+            reply = "";
+            if (data == null) data = new byte[0];
+            try
+            {
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                var req = (HttpWebRequest)WebRequest.Create(url);
+                req.Method = "POST";
+                req.ContentType = string.IsNullOrEmpty(contentType) ? "application/octet-stream" : contentType;
+                req.Timeout = timeoutMs > 0 ? timeoutMs : 60000;
+                req.UserAgent = "Thornswood";
+                req.ContentLength = data.Length;
+                using (var s = req.GetRequestStream()) s.Write(data, 0, data.Length);
+                using (var res = (HttpWebResponse)req.GetResponse())
+                using (var r = new StreamReader(res.GetResponseStream()))
+                {
+                    reply = r.ReadToEnd();
+                    return (int)res.StatusCode;
+                }
+            }
+            catch (WebException we)
+            {
+                var res = we.Response as HttpWebResponse;
+                if (res != null)
+                {
+                    try
+                    {
+                        using (var r = new StreamReader(res.GetResponseStream())) reply = r.ReadToEnd();
+                    }
+                    catch (Exception ex) { Swallow.Note("Discord.PostBytes, reading refusal body", ex); }
+                    return (int)res.StatusCode;
+                }
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("Discord.PostBytes", ex);
+                return 0;
+            }
         }
 
         // Small enough to not want a JSON library for. Flat objects only, which
