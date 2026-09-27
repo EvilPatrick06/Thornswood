@@ -717,9 +717,9 @@
                   <ColumnDefinition Width="250"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- From the world: rotating approved spotlight on Play. Filled by
-                     StartGallery in Shell.cs, hidden until the first picture has loaded (#603).
-                     Staff and Report tools are on the Gallery page, not here (#731). -->
+                <!-- Rotating approved spotlight on Play. Filled by StartGallery in Shell.cs,
+                     hidden until the first picture has loaded (#603). Staff and Report
+                     tools are on the Gallery page, not here (#731). Pending never shows here. -->
                 <Grid x:Name="GalleryCard" Grid.Column="0" ClipToBounds="True" Visibility="Collapsed">
                   <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -1220,9 +1220,9 @@
 
 
           <!-- ================ GALLERY ================ -->
-          <!-- Upload (multi + drop), browse approved image cards, Report,
-               Delete, and staff Accept / Reject on pending (#731). Play keeps
-               the spotlight only. -->
+          <!-- Upload (multi + drop), one Gallery grid of approved + staff pending,
+               Report for people, Accept / Delete for staff (#731). No Reject.
+               Play keeps the approved spotlight only. -->
           <Grid x:Name="PageGallery" Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
               <StackPanel Margin="36,30,36,34" MaxWidth="980" HorizontalAlignment="Left">
@@ -1276,14 +1276,8 @@
                 <TextBlock Text="On the gallery" Style="{StaticResource Eyebrow}"/>
                 <TextBlock x:Name="TxtGalleryApprovedEmpty" Style="{StaticResource Small}" Margin="0,0,0,10"
                            Text="Nothing is on the gallery yet."/>
+                <!-- Approved and staff-pending share this grid. No separate waiting section. -->
                 <WrapPanel x:Name="GalleryApprovedList" Margin="0,0,0,22"/>
-
-                <StackPanel x:Name="GalleryStaffBlock" Visibility="Collapsed">
-                  <TextBlock Text="Waiting for Accept" Style="{StaticResource Eyebrow}"/>
-                  <TextBlock x:Name="TxtGalleryPendingEmpty" Style="{StaticResource Small}" Margin="0,0,0,10"
-                             Text="Nothing is waiting."/>
-                  <WrapPanel x:Name="GalleryPendingList" Margin="0,0,0,22"/>
-                </StackPanel>
 
                 <Grid x:Name="GalleryPageReportRow" Margin="0,0,0,12" Visibility="Collapsed">
                   <Grid.ColumnDefinitions>
