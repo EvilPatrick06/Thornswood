@@ -17,24 +17,6 @@ It never uses a zip it finds on the disk. Until 25 September it took an old
 Downloads folder ahead of everything else, unchecked, and a tester got an old
 install that way. `tests\test-installer-own-payload.ps1` holds it to that.
 
-## Which drive it offers
-
-The drive it starts on is the one Steam's copy of Skyrim Special Edition is on,
-found the way the launcher finds it (`launcher\app\Steam.cs`: Steam's folder
-from the registry, then every path in `config\libraryfolders.vdf`, then the
-first library holding `steamapps\common\Skyrim Special Edition\SkyrimSE.exe`).
-`C:\Thornswood` is only the fallback when there is no Steam copy to find.
-
-That is not a preference. Thornswood runs from its own game folder, built out
-of the Steam copy mostly as hard links, and a hard link cannot cross a drive,
-so an install on another drive is one the launcher refuses to play from
-(`OwnGame.WhyNot`). The drive Skyrim is on is marked on its button, the line
-under the buttons says what a different drive costs, and pressing Install on a
-different drive asks once more before anything is written. It asks and does not
-refuse: whether the launcher may fall back to copies instead, at about 26 to 41
-GB, is Patrick and Djinn's call in #dev (issue #473).
-`tests\test-setup-skyrim-drive.ps1` holds all of that to what is here.
-
 ## On your machine
 
 `scripts\release\Build-Launcher.ps1` compiles it after the launcher, into
@@ -127,3 +109,21 @@ friend-facing side of the same story, the SmartScreen soft-block, the Defender
 warning and the VirusTotal report link, is on the site: the Downloads page and
 the Help page's "Why does Windows or Defender warn about the installer?"
 (`site\data\help.md`, anchor `defender`).
+
+## Which drive it offers
+
+The drive it starts on is the one Steam's copy of Skyrim Special Edition is on,
+found the way the launcher finds it (`launcher\app\Steam.cs`: Steam's folder
+from the registry, then every path in `config\libraryfolders.vdf`, then the
+first library holding `steamapps\common\Skyrim Special Edition\SkyrimSE.exe`).
+`C:\Thornswood` is only the fallback when there is no Steam copy to find.
+
+That is not a preference. Thornswood runs from its own game folder, built out
+of the Steam copy mostly as hard links, and a hard link cannot cross a drive,
+so an install on another drive is one the launcher refuses to play from
+(`OwnGame.WhyNot`). The drive Skyrim is on is marked on its button, the line
+under the buttons says what a different drive costs, and pressing Install on a
+different drive asks once more before anything is written. It asks and does not
+refuse: whether the launcher may fall back to copies instead, at about 26 to 41
+GB, is the team's call in #staff-general (issue #473).
+`tests\test-setup-skyrim-drive.ps1` holds all of that to what is here.

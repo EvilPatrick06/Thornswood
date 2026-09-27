@@ -48,6 +48,9 @@ Yes 'an em dash is refused' (Bad ("The scroll opens when you click it`n- It wait
 Yes 'the words pull request are refused' (Bad "The scroll opens when you click it`n- From the pull request that fixed the scroll")
 
 Yes 'an internal word is refused' (Bad "Launcher 1.1.95 brings demoting to main`n- Everything that shipped on demoting is now on main")
+Yes 'a version in the title is refused' (Bad "Launcher 1.1.96 host feed and DIY theme card`n- Updates come from thornswood.net")
+Yes 'a four-part dev number is refused anywhere' (Bad "The dev fixes reach everyone`n- Dev builds 1.1.92.1 to 1.1.95.4")
+Yes 'a three-part launcher version in a detail line is allowed' (-not (Bad "The dev fixes reach everyone`n- Launcher 1.1.101 is the one to have"))
 Yes 'the SkyUI map.swf error people see is allowed' (-not (Bad "The SkyUI error box is gone`n- The SkyUI error box about map.swf on the way in is gone."))
 $p = @(Get-NoteProblems "Menu music plays again in the launcher`n- Autoplay uses WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS instead")
 Yes 'each problem says where it is and what it is' ($p.Count -ge 1 -and $p[0] -match '^line 2 ' -and $p[0] -match 'WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS')
@@ -58,7 +61,7 @@ $good = @(
     "The Downgrade button works on its own again`n- It finds Steam's window however your Steam draws it.`n- If Steam refuses a part, the launcher tells you why straight away.",
     "Your party, found`n- Green on the strip means the same room as you. Gold means somewhere else in Skyrim.`n- The SkyUI error box about the map is gone.",
     "The mod list has a new revision`n- ElysiumEstateSSE.esp ships with the collection now.`n- Chat fades after its last line, and Settings can change that.",
-    "Launcher 1.1.101 keeps your load order`n- Bring it up to date from Vortex stays fast when nothing changed."
+    "Bringing Thornswood up to date keeps your load order`n- Bring it up to date from Vortex stays fast when nothing changed.`n- Launcher 1.1.101"
 )
 $i = 0
 foreach ($g in $good) {
