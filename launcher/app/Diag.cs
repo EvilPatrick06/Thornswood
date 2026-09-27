@@ -52,7 +52,7 @@ namespace Thornswood
                         return t;
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Diag.CrashCulprit", ex); }
             return "";
         }
 
@@ -75,7 +75,7 @@ namespace Thornswood
 
             // ---- mod list
             int blocking = 0, total = 0;
-            try { foreach (Issue i in Verify.Run()) { total++; if (i.Blocking) blocking++; } } catch { }
+            try { foreach (Issue i in Verify.Run()) { total++; if (i.Blocking) blocking++; } } catch (Exception ex) { Swallow.Note("Diag.Readings, Verify.Run", ex); }
             if (blocking > 0)
                 l.Add(new Reading(2, blocking == 1 ? "1 problem with your mod list" : blocking + " problems with your mod list",
                     "The server compares your plugin list against the one this build shipped with and will refuse the connection. Mods, then Fix."));
@@ -87,7 +87,7 @@ namespace Thornswood
 
             // ---- crash
             Entry crash = null;
-            try { crash = Files.NewestCrash(); } catch { }
+            try { crash = Files.NewestCrash(); } catch (Exception ex) { Swallow.Note("Diag.Readings, NewestCrash", ex); }
             if (crash == null)
                 l.Add(new Reading(0, "No crash logs", "Nothing has fallen over on this machine."));
             else
@@ -118,7 +118,7 @@ namespace Thornswood
                     ? new Reading(2, "Almost no disk space left", Size(free) + " free on " + d.Name + ". Saves and updates both need room.")
                     : new Reading(0, "Disk space is fine", Size(free) + " free on " + d.Name + "."));
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Diag.Readings, disk space", ex); }
 
             // ---- leftovers
             if (Checks.GameRunning())
@@ -163,7 +163,7 @@ namespace Thornswood
             }
             finally
             {
-                try { Directory.Delete(work, true); } catch { }
+                try { Directory.Delete(work, true); } catch (Exception ex) { Swallow.Note("Diag.Report, clearing work folder", ex); }
             }
         }
 
@@ -177,7 +177,7 @@ namespace Thornswood
                 string name = rename != null ? rename : Path.GetFileName(file);
                 File.Copy(file, Path.Combine(into, name), true);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Diag.Grab, " + file, ex); }
         }
 
         static string Summary(Config cfg, string launcherVersion)
@@ -200,7 +200,7 @@ namespace Thornswood
             Add("theme", cfg.Theme);
             s.AppendLine();
 
-            try { Add("game exe", new FileInfo(Paths.Exe).Length.ToString("n0") + " bytes"); } catch { }
+            try { Add("game exe", new FileInfo(Paths.Exe).Length.ToString("n0") + " bytes"); } catch (Exception ex) { Swallow.Note("Diag.Summary, game exe size", ex); }
             Add("expected exe", cfg.ExpectedExeBytes.ToString("n0") + " bytes");
             Add("multiplayer client", File.Exists(Paths.MpClient) ? "present" : "MISSING");
             Add("plugins enabled", Checks.EnabledPlugins().ToString());
@@ -217,7 +217,7 @@ namespace Thornswood
                 var d = new DriveInfo(Path.GetPathRoot(Paths.Root));
                 Add("disk free", Size(d.AvailableFreeSpace) + " on " + d.Name);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Diag.Summary, disk free", ex); }
             s.AppendLine();
 
             s.AppendLine("mod list problems");
@@ -243,7 +243,7 @@ namespace Thornswood
                     foreach (string f in files) s.AppendLine(Path.GetFileName(f));
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Diag.Summary, SKSE plugins", ex); }
 
             return s.ToString();
         }
