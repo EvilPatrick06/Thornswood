@@ -1,8 +1,9 @@
 // test-download-hash.js
 //
 // The Downloads page prints the installer's SHA-256 beside its size and date.
-// VirusTotal report links and over-cap waiting copy are gone: Setup is
-// Authenticode-signed, and the site no longer promises a VT report.
+// VirusTotal report links, over-cap waiting copy, and the SmartScreen /
+// publisher warn above the button are gone: Setup is Authenticode-signed,
+// and the site no longer promises a VT report or a Downloads warn block.
 //
 // THREE HALVES, AND THIS RUNS ALL THREE, because the value has to survive the
 // whole trip and a field name spelt differently at any one stop drops it
@@ -218,10 +219,9 @@ async function main() {
           SIZE.test(p) && p.indexOf('9-24-2026 1:00 AM') >= 0 && p.indexOf(H) > p.indexOf('9-24-2026'));
       yes(c[0] + ': with no VirusTotal report line',
           !/virustotal/i.test(html) && !/VirusTotal report/.test(html));
-      yes(c[0] + ': and the line above the button names the SHA-256 check',
-          /The SHA-256 below lets you check/.test(html));
-      yes(c[0] + ': and names the signed publisher',
-          /signed as Gavin Knotts/.test(html));
+      yes(c[0] + ': and no SmartScreen / publisher warn above the button',
+          !/SmartScreen/i.test(html) && !/Why this happens/.test(html) &&
+          !/signed as /.test(html) && !/Unknown publisher/i.test(html));
     }
 
     const none = await render({ files: [exe(560000000, '')] });
