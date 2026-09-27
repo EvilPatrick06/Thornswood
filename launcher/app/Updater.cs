@@ -107,7 +107,7 @@ namespace Thornswood
             // host an asset URL happens to point at.
             bool github = false;
             try { github = new Uri(url).Host.Equals("api.github.com", StringComparison.OrdinalIgnoreCase); }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Updater.Client, uri host", ex); }
             if (github && !string.IsNullOrEmpty(cfg.UpdateToken))
                 wc.Headers["Authorization"] = "Bearer " + cfg.UpdateToken;
             // GitHub Contents API wants the raw media type; a direct https feed
@@ -292,7 +292,7 @@ namespace Thornswood
                     if (!string.Equals(repo, cfg.UpdateRepo, StringComparison.Ordinal))
                     {
                         cfg.UpdateRepo = repo;
-                        try { cfg.Save(Paths.CfgFile); } catch { }
+                        try { cfg.Save(Paths.CfgFile); } catch (Exception ex) { Swallow.Note("Updater.Check, cfg save", ex); }
                     }
                     return doc;
                 }
@@ -320,7 +320,7 @@ namespace Thornswood
                             // looking for a credential they never set, on an
                             // install that is meant to need none.
                             string left = null;
-                            try { left = r.Headers["X-RateLimit-Remaining"]; } catch { }
+                            try { left = r.Headers["X-RateLimit-Remaining"]; } catch (Exception ex) { Swallow.Note("Updater.Check, header", ex); }
                             if (code == 429 || string.Equals(left, "0", StringComparison.Ordinal) ||
                                 string.IsNullOrEmpty(cfg.UpdateToken))
                                 throw new Exception("GitHub answered " + code + ": too many update checks have come from this connection for now. Nothing is wrong with your install and it clears by itself, usually within the hour.");
@@ -424,7 +424,7 @@ namespace Thornswood
         {
             var s = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             try { if (File.Exists(Paths.AppliedFile)) foreach (string l in File.ReadAllLines(Paths.AppliedFile)) if (l.Trim().Length > 0) s.Add(l.Trim()); }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Updater.Applied, read", ex); }
             return s;
         }
 
@@ -440,7 +440,7 @@ namespace Thornswood
 
         static void MarkApplied(string id)
         {
-            try { File.AppendAllText(Paths.AppliedFile, id + Environment.NewLine); } catch { }
+            try { File.AppendAllText(Paths.AppliedFile, id + Environment.NewLine); } catch (Exception ex) { Swallow.Note("Updater.MarkApplied, append", ex); }
         }
 
         /// <summary>
@@ -466,7 +466,7 @@ namespace Thornswood
                 }
                 File.WriteAllLines(Paths.AppliedFile, keep.ToArray());
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Updater.Unapply, write", ex); }
         }
 
         /// <summary>True if this pack is on disk right now.</summary>
@@ -518,7 +518,7 @@ namespace Thornswood
         {
             var s = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             string leaf = "";
-            try { leaf = Path.GetFileName(mine); } catch { }
+            try { leaf = Path.GetFileName(mine); } catch (Exception ex) { Swallow.Note("Updater.ClaimedElsewhere, leaf", ex); }
             try
             {
                 if (!Directory.Exists(Paths.PacksDir)) return s;
@@ -536,7 +536,7 @@ namespace Thornswood
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Updater.ClaimedElsewhere", ex); }
             return s;
         }
 
@@ -647,7 +647,7 @@ namespace Thornswood
             string got = Sha256(tmp);
             if (!string.Equals(got, expectSha, StringComparison.OrdinalIgnoreCase))
             {
-                try { File.Delete(tmp); } catch { }
+                try { File.Delete(tmp); } catch (Exception ex) { Swallow.Note("Updater.Download, delete", ex); }
                 throw new Exception("Checksum did not match. Download rejected.");
             }
             log("Checksum verified.");
@@ -691,7 +691,7 @@ namespace Thornswood
             log("Downloading " + p.id + "...");
             string zip = Download(cfg, p.url, p.sha256, log);
             try { Install(zip, p, log); }
-            finally { try { File.Delete(zip); } catch { } }
+            finally { try { File.Delete(zip); } catch (Exception ex) { Swallow.Note("Updater.ApplyPack, delete", ex); } }
         }
 
         /// <summary>The part of ApplyPack after the download: unpack the zip
@@ -732,7 +732,7 @@ namespace Thornswood
                                 try { target = Path.GetFullPath(Path.Combine(Paths.Game, rel)); }
                                 catch { continue; }
                                 if (!Inside(target, Paths.Game)) continue;
-                                try { if (File.Exists(target)) { File.Delete(target); log("removed " + line); } } catch { }
+                                try { if (File.Exists(target)) { File.Delete(target); log("removed " + line); } } catch (Exception ex) { Swallow.Note("Updater.Install, delete", ex); }
                                 removed.Add(rel);
                             }
                         }
@@ -825,7 +825,7 @@ namespace Thornswood
                     Directory.CreateDirectory(Paths.PacksDir);
                     File.WriteAllLines(PackListFile(p.id), wrote.ToArray());
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Updater.Install, write", ex); }
                 NoteInstalledIntoGame(newInGame);
                 // The copies this pack just wrote are the ones to put back if
                 // another server's launcher changes them. See Keep.
@@ -864,7 +864,7 @@ namespace Thornswood
                 Directory.CreateDirectory(Paths.ProfileDir);
                 File.AppendAllText(list, string.Join(Environment.NewLine, add.ToArray()) + Environment.NewLine);
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Updater.NoteInstalledIntoGame, append", ex); }
         }
 
         /// <summary>
@@ -910,11 +910,11 @@ namespace Thornswood
                     catch { continue; }
                     if (headed) continue;
                     Unapply(id);
-                    try { File.Delete(list); } catch { }
+                    try { File.Delete(list); } catch (Exception ex) { Swallow.Note("Updater.Requeue, delete", ex); }
                     n++;
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Updater.Requeue, delete", ex); }
             return n;
         }
 
@@ -1027,7 +1027,7 @@ namespace Thornswood
                         at = Path.GetDirectoryName(at);
                     }
                 }
-                catch { }
+                catch (Exception ex) { Swallow.Note("Updater.RemovePack, rmdir", ex); }
             }
 
             // The kept copies go with the files. Install put a copy of every
@@ -1045,7 +1045,7 @@ namespace Thornswood
             int fromSteam = 0;
             string src = "";
             try { if (OwnGame.Active) src = OwnGame.Source(cfg); }
-            catch { }
+            catch (Exception ex) { Swallow.Note("Updater.RemovePack, own game source", ex); }
             if (!string.IsNullOrEmpty(src))
             {
                 foreach (string r in removed)
@@ -1054,11 +1054,11 @@ namespace Thornswood
                     try { at = Path.GetFullPath(Path.Combine(src, r)); }
                     catch { continue; }
                     if (!Inside(at, src)) continue;
-                    try { if (File.Exists(at)) { File.Delete(at); fromSteam++; } } catch { }
+                    try { if (File.Exists(at)) { File.Delete(at); fromSteam++; } } catch (Exception ex) { Swallow.Note("Updater.RemovePack, delete", ex); }
                 }
             }
 
-            try { File.Delete(list); } catch { }
+            try { File.Delete(list); } catch (Exception ex) { Swallow.Note("Updater.RemovePack, delete", ex); }
             Unapply(p.id);
             Swap.RepairConfigs();
 
@@ -1158,7 +1158,7 @@ namespace Thornswood
             // already made.
             CheckSigner(tmp, log);
             File.Copy(tmp, neu, true);
-            try { File.Delete(tmp); } catch { }
+            try { File.Delete(tmp); } catch (Exception ex) { Swallow.Note("Updater.SelfUpdate, delete", ex); }
 
             int me = System.Diagnostics.Process.GetCurrentProcess().Id;
             // Named for the launcher it waits on. The script stays up for a few
