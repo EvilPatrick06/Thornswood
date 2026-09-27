@@ -129,10 +129,10 @@ namespace Thornswood
                         string p = Path.Combine(d.Trim('"'), "node.exe");
                         if (File.Exists(p)) return p;
                     }
-                    catch { }
+                    catch (Exception ex) { Swallow.Note("SkyMp.NodeExe, one PATH entry", ex); }
                 }
             }
-            catch { }
+            catch (Exception ex) { Swallow.Note("SkyMp.NodeExe, reading PATH", ex); }
             return null;
         }
 
@@ -160,16 +160,16 @@ namespace Thornswood
                 psi.RedirectStandardError = true;
 
                 Process p = Process.Start(psi);
-                try { File.WriteAllText(PidFile, p.Id.ToString()); } catch { }
+                try { File.WriteAllText(PidFile, p.Id.ToString()); } catch (Exception ex) { Swallow.Note("SkyMp.Start, writing pid file", ex); }
 
                 // Kept, because when the server refuses to come up the reason is
                 // in here and nowhere else.
                 string logFile = Path.Combine(Paths.ProfileDir, "server.log");
-                try { File.WriteAllText(logFile, ""); } catch { }
+                try { File.WriteAllText(logFile, ""); } catch (Exception ex) { Swallow.Note("SkyMp.Start, clearing server.log", ex); }
                 DataReceivedEventHandler sink = delegate(object s, DataReceivedEventArgs e)
                 {
                     if (e.Data == null) return;
-                    try { File.AppendAllText(logFile, e.Data + Environment.NewLine); } catch { }
+                    try { File.AppendAllText(logFile, e.Data + Environment.NewLine); } catch (Exception ex) { Swallow.Note("SkyMp.Start, appending server.log", ex); }
                 };
                 p.OutputDataReceived += sink;
                 p.ErrorDataReceived += sink;
@@ -217,8 +217,8 @@ namespace Thornswood
                 p.Kill();
                 p.WaitForExit(5000);
             }
-            catch { }
-            try { File.Delete(PidFile); } catch { }
+            catch (Exception ex) { Swallow.Note("SkyMp.Stop, killing process", ex); }
+            try { File.Delete(PidFile); } catch (Exception ex) { Swallow.Note("SkyMp.Stop, deleting pid file", ex); }
             return true;
         }
 

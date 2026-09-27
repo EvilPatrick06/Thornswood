@@ -80,17 +80,17 @@ namespace Thornswood
         static void MoveAside(string from, string to)
         {
             try { Directory.Move(from, to); return; }
-            catch (UnauthorizedAccessException) { }
-            catch (IOException) { }
+            catch (UnauthorizedAccessException ex) { Swallow.Note("Swap.MoveAside, first move UnauthorizedAccess", ex); }
+            catch (IOException ex) { Swallow.Note("Swap.MoveAside, first move IO", ex); }
 
-            try { Checks.CloseGame(); } catch { }
+            try { Checks.CloseGame(); } catch (Exception ex) { Swallow.Note("Swap.MoveAside, CloseGame", ex); }
 
             for (int i = 0; i < 10; i++)
             {
                 System.Threading.Thread.Sleep(400);
                 try { Directory.Move(from, to); return; }
-                catch (UnauthorizedAccessException) { }
-                catch (IOException) { }
+                catch (UnauthorizedAccessException ex) { Swallow.Note("Swap.MoveAside, retry UnauthorizedAccess", ex); }
+                catch (IOException ex) { Swallow.Note("Swap.MoveAside, retry IO", ex); }
             }
 
             // Out of ideas, so name the folder and the two causes that are
@@ -126,7 +126,7 @@ namespace Thornswood
                 else if (Directory.Exists(win))
                 {
                     if (Directory.Exists(bak))
-                        try { Directory.Move(bak, bak + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss")); } catch { }
+                        try { Directory.Move(bak, bak + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss")); } catch (Exception ex) { Swallow.Note("Swap.Apply, renaming leftover backup", ex); }
                     MoveAside(win, bak);
                 }
                 Directory.CreateDirectory(Path.GetDirectoryName(win));
