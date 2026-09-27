@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace Thornswood
@@ -117,11 +119,6 @@ namespace Thornswood
         /// <summary>
         /// Which revision of the collection this machine has installed, or 0.
         ///
-        /// Vortex names the collection's own mod folder for it:
-        ///
-        ///     %APPDATA%\Vortex\skyrimse\mods\collection_7essxf_1_2026-09-26T00-00-00Z
-        ///                                               slug  ^ revision
-        ///
         /// This replaces asking whether one named file exists, which is what
         /// decided "your collection is behind" until 22 September. That test
         /// was wrong in both directions. It named po3_StartOnSave.dll, which
@@ -131,9 +128,27 @@ namespace Thornswood
         /// anybody genuinely two revisions behind read as fine as long as the
         /// file was there.
         ///
-        /// A number is the honest answer to a question about a revision. The
-        /// newest folder wins, because an upgrade leaves the old one until
-        /// Vortex tidies it.
+        /// WHERE THE NUMBER COMES FROM, and why this was rewritten on
+        /// 27 September. The first version read the revision out of the name
+        /// Vortex gave the mod folder:
+        ///
+        ///     %APPDATA%\Vortex\skyrimse\mods\collection_ombo2a_2_2026-09-15T21-08-00Z
+        ///                                               slug  ^ revision
+        ///
+        /// Current Vortex does not name the folder that way any more. It names
+        /// it for the mod id it made up, with no slug and no number in it:
+        ///
+        ///     %APPDATA%\Vortex\skyrimse\mods\vortex_collection_ZRT7NjhN_
+        ///
+        /// So the folder name stopped being able to answer, Have went to 0 on
+        /// every up to date machine, and Deploy-Gamemode's revision gate
+        /// refused every deploy unless -IgnoreRevision.
+        ///
+        /// The honest source is Vortex's own state.v2, where it records the
+        /// slug and the revision NUMBER against the collection's mod. That is
+        /// independent of the folder name, so it answers for both eras. The
+        /// old folder-name parse stays as a fallback. The same rule as
+        /// Get-CollectionRevision in scripts\mods\LoadOrder.ps1.
         /// </summary>
         public static int CollectionRevision(Config cfg)
         {
@@ -141,6 +156,97 @@ namespace Thornswood
             {
                 string slug = CollectionSlug(cfg);
                 if (slug.Length == 0) return 0;
+                int fromState = CollectionRevisionFromState(slug);
+                if (fromState > 0) return fromState;
+                return CollectionRevisionFromFolder(slug);
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>
+        /// The installed revision as Vortex records it in state.v2, or 0.
+        ///
+        /// Vortex keeps the redux state flattened into LevelDB keys joined by
+        /// ###, the same shape Get-CollectionNewest reads. For an installed
+        /// collection the two keys that matter, under the mod's own id, are:
+        ///
+        ///     persistent###mods###skyrimse###&lt;modId&gt;###attributes###collectionSlug -> "ombo2a"
+        ///     persistent###mods###skyrimse###&lt;modId&gt;###attributes###revisionNumber -> 5
+        ///
+        /// LevelDB writes the key, a length byte (a control character), then
+        /// that many bytes of the value's JSON, so a string is "ombo2a" and a
+        /// number is a bare 5. The slug and the number are separate keys tied
+        /// together only by the &lt;modId&gt; both carry, so this reads both,
+        /// matches the slug to its mod id, and takes the highest revision
+        /// recorded against a mod id whose slug is the one asked for. A machine
+        /// can have two collections installed at once (ombo2a on main, 7essxf
+        /// on dev), and the numbers must not be mixed up between them.
+        /// </summary>
+        public static int CollectionRevisionFromState(string slug)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(slug)) return 0;
+                string dir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Vortex\\state.v2");
+                if (!Directory.Exists(dir)) return 0;
+
+                var slugRe = new Regex(
+                    "mods###skyrimse###([^#]+)###attributes###collectionSlug[\\x00-\\x1F]{1,4}\"" +
+                    Regex.Escape(slug) + "\"");
+                var revRe = new Regex(
+                    "mods###skyrimse###([^#]+)###attributes###revisionNumber[\\x00-\\x1F]{1,4}(\\d+)");
+
+                var mine = new HashSet<string>(StringComparer.Ordinal);
+                var rev = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (string f in Directory.GetFiles(dir))
+                {
+                    string txt;
+                    try
+                    {
+                        // Latin1: every byte maps to one char, so the control
+                        // length bytes survive for the regex to bound on.
+                        byte[] raw = File.ReadAllBytes(f);
+                        var sb = new StringBuilder(raw.Length);
+                        foreach (byte b in raw) sb.Append((char)b);
+                        txt = sb.ToString();
+                    }
+                    catch { continue; }
+
+                    foreach (Match m in slugRe.Matches(txt)) mine.Add(m.Groups[1].Value);
+                    foreach (Match m in revRe.Matches(txt))
+                    {
+                        int n;
+                        if (!int.TryParse(m.Groups[2].Value, out n)) continue;
+                        string id = m.Groups[1].Value;
+                        int cur;
+                        if (!rev.TryGetValue(id, out cur) || n > cur) rev[id] = n;
+                    }
+                }
+
+                int best = 0;
+                foreach (string id in mine)
+                {
+                    int r;
+                    if (rev.TryGetValue(id, out r) && r > best) best = r;
+                }
+                return best;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>
+        /// The legacy fallback: the revision out of the old folder name, or 0.
+        /// Kept for a machine that still has collection_&lt;slug&gt;_&lt;rev&gt;_&lt;when&gt;
+        /// folders and no readable state. Current Vortex does not write these
+        /// any more; see CollectionRevision above.
+        /// </summary>
+        public static int CollectionRevisionFromFolder(string slug)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(slug)) return 0;
                 string dir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "Vortex\\skyrimse\\mods");
