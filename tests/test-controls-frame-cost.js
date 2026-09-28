@@ -71,7 +71,8 @@ function harness(opts) {
     getFurnitureReference: function () {
       counts.getFurniture++;
       return opts.furniture || null;
-    }
+    },
+    getSitState: function () { return opts.sitState || 0; }
   };
   const sp = {
     Game: {
@@ -192,6 +193,21 @@ if (block) {
   yes('menu open: isMenuOpen only on the tick rate, not every frame (got ' +
       h5.counts.isMenuOpen + ')',
       h5.counts.isMenuOpen <= menuTicks * 25); // 21 menus max per tick
+
+  // Furniture (#843): sitting must not be fought by the watchdog.
+  const h6 = harness({
+    furniture: { id: 1 },
+    flags: { isMovementControlsEnabled: false }
+  });
+  h6.run(0, 6000, 16);
+  yes('furniture: does not enable controls while seated', h6.counts.enable === 0);
+
+  const h7 = harness({
+    sitState: 3,
+    flags: { isMovementControlsEnabled: false }
+  });
+  h7.run(0, 6000, 16);
+  yes('sitState 3 with no furniture ref: does not enable', h7.counts.enable === 0);
 }
 
 console.log(pass + ' passed, ' + fail + ' failed');
