@@ -68,6 +68,7 @@ at load, which is why it can reach blocks that sit below it.
 | 21086-22922 | Needs | See "Needs". |
 | 22924-23757 | Social | Friends, parties, mutes, journals, the panel, `thornswoodNear` (22983). |
 | 23759-24247 | Trade | Two people, two offers, both confirm: `begin` (23851), `gold` (24012), `confirm` (24025), `swap` (24048). |
+| after Trade | Mod settings | Issue #488, added 28 September. The 176 GLOB records of five classic mod menus (`MOD_GLOBALS`), kept per profile in `private\mod-settings.json` from the plugin's `/modset` lines and put back at login through `thornswoodModSettings` and its updateOwner script. `tests\test-mod-settings.js`. |
 
 ## Startup and settings
 
@@ -195,7 +196,7 @@ In the server's folder, `C:\Thornswood-Server` live and
 | Folder | What the gamemode keeps there | Served to anybody? |
 |---|---|---|
 | `data` | `online.json`, `manifest.json`, `server-bases.json`, `thornswood-log.json`, `restart.json` | Yes: the resources port (3000 live, 7788 dev) hands out anything under it over plain HTTP (`gamemode.js:55-58`) |
-| `private` | `characters.json`, `allowed.json`, `door.json`, `door.log`, `property.json`, `farm-claims.json` (moved from `data` on 25 September, issue #541, because they carry profile ids; the gamemode carries an old copy across on first load) | No |
+| `private` | `characters.json`, `allowed.json`, `door.json`, `door.log`, `property.json`, `farm-claims.json`, `mod-settings.json` (the first six moved from `data` on 25 September, issue #541, because they carry profile ids; the gamemode carries an old copy across on first load) | No |
 | `world` | Not the gamemode's: SkyMP's changeform database, every reference the server has written to (`scripts\ops\Wipe-Saves.ps1:19-24`, `scripts\release\Where.ps1:77`) | No |
 | the folder itself | `thornswood.log`, rolled at 4 MB with five kept (`gamemode.js:74-108`) | No |
 

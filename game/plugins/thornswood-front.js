@@ -5238,6 +5238,219 @@
     } catch (err) { journalShutAt = 0; }
   }));
 
+  // ---------------------------------------------- mod settings menus (#488)
+  /*
+    WHAT A MOD SETTINGS MENU CHANGED, SENT TO THE SERVER TO KEEP.
+
+    A classic SkyUI menu keeps its choices in the save, and there is no save
+    here, so Apocalypse, AHZmoreHUD, atlas map markers, Skyrim Unbound and
+    chfshVariousActions started from their defaults every session. What a
+    menu writes into a GLOB record can be read from here and put back, and
+    those are the 176 below, out of scripts\mods\Audit-ModMenus.js -v: plugin,
+    editor id, and the id inside the plugin, which does not move when the load
+    order does. The gamemode keeps the same table (test-mod-settings.js checks
+    the two agree) and refuses any name that is not in it.
+
+    READ WHEN THE JOURNAL OPENS AND CLOSES, where the menus live, and once a
+    minute for the few a hotkey flips (AHZmoreHUD's widget toggle). Never per
+    frame: a read is 176 native calls. Only what moved since the last read is
+    sent, as /modset Name=value lines over the chat socket like /ate, packed
+    under the 400 characters the voice service keeps of a line.
+
+    PUTTING THEM BACK IS THE SERVER'S: an updateOwner script on the
+    thornswoodModSettings property sets each global when the character comes
+    in. When that lands after the first read here, the next read sees the
+    restored values as moved and sends them back, which changes nothing.
+
+    Runtime ids are kept, never forms: a form does not outlive its frame (see
+    fireIdList).
+  */
+  const MOD_GLOBALS = {
+    'Apocalypse - Magic of Skyrim.esp': {
+      WB_Alteration_ThrummingStone_Global_Delay: 0xa6ec1,
+      WB_Alteration_TranasasReversal_Global_XP: 0x98ff9,
+      WB_Alteration_Undermine_Global_Mult: 0x98ffc, WB_Alteration_Undermine_Global_XP: 0x98ffb,
+      WB_Conjuration_AtronachMark_Global_XP: 0x3ba29,
+      WB_Conjuration_ConjureAvengingWraith_Global_Mult: 0x17aaf,
+      WB_Conjuration_ConjureDremoraAssassin_Global_Health: 0x1a60d,
+      WB_Conjuration_ConjureLich_Global_Cost: 0x1b649,
+      WB_Conjuration_ConjureLich_Global_Cost_DualCast: 0x1b64a,
+      WB_Destruction_ShockScythe_Global_Threshold: 0x24e48,
+      WB_Destruction_Shockbloom_Global_Percentage: 0x2283f,
+      WB_Destruction_Shockbloom_Global_XP: 0x3996f, WB_General_Global_XP: 0x43cef,
+      WB_Illusion_Counterspell_Global_Percentage: 0x207bd,
+      WB_Illusion_EmpathicAgony_Global_XP: 0x321bd, WB_Illusion_Global_AllowNNPC: 0x40bef,
+      WB_Illusion_HarrowingDirge_Global_Percentage: 0x20d36,
+      WB_Illusion_HarrowingDirge_Global_XP: 0x30c19, WB_Illusion_Lobotomize_Global_Mult2: 0x73b52,
+      WB_Illusion_Lobotomize_Global_XP: 0x71ad2, WB_Illusion_MagickaVoid_Global_XP: 0x71ad5,
+      WB_Illusion_MimicsCloak_Global_XP: 0x30c1f, WB_Illusion_PaleMoon_Global_Drain: 0x32c8f,
+      WB_Illusion_ScreamOfPain_Global_XP: 0x321b9,
+      WB_Restoration_Bloodseeker_Global_Mult: 0x71ad7,
+      WB_Restoration_Bloodseeker_Global_XP: 0x71ad6,
+      WB_Restoration_CullingRune_Global_Threshold: 0x3527a,
+      WB_Restoration_CullingRune_Global_XP: 0x35279,
+      WB_Restoration_FingerOfDeath_Global_Percentage: 0x1e196,
+      WB_Restoration_KingsHeart_Global_EnableCraftingSkills: 0xba90a,
+      WB_Restoration_WellingBlood_Global_Threshold: 0x1fcd4
+    },
+    'AHZmoreHUD.esp': {
+      AHZActivationMode: 0x145b4, AHZBottomWidgetRightAligned: 0x10513,
+      AHZBottomWidgetScale: 0x1b15b, AHZBottomWidgetXPercent: 0xdf5e,
+      AHZBottomWidgetYPercent: 0xdf5f, AHZDisplayDelay: 0x227b9, AHZEffectsWidgetStyle: 0x10fd9,
+      AHZEnemyLevelMax: 0x1e72a, AHZEnemyLevelMin: 0x1e72b, AHZHotKey: 0x145b3,
+      AHZHotkeyToggles: 0x16604, AHZIconSize: 0x25d94, AHZIngredientsWidgetStyle: 0x10fda,
+      AHZInventoryWidgetRightAligned: 0x10514, AHZInventoryWidgetScale: 0x1b15d,
+      AHZInventoryWidgetXPercent: 0xffaf, AHZInventoryWidgetYPercent: 0xffb0,
+      AHZShowBookSkill: 0x1507a, AHZShowBooksRead: 0x11aa1, AHZShowBottomWidget: 0x9963,
+      AHZShowBottomWidgetAlways: 0x242a2, AHZShowEffectsWidget: 0x10fdb,
+      AHZShowEnchantmentKnown: 0x1ec8d, AHZShowEnemyHealthStats: 0x24d6c,
+      AHZShowEnemyLevel: 0x1d1a5, AHZShowEnemyMagickaMeter: 0x24d68,
+      AHZShowEnemyMagickaStats: 0x24d6b, AHZShowEnemySoulLevel: 0x24805,
+      AHZShowEnemyStaminaMeter: 0x24d69, AHZShowEnemyStaminaStats: 0x24d6a,
+      AHZShowIngredientWidget: 0x22ed, AHZShowInventoryCount: 0xffae,
+      AHZShowInventoryCountWithZero: 0x25831, AHZShowTargetWeight: 0x155dd, AHZShowVW: 0x19112,
+      AHZShowWeightClass: 0x11aa2, AHZSideWidgetScale: 0x1b15c, AHZSideWidgetXPercent: 0xdf61,
+      AHZSideWidgetYPercent: 0xdf60, AHZToggleState: 0x14b17
+    },
+    'atlas map markers.esp': {
+      ATLASGroupAltarGV: 0x83f, ATLASGroupAltarVanGV: 0x89b, ATLASGroupAnimalDenGV: 0x840,
+      ATLASGroupBLK1GV: 0x841, ATLASGroupBLK2GV: 0x842, ATLASGroupBLK3GV: 0x86d,
+      ATLASGroupBLKLiftsGV: 0x89c, ATLASGroupBYOHHousesGV: 0x89d, ATLASGroupCWCampImpGV: 0x847,
+      ATLASGroupCWCampSonsGV: 0xc72, ATLASGroupCampGV: 0x843, ATLASGroupCampVanGV: 0x89e,
+      ATLASGroupCaravanCampGV: 0x844, ATLASGroupCavesGV: 0x89f, ATLASGroupCityDocksGV: 0x8a0,
+      ATLASGroupCityGV: 0x824, ATLASGroupCityInnGV: 0x845, ATLASGroupCityShopGV: 0x846,
+      ATLASGroupCityStablesGV: 0x8a1, ATLASGroupClearingsGV: 0x8a2, ATLASGroupDB1GV: 0x883,
+      ATLASGroupDB2GV: 0x884, ATLASGroupDB3GV: 0x885, ATLASGroupDB4GV: 0x886,
+      ATLASGroupDG1GV: 0x84d, ATLASGroupDG2GV: 0x84e, ATLASGroupDGFV0GV: 0x84b,
+      ATLASGroupDGFV1GV: 0x848, ATLASGroupDGFV2GV: 0x849, ATLASGroupDGFV3GV: 0x84a,
+      ATLASGroupDGMainGV: 0x8c0, ATLASGroupDGSC1GV: 0x84c, ATLASGroupDGSC2GV: 0x850,
+      ATLASGroupDGSC3GV: 0x851, ATLASGroupDaedricShrinesGV: 0x8a3, ATLASGroupDoomstonesGV: 0x8a4,
+      ATLASGroupDragonGV: 0x852, ATLASGroupDragonLairGV: 0x8a5, ATLASGroupDunExitGV: 0x853,
+      ATLASGroupDwemerRuinsGV: 0x8a6, ATLASGroupFactionCOGV: 0x854, ATLASGroupFactionDBGV: 0x8a8,
+      ATLASGroupFactionDBVanGV: 0x8a9, ATLASGroupFactionMGGV: 0x8a7,
+      ATLASGroupFactionTGVanGV: 0x8aa, ATLASGroupFarmGV: 0x827, ATLASGroupFarmVanGV: 0x8ab,
+      ATLASGroupFishingFreezingGV: 0xc74, ATLASGroupFishingLakeGV: 0xc75,
+      ATLASGroupFishingStreamGV: 0xc76, ATLASGroupFishingUndergroundGV: 0xc77,
+      ATLASGroupFortsGV: 0x8ac, ATLASGroupGiantCampsGV: 0x8ad, ATLASGroupHallDeadGV: 0x855,
+      ATLASGroupImportantGV: 0x856, ATLASGroupImportantTownGV: 0x857,
+      ATLASGroupImportantVanGV: 0x8ae, ATLASGroupInnGV: 0x858, ATLASGroupLandmarkGV: 0x859,
+      ATLASGroupLandmarkVanGV: 0x8af, ATLASGroupLumberMillGV: 0x85a,
+      ATLASGroupLumberMillVanGV: 0x8b0, ATLASGroupMainCitiesGV: 0x8b2,
+      ATLASGroupMainTownsGV: 0x8b3, ATLASGroupMakerStonesGV: 0x8b4, ATLASGroupMineGV: 0x85b,
+      ATLASGroupMineVanGV: 0x8b1, ATLASGroupMntPassesGV: 0x8b5, ATLASGroupMoreCityGV: 0x85c,
+      ATLASGroupMoreCityVanGV: 0x8b6, ATLASGroupMoreTownGV: 0x85d, ATLASGroupNordicRuinsGV: 0x8b7,
+      ATLASGroupOrcHoldsGV: 0x8b8, ATLASGroupPOIGV: 0x85f, ATLASGroupPlayerHomeGV: 0x85e,
+      ATLASGroupRuinGV: 0x860, ATLASGroupShacksGV: 0x8b9, ATLASGroupShipwreckGV: 0x861,
+      ATLASGroupShipwreckVanGV: 0x8ba, ATLASGroupShopGV: 0x862,
+      ATLASGroupShrineAdditionalGV: 0xc7d, ATLASGroupShrineCityGV: 0xc7f,
+      ATLASGroupShrineGV: 0x863, ATLASGroupShrineStepsGV: 0x864, ATLASGroupSkillBookGV: 0x867,
+      ATLASGroupSmallSettlementsGV: 0x8bb, ATLASGroupSpecialLocGV: 0x8c4,
+      ATLASGroupStructuresGV: 0x865, ATLASGroupTempleGV: 0x866, ATLASGroupToSolstheimGV: 0x8bc,
+      ATLASGroupWaterGV: 0x869, ATLAS_CCORDetected: 0x8cb, ATLAS_CorundumToCopperVal: 0x8c6,
+      ATLAS_FishingMarkersEnabled: 0xc78, ATLAS_MalachiteToGlassVal: 0x8c7,
+      ATLAS_MalachiteToMoldaviteVal: 0x8c8, ATLAS_QuicksilverToMithrilVal: 0x8c9,
+      ATLAS_USKPDetected: 0x8ca
+    },
+    'Skyrim Unbound.esp': {
+      DelayDragonLevel1: 0x1209c, DelayDragonLevel2: 0x1209d, DelayDragonMax: 0xfae4,
+      DelayDragonMin: 0xfae3, UnlockShouts: 0x1209b, WhiterunThanePrerequisite: 0xb8eb5e
+    },
+    'chfshVariousActions.esp': {
+      chfshVAMenuHotkey: 0x539c
+    }
+  };
+  const MOD_LINE = 380;          // the voice service keeps 400 characters of a line
+  const MOD_LINES_AT_ONCE = 8;   // tellServer holds 20 lines, so leave room
+  const MOD_AGAIN_MS = 5000;     // what did not fit goes this much later
+  const MOD_BEAT_MS = 60000;
+  let modIds = null;     // [name, runtime id], resolved once
+  let modSeen = null;    // name -> the value last read or sent
+  let modAgainAt = 0;
+  let modBeatAt = 0;
+
+  function modIdList() {
+    if (modIds) { return modIds; }
+    const out = [];
+    let total = 0;
+    for (const file in MOD_GLOBALS) {
+      if (!Object.prototype.hasOwnProperty.call(MOD_GLOBALS, file)) { continue; }
+      const rows = MOD_GLOBALS[file];
+      for (const name in rows) {
+        if (!Object.prototype.hasOwnProperty.call(rows, name)) { continue; }
+        total++;
+        try {
+          const form = sp.Form.from(sp.Game.getFormFromFile(rows[name], file));
+          const id = form ? form.getFormID() : 0;
+          if (id) { out.push([name, id]); }
+        } catch (e) { }
+      }
+    }
+    // Nothing at all means the data is not loaded yet: ask again next time.
+    if (!out.length) { return []; }
+    modIds = out;
+    log('mod settings: ' + out.length + ' of ' + total + ' globals found');
+    return modIds;
+  }
+
+  function modRead() {
+    const ids = modIdList();
+    if (!ids.length) { return null; }
+    const now = {};
+    for (let i = 0; i < ids.length; i++) {
+      try {
+        const gv = sp.GlobalVariable.from(sp.Game.getFormEx(ids[i][1]));
+        const v = gv ? gv.getValue() : NaN;
+        if (typeof v === 'number' && isFinite(v)) { now[ids[i][0]] = v; }
+      } catch (e) { }
+    }
+    return now;
+  }
+
+  function modCheck() {
+    const now = modRead();
+    if (!now) { return; }
+    // The first read is where things stand, not a change.
+    if (!modSeen) { modSeen = now; return; }
+    const moved = [];
+    for (const name in now) {
+      if (Object.prototype.hasOwnProperty.call(now, name) && modSeen[name] !== now[name]) { moved.push(name); }
+    }
+    if (!moved.length) { return; }
+    const lines = [];
+    let line = '/modset';
+    let took = 0;
+    for (let i = 0; i < moved.length; i++) {
+      const pair = moved[i] + '=' + String(now[moved[i]]);
+      if (line.length + 1 + pair.length > MOD_LINE) {
+        lines.push(line);
+        line = '/modset';
+        if (lines.length >= MOD_LINES_AT_ONCE) { break; }
+      }
+      line += ' ' + pair;
+      modSeen[moved[i]] = now[moved[i]];
+      took++;
+    }
+    if (line !== '/modset') { lines.push(line); }
+    for (let i = 0; i < lines.length; i++) { tellServer(lines[i]); }
+    if (took < moved.length) { modAgainAt = Date.now() + MOD_AGAIN_MS; }
+    log('mod settings: sent ' + took + ' of ' + moved.length + ' changed value(s) in ' + lines.length + ' line(s)');
+  }
+
+  sp.on('menuOpen', guard('mod settings open', (e) => {
+    if (e && e.name === JOURNAL_MENU) { modCheck(); }
+  }));
+  sp.on('menuClose', guard('mod settings close', (e) => {
+    if (e && e.name === JOURNAL_MENU) { modCheck(); }
+  }));
+  sp.on('update', guard('mod settings beat', () => {
+    const t = Date.now();
+    if (modAgainAt && t >= modAgainAt) { modAgainAt = 0; modBeatAt = t; modCheck(); return; }
+    if (t - modBeatAt < MOD_BEAT_MS) { return; }
+    modBeatAt = t;
+    modCheck();
+  }));
+  // ---------------------------------------------- end mod settings menus
+
   /*
     / OPENS THE CHAT WITH A SLASH IN IT, AND ONLY THE CHAT.
 

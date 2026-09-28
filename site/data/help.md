@@ -133,8 +133,12 @@ they are usually the difference between a fix and a guess.
 ## Things that are normal here
 
 - No saving. The server holds your character. Quitting is safe.
-- Mod settings menus forget themselves every session, because there is no save
-  to write them to.
+- Most mod settings menus keep your choices: MCM Helper menus in a file on
+  your machine, and Apocalypse, moreHUD, Atlas Map Markers, Skyrim Unbound and
+  chfshVariousActions on the server, with your character. QuickLoot, the
+  instrument menu, MCM Recorder and SkyUI's favourite group and unequip options
+  still forget themselves every session, because there is no save to write
+  them to.
 - No levelling, no fast travel, and the difficulty is fixed at Expert.
 - Start On Save is in the mod list but never loads a save. The launcher points
   it at a character that does not exist, on purpose: an ordinary Skyrim save
