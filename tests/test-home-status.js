@@ -33,12 +33,29 @@ const block = (a >= 0 && b >= 0) ? src.slice(a, b + END.length) : null;
 yes('home.html still has its status line', block !== null);
 if (!block) { console.log('\n' + pass + ' passed, ' + fail + ' failed'); process.exit(1); }
 
+// A node that keeps its text and its children, enough to read back what a
+// person sees and where the link goes.
+function node(tag) {
+  const n = { tag: tag, children: [], href: '', className: '', hidden: false, _text: '' };
+  Object.defineProperty(n, 'textContent', {
+    get: function () { return n._text + n.children.map(function (c) { return c.textContent; }).join(''); },
+    set: function (v) { n._text = String(v); n.children = []; }
+  });
+  n.appendChild = function (c) { n.children.push(c); return c; };
+  return n;
+}
+
 function run(status) {
   const els = {
-    dot: { className: 'dot' }, livetext: { textContent: '' },
-    figOnline: { textContent: '' }, figOnlineWrap: { hidden: true }
+    dot: node('span'), livetext: node('span'),
+    figOnline: node('span'), figOnlineWrap: node('div')
   };
-  const document = { getElementById: function (id) { return els[id] || null; } };
+  els.dot.className = 'dot';
+  els.figOnlineWrap.hidden = true;
+  const document = {
+    getElementById: function (id) { return els[id] || null; },
+    createElement: function (tag) { return node(tag); }
+  };
   vm.runInNewContext('(function(d){' + block + '})(d);', { document: document, d: { status: status }, String: String });
   return els;
 }
@@ -49,10 +66,16 @@ yes("nobody on: Patrick's line, word for word (got '" + e.livetext.textContent +
     e.livetext.textContent === 'The world is open, apply to be an alpha playtester in the Discord!');
 yes('nobody on: it says it is an alpha and that getting in is an application',
     /alpha/i.test(e.livetext.textContent) && /apply/i.test(e.livetext.textContent));
+const link = e.livetext.children[0];
+yes('nobody on: the apply half is one link to /join', e.livetext.children.length === 1 &&
+    link.tag === 'a' && link.href === '/join' &&
+    link.textContent === 'apply to be an alpha playtester in the Discord!');
+yes("nobody on: 'The world is open, ' stays plain text", e.livetext._text === 'The world is open, ');
 yes('nobody on: no head count tile', e.figOnlineWrap.hidden === true);
 
 e = run({ up: true, online: 1 });
-yes('one on: unchanged', e.livetext.textContent === '1 person in the world');
+yes('one on: unchanged, and no link', e.livetext.textContent === '1 person in the world' &&
+    e.livetext.children.length === 0);
 e = run({ up: true, online: 3 });
 yes('three on: unchanged, with the tile', e.livetext.textContent === '3 people in the world' &&
     e.figOnlineWrap.hidden === false && e.figOnline.textContent === '3');
