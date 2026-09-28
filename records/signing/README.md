@@ -41,3 +41,24 @@ itself refuses an unsigned launcher.
 The certificate is issued to a person, and Windows shows that person's name
 as the verified publisher. The live main launcher, 1.1.101, was built before
 signing and is unsigned; the next main Ship is the first signed one.
+
+WHAT THE LAUNCHER PINS (issue #912, `launcher\app\Signature.cs`). Artifact
+Signing certificates last three days, so no certificate thumbprint can be
+pinned. What stays the same, measured on dev 1.1.101.34 on 28 September:
+
+- the root, Microsoft Identity Verification Root Certificate Authority 2020
+  (thumbprint `F40042E2E5F7E8EF8189FED15519AECE42C3BFA2`, to 2045), through
+  Microsoft ID Verified Code Signing PCA 2021 and an issuing authority named
+  "Microsoft ID Verified CS ..." (AOC CA 04 that day; these rotate);
+- the usage `1.3.6.1.4.1.311.97.1.0`, in every Artifact Signing public trust
+  certificate;
+- the durable identity value of the `ThornswoodRelease` profile,
+  `1.3.6.1.4.1.311.97.203948530.216998690.847558466.123546472`, which
+  Microsoft keeps the same across every renewal of that profile.
+
+A new certificate profile or a new identity validation gets a new durable
+identity value. Before signing anything with it, add the new value to
+`Signature.Identities` and Ship that launcher signed with the old profile;
+otherwise every installed launcher refuses the next update. Ship and
+Publish-Installer run the same check before they publish, so a launcher signed
+with a profile the code does not name stops there.

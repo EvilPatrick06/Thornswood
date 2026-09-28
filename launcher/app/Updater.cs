@@ -1231,6 +1231,11 @@ namespace Thornswood
         /// an exact-match check would refuse a perfectly good update the day
         /// the certificate is renewed.
         ///
+        /// Since #912 this is the last of five checks, not the only one:
+        /// Signature.cs first has Windows verify the signature and pins
+        /// Microsoft's Artifact Signing and Thornswood's durable identity.
+        /// scripts\release\Assert-PublishSigned.ps1 reads this line.
+        ///
         /// This is a third layer, not the only one. The host allow list at
         /// AllowedHosts decides where a byte may come from, the SHA-256 in
         /// version.json decides the bytes are the ones published, and this
@@ -1240,44 +1245,30 @@ namespace Thornswood
         public const string ExpectedSigner = "Gavin Knotts";
 
         /// <summary>
-        /// The Subject of whoever signed a file, or an empty string when it is
-        /// not signed. CreateFromSignedFile throws on an unsigned file rather
-        /// than returning null, so the throw is what "unsigned" looks like.
-        /// </summary>
-        static string SignerOf(string path)
-        {
-            try
-            {
-                var c = System.Security.Cryptography.X509Certificates.X509Certificate
-                            .CreateFromSignedFile(path);
-                if (c == null) return "";
-                return c.Subject;
-            }
-            catch { return ""; }
-        }
-
-        /// <summary>
-        /// Refuses a launcher that is not signed by us. Says which of the two
-        /// things went wrong, because "it would not update" with no reason is
-        /// the report nobody can act on.
+        /// Refuses a launcher that is not signed by us, and says which check it
+        /// failed, because "it would not update" with no reason is the report
+        /// nobody can act on.
+        ///
+        /// Until #912 this read the Subject of the embedded certificate and
+        /// nothing else, so a certificate anybody can make with this name on
+        /// it passed. Signature.Refusal now has Windows verify the signature
+        /// and its chain, then pins Microsoft's Artifact Signing root and
+        /// Thornswood's durable identity in the certificate, and only then
+        /// looks for ExpectedSigner in the Subject. Signature.cs says why each.
         /// </summary>
         static void CheckSigner(string path, Action<string> log)
         {
             if (String.IsNullOrEmpty(ExpectedSigner)) return;
-            string who = SignerOf(path);
-            if (who.Length == 0)
+            string said;
+            string why = Signature.Refusal(path, ExpectedSigner, out said);
+            if (why.Length > 0)
             {
                 throw new Exception(
-                    "The launcher that was downloaded is not signed. " +
-                    "Nothing has been replaced and the one you are running is untouched.");
+                    "The launcher that was downloaded " + why + " " +
+                    "Nothing has been replaced and the one you are running is untouched. " +
+                    "Tell Patrick before running anything.");
             }
-            if (who.IndexOf(ExpectedSigner, StringComparison.OrdinalIgnoreCase) < 0)
-            {
-                throw new Exception(
-                    "The launcher that was downloaded was signed by somebody else. " +
-                    "Nothing has been replaced. Tell Patrick before running anything.");
-            }
-            log("Signed by the expected publisher.");
+            log(said);
         }
 
         /// <summary>Replaces the running exe and restarts, via a short detached script.</summary>
