@@ -663,20 +663,35 @@ $s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue 
 # Off, the unknown item is dropped and the rest of the update is kept.
 $s | Add-Member -NotePropertyName equipmentInventoryCheckEnabled -NotePropertyValue $false -Force
 <#
-  npcSettings.default is where the two spawn flags actually live.
+  NO "default" KEY INSIDE npcSettings, EVER. It emptied both worlds.
 
-  ScampServer reads them from INSIDE npcSettings (it used to read them from the
-  root, which is a Thornswood fix already in the fork). An empty object leaves
-  both true, which is every NPC everywhere.
+  ScampServer.cpp reads npcSettings.default for the two flags, and then ALSO
+  puts every key of npcSettings, "default" included, into the per-plugin map.
+  WorldState::IsNpcAllowed walks that map looking for each key among the
+  loaded plugin file names, and returns false the moment a key is not one. No
+  plugin is called "default", so every NPC in every plugin was refused before
+  its flags were ever read. Measured 28 September with the server binary
+  itself (scam_native.node) over the Skyrim.esm and Update.esm form range:
+  npcSettings {} loads 6015 actors, {"default": {both true}} loads 0,
+  {"default": {interior only}} loads 0. Patrick, 28 September: "NPCs are
+  actually not working right now for some reason and they should be".
+
+  So the shape written here is one the engine reads the way it is meant:
+    -Npcs all       {}, no overrides, which is every NPC everywhere
+    -Npcs interior  one entry per plugin in this load order, inside only
+                    (the same measurement: 2498 actors, all of them indoors)
+    -Npcs off       {}, and npcEnabled false above does the work
+  Every key has to be a file name exactly as the load order spells it,
+  because one key that is not a loaded plugin refuses everything again.
 #>
-$npcDefault = [pscustomobject]@{
-    spawnInInterior = ($Npcs -ne 'off')
-    spawnInExterior = ($Npcs -eq 'all')
+$npcTable = [ordered]@{}
+if ($Npcs -eq 'interior') {
+    foreach ($p in $paths) {
+        $npcTable[[IO.Path]::GetFileName($p)] = [pscustomobject]@{ spawnInInterior = $true; spawnInExterior = $false }
+    }
 }
-$s | Add-Member -NotePropertyName npcSettings -NotePropertyValue ([pscustomobject]@{
-    default = $npcDefault
-}) -Force
-Write-Host "  NPCs: $Npcs (interior $($npcDefault.spawnInInterior), exterior $($npcDefault.spawnInExterior))" -ForegroundColor DarkGray
+$s | Add-Member -NotePropertyName npcSettings -NotePropertyValue ([pscustomobject]$npcTable) -Force
+Write-Host ("  NPCs: $Npcs (npcEnabled $($Npcs -ne 'off'), {0} per-plugin entries, no default key)" -f $npcTable.Count) -ForegroundColor DarkGray
 
 <#
   What a blow is worth. See -HitsOnPeople and -HitsOnNpcs above.
