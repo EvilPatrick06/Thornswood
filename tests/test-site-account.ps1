@@ -369,6 +369,18 @@ try {
     Put (Join-Path $server 'world\changeForms.json') '{}'
     Put (Join-Path $voice '2026-09-24.jsonl') '{}'
     Put (Join-Path $voiceDev '2026-09-24.jsonl') '{}'
+    # The update feed the site serves and must not write (#913).
+    Put (Join-Path $docs 'feed\version.json') '{}'
+    Put (Join-Path $docs 'feed\assets\0000000000000000000000000000000000000000000000000000000000000000') 'x'
+    Put (Join-Path $docs 'feed-dev\version.json') '{}'
+    # BUILTIN\Users reaches the real site folder by inheriting from C:\. The
+    # scratch one gets the same, from the scratch folder above it.
+    $usersSid = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
+    $top = Get-Acl -LiteralPath $tmp
+    $top.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($usersSid, 'ReadAndExecute',
+        [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
+        [Security.AccessControl.PropagationFlags]::None, 'Allow')))
+    Set-Acl -LiteralPath $tmp -AclObject $top
     # $dev is left out on purpose: a box with no dev server has no folder.
     $map = @{
         'C:\Thornswood-Server\data'    = (Join-Path $server 'data')
@@ -444,6 +456,48 @@ try {
         (RulesFor (Join-Path $server 'world\changeForms.json') $ls).Count -eq 0 -and
         (RulesFor (Join-Path $server 'world') $ls).Count -eq 0)
 
+    # -- #913: the feed is read, never written, by the site account ---------------
+    # A deny that carries SYNCHRONIZE stops node opening the file at all, which
+    # is what icacls' W did to both feeds on 28 Sep.
+    $noWrite = $fsr::WriteData -bor $fsr::AppendData -bor $fsr::WriteExtendedAttributes -bor
+               $fsr::WriteAttributes -bor $fsr::Delete -bor $fsr::DeleteSubdirectoriesAndFiles
+    function DeniesOf($rules) { return @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Deny' }) }
+    foreach ($f in @('feed', 'feed-dev')) {
+        $d = DeniesOf (RulesFor (Join-Path $docs $f) $ls)
+        Yes "$f`: the site account is denied writing and deleting there" (
+            $d.Count -eq 1 -and ($d[0].FileSystemRights -band $noWrite) -eq $noWrite)
+        Yes "$f`: and the deny leaves out SYNCHRONIZE and every read right, so the site still serves it" (
+            $d.Count -eq 1 -and ($d[0].FileSystemRights -band ($fsr::Synchronize -bor $fsr::ReadData -bor $fsr::ReadAttributes)) -eq 0)
+        Yes "$f`: and reaches what is inside it" ($d.Count -eq 1 -and "$($d[0].InheritanceFlags)" -eq 'ContainerInherit, ObjectInherit')
+        Yes "$f`: it says so" ($said -match [regex]::Escape("denied LOCAL SERVICE writing and deleting in " + (Join-Path $docs $f)))
+    }
+    $vj = RulesFor (Join-Path $docs 'feed\version.json') $ls
+    Yes 'feed\version.json inherits the deny and still the read under it' (
+        (DeniesOf $vj).Count -eq 1 -and (Modifies @($vj | Where-Object { "$($_.AccessControlType)" -eq 'Allow' })))
+    Yes 'feed\assets inherits the deny too' (
+        (DeniesOf (RulesFor (Join-Path $docs 'feed\assets\0000000000000000000000000000000000000000000000000000000000000000') $ls)).Count -eq 1)
+    Yes 'the rest of its folder is not denied anything' (
+        (DeniesOf (RulesFor (Join-Path $docs 'data\board.json') $ls)).Count -eq 0 -and
+        (DeniesOf (RulesFor (Join-Path $docs 'config.json') $ls)).Count -eq 0)
+    Yes 'the deploy script never denies with icacls, whose W carries SYNCHRONIZE' (
+        (Get-Content -LiteralPath $deploy -Raw) -notmatch 'icacls[^\r\n]*/deny')
+
+    # -- #913: BUILTIN\Users no longer reaches the site folder ---------------------
+    $u = 'S-1-5-32-545'
+    Yes 'the scratch folder above gave BUILTIN\Users read, as C:\ does on the box' ((RulesFor $tmp $u).Count -ge 1)
+    Yes 'BUILTIN\Users has nothing on the site folder' ((RulesFor $docs $u).Count -eq 0)
+    Yes 'nor on config.json, data or the feed' (
+        (RulesFor (Join-Path $docs 'config.json') $u).Count -eq 0 -and
+        (RulesFor (Join-Path $docs 'data\board.json') $u).Count -eq 0 -and
+        (RulesFor (Join-Path $docs 'feed\version.json') $u).Count -eq 0)
+    Yes 'the site folder stopped inheriting, so a rule put back on the folder above does not come back' (
+        (Get-Acl -LiteralPath $docs).AreAccessRulesProtected)
+    $meSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    Yes 'whoever ran it keeps what they had there (Administrators on the box)' (
+        (Modifies (RulesFor $docs $meSid)) -or (Modifies (RulesFor $docs 'S-1-5-32-544')))
+    Yes 'and the site account keeps Modify on its folder' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
+    Yes 'it says Users was taken off' ($said -match 'BUILTIN\\Users no longer reaches')
+
     # The grants are given again at every deploy while the site is not SYSTEM,
     # so a second run has to leave the same rules, not a second copy of each.
     $before = @($docs, $server, (Join-Path $server 'data'), $voice, $voiceDev | ForEach-Object { (RulesFor $_ $ls).Count })
@@ -451,6 +505,11 @@ try {
     $after = @($docs, $server, (Join-Path $server 'data'), $voice, $voiceDev | ForEach-Object { (RulesFor $_ $ls).Count })
     Yes ('a second run grants again without doubling a rule (' + ($before -join ',') + ' then ' + ($after -join ',') + ')') (
         ($before -join ',') -eq ($after -join ',') -and @($after | Where-Object { $_ -ne 1 }).Count -eq 0)
+    Yes 'a second run leaves one deny on each feed folder, not two' (
+        (DeniesOf (RulesFor (Join-Path $docs 'feed') $ls)).Count -eq 1 -and
+        (DeniesOf (RulesFor (Join-Path $docs 'feed-dev') $ls)).Count -eq 1)
+    Yes 'and BUILTIN\Users is still off, with nothing refused' (
+        (RulesFor $docs $u).Count -eq 0 -and ($r.said -join "`n") -notmatch 'COULD NOT (DENY|TAKE)')
     Yes 'and the second run still says what it granted, with nothing refused' (
         ($r.said -join "`n") -match [regex]::Escape("granted LOCAL SERVICE (OI)(CI)M on $docs") -and
         ($r.said -join "`n") -notmatch 'COULD NOT GRANT')
