@@ -369,6 +369,41 @@ function Get-LauncherDrift([string]$repoDir, [string]$tag) {
         return $paths
     } finally { $ErrorActionPreference = $old }
 }
+
+# THE EXE CI BUILT IS NOT SIGNED, issue #921. release.yml compiles on the VPS
+# runner, which holds no signing certificate, so Sign-Artifact.ps1 there says
+# "not signing" and every v<version> draft carries an unsigned Thornswood.exe.
+# 20260927-1633 put exactly that on Main as 1.1.101 (sha256 38d4cd5d...), an
+# hour before the publish sign gate existed. Since then the gate refuses it,
+# which is safe but means no main Ship can go out at all.
+# So a main Ship signs the verified download here, with the same Sign-Artifact
+# and tools\signing.json a dev build signs with, -Required so a machine that
+# cannot sign stops, and reads it back against ExpectedSigner before a byte of
+# it is installed or packed. Already signed by us: left alone. Returns '' when
+# the exe is signed by ExpectedSigner, or a sentence saying why not.
+# Needs Get-PublishSignRefusal (Assert-PublishSigned.ps1) dot-sourced first.
+function Set-ReleaseLauncherSignature([string]$exe, [string]$signer, [string]$expectedSigner) {
+    if (-not $exe -or -not (Test-Path -LiteralPath $exe)) {
+        return "There is no launcher at $exe to sign. Nothing was published."
+    }
+    if (-not $expectedSigner) {
+        return 'ExpectedSigner is empty, so there is nothing to check the signature against. Nothing was published.'
+    }
+    if (-not (Get-PublishSignRefusal -Path $exe -ExpectedSigner $expectedSigner)) { return '' }
+    if (-not $signer -or -not (Test-Path -LiteralPath $signer)) {
+        return "Sign-Artifact.ps1 is not at $signer, so the launcher CI built cannot be signed. Nothing was published."
+    }
+    $global:LASTEXITCODE = 0
+    & $signer -Path $exe -Required | Out-Host
+    $rc = $LASTEXITCODE
+    if ($rc -ne 0) {
+        return ("Signing the launcher CI built stopped with exit code $rc. A main release has to be signed, " +
+                'the same as a dev one: Ship from the machine that holds tools\signing.json. Nothing was published.')
+    }
+    $why = Get-PublishSignRefusal -Path $exe -ExpectedSigner $expectedSigner
+    if ($why) { return ('Signing said it worked, but ' + $why) }
+    return ''
+}
 # ==== end thornswood release launcher ====
 
 Set-StrictMode -Version Latest
@@ -399,6 +434,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 # Launcher / setup-stub .pdb stay on this machine only (Ship-Rules, issue #462).
 . (Join-Path $Here 'Ship-Rules.ps1')
+# The publish sign helpers, loaded here rather than at the publish gate because
+# a main Ship signs and checks the exe CI built before it is installed (#921).
+. (Join-Path $Here 'Assert-PublishSigned.ps1')
 # version.json lives in the public releases clone now, beside the source one.
 # Falls back to the source repo when that clone is not there yet, which is the
 # same thing Publish-Update does, so both agree about where the feed is.
@@ -855,6 +893,23 @@ if (-not $ModsOnly) {
             Die $why
         }
         Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item (Join-Path $buildOut 'Thornswood.exe')).Length / 1KB)) 'Green'
+
+        # Signed here, before it is installed or packed (issue #921): CI has no
+        # certificate, so the draft's exe is unsigned, and every launcher from
+        # dev 1.1.101.17 on refuses an unsigned update.
+        Head 'Signing the launcher from CI'
+        try {
+            $ciSigner = Get-ExpectedSignerFragment -RepoRoot $RepoDir
+        } catch {
+            Unbump 'ExpectedSigner could not be read'
+            Die ($_.Exception.Message + ' Nothing was published.')
+        }
+        $why = Set-ReleaseLauncherSignature (Join-Path $buildOut 'Thornswood.exe') (Join-Path $Here 'Sign-Artifact.ps1') $ciSigner
+        if ($why) {
+            Unbump 'the launcher from CI is not signed'
+            Die $why
+        }
+        Say '  Authenticode Valid, signed by ExpectedSigner' 'Green'
     }
     else {
         Head 'Building the launcher'
@@ -1132,8 +1187,8 @@ if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
 # Site and feed only. Local Build-Launcher may print "not signing" and leave an
 # unsigned exe on disk; that must not reach Releases or the host feed.
 # CONTRIBUTING: only a signing machine may Ship, dev included. Soft skip is for
-# build machines, not for publish.
-. (Join-Path $Here 'Assert-PublishSigned.ps1')
+# build machines, not for publish. Assert-PublishSigned.ps1 is dot-sourced at
+# the top, beside Ship-Rules.ps1.
 $signCfg = Join-Path $Here '..\..\tools\signing.json'
 $signWhy = Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir
 if ($signWhy) {
