@@ -4084,9 +4084,18 @@ function beginChoosing(actorId, state, why) {
     then, and it says what has actually happened rather than pretending this is
     the normal greeting.
   */
-  if (!opened) {
-    say(actorId, 'Welcome to Thornswood. The starting panel did not open by ' +
-                 'itself. Press K to choose where you will start. Your class ' +
+  /*
+    AND ONE LINE EITHER WAY, issue #416. The pack has just changed under them
+    (giveShift) and the next pick moves them to a town, and neither is on the
+    screen. So the opened case says those two things, not the panel. The
+    welcome moved to beginAppearance, which says it first.
+  */
+  if (opened) {
+    say(actorId, 'You have been given plain clothes. Choose a home town, and ' +
+                 'you will wake up at its inn.');
+  } else {
+    say(actorId, 'You have been given plain clothes. The starting panel did not ' +
+                 'open by itself. Press K to choose where you will start. Your class ' +
                  'and profession can be chosen there too, or later in the world.');
   }
   log('chargen', actorId.toString(16), '-> choosing (' + why + ')' +
@@ -4146,8 +4155,9 @@ function arriveAt(actorId, townKey) {
     spam and is unnescery". That line described what was already on the
     screen. This one is said once, after the one pick that ends creation, and
     it says where the server has just moved them, which nothing else does.
-    Lines for the other steps of creation are his to decide, and none are
-    added here.
+    The other steps have one line each since issue #416 (beginAppearance,
+    beginChoosing, the returning stamp in chargenTick), each saying what
+    changed and not what is already on the screen.
 
     say() and not notify(), whose own comment says it may well do nothing
     from here.
@@ -4427,6 +4437,12 @@ function beginAppearance(actorId) {
   setChargen(actorId, state);
   log('chargen', actorId.toString(16), '-> appearance',
       state.moved ? '(moving to the hall, menu to follow)' : '(already in the hall)');
+  // Issue #416: the stone room with nobody in it, and the teleport into it,
+  // said to the person beside the log line. The race menu is not described:
+  // it is on their screen.
+  say(actorId, state.moved
+    ? 'Welcome to Thornswood. You are going to the creation hall to make your character.'
+    : 'Welcome to Thornswood. This is the creation hall, where you make your character.');
 }
 
 /**
@@ -4712,6 +4728,9 @@ function chargenTick() {
             ', so creation is skipped for them');
         setChargen(actorId, { stage: 'done', at: now, legacy: true });
         closeRaceMenu(actorId);
+        // Issue #416. Once per character, and if this ever misfires on a new
+        // one again, the person at least knows why the race menu shut.
+        say(actorId, 'Welcome back to Thornswood. This character is already made.');
         continue;
       }
 
