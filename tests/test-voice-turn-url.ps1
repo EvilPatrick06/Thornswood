@@ -64,6 +64,12 @@ function Done {
     if ($script:fail) { exit 1 }
     exit 0
 }
+# Anything that throws still goes through Done. Without this a throw after
+# the three voice services below had started ended the script with them
+# still running, and they held the output of whatever ran this: the nightly
+# run's harness step waited on them until it was cancelled at 45 minutes on
+# 26, 27 and 28 September (issue #891).
+trap { Yes ('the run finished without an error: ' + $_.Exception.Message) $false; Done }
 
 $nodeExe = (Get-Command node -ErrorAction SilentlyContinue).Source
 Yes 'node is here to run the voice service' ([bool]$nodeExe)
@@ -231,11 +237,13 @@ Yes 'and no relay key rides on the command line: the service is handed none ther
 Write-Host ''
 Write-Host 'what is already running is kept, the way -Bind and -Auth are:'
 $stubDir = Join-Path $script:temp 'stub'
-New-Item -ItemType Directory -Force -Path $stubDir | Out-Null
+# Laid out the way scripts\ is since phase 8 of issue #440: the install in
+# deploy, and the Remote.ps1 it calls as ..\vps\Remote.ps1 beside it.
+New-Item -ItemType Directory -Force -Path (Join-Path $stubDir 'deploy'), (Join-Path $stubDir 'vps') | Out-Null
 # Remote.ps1's own parameters, running here instead of on the VPS. A canned
 # answer stands in for a service that is not there, or one saying something
 # no real one would.
-Set-Content -LiteralPath (Join-Path $stubDir 'Remote.ps1') -Encoding ASCII -Value @'
+Set-Content -LiteralPath (Join-Path $stubDir 'vps\Remote.ps1') -Encoding ASCII -Value @'
 param([Parameter(Position = 0)][string]$Script, [string]$VpsHost, [string]$VpsUser)
 if ($env:TS_PROBE_ANSWER) { $env:TS_PROBE_ANSWER; return }
 $full = "`$ProgressPreference = 'SilentlyContinue'`r`n" + $Script
@@ -273,7 +281,7 @@ function StartVoice([int]$port, [hashtable]$vars, [string]$key) {
 # The probe block lifted out of the install, run with the install's own
 # variables as its parameter block would leave them.
 function Probe([int]$port, [hashtable]$given, [string]$canned) {
-    $Here = $stubDir; $Port = $port; $VpsHost = 'vps.invalid'; $VpsUser = 'nobody'
+    $Here = Join-Path $stubDir 'deploy'; $Port = $port; $VpsHost = 'vps.invalid'; $VpsUser = 'nobody'
     $Bind = '0.0.0.0'; $Auth = 'log'; $ChatRange = 'off'; $TurnUrl = ''
     $bindExplicit = $false; $authExplicit = $false; $chatExplicit = $false; $turnExplicit = $false
     if ($given.ContainsKey('TurnUrl')) { $TurnUrl = $given['TurnUrl']; $turnExplicit = $true }
