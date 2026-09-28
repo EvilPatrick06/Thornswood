@@ -22,8 +22,8 @@ read it (issue #440, phase 8):
   compiled fallback (Downgrade.cs, Config.cs) and Setup-Thornswood.ps1,
   because a pin move is one release. `tests\test-skyrim-pin.ps1` fails while
   they disagree.
-- `signing\`: the code signing setup, with its own README. It is switched off
-  until it is finished.
+- `signing\`: the code signing setup, with its own README. On since
+  27 September: Ship refuses a launcher that is not signed (CONTRIBUTING.md).
 
 Change a record only by running the script that writes it, in the same pull
 request as the build or the fork commit it describes.

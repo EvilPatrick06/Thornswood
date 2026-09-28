@@ -26,7 +26,8 @@ release, launcher, game files and server together, are in CONTRIBUTING.md.
 | Piece | Where | What it is |
 | --- | --- | --- |
 | Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
-| Releases repo | github.com/EvilPatrick06/Thornswood-Releases (public), clone beside the source repo as `Thornswood-Releases`, dev branch as a worktree `Thornswood-Releases-dev` | `version.json` and `published.json` (pack baseline) per branch (main, dev), and the release assets: packs and launcher exes |
+| Releases repo | github.com/EvilPatrick06/Thornswood-Releases (public), clone beside the source repo as `Thornswood-Releases`, dev branch as a worktree `Thornswood-Releases-dev` | `version.json` and `published.json` (pack baseline) per branch (main, dev), and the GitHub release assets published before 28 Sep. Since #897 new downloads go to the site instead (next row) |
+| Downloads | On the VPS, `C:\Thornswood-Docs\feed\assets` and `feed-dev\assets`, served at `https://thornswood.net/feed[-dev]/assets/<sha256>` | Every pack, launcher exe and client runtime a feed names, one file per sha256, one folder per channel (`docs\FEED.md` "Downloads come from the site") |
 | Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Play page Server dropdown | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Staff roles only (Owner, Dev, Gamemaster, Moderator, Loremaster) |
 | Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
@@ -103,8 +104,9 @@ launcher, checks that the game folder holds the recorded client build
 scans the game folder for loose files that are not Vortex's, not vanilla, not
 runtime and not per machine, diffs them against this channel's baseline
 (`published.json` in the releases clone), zips the difference as a pack,
-uploads pack and launcher as a GitHub release in the releases repo, rewrites
-`version.json` and pushes it.
+sends the pack, the launcher and the client runtime to the site's
+`/feed[-dev]/assets/<sha256>` (since #897; `-AssetHost github` is the old
+GitHub release), rewrites `version.json` and pushes it.
 
 The tip customers get is that `version.json`, and launchers poll the feed url in
 it. So two things follow the tip, both run by
