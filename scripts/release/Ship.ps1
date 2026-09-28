@@ -107,6 +107,15 @@
   Skips the launcher and publishes only the mod files that changed. The
   version number stays where it is.
 
+  Since issue #921 a Ship does this by itself when nothing the launcher is
+  compiled from (launcher\, records\client-build.json, Build-Launcher.ps1)
+  changed since the launcher on that channel's feed: no new version, no
+  build, no signing, and the feed keeps the launcher it has.
+
+.PARAMETER RebuildLauncher
+  Build, sign and publish a new launcher even when nothing it is compiled
+  from changed since the one on the feed.
+
 .PARAMETER DryRun
   Builds and works out what would ship, and uploads no pack, publishes no
   feed and tells nobody: no news post, no warning from the server. The git
@@ -261,6 +270,9 @@ param(
     # dev first and gets broken there; a plain Ship afterwards promotes it all
     # to main and resets dev to match.
     ,[ValidateSet('main', 'dev')][string]$Channel = 'main'
+    # Build, sign and publish a new launcher even when nothing it is compiled
+    # from changed since the one on the feed (issue #921).
+    ,[switch]$RebuildLauncher
 )
 
 
@@ -403,6 +415,78 @@ function Set-ReleaseLauncherSignature([string]$exe, [string]$signer, [string]$ex
     $why = Get-PublishSignRefusal -Path $exe -ExpectedSigner $expectedSigner
     if ($why) { return ('Signing said it worked, but ' + $why) }
     return ''
+}
+
+# WHAT THE LAUNCHER IS COMPILED FROM, as one sha256, issue #921. Every file
+# under launcher\ but the Markdown (the code, ui.xaml, the art, the video, the
+# WebView2 loader, the manifest), records\client-build.json, which is compiled
+# in, and Build-Launcher.ps1, which writes the version resource and picks what
+# goes in. Read off the working tree, not git, so a dev Ship of uncommitted
+# work counts it. Paths with / and sorted ordinally, so the same tree gives the
+# same answer on any machine; a line ending changed by git's autocrlf gives a
+# different one, which costs a rebuild and nothing worse.
+function Get-LauncherInputHash([string]$repoDir) {
+    $lines = New-Object System.Collections.Generic.List[string]
+    $launcherDir = Join-Path $repoDir 'launcher'
+    if (Test-Path -LiteralPath $launcherDir) {
+        foreach ($f in @(Get-ChildItem -LiteralPath $launcherDir -Recurse -File -Force -EA SilentlyContinue |
+                         Where-Object { $_.Extension -ne '.md' })) {
+            $rel = 'launcher/' + $f.FullName.Substring($launcherDir.Length).TrimStart('\', '/').Replace('\', '/')
+            $lines.Add($rel + "`t" + (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant())
+        }
+    }
+    foreach ($rel in 'records/client-build.json', 'scripts/release/Build-Launcher.ps1') {
+        $p = Join-Path $repoDir $rel
+        $h = 'missing'
+        if (Test-Path -LiteralPath $p) { $h = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant() }
+        $lines.Add($rel + "`t" + $h)
+    }
+    $arr = $lines.ToArray()
+    [Array]::Sort($arr, [StringComparer]::Ordinal)
+    $bytes = [Text.Encoding]::UTF8.GetBytes(($arr -join "`n"))
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return (-join ($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') })) }
+    finally { $sha.Dispose() }
+}
+
+# The launcher a channel's feed offers now, read from origin/<branch> in the
+# releases clone (fetched first) and from the copy on disk when git cannot say.
+# $null when there is no feed to read.
+function Get-PublishedLauncher([string]$dir, [string]$branch) {
+    if (-not $dir -or -not (Test-Path -LiteralPath $dir)) { return $null }
+    $json = ''
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+        if (Test-Path -LiteralPath (Join-Path $dir '.git')) {
+            & git -C $dir fetch --quiet origin $branch *> $null
+            $json = (& git -C $dir show "origin/$($branch):version.json" 2>$null | Out-String)
+            if ($LASTEXITCODE -ne 0) { $json = '' }
+        }
+    } finally { $ErrorActionPreference = $old }
+    if (-not $json.Trim()) {
+        $f = Join-Path $dir 'version.json'
+        if (Test-Path -LiteralPath $f) { $json = [IO.File]::ReadAllText($f) }
+    }
+    if (-not $json.Trim()) { return $null }
+    $doc = $null
+    try { $doc = $json | ConvertFrom-Json } catch { return $null }
+    function Field($o, [string]$k) { if ($o -and $o.PSObject.Properties[$k] -and $null -ne $o.$k) { return ([string]$o.$k).Trim() } return '' }
+    return [pscustomobject]@{
+        Version = (Field $doc 'launcherVersion')
+        Url     = (Field $doc 'launcherUrl')
+        Sha     = (Field $doc 'launcherSha256')
+        Inputs  = (Field $doc 'launcherInputs')
+    }
+}
+
+# True only when the feed names a whole launcher (version, url, sha256) AND the
+# fingerprint it was published with is this one. A feed with no fingerprint,
+# which is every feed before issue #921, is never "unchanged".
+function Test-LauncherUnchanged($published, [string]$inputs) {
+    if ($null -eq $published -or -not $inputs) { return $false }
+    if (-not $published.Inputs -or -not $published.Version -or -not $published.Url) { return $false }
+    if ($published.Sha -notmatch '^[0-9a-fA-F]{64}$') { return $false }
+    return ($published.Inputs -eq $inputs)
 }
 # ==== end thornswood release launcher ====
 
@@ -666,6 +750,29 @@ $src = Get-Content $updaterCs -Raw
 $m = [regex]::Match($src, 'Version\s*=\s*"([^"]+)"')
 if (-not $m.Success) { Die 'Could not read the version out of app\Updater.cs' }
 $current = $m.Groups[1].Value
+
+# NO NEW LAUNCHER WHEN NOTHING LAUNCHER-SIDE CHANGED, issue #921. Patrick, 28
+# Sep: "it should be signed only when a new installer goes up on the website so
+# we aren't signing for every single update". Every signed launcher refuses an
+# unsigned update, so the launcher cannot go out unsigned; what can stop is a
+# new one going out at all. A dev Ship used to bump 1.1.x.N, rebuild and sign
+# every time, even for a pack of textures. Now the feed records a fingerprint
+# of what the exe is compiled from (launcherInputs), and a Ship whose sources
+# match it keeps the launcher already published: same bytes, same sha256, no
+# build, no signing call, only the packs go out, exactly as -ModsOnly does.
+# The first Ship after this change finds no fingerprint and builds as before.
+# -RebuildLauncher or -Version builds one anyway.
+$LauncherInputs = Get-LauncherInputHash $RepoDir
+if (-not $ModsOnly -and -not $RebuildLauncher -and -not $Version) {
+    $feedBranch = if ($Dev) { 'dev' } else { 'main' }
+    $pubLauncher = Get-PublishedLauncher $ReleaseDir $feedBranch
+    if (Test-LauncherUnchanged $pubLauncher $LauncherInputs) {
+        Head 'The launcher'
+        Say ("  nothing it is built from changed since $($pubLauncher.Version) went out, so that one stays: " +
+             'no rebuild, no signing, only the packs. -RebuildLauncher to build one anyway.') 'Green'
+        $ModsOnly = $true
+    }
+}
 
 if ($ModsOnly) {
     $target = $current
@@ -1220,7 +1327,7 @@ Head 'Publishing'
 $pubArgs = @{ Notes = $Notes; Root = $Root; RepoDir = $RepoDir; ReleaseDir = $ReleaseDir; DistRoot = $DistRoot; NoPause = $true }
 if ($MoveServer) { $pubArgs['MoveServer'] = $true }
 if ($AcceptSize) { $pubArgs['AcceptSize'] = $true }
-if (-not $ModsOnly) { $pubArgs['Launcher'] = $true }
+if (-not $ModsOnly) { $pubArgs['Launcher'] = $true; $pubArgs['LauncherInputs'] = $LauncherInputs }
 if ($Dev) { $pubArgs['Channel'] = 'dev'; $pubArgs['VersionOverride'] = $target }
 # A dry run has to leave nothing behind, and NoUpload plus NoPush is not that.
 #
