@@ -692,6 +692,45 @@ $ShipDeleteAlways = @(
 
 function Get-ShipDeleteAlways { return $ShipDeleteAlways }
 
+# FILES THAT TRAVEL WITH A PAGE, issue #883.
+#
+# A pack is a diff against the baseline, so a file the baseline already lists
+# is never packed again, whether or not any launcher ever received it. The
+# sealed scroll's two pictures were written into this machine's game folder on
+# 25 September (17:54 UTC) and recorded by Main update 20260925-1654, which was
+# pulled from version.json four minutes later. The baseline kept them. Not one
+# of the 75 packs on the Main feed carries either picture (every zip listed,
+# 28 September), so an install that has only ever taken packs has the page
+# and not its art, and thornswood-select.js answers a missing picture with
+# "a scroll picture is missing, straight to the slots". That is the start
+# screen that skipped the scroll after the update, on the Main launcher.
+#
+# So when a pack carries the key, it carries these beside it, changed or not:
+# 47 KB, only in a pack that already changes the page. The next pack with the
+# page in it puts the pictures on every install that is missing them.
+# tests\test-start-screen-art.ps1 holds this list to the pictures the page names.
+$ShipTravelsWith = @{
+    'Data\Platform\UI\thornswood-select.js' = @(
+        'Data\Platform\UI\thornswood-scroll.webp',
+        'Data\Platform\UI\thornswood-scroll-open.webp'
+    )
+}
+
+# The companions of every changed path that are not already in the list.
+function Get-ShipTravelsWith([string[]]$changed) {
+    $out = @()
+    foreach ($c in @($changed)) {
+        foreach ($k in $ShipTravelsWith.Keys) {
+            if ($c -ieq $k) {
+                foreach ($w in $ShipTravelsWith[$k]) {
+                    if (@($changed) -notcontains $w -and $out -notcontains $w) { $out += $w }
+                }
+            }
+        }
+    }
+    return $out
+}
+
 # REQUIRED DATA THE COLLECTION DOES NOT YET DEPLOY UNDER THE LOAD ORDER NAME.
 #
 # game\required-data holds plugins (today: ElysiumEstateSSE.esp) that plugins.txt

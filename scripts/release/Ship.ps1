@@ -341,6 +341,34 @@ function Get-ReleaseLauncher([string]$repo, [string]$version, [string]$into) {
     }
     return ''
 }
+
+# THE TAG IS OLDER THAN THE LAUNCHER ON MAIN, issue #883. The exe CI built for
+# v<version> is the source at that tag, so a main Ship that has not moved the
+# version takes the exe of the last bump and quietly leaves out every launcher
+# change merged since. 20260927-1633 went out that way: its Thornswood.exe is
+# byte for byte the one from 20260927-0508 (sha256 38d4cd5d...), built from
+# v1.1.101 (deace6b), so Main never got the menu music fix (#772, #779) that
+# its own notes announced. And records\client-build.json is compiled into the
+# exe, so the stale launcher called the new client runtime in that same pack
+# "not the recorded build" and put the old skymp5-client.js back.
+# Returns the changed paths under launcher\ and records\client-build.json
+# between the tag and HEAD, or nothing when the tag is not here to compare
+# with (Get-ReleaseLauncher stops that Ship anyway). Markdown is not built.
+function Get-LauncherDrift([string]$repoDir, [string]$tag) {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+        & git -C $repoDir rev-parse --verify --quiet "refs/tags/$tag" *> $null
+        if ($LASTEXITCODE -ne 0) {
+            & git -C $repoDir fetch --quiet origin "refs/tags/$($tag):refs/tags/$tag" *> $null
+            & git -C $repoDir rev-parse --verify --quiet "refs/tags/$tag" *> $null
+            if ($LASTEXITCODE -ne 0) { return @() }
+        }
+        $paths = @(& git -C $repoDir diff --name-only "refs/tags/$tag" HEAD -- launcher records/client-build.json ':(exclude,glob)**/*.md' 2>$null |
+                   Where-Object { $_ })
+        if ($LASTEXITCODE -ne 0) { return @() }
+        return $paths
+    } finally { $ErrorActionPreference = $old }
+}
 # ==== end thornswood release launcher ====
 
 Set-StrictMode -Version Latest
@@ -756,6 +784,22 @@ if ($target -ne $current) {
 else {
     Head 'Version'
     Say "  staying on $current" 'DarkGray'
+}
+
+# A main release ships the exe CI built for v$target, so the launcher on main
+# has to be the launcher at that tag (Get-LauncherDrift above, issue #883).
+# -ModsOnly publishes no exe, but the live launcher still judges the pack's
+# client runtime by the record compiled into it, so that one file counts there.
+if (-not $Dev -and (Test-Path -LiteralPath (Join-Path $RepoDir '.git'))) {
+    $drift = @(Get-LauncherDrift $RepoDir ('v' + $target))
+    if ($ModsOnly) { $drift = @($drift | Where-Object { $_ -eq 'records/client-build.json' }) }
+    if ($drift.Count) {
+        foreach ($d in $drift | Select-Object -First 10) { Say "    $d" 'Yellow' }
+        $why = ("$($drift.Count) launcher file(s) changed on this branch after v$target was tagged, and the exe CI built for v$target has none of it. " +
+                "Every launcher already on $target would keep the old one anyway. Move the version first: " +
+                ".\scripts\release\Bump-Version.ps1, its pull request, the new tag, then Ship again.")
+        if ($DryRun) { Say "  $why" 'Yellow' } else { Die $why }
+    }
 }
 
 # The new version goes into Updater.cs before anything is built, because the
