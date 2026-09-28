@@ -6,15 +6,18 @@
 // The To Do List entry "The gamemode registers four event handlers, so nothing
 // server-side watches for griefing": "Establish what the client is allowed to
 // ask the server to do and block the rest at the handler level, then log what
-// was allowed." Which take to refuse is Patrick's decision and it has not been
-// made. This checks the list and the log, which is the half that can be done
-// without him.
+// was allowed." This checks the list and the log. Which take to refuse was
+// Patrick's decision, made on 28 September (issue #475), and the take limit
+// that holds it has its own harness, tests\test-take-limit.js.
 //
-// WHAT MATTERS MOST IS THAT THEY ANSWER NOTHING. ScampServerListener reads
-// undefined as "let it through" and false as "refuse", so a watcher that
-// answered false on any path would shut chests for everybody at once. Every
-// case below checks the answer is exactly undefined, including the ones where
-// every read the handler makes throws, and checks nothing was written.
+// WHAT MATTERS MOST IS THAT THEY ANSWER NOTHING, apart from the one refusal
+// the take limit makes. ScampServerListener reads undefined as "let it
+// through" and false as "refuse", so a watcher that answered false on any
+// other path would shut chests for everybody at once. Every case below checks
+// the answer is exactly undefined, including the ones where every read the
+// handler makes throws, and checks nothing was written. T10 checks the one
+// false comes only from the take limit, and that a limit that throws lets the
+// take through.
 //
 // It drives the REAL guard() and the REAL watchers out of gamemode.js over a
 // fake mp, the way test-coffers.js drives putIn. Where the fork is on this
@@ -157,9 +160,16 @@ yes('no handler on the Papyrus family or an attempt event returns false (' +
     neverFalse.every(function (h) { return !/\breturn\s+false\b/.test(bodyOf(h)); }));
 
 if (handlersSrc !== null) {
-  // Not a single return in either watcher. A return with nothing after it
-  // would be harmless today and is the line somebody turns into a refusal.
-  yes('neither watcher has a return statement in it', !/\breturn\b/.test(handlersSrc));
+  // The drop watcher has no return at all, and the take watcher has exactly
+  // one, a false under the take limit's answer. A second return is the line
+  // somebody turns into a refusal for everybody.
+  const dropSrc = handlersSrc.slice(handlersSrc.indexOf('mp.onDropItem = guard('));
+  const takeSrc = handlersSrc.slice(0, handlersSrc.indexOf('mp.onDropItem = guard('));
+  yes('the drop watcher has no return statement in it', !/\breturn\b/.test(dropSrc));
+  yes('the take watcher has one return, a false on the take limit\'s refusal',
+      (takeSrc.match(/\breturn\b/g) || []).length === 1 &&
+      /if \(no\) \{[\s\S]*?return false;\s*\}/.test(takeSrc) &&
+      takeSrc.indexOf('__thornswoodTakeLimit') !== -1);
 }
 
 // ---------------------------------------------------------------- the list --
@@ -186,7 +196,9 @@ if (listSrc !== null) {
   yes('the list names all five console commands',
       CONSOLE.every(function (c) { return new RegExp('\\b' + c + '\\b').test(listSrc); }));
   yes('the list says where item creation is refused', /EnsureAdmin/.test(listSrc));
-  yes('the list says which decision is still Patrick\'s', /decision Patrick has not made/.test(listSrc));
+  yes('the list says what Patrick decided and that only the take limit refuses',
+      listFlat.indexOf('Patrick decided on 28 September') !== -1 &&
+      listFlat.indexOf('THE TAKE LIMIT below is that and nothing more') !== -1);
 }
 
 // Two older comments said the same wrong thing about casts, and one counted
@@ -475,6 +487,7 @@ function world(opts) {
   };
   const g = {};
   if (opts.prop) { g.__thornswoodProperty = opts.prop; }
+  if (opts.takeLimit) { g.__thornswoodTakeLimit = opts.takeLimit; }
   const make = new Function('mp', 'log', 'console', 'globalThis',
                             guardSrc + '\n' + auditSrc + '\nreturn mp;');
   make(mp, fakeLog, fakeConsole, g);
@@ -592,6 +605,25 @@ if (guardSrc !== null && auditSrc !== null) {
     yes('T9 no arguments at all still answers undefined', w.take() === undefined && w.drop() === undefined);
     yes('T9 and a missing count is written as nought rather than NaN',
         w.lines.length === 2 && w.lines[0].indexOf('NaN') === -1 && w.lines[0].indexOf('took 0') !== -1);
+  }
+
+  // T10: the take limit. Its reason refuses the take with one line; its
+  //      silence, or a throw, lets it through as before.
+  {
+    const refusing = { take: function () { return 'the limit of 3 takes'; } };
+    const w = world({ prop: whiterunBox, takeLimit: refusing });
+    const out = w.take(BOB, ALICE, GOLD, 40);
+    const l = w.lines[0] || '';
+    yes('T10 a take the limit refuses answers false', out === false);
+    yes('T10 and leaves one take refused: line with the reason',
+        w.lines.length === 1 && l.indexOf('take refused: ') === 0 &&
+        l.indexOf('(the limit of 3 takes)') !== -1 && l.indexOf('the body of profile 202') !== -1);
+    const w2 = world({ prop: whiterunBox, takeLimit: { take: function () { return null; } } });
+    yes('T10 a take the limit allows answers undefined', w2.take(BOB, ALICE, GOLD, 4) === undefined &&
+        (w2.lines[0] || '').indexOf('take: ') === 0);
+    const w3 = world({ prop: whiterunBox, takeLimit: { take: function () { throw new Error('broken'); } } });
+    yes('T10 a take limit that throws lets the take through', w3.take(BOB, ALICE, GOLD, 40) === undefined &&
+        w3.errors.length === 0);
   }
 }
 
