@@ -1054,7 +1054,9 @@ namespace Thornswood
         /// installer. On 17 Sep a search for *.exe missed it, because of the
         /// .hidden on the end, and this comment said tilted spawned nothing.
         /// Taking NirnLab out changes which program Windows asks about and
-        /// nothing else. The answer is a firewall rule; see Firewall.cs.
+        /// nothing else. What Windows asked about was the WebRTC connections
+        /// the in-game voice page made after the launcher had taken the
+        /// audio; it makes none now (#911), so no firewall rule is needed.
         ///
         /// The file is edited, never rewritten. It also carries the log level,
         /// the console window geometry and the plugin folder list, none of
@@ -1100,9 +1102,10 @@ namespace Thornswood
                 // produced exactly that box.
                 //
                 // Choosing a backend here is also not a way to get rid of the
-                // firewall prompt. Whichever one runs starts a second program
-                // that binds a socket, so the prompt follows the backend
-                // rather than going away. Firewall.cs is what settles it.
+                // firewall prompt. Whichever one runs starts a second program,
+                // so the prompt follows the backend rather than going away.
+                // What settles it is the voice page making no WebRTC
+                // connection in the game's browser (#911).
                 string want = nirnlab ? "nirnlab" : "tilted";
 
                 string text = File.ReadAllText(PlatformIni);

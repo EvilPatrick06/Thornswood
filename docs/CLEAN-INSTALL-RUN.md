@@ -226,7 +226,7 @@ takes it here, and row 30 records which order the tester really took.
 | --- | --- | --- | --- | --- |
 | 37 | Go back to the launcher. Write down the words on the Play button and any question it asks, and press the button if it asks nothing. | | | |
 | 38 | Answer yes to the question about a Skyrim folder of its own. Copy the whole question word for word, then the percentages the log shows, and how long it took. | | | |
-| 39 | Write down the administrator prompt for the firewall rule, and what the tester chose. | | | |
+| 39 | Write down any Windows prompt while the folder is made. There should be none: the launcher no longer asks for administrator for a firewall rule. | | | |
 | 40 | Write down the restart, and copy the log line that starts "Thornswood's own Skyrim folder is ready at" (M5). | | | |
 | 41 | Measure whether the Address Library and Start On Save are in the own folder (M4 again). | | | |
 | 42 | Write down the Client row on the Play page, and any log lines about putting the client runtime back (M5). | | | |

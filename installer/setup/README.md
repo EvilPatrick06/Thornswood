@@ -141,8 +141,8 @@ The installer does not make the folder. The launcher does (`OwnGame.Make`),
 out of what Vortex has deployed, and nothing is deployed while this window is
 up. So the tick answers the launcher's own question in advance: it goes to the
 script as `-MakeOwnGame`, into `config.json` as `MakeOwnGame`, and the launcher
-then makes the folder without asking once Vortex has deployed, asking Windows
-for administrator once for the firewall rule as it always does. Left unticked,
+then makes the folder without asking once Vortex has deployed. Nothing asks
+for administrator: the firewall rule it used to ask for is gone (#911). Left unticked,
 which is the default, nothing changes: no argument, no field, and the launcher
 asks as it did before. A chosen Vortex folder is checked the way
 `OwnGame.PointAt` checks it (SkyrimSE.exe and `Data\vortex.deployment.json`)

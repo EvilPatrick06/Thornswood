@@ -728,6 +728,23 @@
     onNet = function (m) {
       if (!m || !m.t) { return; }
       if (m.t === 'welcome') { myPeer = Number(m.peer) || 0; return; }
+      /*
+        The relay guard comes before the peer list, not after it.
+
+        It used to sit below this line, so in relay mode a peer list still
+        reached reconcile, and reconcile built a WebRTC connection to every
+        other person in the room before open threw on the audio context relay
+        mode never makes. Measured in cef_debug.log on 26 September: the
+        launcher had the microphone from 14:28:01, and at 14:29:03, when a
+        second person joined, the game's browser made a peer connection, the
+        network service in SkyrimPlatformCEF.exe.hidden started its mDNS
+        responder, and the chat logged "listener threw: TypeError: Cannot read
+        properties of null (reading 'createGain')". A WebRTC connection opens
+        UDP sockets on every network the machine has, which is what makes
+        Windows Firewall ask about the game's browser. The launcher's voice
+        page does all of this in WebView2, so this page has no reason to.
+      */
+      if (inRelay() && (m.t === 'sdp' || m.t === 'ice' || m.t === 'peers')) { return; }
       if (m.t === 'peers') { reconcile(m.peers); return; }
       if (m.t === 'pos') { lastWho = m.who || {}; place(); return; }
       if (m.t === 'vmode') {
@@ -741,11 +758,11 @@
       }
       /*
         Once the launcher holds the audio, this page is a HUD and must not
-        answer for the connection. It used to, which is the other half of the
-        handoff defect below: relay mode dropped the connections and then
-        rebuilt them from the very next offer that arrived.
+        answer for the connection (the guard above). It used to, which is the
+        other half of the handoff defect below: relay mode dropped the
+        connections and then rebuilt them from the very next offer that
+        arrived.
       */
-      if (inRelay() && (m.t === 'sdp' || m.t === 'ice' || m.t === 'peers')) { return; }
       if (m.t === 'sdp') { onSdp(m); return; }
       if (m.t === 'ice') { onIce(m); return; }
       if (m.t === '__closed') {
@@ -781,6 +798,12 @@
   }
 
   function open(id, info, initiator) {
+    // No connection is built unless this page is the one playing the audio.
+    // In relay mode the launcher is, and with no audio context there is
+    // nowhere to play it. Checked before the RTCPeerConnection rather than
+    // after: making one is what opens the sockets Windows Firewall asks about,
+    // and the old order made it and then threw on ctx, leaving it open.
+    if (inRelay() || !ctx) { return; }
     var pc = new RTCPeerConnection({ iceServers: ICE });
     var gain = ctx.createGain();
     var panner = ctx.createPanner();
