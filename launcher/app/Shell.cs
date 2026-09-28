@@ -3071,7 +3071,7 @@ namespace Thornswood
                 "Downgrade Skyrim to 1.6.1170?\n\n" +
                 "Steam only hands over an older build through its own console, so the launcher works that console for you. " +
                 "Steam's window comes to the front, the launcher clicks the console's command line and types these three lines into it, one at a time, each after the one before has finished downloading:\n\n" +
-                string.Join("\n", Downgrade.Commands()) + "\n\n" +
+                string.Join("\n", Downgrade.Commands(cfg)) + "\n\n" +
                 "Steam downloads about 11 GB under your own account, and the launcher then copies the files over the Steam copy of Skyrim. " +
                 "Do not type or click while Steam's window is in front, or the keys go to the wrong place.",
                 "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
