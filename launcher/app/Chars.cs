@@ -655,11 +655,15 @@ namespace Thornswood
                 // Skyrim Platform) has no H.264, so the .mp4 never played and
                 // the still stood in for the loop. The .mp4 stays as the
                 // fallback for a game folder from before the .webm.
+                // Issue #609: when a loop file is present, do not also name
+                // the still. The page starts on the zoomed loop alone; the
+                // still is only for installs that have no playable loop.
+                bool menuLoop = false;
                 if (File.Exists(Path.Combine(ui, "thornswood-menu.webm")))
-                    extra.Append(",\"video\":\"thornswood-menu.webm\"");
+                { extra.Append(",\"video\":\"thornswood-menu.webm\""); menuLoop = true; }
                 else if (File.Exists(Path.Combine(ui, "thornswood-menu.mp4")))
-                    extra.Append(",\"video\":\"thornswood-menu.mp4\"");
-                if (File.Exists(Path.Combine(ui, "thornswood-menu.jpg")))
+                { extra.Append(",\"video\":\"thornswood-menu.mp4\""); menuLoop = true; }
+                if (!menuLoop && File.Exists(Path.Combine(ui, "thornswood-menu.jpg")))
                     extra.Append(",\"still\":\"thornswood-menu.jpg\"");
                 // The scroll in front of the choice (thornswood-select.js).
                 // The page's "Start without the scroll next time" has the
