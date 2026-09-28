@@ -475,15 +475,49 @@ function goldDescriptors(text) {
   yes('the reader finds gold however it is written, and does not take frost salts for it',
       planted.seen === 3 && planted.gold.length === 2);
 
-  const real = goldDescriptors(src);
+  /*
+    EXCEPT THE TESTERS' TWO TABLES. Patrick, 27 September: "/give is an
+    admin/tester command I should be able /give any item I like". So
+    ITEM_NAMES and ADMIN_NAMES, which only /give and /spawn read, name gold
+    like any other item. That is a tester's tool behind the playtester gate,
+    not a mint anybody playing can reach, and the checks after this one hold
+    both halves of that: nothing else reads those tables, and /give stays
+    behind the gate. Everything outside them still names no gold.
+  */
+  function cut(text, start, end) {
+    const a = text.indexOf(start);
+    const b = a < 0 ? -1 : text.indexOf(end, a);
+    return a < 0 || b < 0 ? null : text.slice(0, a) + text.slice(b + end.length);
+  }
+  const noItems = cut(src, '  // ==== ITEM_NAMES ====', '  // ==== end ITEM_NAMES ====');
+  const outside = noItems && cut(noItems, '  // ==== ADMIN_NAMES ====', '  // ==== end ADMIN_NAMES ====');
+  yes('the testers\' two tables were found and set aside', !!outside);
+  const inside = goldDescriptors(src);
+  yes('and they do name gold, so /give gold works for a tester', inside.gold.length > 0);
+  const real = goldDescriptors(outside || src);
   yes('it read ' + real.seen + ' descriptors out of the gamemode', real.seen > 10000);
   yes('including the tables that hand things over: the wolf pelt a body gives, corundum ore, ' +
       'a salt pile, the shift and an armour recipe\'s output',
       real.all.has('3ad74:Skyrim.esm') && real.all.has('5acdb:Skyrim.esm') &&
       real.all.has('34cdf:Skyrim.esm') && real.all.has('1be1a:Skyrim.esm') &&
       real.all.has('d62:Hothtrooper44_ArmorCompilation.esp'));
-  yes('and not one of them is gold' + (real.gold.length ? ': ' + real.gold.slice(0, 5).join(', ') : ''),
+  yes('and outside the testers\' tables not one of them is gold' +
+      (real.gold.length ? ': ' + real.gold.slice(0, 5).join(', ') : ''),
       real.gold.length === 0);
+  if (outside) {
+    const outCode = blankOut(outside).code;
+    const refs = function (name) { return (outCode.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length; };
+    const build = bodyOf('chat commands/buildThings') || '';
+    const beasts = bodyOf('chat commands/buildBeasts') || '';
+    yes('ITEM_NAMES and ADMIN_ITEMS are read by the /give index and nothing else',
+        refs('ITEM_NAMES') === (build.match(/\bITEM_NAMES\b/g) || []).length &&
+        refs('ADMIN_ITEMS') === (build.match(/\bADMIN_ITEMS\b/g) || []).length &&
+        refs('ADMIN_ITEMS') > 0);
+    yes('ADMIN_ACTORS is read by the /spawn index and nothing else',
+        refs('ADMIN_ACTORS') > 0 && refs('ADMIN_ACTORS') === (beasts.match(/\bADMIN_ACTORS\b/g) || []).length);
+    yes('and /give and /spawn still refuse anybody who is not a playtester',
+        /if \(word === '\/give' \|\| word === '\/spawn'\) \{\s*if \(!isPlaytester\(profileId\)\) \{/.test(src));
+  }
 }
 
 {
@@ -528,8 +562,8 @@ function goldDescriptors(text) {
 
   // The testers' /give can only hand over what its index holds, and the index
   // is built out of this file's own tables and nothing the engine is asked.
-  // So if Patrick ever wants /give gold for a test, that is a second mint and
-  // a decision, and section 3 is where it will say so.
+  // Patrick decided on 27 September that /give reaches every item, gold
+  // included; section 3 says where that is allowed and holds the gate.
   const build = bodyOf('chat commands/buildThings');
   yes('the /give index is built out of this file\'s tables and never asks the engine for a form',
       build !== null && /ORES_BY_BASE/.test(build) && /RECIPES_BY_ID/.test(build) &&

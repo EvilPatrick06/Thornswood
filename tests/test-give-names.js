@@ -41,6 +41,7 @@ function cut(from, to) {
 // ------------------------------------------------------------------ A --
 const recipes = cut('  var RECIPES_BY_ID = {', '\n  };');
 const names = cut('  var ITEM_NAMES = {', '\n  };');
+const admin = cut('  // ==== ADMIN_NAMES ====', '  // ==== end ADMIN_NAMES ====') || '';
 const itemsLine = (src.match(/^const ITEMS = .*;$/m) || [null])[0];
 const fns = cut('  function addThing(idx, name, desc) {', "\n  function buildBeasts() {");
 const finder = cut('  function findIn(idx, want, kind) {', "return findIn(buildThings(), want, 'items'); }");
@@ -55,11 +56,12 @@ yes('buildThings reads ITEM_NAMES', !!fns && fns.indexOf('ITEM_NAMES') !== -1);
 yes('RECIPES_BY_ID, ITEMS, buildThings and findThing were found', !!recipes && !!itemsLine && !!fns && !!finder2);
 
 if (names && recipes && itemsLine && fns && finder2) {
-  const box = { log: function () {} };
+  const logged = [];
+  const box = { log: function () { logged.push(Array.prototype.join.call(arguments, ' ')); } };
   vm.createContext(box);
   vm.runInContext(itemsLine.replace(/^const /, 'var ') + '\n' +
     'var ORES_BY_BASE = {}, HARVESTS_BY_BASE = {}, CROPS_BY_BASE = {}, FISH_BY_BASE = {}, HUNTS_BY_BASE = {};\n' +
-    'var thingIndex = null;\n' + recipes + '\n' + names + '\n' +
+    'var thingIndex = null;\n' + recipes + '\n' + names + '\n' + admin + '\n' +
     fns.replace(/\n  function buildBeasts\(\) \{$/, '') + '\n' + finder2, box);
   const give = function (w) { return box.findThing(String(w).toLowerCase()); };
   const cases = [
@@ -76,6 +78,7 @@ if (names && recipes && itemsLine && fns && finder2) {
     const hit = give(c[0]);
     yes('/give ' + c[0] + ' finds ' + c[2], !!hit && hit.desc === c[2] && (!c[1] || hit.name === c[1]));
   }
+  yes('the index built without an error: ' + (logged.join('; ') || 'nothing logged'), logged.length === 0);
   const miss = give('zzz not an item');
   yes('a name nobody has still says Nothing called that', !!miss && !miss.desc && /Nothing called that/.test(miss.why));
 }

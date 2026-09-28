@@ -46,7 +46,9 @@ const RULE_NOT_OWN = 'not your own';
 // ---------------------------------------------------------------- the card
 // Shell.cs finds the card by its name and hides it once the person has played,
 // so the StackPanel has to survive whatever happens to the words inside it.
-const a = xaml.indexOf('<StackPanel x:Name="FirstRunCard">');
+// Found by its name alone: the tag has since gained a Margin, and whatever
+// else it gains is not what this is about.
+const a = xaml.search(/<StackPanel x:Name="FirstRunCard"[\s>]/);
 const b = a < 0 ? -1 : xaml.indexOf('<StackPanel x:Name="QuickKeysCard"', a);
 const card = (a >= 0 && b > a) ? xaml.slice(a, b) : '';
 yes('ui.xaml still has the FirstRunCard StackPanel', card !== '');
