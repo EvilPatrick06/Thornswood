@@ -49,6 +49,19 @@ Yes 'the release upload markers are in Publish-Update.ps1' ($a -ge 0 -and $b -gt
 if ($a -lt 0 -or $b -le $a) { Write-Host ''; Write-Host '0 passed, 1 failed'; exit 1 }
 $block = $src.Substring($a, $b - $a)
 
+# Since the source footer (partial #421) the block reads the two build records
+# through $PSScriptRoot and calls Get-ReleaseSourceFooter, which the script
+# defines just above it. Invoke-Expression runs the block with $PSScriptRoot
+# empty, so it is pointed at the folder the script is in, and the footer
+# function is lifted from the same file by its syntax tree.
+$releaseDir = Split-Path -Parent (Resolve-Path -LiteralPath $PublishPath).Path
+$block = $block.Replace('$PSScriptRoot', '$releaseDir')
+$tk = $null; $pe = $null
+$pubAst = [System.Management.Automation.Language.Parser]::ParseInput($src, [ref]$tk, [ref]$pe)
+$footerFn = $pubAst.Find({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-ReleaseSourceFooter' }, $true)
+Yes 'Publish-Update.ps1 still has Get-ReleaseSourceFooter to lift' ($null -ne $footerFn)
+if ($footerFn) { Invoke-Expression $footerFn.Extent.Text }
+
 # ---- the stand-ins ----------------------------------------------------------
 # The flags gh 2.100.0 takes on each subcommand this block uses, read off
 # gh release create --help, gh release upload --help and gh release edit
@@ -109,6 +122,9 @@ Yes 'dev: and the repository' ($c.Count -eq 1 -and ((@($c[0].argv) -join ' ') -m
 Yes 'dev: nothing uploaded into an existing release' ((Calls 'upload').Count -eq 0)
 Yes 'dev: no edit needed after a create' ((Calls 'edit').Count -eq 0)
 Yes 'dev: gh took every flag' (NoneRejected)
+Yes 'dev: the notes carry the source footer, read from the two build records' (
+    $c.Count -eq 1 -and ((@($c[0].argv) -join ' ') -match 'Source for the SkyMP files Thornswood ships') -and
+    @($script:said | Where-Object { $_ -match 'source footer could not be built' }).Count -eq 0)
 
 # ---- a main release, created first time -------------------------------------
 Run-Upload $false @{}
