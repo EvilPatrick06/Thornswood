@@ -111,6 +111,18 @@ try {
         $room = Get-LiveOnline
         Yes 'Get-LiveOnline names the data folder the gamemode uses' (
             $room.Data -replace '\\','/' -match '/data$')
+        Yes 'a gamemode older than the names file gives no names' (@($room.Names).Count -eq 0)
+
+        # Issue #520: who, from the private folder, never the served one.
+        $priv = Join-Path $box 'private'
+        New-Item -ItemType Directory -Path $priv -Force | Out-Null
+        [IO.File]::WriteAllText((Join-Path $priv 'online-names.json'),
+            '{"at":1790000000000,"names":["Ahlam","Brynjolf","Camilla"]}')
+        $room = Get-LiveOnline
+        Yes "the private online-names.json gives who is on (got $(@($room.Names) -join ', '))" (
+            (@($room.Names) -join ',') -eq 'Ahlam,Brynjolf,Camilla')
+        Yes 'and the warning line carries them' ((Format-Names $room.Names) -eq ': Ahlam, Brynjolf, Camilla')
+        Yes 'and no names adds nothing to it' ((Format-Names @()) -eq '')
 
         Remove-Item -LiteralPath $online -Force
         $n = OnlineNow
@@ -124,6 +136,7 @@ try {
         [IO.File]::WriteAllText($settings, ('{"port":' + $downPort + ',"dataDir":"data"}'))
         $n = OnlineNow
         Yes "nothing on the port is nobody, whatever online.json says (got $n)" ($n -eq 0)
+        Yes 'and whatever names it left behind' (@((Get-LiveOnline).Names).Count -eq 0)
 
         $elsewhere = Join-Path $work 'elsewhere'
         New-Item -ItemType Directory -Path $elsewhere -Force | Out-Null
