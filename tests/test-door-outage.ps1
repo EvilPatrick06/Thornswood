@@ -104,6 +104,14 @@ namespace Thornswood
 {
     STANDING_GOES_HERE
 
+    // Stands in for launcher\app\Swallow.cs, which Door.cs calls from its
+    // catch blocks since the silent catches were given a log line (#461).
+    // The real one writes to Paths.LogFile, which this driver has no use for.
+    public static class Swallow
+    {
+        public static void Note(string where, Exception e) { }
+    }
+
     public static class Discord
     {
         public static string Folder = "";
