@@ -194,11 +194,20 @@ yes('the site still makes secret on first start and signs tickets with it',
 
 // ---------------------------------------------------------------- the bot token ---
 const tok = row(/bot token/i) || ['', '', '', ''];
-yes('the bot token row names both files it lives in and both scripts that write it',
+// Since issue #466 one writer, scripts\vps\Write-BotToken.ps1, puts the token
+// in both files or neither, and every script that takes a token goes through it.
+yes('the bot token row names both files it lives in, the one command and the one writer',
     /config\.json/.test(tok[1]) && /bot\.env\.json/.test(tok[1]) &&
+    /Rotate-BotToken\.ps1/.test(tok[3]) && /Write-BotToken\.ps1/.test(tok[3]) &&
     /Set-DiscordLogin\.ps1/.test(tok[3]) && /Install-Bot\.ps1/.test(tok[3]));
-yes('Set-DiscordLogin.ps1 and Install-Bot.ps1 still each write the token',
-    /\$d\.botToken = \$botToken/.test(read('scripts/deploy/Set-DiscordLogin.ps1')) && /DISCORD_TOKEN'\] = /.test(installBot));
+const tokenWriter = read('scripts/vps/Write-BotToken.ps1');
+yes('Write-BotToken.ps1 still writes DISCORD_TOKEN and discord.botToken together',
+    /\$env2\['DISCORD_TOKEN'\] = \$Token/.test(tokenWriter) && /\$d\['botToken'\] = \$Token/.test(tokenWriter));
+yes('Rotate-BotToken.ps1, Set-DiscordLogin.ps1 and Install-Bot.ps1 all hand the token to it',
+    ['scripts/deploy/Rotate-BotToken.ps1', 'scripts/deploy/Set-DiscordLogin.ps1', 'scripts/deploy/Install-Bot.ps1']
+      .every(function (f) { return /Write-ThornswoodBotToken -Token/.test(read(f)); }) &&
+    !/\$d\.botToken = \$botToken/.test(read('scripts/deploy/Set-DiscordLogin.ps1')) &&
+    !/DISCORD_TOKEN'\] = /.test(installBot));
 
 // ------------------------------------------------------------------- the voice ---
 const vk = row(/voice/i) || ['', '', '', ''];
