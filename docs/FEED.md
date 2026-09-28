@@ -11,7 +11,8 @@ who reads it, and what goes wrong when it is wrong.
 
 ### Host cutover (#649) - live URL shape
 
-Confirmed with Website. Signing / `ExpectedSigner` is still **off**.
+Confirmed with Website. Code signing is on since 27 Sep; what it checks and
+what it does not is under "Checks on every download".
 
 | What | URL |
 | --- | --- |
@@ -50,9 +51,19 @@ use the website".
 - **Where the bytes are.** On the VPS, `C:\Thornswood-Docs\feed\assets\<sha256>`
   and `C:\Thornswood-Docs\feed-dev\assets\<sha256>`, served by `site\server.js`
   at the asset urls in the table above, with Range resume and immutable
-  caching. Measured 28 Sep: both feeds together name 94 distinct assets,
-  532,163,762 bytes (0.50 GiB); one copy per channel folder is at most about
-  0.74 GB, and most of it was already up there.
+  caching. Each channel has its own folder and holds its own copy: a file both
+  feeds name is stored twice, once in each. The route answers only a name of
+  64 lowercase hex characters; there is no listing of the folder, and a
+  `.part` left by a dropped send is never served.
+- **What is up there, 28 Sep.** The one-off copy below was run that day: it
+  sent 2 assets to `feed` (6.7 MB) and 25 to `feed-dev` (339.6 MB), each
+  checked against the feed's sha256 first, and wrote no `version.json`. After
+  it, every asset both live feeds name answers at its site url with the size
+  GitHub recorded for it (77 of 77 on main, 94 of 94 on dev). On disk: `feed`
+  79 files, 371 MB; `feed-dev` 100 files, 564 MB; 75 files (354 MB) are in
+  both. Ten files no feed names any more (old launchers and client runtimes,
+  35 MB) and two old `version.json` copies in `feed-dev` are left for a person
+  to clear.
 - **How a release gets there.** `Publish-Update.ps1` (default `-AssetHost site`)
   sends every pack, the launcher and the client runtime with
   `Remirror-Site-Feed.ps1 -Send` (scp to `<sha256>.part`, then renamed) BEFORE
@@ -71,7 +82,13 @@ use the website".
   sha256 and sends it. It never writes a feed.
 - **Launchers in the field** need nothing new: `thornswood.net` has been on the
   host allow list since before 25 Sep, and a download is checked for https, the
-  host and the sha256 only.
+  host and the sha256, plus the signer for a launcher exe (see "Checks on every
+  download").
+- **The urls on the feeds today.** Both live feeds still name GitHub for every
+  download (main 77, dev 94), though the site holds every one of them. The dev
+  ones move at the next dev Ship. Main's move at the next main Ship, or now
+  with `Repair-Manifest.ps1 -MoveToSite` then `Remirror-Site-Feed.ps1`, which
+  is Patrick's call; its `-DryRun` on 28 Sep said all 77 would move.
 - **Still on GitHub for now:** `version.json` history and the baseline
   (`published.json`) live in the Releases clones, which are pushed to
   `Thornswood-Releases` as before, and `updateRepo` keeps naming it. That is
@@ -194,14 +211,15 @@ application id (`Config.cs:160-164`).
 Those `api.github.com/.../releases/assets/<id>` addresses are what the
 publisher wrote before #445. They still work and are left alone; the site feed
 at `https://thornswood.net/feed/version.json` serves the same packs as
-`/feed/assets/<sha256>`, and a release published from now on writes the browser
-download address on the GitHub side.
+`/feed/assets/<sha256>`. A release published since #445 wrote the browser
+download address on the GitHub side, and one published since #897 writes the
+site address.
 
 The dev feed (branch `dev`, commit 12f71c8) has the same shape with
 `serverPort` `"7787"`, `voicePort` `"7789"`, `voiceUrl`
 `"https://thornswood.net/voice-dev"`, `launcherVersion` `"1.1.95.11"`,
-`collectionUrl` ending `7essxf` rather than main's `ombo2a`, pack ids ending
-`-dev`, and a non-empty `mainVersion`.
+`collectionUrl` ending `7essxf` where main's then ended `ombo2a` (both end
+`7essxf` since), pack ids ending `-dev`, and a non-empty `mainVersion`.
 
 ## Top-level fields
 
@@ -215,7 +233,7 @@ launcher.
 | Field | Type | Written by | Read by | If wrong or missing |
 | --- | --- | --- | --- | --- |
 | `launcherVersion` | string, dotted numbers | `Publish-Update.ps1:1251`, from `Version` in `launcher/app/Updater.cs:13` or Ship's dev number | `Shell.cs:4610`, `Updater.IsNewer` (`Updater.cs:87-108`) | Offered only when higher, part by part. Equal or lower offers nothing. A number that does not parse is offered whenever it differs. Not saved. |
-| `launcherUrl` | string, https | `Publish-Update.ps1`, the asset's browser download address since #445 (the `api.github.com` asset id address only when gh named no browser one) | `Updater.SelfUpdate` (`Updater.cs:945-948`) | Empty: no launcher update is offered (`Shell.cs:4610-4611`). Must pass the host list below. |
+| `launcherUrl` | string, https | `Publish-Update.ps1`: since #897 the site address `/feed[-dev]/assets/<sha256>`; with `-AssetHost github`, the asset's browser download address (#445) | `Updater.SelfUpdate` (`Updater.cs:945-948`) | Empty: no launcher update is offered (`Shell.cs:4610-4611`). Must pass the host list below. |
 | `launcherSha256` | string, 64 hex | `Publish-Update.ps1:1253` | `Updater.Download` (`Updater.cs:436-448`) | Empty: download refused. Mismatch: file deleted, update fails. |
 | `serverAddress` | string | `Publish-Update.ps1:1316-1321` from config `ServerAddress`; `Set-Server.ps1:97`; `Set-Vps.ps1` | `Shell.cs:4548` | Saved. A change stops Ship unless `-MoveServer` (`Publish-Update.ps1:1289-1303`); the dev channel skips that check. Wrong: everybody connects to the wrong box. |
 | `serverPort` | string | as above, `ServerPort` | `Shell.cs:4550` | Saved. Must be a string; the launcher field is a string. |
@@ -242,7 +260,7 @@ launcher.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | `yyyyMMdd-HHmm`, `-dev` added on the dev channel, `-<part>` added when a release is split to stay under GitHub's 2 GiB asset limit (`Publish-Update.ps1:762,768-804`). Compared case-insensitively with `applied.txt`. An empty id is never offered. |
-| `url` | string | A GitHub release asset in the feed's `updateRepo`, **or** a thornswood.net host asset under `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>` (`Feed-Rules.ps1`). A GitHub one is written as the browser download address, `https://github.com/<owner>/<name>/releases/download/<tag>/<file>`, since #445: it hands over the same bytes as the `api.github.com` asset id address and counts against no quota. Empty: the launcher skips it and writes it off as applied. A url that answers 404 fails the whole update and Play stays off. |
+| `url` | string | A GitHub release asset in the feed's `updateRepo`, **or** a thornswood.net host asset under `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>` (`Feed-Rules.ps1`). Since #897 a new pack is written as the site address. A GitHub one (`-AssetHost github`, or a pack published before 28 Sep) is the browser download address, `https://github.com/<owner>/<name>/releases/download/<tag>/<file>`, since #445: it hands over the same bytes as the `api.github.com` asset id address and counts against no quota. Empty: the launcher skips it and writes it off as applied. A url that answers 404 fails the whole update and Play stays off. |
 | `sha256` | string, 64 hex | Mandatory; checked after download (`Updater.cs:436-448`). |
 | `notes` | string | The whole Ship note, first line first. The update card shows it (`Shell.cs:4669-4670`). |
 | `name`, `bytes` | string, number | Optional packs only: the Add-ons tab shows them (`Config.cs:354-360`). Publish-Pack also writes `notes` as a file count. |
@@ -293,14 +311,21 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
   `api.github.com` (`Updater.cs:46-52`).
 - **sha256.** Required for packs, the launcher and the client runtime; an empty
   one refuses the download (`Updater.cs:428-451`).
-- **Signature.** `ExpectedSigner` is empty, so the launcher exe's signature is
-  not checked yet (`Updater.cs:881-901`).
+- **Signature.** A downloaded launcher exe must carry a signer whose Subject
+  contains `ExpectedSigner` (`Gavin Knotts`, `Updater.CheckSigner`), checked
+  before the swap, in every launcher from dev 1.1.101.17 on. Main's live
+  1.1.101 predates it and is itself unsigned; dev 1.1.101.34 is signed and
+  timestamped. The check reads the embedded certificate's Subject and does not
+  verify the signature or its chain, so it is weaker than it reads (#912).
+  Packs and the client runtime are zips and are not signed: the host and the
+  sha256 are their only checks.
 - **Quota.** Nothing a launcher fetches spends the sixty anonymous
   `api.github.com` requests an hour any more (#445): the feed is on
-  thornswood.net, its assets are too, and a GitHub asset url written from now
-  on is the browser download address, which redirects to the asset CDN and
-  counts against nothing. Packs already on the feed keep the addresses they
-  were published with; `Repair-Manifest.ps1` is what takes an old one off.
+  thornswood.net, and since #897 so is every new download. The GitHub urls
+  still on a feed are browser download addresses (redirected to the asset
+  CDN, no quota) or older `api.github.com` asset id addresses; the next Ship on
+  each channel, or `Repair-Manifest.ps1 -MoveToSite`, moves them all to the
+  site.
 - **Publish side.** `Feed-Rules.ps1` refuses a new pack whose url is neither a
   release asset in `updateRepo` nor a thornswood.net feed asset under
   `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>`. Since #897 every new
@@ -309,8 +334,13 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
   way). `Check-Secrets.ps1` scans every zip
   and exe before upload. Nothing is written to the feed if any asset failed to
   upload, and `version.json` is written without a byte order mark.
-- **Signing.** `ExpectedSigner` is still empty/absent - Azure Artifact Signing
-  is out of scope for the #649 cutover. Do not invent secrets.
+- **Signing.** On since 27 Sep: `Ship.ps1` and `Publish-Installer.ps1` refuse
+  a launcher or setup program that is not Authenticode Valid under
+  `ExpectedSigner` (CONTRIBUTING.md, `records\signing\README.md`).
+- **Optional packs are the exception.** `Publish-Pack.ps1` still uploads to a
+  GitHub release in Thornswood-Releases; it has no site path yet. It publishes
+  nothing today (`optional-packs.txt` lists none), but it must send to the site
+  before anybody uses it again, or before the repository goes.
 
 ## Main and dev
 
@@ -341,26 +371,27 @@ is what happened on 21 September, when 1.1.76 was undone by 1.1.77
 
 ## What looks wrong in the feeds today
 
-Re-checked against the live feed (main commit a22e4ef, dev commit 12f71c8):
-the three problems this section used to list have all cleared.
+Re-checked on 28 Sep against both live feeds on thornswood.net and the records
+in this repository (#897). The three problems this section once listed (dead
+private packs, main and dev launcher versions apart, `Updater.cs` behind the
+feed) are still cleared: main holds 75 packs and dev 92, none under the private
+source repository; main's `launcherVersion` is `1.1.101`, the same as `Version`
+in `Updater.cs` and as the dev feed's `mainVersion`; dev is on `1.1.101.34`.
+Both feeds carry `collectionUrl` ending `7essxf` and `collectionRevision` 1.
+The stale-main-clone hazard in `Publish-Update.ps1` still exists, so keep the
+releases clone pulled before a dev Ship.
 
-- **The dead private packs are gone.** The live feed once carried 164 packs
-  under the private source repository that no launcher could download; the
-  main feed now holds 69 packs and 0 of them point at
-  `repos/EvilPatrick06/Thornswood/...`. Every pack url is a release asset in
-  `updateRepo` (`Feed-Rules.ps1:8-14,55-64`), so a launcher with a lost or
-  incomplete `applied.txt` can fetch them all.
-- **Main and dev launcher versions agree.** The dev feed's `mainVersion` is
-  `"1.1.95"`, matching main's `launcherVersion` `1.1.95` (it used to be stuck
-  on `"1.1.37"`), and only 1 of the 40 dev news entries is marked `"dev"`. The
-  stale-main-clone hazard in `Publish-Update.ps1:1557-1561` still exists, so
-  keep the releases clone pulled before a dev Ship.
-- **`Updater.cs:13` and the live feed match.** The launcher's `Version` is
-  `1.1.95` and so is the feed's `launcherVersion`. `Bump-Version.ps1:66-112`
-  reads the live feed and climbs past it, so the next main number stays safe as
-  long as the releases clone is pulled first.
+What differs, none of it broken:
 
-The one standing gap is not new and is by design for now: `ExpectedSigner` is
-still empty/absent in the feed, so the launcher exe's signature is not checked
-(`Updater.cs:881-901`, and "Checks on every download" above). Do not read that
-as a signer that failed to publish; no signer has been set yet.
+- **Every download url still names GitHub** (main 77, dev 94), though the site
+  holds every one; see "Downloads come from the site" for when they move.
+- **Main's client runtime is behind the record.** Main names fork
+  commit `9732d2cc`; `records\client-build.json` and the dev feed are on
+  `ccf71644`. The next main Ship carries it.
+- **Main has no Skyrim pin fields.** The dev feed's `expectedExeBytes`,
+  `newerExeBytes` and `depots` match `records\skyrim-pin.json`; main was last
+  published before #874 added them, so main launchers use their compiled
+  values until the next main Ship.
+- **Main's live launcher is unsigned** (1.1.101 predates signing); the next
+  main Ship is the first signed one. See "Checks on every download" for what
+  the signer check does and does not prove (#912).

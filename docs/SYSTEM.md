@@ -31,13 +31,14 @@ flowchart LR
   end
 
   subgraph GH["GitHub"]
-    R["Thornswood-Releases<br/>version.json on main and dev"]
-    A["Release assets<br/>packs, launcher exe, client runtime"]
+    R["Thornswood-Releases<br/>version.json on main and dev<br/>fallback feed and baseline"]
   end
 
   subgraph VPS["VPS 192.135.112.23"]
     C["Caddy :80 :443<br/>thornswood.net"]
     W["Site node 127.0.0.1:3001"]
+    F["Feed and downloads<br/>/feed and /feed-dev<br/>version.json, assets by sha256"]
+    W --> F
     GS["Game server :7777<br/>resources :3000"]
     DS["Dev game server :7787<br/>resources :7788"]
     VO["Voice :7778"]
@@ -58,11 +59,12 @@ flowchart LR
   end
 
   P["Patrick's machine<br/>Ship.ps1, Deploy-*"]
-  P -->|Publish-Update: gh release, git push| R
-  P -->|uploads| A
+  P -->|Publish-Update: git push| R
+  P -->|scp: assets, then version.json| F
   P -->|ssh: Deploy-*, Install-*| VPS
-  L -->|polls version.json| R
-  L -->|downloads, sha256 checked| A
+  L -->|polls version.json| C
+  L -->|fallback, at most every 5 min| R
+  L -->|downloads, host and sha256 checked| C
   L -->|Discord sign in, installer, news| C
   G -->|UDP 7777 or 7787| GS
   L -->|voice socket| C
@@ -100,15 +102,19 @@ packs and as its own asset named in the feed's `clientRuntime`
 ## Updates, the installer and the site
 
 - **The feed.** Every launcher reads `version.json` from
-  `EvilPatrick06/Thornswood-Releases` (public) through the GitHub contents API,
-  branch `main` or `dev` (`Updater.cs:157-164`). Packs, the launcher exe and the
-  client runtime are release assets in that same repository. FEED.md has every
-  field.
+  `https://thornswood.net/feed/version.json` (dev: `/feed-dev/`) since #649,
+  and falls back to `EvilPatrick06/Thornswood-Releases` (public) through the
+  GitHub contents API, branch `main` or `dev`, only when the site does not
+  answer (`Updater.Check`). Since #897 packs, the launcher exe and the client
+  runtime are served by the site too, at `/feed[-dev]/assets/<sha256>`; urls
+  published before that still name GitHub release assets until they are moved.
+  FEED.md has every field.
 - **Who writes it.** `Ship.ps1` runs `Publish-Update.ps1`, which diffs the game
   folder against this channel's baseline
   (`published.json` in the releases clone for that channel), zips the
-  difference, uploads it with `gh release`, rewrites
-  `version.json` and pushes it. Then `Publish-News.ps1` (main only), then
+  difference, sends it and the launcher to the site's assets folder, rewrites
+  `version.json` and pushes it; `Publish-PostShip.ps1` then puts that
+  `version.json` on the site with `Remirror-Site-Feed.ps1`. Then `Publish-News.ps1` (main only), then
   `Publish-Discord.ps1` (#news, or the dev updates channel), then
   `Request-Restart.ps1`, which warns the room for five minutes
   (`Ship.ps1:1033-1098`).
