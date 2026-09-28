@@ -1980,6 +1980,11 @@
     meter alone (chopping has its own watcher below).
   */
   let restingInBed = false;
+  /* #843: chairs/benches leave controls off with no menu. The controls
+     watchdog, stuck rescue and ownTheCharacter all refuse to fight that
+     state when notOurs() says so. getFurnitureReference alone can flicker
+     null while still seated, so furnitureEnter/Exit keep a seated flag too. */
+  let seatedInFurniture = false;
 
   try {
     sp.on('furnitureEnter', guard('bedenter', (e) => {
@@ -1988,6 +1993,7 @@
       if (actorId !== 0x14) { return; }
       const ref = e ? e.target : null;
       if (!ref) { return; }
+      seatedInFurniture = true;
       try { clearBedOwnership(ref); } catch (err) { }
       let bed = false;
       try { bed = isBedRef(ref); } catch (err) { }
@@ -2000,6 +2006,7 @@
       let actorId = 0;
       try { actorId = e.actor ? e.actor.getFormID() : 0; } catch (err) { }
       if (actorId !== 0x14) { return; }
+      seatedInFurniture = false;
       if (!restingInBed) { return; }
       restingInBed = false;
       tellServer('/rest up');
@@ -2492,7 +2499,7 @@
      MEASURED 26 September after MENU_CACHE_MS and CONTROLS_CACHE_MS were
      already 250: controls was still #1 in 11/13 heartbeats (366-736 ms per
      ~30 s). The residual was this handler still calling getPlayer and
-     notOurs (getPlayer again, isDead, getFurnitureReference) on every
+     notOurs (getPlayer again, isDead, furniture/sit state) on every
      update. The whole tick now shares that quarter-second rate. */
   const CONTROLS_CACHE_MS = 250;
   let controlsCachedAt = 0;
@@ -2506,9 +2513,25 @@
     try { pc = sp.Game.getPlayer(); } catch (e) { return ''; }
     if (!pc) { return ''; }
     try { if (pc.isDead()) { return 'dead'; } } catch (e) { }
+    /* Chair/bench kick-out (#843). Sitting turns controls off with no menu.
+       enablePlayerControls / setPlayerAIDriven(false) stand people up. Three
+       signals, any one is enough: the enter/exit flag, the furniture ref,
+       and getSitState (non-zero = waiting to sit, sitting, or standing up).
+       The ref alone used to flicker null and the watchdog kicked them out. */
+    try {
+      if (typeof seatedInFurniture !== 'undefined' && seatedInFurniture) {
+        return 'in furniture';
+      }
+    } catch (e) { }
     try {
       const f = pc.getFurnitureReference();
       if (f) { return 'in furniture'; }
+    } catch (e) { }
+    try {
+      if (typeof pc.getSitState === 'function') {
+        const sit = pc.getSitState();
+        if (sit) { return 'in furniture'; }
+      }
     } catch (e) { }
     return '';
   }
