@@ -98,7 +98,7 @@ namespace Thornswood
             // on changes this item in the same release, and says what /me, /do,
             // /w and /s do here, because with the range on they are chat.
             new HelpItem("Chat and commands", "The chat box",
-                "Enter opens it and Escape gives the keyboard back to the game. A line typed there goes to everybody connected, wherever they are in Skyrim, so treat it as the whole server rather than the room. A line that starts with a slash is a command for the server and is not shown to anybody else. Text chat is kept, with the name and the time. Voice is not recorded."),
+                "Enter opens it and Escape gives the keyboard back to the game. / opens it with the slash already typed, for a command. A line typed there goes to everybody connected, wherever they are in Skyrim, so treat it as the whole server rather than the room. A line that starts with a slash is a command for the server and is not shown to anybody else. Text chat is kept, with the name and the time. Voice is not recorded."),
 
             new HelpItem("Chat and commands", "Out of character",
                 "Type /ooc and then what you meant. It goes only to people in the same place as you and within about 60 metres, in double brackets with your name on it, so nobody wonders whether your character said it. If nobody is near enough to hear it, the server tells you. /ooc can we not ends any scene at once, from anybody in it, with no reason owed."),
@@ -107,10 +107,10 @@ namespace Thornswood
                 "/roll 20 rolls one twenty sided die, and /roll 6x3 rolls three six sided ones. The server rolls it, so nobody can make a number up, and the same people /ooc reaches see the result. Up to 1000 sides and 100 dice."),
 
             new HelpItem("Chat and commands", "Voice",
-                "Hold V to talk. Voice runs in the launcher rather than in the game, so leave the launcher open while you play; it minimises by itself. B steps your voice between a whisper, which carries about 7 metres, your normal voice, about 30 metres, and a yell, about 85 metres. The further away somebody is standing, the quieter you are to them."),
+                "Hold V to talk, or press O to keep the microphone open until you press O again, for a song or a long speech. Voice runs in the launcher rather than in the game, so leave the launcher open while you play; it minimises by itself. B steps your voice between a whisper, which carries about 7 metres, your normal voice, about 30 metres, and a yell, about 85 metres. The further away somebody is standing, the quieter you are to them."),
 
             new HelpItem("Chat and commands", "Friends and trading",
-                "Look at somebody and press G to ask them to be friends, H to offer a trade, or L to stop hearing them. Those three only work with somebody under your crosshair. /yes and /no answer whatever somebody has asked you. Your friends are on the P panel, and friends are kept."),
+                "Look at somebody and press Y to ask them to be friends, H to offer a trade, or L to stop hearing them. Those three only work with somebody under your crosshair. /yes and /no answer whatever somebody has asked you. Your friends are on the P panel, and friends are kept."),
 
             // The two party items came from main (entry 336, #281), which put
             // them in place of the old item that said there were no parties.

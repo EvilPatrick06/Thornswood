@@ -87,6 +87,7 @@ function rig(opts) {
     'function journalKeyDown() { }\n' +
     'function journalKeyPressed() { }\n' +
     'function moldPress() { return false; }\n' +
+    'const COMMAND_KEY = 53; let statsPressAt = 0; function commandKeyPressed() { }\n' +
     'function busyMenuOpen() { for (const n of KEYBOARD_MENUS) { if (sp.Ui.isMenuOpen(n)) { return n; } } return ""; }\n' +
     'function lookVerb(v) { verbs.push(v); }\n';
   new Function('sp', 'T', 'claims', 'say', 'guard', 'verbs', prelude + keys)(

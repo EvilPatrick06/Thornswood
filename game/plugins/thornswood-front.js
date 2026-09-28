@@ -267,6 +267,9 @@
 
   const ini = readText(INI);
   const CHAT_KEY = iniNumber(ini, 'ChatKey', 28);       // Enter
+  // Opens the chat with a slash already in it, ready for a command. /, which
+  // is the game's Quick Stats; see STATS_MENU below for why that stays shut.
+  const COMMAND_KEY = iniNumber(ini, 'CommandKey', 53);  // /
   /*
     Profession, Class and Skill Tree. K, which was the minimap's settings
     panel until 20 September; that moved to F10 in Keys.cs and this took the
@@ -304,23 +307,22 @@
     "P for the Party menu... J for Journal".
 
     DirectInput scan codes, the same as ChatKey and SkillsKey above, because
-    that is what buttonEvent hands back. G, H and B do nothing in vanilla
+    that is what buttonEvent hands back. Y, H and L do nothing in vanilla
     Skyrim and are only armed while somebody is under the crosshair, so even a
     mod that wanted one of them would keep it the rest of the time.
   */
   const PARTY_KEY   = iniNumber(ini, 'PartyKey', 25);      // P
   const JOURNAL_KEY = iniNumber(ini, 'JournalKey', 36);    // J
-  const FRIEND_KEY  = iniNumber(ini, 'FriendKey', 34);     // G
+  const FRIEND_KEY  = iniNumber(ini, 'FriendKey', 21);     // Y, not G: G is the emote wheel (#529)
   const TRADE_KEY   = iniNumber(ini, 'TradeWithKey', 35);  // H
   /*
     MuteThemKey, NOT MuteKey. MuteKey is already in this same file and is the
-    microphone: "Mute the microphone... for when somebody walks into the
-    room", Keys.cs, default Y. Reusing the name would have made one launcher
-    row set two different things, and the first person to rebind their
-    microphone would have rebound this as well.
+    microphone's, once a row on the Controls page with nothing reading it
+    (it went in #529). Reusing the name would have made one launcher row set
+    two different things.
 
-    L rather than B or N or M: WheelKey is B, StopKey is N and MenuKey is M,
-    all of them in this file already.
+    L rather than G, B or N: WheelKey is G, VoiceModeKey is B and StopKey is
+    N, all of them in this file already.
   */
   const MUTE_KEY    = iniNumber(ini, 'MuteThemKey', 38);   // L
   /*
@@ -1354,9 +1356,11 @@
   let heldSince = 0;    // when the keyboard was handed over, for the hard cap
   let boxReady = false; // the page has said, once, that it has a chat box
 
-  function wantTyping(on) {
+  // prefill is typed into an empty box as it opens: '/' from the command key.
+  function wantTyping(on, prefill) {
     if (on) {
       if (claims.chat) return;
+      const fill = JSON.stringify(String(prefill || ''));
 
       // Once the page has reported a box, the keyboard goes over immediately
       // and the page is told afterwards. Waiting for the answer first was
@@ -1371,13 +1375,13 @@
         beat = Date.now();
         heldSince = Date.now();
         T.claimFocus('chat', true);
-        T.js('try{if(window.thornswoodChat){window.thornswoodChat.focusInput();window.thornswoodChat.state();}else{window.skyrimPlatform.sendMessage("thornswood-front","the page has no chat object, so there is nothing to type into");}}catch(e){try{window.skyrimPlatform.sendMessage("thornswood-front","focusInput threw "+e);}catch(e2){}}');
+        T.js('try{if(window.thornswoodChat){window.thornswoodChat.focusInput(' + fill + ');window.thornswoodChat.state();}else{window.skyrimPlatform.sendMessage("thornswood-front","the page has no chat object, so there is nothing to type into");}}catch(e){try{window.skyrimPlatform.sendMessage("thornswood-front","focusInput threw "+e);}catch(e2){}}');
         return;
       }
 
       if (asked) return;
       asked = Date.now();
-      T.js('try{if(window.thornswoodChat){window.thornswoodChat.focusInput();window.thornswoodChat.state();}else{window.skyrimPlatform.sendMessage("thornswood-front","the page has no chat object, so there is nothing to type into");}}catch(e){try{window.skyrimPlatform.sendMessage("thornswood-front","focusInput threw "+e);}catch(e2){}}');
+      T.js('try{if(window.thornswoodChat){window.thornswoodChat.focusInput(' + fill + ');window.thornswoodChat.state();}else{window.skyrimPlatform.sendMessage("thornswood-front","the page has no chat object, so there is nothing to type into");}}catch(e){try{window.skyrimPlatform.sendMessage("thornswood-front","focusInput threw "+e);}catch(e2){}}');
       return;
     }
     asked = 0;
@@ -3654,10 +3658,14 @@
     not gain a record while the game runs. What is kept is the Key Mold's
     runtime id and not the form, for the reason under THE IDS, RESOLVED ONCE.
 
-    A STAMPED MOLD LOOKS LIKE A BLANK FROM HERE. Which door a mold is for is
-    the name on the server's copy of the pack, and getItemCount counts the
-    record. So the line shows for anybody carrying a Key Mold, and somebody
-    whose only mold is already stamped is told so by the server on the press.
+    ONLY FOR A BLANK (#529). Which door a mold is for is the name on it, and
+    getItemCount counts the record, so a stamped mold and a blank look the
+    same through it, and every holder saw the line at every door. The name
+    reaches the game as TextDisplayData on the item, the same place
+    skymp5-client reads it back from (sync/inventory.ts in the fork), so the
+    named molds are counted out of getExtraContainerChanges and taken off.
+    If that cannot be read, nothing is taken off: the line shows as it did,
+    and the server still refuses a stamped mold on the press.
 
     ON THE CROSSHAIR POLL'S BEAT, a third of a second, never every frame. On a
     build without the recipe that is one comparison and no call into the game.
@@ -3704,7 +3712,29 @@
     return moldBase > 0;
   }
 
-  /** The door under the crosshair, in hex, while a Key Mold could go into it. '' otherwise. */
+  /** How many of the Key Molds carried have a name, which is a door's. 0 when it cannot tell. */
+  function stampedMolds(pc) {
+    let named = 0;
+    try {
+      const changes = sp.getExtraContainerChanges(pc.getFormID()) || [];
+      for (let i = 0; i < changes.length; i++) {
+        if (!changes[i] || changes[i].baseId !== moldBase) { continue; }
+        const lists = changes[i].extendDataList || [];
+        for (let j = 0; j < lists.length; j++) {
+          let n = 1, name = false;
+          (lists[j] || []).forEach(function (x) {
+            if (!x) { return; }
+            if (x.type === 'Count') { n = Number(x.count) || 1; }
+            if (x.type === 'TextDisplayData' && x.name) { name = true; }
+          });
+          if (name) { named += n; }
+        }
+      }
+    } catch (e) { named = 0; }
+    return named;
+  }
+
+  /** The door under the crosshair, in hex, while a blank Key Mold could go into it. '' otherwise. */
   function moldDoorNow() {
     if (!moldReady()) { return ''; }
     if (anyClaim()) { return ''; }
@@ -3719,12 +3749,14 @@
     if (!door) { return ''; }
     if (busyMenuOpenNow()) { return ''; }
     let carried = 0;
+    let pc = null;
     try {
-      const pc = sp.Game.getPlayer();
+      pc = sp.Game.getPlayer();
       const mold = sp.Game.getFormEx(moldBase);
       carried = (pc && mold) ? pc.getItemCount(mold) : 0;
     } catch (e) { carried = 0; }
     if (!(carried > 0)) { return ''; }
+    if (!(carried - stampedMolds(pc) > 0)) { return ''; }
     let hex = '';
     try { hex = (ref.getFormID() >>> 0).toString(16); } catch (e) { hex = ''; }
     return hex;
@@ -5013,6 +5045,81 @@
     } catch (err) { journalShutAt = 0; }
   }));
 
+  /*
+    / OPENS THE CHAT WITH A SLASH IN IT, AND ONLY THE CHAT.
+
+    Patrick, 27 September: "can we also make / pull up the text chat and enter
+    slash and not the vanilla skyrims skill tree thingg and only the chat".
+
+    / is the game's Quick Stats, the skill tree, and a plugin cannot keep a
+    key from the game. So this is the J block's answer again: the tree is shut
+    the moment it opens, when this press opened it, and the chat opens with a
+    / typed. Told by the game's own name for the press ('Quick Stats' in
+    RE::UserEvents), so somebody who moved Quick Stats to another key keeps it
+    there untouched.
+
+    Either order of events is handled. The tree opening before this file
+    hears the key is shut at the press; opening after, it is shut when it
+    opens. A tree that was already up before / went down is left alone, and so
+    is the /: in the tree, / is the game's key for closing it.
+  */
+  const STATS_MENU = 'StatsMenu';
+  const STATS_PRESS_MS = 1000;
+  let statsPressAt = 0;
+  let statsOpenedAt = 0;
+  let statsShutAt = 0;
+  let statsAsked = 0;
+
+  function gameStatsPress(e) {
+    if (e.userEventName) { return e.userEventName === 'Quick Stats'; }
+    try { return sp.Input.getMappedKey('Quick Stats', 0) === e.code; } catch (err) { return false; }
+  }
+
+  function shutStats() {
+    statsPressAt = 0;
+    statsAsked++;
+    // The clock runs from the first ask, so asking again does not restart it.
+    if (statsAsked === 1) { statsShutAt = Date.now(); }
+    try { sp.TESModPlatform.closeMenu(STATS_MENU); }
+    catch (err) { say('/: closeMenu threw on the skill tree: ' + err); statsShutAt = 0; }
+  }
+
+  sp.on('menuOpen', guard('stats shut', (e) => {
+    if (!e || e.name !== STATS_MENU) { return; }
+    statsOpenedAt = Date.now();
+    if (!statsPressAt || Date.now() - statsPressAt > STATS_PRESS_MS) { statsPressAt = 0; return; }
+    statsAsked = 0;
+    shutStats();
+  }));
+
+  // A tree still up a second after the shut is asked once more, and one still
+  // up after two is said in the log and left.
+  sp.on('update', guard('stats after', () => {
+    if (!statsShutAt) { return; }
+    const since = Date.now() - statsShutAt;
+    let up = false;
+    try { up = !!sp.Ui.isMenuOpen(STATS_MENU); } catch (err) { up = false; }
+    if (!up) { statsShutAt = 0; return; }
+    if (since > 2000) {
+      statsShutAt = 0;
+      say('/: the skill tree is still open ' + since + 'ms after it was shut, asked ' + statsAsked + ' times');
+    } else if (since > 1000 && statsAsked < 2) {
+      shutStats();
+    }
+  }));
+
+  function commandKeyPressed(e) {
+    if (claims.chat) { return; }
+    const busy = busyMenuOpenNow();
+    const treeJustNow = busy === STATS_MENU && Date.now() - statsOpenedAt < STATS_PRESS_MS;
+    if (busy && !treeJustNow) { say('/ seen, but ' + busy + ' is open'); return; }
+    if (gameStatsPress(e)) {
+      if (treeJustNow) { statsAsked = 0; shutStats(); } else { statsPressAt = Date.now(); }
+    }
+    say('/ seen, opening the chat with a slash in it');
+    wantTyping(true, '/');
+  }
+
   sp.on('buttonEvent', guard('keys', (e) => {
     keysSeen++;
     // Before the isDown guard, not after it.
@@ -5030,6 +5137,8 @@
     // Any key going down ends J's claim on the next Journal Menu, Escape
     // above all. See JOURNAL_MENU above.
     journalKeyDown(e);
+    // And any key ends a / press's claim on the next skill tree.
+    statsPressAt = 0;
     // 17 30 31 32 are W A S D. Somebody standing at a handle pressing E is not
     // stuck, they are using something, and that is what the one and only
     // firing of this detector actually caught.
@@ -5118,6 +5227,8 @@
       T.js('try{window.thornswoodSkills&&window.thornswoodSkills.toggle();}catch(e){}');
       return;
     }
+
+    if (e.code === COMMAND_KEY) { commandKeyPressed(e); return; }
 
     if (e.code !== CHAT_KEY) return;
 
