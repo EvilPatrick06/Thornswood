@@ -30,14 +30,10 @@ flowchart LR
     L -->|builds, patches, starts| G
   end
 
-  subgraph GH["GitHub"]
-    R["Thornswood-Releases<br/>version.json on main and dev<br/>fallback feed and baseline"]
-  end
-
   subgraph VPS["VPS 192.135.112.23"]
     C["Caddy :80 :443<br/>thornswood.net"]
     W["Site node 127.0.0.1:3001"]
-    F["Feed and downloads<br/>/feed and /feed-dev<br/>version.json, assets by sha256"]
+    F["Feed and downloads<br/>/feed and /feed-dev<br/>version.json, assets by sha256<br/>baseline and history, not served"]
     W --> F
     GS["Game server :7777<br/>resources :3000"]
     DS["Dev game server :7787<br/>resources :7788"]
@@ -59,11 +55,9 @@ flowchart LR
   end
 
   P["Patrick's machine<br/>Ship.ps1, Deploy-*"]
-  P -->|Publish-Update: git push| R
-  P -->|scp: assets, then version.json| F
+  P -->|scp: assets, then version.json and the baseline| F
   P -->|ssh: Deploy-*, Install-*| VPS
   L -->|polls version.json| C
-  L -->|fallback, at most every 5 min| R
   L -->|downloads, host and sha256 checked| C
   L -->|Discord sign in, installer, news| C
   G -->|UDP 7777 or 7787| GS
@@ -103,18 +97,17 @@ packs and as its own asset named in the feed's `clientRuntime`
 
 - **The feed.** Every launcher reads `version.json` from
   `https://thornswood.net/feed/version.json` (dev: `/feed-dev/`) since #649,
-  and falls back to `EvilPatrick06/Thornswood-Releases` (public) through the
-  GitHub contents API, branch `main` or `dev`, only when the site does not
-  answer (`Updater.Check`). Since #897 packs, the launcher exe and the client
-  runtime are served by the site too, at `/feed[-dev]/assets/<sha256>`; urls
-  published before that still name GitHub release assets until they are moved.
-  FEED.md has every field.
+  and since #907 nowhere else: a site feed that does not answer is asked again
+  on the next check (`Updater.Check`). Since #897 packs, the launcher exe and
+  the client runtime are served by the site too, at
+  `/feed[-dev]/assets/<sha256>`. FEED.md has every field.
 - **Who writes it.** `Ship.ps1` runs `Publish-Update.ps1`, which diffs the game
   folder against this channel's baseline
-  (`published.json` in the releases clone for that channel), zips the
-  difference, sends it and the launcher to the site's assets folder, rewrites
-  `version.json` and pushes it; `Publish-PostShip.ps1` then puts that
-  `version.json` on the site with `Remirror-Site-Feed.ps1`. Then `Publish-News.ps1` (main only), then
+  (`published.json`, received from the VPS store beside the channel's feed,
+  `Feed-Store.ps1`), zips the difference, sends it and the launcher to the
+  site's assets folder, rewrites `version.json` and sends it and the baseline
+  back to the store, which is when the site serves it; `Publish-PostShip.ps1`
+  then checks every asset the feed names is up with `Remirror-Site-Feed.ps1`. Then `Publish-News.ps1` (main only), then
   `Publish-Discord.ps1` (#news, or the dev updates channel), then
   `Request-Restart.ps1`, which warns the room for five minutes
   (`Ship.ps1:1033-1098`).
@@ -202,9 +195,10 @@ nothing from `C:\Thornswood-Server-Dev` or `C:\Thornswood-Voice-Dev`
 `Ship.ps1`, `Publish-*`, `Repair-Manifest.ps1`, `Bump-Version.ps1`, every
 `Deploy-*` and `Install-*`, and `Request-Restart.ps1`. The engine build and the
 release output (`out`, ignored by git) are in the repo folder; `scripts\release\Where.ps1`
-says where (`Where.ps1:71-82`). The releases repo is cloned beside the source
-repo as `Thornswood-Releases`, its dev branch as the worktree
-`Thornswood-Releases-dev` (`Publish-Update.ps1:111-129`). Which command each
+says where (`Where.ps1:71-82`). The feed and its baseline are received from
+the VPS into `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev`, working copies
+with a backup of the last twenty of each, not git clones (`Feed-Store.ps1`,
+#907). Which command each
 change needs after a merge: CONTRIBUTING.md, "After a pull request is merged".
 
 ## Where the sources disagree
