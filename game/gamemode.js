@@ -2365,6 +2365,10 @@ function wearScript() {
     '        if (it) { pc.equipItem(it, false, true); }',
     '      } catch (e) { }',
     '    }',
+    '    try {',
+    '      var ac = sp.Actor.from(pc);',
+    '      if (ac) { ac.queueNiNodeUpdate(); }',
+    '    } catch (e) { }',
     '  } catch (e) { }',
     '})();'
   ].join('\n');
