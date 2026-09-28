@@ -537,6 +537,7 @@ function goldDescriptors(text) {
     'ITEMS.firewood': 'firewood, ITEMS',
     'ITEMS[grade]': 'charcoal, ITEMS',
     'ITEMS.butter': 'butter off the churn, ITEMS',
+    'ITEMS.milk': 'milk off a living cow, ITEMS (#396)',
     'plant.produce': 'a plant, HARVESTS_BY_BASE',
     'caught.produce': 'a fish, FISH_BY_BASE',
     'hung.produce': 'game, GAME_BY_BASE',
