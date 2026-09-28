@@ -117,6 +117,12 @@ namespace Thornswood
 
         [DataMember] public long ExpectedExeBytes = 37157144;
 
+        // The rest of the Skyrim pin, as the update feed last gave it (#471,
+        // Downgrade.AdoptPin). 0 and null mean the feed has not said, and
+        // Downgrade uses what it was built with.
+        [DataMember] public long NewerExeBytes;
+        [DataMember] public PinDepot[] SkyrimDepots = null;
+
         // Set these to turn on updates. Leave blank and the launcher never
         // talks to the network beyond a ping.
         // UpdateToken is a problem worth naming rather than leaving implicit.
@@ -492,6 +498,18 @@ namespace Thornswood
         [DataMember] public string forkCommit = "";
     }
 
+    /// <summary>
+    /// One of the depots the Downgrade button asks Steam for, with the manifest
+    /// that is the pinned build of it. Strings, because a manifest id can be
+    /// larger than a long.
+    /// </summary>
+    [DataContract]
+    public class PinDepot
+    {
+        [DataMember] public string id = "";
+        [DataMember] public string manifest = "";
+    }
+
     [DataContract]
     public class VersionDoc
     {
@@ -526,6 +544,19 @@ namespace Thornswood
 
         [DataMember] public string serverPort = "";
         [DataMember] public int maxOnline;
+
+        // The Skyrim build the release is pinned to (#471): the exe size the
+        // checks look for, the size of the newer build Steam hands out, and
+        // the depot manifests the Downgrade button asks for. Written by
+        // Publish-Update from records\skyrim-pin.json. Null on a feed written
+        // before these existed, which leaves the launcher on what it was built
+        // with; a launcher older than these ignores them. The sizes are
+        // strings for the reason maintenance is below: a long given null or a
+        // quoted number throws, and a throw is the whole document unread.
+        // Downgrade.AdoptPin reads them as numbers.
+        [DataMember] public string expectedExeBytes;
+        [DataMember] public string newerExeBytes;
+        [DataMember] public PinDepot[] depots = null;
 
         // Where updates come from, and where voice lives. These used to be
         // boxes on the Settings page, which was wrong twice over: they are not

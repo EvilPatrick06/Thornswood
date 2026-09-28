@@ -1619,6 +1619,37 @@ if (Test-Path $cfgPath) {
     }
 }
 
+# The Skyrim build this release is pinned to (issue #471): the exe size the
+# launcher's checks look for, the size of the newer build Steam hands out, and
+# the depot manifests the Downgrade button asks Steam for. Read from
+# records\skyrim-pin.json, the one record of the pin. A launcher older than
+# these fields ignores them; a newer one reading a feed without them keeps
+# what it was built with. Sizes are numbers and the ids strings, because the
+# launcher reads them that way and a manifest id can be larger than a long.
+# Left as the feed had it when the record cannot be read, never a guess.
+$pinPath = Join-Path $PSScriptRoot '..\..\records\skyrim-pin.json'
+try {
+    $pin = (Get-Content -LiteralPath $pinPath -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $pinExe = [long](Val $pin 'expectedExeBytes')
+    $pinNewer = [long](Val $pin 'newerExeBytes')
+    $pinDepots = @()
+    if ($pin.PSObject.Properties['depots']) {
+        foreach ($d in @($pin.depots)) {
+            $pinDepots += [pscustomobject][ordered]@{ id = (Val $d 'id'); manifest = (Val $d 'manifest') }
+        }
+    }
+    $bad = @($pinDepots | Where-Object { $_.id -notmatch '^\d+$' -or $_.manifest -notmatch '^\d+$' })
+    if ($pinExe -le 0 -or $pinNewer -le 0 -or $pinDepots.Count -ne 3 -or $bad.Count) {
+        throw 'it needs expectedExeBytes, newerExeBytes and three depots, each an id and a manifest in digits'
+    }
+    Set-Prop $doc 'expectedExeBytes' $pinExe
+    Set-Prop $doc 'newerExeBytes' $pinNewer
+    Set-Prop $doc 'depots' $pinDepots
+    Say "  Skyrim pin: SkyrimSE.exe $pinExe bytes, depots $((@($pinDepots | ForEach-Object { $_.id })) -join ', ')" 'Green'
+} catch {
+    Say "  could not read records\skyrim-pin.json, so the feed keeps the Skyrim pin it had: $($_.Exception.Message)" 'Yellow'
+}
+
 # The launcher's News page reads this. Without it the page sits empty however
 # many releases go out, because the notes were only ever going into the GitHub
 # release body, which nobody playing the game ever sees.

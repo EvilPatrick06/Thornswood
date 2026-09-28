@@ -173,6 +173,9 @@ namespace Thornswood
             // pointed at Caddy. Null means the feed did not mention it.
             if (v.voiceUrl != null && v.voiceUrl != cfg.VoiceUrl) { cfg.VoiceUrl = v.voiceUrl; quiet = true; }
             if (!string.IsNullOrEmpty(v.presenceImage) && v.presenceImage != cfg.PresenceImage) { cfg.PresenceImage = v.presenceImage; quiet = true; }
+            // The Skyrim build the checks and the Downgrade button look for
+            // (#471). A feed without it leaves what the launcher was built with.
+            if (Downgrade.AdoptPin(cfg, v)) { LogOnly("Took the Skyrim build from the update feed: SkyrimSE.exe of " + cfg.ExpectedExeBytes + " bytes, and the depots the Downgrade button asks Steam for."); quiet = true; }
             if (quiet)
             {
                 cfg.Save(Paths.CfgFile);

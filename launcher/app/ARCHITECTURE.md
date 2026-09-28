@@ -157,7 +157,10 @@ and written by Save, which encrypts the update token with Windows' DPAPI and
 locks the file to this Windows account. The server address, port, collection
 link, voice port and update repository in it are facts about the server, not
 settings: `Shell.cs:4540 OnVersionDoc()` overwrites them from version.json on
-every update check.
+every update check. So is the Skyrim build pin (the exe size the checks look
+for and the depots the Downgrade button asks Steam for), taken through
+`Downgrade.AdoptPin()` when the feed carries it; the numbers compiled into
+Downgrade.cs are the fallback until it does.
 
 **Updater** (Updater.cs). The update feed, the packs and the launcher's own
 replacement. `Updater.cs:152 Check()` reads version.json from the releases
