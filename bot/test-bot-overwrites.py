@@ -259,7 +259,9 @@ def live_server():
     for name, _c, _h, _p in B.ROLES:
         g.roles.append(Role(name, 100 + pos, pos))
         pos -= 1
-    bot_role = Role('Thornswood Bot', 7, 60, WANT)
+    # The running set Build-Discord.py prints the invite for, which holds
+    # the three and the thread ones as well.
+    bot_role = Role('Thornswood Bot', 7, 60, B.RUN_PERMISSIONS)
     g.roles.append(bot_role)
     roles = dict((r.name, r) for r in g.roles)
 
@@ -483,6 +485,10 @@ try:
         not before_bot[by_name['news']])
     yes('  but not out of #say-hello, which is open to everybody',
         before_bot[by_name['say-hello']])
+    tickets = by_name['tickets-and-applications']
+    yes('  and in #tickets-and-applications it could open a ticket thread but '
+        'not write in it, even with the running set on its role',
+        not resolve(g, me, tickets).send_messages_in_threads)
 
     said = run(g, True)
     yes('-Check writes nothing to any channel',
@@ -527,11 +533,53 @@ try:
         all(resolve(g, p, c).value == before_them[(p, c)]
             for p in people for c in everything))
     yes('nothing failed', not B.failed)
+    p = resolve(g, me, tickets)
+    yes('without Administrator the bot opens a private thread in '
+        '#tickets-and-applications and writes the ticket into it',
+        p.create_private_threads and p.send_messages_in_threads)
+    o = tickets.ow.get(me)
+    yes('  and its overwrite there is the three plus Create Private Threads and '
+        'Send Messages in Threads, and denies nothing',
+        o is not None and o.pair()[0].value == WANT | (1 << 36) | (1 << 38)
+        and o.pair()[1].value == 0)
+    yes('  and every other channel it writes gets the three and nothing more',
+        all(c[1].ow[me].pair()[0].value == WANT for c in writes
+            if c[1] is not tickets))
+    yes('the build ends without the invite when the client cannot say which '
+        'application it is, rather than a link with no id in it',
+        'oauth2/authorize' not in said)
 
     said = run(g, False)
     yes('a second run writes nothing, so it asks nothing of Discord once '
         'Administrator is gone',
         not [c for c in g.calls if c[0] == 'set_permissions'])
+
+    # ---------------------------------- the invite a finished build ends on --
+    g, roles, people, news, loose = live_server()
+    Client.application_id = 123456789012345678
+    try:
+        said = run(g, False)
+        link = ('https://discord.com/oauth2/authorize?client_id=123456789012345678'
+                '&scope=bot&permissions=%d' % B.RUN_PERMISSIONS)
+        yes('a build with nothing failed ends on the invite with the running set',
+            link in said)
+        yes('  and on the line saying to untick Administrator on the bot\'s role, '
+            'naming it', 'untick Administrator' in said and 'Thornswood Bot' in said
+            and said.index('untick Administrator') > said.index(link))
+        yes('  and never asks for 8', 'permissions=8&' not in said
+            and not said.rstrip().endswith('permissions=8'))
+        said = run(g, True)
+        yes('-Check does not, because nothing was built',
+            'oauth2/authorize' not in said)
+        g, roles, people, news, loose = live_server()
+        by_name = dict((c.name, c) for c in g.channels)
+        by_name['staff-general'].refuse = True
+        said = run(g, False)
+        yes('nor does a build where something failed, because the run that '
+            'fixes it still wants Administrator',
+            B.failed and 'oauth2/authorize' not in said)
+    finally:
+        del Client.application_id
 
 finally:
     shutil.rmtree(TMP, ignore_errors=True)

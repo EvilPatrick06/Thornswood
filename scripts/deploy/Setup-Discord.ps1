@@ -23,7 +23,18 @@
     2. Bot in the sidebar, then Reset Token, and copy what it gives you.
     3. Still under Bot, turn ON "Server Members Intent". Leave the rest off.
     4. OAuth2, URL Generator, tick "bot" and then "Administrator". Open the URL
-       it builds and add the bot to your server.
+       it builds and add the bot to your server. Administrator is for the build
+       only: it makes the Owner and Dev roles, which carry Administrator, and
+       Discord refuses that from a bot without it.
+
+  Two permission sets. Administrator for a build, and a smaller set for the
+  rest of the time, which is all the running bot needs. A build that finishes
+  with nothing failed ends on the invite link with that smaller set and a line
+  saying to untick Administrator on the bot's role. Tick it again before the
+  next build. To see that link without building anything, from the repository
+  folder, with the id from the developer portal's General Information page:
+
+    python bot\Build-Discord.py --invite <application id>
     5. Server Settings, Roles: drag the bot's own role to the TOP. It cannot
        make roles above itself.
     6. Server Settings, Enable Community, so forums, the announcement channel
