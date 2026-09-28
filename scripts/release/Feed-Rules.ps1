@@ -50,6 +50,19 @@
       Get-HostFeedAssetUrl $sha $Dev build https://thornswood.net/feed[-dev]/assets/<sha>
       Test-FeedPackUrl $url $repo    true when a launcher can download it
       Split-FeedPacks $packs $repo   .Keep and .Drop, in feed order, each drop with .Why
+      Get-FeedAssets $doc            every asset the feed names: What, Url, Sha, Bytes
+      Test-SiteAsset $base $prefix $sha $bytes
+                                     true when the site answers for that asset
+      Move-FeedUrlsToSite $doc -Dev -OnSite { param($sha, $bytes) ... }
+                                     rewrites each url the site holds to the site
+
+  UPDATES COME FROM THE SITE (#897). Since then Publish-Update sends every new
+  asset to /feed[-dev]/assets/<sha256> and writes that url, and nothing new is
+  uploaded to Thornswood-Releases. The urls already on a feed move over with
+  Move-FeedUrlsToSite, run by the next Ship on that channel or by
+  Repair-Manifest.ps1 -MoveToSite, and only for an asset the site already
+  answers for, so a feed never names a url that answers 404. The GitHub shapes
+  stay legal here until no feed names them.
 #>
 
 # The repository every launcher reads this feed from (GitHub Contents API
@@ -143,4 +156,89 @@ function Split-FeedPacks($packs, [string]$repo) {
         [void]$drop.Add([pscustomobject]@{ Pack = $p; Repo = $r; Why = $why })
     }
     return [pscustomobject]@{ Keep = @($keep.ToArray()); Drop = @($drop.ToArray()) }
+}
+
+# ---------------------------------------------------------------- #897 --
+# Every asset a feed names, in feed order: the launcher, the client runtime,
+# each pack, each optional pack. Each is What (a line a person can read), Url,
+# Sha (lowercase, '' when the feed gives none) and Bytes (0 when the feed does
+# not say). Kind and Ref say where in the document it sits, so the url can be
+# written back. A null entry, or one with no url, is left out.
+function Get-FeedAssets($doc) {
+    $out = New-Object System.Collections.ArrayList
+    if ($null -eq $doc) { return @() }
+    function One($obj, [string]$urlName, [string]$shaName, [string]$what, [string]$kind) {
+        if ($null -eq $obj) { return }
+        $u = ''
+        if ($obj.PSObject.Properties[$urlName]) { $u = ([string]$obj.$urlName).Trim() }
+        if (-not $u) { return }
+        $s = ''
+        if ($obj.PSObject.Properties[$shaName]) { $s = ([string]$obj.$shaName).Trim().ToLowerInvariant() }
+        if ($s -notmatch '^[a-f0-9]{64}$') { $s = '' }
+        $n = [int64]0
+        if ($obj.PSObject.Properties['bytes']) { try { $n = [int64]$obj.bytes } catch { $n = 0 } }
+        [void]$out.Add([pscustomobject]@{ What = $what; Url = $u; Sha = $s; Bytes = $n; Kind = $kind; Ref = $obj; UrlName = $urlName })
+    }
+    One $doc 'launcherUrl' 'launcherSha256' ('launcher ' + [string]$(if ($doc.PSObject.Properties['launcherVersion']) { $doc.launcherVersion } else { '' })) 'launcher'
+    if ($doc.PSObject.Properties['clientRuntime'] -and $null -ne $doc.clientRuntime) {
+        $fc = if ($doc.clientRuntime.PSObject.Properties['forkCommit']) { [string]$doc.clientRuntime.forkCommit } else { '' }
+        One $doc.clientRuntime 'url' 'sha256' ('client runtime ' + $fc) 'client'
+    }
+    foreach ($list in 'packs', 'optional') {
+        if (-not $doc.PSObject.Properties[$list] -or $null -eq $doc.$list) { continue }
+        foreach ($p in @($doc.$list)) {
+            if ($null -eq $p) { continue }
+            $id = if ($p.PSObject.Properties['id']) { [string]$p.id } else { '' }
+            $label = if ($list -eq 'optional') { 'optional pack ' } else { 'pack ' }
+            One $p 'url' 'sha256' ($label + $id) $list
+        }
+    }
+    return @($out.ToArray())
+}
+
+# True when the site answers 200 for /<prefix>/assets/<sha> under $base
+# (https://thornswood.net, or a local copy in the tests), and, when the feed
+# says how big it is, with that many bytes. A HEAD request, so nothing is
+# downloaded. Anything else, an error included, is false: the caller then
+# leaves the url where it was, which is the safe way round.
+function Test-SiteAsset([string]$base, [string]$prefix, [string]$sha, [int64]$bytes = 0) {
+    if ($sha -notmatch '^[a-f0-9]{64}$') { return $false }
+    $url = $base.TrimEnd('/') + '/' + $prefix + '/assets/' + $sha
+    $res = $null
+    try {
+        $req = [Net.HttpWebRequest]::Create($url)
+        $req.Method = 'HEAD'
+        $req.Timeout = 20000
+        $req.UserAgent = 'Thornswood-Publish'
+        $req.AllowAutoRedirect = $false
+        $res = $req.GetResponse()
+        if ([int]$res.StatusCode -ne 200) { return $false }
+        if ($bytes -gt 0 -and $res.ContentLength -ge 0 -and $res.ContentLength -ne $bytes) { return $false }
+        return $true
+    } catch {
+        return $false
+    } finally {
+        if ($null -ne $res) { $res.Close() }
+    }
+}
+
+# Rewrites every url on the feed that is not already a site asset to
+# https://thornswood.net/feed[-dev]/assets/<sha256>, but only where $OnSite
+# says the site holds those bytes. $OnSite is called with the sha and the
+# size the feed gives (0 when it gives none). A url with no sha on the feed
+# is left alone, since there is nothing to name it by. Returns what moved and
+# what stayed, each a list of Get-FeedAssets entries, in feed order.
+function Move-FeedUrlsToSite($doc, [switch]$Dev, [scriptblock]$OnSite) {
+    $moved = New-Object System.Collections.ArrayList
+    $stayed = New-Object System.Collections.ArrayList
+    foreach ($a in @(Get-FeedAssets $doc)) {
+        if (Test-HostFeedAssetUrl $a.Url) { continue }
+        if (-not $a.Sha) { [void]$stayed.Add($a); continue }
+        $yes = $false
+        try { $yes = [bool](& $OnSite $a.Sha $a.Bytes) } catch { $yes = $false }
+        if (-not $yes) { [void]$stayed.Add($a); continue }
+        $a.Ref.($a.UrlName) = (Get-HostFeedAssetUrl $a.Sha -Dev:$Dev)
+        [void]$moved.Add($a)
+    }
+    return [pscustomobject]@{ Moved = @($moved.ToArray()); Stayed = @($stayed.ToArray()) }
 }

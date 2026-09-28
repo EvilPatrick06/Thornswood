@@ -45,6 +45,20 @@
   refused to publish the feed, which is a line on screen for whoever shipped
   rather than a reason to fail a release that is already out on GitHub.
 
+  SENDING ASSETS ON THEIR OWN (#897). Since updates come from the site rather
+  than from Thornswood-Releases, Publish-Update.ps1 sends each new pack, the
+  launcher and the client runtime up BEFORE it writes version.json, with
+
+      .\scripts\deploy\Remirror-Site-Feed.ps1 [-Dev] -Send <file>, <file>
+
+  which sends exactly those files to /feed[-dev]/assets/<sha256> (by the same
+  .part then rename), skips any already up there, never touches version.json,
+  and exits 1 when one did not land. Copy-ReleaseAssets-ToSite.ps1 uses it too.
+
+  -SiteDir <folder> stands in for the site's feed root on this machine: every
+  list, send and rename happens in that folder and nothing connects to the
+  VPS. The tests use it, with a copy of site\server.js serving that folder.
+
   Nothing about the installer's VirusTotal report is this script's business.
   That upload belongs to whoever publishes the installer, and
   scripts\release\Publish-Installer.ps1 says what the site needs from it.
@@ -73,7 +87,14 @@ param(
   # they are stored under. Off by default because the assets are tens of
   # megabytes each and the name is the hash.
   [switch]$Verify,
-  [switch]$Quiet
+  [switch]$Quiet,
+  # Send exactly these files to /feed[-dev]/assets/<sha256> and nothing else:
+  # no feed is read and version.json is not sent. Publish-Update.ps1 calls it
+  # before it writes the feed (#897).
+  [string[]]$Send,
+  # A folder on this machine standing in for the site's feed root (the folder
+  # holding feed\ and feed-dev\). Nothing connects to the VPS. For the tests.
+  [string]$SiteDir
 )
 
 $ErrorActionPreference = 'Stop'
@@ -81,12 +102,96 @@ $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
-if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
+if (-not $Vps -and -not $SiteDir) { $Vps = Get-ThornswoodVpsAddress }
 $rootWin = $Root.Replace('/','\')
 $prefix  = if ($Dev) { 'feed-dev' } else { 'feed' }
 
 function Say($m, $c = 'Gray') { if (-not $Quiet) { Write-Host $m -ForegroundColor $c } }
 function Head($m) { if (-not $Quiet) { Write-Host ''; Write-Host $m -ForegroundColor Cyan } }
+
+# ------------------------------------------------------------ the transport --
+# Three things this script does to the site, each one way over ssh and one way
+# into -SiteDir, so the whole of it can be run against a folder on this machine.
+function Get-ThereLines([bool]$withHashes) {
+  if ($SiteDir) {
+    $dir = Join-Path (Join-Path $SiteDir $prefix) 'assets'
+    if (-not (Test-Path -LiteralPath $dir)) { return @('NOTHING THERE YET') }
+    $lines = @('ASKED')
+    foreach ($f in @(Get-ChildItem -LiteralPath $dir -File)) {
+      $h = ''
+      if ($withHashes) { $h = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLower() }
+      $lines += ($f.Name + '|' + $f.Length + '|' + $h)
+    }
+    return $lines
+  }
+  $wantHashes = if ($withHashes) { '1' } else { '0' }
+  $listScript = @"
+`$dir = '$rootWin\$prefix\assets'
+if (-not (Test-Path `$dir)) { 'NOTHING THERE YET'; exit }
+'ASKED'
+Get-ChildItem `$dir -File | ForEach-Object {
+  `$h = ''
+  if ('$wantHashes' -eq '1') { `$h = (Get-FileHash -LiteralPath `$_.FullName -Algorithm SHA256).Hash.ToLower() }
+  `$_.Name + '|' + `$_.Length + '|' + `$h
+}
+"@
+  return @(RemoteLines $listScript)
+}
+
+function New-ThereFolders {
+  if ($SiteDir) {
+    New-Item -ItemType Directory -Force -Path (Join-Path (Join-Path $SiteDir $prefix) 'assets') | Out-Null
+    return @('ready')
+  }
+  return @(RemoteLines @"
+foreach (`$d in @('$rootWin\$prefix', '$rootWin\$prefix\assets')) {
+  if (-not (Test-Path `$d)) { New-Item -ItemType Directory -Path `$d -Force | Out-Null }
+}
+'ready'
+"@)
+}
+
+# One asset, to <sha>.part and then renamed, so a dropped connection cannot
+# leave a short file sitting at the name of its own hash: the site would serve
+# it happily, and the launcher that downloads it fails the hash check and stops
+# the whole update. Throws when it did not land.
+function Send-Asset([string]$local, [string]$sha) {
+  $size = (Get-Item -LiteralPath $local).Length
+  if ($SiteDir) {
+    $dir = Join-Path (Join-Path $SiteDir $prefix) 'assets'
+    $part = Join-Path $dir ($sha + '.part')
+    Copy-Item -LiteralPath $local -Destination $part -Force
+    $n = (Get-Item -LiteralPath $part).Length
+    if ($n -ne $size) { Remove-Item -LiteralPath $part -Force; throw "$sha did not land: SHORT: $n bytes of $size" }
+    Move-Item -LiteralPath $part -Destination (Join-Path $dir $sha) -Force
+    return
+  }
+  & scp @ssh $local "$User@${Vps}:$Root/$prefix/assets/$sha.part"
+  if ($LASTEXITCODE -ne 0) { throw "scp failed: $sha ($local)" }
+  $said = ((RemoteLines @"
+`$p = '$rootWin\$prefix\assets\$sha.part'
+`$f = '$rootWin\$prefix\assets\$sha'
+`$n = (Get-Item -LiteralPath `$p).Length
+if (`$n -ne $size) { Remove-Item -LiteralPath `$p -Force; 'SHORT: ' + `$n + ' bytes of $size'; exit }
+Move-Item -LiteralPath `$p -Destination `$f -Force
+'in place'
+"@) -join ' ').Trim()
+  if ($said -notmatch 'in place') { throw "$sha did not land: $said" }
+}
+
+function Send-VersionJson([string]$local) {
+  if ($SiteDir) {
+    $dir = Join-Path $SiteDir $prefix
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    # Through a temporary name as well, so a reader never sees half a file.
+    $tmp = Join-Path $dir 'version.json.part'
+    Copy-Item -LiteralPath $local -Destination $tmp -Force
+    Move-Item -LiteralPath $tmp -Destination (Join-Path $dir 'version.json') -Force
+    return
+  }
+  & scp @ssh $local "$User@${Vps}:$Root/$prefix/version.json"
+  if ($LASTEXITCODE -ne 0) { throw 'scp failed: version.json' }
+}
 
 # Runs a script up there and hands back what it said. The same block every
 # other script that talks to the VPS carries: under the limit it goes on the
@@ -143,6 +248,55 @@ function PropList($obj, $name) {
 
 # Which urls the site is supposed to serve, and the sha256 in each one.
 . (Join-Path $Here '..\release\Feed-Rules.ps1')
+
+# ------------------------------------------------- -Send: these files only --
+if ($PSBoundParameters.ContainsKey('Send')) {
+  $files = @($Send | Where-Object { $_ })
+  Head ("Sending {0} asset(s) to /{1}/assets/ on the site" -f $files.Count, $prefix)
+  $byHash = [ordered]@{}
+  foreach ($f in $files) {
+    if (-not (Test-Path -LiteralPath $f -PathType Leaf)) { Say "  not a file: $f" 'Red'; exit 1 }
+    $h = (Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLower()
+    if (-not $byHash.Contains($h)) { $byHash[$h] = (Resolve-Path -LiteralPath $f).Path }
+  }
+  $upThere = @{}
+  $asked = $false
+  foreach ($l in (Get-ThereLines $false)) {
+    $line = ([string]$l).Trim()
+    if ($line -eq 'NOTHING THERE YET' -or $line -eq 'ASKED') { $asked = $true; continue }
+    $m = [regex]::Match($line, '^([a-f0-9]{64})\|(\d+)\|')
+    if ($m.Success) { $upThere[$m.Groups[1].Value] = [int64]$m.Groups[2].Value }
+  }
+  if (-not $asked) {
+    Say "  $Vps did not say what is already up there, so nothing was sent." 'Red'
+    Say '  Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test.' 'Yellow'
+    exit 1
+  }
+  if ($Check) {
+    foreach ($h in $byHash.Keys) {
+      $state = if ($upThere.ContainsKey($h)) { 'already there' } else { 'to send      ' }
+      Say ("  {0}  {1}  {2}" -f $state, $h.Substring(0, 12), (Split-Path -Leaf $byHash[$h]))
+    }
+    Say '  Dry run. Nothing left this machine.' 'Yellow'
+    exit 0
+  }
+  [void](New-ThereFolders)
+  $sentNow = 0
+  foreach ($h in $byHash.Keys) {
+    $local = $byHash[$h]
+    $size = (Get-Item -LiteralPath $local).Length
+    if ($upThere.ContainsKey($h) -and $upThere[$h] -eq $size) {
+      Say ("  already there  {0}  {1}" -f $h.Substring(0, 12), (Split-Path -Leaf $local)) 'DarkGray'
+      continue
+    }
+    Say ("  {0}  {1:N1} MB  {2}" -f $h.Substring(0, 12), ($size / 1MB), (Split-Path -Leaf $local))
+    try { Send-Asset $local $h }
+    catch { Say "  $($_.Exception.Message)" 'Red'; exit 1 }
+    $sentNow++
+  }
+  Say ("  {0} sent, {1} already there. version.json was not touched." -f $sentNow, ($byHash.Count - $sentNow)) 'Green'
+  exit 0
+}
 
 # ------------------------------------------------------------------ the feed
 if (-not $FeedDir) {
@@ -215,18 +369,7 @@ foreach ($w in $script:wrongChannel) {
 $there = @{}
 $badUpThere = @()
 $askedTheVps = $false
-$wantHashes = if ($Verify) { '1' } else { '0' }
-$listScript = @"
-`$dir = '$rootWin\$prefix\assets'
-if (-not (Test-Path `$dir)) { 'NOTHING THERE YET'; exit }
-'ASKED'
-Get-ChildItem `$dir -File | ForEach-Object {
-  `$h = ''
-  if ('$wantHashes' -eq '1') { `$h = (Get-FileHash -LiteralPath `$_.FullName -Algorithm SHA256).Hash.ToLower() }
-  `$_.Name + '|' + `$_.Length + '|' + `$h
-}
-"@
-foreach ($l in (RemoteLines $listScript)) {
+foreach ($l in (Get-ThereLines ([bool]$Verify))) {
   $line = $l.Trim()
   if ($line -eq 'NOTHING THERE YET' -or $line -eq 'ASKED') { $askedTheVps = $true; continue }
   $m = [regex]::Match($line, '^([a-f0-9]{64})\|(\d+)\|([a-f0-9]{64})?$')
@@ -263,14 +406,17 @@ foreach ($d in @($AssetDir)) { if ($d) { $folders += $d } }
 $folders += (Join-Path $FeedDir 'assets')
 # Where.ps1 looks for the old C:\Thornswood-Dev layout, so it needs a machine
 # that has a C drive to answer at all. A machine that cannot be asked still
-# sends whatever -AssetDir names.
-try {
-  $folders += (& (Join-Path $Here '..\release\Where.ps1') Package)
-  $folders += (& (Join-Path $Here '..\release\Where.ps1') Dist)
-} catch {
-  Say "  could not ask Where.ps1 where the build output is: $_" 'DarkGray'
+# sends whatever -AssetDir names. With -SiteDir (the tests) only the folders
+# named are read, never this machine's build output or install.
+if (-not $SiteDir) {
+  try {
+    $folders += (& (Join-Path $Here '..\release\Where.ps1') Package)
+    $folders += (& (Join-Path $Here '..\release\Where.ps1') Dist)
+  } catch {
+    Say "  could not ask Where.ps1 where the build output is: $_" 'DarkGray'
+  }
+  $folders += ($gameRoot + '\Launcher')
 }
-$folders += ($gameRoot + '\Launcher')
 $folders = @($folders |
   Where-Object { $_ -and (Test-Path -LiteralPath $_ -ErrorAction SilentlyContinue) } |
   Select-Object -Unique)
@@ -334,12 +480,7 @@ if ($Check) {
 
 # ----------------------------------------------------------------- sending --
 Head 'Making room'
-foreach ($l in (RemoteLines @"
-foreach (`$d in @('$rootWin\$prefix', '$rootWin\$prefix\assets')) {
-  if (-not (Test-Path `$d)) { New-Item -ItemType Directory -Path `$d -Force | Out-Null }
-}
-'ready'
-"@)) { Say "  $l" }
+foreach ($l in (New-ThereFolders)) { Say "  $l" }
 
 $sent = 0
 if ($found.Count) { Head 'Sending the assets' }
@@ -348,29 +489,15 @@ foreach ($sha in $need.Keys) {
   $local = $found[$sha]
   $size  = (Get-Item -LiteralPath $local).Length
   Say ("  {0}  {1:N1} MB  {2}" -f $sha.Substring(0, 12), ($size / 1MB), (Split-Path -Leaf $local))
-  # To .part first, then renamed up there. scp straight onto the final name
-  # leaves a short file at the name of a hash when the connection drops, the
-  # site serves it happily, and the launcher that downloads it fails the hash
-  # check and stops the whole update.
-  & scp @ssh $local "$User@${Vps}:$Root/$prefix/assets/$sha.part"
-  if ($LASTEXITCODE -ne 0) { throw "scp failed: $sha ($local)" }
-  $said = ((RemoteLines @"
-`$p = '$rootWin\$prefix\assets\$sha.part'
-`$f = '$rootWin\$prefix\assets\$sha'
-`$n = (Get-Item -LiteralPath `$p).Length
-if (`$n -ne $size) { Remove-Item -LiteralPath `$p -Force; 'SHORT: ' + `$n + ' bytes of $size'; exit }
-Move-Item -LiteralPath `$p -Destination `$f -Force
-'in place'
-"@) -join ' ').Trim()
-  if ($said -notmatch 'in place') { throw "$sha did not land: $said" }
+  # To .part first, then renamed up there (Send-Asset says why).
+  Send-Asset $local $sha
   $sent++
 }
 
 # version.json last. Everything it names is up there by now, so a launcher
 # reading it the same second finds every asset it asks for.
 Head 'Sending version.json'
-& scp @ssh $versionFile "$User@${Vps}:$Root/$prefix/version.json"
-if ($LASTEXITCODE -ne 0) { throw 'scp failed: version.json' }
+Send-VersionJson $versionFile
 
 Head 'Done'
 Say ("  {0} asset(s) sent, {1} already there, version.json published" -f $sent, $there.Count) 'Green'
