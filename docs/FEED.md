@@ -337,10 +337,13 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
 - **Signing.** On since 27 Sep: `Ship.ps1` and `Publish-Installer.ps1` refuse
   a launcher or setup program that is not Authenticode Valid under
   `ExpectedSigner` (CONTRIBUTING.md, `records\signing\README.md`).
-- **Optional packs are the exception.** `Publish-Pack.ps1` still uploads to a
-  GitHub release in Thornswood-Releases; it has no site path yet. It publishes
-  nothing today (`optional-packs.txt` lists none), but it must send to the site
-  before anybody uses it again, or before the repository goes.
+- **Optional packs go to the site too.** `Publish-Pack.ps1` (default
+  `-AssetHost site`) sends each zip to `/feed/assets/<sha256>` with
+  `Remirror-Site-Feed.ps1 -Send` before `version.json` is touched, names it
+  there, and after the push puts the feed on the site with
+  `Remirror-Site-Feed.ps1`. `-AssetHost github` is the old GitHub release,
+  kept for rolling back. It publishes nothing today (`optional-packs.txt`
+  lists none).
 
 ## Main and dev
 
