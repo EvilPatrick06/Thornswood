@@ -3102,6 +3102,21 @@
     nothing and walking every reference in an exterior cell costs a great
     deal.
   */
+  /*
+    HOW LONG AN EMPTY WALK IS BELIEVED.
+
+    fireHere = [] is truthy in JavaScript. The first version cached an empty
+    list the same way it cached a full one, so the first probe after a cell
+    change that found nothing (bases not resolved yet, cell not fully loaded,
+    or a forge room whose FX had not appeared) was the answer for the rest of
+    the stay. Patrick, #608: chilly standing in a burning forge, no warmth
+    next to one. A non-empty list is still kept for the cell; an empty one is
+    retried until something shows up or FIRE_EMPTY_RETRY has not yet run out
+    since the last empty walk with bases already resolved.
+  */
+  const FIRE_EMPTY_RETRY = 8000;
+  let fireEmptyAt = 0;
+
   function fireSpotsHere(pc) {
     let cellId = 0;
     let cell = null;
@@ -3109,8 +3124,16 @@
       cell = pc.getParentCell();
       cellId = cell ? cell.getFormID() : 0;
     } catch (e) { cellId = 0; }
-    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; }
-    if (fireHere) { return fireHere; }
+    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; fireEmptyAt = 0; }
+    // A non-empty list is good for the cell. An empty one is not final.
+    if (fireHere && fireHere.length) { return fireHere; }
+    if (fireHere && fireHere.length === 0) {
+      const ready = fireIdList().length > 0;
+      if (ready && (Date.now() - fireEmptyAt) < FIRE_EMPTY_RETRY) {
+        return fireHere;
+      }
+      fireHere = null;
+    }
     if (!cell) { return []; }
 
     const ids = fireIdList();
@@ -3133,6 +3156,7 @@
     }
     fireHere = out;
     fireHits = out.length;
+    if (!out.length) { fireEmptyAt = Date.now(); }
     // fireWalked, not walked: that one lives inside refsInCell. Naming it here
     // threw on every cell change from #184 on, 80 times in the dev log of
     // 23 September, and the place report for that tick never went.
@@ -3143,15 +3167,38 @@
 
   /** How far the nearest lit fire is, or -1 when there is none in reach. */
   function fireDistance(px, py, pz, pc) {
+    /*
+      USING A FORGE (OR SMELTER, OR COOKING SPIT) IS STANDING IN THE HEAT.
+
+      The craft markers in FIRE_BASES are furniture. Activating one seats you
+      on that reference; the visual flames may sit a little off the marker, or
+      Embers may have swapped the FX for a base we do not list. Either way the
+      person at the anvil is in the forge. #608: chilly in a burning forge,
+      and it never set anybody on fire. getFurnitureReference is the engine's
+      own answer for which station you are at.
+    */
+    try {
+      const furn = pc.getFurnitureReference ? pc.getFurnitureReference() : null;
+      if (furn) {
+        const b = furn.getBaseObject();
+        const id = b ? b.getFormID() : 0;
+        if (id) {
+          const ids = fireIdList();
+          for (let f = 0; f < ids.length; f++) {
+            if (ids[f] === id) { return 0; }
+          }
+        }
+      }
+    } catch (e) { }
     let best = -1;
     const spots = fireSpotsHere(pc);
     for (let i = 0; i < spots.length; i++) {
       const dx = spots[i][0] - px;
       const dy = spots[i][1] - py;
       const dz = spots[i][2] - pz;
-      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (d > FIRE_REACH) { continue; }
-      if (best < 0 || d < best) { best = d; }
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist > FIRE_REACH) { continue; }
+      if (best < 0 || dist < best) { best = dist; }
       if (best <= FIRE_INSIDE) { break; }
     }
     return best;
