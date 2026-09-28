@@ -71,6 +71,22 @@ try {
     Yes 'and ServerDist is under the engine''s build' (Same (Ask 'ServerDist') (Join-Path $newEngine 'build\dist\server'))
     Yes 'and Package is out\dist\Thornswood\_dist' (Same (Ask 'Package') (Join-Path $newOut 'dist\Thornswood\_dist'))
 
+    # Ship.ps1 runs with Set-StrictMode -Version Latest and so does every
+    # script it calls. Where.ps1 read $layout.siblings.$name, which throws
+    # there for anything that is not a sibling, and Ship stopped at
+    # Sync-Client on "The property 'ClientDist' cannot be found".
+    $strictSaid = @{}
+    & {
+        Set-StrictMode -Version Latest
+        foreach ($p in 'ClientDist', 'ServerDist', 'ServerSettings', 'Dist', 'Releases', 'ReleasesDev', 'Engine') {
+            try { $strictSaid[$p] = [string](& $w $p -OldRoot $old) } catch { $strictSaid[$p] = 'THREW ' + $_.Exception.Message }
+        }
+    }
+    Yes ('under Set-StrictMode, as Ship runs it, every place still answers' +
+         $(if (@($strictSaid.Values | Where-Object { $_ -like 'THREW*' }).Count) { ': ' + (@($strictSaid.Values | Where-Object { $_ -like 'THREW*' }) -join '; ') } else { '' })) (
+        @($strictSaid.Values | Where-Object { $_ -like 'THREW*' -or -not $_ }).Count -eq 0)
+    Yes 'and ClientDist under it is the engine''s client build' (Same $strictSaid['ClientDist'] (Join-Path $newEngine 'build\dist\client'))
+
     # 2. Patrick's machine before the move: the old folder is full, and the
     #    submodule is the empty folder git leaves for one not fetched yet.
     New-Item -ItemType Directory -Force -Path (Join-Path $oldEngine 'build\dist\server') | Out-Null
