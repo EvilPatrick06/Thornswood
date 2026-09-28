@@ -174,7 +174,8 @@ var over = Object.keys(CROPS).filter(function (d) { return CROPS[d].growMinutes 
 check('every wait is under the engine hour', over.length, '0');
 check('cabbage is a novice crop', CROPS[CABBAGE].rank, 'novice');
 check('the orchard is expert', CROPS[APPLE].rank, 'expert');
-check('crop count', Object.keys(CROPS).length, '15');
+check('crop count', Object.keys(CROPS).length, '14');
+check('tundra cotton is not a farm crop (#626)', own(CROPS, 'bb947:Skyrim.esm'), 'false');
 
 // 2. The rank gate is live (findings 8 and 14).
 addActor(100, 11, 'Brynja', 'farmer', 0, CELL, [4000, 0, 0]);
