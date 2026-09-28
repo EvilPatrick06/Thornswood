@@ -22,7 +22,7 @@ namespace Thornswood
     ///   minLauncher   a launcher older than this version holds Play.
     ///
     /// Pure on purpose: it takes the document and the running version and
-    /// says what to show, so tools\test-feed-notice.ps1 compiles this file
+    /// says what to show, so tests\test-feed-notice.ps1 compiles this file
     /// with Config.cs and asks it every case without a window.
     ///
     /// It is a kill switch, so every doubt comes out open. A document that was
