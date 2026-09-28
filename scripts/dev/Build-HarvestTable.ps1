@@ -159,9 +159,10 @@
   are the two props. So the crop rule is now the food rule with those three
   lists subtracted: a plant, of either record type, whose produce carries the
   food bit and which is not game, not a prop and not named as staying the
-  gatherer's. On this build that is 13 records, and two field crops give an
-  INGR rather than a food, so no rule reaches them and they are named one at a
-  time in CROP_BY_EDITOR_ID below: wheat and tundra cotton. 15 crops in all.
+  gatherer's. On this build that is 13 records, and one field crop gives an
+  INGR rather than a food, so no rule reaches it and it is named one at a
+  time in CROP_BY_EDITOR_ID below: wheat. Tundra cotton (#626) stays the
+  gatherer's, like the other flowers and mushrooms. 14 crops in all.
 
   The name in the table is the produce's name, the same as in the harvests
   table, because that is what somebody is handed. It is what the record says
@@ -608,15 +609,16 @@ $FOOD_STAYS_THE_GATHERERS = @('DLC01SoulHusk01', 'DLC01SoulHusk02')
 # carries the food bit and which is none of those three things. On this build
 # that is 13 records where the old rule found 9.
 #
-# CROP_BY_EDITOR_ID: the crops the rule cannot reach. Wheat and tundra cotton
-# are grown in fields all over Skyrim and are TREE records like the rest, but
-# their produce is an INGR and not a food, so no rule written on the record
-# types finds them. Naming two records is honest; widening the rule to INGR to
-# catch them would take in every mountain flower, mushroom and hanging moss in
-# the game, which is gathering and not farming. Matched on the editor id
-# exactly, so the HearthFires planter versions of the same two plants
-# (BYOHHouseIngrdWheat01, BYOHHouseIngrdCotton01) are not caught by it.
-$CROP_BY_EDITOR_ID = @('TreeFloraWheat01', 'TreeFloraTundraCotton01')
+# CROP_BY_EDITOR_ID: the crops the rule cannot reach. Wheat is grown in fields
+# all over Skyrim and is a TREE record like the rest, but its produce is an INGR
+# and not a food, so no rule written on the record types finds it. Naming one
+# record is honest; widening the rule to INGR to catch it would take in every
+# mountain flower, mushroom and hanging moss in the game, which is gathering and
+# not farming. Tundra cotton used to sit here too; #626 moved it to gatherers
+# (reagent flora with put-back), matching flowers and mushrooms. Matched on the
+# editor id exactly, so the HearthFires planter BYOHHouseIngrdWheat01 is not
+# caught by it.
+$CROP_BY_EDITOR_ID = @('TreeFloraWheat01')
 #
 # CROP_NOT_A_PLOT_PREFIX: the HearthFires planters. These are Skyrim's own
 # plant-and-grow system for a homestead garden: somebody puts a seed in the
@@ -677,7 +679,7 @@ $CROP_NOT_A_PLOT_PREFIX = @('BYOHHouseFlora', 'BYOHHouseIngrd')
 #             and on tables all over Skyrim, and a Novice can work them on their
 #             first day. This is the rung the whole ladder stands on: unless a
 #             beginner can both FIND and GROW something, farming cannot start.
-#   Advanced  the ones that take a season. Wheat, tundra cotton, ash yam, tomato.
+#   Advanced  the ones that take a season. Wheat, ash yam, tomato.
 #   Expert    the orchard. Apples, because a tree is the longest thing anybody
 #             here plants.
 #   Master    nothing yet. Left open on purpose for whatever is added next.
@@ -709,7 +711,6 @@ $CROP_RANK_BY_EDITOR_ID = @{
     'TreeFloraPotatoPlant01'      = 'novice'
     'TreeGourdCluster01'          = 'novice'
     'TreeFloraWheat01'            = 'advanced'
-    'TreeFloraTundraCotton01'     = 'advanced'
     'XJKWOTreeFloraTomatoPlant01' = 'advanced'
     'DLC2TreeFloraAshYam01'       = 'advanced'
     'XJKappleGreentree'           = 'expert'
@@ -1932,10 +1933,11 @@ if ($oddGrow.Count -gt 0) {
 #
 # What still has to hold is the other direction, and it is the one that catches
 # a real fault: a crop whose produce is food must be OUT of the plant table, or
-# a gatherer could pick a cabbage after all. Wheat and tundra cotton give an
-# ingredient rather than a food, so the food rule never touches them and they
-# are in both tables on purpose; they are the two named in CROP_BY_EDITOR_ID and
-# the run says so by name rather than by a count.
+# a gatherer could pick a cabbage after all. Wheat gives an ingredient rather
+# than a food, so the food rule never touches it and it is in both tables on
+# purpose; it is the one named in CROP_BY_EDITOR_ID and the run says so by name
+# rather than by a count. Tundra cotton (#626) is gatherer-only and must NOT be
+# in the crops table.
 $bothTables = New-Object 'System.Collections.Generic.List[string]'
 $ingrCrops  = New-Object 'System.Collections.Generic.List[string]'
 foreach ($d in $crops.Keys) {
@@ -2215,8 +2217,8 @@ $cropLines.Add('/* Built by scripts\dev\Build-HarvestTable.ps1 out of the same r
 $cropLines.Add('     ' + $crops.Count + ' farm crops, the same table as the crops map in tools\harvests.json.')
 $cropLines.Add('     A crop is a plot somebody works rather than a plant anybody finds: a plant of')
 $cropLines.Add('     either record type whose produce carries the ALCH food bit and which is not')
-$cropLines.Add('     hanging game and not a prop, plus wheat and tundra cotton, which give an')
-$cropLines.Add('     ingredient and are named one at a time in the script.')
+$cropLines.Add('     hanging game and not a prop, plus wheat, which gives an')
+$cropLines.Add('     ingredient and is named one at a time in the script. Tundra cotton is gatherer flora (#626).')
 $cropLines.Add('     growMinutes is how long after a pick the server counts the plot as grown.')
 $cropLines.Add('     The engine reloots a FLOR or TREE an hour after a pick and the gamemode cannot')
 $cropLines.Add('     set isHarvested or a reloot time, so the plant looks ready before it is: the')
