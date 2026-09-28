@@ -295,38 +295,21 @@ Yes 'Uninstall.cs removes WebView2-LICENSE.txt from the install folder' `
 Yes 'SOURCE CODE.txt notice names the three licence files beside it' `
     ($note -match 'AGPL-3\.0\.txt' -and $note -match 'GPL-3\.0\.txt' -and $note -match 'WebView2-LICENSE\.txt')
 
-# ---- GitHub release pages name source beside the feed files (#421) ------
+# ---- where release pages said source is (#421, #907) ----------------------
 $publishUpdatePath = Join-Path $Here '..\scripts\release\Publish-Update.ps1'
 $publishPackPath   = Join-Path $Here '..\scripts\release\Publish-Pack.ps1'
 $releaseYmlPath    = Join-Path $Here '..\.github\workflows\release.yml'
 $publishUpdate = Get-Content -LiteralPath $publishUpdatePath -Raw
 $publishPack   = Get-Content -LiteralPath $publishPackPath -Raw
 $releaseYml    = Get-Content -LiteralPath $releaseYmlPath -Raw
-Yes 'Publish-Update.ps1 has Get-ReleaseSourceFooter' ($publishUpdate -match 'function Get-ReleaseSourceFooter')
-Yes 'Publish-Update.ps1 appends that footer to gh release create --notes' (
-    $publishUpdate -match 'Get-ReleaseSourceFooter \$clientRec \$serverRec' -and
-    $publishUpdate -match 'gh release create \$Id @assets @repoArg @pre --title "Update \$Id" --notes \$releaseNotes')
-Yes 'Get-ReleaseSourceFooter names credits#source and the licence file names' (
-    $publishUpdate -match 'credits#source' -and
-    $publishUpdate -match 'SOURCE CODE\.txt' -and
-    $publishUpdate -match 'AGPL-3\.0\.txt' -and
-    $publishUpdate -match 'GPL-3\.0\.txt' -and
-    $publishUpdate -match 'WebView2-LICENSE\.txt')
-Yes 'Publish-Pack.ps1 release body points at credits#source' ($publishPack -match 'credits#source')
+# Update and optional packs have had no GitHub release page since #907 (the
+# downloads are on thornswood.net and Thornswood-Releases is gone), so the
+# footer those pages carried went with them. The installer's SOURCE CODE.txt,
+# the credits page and release.yml's draft notes are what say where source is.
+Yes 'Publish-Update.ps1 makes no GitHub release page to put a footer on (#907)' (
+    $publishUpdate -notmatch 'gh release create' -and $publishUpdate -notmatch 'function Get-ReleaseSourceFooter')
+Yes 'nor does Publish-Pack.ps1' ($publishPack -notmatch 'api\.github\.com/repos/.+/releases')
 Yes 'launcher release.yml draft notes point at credits#source' ($releaseYml -match 'credits#source')
-if ($publishUpdate -match 'function Get-ReleaseSourceFooter') {
-    $fnRel = Get-FunctionText $publishUpdate 'Get-ReleaseSourceFooter'
-    Yes 'Get-ReleaseSourceFooter can be lifted from Publish-Update.ps1' ($null -ne $fnRel)
-    if ($fnRel) {
-        . ([ScriptBlock]::Create($fnRel))
-        $footer = Get-ReleaseSourceFooter $clientPath $serverPath
-        Yes 'the release footer names the fork tree for the client commit' ($footer.Contains($forkUrl + '/tree/' + $cCommit))
-        Yes 'the release footer names the server commit tree' ($footer.Contains(($server.source.repo -replace '\.git$', '') + '/tree/' + $sCommit))
-        Yes 'the release footer points at credits#source' ($footer.Contains('https://thornswood.net/credits#source'))
-        Yes 'the release footer is plain ASCII' (-not ($footer -match '[^\x09\x0A\x0D\x20-\x7E]'))
-        Yes 'the release footer has no em dash and never says player' (Test-Words $footer)
-    }
-}
 
 # ---- the credits page ------------------------------------------------------
 $credits = Get-Content -LiteralPath $creditsPath -Raw

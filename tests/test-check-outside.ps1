@@ -145,8 +145,8 @@ try {
   # ---- the files it reads out of the repository ------------------------------
   Yes "AllowedHosts is read out of the real Updater.cs" (($Allowed -contains 'api.github.com') -and ($Allowed -contains 'release-assets.githubusercontent.com'))
   $d = Read-Defaults (Join-Path $Tools '..\launcher\app\Config.cs')
-  Yes 'the releases repository is read out of the real Config.cs' ($d.Repo -match '^[^/\s]+/[^/\s]+$' -and $d.Repo -like '*Releases*')
-  Yes 'so is the collection address' ($d.Collection -like 'https://*nexusmods.com/*')
+  Yes 'no releases repository is named by default any more; the feed is the site''s (#907)' ($d.Repo -eq '')
+  Yes 'the collection address is read out of the real Config.cs' ($d.Collection -like 'https://*nexusmods.com/*')
   Yes 'and the site, so it can be kept off it' ($d.SiteHost -eq 'thornswood.net')
   $real = [IO.File]::ReadAllText((Join-Path $Tools '..\records\steam-build.json')) | ConvertFrom-Json
   Yes 'records\steam-build.json records app 489830 and a build number' ($real.appId -eq 489830 -and ([string]$real.publicBuildId) -match '^\d+$')

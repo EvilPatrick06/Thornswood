@@ -25,10 +25,7 @@
     "Payload": { "from": "Out", "join": "_payload" },
     "ServerZip": { "from": "Out", "join": "thornswood-server.zip" }
   },
-  "siblings": {
-    "Releases": "Thornswood-Releases",
-    "ReleasesDev": "Thornswood-Releases-dev"
-  },
+  "siblings": {},
   "moves": {
     "docs": {
       "old": "tools/docs",

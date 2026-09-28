@@ -66,9 +66,9 @@ Write-Host ''
 Write-Host 'the rule'
 
 Yes 'the feed says which repository it is read from' ((Get-FeedRepo ([pscustomobject]@{ updateRepo = $pub })) -eq $pub)
-Yes 'a feed that does not say is read from the one Config.cs gives a fresh install' ((Get-FeedRepo ([pscustomobject]@{ packs = @() })) -eq $pub)
-Yes 'nonsense in updateRepo is not taken for a repository' ((Get-FeedRepo ([pscustomobject]@{ updateRepo = 'nope' })) -eq $pub)
-Yes 'no feed at all falls back the same way' ((Get-FeedRepo $null) -eq $pub)
+Yes 'a feed that names no repository has none: Thornswood-Releases is no default any more (#907)' ((Get-FeedRepo ([pscustomobject]@{ packs = @() })) -eq '')
+Yes 'nonsense in updateRepo is not taken for a repository' ((Get-FeedRepo ([pscustomobject]@{ updateRepo = 'nope' })) -eq '')
+Yes 'no feed at all has none either' ((Get-FeedRepo $null) -eq '')
 
 Yes 'a private source asset names the source repository' ((Get-FeedPackRepo (Api $priv '556583849')) -eq $priv)
 Yes 'a public asset names the public repository' ((Get-FeedPackRepo (Api $pub '585078233')) -eq $pub)
@@ -228,74 +228,32 @@ Yes 'a clean feed says nothing about stale packs' (($r -eq 'ok') -and -not (($sc
 
 $doc = [pscustomobject]@{ launcherVersion = '1.1.99' }
 $r = Run-Append $doc @((Chunk 'N1' (Api $pub '900'))) $false
-Yes 'a feed with no packs and no updateRepo takes a public pack' (($r -eq 'ok') -and ((Ids $doc.packs) -eq 'N1'))
+Yes 'a feed that names no updateRepo refuses a GitHub pack, since #907' (($r -like 'DIE *') -and -not $doc.PSObject.Properties['packs'])
+$doc = [pscustomobject]@{ launcherVersion = '1.1.99' }
+$r = Run-Append $doc @((Chunk 'N1' ('https://thornswood.net/feed/assets/' + ('1' * 64)))) $false
+Yes 'and takes a pack on the site' (($r -eq 'ok') -and ((Ids $doc.packs) -eq 'N1'))
 
 $doc = Feed
 $r = Run-Append $doc @() $false
 Yes 'a release with no packs still warns and adds nothing' (($r -eq 'ok') -and ((Ids $doc.packs) -eq 'old1,old2,new1') -and (($script:said -join "`n") -like '*2 pack(s)*'))
 
-# ------------------------------------------------------------ Publish-Update, the asset urls
-Write-Host ''
-Write-Host 'Publish-Update writing the asset urls'
-
-# Entry 236 / #445. A launcher with no token shares sixty api.github.com
-# requests an hour with everything else on its address, and the update checks
-# need them, so a new asset goes into the feed by its browser download address,
-# which counts against nothing. The api.github.com asset id address stays as
-# the fallback for an asset gh did not name a browser one for.
-$urlFrom = $pubSrc.IndexOf('# ==== thornswood asset urls ====')
-$urlTo   = $pubSrc.IndexOf('# ==== end thornswood asset urls ====')
-Yes 'the asset url block is marked in Publish-Update.ps1' (($urlFrom -ge 0) -and ($urlTo -gt $urlFrom))
-$urlBlock = ''
-if ($urlFrom -ge 0 -and $urlTo -gt $urlFrom) { $urlBlock = $pubSrc.Substring($urlFrom, $urlTo - $urlFrom) }
-
+# ------------------------------------------------------------ GitHub browser addresses
+# A feed that still names updateRepo (main until its next Ship after #907)
+# keeps its browser download addresses legal until then.
 function Dl([string]$repo, [string]$tag, [string]$name) { return "https://github.com/$repo/releases/download/$tag/$name" }
-function Asset([string]$name, [string]$id, $browser) {
-    $o = [pscustomobject]@{ id = $id; name = $name }
-    if ($null -ne $browser) { $o | Add-Member -NotePropertyName browser_download_url -NotePropertyValue $browser }
-    return $o
-}
-# The block on its own, with the variables Publish-Update has by the time it
-# runs: the release's assets as gh listed them, and the things whose urls it
-# fills in.
-function Run-Urls($relAssets) {
-    $Repo = $pub
-    $exeUrl = ''
-    $clientRel = [pscustomobject]@{ name = 'client-runtime.zip'; url = ''; sha256 = ('2' * 64) }
-    $chunks = @((Chunk 'N1' ''), (Chunk 'N2' ''))
-    if (-not $urlBlock) { return $null }
-    Invoke-Expression $urlBlock
-    return [pscustomobject]@{ Exe = $exeUrl; Client = $clientRel.url; Packs = @($chunks | ForEach-Object { [string]$_.Url }) }
-}
-
-$dlExe    = Dl $pub '20260927-0508' 'Thornswood.exe'
-$dlClient = Dl $pub '20260927-0508' 'client-runtime.zip'
-$dlPack   = Dl $pub '20260927-0508' 'pack-N1.zip'
-$u = Run-Urls @(
-    (Asset 'Thornswood.exe' '900' $dlExe),
-    (Asset 'client-runtime.zip' '901' $dlClient),
-    (Asset 'pack-N1.zip' '902' $dlPack),
-    (Asset 'pack-N2.zip' '903' $null))
-Yes 'the launcher goes into the feed by its browser download address' ($u.Exe -eq $dlExe)
-Yes 'so does the client runtime' ($u.Client -eq $dlClient)
-Yes 'and so does a pack' ($u.Packs[0] -eq $dlPack)
-Yes 'none of the three spends a GitHub API request' (-not (($u.Exe + $u.Client + $u.Packs[0]) -like '*api.github.com*'))
-Yes 'an asset gh named no browser address for keeps the api one' ($u.Packs[1] -eq (Api $pub '903'))
-Yes 'a browser download address is one a launcher may download' (Test-FeedPackUrl $dlPack $pub)
+$dlPack = Dl $pub '20260927-0508' 'pack-N1.zip'
+Yes 'a browser download address is one a launcher may download, while the feed names that repository' (Test-FeedPackUrl $dlPack $pub)
 Yes 'and one in another repository still is not' (-not (Test-FeedPackUrl (Dl $priv '20260927-0508' 'pack-N1.zip') $pub))
+Yes 'and on a feed that names no repository, no GitHub address is' (-not (Test-FeedPackUrl $dlPack (Get-FeedRepo ([pscustomobject]@{ packs = @() }))))
 
-# ------------------------------------------------------------ Publish-Update, before uploading
+# ------------------------------------------------------------ Publish-Update, nothing to GitHub
 Write-Host ''
-Write-Host 'Publish-Update before it uploads'
+Write-Host 'Publish-Update uploads nothing to GitHub (#907)'
 $dot    = $pubSrc.IndexOf(". (Join-Path `$Here 'Feed-Rules.ps1')")
-$guard  = $pubSrc.IndexOf('[string]::Equals($Repo, $feedRepo')
-$upload = $pubSrc.IndexOf('& gh release create')
 Yes 'Publish-Update dot-sources Feed-Rules.ps1' ($dot -ge 0)
-Yes 'and compares the upload repository with the feed''s' (($guard -gt $dot) -and ($dot -ge 0))
-Yes 'before anything is uploaded' (($guard -ge 0) -and ($upload -gt $guard))
-$tail = ''
-if ($guard -ge 0) { $tail = $pubSrc.Substring($guard, [Math]::Min(400, $pubSrc.Length - $guard)) }
-Yes 'and stops when they differ' ($tail -match '\bDie\b')
+Yes 'and has no GitHub release upload, no -AssetHost and no -Repo' (
+    -not $pubSrc.Contains('gh release') -and -not $pubSrc.Contains('$AssetHost') -and ($pubSrc -notmatch '\[string\]\$Repo\b'))
+Yes 'and takes updateRepo out of the feed it writes' ($pubSrc.Contains("PSObject.Properties.Remove('updateRepo')"))
 
 # ------------------------------------------------------------ Repair-Manifest
 Write-Host ''
@@ -359,16 +317,12 @@ try {
     Yes 'no feed where it looks stops it, and says where it looked' (($r.Code -ne 0) -and ($r.Out -like '*nowhere*version.json*'))
 
     # ---- the live feed, measured on a copy
+    # This machine's working copy of the live feed (Feed-Store.ps1, #907).
     $clone = ''
-    try {
-        $common = (& git -C $here rev-parse --path-format=absolute --git-common-dir 2>$null | Out-String).Trim()
-        if ($common) {
-            $cand = Join-Path (Split-Path -Parent (Split-Path -Parent $common)) 'Thornswood-Releases'
-            if (Test-Path -LiteralPath (Join-Path $cand 'version.json')) { $clone = $cand }
-        }
-    } catch { $clone = '' }
+    $cand = Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main'
+    if (Test-Path -LiteralPath (Join-Path $cand 'version.json')) { $clone = $cand }
     if (-not $clone) {
-        Write-Host 'SKIP  no releases clone beside this repository, so the live feed was not measured'
+        Write-Host 'SKIP  no live feed received on this machine, so it was not measured'
     } else {
         $liveDir = Join-Path $work 'live'
         New-Item -ItemType Directory -Path $liveDir -Force | Out-Null
@@ -378,13 +332,13 @@ try {
         $liveRepo = Get-FeedRepo $live
         $ls = Split-FeedPacks $live.packs $liveRepo
         $total = @($live.packs).Count
-        Write-Host ("      the releases clone's feed: {0} packs, {1} a launcher can download from {2}, {3} it cannot" -f $total, $ls.Keep.Count, $liveRepo, $ls.Drop.Count)
+        Write-Host ("      the live feed received here: {0} packs, {1} a launcher can download, {2} it cannot" -f $total, $ls.Keep.Count, $ls.Drop.Count)
         $liveApplied = Join-Path $work 'live-applied.txt'
         $r = Run-Repair @('-RepoDir', $liveDir, '-AppliedFile', $liveApplied, '-NoPush', '-NoPause')
         $fixed = Read-Feed (Join-Path $liveDir 'version.json')
         Yes ("a copy of the live feed repairs to the {0} downloadable packs" -f $ls.Keep.Count) (($r.Code -eq 0) -and (@($fixed.packs).Count -eq $ls.Keep.Count))
-        Yes 'and every one left is in the repository the feed is read from' (@($fixed.packs | Where-Object { -not (Test-FeedPackUrl $_.url $liveRepo) }).Count -eq 0)
-        Yes 'the clone itself was not written' ((Get-FileHash -LiteralPath (Join-Path $clone 'version.json')).Hash -eq $cloneHash)
+        Yes 'and every one left is one a launcher can download' (@($fixed.packs | Where-Object { -not (Test-FeedPackUrl $_.url $liveRepo) }).Count -eq 0)
+        Yes 'the working copy itself was not written' ((Get-FileHash -LiteralPath (Join-Path $clone 'version.json')).Hash -eq $cloneHash)
     }
 }
 finally {
@@ -508,21 +462,19 @@ if ($syncFind -ne '') {
     Yes 'Sync-Client Find-Root answers the same on another drive' ((Run-FindRoot $syncFind @($onD2 + '\Launcher\Thornswood.exe') $drives2) -eq $onD2)
 }
 
-# A Dev Ship pulls main's releases clone before it reads mainVersion, so the
-# Dev News tab cannot keep showing a stale main (1.1.37 while main had moved
-# on; #546). The pull is the same shape Publish-Pack uses for its own feed.
+# A Dev Ship reads main's feed as the site serves it before it writes
+# mainVersion, so the Dev News tab cannot keep showing a stale main (1.1.37
+# while main had moved on; #546). Until #907 that was main's releases clone,
+# pulled first.
 $puSrc = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $pubUpd).Path)
 $mainPull = [regex]::Match($puSrc, '(?s)if \(\$Dev\) \{.*?Set-Prop \$doc ''mainVersion''')
 Yes 'the Dev mainVersion block is still in Publish-Update' $mainPull.Success
 if ($mainPull.Success) {
     $block = $mainPull.Value
-    Yes 'it names the main releases clone as mainRelDir' ($block.Contains('$mainRelDir ='))
-    Yes 'it pulls that clone before reading version.json' (
-        $block.Contains('git -C $mainRelDir pull --rebase') -and
-        $block.IndexOf('git -C $mainRelDir pull') -ge 0 -and
-        $block.IndexOf('git -C $mainRelDir pull') -lt $block.IndexOf('Get-Content -LiteralPath $mainJson'))
-    Yes 'a pull that fails leaves the dev marks alone rather than shipping a stale mainVersion' (
-        $block -match "could not pull main's feed, so the dev marks were left alone")
+    Yes 'it reads main''s feed from the site, fresh, not a clone on this disk' (
+        $block.Contains("Read-SiteFeed 'main'") -and -not $block.Contains('Thornswood-Releases''') -and -not $block.Contains('git -C'))
+    Yes 'a feed that cannot be read leaves the dev marks alone rather than shipping a stale mainVersion' (
+        $block -match "could not read main's feed, so the dev marks were left alone")
 }
 
 Write-Host ''

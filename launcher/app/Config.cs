@@ -132,17 +132,19 @@ namespace Thornswood
         // updates for all of them at once. A read-only fine-grained PAT limits
         // the damage without fixing the shape. The real fix is a release
         // channel that needs no credential, at which point this field goes.
+        // UpdateRepo and UpdateToken are read by nothing since #907, when the
+        // GitHub fallback went with Thornswood-Releases; they stay declared so
+        // a config.json that carries them still loads and saves unchanged.
         [DataMember] public string UpdateRepo = "";    // "owner/name"
         [DataMember] public string UpdateToken = "";   // read-only fine-grained PAT
         [DataMember] public string UpdateBranch = "main";
 
-        // Direct https URL for version.json on the site feed (#649). Empty
-        // means fall back to the GitHub Contents API on UpdateRepo (kept hot
-        // as rollback via Thornswood-Releases). Defaults in AfterLoad:
+        // Direct https URL for version.json on the site feed (#649), the only
+        // place updates are read from since #907. Defaults in AfterLoad:
         // main -> https://thornswood.net/feed/version.json ; Channel or
         // UpdateBranch "dev" -> https://thornswood.net/feed-dev/version.json.
-        // The feed can announce a move the way updateRepo announces a rename
-        // by shipping updateFeedUrl under the old URL first.
+        // The feed can announce a move by shipping updateFeedUrl under the old
+        // URL first.
         [DataMember] public string UpdateFeedUrl = "";
 
         [DataMember] public string Theme = "Forge";
@@ -307,15 +309,14 @@ namespace Thornswood
             if (ServerPort == "25565") ServerPort = "7777";
             if (ServerAddress == "192.135.119.166") ServerAddress = "192.135.112.23";
             if (ExpectedExeBytes <= 0) ExpectedExeBytes = 37157144;
-            // The releases repo is public now, so there is a right answer here
-            // and no reason to make a fresh install go looking for it. A blank
-            // one used to mean a launcher that could never update itself and
-            // never said why.
-            if (string.IsNullOrEmpty(UpdateRepo)) UpdateRepo = "EvilPatrick06/Thornswood-Releases";
+            // UpdateRepo used to default to Thornswood-Releases, the GitHub
+            // fallback. That repository is gone (#907), so nothing fills it in.
+            if (UpdateRepo == null) UpdateRepo = "";
             if (UpdateToken == null) UpdateToken = "";
             if (string.IsNullOrEmpty(UpdateBranch)) UpdateBranch = "main";
-            // Site feed first (#649). GitHub Contents API on UpdateRepo stays
-            // as the fallback when the site does not answer.
+            // The site feed (#649), and since #907 the only one: a blank one
+            // used to mean a launcher that could never update itself and never
+            // said why, so there is always a right answer here.
             if (string.IsNullOrEmpty(UpdateFeedUrl))
             {
                 bool feedDev = string.Equals(Channel, "dev", StringComparison.OrdinalIgnoreCase)
@@ -572,16 +573,14 @@ namespace Thornswood
         // one is exactly the launcher that cannot be told. Shipping them in the
         // update means a rename or a moved port reaches every copy by itself.
         //
-        // updateRepo is the interesting one: publish it under the OLD name
-        // pointing at the new, then rename. Every stale copy reads it once and
-        // finds its way home.
+        // updateRepo named the GitHub repository of the fallback. It is read by
+        // nothing since #907 and kept only so an older feed still parses.
         [DataMember] public string updateRepo = "";
 
-        // Where version.json itself lives, when that is a direct https URL on
-        // the site rather than the GitHub Contents API. Same announce-a-rename
-        // pattern as updateRepo (#649): publish the new URL under the old feed
-        // first, then move. Null/empty on older feeds means keep whatever the
-        // launcher already has (including the AfterLoad default).
+        // Where version.json itself lives, a direct https URL on the site.
+        // Publish the new URL under the old feed first, then move (#649).
+        // Null/empty on older feeds means keep whatever the launcher already
+        // has (including the AfterLoad default).
         [DataMember] public string updateFeedUrl = "";
         [DataMember] public string voicePort = "";
 

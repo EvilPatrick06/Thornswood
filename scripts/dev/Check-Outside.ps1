@@ -17,8 +17,12 @@
   What it asks, all of it anonymously, the way a launcher on somebody's
   machine asks with no token of its own:
 
-    the feed      version.json, read from the releases repository the way
-                  Updater.Check reads it. It has to answer and be JSON.
+    the feed      version.json, read from https://thornswood.net/feed/version.json
+                  (feed-dev with -Branch dev), the one address on the site this
+                  asks, because it is what every launcher reads. It has to
+                  answer and be JSON. Until #907 it was read from
+                  Thornswood-Releases through the GitHub contents API; -Repo
+                  still reads a repository that way.
     every url     every pack, the launcher and the client runtime: https, a
                   host the launcher's AllowedHosts accepts (read out of
                   Updater.cs, so the list here cannot go stale), a checksum,
@@ -64,8 +68,9 @@
 #>
 [CmdletBinding()]
 param(
-  # owner/name of the releases repository. Read from launcher\app\Config.cs when
-  # not given, which is where every installed launcher gets it.
+  # owner/name of a releases repository to read the feed from through the
+  # GitHub contents API, as launchers did before the site feed. Left out, the
+  # feed is the site's (#907).
   [string]$Repo,
   # main is the live feed, dev the dev one.
   [string]$Branch = 'main',
@@ -225,7 +230,8 @@ function Read-AllowedHosts([string]$updaterCs) {
 # The releases repository, the collection and the server, from the launcher's
 # own config, which is the one place Set-Vps.ps1 and a rename keep them true.
 function Read-Defaults([string]$configCs) {
-  $o = @{ Repo = 'EvilPatrick06/Thornswood-Releases'; Collection = ''; SiteHost = 'thornswood.net'; ServerAddress = '' }
+  # No releases repository by default any more: Config.cs names none since #907.
+  $o = @{ Repo = ''; Collection = ''; SiteHost = 'thornswood.net'; ServerAddress = '' }
   if (-not (Test-Path -LiteralPath $configCs)) { return $o }
   $cs = [IO.File]::ReadAllText($configCs)
   $m = [regex]::Match($cs, 'UpdateRepo\s*=\s*"([^"/\s]+/[^"\s]+)"')
@@ -364,7 +370,10 @@ function Invoke-Outside {
     [string[]]$Hosts,
     [string]$SteamRecord,
     [string]$Collection,
-    [string[]]$Server
+    [string[]]$Server,
+    # The feed is on the site (#907). Asked once, directly, although the site
+    # is the server: it is the one file every launcher reads.
+    [switch]$FeedFromSite
   )
   $script:Problems = 0
   $script:Found = New-Object 'System.Collections.Generic.List[object]'
@@ -379,7 +388,7 @@ function Invoke-Outside {
   # ---- the feed
   Head 'The feed'
   $v = $null
-  $f = Ask $FeedUrl 'application/vnd.github.raw' -Body
+  $f = if ($FeedFromSite) { Probe $FeedUrl 'application/json' -Body } else { Ask $FeedUrl 'application/vnd.github.raw' -Body }
   if (Spent $f) { Bad ('version.json was not read. ' + (Allowance)) }
   elseif ($f.code -ne 200) { Bad ('version.json answers ' + (Answer $f) + ', so no launcher can read it and no pack or download can be checked.') }
   else {
@@ -534,6 +543,13 @@ if ($MyInvocation.InvocationName -eq '.') { return }
 
 $d = Read-Defaults (Join-Path $Here '..\..\launcher\app\Config.cs')
 if (-not $Repo) { $Repo = $d.Repo }
+# The feed launchers read is the site's (#907), unless a repository or an
+# address was named.
+$fromSite = $false
+if (-not $FeedUrl -and -not $Repo) {
+  $FeedUrl = 'https://' + $d.SiteHost + $(if ($Branch -eq 'dev') { '/feed-dev' } else { '/feed' }) + '/version.json'
+  $fromSite = $true
+}
 if (-not $SteamRecord) { $SteamRecord = Join-Path $Here '..\..\records\steam-build.json' }
 $allowed = Read-AllowedHosts (Join-Path $Here '..\..\launcher\app\Updater.cs')
 
@@ -541,6 +557,6 @@ Write-Host ''
 Write-Host '  THORNSWOOD  -  what a first install needs that we do not run' -ForegroundColor White
 
 $problems = Invoke-Outside -Repo $Repo -Branch $Branch -FeedUrl $FeedUrl -Hosts $allowed -SteamRecord $SteamRecord `
-  -Collection $d.Collection -Server @($d.SiteHost, $d.ServerAddress)
+  -Collection $d.Collection -Server @($d.SiteHost, $d.ServerAddress) -FeedFromSite:$fromSite
 if ($problems -gt 0) { exit 1 }
 exit 0

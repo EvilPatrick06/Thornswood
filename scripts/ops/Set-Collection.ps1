@@ -33,14 +33,14 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
-if (-not $ReleaseDir) {
-  $guess = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
-  # The feed lives only in the releases clone. This repository's own copy, the
-  # old fallback, was deleted on 25 September (#363), so without a clone
-  # there is nothing to edit and this stops rather than guess.
-  if (-not (Test-Path (Join-Path $guess '.git'))) { throw "No Thornswood-Releases clone at $guess. Clone it there (git clone https://github.com/EvilPatrick06/Thornswood-Releases), or pass -ReleaseDir." }
-  $ReleaseDir = $guess
-}
+# The live feed lives on the VPS beside what the site serves (#907): received
+# into this machine's working folder for main, edited there, and sent back,
+# refused if it changed up there in between. Until #907 this edited and pushed
+# the Thornswood-Releases clone. -ReleaseDir works on a folder instead and
+# receives nothing.
+. (Join-Path $Here '..\release\Feed-Store.ps1')
+$receive = -not $ReleaseDir
+if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir 'main' }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -96,6 +96,10 @@ Say ("  now  " + $(if ($Url) { $Url } else { '(none)' })) 'Green'
 
 # ----------------------------------------------------------- everybody else ---
 Head 'Everybody else'
+if ($receive) {
+  try { [void](Receive-FeedStore 'main' $ReleaseDir) }
+  catch { Die ("Could not receive the live feed from the VPS, so only this machine was changed: " + $_.Exception.Message) }
+}
 $vFile = Join-Path $ReleaseDir 'version.json'
 if (-not (Test-Path -LiteralPath $vFile)) { Die "not found: $vFile" }
 $doc = ReadJson $vFile
@@ -111,16 +115,10 @@ if ($NoPush) {
   Say 'Not pushed, as asked. Until it is, other launchers still have the old one.' 'Yellow'
 }
 else {
-  Head 'Pushing'
-  $old = $ErrorActionPreference
-  $ErrorActionPreference = 'Continue'
-  & git -C $ReleaseDir add version.json 2>&1 | Out-Host
-  & git -C $ReleaseDir commit -m $(if ($Url) { 'Mods come from the collection' } else { 'Collection cleared' }) 2>&1 | Out-Host
-  & git -C $ReleaseDir push 2>&1 | Out-Host
-  $rc = $LASTEXITCODE
-  $ErrorActionPreference = $old
-  if ($rc -ne 0) { Die "git push exited with $rc. Both files are set here, they are just not up yet." }
-  Say '  pushed' 'Green'
+  Head 'Sending'
+  try { [void](Send-FeedStore 'main' $ReleaseDir @('version.json')) }
+  catch { Die ("The feed was not sent: " + $_.Exception.Message + " Both files are set here, they are just not up yet.") }
+  Say '  sent; the site serves it now' 'Green'
 }
 
 Write-Host ''

@@ -26,9 +26,7 @@ namespace Thornswood
         /// <summary>
         /// The address the last check actually read version.json from, so
         /// launcher.log can be read back afterwards and say where the checks
-        /// went. The site feed on thornswood.net costs nothing; the GitHub
-        /// Contents API fallback spends one of the sixty anonymous requests an
-        /// hour that every launcher on the address shares (#445).
+        /// went: the site feed on thornswood.net, the only source since #907.
         /// </summary>
         public static string LastFeedUrl = "";
 
@@ -76,18 +74,6 @@ namespace Thornswood
         static Cached cached;
         static bool cacheRead;
         const string CacheMagic = "Thornswood feed cache 1";
-
-        // How long the GitHub Contents API fallback is left alone after a try.
-        //
-        // The site feed is asked every thirty seconds in play, and before this
-        // every one of those checks fell through to GitHub the moment the site
-        // missed: a hundred and twenty Contents API calls an hour against an
-        // allowance of sixty per address, so one site hiccup spent the hour's
-        // allowance in half an hour, for everybody on the connection at once.
-        // The site is still asked every thirty seconds, which is what the
-        // countdown needs. Only the fallback waits.
-        static readonly TimeSpan GithubRest = TimeSpan.FromMinutes(5);
-        static DateTime githubTried = DateTime.MinValue;
 
         // WebClient has no timeout worth the name, and the default is long
         // enough that a GitHub which accepts the connection and then says
@@ -140,11 +126,9 @@ namespace Thornswood
 
         public static bool Enabled(Config cfg)
         {
-            // No token needed. The site feed (UpdateFeedUrl) is the primary
-            // source after the #649 cutover; Thornswood-Releases via UpdateRepo
-            // stays as the GitHub Contents API fallback. UpdateToken is still
-            // honoured if somebody sets one, which is what keeps a private
-            // source working for whoever is developing against it.
+            // No token needed. The site feed (UpdateFeedUrl) is the only
+            // source since #907; the GitHub Contents API fallback on UpdateRepo
+            // went with Thornswood-Releases.
             if (!string.IsNullOrEmpty(cfg.UpdateFeedUrl))
             {
                 Uri feed;
@@ -152,8 +136,7 @@ namespace Thornswood
                     && feed.Scheme == Uri.UriSchemeHttps)
                     return true;
             }
-            return !string.IsNullOrEmpty(cfg.UpdateRepo)
-                   && cfg.UpdateRepo.Contains("/");
+            return false;
         }
 
         public static string WhyDisabled(Config cfg)
@@ -165,8 +148,7 @@ namespace Thornswood
                     && feed.Scheme == Uri.UriSchemeHttps)
                     return cfg.UpdateFeedUrl.Trim();
             }
-            if (string.IsNullOrEmpty(cfg.UpdateRepo) || !cfg.UpdateRepo.Contains("/")) return "no update source set";
-            return cfg.UpdateRepo;
+            return "no update source set";
         }
 
         /// <summary>
@@ -219,40 +201,12 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The repository names worth trying, in order. The project was renamed
-        /// from skyrim-together to Thornswood, and a config.json written either
-        /// side of that rename is still out there on somebody's machine.
-        ///
-        /// Rewriting the name in the config on load was the obvious fix and the
-        /// wrong one: it renamed everybody's config before the repository
-        /// itself was renamed, so every launcher started asking GitHub for
-        /// something that did not exist yet. Trying is the only thing that
-        /// works whichever side of the rename a machine is on.
-        /// </summary>
-        static List<string> RepoCandidates(string repo)
-        {
-            var l = new List<string>();
-            if (string.IsNullOrEmpty(repo)) return l;
-            l.Add(repo);
-
-            int slash = repo.LastIndexOf('/');
-            if (slash <= 0) return l;
-            string owner = repo.Substring(0, slash + 1);
-            string name = repo.Substring(slash + 1);
-
-            if (string.Equals(name, "skyrim-together", StringComparison.OrdinalIgnoreCase)) l.Add(owner + "Thornswood");
-            else if (string.Equals(name, "Thornswood", StringComparison.OrdinalIgnoreCase)) l.Add(owner + "skyrim-together");
-            return l;
-        }
-
-        /// <summary>
         /// Reads version.json. Prefers UpdateFeedUrl (direct https on the
         /// site, #649), with the ETag of the last copy so an unchanged feed is
-        /// answered 304 and not downloaded again. If that fails or is unset,
-        /// falls back to the GitHub Contents API on UpdateRepo/UpdateBranch so
-        /// Thornswood-Releases stays a hot rollback, at most once every
-        /// GithubRest because that is the request with a quota on it (#445).
-        /// Returns null if updates are off.
+        /// answered 304 and not downloaded again. Until #907 a miss fell back to
+        /// the GitHub Contents API on UpdateRepo (Thornswood-Releases); that
+        /// repository is gone, so a miss is reported and the next check tries
+        /// the site again. Returns null if updates are off.
         /// </summary>
         public static VersionDoc Check(Config cfg)
         {
@@ -268,97 +222,18 @@ namespace Thornswood
                 try { return FromSite(cfg, feedUrl); }
                 catch (Exception ex)
                 {
-                    // Site feed missed; try GitHub so a site outage does not
-                    // leave every launcher without updates.
+                    // Site feed missed. Said below; the next check asks again.
                     hostFail = ex;
                 }
             }
 
-            if (string.IsNullOrEmpty(cfg.UpdateRepo) || !cfg.UpdateRepo.Contains("/"))
-            {
-                if (hostFail != null) throw WrapFeedFail(hostFail, true);
-                return null;
-            }
-
-            // The fallback is the one that costs quota, so it is not taken on
-            // every thirty second check while the site is down. Until its rest
-            // is up, the site's failure is what the caller gets, which reads as
-            // no answer rather than as no update and so leaves the in play
-            // clock where it is (Shell.CheckUpdatesInPlay).
-            if (hostFail != null && (DateTime.Now - githubTried) < GithubRest)
-                throw WrapFeedFail(hostFail, true);
-            githubTried = DateTime.Now;
-
-            string branch = string.IsNullOrEmpty(cfg.UpdateBranch) ? "main" : cfg.UpdateBranch;
-            List<string> tries = RepoCandidates(cfg.UpdateRepo);
-            Exception last = null;
-
-            foreach (string repo in tries)
-            {
-                string url = "https://api.github.com/repos/" + repo +
-                             "/contents/version.json?ref=" + branch;
-                LastFeedUrl = url;
-                try
-                {
-                    VersionDoc doc;
-                    using (var wc = Client(cfg, false, url))
-                        doc = VersionDoc.Parse(wc.DownloadData(url));
-
-                    // Settle on whichever one answered, so the next check is one
-                    // request rather than two.
-                    if (!string.Equals(repo, cfg.UpdateRepo, StringComparison.Ordinal))
-                    {
-                        cfg.UpdateRepo = repo;
-                        try { cfg.Save(Paths.CfgFile); } catch (Exception ex) { Swallow.Note("Updater.Check, cfg save", ex); }
-                    }
-                    return doc;
-                }
-                catch (WebException wex)
-                {
-                    var r = wex.Response as HttpWebResponse;
-                    if (r != null)
-                    {
-                        int code = (int)r.StatusCode;
-                        // Only a missing repo is worth trying the other name for.
-                        // A refused token would fail identically on both and the
-                        // second attempt would only hide what is actually wrong.
-                        if (code == 404)
-                        {
-                            last = new Exception("the repo or the branch could not be read, check UpdateRepo and that the token still has access");
-                            continue;
-                        }
-                        if (code == 401) throw new Exception("the access token was refused, it may have expired");
-                        if (code == 403 || code == 429)
-                        {
-                            // GitHub answers a rate limit with 403 as well as
-                            // with 429, and an install with no token of its own
-                            // shares sixty calls an hour with everybody on its
-                            // address. Calling that a refused token sent people
-                            // looking for a credential they never set, on an
-                            // install that is meant to need none.
-                            string left = null;
-                            try { left = r.Headers["X-RateLimit-Remaining"]; } catch (Exception ex) { Swallow.Note("Updater.Check, header", ex); }
-                            if (code == 429 || string.Equals(left, "0", StringComparison.Ordinal) ||
-                                string.IsNullOrEmpty(cfg.UpdateToken))
-                                throw new Exception("GitHub answered " + code + ": too many update checks have come from this connection for now. Nothing is wrong with your install and it clears by itself, usually within the hour.");
-                            throw new Exception("the access token was refused, it may have expired");
-                        }
-                    }
-                    if (wex.Status == WebExceptionStatus.Timeout)
-                        throw new Exception("GitHub did not answer in time. The check runs again by itself.");
-                    last = new Exception("could not reach GitHub");
-                }
-                catch (Exception ex)
-                {
-                    last = ex;
-                }
-            }
-
-            // Both the site feed and GitHub missed. Prefer the GitHub reason
-            // when we got one; otherwise surface the site failure.
-            if (last != null) throw WrapFeedFail(last, false);
+            // No GitHub fallback any more (#907): Thornswood-Releases is gone.
+            // A site feed that misses is what the caller gets, which reads as
+            // no answer rather than as no update, so the in play clock is left
+            // where it is (Shell.CheckUpdatesInPlay) and the next check, thirty
+            // seconds on, asks the site again.
             if (hostFail != null) throw WrapFeedFail(hostFail, true);
-            throw new Exception("could not reach the update feed");
+            return null;
         }
 
         /// <summary>

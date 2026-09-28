@@ -84,22 +84,11 @@ if ($isClone) {
   }
 }
 
-# ------------------------------------------------------------ the releases --
-Head 'The releases repository'
-$ReleaseDir = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
-$hasRel = Test-Path (Join-Path $ReleaseDir 'version.json')
-Ready 'Thornswood-Releases is cloned beside this repo' $hasRel $ReleaseDir `
-  ("git clone https://github.com/EvilPatrick06/Thornswood-Releases.git " + $ReleaseDir)
-
-if ($Dev) {
-  $devRel = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases-dev'
-  $hasDev = Test-Path (Join-Path $devRel 'version.json')
-  Ready 'the dev release worktree exists' $hasDev $devRel `
-    'Ship.ps1 -Channel dev makes it on first use; nothing to do by hand'
-}
-
-# GitHub itself, because a release is pushed there and a clone proves nothing
-# about whether this account may push.
+# ------------------------------------------------------------ GitHub --
+# No releases clone any more: the feed and its baseline are on the VPS (#907),
+# checked under The VPS below. GitHub is still where the source is, and where a
+# main Ship downloads the launcher CI built for its tag.
+Head 'GitHub'
 $ghOk = $false
 $ghWho = ''
 try {
@@ -109,16 +98,6 @@ try {
   if ($m.Success) { $ghWho = $m.Groups[1].Value }
 } catch { $ghOk = $false }
 Ready 'signed in to GitHub' $ghOk $ghWho 'gh auth login'
-
-if ($ghOk) {
-  $canPush = $false
-  try {
-    $p = & gh api repos/EvilPatrick06/Thornswood-Releases --jq '.permissions.push' 2>$null
-    $canPush = ("$p".Trim() -eq 'true')
-  } catch { $canPush = $false }
-  Ready 'this account may push to Thornswood-Releases' $canPush $ghWho `
-    'Patrick adds the account under Settings, Collaborators on the Thornswood-Releases repository' 'patrick'
-}
 
 # --------------------------------------------------------- the install root --
 Head 'The launcher install'
@@ -286,7 +265,20 @@ if ($NoVps) {
   } catch { $sshOk = $false }
   Ready 'ssh to the VPS works without a password' $sshOk $script:VpsAddress `
     '.\scripts\vps\Setup-SshKey.ps1        then Patrick runs .\scripts\vps\Add-VpsKey.ps1 to put the public half on the box' 'either'
-  Say '  note  ssh is needed by Deploy-*, Publish-Server and the Check scripts that ask the box. A Ship itself does not use it.' 'DarkGray'
+  Say '  note  a Ship needs ssh: the feed, its baseline and every download go to the VPS (#897, #907).' 'DarkGray'
+  # The feed store beside the feed the site serves (Feed-Store.ps1, #907).
+  # Read only: asks what is there, sends nothing.
+  if ($sshOk) {
+    $storeOk = $false; $storeSaid = ''
+    try {
+      . (Join-Path $PSScriptRoot 'Feed-Store.ps1')
+      $there = Get-FeedStoreThere $Channel
+      $storeOk = [bool]$there['version.json'] -and [bool]$there['published.json']
+      $storeSaid = $(if ($storeOk) { 'version.json and published.json' } else { 'missing ' + ((@('version.json', 'published.json') | Where-Object { -not $there[$_] }) -join ' and ') })
+    } catch { $storeSaid = $_.Exception.Message }
+    Ready ("the $Channel feed and its baseline are on the VPS") $storeOk $storeSaid `
+      'scripts\oneoff\Move-FeedStore-ToVps.ps1 put them there once; if one is gone, Patrick looks at C:\Thornswood-Docs\feed on the VPS' 'patrick'
+  }
 }
 
 # --------------------------------------------------------------- the verdict --

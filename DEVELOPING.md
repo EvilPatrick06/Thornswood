@@ -26,7 +26,7 @@ release, launcher, game files and server together, are in CONTRIBUTING.md.
 | Piece | Where | What it is |
 | --- | --- | --- |
 | Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
-| Releases repo | github.com/EvilPatrick06/Thornswood-Releases (public), clone beside the source repo as `Thornswood-Releases`, dev branch as a worktree `Thornswood-Releases-dev` | `version.json` and `published.json` (pack baseline) per branch (main, dev), and the GitHub release assets published before 28 Sep. Since #897 new downloads go to the site instead (next row) |
+| Feed store | On the VPS beside the feed the site serves: `C:\Thornswood-Docs\feed\{version.json, published.json, launchers.txt, history\}` and the same under `feed-dev`. Each machine's working copy is `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev` | `version.json` (the feed, served at `/feed[-dev]/version.json`), `published.json` (the pack baseline), every launcher version the channel published, and each replaced file, none of those three served. Ship receives and sends them through `scripts\release\Feed-Store.ps1` (#907). Until then they were the `Thornswood-Releases` GitHub repository and its two clones |
 | Downloads | On the VPS, `C:\Thornswood-Docs\feed\assets` and `feed-dev\assets`, served at `https://thornswood.net/feed[-dev]/assets/<sha256>` | Every pack, launcher exe and client runtime a feed names, one file per sha256, one folder per channel (`docs\FEED.md` "Downloads come from the site") |
 | Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Play page Server dropdown | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Staff roles only (Owner, Dev, Gamemaster, Moderator, Loremaster) |
@@ -63,8 +63,8 @@ untestable, or for work Patrick has said goes live, and it is his call.
 ```
 
 That is the dev release: version 1.1.36.1, .2, .3, pack ids ending `-dev`, the
-dev worktree and branch of the releases repo, the dev baseline
-(`published.json` in that worktree), the dev ports, and the dev server told. It runs from
+dev feed and the dev baseline (`feed-dev` in the VPS store), the dev ports,
+and the dev server told. It runs from
 any branch on any developer's machine. There is no installer for it, and it
 posts to the dev updates channel in Discord and the dev launcher's News tab,
 never #news. There is one dev feed and the last dev Ship wins, so say in #staff-general
@@ -103,10 +103,11 @@ launcher, checks that the game folder holds the recorded client build
 `scripts\release\Publish-Update.ps1`, which
 scans the game folder for loose files that are not Vortex's, not vanilla, not
 runtime and not per machine, diffs them against this channel's baseline
-(`published.json` in the releases clone), zips the difference as a pack,
-sends the pack, the launcher and the client runtime to the site's
-`/feed[-dev]/assets/<sha256>` (since #897; `-AssetHost github` is the old
-GitHub release), rewrites `version.json` and pushes it.
+(`published.json`, received from the VPS store at the start), zips the
+difference as a pack, sends the pack, the launcher and the client runtime to
+the site's `/feed[-dev]/assets/<sha256>` (since #897), rewrites `version.json`
+and sends it and then the baseline back to the VPS store (since #907), which
+is the moment the site serves the release.
 
 The tip customers get is that `version.json`, and launchers poll the feed url in
 it. So two things follow the tip, both run by
@@ -114,16 +115,13 @@ it. So two things follow the tip, both run by
 the channel it shipped, and then the release is announced as it always was:
 
 1. **The host feed remirror**, the website lane's script, called as
-   `& (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') -Dev:$Dev`. The
-   Thornswood-Releases tip goes to `https://thornswood.net/feed/` and the
-   Thornswood-Releases-dev tip to `https://thornswood.net/feed-dev/`, with the
-   assets each feed names. It has `-Check` for a dry run and `-Verify` to rehash
+   `& (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') -Dev:$Dev`. It
+   checks every asset the channel's feed names is on `https://thornswood.net/feed/`
+   (or `/feed-dev/`) and finds `version.json` already there, because the
+   publisher sent it. It has `-Check` for a dry run and `-Verify` to rehash
    what is up there, and optional `-FeedDir` and `-AssetDir` that nothing here
-   passes: it works the clone out from the channel itself. That is the feed a
-   launcher polls since the #649 host cutover (`docs\FEED.md`), and a launcher
-   falls back to the GitHub feed only when the site feed does not answer at all,
-   so an unmirrored site feed offers people the release it last held rather than
-   this one.
+   passes: it works this machine's working copy out from the channel itself.
+   That is the only feed a launcher polls since #907 (`docs\FEED.md`).
 2. **The site news, the #news post and the server's countdown**, unchanged, the
    news main only as it always was. Those tell people to update, which is why
    the feed is mirrored before them.
@@ -223,12 +221,17 @@ Several people, several machines, one repo. The short rules are in
   team before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
   `Updater.cs` or `Publish-Update.ps1` gets a line in #staff-general too; every
   machine touches them.
-- **The publisher pulls the feed** before `version.json` is edited, so a
-  release is added on top of whatever another machine just published; a
-  refused push means NOT SHIPPED, pull and run Ship again.
-- **The baseline is per channel in Thornswood-Releases.** Every shipping machine
-  pulls the same published.json, so a Dev Ship from a second machine packs the
-  same difference. Pending unfinished-push notes stay per machine under LOCALAPPDATA.
+- **The publisher receives the feed and the baseline from the VPS** at the
+  start and asks again before `version.json` is edited: a feed somebody changed
+  meanwhile is received again and the release goes on top of it, and a
+  baseline another Ship moved stops the release with nothing written. Each send
+  replaces the file on the VPS only if it is still the one received
+  (`scripts\release\Feed-Store.ps1`), so a refused send means NOT SHIPPED; run
+  Ship again.
+- **The baseline is per channel on the VPS store.** Every shipping machine
+  receives the same published.json, so a Dev Ship from a second machine packs
+  the same difference. Pending unfinished-send notes stay per machine under
+  LOCALAPPDATA.
 - **Keep puts its kept copies back at every Play**, on every machine. Go.ps1,
   which Ship runs to put the plugins and overlays in, makes what it installs
   the kept copy, the way a pack does, so a Ship is never undone by the next
@@ -250,13 +253,13 @@ Needs: Windows 10 or 11, Skyrim Special Edition on Steam (any Steam library,
 any drive; the scripts find it through Steam) with the Thornswood collection
 deployed through Vortex, the Thornswood launcher installed on any drive and
 signed in, git, the GitHub CLI (`gh`) signed in to an account that is a
-collaborator on both repos, PowerShell 7, node, Python 3 with `discord.py`
-and `Pillow` for the bot scripts, and an SSH key the VPS knows.
+collaborator on the source repo, PowerShell 7, node, Python 3 with `discord.py`
+and `Pillow` for the bot scripts, and an SSH key the VPS knows. There is no
+releases clone any more: the feed and its baseline are on the VPS (#907).
 
 ```
 cd C:\Users\<you>\Downloads
 git clone https://github.com/EvilPatrick06/Thornswood.git Thornswood-Repo
-git clone https://github.com/EvilPatrick06/Thornswood-Releases.git Thornswood-Releases
 gh auth login
 gh auth status
 ```
@@ -280,9 +283,10 @@ Then in `Thornswood-Repo`:
 which makes a key for the VPS, points ssh at it, and prints the public line.
 Send that line to Patrick; he runs `.\scripts\vps\Add-VpsKey.ps1 -PublicKey '<the line>'`
 from his machine and the VPS knows you. `.\scripts\vps\Setup-SshKey.ps1 -Test`
-proves it. Until then the scripts that talk to the VPS (`Deploy-*`,
+proves it. Until then the scripts that talk to the VPS (`Ship`, `Deploy-*`,
 `Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) cannot
-reach it, and Ship still publishes but cannot warn the room.
+reach it, and Ship stops before it builds anything: the feed and its baseline
+are received from the VPS (#907).
 
 Every Ship, dev included, checks the SkyMP client against the record, so
 this machine builds the engine once (Visual Studio 2022 Build Tools with
@@ -293,16 +297,14 @@ missing):
 .\scripts\release\Build-Engine.ps1
 ```
 
-`engine\README.md` has the rest. Two more one-time things somebody already
-set up does for you: Patrick adds you as a collaborator on
-`EvilPatrick06/Thornswood-Releases`, which the publish pushes to, and gives
-you the dev news webhook privately, which `.\scripts\ops\Set-DevNews.ps1`
-stores on this machine (without it a dev Ship publishes and posts nothing).
+`engine\README.md` has the rest. One more one-time thing somebody already
+set up does for you: Patrick gives you the dev news webhook privately, which
+`.\scripts\ops\Set-DevNews.ps1` stores on this machine (without it a dev Ship
+publishes and posts nothing).
 
-The pack baseline lives in the releases clone. Pull `Thornswood-Releases` (and the
-dev worktree) before the first Ship so `published.json` is there. If this machine
-still has a legacy copy under `%LOCALAPPDATA%\Thornswood\`, the first Ship copies
-it into Releases and leaves the legacy file alone. To rebuild a baseline by hand:
+The pack baseline lives on the VPS beside the feed, and every Ship receives it
+first, so there is nothing to pull. If the VPS has none for a channel, Ship
+stops with "No baseline yet". To rebuild a baseline by hand:
 
 ```
 .\scripts\release\Publish-Update.ps1 -Baseline
@@ -338,7 +340,7 @@ says **not enforced** where nothing checks it.
 | Voice join token key | `token-key.txt` in `C:\Thornswood-Voice` on the VPS. `C:\Thornswood-Voice-Dev` has its own; `vps-dev-instance.ps1` copies the whole live folder, this file included, when it makes the dev one | Signs the token that says which profile a voice connection belongs to. **Not enforced** unless the service runs with `-Auth on`: the default, `log`, lets an unproven connection in as whoever it claims and writes a line saying so. The `auth` field of the service's `/health` says which. | The service makes it itself. Delete the file and run `Install-Voice.ps1 -Restart`; tokens already issued stop working and the launcher fetches new ones on its next renewal. |
 | TURN relay key, not in use yet | `turn-key.txt` in `C:\Thornswood-Voice` on the VPS, put there by hand, and its own in `C:\Thornswood-Voice-Dev`; `vps-dev-instance.ps1` would copy the live one along with the rest of that folder. Neither is there yet: no relay has been stood up, so the service offers STUN only | Nothing yet. Once a relay is up, the voice service makes each browser a credential from it, and a credential lets whoever holds it send traffic through the relay until it expires. **Not enforced** as to who gets one: `/ice` answers anybody who asks. | Whoever runs the relay changes its shared secret there, puts the same value in `turn-key.txt`, and runs `Install-Voice.ps1 -Restart`. Credentials already handed out stop working at once. |
 | Backup passphrase | `C:\Thornswood-Backup\key.txt` on the VPS and `Documents\thornswood-backup-key.txt` on Patrick's machine, one copy in each on purpose | The nightly backups, which hold the site's `config.json`, `bot.env.json` and the live game server's `private` folder: every VPS secret above except the voice service's files. | `Install-Backup.ps1` makes one when `key.txt` is missing and copies it down when the Documents copy is missing. Keep the old one until the backups made with it have aged out. |
-| GitHub access | your own `gh auth login`, kept in Windows' credential store | Pushing branches and opening pull requests here, and every release: `Publish-Update.ps1` uploads to the releases repo with `gh`, and every launcher installs what that feed says. | You: `gh auth logout`, then `gh auth login`, or revoke it on GitHub under Settings, Applications. Collaborator access to both repos is Patrick's to give or take away. |
+| GitHub access | your own `gh auth login`, kept in Windows' credential store | Pushing branches and opening pull requests here, and a main Ship's download of the launcher CI built. Releases go to the VPS, not GitHub, since #897 and #907. | You: `gh auth logout`, then `gh auth login`, or revoke it on GitHub under Settings, Applications. Collaborator access to the source repo is Patrick's to give or take away. |
 | VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, and its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. None of the scripts needs the Administrator password; `Add-VpsKey.ps1` exists so nobody else has to hold it. | You. First move the old key aside: rename both `.ssh\thornswood_ed25519` and `.ssh\thornswood_ed25519.pub`, say by adding `.old`. While the old key still opens the VPS, `Setup-SshKey.ps1` says it already works and stops, and while the `.pub` is there it uses that one again rather than making a new one. Passing `-KeyPath` a new file does not get round this, because that first check goes through your ssh config, which still names the old key. Then `Setup-SshKey.ps1 -KeyOnly` makes a new key at the same path and prints its public line. Patrick adds it with `Add-VpsKey.ps1 -PublicKey '<the new line>'` and takes the old one off with `Add-VpsKey.ps1 -PublicKey '<the line in the .old .pub>' -Remove`. For his own key, Patrick runs `Setup-SshKey.ps1` without `-KeyOnly`, which asks for the Administrator password once and puts the new key on itself, and then removes the old line the same way. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes and the old line is off. |
 | VirusTotal API key | the environment variable `VT_API_KEY` on the machine that runs the optional manual upload, and nowhere in this repository: `Publish-VirusTotal.ps1` reads it from there only, so it has no file to be committed in and no parameter to be typed on a command line | Reading and uploading under our VirusTotal account when somebody runs the manual tool. Publish, Package, and Ship do not call it (#802). | Whoever owns the VirusTotal account, in the account's own API key page, then sets the variable on that machine. A machine without it skips a manual run; publish does not need the key. |
 | Code signing | `tools\signing.json` on a machine that signs. It names the setup and holds no key: the credential is the Azure account behind Artifact Signing, or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Whoever owns the Azure signing account, in Azure. Without the file `Sign-Artifact.ps1` signs nothing and a local build carries on unsigned. Ship and Publish-Installer refuse that soft skip before anything reaches the site or the feed. |
