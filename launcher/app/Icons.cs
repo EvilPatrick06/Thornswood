@@ -112,10 +112,55 @@ namespace Thornswood
                 if (!Directory.Exists(Paths.LauncherDir)) return null;
                 string want = Path.Combine(Paths.LauncherDir, "icon-" + hash + ".ico");
                 if (!File.Exists(want) || new FileInfo(want).Length != bytes.Length)
+                {
                     File.WriteAllBytes(want, bytes);
+                    // The shortcuts may have been drawn while it was gone, and
+                    // Windows keeps that blank against this same name (#887).
+                    iconWritten = true;
+                }
                 return want;
             }
             catch { return null; }
+        }
+
+        static bool iconWritten;
+
+        /// <summary>
+        /// Whether the shortcuts need redrawing even where IconLocation already
+        /// reads right, issue #887. A rebuild or a Ship copies a new exe over
+        /// the old one and leaves no .old, and Install-Launcher used to delete
+        /// the icon file the Start menu and pinned shortcuts name; Windows then
+        /// drew them blank and kept that. So Profile\icons.stamp remembers the
+        /// icon and the exe (size, write time) of the last redraw, and a start
+        /// where either differs, or where the icon file had to be written
+        /// again, redraws. An ordinary start matches and stays quiet.
+        /// </summary>
+        static bool Due(string exe, string want, bool wrote)
+        {
+            if (wrote) return true;
+            try
+            {
+                string stamp = Path.Combine(Paths.ProfileDir, "icons.stamp");
+                if (!File.Exists(stamp)) return true;
+                return !string.Equals(File.ReadAllText(stamp).Trim(), Mark(exe, want), StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception ex) { Swallow.Note("Icons.Due", ex); return true; }
+        }
+
+        static void Remember(string exe, string want)
+        {
+            try
+            {
+                if (Directory.Exists(Paths.ProfileDir))
+                    File.WriteAllText(Path.Combine(Paths.ProfileDir, "icons.stamp"), Mark(exe, want));
+            }
+            catch (Exception ex) { Swallow.Note("Icons.Remember", ex); }
+        }
+
+        static string Mark(string exe, string want)
+        {
+            var fi = new FileInfo(exe);
+            return want + "|" + (fi.Exists ? fi.Length + "|" + fi.LastWriteTimeUtc.Ticks : "none");
         }
 
         static void Sweep(string keep)
@@ -177,7 +222,9 @@ namespace Thornswood
         /// a quiet Ensure then skips the notify that would redraw it. Force
         /// rewrites the same IconLocation, tells Explorer about each .lnk, and
         /// asks ie4uinit to refresh, without killing Explorer (Repair still does
-        /// that from Settings when somebody needs the heavy pass).
+        /// that from Settings when somebody needs the heavy pass). Ensure also
+        /// forces itself when the exe or the icon changed since the last pass
+        /// (Due), which covers a rebuild or a Ship that leaves no .old.
         /// </summary>
         public static int Ensure()
         {
@@ -187,6 +234,7 @@ namespace Thornswood
         /// <summary>See <see cref="Ensure()"/>.</summary>
         public static int Ensure(bool force)
         {
+            iconWritten = false;
             string icon = IconFile();
             string exe = LauncherExe;
             string want = (icon == null ? exe : icon) + ",0";
@@ -198,6 +246,8 @@ namespace Thornswood
             {
                 try { if (File.Exists(exe + ".old")) force = true; } catch { /* .old gone mid-check: treat as ordinary start */ }
             }
+            // A rebuild or a Ship leaves no .old; the stamp catches those.
+            if (!force && Due(exe, want, iconWritten)) force = true;
 
             int changed = 0;
             var touchedLinks = new List<string>();
@@ -312,6 +362,9 @@ namespace Thornswood
                         }
                     }
                 }
+                // Every shortcut has been walked, so the next start with the
+                // same exe and icon can stay quiet.
+                Remember(exe, want);
             }
             catch (Exception ex) { Swallow.Note("Icons.Ensure", ex); }
             finally
@@ -323,8 +376,11 @@ namespace Thornswood
 
             if (changed > 0 || force)
             {
-                // One .lnk at a time first: ASSOCCHANGED alone leaves blank
-                // shortcut icons after a self-update on some machines.
+                // The icon file first, since Windows keeps the picture against
+                // its path, then one .lnk at a time: ASSOCCHANGED alone leaves
+                // blank shortcut icons after a self-update on some machines.
+                if (icon != null)
+                    try { SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATHW | SHCNF_FLUSH, icon, null); } catch (Exception ex) { Swallow.Note("Icons.Ensure, notify icon file", ex); }
                 foreach (string lnk in touchedLinks)
                     try { SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATHW | SHCNF_FLUSH, lnk, null); } catch { /* shell notify is best-effort */ }
                 try { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero); } catch { /* shell notify is best-effort */ }
