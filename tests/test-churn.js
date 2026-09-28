@@ -187,7 +187,7 @@ function world(opts) {
     'notify', 'say', 'globalThis', 'mp', 'kindIsContainer', 'STATIONS', 'mineSalt',
     'burnCharcoal', 'isChoppingBlock', 'chopWood', 'SHRINES', 'bless', 'isCrop',
     'farmActivate', 'isFish', 'fish', 'isGame', 'game', 'isPlant', 'harvest', 'ALLOW',
-    'isVein', 'mineOre', 'loot', 'log', 'ITEMS', 'floraHanded'];
+    'isVein', 'mineOre', 'loot', 'milk', 'log', 'ITEMS', 'floraHanded'];
   const body = "'use strict';\n" +
     [parts.coolBlock, parts.waitLine, parts.churnsLine,
      parts.waitWord, parts.isChurn, parts.churn].filter(Boolean).join('\n') + '\n' +
@@ -209,7 +209,7 @@ function world(opts) {
       function (d) { return d === 'cabbage:Test.esp'; }, tag('farmActivate'),
       never, tag('fish'), never, tag('game'),
       function (d) { return d === 'flower:Test.esp'; }, tag('harvest'),
-      { thornswoodAllow: true }, never, tag('mineOre'), loot, function () { }, ITEMS,
+      { thornswoodAllow: true }, never, tag('mineOre'), loot, function () { return null; }, function () { }, ITEMS,
       function (message) {
         return typeof message === 'string' && /^(You pick |You take )/.test(message);
       }]);
@@ -358,7 +358,7 @@ function world(opts) {
         'and somebody with no class, so the engine goes ahead for all of them', open);
     yes('nothing was said, gated or put back for any of those presses',
         w.rec.gates.length === gates0 && w.rec.putBack.length === put0 && w.rec.told.length === told1);
-    yes('a farmer pressing a living cow is still nothing, because milking is not built',
+    yes('a farmer pressing a living cow whose base is not a milk cow is still nothing',
         on(COW, FARMER) === undefined);
     const dead = on(DEAD_COW, 0x14e);
     yes('a dead cow still goes to loot() and the hunter, unchanged', dead === false &&
@@ -456,10 +456,10 @@ function world(opts) {
   const b = a < 0 ? -1 : src.indexOf('*/', a);
   const note = (a < 0 || b < 0) ? '' : src.slice(a, b).replace(/\s+/g, ' ');
   yes('the note over CHURNS is in the gamemode', note.length > 0);
-  yes('it leaves Patrick the two questions the entry leaves him: a goat, and a rank',
-      /whether a goat gives milk too/.test(note) && /whether milking has a rank/.test(note));
-  yes('and not the one the entry settled, since milk is already on a cooldown',
-      !/whether milking waits/.test(note) && /milk on a cooldown/.test(note));
+  yes('the note says milk is beside loot for living cows',
+      /MILK IS BESIDE loot/.test(note) && /living cow/.test(note));
+  yes('and still leaves Patrick goats and a rank',
+      /Goats and a milking rank are still Patrick/.test(note));
   yes('it names the console line a press on a living cow on dev is read for',
       note.indexOf('"Sent activation for caster="') !== -1);
 
