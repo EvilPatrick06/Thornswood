@@ -604,6 +604,14 @@ Write-Host 'Pointing the dev server at the dev voice service...'
 # above, so the dev feed and the dev server say one number. With no number it
 # is left as the box has it and does not count as a reason to rewrite.
 #
+# AND NO "default" KEY IN npcSettings, added 28 September for issue #879. The
+# engine reads every key of npcSettings as a plugin name and refuses every NPC
+# when one names no loaded plugin, so {"default": {...}} emptied the world:
+# NPCs showed for a moment and went, or never showed. Deploy-Gamemode stopped
+# writing it in #880, but this script never sends the settings file, so the
+# dev box kept the old one. The key is dropped here and the rest of npcSettings
+# is left as it is.
+#
 # This comment is HERE and not inside the here-string below on purpose. Anything
 # in that string is base64 encoded and sent as an ssh command line, where it
 # counts double and the far end truncates at about 8191 characters. Ten lines of
@@ -663,6 +671,8 @@ if (`$pt -and `$unb -ge 0) {
   }
 } elseif (-not `$pt) { 'no startPoints in the dev settings, leaving that alone' }
 elseif (`$unb -lt 0) { 'Skyrim Unbound.esp is not in this load order, leaving the start point alone' }
+`$wantNpc = (`$s.npcSettings -and (`$s.npcSettings.PSObject.Properties.Name -contains 'default'))
+if (`$wantNpc) { 'npcSettings has a default key, which refuses every NPC. Dropping it.' }
 `$wantMax = `$false
 if ($maxOnline -gt 0 -and [int]`$s.maxPlayers -ne $maxOnline) {
   `$wantMax = `$true
@@ -676,7 +686,7 @@ if ($maxOnline -gt 0 -and [int]`$s.maxPlayers -ne $maxOnline) {
 `$bom = `$false
 try { `$bom = ([IO.File]::ReadAllBytes(`$p)[0] -eq 0xEF) } catch { }
 if (`$bom) { 'the settings file starts with a byte order mark, rewriting it without one' }
-if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax) {
+if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax -and -not `$wantNpc) {
   'thornswoodVoicePort is already $VoicePort, both equipment checks are already off, and the load order is already right'
 } else {
   Copy-Item `$p (`$p + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
@@ -687,6 +697,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
     'start point moved to 0x{0:X8}, index {1}' -f `$startWant, `$unb
   }
   if (`$wantMax) { `$s | Add-Member -NotePropertyName maxPlayers -NotePropertyValue $maxOnline -Force }
+  if (`$wantNpc) { `$s.npcSettings.PSObject.Properties.Remove('default') }
   `$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
   `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
@@ -723,6 +734,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
             ', unknown item vetoes ' + `$back.equipmentInventoryCheckEnabled +
             ', load order ' + @(`$back.loadOrder).Count + ' plugins' +
             ', most online ' + `$back.maxPlayers +
+            ', npcSettings keys ' + @(`$back.npcSettings.PSObject.Properties).Count +
             ', start point ' + @(`$back.startPoints)[0].worldOrCell }
   } catch {
     'THE FILE NO LONGER PARSES: ' + `$_.Exception.Message + '. Put the .before- copy back.'
