@@ -76,7 +76,9 @@ something.
 
 ### In character, the rest
 
-`#game-rules` carries all ten in-world rules. `#lore` carries the setting.
+`#game-rules` carries the nine in-world rules, read out of the "In the World"
+part of `site\data\site\rules.md`, the /rules page, so the two cannot
+disagree. `#lore` carries the setting.
 `#character-introductions`, `#tales` (a forum), `#rp-appreciation` and
 `#graveyard`.
 

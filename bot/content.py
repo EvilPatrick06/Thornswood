@@ -177,70 +177,45 @@ the launcher, so this channel and the Play button can't disagree.
 Same list at **https://thornswood.net/news**.
 """
 
-GAME_RULES = """\
+# THE RULES IN THE WORLD ARE READ OUT OF THE RULES PAGE, NOT WRITTEN HERE.
+#
+# Issue #430: #game-rules, lore\game-rules.md and site\data\site\rules.md
+# were three copies of the rules for playing, and they disagreed on the one
+# people get removed over: this channel and the lore copy had a fight with
+# another character agreed first, the site had it start freely. Patrick
+# decided on 28 Sep that fights start freely, and that the site page is the
+# only copy. So
+# #game-rules is that page's "# In the World" part, to the end of the page,
+# and an edit there reaches the channel with the next Setup-Discord.ps1
+# -Posts. Paragraphs past LONGEST_PARAGRAPH are refused by as_discord, as
+# they are for join.md.
+#
+# RULES above is a different document, the Discord conduct rules posted in
+# #rules, and is left as it is.
+_RULES_MD = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         '..', 'site', 'data', 'site', 'rules.md')
+
+
+def in_the_world(md, where='rules.md'):
+    """The rules page's "# In the World" part, from under its heading to the
+    next top level heading or the end of the page."""
+    md = md.replace('\r\n', '\n')
+    m = re.search(r'^# In the World[ \t]*\n(.*?)(?=^# |\Z)', md, re.M | re.S)
+    if not m:
+        raise ValueError('%s has no "# In the World" part, and #game-rules is '
+                         'read out of it' % where)
+    return m.group(1).strip()
+
+
+with open(_RULES_MD, encoding='utf-8') as _f:
+    GAME_RULES = """\
 # Rules in the world
 
-<#RULES> is about how we treat each other. This is about playing.
+This is **https://thornswood.net/rules** from "In the World" on, read out of
+the same file, so the two can't disagree. <#RULES> is the Discord half.
 
-We're looser than the big roleplay servers on purpose. No character sheet to
-get approved, no lore exam, nobody blessing your backstory. What you do need is
-to not ruin somebody else's evening.
+""" + as_discord(in_the_world(_f.read()), 'rules.md') + "\n"
 
-**1. Your character knows what your character knows.**
-You read here that somebody got robbed on the road. Your character didn't. The
-fun half of this rule: **ask**. "Has word got round about the road?" gets you
-an answer in character, and now it's real.
-
-**2. You don't decide what happens to other people.**
-Write what you try, not what you land. Swinging at his shoulder leaves him a
-choice. Burying the axe in it doesn't.
-
-**3. Nobody dies without agreeing to it.**
-Beaten, robbed, broken, left in a ditch, all fine. Death isn't. Say it out of
-character first and make sure everyone actually wants it. A death somebody
-agreed to is the best thing that happens on a server like this.
-
-**4. Ask before you draw on someone.**
-Go get killed by a draugr all you like. Fighting another character takes one
-line out of character first. Nobody has ever been annoyed by being asked.
-
-**5. Rob people, don't loot them.**
-Pick the lock, lift the key, talk your way in, all fair. Don't empty someone's
-house because you caught it open while they were offline. Take a good thing,
-leave a trace, and give them a story to come back to.
-
-**6. Play a person, not a legend.**
-You can be remarkable. You can't be the Dragonborn, the Listener, the Archmage,
-the Harbinger, or the last of anything.
-
-**7. Titles are given, or taken properly.**
-Jarl, steward, housecarl, thane, captain, priest of a named temple. Most of them
-are sitting empty, and how one comes free is something you find out in
-character.
-
-Claiming an empty one is fine within reason. Nobody will stop you calling
-yourself captain of a guard nobody else has claimed. High King is not within
-reason.
-
-Want one somebody already holds? Take it. Scheme, challenge them, put a knife
-somewhere useful. But take it **in the world, with them in it**. Announcing
-you're the Jarl of Riften now while the Jarl of Riften is asleep isn't taking
-it, it's editing your own name.
-
-**8. Use `/ooc` for out of character talk.**
-`/ooc brb, dog`. It only reaches people near you and it comes out in brackets,
-so nobody has to guess whether your character said it.
-
-**9. If you wouldn't enjoy being on the other end of it, don't.**
-The other eight are made out of this one.
-
-**10. `/ooc can we not` ends anything.**
-Immediately, no explanation owed, no argument. Ignore that and you're done
-here. It's the only rule with no second chance.
-
-The full thing, including what we're deliberately relaxed about, is at
-**https://thornswood.net/rules**
-"""
 
 LORE = """\
 # Where you are
