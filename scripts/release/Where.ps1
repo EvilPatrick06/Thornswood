@@ -109,6 +109,10 @@ function Get-Place([string]$name) {
         'Repo'   { return $repo }
         'Engine' { return Get-Engine }
         'Out'    { return Get-Out }
+        # This machine's working copies of the feeds (Feed-Store.ps1, #907),
+        # not clones of Thornswood-Releases beside the repository any more.
+        'Releases'    { return Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main' }
+        'ReleasesDev' { return Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev' }
     }
     # Looked up by name rather than read as $layout.siblings.$name. Ship.ps1
     # runs with Set-StrictMode -Version Latest, and a script it calls runs

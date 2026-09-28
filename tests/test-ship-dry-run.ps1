@@ -14,7 +14,9 @@
   The same read found one more way a dry run could reach outside the machine.
   On the dev channel, with no dev release worktree on the disk and no dev
   branch that git could see on the releases repository, Ship made the branch
-  and pushed it, dry run or not.
+  and pushed it, dry run or not. Since #907 there is no releases repository:
+  the feed and the baseline are on the VPS store (Feed-Store.ps1), stood in for
+  here by a folder through THORNSWOOD_TEST_SITE_DIR.
 
   HOW. The real Ship.ps1 is copied into a temp folder shaped like this repo,
   beside a stand-in for every script it calls. Each stand-in writes down what it
@@ -26,11 +28,11 @@
     D  -DryRun -Package on main
     V  -DryRun -Package on dev
     R  a real Ship -Package on main
-    E  -DryRun on dev, with no dev worktree and no dev branch on the releases repo
+    E  -DryRun on dev, numbered from what the store says dev has published
 
   R is there so D and V prove something: the same stand-ins, on a real Ship,
-  do write down the installer going to the site, the upload, the push, the
-  news, the Discord and the restart.
+  do write down the installer going to the site, the feed and baseline going to
+  the store, dev following main through it, the news, the Discord and the restart.
 
   R also proves the launcher that ships is the one CI built, not one compiled
   here (issue #457). A real main Ship never calls Build-Launcher.ps1: it runs
@@ -42,9 +44,8 @@
 
   The stand-ins are only worth what the real scripts do, so two of those are
   read as well: Package-Thornswood.ps1 calls Publish-Installer.ps1 only without
-  -NoPublish, and every gh call and every git push, pull or fetch in
-  Publish-Update.ps1 is behind -NoUpload or -NoPush, or in the dev worktree
-  maker that runs only when no -ReleaseDir is given, and Ship always gives one.
+  -NoPublish, and Publish-Update.ps1 has no gh or git call that reaches GitHub,
+  and every send to the VPS store is behind -NoPush.
 
   Nothing here touches this repository, the network, a game or a launcher.
   Everything it writes is under its own temp folder.
@@ -129,47 +130,34 @@ $away = @($pu.Ast.FindAll({ param($n) $n -is $CmdAst }, $true) | Where-Object {
     $words = @($_.CommandElements | ForEach-Object { $_.Extent.Text })
     ($name -eq 'gh') -or ($name -eq 'git' -and @($words | Where-Object { $_ -in 'push', 'pull', 'fetch', 'ls-remote', 'clone' }).Count -gt 0)
 })
-# A function that opens with "if ($NoPush ...) { return }" holds everything
-# in it behind -NoPush as surely as an if around the call does. Push-Baseline
-# (27 Sep) is written that way.
-$heldFns = @{}
-foreach ($f in @($pu.Ast.FindAll({ param($n) $n -is $FnAst }, $true))) {
-    $first = @($f.Body.EndBlock.Statements) | Select-Object -First 1
-    if ($first -is $IfAst -and $first.Clauses[0].Item1.Extent.Text -match '^\$NoPush\b' -and
-        $first.Clauses[0].Item2.Extent.Text -match '^\{\s*return\s*\}$') { $heldFns[$f.Name] = $true }
-}
+Yes ('Publish-Update.ps1 has no gh or git call that reaches GitHub any more (#907)' + $(if ($away.Count) { ': ' + (($away | ForEach-Object { 'line ' + $_.Extent.StartLineNumber }) -join ', ') } else { '' })) ($away.Count -eq 0)
+$sends = @($pu.Ast.FindAll({ param($n) $n -is $CmdAst -and $n.GetCommandName() -eq 'Send-FeedStore' }, $true))
 $loose = @()
-foreach ($c in $away) {
+foreach ($c in $sends) {
     $e = Enclosing $c
-    $held = @($e.Conditions | Where-Object { $_ -match '-not \$NoUpload\b' -or $_ -match '-not \$NoPush\b' }).Count -gt 0
-    if ($e.Function -and $heldFns[$e.Function]) { $held = $true }
-    # The one read left outside: a dev release pulls MAIN's releases clone
-    # before reading its feed for the news marks (#546). It only reads what
-    # main has published and never writes to main's clone's origin; a push
-    # anywhere, or a pull or fetch of any other clone, is still loose.
-    $words = @($c.CommandElements | ForEach-Object { $_.Extent.Text })
-    if ($c.GetCommandName() -eq 'git' -and $words -contains '$mainRelDir' -and
-        @($words | Where-Object { $_ -in 'pull', 'fetch' }).Count -gt 0 -and $words -notcontains 'push') { $held = $true }
-    if (-not $held -and $e.Function -ne 'Ensure-DevReleases') { $loose += ('line ' + $c.Extent.StartLineNumber + ': ' + $c.Extent.Text) }
+    $held = @($e.Conditions | Where-Object { $_ -match '-not \$NoPush\b' }).Count -gt 0
+    if (-not $held -and $e.Function -ne 'Send-Baseline') { $loose += ('line ' + $c.Extent.StartLineNumber) }
 }
-Yes ("Publish-Update.ps1 has gh and git calls that reach GitHub ({0}), so the next line reads something" -f $away.Count) ($away.Count -ge 5)
-Yes ('  every one is behind -NoUpload or -NoPush, or in Ensure-DevReleases' + $(if ($loose.Count) { ': ' + ($loose -join '; ') } else { '' })) ($loose.Count -eq 0)
-$edr = @($pu.Ast.FindAll({ param($n) $n -is $CmdAst -and $n.GetCommandName() -eq 'Ensure-DevReleases' }, $true))
-$edrHeld = @($edr | Where-Object { @((Enclosing $_).Conditions | Where-Object { $_ -match '-not \$ReleaseDir\b' }).Count -gt 0 })
-Yes '  Ensure-DevReleases runs there only when no -ReleaseDir is given' ($edr.Count -ge 1 -and $edrHeld.Count -eq $edr.Count)
-Yes '  and Ship always gives one' ($shipSrc -match '\$pubArgs = @\{[^\r\n]*ReleaseDir = \$ReleaseDir')
+$sb = @($pu.Ast.FindAll({ param($n) $n -is $FnAst -and $n.Name -eq 'Send-Baseline' }, $true))
+Yes ("  what it sends to the VPS goes through Send-FeedStore ({0} call(s)), so the next lines read something" -f $sends.Count) ($sends.Count -ge 2)
+Yes ('  every one is behind -NoPush, or in Send-Baseline' + $(if ($loose.Count) { ': ' + ($loose -join '; ') } else { '' })) ($loose.Count -eq 0)
+Yes '  and Send-Baseline sends nothing under -NoPush' ($sb.Count -eq 1 -and $sb[0].Extent.Text -match 'if \(\$NoPush\) \{ return \}')
+Yes '  and Ship always gives it the working folder' ($shipSrc -match '\$pubArgs = @\{[^\r\n]*ReleaseDir = \$ReleaseDir')
 
 # ---- a repository, a releases clone and two installs, all stand-ins --------------
 $T = Join-Path ([IO.Path]::GetTempPath()) ('ts-ship-dry-' + [Guid]::NewGuid().ToString('N'))
 $repo = Join-Path $T 'Thornswood'
 $tools = Join-Path $repo 'tools'
-$rel = Join-Path $T 'Thornswood-Releases'
-$relDev = Join-Path $T 'Thornswood-Releases-dev'
+$appdata = Join-Path $T 'appdata'
+# This machine's working copies of the feeds (Feed-Store.ps1, #907), and the
+# folder standing in for the VPS store beside the site's feeds.
+$rel = Join-Path $appdata 'Thornswood\feed\main'
+$relDev = Join-Path $appdata 'Thornswood\feed\dev'
+$site = Join-Path $T 'site'
 $bin = Join-Path $T 'bin'
 $root = Join-Path $T 'Play'
 $rootDev = Join-Path $T 'Play-DevBuild'
 $dist = Join-Path $T 'dist'
-$appdata = Join-Path $T 'appdata'
 $log = Join-Path $T 'calls.log'
 
 # What every stand-in script writes down: its name and what it was given, on
@@ -204,6 +192,7 @@ $oldTmp = $env:TMP
 $oldCalls = $env:TS_DRY_CALLS
 $oldGhPwsh = $env:TS_GH_PWSH
 $oldGhDl = $env:TS_GH_DL
+$oldSite = $env:THORNSWOOD_TEST_SITE_DIR
 $ps = (Get-Process -Id $PID).Path
 
 function Invoke-Ship([string[]]$shipArgs) {
@@ -244,11 +233,19 @@ function Read-Version([string]$path) {
 }
 
 try {
-    foreach ($d in @($tools, (Join-Path $tools '..\launcher\app'), (Join-Path $tools '..\scripts\release'), (Join-Path $rel '.git'), $relDev, $bin,
+    foreach ($d in @($tools, (Join-Path $tools '..\launcher\app'), (Join-Path $tools '..\scripts\release'), $rel, $relDev, $bin,
                      (Join-Path $root 'Launcher'), (Join-Path $rootDev 'Launcher'), $dist, (Join-Path $appdata 'Thornswood'))) {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
     Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $tools '..\scripts\release\Ship.ps1') -Force
+    # The real files Ship dot-sources, beside it, so it runs as it does for real.
+    $realRel = Split-Path -Parent $ShipPath
+    foreach ($n in 'Ship-Rules.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Note-Rules.ps1', 'Where.ps1') {
+        Copy-Item -LiteralPath (Join-Path $realRel $n) -Destination (Join-Path $tools ('..\scripts\release\' + $n)) -Force
+    }
+    Copy-Item -LiteralPath (Join-Path $realRel '..\..\layout.json') -Destination (Join-Path $tools '..\layout.json') -Force
+    New-Item -ItemType Directory -Force -Path (Join-Path $tools '..\scripts\mods') | Out-Null
+    Copy-Item -LiteralPath (Join-Path $realRel '..\mods\LoadOrder.ps1') -Destination (Join-Path $tools '..\scripts\mods\LoadOrder.ps1') -Force
     # What Ship.ps1 dot-sources, which a stand-in cannot write down because it
     # is not called, only read. The two rule files are the real ones: they
     # only define functions, and the notes below are held to Note-Rules the
@@ -274,10 +271,18 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
 '@)
     $updaterCs = Join-Path $tools '..\launcher\app\Updater.cs'
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.93`";`r`n")
-    [IO.File]::WriteAllText((Join-Path $rel 'version.json'), '{"launcherVersion":"1.1.93","packs":[]}')
-    [IO.File]::WriteAllText((Join-Path $relDev 'version.json'), '{"launcherVersion":"1.1.93.2","packs":[],"serverPort":7001}')
-    [IO.File]::WriteAllText((Join-Path $rel 'published.json'), '{"main":"as last published"}')
-    [IO.File]::WriteAllText((Join-Path $relDev 'published.json'), '{"dev":"as last published"}')
+    # The VPS store (Feed-Store.ps1, #907), stood in for by a folder, and this
+    # machine's working copies of it as the last run left them.
+    foreach ($d in (Join-Path $site 'feed'), (Join-Path $site 'feed-dev')) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
+    foreach ($pair in @(@($rel, 'feed'), @($relDev, 'feed-dev'))) {
+        $v = if ($pair[1] -eq 'feed') { '{"launcherVersion":"1.1.93","packs":[]}' } else { '{"launcherVersion":"1.1.93.2","packs":[],"serverPort":7001}' }
+        $b = if ($pair[1] -eq 'feed') { '{"main":"as last published"}' } else { '{"dev":"as last published"}' }
+        [IO.File]::WriteAllText((Join-Path $site ($pair[1] + '\version.json')), $v)
+        [IO.File]::WriteAllText((Join-Path $site ($pair[1] + '\published.json')), $b)
+        [IO.File]::WriteAllText((Join-Path $pair[0] 'version.json'), $v)
+        [IO.File]::WriteAllText((Join-Path $pair[0] 'published.json'), $b)
+    }
+    [IO.File]::WriteAllText((Join-Path $site 'feed-dev\launchers.txt'), "1.1.93.1`r`n1.1.93.2`r`n")
     # An hour old, so the stand-in install is newer and Ship calls it built.
     foreach ($r in $root, $rootDev) {
         $exe = Join-Path $r 'Launcher\Thornswood.exe'
@@ -291,20 +296,29 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
 '@
     Stub 'Go' '[switch]$SkipServer, [string]$Game, [switch]$Vortex' ''
     Stub 'Sync-Client' '[switch]$Check, [switch]$NoPause, [string]$Game' ''
-    # What the real publisher does under -NoUpload -NoPush: writes version.json
-    # and its baseline. Otherwise it uploads and pushes, through the stand-ins.
+    # What the real publisher does: receives the feed and baseline (from the
+    # stand-in store), writes version.json and its baseline, and with no
+    # -NoPush sends both back.
     Stub 'Publish-Update' ('[string]$Notes, [string]$Root, [string]$RepoDir, [string]$ReleaseDir, [string]$DistRoot, ' +
                            '[switch]$NoPause, [switch]$MoveServer, [switch]$AcceptSize, [switch]$Launcher, ' +
                            '[string]$Channel, [string]$VersionOverride, [switch]$NoUpload, [switch]$NoPush, ' +
                            # A dry run also passes these two since #494: close no game, prune no packs.
                            '[switch]$NoClose, [int]$KeepPacks = 10') @'
+. (Join-Path $PSScriptRoot 'Feed-Store.ps1')
+if (-not $NoPush) { [void](Receive-FeedStore $(if ($Channel) { $Channel } else { 'main' }) $ReleaseDir) }
 $vf = Join-Path $ReleaseDir 'version.json'
 $was = [string]((Get-Content -LiteralPath $vf -Raw | ConvertFrom-Json).launcherVersion)
 $now = if ($VersionOverride) { $VersionOverride } else { $was }
 [IO.File]::WriteAllText($vf, '{"launcherVersion":"' + $now + '","packs":[{"id":"20990101-0000"}]}')
 [IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"written":"by the publisher"}')
-if (-not $NoUpload) { & gh release create 20990101-0000 }
-if (-not $NoPush) { & git -C $ReleaseDir push -u origin HEAD }
+# The send the real one makes: the feed and then the baseline, through
+# Feed-Store.ps1 into the stand-in for the VPS store.
+if (-not $NoPush) {
+    . (Join-Path $PSScriptRoot 'Feed-Store.ps1')
+    $ch = if ($Channel) { $Channel } else { 'main' }
+    [void](Send-FeedStore $ch $ReleaseDir @('version.json'))
+    [void](Send-FeedStore $ch $ReleaseDir @('published.json'))
+}
 '@
     # The real one's last step, which the static check above holds it to.
     Stub 'Package-Thornswood' '[string]$Root, [string]$OutDir, [switch]$NoPause, [switch]$NoPublish, [string]$ReleaseDir' @'
@@ -357,15 +371,20 @@ if ($dir) {
     $env:TS_DRY_CALLS = $log
     $env:TS_GH_PWSH = $ps
     $env:TS_GH_DL = $ghDl
+    $env:THORNSWOOD_TEST_SITE_DIR = $site
 
     $feed = Join-Path $rel 'version.json'
     $devFeed = Join-Path $relDev 'version.json'
     $base = Join-Path $rel 'published.json'
     $devBase = Join-Path $relDev 'published.json'
+    $siteFeed = Join-Path $site 'feed\version.json'
+    $siteBase = Join-Path $site 'feed\published.json'
+    $siteDevFeed = Join-Path $site 'feed-dev\version.json'
+    $siteDevBase = Join-Path $site 'feed-dev\published.json'
     $distDir = Join-Path $dist 'Play\_dist'
 
     # ---- D: -DryRun -Package on main ------------------------------------------------
-    $was = @{ feed = (Hash $feed); dev = (Hash $devFeed); base = (Hash $base) }
+    $was = @{ feed = (Hash $feed); dev = (Hash $devFeed); base = (Hash $base); site = (Hash $siteFeed); siteBase = (Hash $siteBase); siteDev = (Hash $siteDevFeed) }
     $d = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-DryRun', '-Package', '-Root', $root, '-DistRoot', $dist, '-NoPause')
     Yes ("D a main -DryRun -Package runs to the end (exit {0})" -f $d.Code) ($d.Code -eq 0 -and $d.Out -match 'Dry run finished')
     $pub = Called $d 'Publish-Update'
@@ -386,6 +405,7 @@ if ($dir) {
     Yes 'D version.json is byte for byte what it was' ((Hash $feed) -eq $was.feed)
     Yes '  and so is the baseline' ((Hash $base) -eq $was.base)
     Yes '  and the dev feed is not reset to match' ((Hash $devFeed) -eq $was.dev)
+    Yes '  and nothing on the VPS store moved' ((Hash $siteFeed) -eq $was.site -and (Hash $siteBase) -eq $was.siteBase -and (Hash $siteDevFeed) -eq $was.siteDev)
 
     # ---- V: -DryRun -Package on dev -------------------------------------------------
     $was = @{ dev = (Hash $devFeed); devBase = (Hash $devBase); feed = (Hash $feed) }
@@ -439,19 +459,25 @@ if ($dir) {
     Yes 'R the shipped launcher is not compiled here: Build-Launcher.ps1 is not called' ((Called $r 'Build-Launcher').Count -eq 0)
     Yes ('R the launcher CI built is downloaded and verified: gh release download runs once (' + ($gone -join '; ') + ')') (
         @($gone | Where-Object { $_ -match '^gh release download' }).Count -eq 1)
-    Yes 'R the pack is uploaded: gh release create or upload runs' (
-        @($gone | Where-Object { $_ -match '^gh release (create|upload)' }).Count -ge 1)
-    Yes 'R the pushes happen' (@($gone | Where-Object { $_ -match '^git .*\bpush\b' }).Count -ge 1)
+    Yes 'R the feed reaches the VPS store: the site serves what the publisher wrote' (
+        ([IO.File]::ReadAllText($siteFeed)) -match '20990101-0000')
+    Yes 'R nothing is pushed to any git repository' (@($gone | Where-Object { $_ -match '^git .*\bpush\b' }).Count -eq 0)
+    $devNow = [IO.File]::ReadAllText($siteDevFeed) | ConvertFrom-Json
+    Yes 'R dev follows main through the store: the site''s dev feed is main''s, dev port kept' (
+        $devNow.launcherVersion -eq '1.1.93' -and [string]$devNow.serverPort -eq '7001')
+    Yes '  and the dev baseline on the VPS is main''s' ((Hash $siteDevBase) -eq (Hash $siteBase))
 
-    # ---- E: a dev dry run with no dev worktree and no dev branch to see ---------------
-    Remove-Item -LiteralPath $relDev -Recurse -Force
+    # ---- E: a dev dry run numbers itself from the site store, not from git ------------
+    # launchers.txt on the dev store says 1.1.93.2 went out, main's feed on the
+    # site says 1.1.93, so the next dev number is 1.1.93.3, worked out with no
+    # git, gh, ssh or scp at all (#907).
     $e = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
-    $gits = @($e.Calls | Where-Object { $_ -match '^git( |$)' })
-    Yes ('E the stand-in git was asked, so the next lines measure something (' + ($gits -join '; ') + ')') ($gits.Count -ge 1)
-    Yes 'E nothing is pushed to the releases repository' (@($gits | Where-Object { $_ -match '\bpush\b' }).Count -eq 0)
-    Yes '  and no dev branch is made on this disk' (@($gits | Where-Object { $_ -match '\bworktree add\b' }).Count -eq 0)
-    Yes ("E it stops and says why (exit {0})" -f $e.Code) ($e.Code -ne 0 -and $e.Out -match 'A dry run pushes nothing')
-    Yes '  before anything is built or published' ((Called $e 'Build-Launcher').Count -eq 0 -and (Called $e 'Publish-Update').Count -eq 0)
+    $pub = Called $e 'Publish-Update'
+    Yes ("E a dev dry run runs to the end (exit {0})" -f $e.Code) ($e.Code -eq 0 -and $e.Out -match 'Dry run finished')
+    Yes ('E it goes out as the number after every dev launcher the store lists' + $(if ($pub.Count) { ' (' + $pub[0] + ')' } else { '' })) (
+        $pub.Count -eq 1 -and $pub[0] -match ' -VersionOverride 1\.1\.93\.3\b')
+    $gone = Away $e
+    Yes ('E and asks nothing of git, gh, ssh or scp to get it' + $(if ($gone.Count) { ' (' + ($gone -join '; ') + ')' } else { '' })) ($gone.Count -eq 0)
 }
 finally {
     $env:PATH = $oldPath
@@ -461,6 +487,7 @@ finally {
     $env:TS_DRY_CALLS = $oldCalls
     $env:TS_GH_PWSH = $oldGhPwsh
     $env:TS_GH_DL = $oldGhDl
+    $env:THORNSWOOD_TEST_SITE_DIR = $oldSite
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
 }
 

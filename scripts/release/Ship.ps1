@@ -42,11 +42,11 @@
   off -Channel, owns the remirror and calls the website lane's script:
 
       1  the host feed remirror   scripts\deploy\Remirror-Site-Feed.ps1, the
-                                  website lane's. Main takes the
-                                  Thornswood-Releases tip to
-                                  thornswood.net/feed/, -Dev takes the
-                                  Thornswood-Releases-dev tip to
-                                  thornswood.net/feed-dev/.
+                                  website lane's. It checks every asset the
+                                  feed names is on thornswood.net/feed/ (-Dev:
+                                  /feed-dev/). Since #907 the publisher has
+                                  already sent version.json to the VPS store
+                                  there, so this finds it in place.
       2  the site news            Publish-News.ps1, then the #news post and the
                                   server's countdown, all unchanged and the news
                                   main only, as they always were.
@@ -449,27 +449,25 @@ function Get-LauncherInputHash([string]$repoDir) {
     finally { $sha.Dispose() }
 }
 
-# The launcher a channel's feed offers now, read from origin/<branch> in the
-# releases clone (fetched first) and from the copy on disk when git cannot say.
-# $null when there is no feed to read.
+# The launcher a channel's feed offers now ($branch is the channel, main or
+# dev), read from the site and from the copy last received into $dir when the
+# site cannot say. $null when there is no feed to read.
 function Get-PublishedLauncher([string]$dir, [string]$branch) {
-    if (-not $dir -or -not (Test-Path -LiteralPath $dir)) { return $null }
-    $json = ''
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    try {
-        if (Test-Path -LiteralPath (Join-Path $dir '.git')) {
-            & git -C $dir fetch --quiet origin $branch *> $null
-            $json = (& git -C $dir show "origin/$($branch):version.json" 2>$null | Out-String)
-            if ($LASTEXITCODE -ne 0) { $json = '' }
-        }
-    } finally { $ErrorActionPreference = $old }
-    if (-not $json.Trim()) {
-        $f = Join-Path $dir 'version.json'
-        if (Test-Path -LiteralPath $f) { $json = [IO.File]::ReadAllText($f) }
-    }
-    if (-not $json.Trim()) { return $null }
+    # The feed as the site serves it (Read-SiteFeed, Feed-Store.ps1, #907),
+    # which is what launchers have; the copy last received into $dir only when
+    # the site cannot be read. Until #907 this read origin/<branch> of the
+    # Thornswood-Releases clone.
     $doc = $null
-    try { $doc = $json | ConvertFrom-Json } catch { return $null }
+    if (Get-Command Read-SiteFeed -ErrorAction SilentlyContinue) {
+        try { $doc = Read-SiteFeed $branch } catch { $doc = $null }
+    }
+    if ($null -eq $doc) {
+        if (-not $dir -or -not (Test-Path -LiteralPath $dir)) { return $null }
+        $f = Join-Path $dir 'version.json'
+        if (-not (Test-Path -LiteralPath $f)) { return $null }
+        try { $doc = ([IO.File]::ReadAllText($f) -replace '^﻿', '') | ConvertFrom-Json } catch { return $null }
+    }
+    if ($null -eq $doc) { return $null }
     function Field($o, [string]$k) { if ($o -and $o.PSObject.Properties[$k] -and $null -ne $o.$k) { return ([string]$o.$k).Trim() } return '' }
     return [pscustomobject]@{
         Version = (Field $doc 'launcherVersion')
@@ -521,13 +519,14 @@ $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 # The publish sign helpers, loaded here rather than at the publish gate because
 # a main Ship signs and checks the exe CI built before it is installed (#921).
 . (Join-Path $Here 'Assert-PublishSigned.ps1')
-# version.json lives in the public releases clone now, beside the source one.
-# Falls back to the source repo when that clone is not there yet, which is the
-# same thing Publish-Update does, so both agree about where the feed is.
-$ReleaseDir = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
-if (-not (Test-Path (Join-Path $ReleaseDir '.git'))) { $ReleaseDir = $RepoDir }
-$MainReleaseDir = $ReleaseDir
+# The feed and its baseline live on the VPS beside the feed the site serves,
+# and each channel has a working folder on this machine that Publish-Update
+# receives them into and sends them back from (Feed-Store.ps1, #907). Until
+# then they were clones of Thornswood-Releases beside this repository.
+. (Join-Path $Here 'Feed-Store.ps1')
 $Dev = ($Channel -eq 'dev')
+$ReleaseDir = Get-FeedStoreDir $Channel
+$MainReleaseDir = Get-FeedStoreDir 'main'
 
 # ---- where the launcher is installed ----------------------------------------
 #
@@ -548,43 +547,14 @@ function Find-Root {
 if (-not $PSBoundParameters.ContainsKey('Root')) { $Root = Find-Root }
 
 # ------------------------------------------------------------ dev channel
-# The dev build follows the dev branch of the releases repo. That branch is
-# checked out as a git worktree beside the main clone, so both feeds sit on
-# disk at once and a publish to one cannot touch the other. Made on first use,
-# from main's tip, so the first dev version.json is exactly what main has.
-function Ensure-DevReleases([string]$mainRel) {
-    $devRel = Join-Path (Split-Path -Parent $mainRel) 'Thornswood-Releases-dev'
-    if (Test-Path (Join-Path $devRel 'version.json')) { return $devRel }
-    if (-not (Test-Path (Join-Path $mainRel '.git'))) {
-        Die "The dev channel needs the releases clone at $mainRel first."
-    }
-    Write-Host "  making the dev release worktree at $devRel" -ForegroundColor DarkGray
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    try {
-        & git -C $mainRel fetch origin 2>&1 | Out-Null
-        $remoteDev = & git -C $mainRel ls-remote --heads origin dev 2>$null
-        if ($remoteDev) {
-            & git -C $mainRel worktree add $devRel dev 2>&1 | Out-Host
-        } else {
-            # Making the dev branch means pushing it to the releases repository,
-            # and a dry run pushes nothing. Stopped before the branch is made,
-            # so nothing is left half done on this disk either.
-            if ($DryRun) { Die 'The releases repository has no dev branch that git could see, and making one means pushing it. A dry run pushes nothing. Run .\scripts\release\Ship.ps1 -Channel dev once without -DryRun.' }
-            & git -C $mainRel worktree add -b dev $devRel origin/main 2>&1 | Out-Host
-            & git -C $devRel push -u origin dev 2>&1 | Out-Host
-        }
-    } finally { $ErrorActionPreference = $old }
-    if (-not (Test-Path (Join-Path $devRel 'version.json'))) { Die "Could not make the dev release worktree at $devRel." }
-    return $devRel
-}
-
+# The dev build has its own feed and baseline on the VPS (feed-dev), and its
+# own working folder here. Until #907 it was a git worktree of the dev branch
+# of Thornswood-Releases, made on first use.
 if ($Dev) {
     if (-not $PSBoundParameters.ContainsKey('Root')) { $Root = (Find-Root) + '-DevBuild' }
     if (-not (Test-Path (Join-Path $Root 'Launcher'))) {
         Die "No dev build at $Root. Install it from the main launcher's Settings page (The dev build) first."
     }
-    if ($MainReleaseDir -eq $RepoDir) { Die 'The dev channel needs the public releases clone, Thornswood-Releases, beside this repo.' }
-    $ReleaseDir = Ensure-DevReleases $MainReleaseDir
 }
 
 Write-Host ''
@@ -831,38 +801,41 @@ elseif ($Dev) {
         return 0
     }
 
-    # WHAT IS PUBLISHED, READ OFF GITHUB, NOT OFF THIS DISK. Until 25 September
-    # both numbers came from the version.json files in this machine's releases
-    # clones, which nothing here pulls first. Djinn's clone was days old and
-    # still said 1.1.92, so his dev Ship went out as 1.1.92.3 while every dev
-    # launcher was on 1.1.94.x: lower, so never offered. And the count after
-    # the last dot came from the dev feed's current number only, so the next
-    # Ship after it would have restarted at .1 under numbers already out.
-    # Now both feeds are fetched and read from origin, and the dev number
-    # climbs past every launcher version the dev branch has ever published.
-    function Read-Published([string]$dir, [string]$branch) {
-        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    # WHAT IS PUBLISHED, READ OFF THE SITE, NOT OFF THIS DISK. Until 25
+    # September both numbers came from the version.json files in this
+    # machine's releases clones, which nothing here pulled first. Djinn's clone
+    # was days old and still said 1.1.92, so his dev Ship went out as 1.1.92.3
+    # while every dev launcher was on 1.1.94.x: lower, so never offered. And
+    # the count after the last dot came from the dev feed's current number
+    # only, so the next Ship after it would have restarted at .1 under numbers
+    # already out. From then until #907 both were read from origin in the
+    # clones, and the dev number climbed past every launcherVersion in the dev
+    # branch's history. Now main's number is the feed the site serves, and
+    # "every dev number ever published" is launchers.txt in the dev store on
+    # the VPS, which every send of the dev feed adds to (Feed-Store.ps1) and
+    # the one-off move seeded from the dev branch's whole history.
+    function Read-Published([string]$ch) {
         try {
-            & git -C $dir fetch --quiet origin $branch 2>$null | Out-Null
-            $j = (& git -C $dir show "origin/$($branch):version.json" 2>$null | Out-String)
-            if ($LASTEXITCODE -eq 0 -and $j.Trim()) { return [string](($j | ConvertFrom-Json).launcherVersion) }
-            $f = Join-Path $dir 'version.json'
-            if (-not (Test-Path -LiteralPath $f)) { return '' }
-            Say "  could not read origin/$branch in $dir, so this uses the copy on disk, which may be old" 'Yellow'
-            return [string]((Get-Content -LiteralPath $f -Raw | ConvertFrom-Json).launcherVersion)
-        } finally { $ErrorActionPreference = $old }
+            $d = Read-SiteFeed $ch
+            if ($null -ne $d -and $d.PSObject.Properties['launcherVersion']) { return [string]$d.launcherVersion }
+        } catch {
+            Say "  could not read the $ch feed from the site ($($_.Exception.Message)), so this uses the copy last received here, which may be old" 'Yellow'
+        }
+        $f = Join-Path (Get-FeedStoreDir $ch) 'version.json'
+        if (-not (Test-Path -LiteralPath $f)) { return '' }
+        return [string]((Get-Content -LiteralPath $f -Raw | ConvertFrom-Json).launcherVersion)
     }
-    function Read-EverPublished([string]$dir, [string]$branch) {
-        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try {
-            $log = (& git -C $dir log -p -n 400 "origin/$branch" -- version.json 2>$null | Out-String)
-            return @([regex]::Matches($log, '(?m)^[+-]\s*"launcherVersion"\s*:\s*"([0-9.]+)"') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
-        } finally { $ErrorActionPreference = $old }
+    function Read-EverPublished([string]$ch) {
+        try { return @(Get-FeedStoreLaunchers $ch) }
+        catch {
+            Say "  could not read the launchers $ch has published from the VPS ($($_.Exception.Message)); the number climbs from the current feed only" 'Yellow'
+            return @()
+        }
     }
 
     $base = $current
     try {
-        $mainWas = Read-Published $MainReleaseDir 'main'
+        $mainWas = Read-Published 'main'
         # Only the first three parts of main's number. Main never carries a
         # fourth, but reading defensively costs nothing and a 1.1.77.2 base
         # would produce a five part version nobody can read.
@@ -877,8 +850,8 @@ elseif ($Dev) {
     } catch { }
 
     $seen = @()
-    try { $seen = @(Read-EverPublished $ReleaseDir 'dev') } catch { }
-    try { $was = Read-Published $ReleaseDir 'dev'; if ($was) { $seen += $was } } catch { }
+    try { $seen = @(Read-EverPublished 'dev') } catch { }
+    try { $was = Read-Published 'dev'; if ($was) { $seen += $was } } catch { }
     $n = 1
     foreach ($v in $seen) {
         if ($v.StartsWith("$base.")) {
@@ -1737,47 +1710,38 @@ if (-not $DryRun -and -not $NoAnnounce) {
 # false and the reset would take dev testers back to the hotfix until the next
 # dev Ship. Dev is left as it was; its next Ship still climbs from the hotfix's
 # number, because the dev version is read off main's published feed.
+#
+# THROUGH THE STORE (#907). The dev feed and baseline are received from the
+# VPS, rewritten from main's as this release left them, and sent back with the
+# same check a Ship makes, so the site serves the reset dev feed at once. Until
+# #907 this committed and pushed the Thornswood-Releases dev branch, and the
+# site's copy stayed on the old dev tip until somebody remirrored it.
 if (-not $DryRun -and -not $Dev -and -not $hotfix) {
-    $devRel = Join-Path (Split-Path -Parent $MainReleaseDir) 'Thornswood-Releases-dev'
-    if (Test-Path (Join-Path $devRel 'version.json')) {
-        Head 'Resetting dev to match'
-        try {
-            $mainDoc = Get-Content (Join-Path $MainReleaseDir 'version.json') -Raw | ConvertFrom-Json
-            $devDoc  = Get-Content (Join-Path $devRel 'version.json') -Raw | ConvertFrom-Json
-            foreach ($keep in 'serverPort', 'voicePort', 'voiceUrl') {
-                if ($devDoc.PSObject.Properties[$keep]) {
-                    if ($mainDoc.PSObject.Properties[$keep]) { $mainDoc.$keep = $devDoc.$keep }
-                    else { $mainDoc | Add-Member -NotePropertyName $keep -NotePropertyValue $devDoc.$keep }
-                }
+    Head 'Resetting dev to match'
+    try {
+        $devRel = Get-FeedStoreDir 'dev'
+        [void](Receive-FeedStore 'dev' $devRel)
+        $mainDoc = Get-Content (Join-Path $MainReleaseDir 'version.json') -Raw | ConvertFrom-Json
+        $devDoc  = Get-Content (Join-Path $devRel 'version.json') -Raw | ConvertFrom-Json
+        foreach ($keep in 'serverPort', 'voicePort', 'voiceUrl') {
+            if ($devDoc.PSObject.Properties[$keep]) {
+                if ($mainDoc.PSObject.Properties[$keep]) { $mainDoc.$keep = $devDoc.$keep }
+                else { $mainDoc | Add-Member -NotePropertyName $keep -NotePropertyValue $devDoc.$keep }
             }
-            [IO.File]::WriteAllText((Join-Path $devRel 'version.json'), ($mainDoc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
-            $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-            Push-Location $devRel
-            try {
-                $mainState = Join-Path $MainReleaseDir 'published.json'
-                if (Test-Path -LiteralPath $mainState) {
-                    Copy-Item -LiteralPath $mainState -Destination (Join-Path $devRel 'published.json') -Force
-                }
-                & git add version.json 2>&1 | Out-Null
-                if (Test-Path -LiteralPath (Join-Path $devRel 'published.json')) { & git add published.json 2>&1 | Out-Null }
-                & git commit -m "Dev follows main $target" 2>&1 | Out-Null
-                & git push -u origin HEAD 2>&1 | Out-Null
-                if ($LASTEXITCODE -ne 0) { Say '  the dev feed did not push, run Ship -Channel dev once to sort it' 'Yellow' }
-                else { Say "  dev feed now matches main $target, dev ports kept" 'Green' }
-                if (Test-Path -LiteralPath (Join-Path $devRel 'published.json')) { Say '  dev baseline is now main''s' 'Green' }
-                # The site's copy of the dev feed is not this step's to write.
-                # The mirror above ran for the channel that shipped, which is
-                # main, so thornswood.net/feed-dev still serves the dev tip from
-                # before this release until somebody mirrors it or the next dev
-                # Ship does. Said here rather than done here: this block is the
-                # feed in git, and a second mirror inside it would be a fourth
-                # thing that can fail after a live release is already out.
-                Say '  the site copy of the dev feed is not reset with it:' 'DarkGray'
-                Say '  .\scripts\deploy\Remirror-Site-Feed.ps1 -Dev   puts that right' 'DarkGray'
-            } finally { Pop-Location; $ErrorActionPreference = $old }
-        } catch {
-            Say "  could not reset the dev feed: $_" 'Yellow'
         }
+        [IO.File]::WriteAllText((Join-Path $devRel 'version.json'), ($mainDoc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+        $toSend = @('version.json')
+        $mainState = Join-Path $MainReleaseDir 'published.json'
+        if (Test-Path -LiteralPath $mainState) {
+            Copy-Item -LiteralPath $mainState -Destination (Join-Path $devRel 'published.json') -Force
+            $toSend += 'published.json'
+        }
+        [void](Send-FeedStore 'dev' $devRel $toSend)
+        Say "  dev feed now matches main $target, dev ports kept, and the site serves it" 'Green'
+        if ($toSend -contains 'published.json') { Say '  dev baseline is now main''s' 'Green' }
+    } catch {
+        Say "  could not reset the dev feed: $($_.Exception.Message)" 'Yellow'
+        Say '  Ship -Channel dev once puts dev on top of this release.' 'Yellow'
     }
 }
 

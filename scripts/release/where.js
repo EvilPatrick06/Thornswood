@@ -66,6 +66,11 @@ function getPlace(layout, oldRoot, name) {
   if (name === 'Repo') return repo;
   if (name === 'Engine') return getEngine(layout, oldRoot);
   if (name === 'Out') return getOut(layout, oldRoot);
+  // This machine's working copies of the feeds (Feed-Store.ps1, #907), not
+  // clones of Thornswood-Releases beside the repository any more.
+  if (name === 'Releases' || name === 'ReleasesDev') {
+    return path.join(process.env.LOCALAPPDATA || '', 'Thornswood', 'feed', name === 'Releases' ? 'main' : 'dev');
+  }
   if (layout.siblings && layout.siblings[name] != null) {
     return path.join(path.dirname(repo), layout.siblings[name]);
   }

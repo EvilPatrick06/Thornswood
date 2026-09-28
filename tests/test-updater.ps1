@@ -5,9 +5,9 @@
 
   The launcher's updater, asked its own questions.
 
-  WHY THIS EXISTS. Seven functions in launcher\app\Updater.cs decide what counts
+  WHY THIS EXISTS. Six functions in launcher\app\Updater.cs decide what counts
   as an update, where one may come from, and which files a pack may write or
-  delete: IsNewer, Parts, RepoCandidates, Inside, ClaimedElsewhere, Pending and
+  delete: IsNewer, Parts, Inside, ClaimedElsewhere, Pending and
   CheckUrl. Each has the incident that shaped it written above it, and until
   this nothing ran any of them outside a live launcher. The To Do List entry
   put it as "the easiest thing in the codebase to test and the most expensive
@@ -185,11 +185,11 @@ function Run {
     $flags = [Reflection.BindingFlags]'Static, Public, NonPublic'
     $script:m = @{}
     $gone = @()
-    foreach ($n in 'IsNewer', 'Parts', 'RepoCandidates', 'Inside', 'ClaimedElsewhere', 'Pending', 'CheckUrl') {
+    foreach ($n in 'IsNewer', 'Parts', 'Inside', 'ClaimedElsewhere', 'Pending', 'CheckUrl') {
         $script:m[$n] = $U.GetMethod($n, $flags)
         if ($null -eq $script:m[$n]) { $gone += $n }
     }
-    Yes ('the seven functions under test are all there' + $(if ($gone.Count) { ', missing ' + ($gone -join ', ') } else { '' })) (
+    Yes ('the six functions under test are all there' + $(if ($gone.Count) { ', missing ' + ($gone -join ', ') } else { '' })) (
         $gone.Count -eq 0)
     if ($gone.Count) { return }
 
@@ -235,24 +235,27 @@ function Run {
         Yes "Parts: nothing for $shown, which is not all numbers" ((PartsText $bad) -eq 'null')
     }
 
-    # ---- RepoCandidates: both sides of the rename ----------------------------
+    # ---- no GitHub fallback (#907) --------------------------------------------
     #
-    # A config.json written either side of skyrim-together becoming Thornswood
-    # is still on somebody's machine, and rewriting it on load renamed
-    # everybody's before the repository itself was renamed. So both are tried,
-    # the one in the config first.
-    Yes 'RepoCandidates: skyrim-together tries Thornswood next' (
-        (Repos 'EvilPatrick06/skyrim-together') -eq 'EvilPatrick06/skyrim-together then EvilPatrick06/Thornswood')
-    Yes 'RepoCandidates: Thornswood tries skyrim-together next' (
-        (Repos 'EvilPatrick06/Thornswood') -eq 'EvilPatrick06/Thornswood then EvilPatrick06/skyrim-together')
-    Yes 'RepoCandidates: whatever case the config wrote it in' (
-        (Repos 'EvilPatrick06/THORNSWOOD') -eq 'EvilPatrick06/THORNSWOOD then EvilPatrick06/skyrim-together')
-    # The default a fresh install writes (Config.cs). It was never renamed, so
-    # a second name would only be a second request.
-    Yes 'RepoCandidates: Thornswood-Releases is asked on its own' (
-        (Repos 'EvilPatrick06/Thornswood-Releases') -eq 'EvilPatrick06/Thornswood-Releases')
-    Yes 'RepoCandidates: nothing set gives nothing to try' ((Repos $null) -eq '' -and (Repos '') -eq '')
-    Yes 'RepoCandidates: a name with no owner is tried as it is and nothing more' ((Repos 'Thornswood') -eq 'Thornswood')
+    # RepoCandidates tried both sides of the skyrim-together rename on the
+    # GitHub Contents API fallback. The fallback went with Thornswood-Releases,
+    # so the site feed is the only place updates are read from: a config with a
+    # repository and no feed url has no update source at all.
+    Yes 'RepoCandidates is gone with the GitHub fallback' ($null -eq $U.GetMethod('RepoCandidates', $flags))
+    $C = $asm.GetType('Thornswood.Config')
+    $en = $U.GetMethod('Enabled', $flags)
+    if ($null -ne $C -and $null -ne $en) {
+        $cfg = [Activator]::CreateInstance($C)
+        $C.GetField('UpdateRepo').SetValue($cfg, 'EvilPatrick06/Thornswood-Releases')
+        $C.GetField('UpdateFeedUrl').SetValue($cfg, '')
+        Yes 'a repository with no site feed url is no update source' (-not [bool]$en.Invoke($null, @($cfg)))
+        $C.GetField('UpdateFeedUrl').SetValue($cfg, 'https://thornswood.net/feed/version.json')
+        Yes 'the site feed url is' ([bool]$en.Invoke($null, @($cfg)))
+    } else {
+        Yes 'Config and Updater.Enabled are in the build' $false
+    }
+    $upSrc = [IO.File]::ReadAllText((Join-Path $Src 'Updater.cs'))
+    Yes 'Updater.cs builds no GitHub contents API address' ($upSrc -notmatch '/contents/version\.json')
 
     # ---- Inside: the fence round every write and delete ----------------------
     #
@@ -391,11 +394,6 @@ function PartsText($v) {
     $r = Ask 'Parts' $v
     if ($null -eq $r) { return 'null' }
     return ($r -join '.')
-}
-function Repos($repo) {
-    $l = Ask 'RepoCandidates' $repo
-    if ($null -eq $l) { return 'null' }
-    return (@($l) -join ' then ')
 }
 function Fenced([string]$fence, [string]$line) {
     $full = [IO.Path]::GetFullPath([IO.Path]::Combine($fence, $line))

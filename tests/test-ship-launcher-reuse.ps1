@@ -15,7 +15,7 @@
 
   This lifts Get-LauncherInputHash, Get-PublishedLauncher and
   Test-LauncherUnchanged out of the shipped Ship.ps1 by the parser and drives
-  them against a scratch tree and a scratch releases clone, then checks the
+  them against a scratch tree and a stand-in for the site feed, then checks the
   wiring in Ship.ps1 and Publish-Update.ps1 by text. If a name moves, this says
   so rather than quietly testing nothing. Read only apart from its temp folder.
 #>
@@ -129,28 +129,20 @@ try {
     Yes "reads the feed off disk when the folder is not a clone: '$($p.Version)'" ($p -and $p.Version -eq '1.1.102.3' -and $p.Inputs -eq $h5 -and $p.Sha -eq $sha)
     Yes 'no folder reads as no feed' ($null -eq (Get-PublishedLauncher (Join-Path $work 'nope') 'dev'))
 
-    if (Get-Command git -EA SilentlyContinue) {
-        $bare = Join-Path $work 'releases.git'
-        $seed = Join-Path $work 'seed'
-        $clone = Join-Path $work 'clone'
-        [void](Run-Git init -q --bare $bare)
-        [void](Run-Git init -q $seed)
-        [void](Run-Git -C $seed checkout -q -b dev)
-        $feed['launcherVersion'] = '1.1.102.4'
-        Put (Join-Path $seed 'version.json') ($feed | ConvertTo-Json)
-        [void](Run-Git -C $seed add version.json)
-        [void](Run-Git -C $seed -c user.name=t -c user.email=t@t commit -q -m feed)
-        [void](Run-Git -C $seed remote add origin $bare)
-        [void](Run-Git -C $seed push -q origin dev)
-        [void](Run-Git clone -q -b dev $bare $clone)
-        # The copy on disk is stale; origin/dev is what counts.
-        $stale = $feed; $stale['launcherVersion'] = '1.1.101.9'
-        Put (Join-Path $clone 'version.json') ($stale | ConvertTo-Json)
-        $p = Get-PublishedLauncher $clone 'dev'
-        Yes "reads origin/dev, not the copy on disk: '$($p.Version)'" ($p -and $p.Version -eq '1.1.102.4')
-    } else {
-        Write-Host 'SKIP  git is not on PATH, so the clone read is not exercised'
-    }
+    # The feed as the site serves it wins over the copy last received (#907):
+    # Read-SiteFeed is what Ship reads first, and a stand-in for it here.
+    $siteFeed = $feed
+    $siteFeed['launcherVersion'] = '1.1.102.4'
+    function Read-SiteFeed([string]$ch) { return ($script:siteDoc | ConvertFrom-Json) }
+    $script:siteDoc = ($siteFeed | ConvertTo-Json)
+    $stale = $feed; $stale['launcherVersion'] = '1.1.101.9'
+    Put (Join-Path $disk 'version.json') ($stale | ConvertTo-Json)
+    $p = Get-PublishedLauncher $disk 'dev'
+    Yes "reads the site's feed, not the copy on disk: '$($p.Version)'" ($p -and $p.Version -eq '1.1.102.4')
+    function Read-SiteFeed([string]$ch) { throw 'the site did not answer' }
+    $p = Get-PublishedLauncher $disk 'dev'
+    Yes "and the copy on disk when the site does not answer: '$($p.Version)'" ($p -and $p.Version -eq '1.1.101.9')
+    Remove-Item Function:\Read-SiteFeed
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

@@ -158,11 +158,11 @@ Yes 'Deploy-Server.ps1 stages thornswood-build.json with gamemode.js, so it is s
 if (-not (Test-Path -LiteralPath $helper)) { Done }
 . $helper
 
-# ---- a scratch repo and its feeds, laid out the way Ship.ps1 finds them -----
+# ---- a scratch repo, and the feeds where Ship.ps1 keeps them (#907) --------
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-build-stamp-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $repo = Join-Path $tmp 'Thornswood-Repo'
-$mainFeed = Join-Path $tmp 'Thornswood-Releases'
-$devFeed = Join-Path $tmp 'Thornswood-Releases-dev'
+$mainFeed = Join-Path $tmp 'appdata\Thornswood\feed\main'
+$devFeed = Join-Path $tmp 'appdata\Thornswood\feed\dev'
 $noGit = Join-Path $tmp 'not-a-repo'
 $utf8 = New-Object Text.UTF8Encoding($false)
 function Put([string]$path, [string]$text) {
@@ -178,6 +178,9 @@ function Sha([string]$p) { return (Get-FileHash -LiteralPath $p -Algorithm SHA25
 # git is never allowed to wander up out of the scratch folder into a real repo.
 $oldCeiling = $env:GIT_CEILING_DIRECTORIES
 $env:GIT_CEILING_DIRECTORIES = $tmp
+# The working copies of the feeds are under LOCALAPPDATA (Feed-Store.ps1).
+$oldAppData = $env:LOCALAPPDATA
+$env:LOCALAPPDATA = Join-Path $tmp 'appdata'
 
 try {
     $gm = Join-Path $repo 'game\gamemode.js'
@@ -185,7 +188,6 @@ try {
     Put (Join-Path $repo 'launcher\app\Updater.cs') "namespace T {`n    public static class Updater {`n        public const string Version = `"1.2.3`";`n    }`n}`n"
     Put (Join-Path $repo 'version.json') '{ "launcherVersion": "0.9.9" }'
     Put (Join-Path $mainFeed 'version.json') '{ "launcherVersion": "1.2.3" }'
-    New-Item -ItemType Directory -Force -Path (Join-Path $mainFeed '.git') | Out-Null
     Put (Join-Path $devFeed 'version.json') '{ "launcherVersion": "1.2.3.4" }'
     New-Item -ItemType Directory -Force -Path $noGit | Out-Null
     Put (Join-Path $noGit 'gamemode.js') "console.log('elsewhere');`n"
@@ -204,7 +206,7 @@ try {
     Yes 'main: the gamemode is the committed one' ($m.gamemodeMatchesCommit -eq $true)
     Yes 'main: the hash is the gamemode file' ($m.gamemodeSha256 -eq (Sha $gm))
     Yes 'main: the launcher version is the one in Updater.cs' ($m.launcherVersion -eq '1.2.3')
-    Yes 'main: the feed version is Thornswood-Releases, beside the repo' ($m.feedVersion -eq '1.2.3')
+    Yes 'main: the feed version is this machine''s working copy of the main feed' ($m.feedVersion -eq '1.2.3')
     Yes 'main: the time is UTC in ISO form' ($m.stampedUtc -match '^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$')
     $t = [DateTime]::ParseExact($m.stampedUtc, "yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture,
         [Globalization.DateTimeStyles]::AssumeUniversal -bor [Globalization.DateTimeStyles]::AdjustToUniversal)
@@ -264,7 +266,7 @@ try {
     # ---- run from a worktree, which is how these runs happen --------------
     #
     # A worktree's parent is .claude\worktrees, with no feed beside it. The
-    # feeds are found beside the main checkout instead.
+    # feeds are this machine's, so a worktree finds the same ones.
     $wt = Join-Path $tmp 'wt\deeper\Thornswood-Repo-wt'
     Run-Git -C $repo worktree add -q $wt
     $w = $null
@@ -272,22 +274,22 @@ try {
         $w = New-ThornswoodBuildStamp -Gamemode (Join-Path $wt 'game\gamemode.js') -Channel main -RepoDir $wt
     }
     Yes 'worktree: the scratch worktree is there' ($null -ne $w)
-    Yes 'worktree: main finds Thornswood-Releases beside the main checkout' ($w -and $w.feedVersion -eq '1.2.3')
+    Yes 'worktree: main finds the same main feed' ($w -and $w.feedVersion -eq '1.2.3')
     Yes 'worktree: the commit and the launcher are the worktree''s own' (
         $w -and $w.commit -eq $head -and $w.launcherVersion -eq '1.2.3' -and $w.gamemodeMatchesCommit -eq $true)
     if ($w) {
         $w = New-ThornswoodBuildStamp -Gamemode (Join-Path $wt 'game\gamemode.js') -Channel dev -RepoDir $wt
     }
-    Yes 'worktree: dev finds Thornswood-Releases-dev the same way' ($w -and $w.feedVersion -eq '1.2.3.4')
+    Yes 'worktree: dev finds the dev feed the same way' ($w -and $w.feedVersion -eq '1.2.3.4')
 
-    # ---- no releases clone: empty, and not the stale file inside the repo ---
+    # ---- no feed received: empty, and not the stale file inside the repo ----
     #
     # Ship.ps1 falls back to the version.json in the source repo. That file
     # stopped being the feed when releases moved out, and on 24 September it
     # said 1.0.196 against a real 1.1.92, so the stamp does not read it.
     Remove-Item -LiteralPath (Join-Path $mainFeed 'version.json') -Force
     $f = New-ThornswoodBuildStamp -Gamemode $gm -Channel main -RepoDir $repo
-    Yes 'no releases clone: the feed version is empty, not the stale one inside the repo' ($f.feedVersion -eq '')
+    Yes 'no feed received: the feed version is empty, not the stale one inside the repo' ($f.feedVersion -eq '')
     Remove-Item -LiteralPath (Join-Path $devFeed 'version.json') -Force
     $f = New-ThornswoodBuildStamp -Gamemode $gm -Channel dev -RepoDir $repo
     Yes 'no dev feed: the feed version is empty and the rest is there' ($f.feedVersion -eq '' -and $f.gamemodeSha256 -eq (Sha $gm))
@@ -305,6 +307,7 @@ try {
 }
 finally {
     $env:GIT_CEILING_DIRECTORIES = $oldCeiling
+    $env:LOCALAPPDATA = $oldAppData
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
 

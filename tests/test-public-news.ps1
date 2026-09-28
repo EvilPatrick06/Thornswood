@@ -152,12 +152,12 @@ try {
     }
 
     # ---- the live feed, read as a stranger would -----------------------------
-    # From the Thornswood-Releases clone beside this repository, where the
-    # scripts that publish look for it. This repository's own version.json,
-    # which this read until 25 September, was a stale copy and is gone.
-    $repoV = Join-Path (Join-Path (Split-Path -Parent (Split-Path -Parent $Tools)) 'Thornswood-Releases') 'version.json'
+    # From this machine's working copy of the live feed (Feed-Store.ps1, #907),
+    # where the scripts that publish look for it. This repository's own
+    # version.json, which this read until 25 September, was a stale copy and is gone.
+    $repoV = Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main\version.json'
     if (-not (Test-Path -LiteralPath $repoV)) {
-        Write-Host "SKIP  no Thornswood-Releases clone beside this repository to read the feed from"
+        Write-Host "SKIP  no live feed received on this machine to read"
     } else {
         $copy = Join-Path $tmp 'copy'
         New-Item -ItemType Directory -Path $copy -Force | Out-Null

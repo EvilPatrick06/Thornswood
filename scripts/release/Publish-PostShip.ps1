@@ -20,7 +20,7 @@
   The remirror is the website lane's (pull request #730). Default is main, to
   /feed; -Dev is the dev channel, to /feed-dev. It has -Check for a dry run,
   -Verify to rehash what is up there, and optional -FeedDir and -AssetDir, and
-  nothing here passes those: it works the clone out from the channel itself.
+  nothing here passes those: it works the working copy out from the channel itself.
 
   VirusTotal is NOT part of publish any more. Code signing covers trust for the
   installer (#390). `Publish-VirusTotal.ps1` and `Add-VirusTotalComment.ps1`
@@ -59,13 +59,13 @@
     .\scripts\release\Publish-PostShip.ps1 -Only Remirror      the feed (Ship's form)
 
 .PARAMETER Channel
-  main or dev. main remirrors the Thornswood-Releases tip to
-  https://thornswood.net/feed/; dev passes -Dev, which takes the
-  Thornswood-Releases-dev tip to https://thornswood.net/feed-dev/.
+  main or dev. main remirrors this machine's working copy of the live feed
+  to https://thornswood.net/feed/; dev passes -Dev, which takes the dev one to
+  https://thornswood.net/feed-dev/ (Feed-Store.ps1, #907).
 
 .PARAMETER Root
   The install the release was built from. Kept for callers that still pass it;
-  the remirror works its own clone out from the channel.
+  the remirror works its own working copy out from the channel.
 
 .PARAMETER DistRoot
   Where releases are staged. Kept for callers that still pass it; unused now

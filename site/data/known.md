@@ -70,6 +70,7 @@ Position and cell. Health, magicka and stamina. Death and respawn, including whe
 | The creation hall is a bare stone room | Nothing in the room itself does anything. Every choice about a new character is on the panel behind K, which opens by itself once your face is made and keeps coming back until you have picked a town |
 | Start On Save is in the mod list but never loads a save | The launcher points it at a character that does not exist. An ordinary Skyrim save cannot be loaded under Thornswood, and loading one crashed the game on a fresh install |
 | You can leave the hall with no class or profession | Only the town you wake up in has to be chosen before you leave. Your class, your profession and the half of it can wait, and are picked later in the world from the same panel on K |
+| A launcher last opened before 26 September says it cannot read the update source, or never offers an update | Updates come only from thornswood.net now. A launcher that old still looks for them in the place they used to come from, which has closed, so it cannot find its way to the new one by itself. Take the installer again from the [Downloads](/downloads) page and run it over your install. Your characters live on the server and nothing is lost |
 
 ## The load order rule
 
