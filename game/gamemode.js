@@ -5973,7 +5973,6 @@ var CROPS_BY_BASE = {
   "2493e:JKs Skyrim.esp": { "produce": "669a5:Skyrim.esm", "name": "Leek", "rank": "novice", "growMinutes": 75 },
   "2c91:JKs Skyrim.esp": { "produce": "64b2e:Skyrim.esm", "name": "Red Apple", "rank": "expert", "growMinutes": 75 },
   "3274:JKs Skyrim.esp": { "produce": "64b2f:Skyrim.esm", "name": "Green Apple", "rank": "expert", "growMinutes": 75 },
-  "bb947:Skyrim.esm": { "produce": "3f7f8:Skyrim.esm", "name": "Tundra Cotton", "rank": "advanced", "growMinutes": 75 },
   "bb952:Skyrim.esm": { "produce": "669a5:Skyrim.esm", "name": "Leek", "rank": "novice", "growMinutes": 75 },
   "bb953:Skyrim.esm": { "produce": "4b0ba:Skyrim.esm", "name": "Wheat", "rank": "advanced", "growMinutes": 135 },
   "bcf47:Skyrim.esm": { "produce": "64b41:Skyrim.esm", "name": "Potato", "rank": "novice", "growMinutes": 75 },
@@ -6013,7 +6012,7 @@ var CROP_GROW_MINUTES_MAX = ENGINE_RELOOT_MINUTES - 5;
 
   It cannot be decided by the gold value, which is what the generated rank does.
   Measured in tools\harvests.json on 20 September: Cabbage, Leek, Potato, Gourd,
-  Tomato, Ash Yam, Tundra Cotton and both apples all produce something worth
+  Tomato, Ash Yam and both apples all produce something worth
   exactly 1 gold, and Wheat is worth 5. A ladder built on that has four rungs
   and puts ten things on one of them. So the split is by what the produce is
   for, which is the thing the site's words are already about:
@@ -6021,8 +6020,9 @@ var CROP_GROW_MINUTES_MAX = ENGINE_RELOOT_MINUTES - 5;
     novice     the common field crops, the vegetables anybody eats and the ones
                a new Farmer is handed. Cabbage, Leek, Potato, Gourd and Carrot.
     advanced   what a trade buys rather than what a person eats. Wheat for the
-               cook, Tundra Cotton for the tailor, and the Ash Yam and Tomato,
-               which grow in one corner of the map each and are worth the walk.
+               cook, and the Ash Yam and Tomato, which grow in one corner of the
+               map each and are worth the walk. Tundra Cotton is gatherer flora
+               (#626), not a farm crop.
     expert     the orchard, which is the site's own word for it. Both apple
                trees, in both plugins that have a pair.
     master     everything, which is the site's word again, and it means a Master
@@ -6072,7 +6072,6 @@ var CROP_RULES = {
   '1503ff:JK\'s Whiterun\'s Outskirts.esp': { rank: 'novice', growMinutes: 20,
                             produce: '64b40:Skyrim.esm', name: 'Carrot' },
   'bb953:Skyrim.esm': { rank: 'advanced', growMinutes: 45 },
-  'bb947:Skyrim.esm': { rank: 'advanced', growMinutes: 30 },
   '206e8:Dragonborn.esm': { rank: 'advanced', growMinutes: 25 },
   '18d5d7:JK\'s Whiterun\'s Outskirts.esp': { rank: 'advanced', growMinutes: 25 },
   '2c91:JKs Skyrim.esp': { rank: 'expert', growMinutes: 40 },
@@ -6216,17 +6215,18 @@ function harvest(actorId, refrId, baseDesc) {
   /*
     A CROP IS NOT A PLANT TO BE PICKED HERE, whatever the pass says about it.
 
-    Measured on 20 September: every one of the fifteen bases in CROPS was also a
+    Measured on 20 September: every one of the crop bases in CROPS was also a
     row in the generated harvests table, because both passes read the same FLOR
     and TREE records and a cabbage plot is a FLOR like any other. Patrick's food
-    rule of 21 September took thirteen of those fifteen out of the plant table,
-    since a plant whose produce is food is not the gatherer's at all, so today
-    the overlap is two: wheat and tundra cotton, which give an ingredient rather
-    than a food and which the food rule therefore never touches.
+    rule of 21 September took the food crops out of the plant table, since a
+    plant whose produce is food is not the gatherer's at all. Tundra cotton left
+    the crop table for #626 (gatherer reagent flora with put-back), so today the
+    overlap is one: wheat, which gives an ingredient rather than a food and which
+    the food rule therefore never touches.
 
     That makes this line matter MORE and not less. It is now the only thing
-    standing between a gatherer and a field of wheat, where before it was one of
-    two. onActivate asks isCrop first as well, and this asks again rather than
+    standing between a gatherer and a field of wheat. onActivate asks isCrop
+    first as well, and this asks again rather than
     trusting the branch order to stay the way it is: a press that reached here
     would hand over the produce with no plot, no wait, no claim and no farmer,
     which is the free farming the farming block exists to stop.
