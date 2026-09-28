@@ -129,10 +129,27 @@ $away = @($pu.Ast.FindAll({ param($n) $n -is $CmdAst }, $true) | Where-Object {
     $words = @($_.CommandElements | ForEach-Object { $_.Extent.Text })
     ($name -eq 'gh') -or ($name -eq 'git' -and @($words | Where-Object { $_ -in 'push', 'pull', 'fetch', 'ls-remote', 'clone' }).Count -gt 0)
 })
+# A function that opens with "if ($NoPush ...) { return }" holds everything
+# in it behind -NoPush as surely as an if around the call does. Push-Baseline
+# (27 Sep) is written that way.
+$heldFns = @{}
+foreach ($f in @($pu.Ast.FindAll({ param($n) $n -is $FnAst }, $true))) {
+    $first = @($f.Body.EndBlock.Statements) | Select-Object -First 1
+    if ($first -is $IfAst -and $first.Clauses[0].Item1.Extent.Text -match '^\$NoPush\b' -and
+        $first.Clauses[0].Item2.Extent.Text -match '^\{\s*return\s*\}$') { $heldFns[$f.Name] = $true }
+}
 $loose = @()
 foreach ($c in $away) {
     $e = Enclosing $c
     $held = @($e.Conditions | Where-Object { $_ -match '-not \$NoUpload\b' -or $_ -match '-not \$NoPush\b' }).Count -gt 0
+    if ($e.Function -and $heldFns[$e.Function]) { $held = $true }
+    # The one read left outside: a dev release pulls MAIN's releases clone
+    # before reading its feed for the news marks (#546). It only reads what
+    # main has published and never writes to main's clone's origin; a push
+    # anywhere, or a pull or fetch of any other clone, is still loose.
+    $words = @($c.CommandElements | ForEach-Object { $_.Extent.Text })
+    if ($c.GetCommandName() -eq 'git' -and $words -contains '$mainRelDir' -and
+        @($words | Where-Object { $_ -in 'pull', 'fetch' }).Count -gt 0 -and $words -notcontains 'push') { $held = $true }
     if (-not $held -and $e.Function -ne 'Ensure-DevReleases') { $loose += ('line ' + $c.Extent.StartLineNumber + ': ' + $c.Extent.Text) }
 }
 Yes ("Publish-Update.ps1 has gh and git calls that reach GitHub ({0}), so the next line reads something" -f $away.Count) ($away.Count -ge 5)
@@ -155,13 +172,16 @@ $dist = Join-Path $T 'dist'
 $appdata = Join-Path $T 'appdata'
 $log = Join-Path $T 'calls.log'
 
-# What every stand-in script writes down: its name and what it was given.
+# What every stand-in script writes down: its name and what it was given, on
+# one line. A value's own line breaks are written as " / ": the notes have a
+# title and a list since #586, and a break in them split one call into two
+# lines of the log, so a switch after -Notes was never seen.
 $noteText = @'
 $line = 'NAME'
 foreach ($k in @($PSBoundParameters.Keys | Sort-Object)) {
     $v = $PSBoundParameters[$k]
     if ($v -is [System.Management.Automation.SwitchParameter]) { if ($v.IsPresent) { $line += ' -' + $k } }
-    else { $line += ' -' + $k + ' ' + [string]$v }
+    else { $line += ' -' + $k + ' ' + ([string]$v -replace "\r?\n", ' / ') }
 }
 [IO.File]::AppendAllText($env:TS_DRY_CALLS, $line + "`r`n")
 '@
@@ -179,6 +199,8 @@ function Stub([string]$name, [string]$params, [string]$body) {
 
 $oldPath = $env:PATH
 $oldAppData = $env:LOCALAPPDATA
+$oldTemp = $env:TEMP
+$oldTmp = $env:TMP
 $oldCalls = $env:TS_DRY_CALLS
 $oldGhPwsh = $env:TS_GH_PWSH
 $oldGhDl = $env:TS_GH_DL
@@ -198,8 +220,18 @@ function Invoke-Ship([string[]]$shipArgs) {
 # The comma keeps a one line answer an array: a return unrolls it otherwise,
 # and [0] of a bare string is its first character.
 function Called($run, [string]$name) { return ,@($run.Calls | Where-Object { $_ -eq $name -or $_.StartsWith($name + ' ') }) }
-# Anything that would have left the machine, by the stand-ins on PATH.
-function Away($run) { return ,@($run.Calls | Where-Object { $_ -match '^(git|gh|ssh|scp)( |$)' }) }
+# Anything that would have left the machine, by the stand-ins on PATH. Every
+# gh, ssh and scp call, and every git call but the ones that only read: since
+# 25 September a dev Ship reads the version each channel has published off
+# origin (git fetch, then show and log of origin/main and origin/dev), so a
+# dev number never lands below one already out. Reading sends nothing of this
+# release anywhere.
+function Away($run) {
+    return ,@($run.Calls | Where-Object {
+        $_ -match '^(gh|ssh|scp)( |$)' -or
+        ($_ -match '^git( |$)' -and $_ -notmatch '^git (-C \S+ )?(fetch|show|log|rev-parse|status|remote get-url|ls-remote)( |$)')
+    })
+}
 function Hash([string]$path) {
     if (-not (Test-Path -LiteralPath $path)) { return 'absent' }
     $sha = [Security.Cryptography.SHA256]::Create()
@@ -217,6 +249,29 @@ try {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
     Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $tools '..\scripts\release\Ship.ps1') -Force
+    # What Ship.ps1 dot-sources, which a stand-in cannot write down because it
+    # is not called, only read. The two rule files are the real ones: they
+    # only define functions, and the notes below are held to Note-Rules the
+    # way a real Ship holds them.
+    $realRelease = Split-Path -Parent (Resolve-Path -LiteralPath $ShipPath).Path
+    foreach ($f in 'Ship-Rules.ps1', 'Note-Rules.ps1') {
+        Copy-Item -LiteralPath (Join-Path $realRelease $f) -Destination (Join-Path $tools '..\scripts\release') -Force
+    }
+    # The publish sign gate (#826) and the load order check (#557) read this
+    # machine's signing setup, its signed exe and Vortex, none of which a
+    # temp folder has. Their stand-ins pass, so what is measured here is
+    # still what Ship calls and what leaves the machine; the gate itself has
+    # tests\test-publish-sign-gate.ps1.
+    [IO.File]::WriteAllText((Join-Path $tools '..\scripts\release\Assert-PublishSigned.ps1'), @'
+function Get-SigningConfigRefusal { param([string]$ConfigPath, [string]$RepoRoot) return '' }
+function Get-ExpectedSignerFragment { param([string]$RepoRoot) return 'CN=Thornswood' }
+function Get-PublishSignRefusal { param([string]$Path, [string]$ExpectedSigner) return '' }
+'@)
+    New-Item -ItemType Directory -Force -Path (Join-Path $tools '..\scripts\mods') | Out-Null
+    [IO.File]::WriteAllText((Join-Path $tools '..\scripts\mods\LoadOrder.ps1'), @'
+function Assert-VortexProfile([string]$Name = 'Thornswood') { return (Join-Path $env:LOCALAPPDATA 'Vortex-Thornswood') }
+function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
+'@)
     $updaterCs = Join-Path $tools '..\launcher\app\Updater.cs'
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.93`";`r`n")
     [IO.File]::WriteAllText((Join-Path $rel 'version.json'), '{"launcherVersion":"1.1.93","packs":[]}')
@@ -240,7 +295,9 @@ try {
     # and its baseline. Otherwise it uploads and pushes, through the stand-ins.
     Stub 'Publish-Update' ('[string]$Notes, [string]$Root, [string]$RepoDir, [string]$ReleaseDir, [string]$DistRoot, ' +
                            '[switch]$NoPause, [switch]$MoveServer, [switch]$AcceptSize, [switch]$Launcher, ' +
-                           '[string]$Channel, [string]$VersionOverride, [switch]$NoUpload, [switch]$NoPush') @'
+                           '[string]$Channel, [string]$VersionOverride, [switch]$NoUpload, [switch]$NoPush, ' +
+                           # A dry run also passes these two since #494: close no game, prune no packs.
+                           '[switch]$NoClose, [int]$KeepPacks = 10') @'
 $vf = Join-Path $ReleaseDir 'version.json'
 $was = [string]((Get-Content -LiteralPath $vf -Raw | ConvertFrom-Json).launcherVersion)
 $now = if ($VersionOverride) { $VersionOverride } else { $was }
@@ -292,6 +349,11 @@ if ($dir) {
 
     $env:PATH = $bin + ';' + $oldPath
     $env:LOCALAPPDATA = $appdata
+    # Ship stages the launcher CI built under TEMP, and the gh stand-in writes
+    # it there, so TEMP is this run's own folder too.
+    $env:TEMP = Join-Path $T 'temp'
+    $env:TMP = $env:TEMP
+    New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
     $env:TS_DRY_CALLS = $log
     $env:TS_GH_PWSH = $ps
     $env:TS_GH_DL = $ghDl
@@ -394,6 +456,8 @@ if ($dir) {
 finally {
     $env:PATH = $oldPath
     $env:LOCALAPPDATA = $oldAppData
+    $env:TEMP = $oldTemp
+    $env:TMP = $oldTmp
     $env:TS_DRY_CALLS = $oldCalls
     $env:TS_GH_PWSH = $oldGhPwsh
     $env:TS_GH_DL = $oldGhDl

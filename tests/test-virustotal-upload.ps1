@@ -44,8 +44,9 @@
   up string, and the files are made in a temp folder this removes. The two
   large files are sparse: they are the length the case needs and take no disk.
 
-  It also reads Publish-Installer.ps1 for the call, because a helper nothing
-  calls publishes nothing.
+  It also reads Publish-Installer.ps1, which since #813 (27 September) must
+  NOT call it: publish sends nothing to VirusTotal any more, code signing is
+  the trust path, and this script is a manual tool run by hand.
 #>
 [CmdletBinding()]
 param([string]$ScriptPath)
@@ -680,35 +681,31 @@ if (`$mark.ContainsKey('vtUrl')) {
     Yes '  and the already-has path does not call it' (
         -not [regex]::IsMatch($text, "(?s)already has this build.{0,400}Add-VirusTotalComment"))
 
+    # Since #813 (27 September) publish sends nothing to VirusTotal: code
+    # signing (#390) is the trust path, and Publish-VirusTotal.ps1 is a
+    # manual tool somebody runs by hand. So Publish-Installer must not call
+    # it, and must not reach for the key; what it still does is measure the
+    # hash the Downloads page prints and say where the manual tool is.
     Yes 'Publish-Installer.ps1 is there' (Test-Path -LiteralPath $Installer)
     $pub = [IO.File]::ReadAllText($Installer, (New-Object Text.UTF8Encoding($false)))
-    Yes 'it calls Publish-VirusTotal.ps1' ($pub -match "Publish-VirusTotal\.ps1'\)\s*-Path\b")
-    Yes '  with the exe and the hash it measured' (
-        $pub -match "Publish-VirusTotal\.ps1'\)\s+-Path\s+\`$exeItem\.FullName\s+-Sha256\s+\`$exeSha")
-    Yes '  and passes -OutcomePath for the mark' ($pub -match '-OutcomePath\s+\$vtOutcome')
-    Yes '  and still prints the report address itself' (
-        $pub -match 'VirusTotal: https://www\.virustotal\.com/gui/file/')
-    Yes '  and marks files.json with name=value, not JSON' (
-        $pub -match 'vtUrl=' -and $pub -match 'vtSubmittedAt=' -and
-        $pub -match 'vtSkipReason=' -and $pub -match 'markB64' -and
-        $pub -match '-split \[char\]10')
-    # After the exe and the payload are on the VPS and files.json is written.
-    # A publish that has happened is not undone by a report that is missing.
-    $at = $pub.IndexOf('& (Join-Path $Here ''Publish-VirusTotal.ps1'')')
-    Yes '  after the scp, so the file is published before it is sent' (
-        $at -gt 0 -and $at -gt $pub.IndexOf('scp failed'))
-    Yes '  and nothing from there on can stop the publish' (
-        $at -gt 0 -and $pub.Substring($at) -notmatch '(?m)\bthrow\b|\bexit 1\b')
-    Yes '  and its header says the key is VT_API_KEY on the machine that ships' (
-        $pub -match 'VT_API_KEY')
+    $pubCode = ($pub -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n"
+    Yes 'it does not call Publish-VirusTotal.ps1, since publish sends nothing there (#813)' (
+        $pubCode -notmatch 'Publish-VirusTotal\.ps1')
+    Yes '  nor Add-VirusTotalComment.ps1' ($pubCode -notmatch 'Add-VirusTotalComment\.ps1')
+    Yes '  and reads no VT_API_KEY' ($pubCode -notmatch 'VT_API_KEY')
+    Yes '  and still measures the SHA-256 the Downloads page prints' (
+        $pubCode -match 'Get-FileHash -LiteralPath \$exeItem\.FullName -Algorithm SHA256')
+    Yes '  and its comments say where the manual tool is' (
+        $pub -match 'scripts\\release\\Publish-VirusTotal\.ps1')
 
     # ================================================= and it is written down
 
     Yes 'installer\setup\README.md is there' (Test-Path -LiteralPath $Readme)
     $doc = [IO.File]::ReadAllText($Readme, (New-Object Text.UTF8Encoding($false)))
     Yes '  and says the upload needs VT_API_KEY' ($doc -match 'VT_API_KEY')
-    Yes '  and that a machine without it skips' ($doc -match 'skipped \(VT_API_KEY not set\)')
-    Yes '  and gives the two ways Ship calls it' (
+    Yes '  and that publish no longer sends anything, so it is a manual tool' (
+        $doc -match 'Publish no longer sends the installer to VirusTotal' -and $doc -match 'optional\s+manual tools')
+    Yes '  and gives the two ways to run it by hand' (
         $doc -match 'Publish-VirusTotal\.ps1 -Path <file>\s' -and
         $doc -match 'Publish-VirusTotal\.ps1 -Path <file> -Sha256 <hex>')
 }
