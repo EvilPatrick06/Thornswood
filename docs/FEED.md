@@ -315,8 +315,17 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
   contains `ExpectedSigner` (`Gavin Knotts`, `Updater.CheckSigner`), checked
   before the swap, in every launcher from dev 1.1.101.17 on. Main's live
   1.1.101 predates it and is itself unsigned; dev 1.1.101.34 is signed and
-  timestamped. The check reads the embedded certificate's Subject and does not
-  verify the signature or its chain, so it is weaker than it reads (#912).
+  timestamped. Up to #912 the check read only the embedded certificate's
+  Subject, so a self-made certificate with that name passed. Since #912
+  (`launcher\app\Signature.cs`) Windows verifies the signature and its chain
+  first (WinVerifyTrust: a changed or self-signed file fails), and the chain
+  must end at Microsoft Identity Verification Root Certificate Authority 2020,
+  come from a "Microsoft ID Verified CS" authority, be timestamped, and carry
+  Thornswood's Artifact Signing durable identity value
+  (`1.3.6.1.4.1.311.97.203948530.216998690.847558466.123546472`), which stays
+  the same across the three day certificate renewals. Launchers already
+  installed still run the old Subject check, which a real signed launcher
+  passes.
   Packs and the client runtime are zips and are not signed: the host and the
   sha256 are their only checks.
 - **Quota.** Nothing a launcher fetches spends the sixty anonymous
@@ -336,7 +345,8 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
   upload, and `version.json` is written without a byte order mark.
 - **Signing.** On since 27 Sep: `Ship.ps1` and `Publish-Installer.ps1` refuse
   a launcher or setup program that is not Authenticode Valid under
-  `ExpectedSigner` (CONTRIBUTING.md, `records\signing\README.md`).
+  `ExpectedSigner` (CONTRIBUTING.md, `records\signing\README.md`), or that
+  the launcher's own `Signature.cs` check refuses (#912).
 - **Optional packs go to the site too.** `Publish-Pack.ps1` (default
   `-AssetHost site`) sends each zip to `/feed/assets/<sha256>` with
   `Remirror-Site-Feed.ps1 -Send` before `version.json` is touched, names it
