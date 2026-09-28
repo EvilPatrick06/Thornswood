@@ -13,9 +13,12 @@
     1. Checks Python is on the VPS, and says how to get it if not.
     2. Copies bot.py, card.py and the card artwork up.
     3. Installs discord.py and Pillow there.
-    4. Asks for the bot token at a prompt, never on a command line.
+    4. Asks for the bot token at a prompt, never on a command line, and puts
+       it in the bot's bot.env.json and the site's config.json together
+       (scripts\vps\Write-BotToken.ps1, the one writer of it).
     5. Makes a shared key, gives it to both the bot and the site, so the site
-       knows a ticket really came from the bot.
+       knows a ticket really came from the bot. The site is restarted when the
+       key or the token changed, since it reads its config only on starting.
     6. Registers a scheduled task that starts it at boot and restarts it if it
        falls over, then starts it now.
 
@@ -28,6 +31,8 @@ param(
   [string]$Root = 'C:/Thornswood-Bot',
   [string]$DocsRoot = 'C:/Thornswood-Docs',
   [string]$Task = 'Thornswood Bot',
+  # The site's task, restarted when the key or the token it reads changed.
+  [string]$SiteTask = 'Thornswood Docs',
   # The channel the ticket panel lives in. More than one name is allowed and
   # the first that exists wins, so renaming the channel in Discord stops being
   # able to take tickets down with it.
@@ -330,8 +335,14 @@ $payload = @{ token = $token; key = $botKey } | ConvertTo-Json -Compress
 $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
 $token = $null; $payload = $null
 
+# The one writer of the token, which puts it in bot.env.json and the site's
+# config.json together or in neither (issue #466). It goes up in front of the
+# settings script, so both run in the same session on the VPS.
+$writer = Join-Path $Here '..\vps\Write-BotToken.ps1'
+if (-not (Test-Path -LiteralPath $writer)) { Die "missing: $writer" }
+
 Head 'Settings, and the key the site will check'
-$settings = Remote @"
+$settings = Remote ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Stop'
 `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')
 `$p = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64')) | ConvertFrom-Json
@@ -343,7 +354,8 @@ if (Test-Path `$f) {
   try { (Get-Content `$f -Raw | ConvertFrom-Json).PSObject.Properties |
         ForEach-Object { `$env2[`$_.Name] = `$_.Value } } catch { }
 }
-if (`$p.token) { `$env2['DISCORD_TOKEN'] = `$p.token }
+# The token is not written here. Write-ThornswoodBotToken writes it below,
+# into this file and the site's config.json together, once both exist.
 `$env2['THORNSWOOD_SITE'] = 'https://thornswood.net'
 `$changed = `$false
 if ('$KeyMode' -eq 'new' -or -not `$env2['THORNSWOOD_KEY']) {
@@ -388,7 +400,6 @@ try {
     [Security.Principal.WindowsIdentity]::GetCurrent().Name, 'FullControl', 'Allow')))
   Set-Acl `$f `$acl
 } catch { 'could not tighten bot.env.json: ' + `$_.Exception.Message }
-if (`$env2['DISCORD_TOKEN']) { 'token held' } else { 'NO TOKEN, the bot will not start' }
 'panel channel: #' + (`$env2['TICKET_CHANNEL'] -replace ',', ' or #')
 'closed tickets: #' + (`$env2['TICKET_LOG'] -replace ',', ' or #') + '  (staff only)'
 'join cards:    #' + `$env2['JOIN_CHANNEL']
@@ -396,17 +407,40 @@ if (`$env2['DISCORD_TOKEN']) { 'token held' } else { 'NO TOKEN, the bot will not
 'creator only:  ' + `$env2['CREATOR_ROLES']
 
 # The same key into the site's config, so it accepts the bot and nobody else.
+# Never over a config.json that is there and does not parse: it is not empty,
+# it is unreadable, and writing a fresh one over it is how the whole Discord
+# setup, client secret and token included, went once already.
 `$c = '$docsWin\config.json'
 `$cfg = @{}
+`$cfgOk = `$true
 if (Test-Path `$c) {
   try { (Get-Content `$c -Raw | ConvertFrom-Json).PSObject.Properties |
-        ForEach-Object { `$cfg[`$_.Name] = `$_.Value } } catch { }
+        ForEach-Object { `$cfg[`$_.Name] = `$_.Value } } catch { `$cfgOk = `$false }
 }
-`$cfg['botKey'] = `$env2['THORNSWOOD_KEY']
-[IO.File]::WriteAllText(`$c, (`$cfg | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
-if (`$changed) { 'site told about a NEW key, so the site needs restarting' }
-else { 'key unchanged, the site does not need restarting' }
-"@
+if (`$cfgOk) {
+  `$cfg['botKey'] = `$env2['THORNSWOOD_KEY']
+  [IO.File]::WriteAllText(`$c, (`$cfg | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
+} else {
+  `$changed = `$false
+  'SITE CONFIG DOES NOT PARSE: ' + `$c + ' was left as it is, and neither the key nor the token went into it'
+}
+
+# The token, into both files or neither. Blank at the prompt keeps what is there.
+`$tokenChanged = `$false
+if (`$p.token) {
+  `$r = Write-ThornswoodBotToken -Token `$p.token -BotEnv `$f -SiteConfig `$c
+  `$r.Lines
+  `$tokenChanged = [bool]`$r.Changed
+}
+Get-ThornswoodBotTokenState -BotEnv `$f -SiteConfig `$c
+
+# The site reads config.json once, when it starts, so a new key or token means
+# nothing to it until it restarts.
+if (`$changed -or `$tokenChanged) {
+  if (`$changed) { 'site told about a NEW key' }
+  Restart-ThornswoodSite -Root '$docsWin' -Task '$SiteTask'
+} else { 'key and token unchanged, the site does not need restarting' }
+"@)
 $settings | ForEach-Object { Say "  $_" }
 
 # -------------------------------------------------------------- runner ---
@@ -561,12 +595,19 @@ if (`$said) { `$said | Select-Object -Last 25 } else { 'nothing yet' }
 "@ | ForEach-Object { Say "  $_" }
 
 Write-Host ''
-if ("$settings" -match 'NEW key') {
-  Say 'The site is still running with the old key, so tickets will not reach' 'Yellow'
-  Say 'its inbox until it restarts:' 'Yellow'
+if ("$settings" -match 'SITE DID NOT COME BACK|SITE CONFIG DOES NOT PARSE') {
+  Say 'The site is not running with the new key or token, so tickets and role' 'Yellow'
+  Say 'lookups fail until it is. Start it again with:' 'Yellow'
   Say '    .\scripts\deploy\Deploy-Docs.ps1' 'Green'
+} elseif ("$settings" -match 'site restarted') {
+  Say 'The site was restarted, so it has the key and the token the bot has.' 'DarkGray'
 } else {
-  Say 'The key did not change, so the site needs nothing.' 'DarkGray'
+  Say 'The key and the token did not change, so the site needs nothing.' 'DarkGray'
+}
+if ("$settings" -match 'NEW key') {
+  Say 'A NEW key: the doors need it too, or both are refused on their next fetch:' 'Yellow'
+  Say '    .\scripts\ops\Set-Door.ps1 -Connect' 'Green'
+  Say '    .\scripts\ops\Set-Door.ps1 -Connect -Root C:\Thornswood-Server-Dev -Site https://thornswood.net/dev' 'Green'
 }
 Write-Host ''
 Say 'Then check the panel channel above, and try joining with another account.' 'DarkGray'
