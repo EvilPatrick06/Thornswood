@@ -144,7 +144,9 @@ function Run {
         if ($p) { $refs += $p } else { $missing += $n }
     }
     foreach ($n in $wv2) {
-        $p = Join-Path $Here ('lib\webview2\' + $n)
+        # Where Build-Launcher.ps1 reads them, launcher\lib\webview2, since the
+        # launcher moved out of tools\.
+        $p = Join-Path $Here ('..\launcher\lib\webview2\' + $n)
         if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n }
     }
     Yes ('every one of them is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) (
