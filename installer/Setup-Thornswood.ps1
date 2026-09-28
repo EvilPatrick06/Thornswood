@@ -25,7 +25,12 @@ param(
     [switch]$SkipDowngrade,
     [switch]$MovePayload,
     # Finishes without opening the launcher. For testing the install itself.
-    [switch]$NoOpen
+    [switch]$NoOpen,
+    # Run by the setup window (Bootstrap.cs) with no console of its own
+    # (issue #889). Nothing waits on Enter; a stop exits 1 and the window shows
+    # it; the one question left, the Steam depots, goes to the window as an
+    # ASK line and the answer comes back on standard input.
+    [switch]$NonInteractive
 )
 
 
@@ -82,7 +87,23 @@ function Copy-Quietly($from, $to, $label, [switch]$Move) {
     return $code
 }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
-function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Write-Host ''; [void](Read-Host 'Enter to exit'); exit 1 }
+function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Write-Host ''; if (-not $NonInteractive) { [void](Read-Host 'Enter to exit') }; exit 1 }
+
+# A question for whoever is at the screen. From the setup window there is no
+# console to type into, so the question goes out as one ASK line, the window
+# puts it up as an OK or Cancel box and writes ok or no back. True means go on.
+function Ask($m) {
+    Write-Host ('THORNSWOOD-ASK ' + $m)
+    # Letters only: whatever writes the answer may put a byte order mark or a
+    # carriage return round it. No answer at all, the input shut, is a no.
+    $answer = [Console]::In.ReadLine()
+    return (("$answer" -replace '[^a-z]', '') -eq 'ok')
+}
+if ($NonInteractive) {
+    # Anything else that ever reads the keyboard stops with a reason, rather
+    # than waiting on a console nobody can see.
+    function Read-Host { Die ('Setup stopped at a question the setup window cannot ask: ' + ($args -join ' ') + '. Run Install.bat in ' + $Here + ' to answer it there.') }
+}
 
 $Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Payload = Join-Path $Here 'payload'
@@ -333,7 +354,13 @@ function Invoke-DepotRepair($reason) {
         Start-Process 'steam://open/console'
         Say '  If no console tab opens, press Win+R and run:  steam://open/console' 'DarkGray'
         Write-Host ''
-        [void](Read-Host '  Press Enter here once all three have finished')
+        if ($NonInteractive) {
+            if (-not (Ask 'Run the three download_depot lines shown in the setup window in the Steam console, one at a time, waiting for each to say Done. They are on your clipboard too. Press OK once all three have finished, or Cancel to stop.')) {
+                Die 'Stopped before the Steam files were applied. Run the setup again once the three downloads have finished.'
+            }
+        } else {
+            [void](Read-Host '  Press Enter here once all three have finished')
+        }
         $missing = @($Depots.Keys | Where-Object { -not (Resolve-Depot $_) })
         if ($missing.Count) { Die ("These depots still are not downloaded: " + ($missing -join ', ')) }
     }
@@ -680,7 +707,8 @@ if ($bad) {
     Say "$bad checks failed. Send staff a screenshot of this window in the Discord." 'Red'
     Write-Host ''
     # Left open on purpose. This is the window somebody has to photograph.
-    [void](Read-Host 'Enter to close')
+    # From the setup window it is that window which stays open, on exit 1.
+    if ($NonInteractive) { exit 1 } else { [void](Read-Host 'Enter to close') }
 } else {
     if ($later) {
         Say "Installed. $later thing$(if ($later -eq 1) { '' } else { 's' }) still to come from the collection, which is the next step." 'Green'
@@ -701,7 +729,7 @@ if ($bad) {
     if ($NoOpen) {
         Say 'Open "Thornswood" on your desktop and press PLAY.' 'White'
         Write-Host ''
-        [void](Read-Host 'Enter to close')
+        if (-not $NonInteractive) { [void](Read-Host 'Enter to close') }
     } else {
         Say 'Opening Thornswood now.' 'White'
         Open-Launcher (Get-LauncherExe $LaunchDir)
