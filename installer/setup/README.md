@@ -10,7 +10,17 @@ which drive to install to, reads the
 payload attached to its own end, or downloads it from the site
 (`https://thornswood.net/api/payload`), carrying on from where a dropped
 download stopped and checking it against the SHA-256 the site gives, then
-unpacks it and starts the `Setup.bat` inside with the chosen folder.
+unpacks it and runs the install script inside, the one `Setup.bat` runs, with
+the chosen folder.
+
+Since issue #889 that script runs inside this window, not in a console of its
+own. It is started the way `Setup.bat` starts it (the same PowerShell, the same
+`-MovePayload -Root`), hidden, with `-NonInteractive`; every line it prints
+shows in the window and in `setup-log.txt` beside the unpacked payload, its
+exit code decides whether the window closes or says what stopped it, and its
+one question, the Steam depot downloads on a standalone install, comes up as a
+box in this window. The window will not close while the script is moving
+files. `tests\test-setup-in-window.ps1` holds all of that.
 
 It never uses a zip it finds on the disk. Until 25 September it took an old
 `SkyrimTogether-Setup.zip` or `Thornswood-Setup*.zip` from beside itself or the

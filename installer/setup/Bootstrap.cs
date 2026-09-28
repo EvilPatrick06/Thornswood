@@ -143,6 +143,16 @@ namespace SkyrimTogetherSetup
         static Button btnPick;
         static bool running;
 
+        // The install itself, Setup-Thornswood.ps1, runs inside this window
+        // now (issue #889): no console of its own, its lines in TxtLog and in
+        // a log file, and its exit code the answer.
+        static TextBox txtLog;
+        static Border rootBox;
+        static bool installing;
+        static StreamWriter logFile;
+        static readonly object logLock = new object();
+        static string lastStop = "";
+
         [STAThread]
         static void Main()
         {
@@ -664,7 +674,7 @@ namespace SkyrimTogetherSetup
                    TextWrapping=""Wrap""
                    Text=""This puts the launcher, the script extender and Thornswood's own content into a folder of its own. It does not install into the Skyrim you already have on Steam, and that copy is left as it is.&#10;&#10;Thornswood runs from its own game folder. The launcher builds it out of your Steam copy and what Vortex has deployed there, most of it as hard links that take no extra space, and copies of the few files other programs rewrite. Hard links only work inside one drive, so Thornswood goes on the same drive as Skyrim.&#10;&#10;The mods themselves come from a collection on Nexus. Vortex installs them into a profile of their own, so switching back to your usual profile and running Purge Mods leaves your Skyrim where you started. The launcher has the link and walks you through it.&#10;&#10;Nothing of Bethesda's is renamed or deleted. You need Steam running and Skyrim on build 1.6.1170.""/>
 
-        <Border Grid.Row=""1"" Margin=""0,20,0,0"" Padding=""17,14"" CornerRadius=""2""
+        <Border x:Name=""RootBox"" Grid.Row=""1"" Margin=""0,20,0,0"" Padding=""17,14"" CornerRadius=""2""
                 Background=""{StaticResource Card}"" BorderBrush=""{StaticResource Line}"" BorderThickness=""1"">
           <StackPanel>
             <Grid>
@@ -703,6 +713,14 @@ namespace SkyrimTogetherSetup
                        TextWrapping=""Wrap"" LineHeight=""20"" Text=""Looking...""/>
           </StackPanel>
         </Border>
+
+        <!-- What the install script prints, shown here in place of the two
+             boxes above once it starts, instead of in a console of its own. -->
+        <TextBox x:Name=""TxtLog"" Margin=""0,16,0,0"" Height=""330"" Visibility=""Collapsed""
+                 IsReadOnly=""True"" TextWrapping=""Wrap"" VerticalScrollBarVisibility=""Auto""
+                 FontFamily=""Cascadia Mono, Consolas"" FontSize=""11.5"" Padding=""10,8""
+                 Background=""{StaticResource Deep}"" Foreground=""{StaticResource Muted}""
+                 BorderBrush=""{StaticResource Line}"" BorderThickness=""1""/>
 
           </StackPanel>
         </ScrollViewer>
@@ -756,6 +774,8 @@ namespace SkyrimTogetherSetup
             btnGo    = (Button)win.FindName("BtnGo");
             btnClose = (Button)win.FindName("BtnClose");
             foundBox = (Border)win.FindName("FoundBox");
+            txtLog   = (TextBox)win.FindName("TxtLog");
+            rootBox  = (Border)win.FindName("RootBox");
 
             txtRoot   = (TextBlock)win.FindName("TxtRoot");
             txtRoom   = (TextBlock)win.FindName("TxtRoom");
@@ -806,6 +826,18 @@ namespace SkyrimTogetherSetup
 
             win.Closing += delegate(object s, System.ComponentModel.CancelEventArgs e)
             {
+                // Once the install script is moving files, stopping half way
+                // leaves half of them moved. Nothing in it waits for ever: its
+                // one question comes to this window and every other read stops
+                // it, so it ends by itself.
+                if (installing)
+                {
+                    MessageBox.Show(win, "Thornswood is being installed and cannot be stopped part way, because " +
+                                    "that would leave it half moved. This window closes by itself when it is done.",
+                                    "Thornswood Setup", MessageBoxButton.OK, MessageBoxImage.Information);
+                    e.Cancel = true;
+                    return;
+                }
                 if (running)
                 {
                     var r = MessageBox.Show("Setup is still unpacking. Stop it?", "Thornswood Setup",
@@ -1282,6 +1314,181 @@ namespace SkyrimTogetherSetup
             return answer == MessageBoxResult.Yes;
         }
 
+        /// <summary>
+        /// The PowerShell Setup.bat would pick: PowerShell 7 when it is on the
+        /// PATH, Windows PowerShell otherwise. The two differ in whether a text
+        /// file gets a byte order mark, so the choice stays the same as by hand.
+        /// </summary>
+        static string PowerShellExe()
+        {
+            foreach (string name in new string[] { "pwsh.exe", "powershell.exe" })
+            {
+                string path = Environment.GetEnvironmentVariable("PATH") ?? "";
+                foreach (string dir in path.Split(';'))
+                {
+                    try
+                    {
+                        string d = dir.Trim().Trim('"');
+                        if (d.Length == 0) continue;
+                        string p = Path.Combine(d, name);
+                        if (File.Exists(p)) return p;
+                    }
+                    catch { }
+                }
+            }
+            string sys = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
+                                      "WindowsPowerShell\\v1.0\\powershell.exe");
+            return File.Exists(sys) ? sys : "powershell.exe";
+        }
+
+        /// <summary>
+        /// Setup.bat's own command line with no console: the same script, the
+        /// same -MovePayload and -Root, from the payload's folder. -NonInteractive
+        /// goes twice. Before -File it is PowerShell's, so anything that reads
+        /// the keyboard fails at once instead of waiting on a window nobody can
+        /// see; after it, the script's, so it asks this window instead.
+        /// </summary>
+        static ProcessStartInfo SetupStartInfo(string ps, string script, string root)
+        {
+            var psi = new ProcessStartInfo(ps);
+            psi.Arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"" + script +
+                            "\" -MovePayload -Root \"" + root.TrimEnd('\\') + "\" -NonInteractive";
+            psi.WorkingDirectory = Path.GetDirectoryName(script);
+            psi.UseShellExecute = false;
+            psi.CreateNoWindow = true;
+            psi.RedirectStandardOutput = true;
+            psi.RedirectStandardError = true;
+            psi.RedirectStandardInput = true;
+            // What a console child writes in when it has no console window of
+            // its own to take a code page from: the OEM one.
+            Encoding oem = Encoding.GetEncoding(System.Globalization.CultureInfo.CurrentCulture.TextInfo.OEMCodePage);
+            psi.StandardOutputEncoding = oem;
+            psi.StandardErrorEncoding = oem;
+            return psi;
+        }
+
+        [DllImport("user32.dll")]
+        static extern bool AllowSetForegroundWindow(int processId);
+
+        /// <summary>
+        /// Runs the install script with its lines in TxtLog and in the log
+        /// file, answers its one question with a box, and returns its exit code.
+        /// </summary>
+        static int RunSetupScript(ProcessStartInfo psi, string log)
+        {
+            lock (logLock)
+            {
+                try { logFile = new StreamWriter(log, false, new UTF8Encoding(false)); logFile.AutoFlush = true; }
+                catch { logFile = null; }
+            }
+            Log("Thornswood Setup, " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            Log(psi.FileName + " " + psi.Arguments);
+
+            win.Dispatcher.Invoke(new Action(delegate
+            {
+                rootBox.Visibility = Visibility.Collapsed;
+                foundBox.Visibility = Visibility.Collapsed;
+                txtLog.Visibility = Visibility.Visible;
+                txtBody.Text = "Installing. What it is doing shows below, and Thornswood opens by itself when it is done.";
+                bar.IsIndeterminate = true;
+            }));
+
+            var outDone = new ManualResetEvent(false);
+            var errDone = new ManualResetEvent(false);
+            var p = new Process();
+            p.StartInfo = psi;
+            p.OutputDataReceived += delegate(object s, DataReceivedEventArgs e)
+            {
+                if (e.Data == null) outDone.Set(); else Line(p, e.Data, false);
+            };
+            p.ErrorDataReceived += delegate(object s, DataReceivedEventArgs e)
+            {
+                if (e.Data == null) errDone.Set(); else Line(p, e.Data, true);
+            };
+            installing = true;
+            try
+            {
+                p.Start();
+                // The script opens the launcher at the end and brings it to
+                // the front, which Windows allows a process only when the
+                // one in front says so. The console used to be that one.
+                try { AllowSetForegroundWindow(p.Id); } catch { }
+                p.BeginOutputReadLine();
+                p.BeginErrorReadLine();
+                // With a timeout: WaitForExit() with none also waits for the
+                // output to close, and the launcher the script opens could
+                // hold it open for as long as it runs.
+                while (!p.WaitForExit(500)) { }
+                outDone.WaitOne(3000);
+                errDone.WaitOne(3000);
+                int code = p.ExitCode;
+                Log("Exit code " + code);
+                return code;
+            }
+            finally
+            {
+                installing = false;
+                try { p.Dispose(); } catch { }
+                lock (logLock)
+                {
+                    if (logFile != null) { try { logFile.Dispose(); } catch { } }
+                    logFile = null;
+                }
+            }
+        }
+
+        static void Log(string s)
+        {
+            lock (logLock)
+            {
+                if (logFile == null) return;
+                try { logFile.WriteLine(s); } catch { }
+            }
+        }
+
+        /// <summary>One line from the script: to the log, to the window, or a question.</summary>
+        static void Line(Process p, string s, bool err)
+        {
+            Log(err ? "error: " + s : s);
+            const string ask = "THORNSWOOD-ASK ";
+            if (!err && s.StartsWith(ask, StringComparison.Ordinal))
+            {
+                bool ok = AskForScript(s.Substring(ask.Length));
+                Log(ok ? "Answered OK" : "Answered Cancel");
+                try { p.StandardInput.WriteLine(ok ? "ok" : "no"); p.StandardInput.Flush(); } catch { }
+                return;
+            }
+            string t = s.Trim();
+            if (t.StartsWith("STOP. ", StringComparison.Ordinal)) lastStop = t.Substring(6);
+            else if (err && lastStop.Length == 0 && t.Length > 0) lastStop = t;
+            win.Dispatcher.BeginInvoke(new Action(delegate
+            {
+                txtLog.AppendText(s + "\n");
+                txtLog.ScrollToEnd();
+                if (t.Trim('-').Length > 0) txtStat.Text = t;
+            }));
+        }
+
+        /// <summary>
+        /// The script's question, as an OK or Cancel box on the window's own
+        /// thread. Anything that goes wrong asking counts as Cancel, which
+        /// stops the script with a reason rather than guessing.
+        /// </summary>
+        static bool AskForScript(string text)
+        {
+            var answer = MessageBoxResult.Cancel;
+            try
+            {
+                win.Dispatcher.Invoke(new Action(delegate
+                {
+                    answer = MessageBox.Show(win, text, "Thornswood Setup",
+                                             MessageBoxButton.OKCancel, MessageBoxImage.Information);
+                }));
+            }
+            catch { return false; }
+            return answer == MessageBoxResult.OK;
+        }
+
         static void Work()
         {
             try
@@ -1377,21 +1584,38 @@ namespace SkyrimTogetherSetup
                 // on a drive that was already asked for three times the zip.
                 if (downloaded) { try { File.Delete(pay.File); } catch { } }
 
+                // What Setup.bat does, done from here: the same PowerShell,
+                // the same script and the same arguments, but with no console
+                // of its own. Its lines come into this window (issue #889).
+                // Setup.bat and Install.bat stay in the payload for a person
+                // running it by hand.
                 Say("Starting the installer");
-                string bat = Path.Combine(temp, "Setup.bat");
-                if (!File.Exists(bat)) throw new Exception("Setup.bat was not in the payload.");
-                var psi = new ProcessStartInfo(bat);
-                psi.Arguments = "\"" + installRoot.TrimEnd('\\') + "\"";
-                psi.WorkingDirectory = temp;
-                psi.UseShellExecute = true;
-                Process.Start(psi);
+                string script = Path.Combine(temp, "Setup-Thornswood.ps1");
+                if (!File.Exists(script)) throw new Exception("Setup-Thornswood.ps1 was not in the payload.");
+                string log = Path.Combine(temp, "setup-log.txt");
+                int code = RunSetupScript(SetupStartInfo(PowerShellExe(), script, installRoot), log);
 
                 running = false;
-                win.Dispatcher.BeginInvoke(new Action(delegate { win.Close(); }));
+                if (code == 0)
+                {
+                    win.Dispatcher.BeginInvoke(new Action(delegate { win.Close(); }));
+                    return;
+                }
+                string why = lastStop.Length > 0 ? lastStop : "Setup stopped with code " + code + ".";
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    bar.Visibility = Visibility.Collapsed;
+                    txtBody.Text = why + "\n\nEverything it printed is below, and saved in " + log +
+                                   ". Send staff a screenshot of this window, or that file, in the Discord.";
+                    txtStat.Text = "";
+                    btnClose.IsEnabled = true;
+                    btnClose.Content = "Close";
+                }));
             }
             catch (Exception ex)
             {
                 running = false;
+                installing = false;
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     bar.Visibility = Visibility.Collapsed;
