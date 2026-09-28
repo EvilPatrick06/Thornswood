@@ -1605,6 +1605,58 @@
     say('browser backend: could not ask (' + e + ')');
   }
 
+  /*
+    Beds are sleepable for everybody (#839).
+
+    Vanilla marks most beds Owned by an NPC or a faction, and Sleep/Wait then
+    refuses them. Under SkyMP there is nobody home to ask, so an Owned bed is
+    just a bed nobody can rest in. Clear the owner on a bed press (and ask
+    again if it was owned, because that press may already have been refused),
+    and when somebody actually lies down tell the server /rest bed so the
+    exhaustion meter recovers the way Blade's pitch asked.
+
+    Claimed-property beds are left as a later gate if Patrick wants one: the
+    done line for #839 is ordinary beds sleepable, not a new property lock.
+  */
+  const BED_KEYWORDS = [
+    'FurnitureBedDouble', 'FurnitureBedSingle', 'FurnitureBedRoll',
+    'isBedRoll', 'VendorItemBed'
+  ];
+  const BED_NAME = /\b(bed|cot|bunk|mattress|pallet|bedroll|sleeping\s*bag)\b/i;
+
+  function isBedRef(ref) {
+    if (!ref) { return false; }
+    let base = null;
+    try { base = ref.getBaseObject(); } catch (e) { return false; }
+    if (!base) { return false; }
+    try {
+      if (base.getType() !== 40) { return false; }
+    } catch (e) { return false; }
+    for (let i = 0; i < BED_KEYWORDS.length; i++) {
+      try {
+        const kw = sp.Keyword.getKeyword(BED_KEYWORDS[i]);
+        if (kw && base.hasKeyword(kw)) { return true; }
+      } catch (e) { }
+    }
+    try {
+      const n = base.getName() || '';
+      if (BED_NAME.test(n)) { return true; }
+    } catch (e) { }
+    return false;
+  }
+
+  function clearBedOwnership(ref) {
+    if (!isBedRef(ref)) { return false; }
+    let cleared = false;
+    try {
+      if (ref.getActorOwner()) { ref.setActorOwner(null); cleared = true; }
+    } catch (e) { }
+    try {
+      if (ref.getFactionOwner()) { ref.setFactionOwner(null); cleared = true; }
+    } catch (e) { }
+    return cleared;
+  }
+
   sp.on('activate', guard('activate', (e) => {
     // Declared here, once, for the whole handler. It used to be declared
     // further down, after the door block, and a const is not usable
@@ -1774,6 +1826,35 @@
       return;
     }
 
+    // Furniture: beds only. Clear Owned so Sleep/Wait works (#839).
+    if (type === 40) {
+      let wasOwned = false;
+      try {
+        wasOwned = !!(e.target.getActorOwner() || e.target.getFactionOwner());
+      } catch (err) { }
+      let bed = false;
+      try { bed = isBedRef(e.target); } catch (err) { }
+      if (bed) {
+        try { clearBedOwnership(e.target); } catch (err) { }
+        if (wasOwned) {
+          // This press may already have been refused as Owned. Ask again.
+          try {
+            const pc = sp.Game.getPlayer();
+            if (pc) {
+              reActivating = true;
+              try { e.target.activate(pc, false); }
+              finally { reActivating = false; }
+              say('  cleared ownership on ' + (name || 'a bed') + ', activated again');
+            }
+          } catch (err) {
+            reActivating = false;
+            say('  clearing bed ownership threw: ' + err);
+          }
+        }
+      }
+      return;
+    }
+
     if (type !== 24) { return; }
 
     // The server already answers for this one, and the client forwards the
@@ -1883,6 +1964,45 @@
       if (!sent) { return; }
       toServer.shift();
     }
+  }
+
+  /*
+    ------------------------------------------------- lying down in a bed (#839)
+
+    Ownership clear on activate makes Sleep/Wait open. This half tells the
+    exhaustion meter: furnitureEnter on a bed is /rest bed, furnitureExit is
+    /rest up. Chairs and chopping blocks are not beds, so they leave the
+    meter alone (chopping has its own watcher below).
+  */
+  let restingInBed = false;
+
+  try {
+    sp.on('furnitureEnter', guard('bedenter', (e) => {
+      let actorId = 0;
+      try { actorId = e.actor ? e.actor.getFormID() : 0; } catch (err) { }
+      if (actorId !== 0x14) { return; }
+      const ref = e ? e.target : null;
+      if (!ref) { return; }
+      try { clearBedOwnership(ref); } catch (err) { }
+      let bed = false;
+      try { bed = isBedRef(ref); } catch (err) { }
+      if (!bed) { return; }
+      restingInBed = true;
+      tellServer('/rest bed');
+      say('resting in a bed');
+    }));
+    sp.on('furnitureExit', guard('bedexit', (e) => {
+      let actorId = 0;
+      try { actorId = e.actor ? e.actor.getFormID() : 0; } catch (err) { }
+      if (actorId !== 0x14) { return; }
+      if (!restingInBed) { return; }
+      restingInBed = false;
+      tellServer('/rest up');
+      say('left the bed');
+    }));
+    say('watching for beds');
+  } catch (e) {
+    say('could not watch for beds: ' + e);
   }
 
   /*
