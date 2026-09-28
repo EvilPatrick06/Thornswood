@@ -1,13 +1,24 @@
 <#
   Publish-Pack.ps1
 
-  Builds the optional packs listed in optional-packs.txt, uploads them as
-  release assets, and adds them to version.json so the Add-ons tab in every
-  launcher offers them.
+  Builds the optional packs listed in optional-packs.txt, sends them to the
+  site, and adds them to version.json so the Add-ons tab in every launcher
+  offers them.
 
       .\scripts\release\Publish-Pack.ps1
       .\scripts\release\Publish-Pack.ps1 -Only hd-textures
       .\scripts\release\Publish-Pack.ps1 -DryRun        build and check, upload nothing
+      .\scripts\release\Publish-Pack.ps1 -AssetHost github
+                                                        the old way, a GitHub release
+
+  WHERE THE PACKS GO (#897). Updates come from thornswood.net since 28 Sep, so
+  by default each zip is sent to /feed/assets/<sha256> on the site with
+  Remirror-Site-Feed.ps1 -Send (.part then rename) BEFORE version.json is
+  touched, the feed names it there, and after the push the feed itself goes
+  up with Remirror-Site-Feed.ps1, because launchers read the site's copy and
+  not the clone's. Nothing is uploaded to Thornswood-Releases. -AssetHost
+  github is the GitHub release per run it did before, kept for rolling back,
+  the same switch Publish-Update.ps1 has.
 
   These are the files Package-Thornswood.ps1 deliberately left out of the
   installer. Both scripts read optional-packs.txt, so what comes out of one is
@@ -38,7 +49,14 @@ param(
     # Patrick's Downloads path.
     [string]$ReleaseDir,
     [string]$Repo = 'EvilPatrick06/Thornswood-Releases',
-    [switch]$NoPause
+    [switch]$NoPause,
+    # Where launchers download the packs from (#897). site, the default, is
+    # /feed/assets/<sha256> on thornswood.net; github is a GitHub release in
+    # -Repo, as before 28 Sep.
+    [ValidateSet('site', 'github')][string]$AssetHost = 'site',
+    # A folder standing in for the site's feed root, passed to
+    # Remirror-Site-Feed.ps1 so nothing connects to the VPS. Tests only.
+    [string]$SiteDir
 )
 
 $ErrorActionPreference = 'Stop'
@@ -181,6 +199,38 @@ if ($DryRun) {
 }
 
 # ----------------------------------------------------------- uploading ---
+$tag = 'packs-' + (Get-Date -Format 'yyyyMMdd-HHmm')
+if ($AssetHost -eq 'site') {
+# ==== thornswood pack site upload ====
+# tests\test-pack-feed.ps1 runs this block on its own. If the markers move,
+# it stops rather than quietly testing nothing.
+#
+# Every zip goes to /feed/assets/<sha256> on the site, the path site\server.js
+# serves with Range resume, before version.json is touched. One that does not
+# land stops the publish with the feed as it was, so nobody is offered a pack
+# the site does not hold. Optional packs are on the live feed only, so this is
+# /feed and never /feed-dev.
+Head 'Sending to the site'
+$sendArgs = @{ Send = @($built | ForEach-Object { $_.Zip }) }
+if ($SiteDir) { $sendArgs['SiteDir'] = $SiteDir }
+$global:LASTEXITCODE = 0
+$sendWhy = ''
+try { & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @sendArgs }
+catch { $sendWhy = $_.Exception.Message }
+if (-not $sendWhy -and $LASTEXITCODE -ne 0) { $sendWhy = "Remirror-Site-Feed.ps1 -Send exited $LASTEXITCODE" }
+if ($sendWhy) {
+    Say "  $sendWhy" 'Red'
+    Die ('Not every pack reached the site, so version.json has not been touched and nobody has been offered them. ' +
+         'Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test, then run this again.')
+}
+foreach ($b in $built) {
+    $u = Get-HostFeedAssetUrl $b.Sha
+    if (-not $u) { Die ("No site url for {0}, so version.json has not been touched." -f $b.Id) }
+    $b | Add-Member -NotePropertyName Url -NotePropertyValue $u -Force
+    Say ("  {0}  {1}" -f $b.Id, $u) 'Green'
+}
+# ==== end thornswood pack site upload ====
+} else {
 Head 'Uploading'
 $token = $env:GITHUB_TOKEN
 if (-not $token) {
@@ -192,7 +242,6 @@ if (-not $token) {
          [Environment]::NewLine + "    gh auth login")
 }
 
-$tag = 'packs-' + (Get-Date -Format 'yyyyMMdd-HHmm')
 $hdr = @{ Authorization = "Bearer $token"; 'User-Agent' = 'thornswood'; Accept = 'application/vnd.github+json' }
 
 # Partial #421: optional-pack release pages name where SkyMP source is, the same
@@ -214,6 +263,7 @@ foreach ($b in $built) {
          -Headers $hdr -InFile $b.Zip -ContentType 'application/zip'
     $b | Add-Member -NotePropertyName Url -NotePropertyValue $a.browser_download_url
     Say ("    " + $a.browser_download_url) 'Green'
+}
 }
 
 # --------------------------------------------------------- version.json ---
@@ -298,6 +348,29 @@ try {
 } finally { if ((Get-Location).Path -eq $ReleaseDir) { Pop-Location } }
 
 Remove-Item $work -Recurse -Force -EA SilentlyContinue
+
+# ==== thornswood pack site feed ====
+# Launchers read version.json from the site, so the feed just pushed goes up
+# too, or the Add-ons tab never hears of these packs. Remirror-Site-Feed.ps1
+# sends the clone's version.json last, once every asset it names is there.
+# The feed on GitHub is already right, so a failure here is said and the
+# command to finish it given, rather than undoing anything.
+if ($AssetHost -eq 'site') {
+    Head 'Feed to the site'
+    $mirrorArgs = @{ FeedDir = $ReleaseDir }
+    if ($SiteDir) { $mirrorArgs['SiteDir'] = $SiteDir }
+    $global:LASTEXITCODE = 0
+    $mirrorWhy = ''
+    try { & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @mirrorArgs }
+    catch { $mirrorWhy = $_.Exception.Message }
+    if (-not $mirrorWhy -and $LASTEXITCODE -ne 0) { $mirrorWhy = "Remirror-Site-Feed.ps1 exited $LASTEXITCODE" }
+    if ($mirrorWhy) {
+        Say "  $mirrorWhy" 'Red'
+        Die ('The packs are on the site and in the clone''s version.json, but the site still serves the feed without them. ' +
+             'Run .\scripts\deploy\Remirror-Site-Feed.ps1 to finish.')
+    }
+}
+# ==== end thornswood pack site feed ====
 
 Head 'Done'
 Say ("  " + $built.Count + " pack(s) live. They show on the Add-ons tab of the Mods page.") 'Green'
