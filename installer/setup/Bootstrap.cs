@@ -425,6 +425,7 @@ namespace SkyrimTogetherSetup
             }
 
             SaySkyrim(root);
+            SayOwnGame();
 
             long free = -1;
             try { free = new DriveInfo(root).AvailableFreeSpace; } catch { }
@@ -506,6 +507,128 @@ namespace SkyrimTogetherSetup
                              "your Steam copy with hard links, and a link cannot cross a drive. Installed here, the " +
                              "launcher cannot build that folder and will not let you play. Pick " + Letter(sky) + ".";
             txtSkyrim.Foreground = B("#BC5039");
+        }
+
+        // --------------------------------------- Thornswood's own Skyrim folder
+        //
+        // Issue #906, Patrick on 28 September: "let's offer the own folder
+        // during install as well". The launcher offers it in a box the first
+        // time it opens and in Settings, Maintenance; a new person could only
+        // find it there. This card asks the same question with the same words
+        // before the launcher is ever opened.
+        //
+        // What it can and cannot do from here. The folder is Root\Game, made
+        // by the launcher (OwnGame.Make) from what Vortex has deployed, and
+        // nothing is deployed yet while this window is up: the collection is
+        // the step after it. So a tick is the launcher's own question answered
+        // in advance, written into config.json as MakeOwnGame, and the launcher
+        // then makes the folder without asking once Vortex has deployed
+        // (ShellOwnGame.AskOwnGame). No tick is what every install did before
+        // this: the launcher asks. It stays that way by default. Thornswood
+        // will not start out of a shared Skyrim either way (OwnGameRequired),
+        // which is why the off line says Play asks for it too.
+        //
+        // Choose Vortex's folder is the Settings button of the same name,
+        // taken early: the same check as OwnGame.PointAt, saved into
+        // config.json as the same VortexGame field.
+        static CheckBox chkOwn;
+        static TextBlock txtOwn;
+        static Border ownBox;
+        static Button btnVortexPick, btnVortexForget;
+        // Read on the window's thread when Install is pressed, because Work
+        // runs on another one and a WPF control may only be read on its own.
+        static bool makeOwnGame;
+        static string vortexGame = "";
+
+        /// <summary>
+        /// The line under the tick box: on or off, where the folder goes and
+        /// what it is made from, whether the drive picked can hold it, and the
+        /// chosen Vortex folder. Drawn again whenever any of those change.
+        /// </summary>
+        static void SayOwnGame()
+        {
+            if (txtOwn == null) return;
+            string root = "";
+            try { root = Path.GetPathRoot(installRoot); } catch { }
+
+            string text;
+            if (chkOwn != null && chkOwn.IsChecked == true)
+            {
+                text = "On. Thornswood will run from " + Path.Combine(installRoot, "Game") +
+                       ", made from what Vortex has deployed" + (vortexGame.Length > 0 ? " in " + vortexGame : "") +
+                       ". The launcher makes it by itself once Vortex has deployed the Thornswood collection, " +
+                       "and restarts when it is done.";
+            }
+            else
+            {
+                text = "Off for now. The launcher asks before it makes the folder, and Settings, Maintenance has " +
+                       "the button. Thornswood will not start out of a Skyrim shared with other servers, so Play " +
+                       "asks for it too.";
+            }
+
+            // The same drive logic as the line under the drive buttons: the
+            // folder is mostly hard links out of the Steam copy.
+            string sky = SkyrimDrive();
+            bool apart = sky.Length > 0 && !string.IsNullOrEmpty(root) && !SameDrive(sky, root);
+            if (apart)
+                text += "\nIt cannot be made on " + Letter(root) + ", because Skyrim is on " + Letter(sky) +
+                        " and a link cannot cross a drive.";
+            if (vortexGame.Length > 0)
+                text += "\nVortex's folder is set to " + vortexGame + ". Forget the chosen folder to have Thornswood look for it again.";
+
+            txtOwn.Text = text;
+            txtOwn.Foreground = B(apart ? "#BC5039" : "#66594A");
+            if (btnVortexForget != null)
+                btnVortexForget.Visibility = vortexGame.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Null when the launcher's OwnGame.PointAt would take this folder, else
+        /// its sentence saying why not. <paramref name="full"/> is the folder as
+        /// it is saved: quotes off, the full path, no trailing backslash.
+        /// </summary>
+        static string VortexFolderProblem(string folder, out string full)
+        {
+            full = (folder ?? "").Trim().Trim('"').Trim();
+            string f = full;
+            try { f = Path.GetFullPath(f).TrimEnd('\\'); }
+            catch { return f + " is not a folder Thornswood can read, so nothing changed."; }
+            full = f;
+            if (!File.Exists(Path.Combine(f, "SkyrimSE.exe")))
+                return f + " has no SkyrimSE.exe in it, so it is not a Skyrim folder and nothing changed. Choose the folder that Open Game Folder opens in Vortex.";
+            if (!File.Exists(Path.Combine(f, "Data\\vortex.deployment.json")))
+                return "Vortex has not deployed into " + f + ": it has no Data\\vortex.deployment.json, the record Vortex leaves in every folder it deploys to, so nothing changed. Choose the folder that Open Game Folder opens in Vortex.";
+            return null;
+        }
+
+        static void PickVortexFolder()
+        {
+            string chosen;
+            try
+            {
+                var dlg = new System.Windows.Forms.FolderBrowserDialog();
+                dlg.Description = "Choose the Skyrim folder Vortex deploys into. In Vortex, Mods, Open, Open Game Folder opens it.";
+                dlg.ShowNewFolderButton = false;
+                string start = vortexGame.Length > 0 ? vortexGame : SkyrimPath();
+                if (start.Length > 0 && Directory.Exists(start)) dlg.SelectedPath = start;
+                if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+                chosen = dlg.SelectedPath;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not open the folder picker: " + ex.Message,
+                                "Thornswood Setup", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            string full;
+            string why = VortexFolderProblem(chosen, out full);
+            if (why != null)
+            {
+                MessageBox.Show(why, "Thornswood Setup", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            vortexGame = full;
+            SayOwnGame();
         }
 
         static void PickFolder()
@@ -702,6 +825,42 @@ namespace SkyrimTogetherSetup
           </StackPanel>
         </Border>
 
+        <!-- Thornswood's own Skyrim folder, offered here as well as in the
+             launcher's Settings, Maintenance (issue #906). The words are that
+             panel's own, launcher\ui.xaml PnlOwnGame, so the two say the same
+             thing. -->
+        <Border x:Name=""OwnBox"" Margin=""0,14,0,0"" Padding=""17,14"" CornerRadius=""2""
+                Background=""{StaticResource Card}"" BorderBrush=""{StaticResource Line}"" BorderThickness=""1"">
+          <StackPanel>
+            <TextBlock Text=""Thornswood's own Skyrim folder"" Foreground=""{StaticResource Faint}"" FontSize=""12""
+                       FontFamily=""Constantia, Georgia"" Typography.Capitals=""SmallCaps""
+                       TextOptions.TextFormattingMode=""Ideal"" Margin=""0,0,0,6""/>
+            <TextBlock x:Name=""TxtOwnAbout"" Foreground=""{StaticResource Muted}"" FontSize=""11.5"" LineHeight=""18""
+                       TextWrapping=""Wrap""
+                       Text=""Runs Thornswood from a Skyrim folder of its own, made from what Vortex has deployed while the Thornswood profile is on. Any other Vortex profile can then use the Steam copy without reaching Thornswood, and switching profiles in Vortex no longer takes Thornswood's mods away. The big files are links to Vortex's copies, so the collection is not on the disk twice. When Vortex deploys a newer Thornswood collection, the launcher brings it in by itself the next time it starts. Windows asks for administrator once while this is set up, to write a firewall rule for the game's browser: Skyrim Platform draws the interface in a second program, and a rule is tied to a program's path, so moving the game into its own folder is what makes Windows ask about it. The rule is a block, because that program only ever talks to the game on this machine. Saying no is fine and only means Windows asks you about the browser on the first launch instead.""/>
+            <CheckBox x:Name=""ChkOwnGame"" Margin=""0,12,0,0"" Foreground=""{StaticResource Ink}"">
+              <TextBlock Foreground=""{StaticResource Ink}"" FontSize=""12.5"" LineHeight=""18""
+                         TextWrapping=""Wrap"" Margin=""4,0,0,0""
+                         Text=""Give Thornswood a Skyrim folder of its own""/>
+            </CheckBox>
+            <TextBlock x:Name=""TxtOwnGame"" Foreground=""{StaticResource Faint}"" FontSize=""11.5"" LineHeight=""18""
+                       TextWrapping=""Wrap"" Margin=""0,8,0,0""/>
+            <TextBlock Foreground=""{StaticResource Faint}"" FontSize=""11.5"" LineHeight=""18""
+                       TextWrapping=""Wrap"" Margin=""0,12,0,0""
+                       Text=""The launcher finds the folder Vortex deploys into when it is in a Steam library. If it is somewhere else, choose it here: in Vortex, Mods, Open, Open Game Folder shows which one. Only the files Vortex lists in it are used, and the game itself always comes from the Steam copy.""/>
+            <StackPanel Orientation=""Horizontal"" Margin=""0,9,0,0"">
+              <Button x:Name=""BtnVortexPick"" Style=""{StaticResource Btn}"" Content=""Choose Vortex's folder""
+                      Padding=""16,7"" FontSize=""12"" Margin=""0,0,8,0""
+                      Background=""{StaticResource Deep}"" BorderBrush=""{StaticResource Line}""
+                      Foreground=""{StaticResource Ink}""/>
+              <Button x:Name=""BtnVortexForget"" Style=""{StaticResource Btn}"" Content=""Forget the chosen folder""
+                      Padding=""16,7"" FontSize=""12"" Visibility=""Collapsed""
+                      Background=""{StaticResource Deep}"" BorderBrush=""{StaticResource Line}""
+                      Foreground=""{StaticResource Ink}""/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
         <Border x:Name=""FoundBox"" Margin=""0,14,0,0"" Padding=""17,14""
                 CornerRadius=""2"" Background=""{StaticResource Card}""
                 BorderBrush=""{StaticResource Line}"" BorderThickness=""1"">
@@ -783,6 +942,19 @@ namespace SkyrimTogetherSetup
             driveRow  = (WrapPanel)win.FindName("DriveRow");
             btnPick   = (Button)win.FindName("BtnPick");
             btnPick.Click += delegate { PickFolder(); };
+
+            ownBox          = (Border)win.FindName("OwnBox");
+            chkOwn          = (CheckBox)win.FindName("ChkOwnGame");
+            txtOwn          = (TextBlock)win.FindName("TxtOwnGame");
+            btnVortexPick   = (Button)win.FindName("BtnVortexPick");
+            btnVortexForget = (Button)win.FindName("BtnVortexForget");
+            if (chkOwn != null)
+            {
+                chkOwn.Checked   += delegate { SayOwnGame(); };
+                chkOwn.Unchecked += delegate { SayOwnGame(); };
+            }
+            if (btnVortexPick != null) btnVortexPick.Click += delegate { PickVortexFolder(); };
+            if (btnVortexForget != null) btnVortexForget.Click += delegate { vortexGame = ""; SayOwnGame(); };
 
             // Start on the drive Skyrim is on. It is the only drive this
             // install can play from, and it is not something a person can put
@@ -1189,6 +1361,11 @@ namespace SkyrimTogetherSetup
             btnGo.IsEnabled = false;
             if (chkAge != null) chkAge.IsEnabled = false;
             btnPick.IsEnabled = false;
+            // The own folder choice as it stands now, for Work on its own thread.
+            makeOwnGame = chkOwn != null && chkOwn.IsChecked == true;
+            if (chkOwn != null) chkOwn.IsEnabled = false;
+            if (btnVortexPick != null) btnVortexPick.IsEnabled = false;
+            if (btnVortexForget != null) btnVortexForget.IsEnabled = false;
             foreach (object o in driveRow.Children) { var b = o as Button; if (b != null) b.IsEnabled = false; }
             btnClose.IsEnabled = false;
             bar.Visibility = Visibility.Visible;
@@ -1347,12 +1524,17 @@ namespace SkyrimTogetherSetup
         /// goes twice. Before -File it is PowerShell's, so anything that reads
         /// the keyboard fails at once instead of waiting on a window nobody can
         /// see; after it, the script's, so it asks this window instead.
+        /// The own folder card adds -MakeOwnGame when it is ticked and
+        /// -VortexGame when a folder was chosen, and nothing when it was left
+        /// alone, so an untouched card starts the script exactly as before.
         /// </summary>
-        static ProcessStartInfo SetupStartInfo(string ps, string script, string root)
+        static ProcessStartInfo SetupStartInfo(string ps, string script, string root, bool makeOwn, string vortex)
         {
             var psi = new ProcessStartInfo(ps);
             psi.Arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"" + script +
                             "\" -MovePayload -Root \"" + root.TrimEnd('\\') + "\" -NonInteractive";
+            if (makeOwn) psi.Arguments += " -MakeOwnGame";
+            if (!string.IsNullOrEmpty(vortex)) psi.Arguments += " -VortexGame \"" + vortex.TrimEnd('\\') + "\"";
             psi.WorkingDirectory = Path.GetDirectoryName(script);
             psi.UseShellExecute = false;
             psi.CreateNoWindow = true;
@@ -1388,6 +1570,7 @@ namespace SkyrimTogetherSetup
             {
                 rootBox.Visibility = Visibility.Collapsed;
                 foundBox.Visibility = Visibility.Collapsed;
+                if (ownBox != null) ownBox.Visibility = Visibility.Collapsed;
                 txtLog.Visibility = Visibility.Visible;
                 txtBody.Text = "Installing. What it is doing shows below, and Thornswood opens by itself when it is done.";
                 bar.IsIndeterminate = true;
@@ -1593,7 +1776,7 @@ namespace SkyrimTogetherSetup
                 string script = Path.Combine(temp, "Setup-Thornswood.ps1");
                 if (!File.Exists(script)) throw new Exception("Setup-Thornswood.ps1 was not in the payload.");
                 string log = Path.Combine(temp, "setup-log.txt");
-                int code = RunSetupScript(SetupStartInfo(PowerShellExe(), script, installRoot), log);
+                int code = RunSetupScript(SetupStartInfo(PowerShellExe(), script, installRoot, makeOwnGame, vortexGame), log);
 
                 running = false;
                 if (code == 0)

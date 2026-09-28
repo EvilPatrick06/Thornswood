@@ -107,7 +107,9 @@ namespace Thornswood
                 try
                 {
                     if (active) refresh = OwnGame.NeedsRefresh(c);
-                    else if (collection && !OwnGame.Declined)
+                    // A yes given in the setup window (MakeOwnGame) is newer
+                    // than a no left in the profile by an earlier install.
+                    else if (collection && (!OwnGame.Declined || c.MakeOwnGame))
                     {
                         string src = OwnGame.DeploysInto(c);
                         // Offered whenever it is possible. It used to be offered
@@ -212,6 +214,17 @@ namespace Thornswood
             {
                 Log(why);
                 if (!atStart) MessageBox.Show(why, "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Already answered in the setup window (issue #906): its card
+            // carries this panel's words and a tick box, and a tick is the
+            // same yes as the one below, given before the launcher was open.
+            if (cfg.MakeOwnGame)
+            {
+                Log("Making Thornswood's own Skyrim folder, as chosen when Thornswood was installed. " +
+                    "It is made from what Vortex has deployed in " + src + ".");
+                StartOwnGame(true, true);
                 return;
             }
 
