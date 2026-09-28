@@ -118,7 +118,22 @@ if ($intro.Success) {
     Yes 'the old shape is gone from it' (-not $t.Contains('does not make a second copy'))
 }
 
-# ---- 5. the house words ----------------------------------------------------
+# ---- 5. the folder the picker says is the folder it makes (#852) -----------
+# Measured under #497: an older Bootstrap told the customer "a folder called
+# SkyrimTogether is made" while Path.Combine actually made Thornswood. The
+# rename on main already fixed the string; this holds the two sides together
+# so they cannot drift apart again.
+Yes 'the folder picker says a folder called Thornswood is made' (
+    $bs.Contains('A folder called Thornswood is made inside whatever you pick.'))
+Yes 'and does not still say SkyrimTogether for that folder' (
+    -not ($bs -match 'folder called SkyrimTogether'))
+Yes 'drive buttons Path.Combine the chosen drive with Thornswood' (
+    $bs.Contains('Path.Combine(captured.Name, "Thornswood")'))
+Yes 'Browse appends Thornswood when the pick is not already that folder' (
+    $bs.Contains('Path.Combine(chosen, "Thornswood")') -and
+    $bs.Contains('EndsWith("Thornswood", StringComparison.OrdinalIgnoreCase)'))
+
+# ---- 6. the house words ----------------------------------------------------
 Yes 'no em dash anywhere in the setup program' ($bs.IndexOf([char]0x2014) -lt 0)
 Yes 'and not the word this project does not use' ($bs -notmatch '(?i)\bplayers?\b')
 
