@@ -45,11 +45,14 @@ param(
     # payload was 14 GB, because Windows would not load an executable that big.
     # It is under a gigabyte now that the mods come from the collection.
     [switch]$OneFile,
-    # The public releases clone. Its version.json is how this build knows which
-    # packs it already has (applied.txt, further down). Left empty it is the
-    # Thornswood-Releases folder beside this repo, where Ship, Publish-Update
-    # and Check-ShipReady already look. It was a path into one home folder, so
-    # only one machine could build an installer that knew its own packs.
+    # The folder holding the live feed. Its version.json is how this build
+    # knows which packs it already has (applied.txt, further down). Left empty
+    # it is this machine's working copy of the live feed,
+    # %LOCALAPPDATA%\Thornswood\feed\main, which every Ship and feed edit
+    # receives from the VPS (Feed-Store.ps1, #907); until #907 it was the
+    # Thornswood-Releases clone beside this repo. It was once a path into one
+    # home folder, so only one machine could build an installer that knew its
+    # own packs.
     # Last in the list so no existing positional argument moves.
     [string]$ReleaseDir = ''
 )
@@ -148,13 +151,13 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # them all again. With neither file there it shipped no applied.txt at all:
 # every one of the 227 packs pending on first launch, and 164 of them point at
 # the private repository. So it stops and says where it looked.
-if (-not $ReleaseDir) { $ReleaseDir = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $Here))) 'Thornswood-Releases' }
+if (-not $ReleaseDir) { $ReleaseDir = Join-Path (Join-Path (Join-Path $env:LOCALAPPDATA 'Thornswood') 'feed') 'main' }
 $vLive = Join-Path $ReleaseDir 'version.json'
 if (-not (Test-Path -LiteralPath $vLive)) {
     Die ("No version.json in $ReleaseDir, so this installer cannot say which packs it already has, " +
          "and everybody who installs from it would be offered every pack ever published. " +
-         "Clone the feed there (git clone https://github.com/EvilPatrick06/Thornswood-Releases.git $ReleaseDir) " +
-         "or pass -ReleaseDir with the folder it is in.")
+         "Any Ship or feed edit on this machine receives the live feed there; or save " +
+         "https://thornswood.net/feed/version.json into a folder and pass -ReleaseDir with it.")
 }
 # ==== end thornswood release feed ====
 

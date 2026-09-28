@@ -280,7 +280,7 @@ try {
     # compression in Package-Thornswood, both steps in the build check.
     $pub = [IO.File]::ReadAllText((Join-Path $here '..\scripts\release\Publish-Update.ps1'))
     $a = $pub.IndexOf("Check-Secrets.ps1')")
-    $b = $pub.IndexOf('gh release create')
+    $b = $pub.IndexOf('# ==== thornswood site upload ====')
     yes 'Publish-Update runs the scan over what it built' ($a -ge 0 -and $pub.Contains('-Zip $scanZips'))
     yes 'and before the upload' ($a -ge 0 -and $b -gt $a)
     $pkg = [IO.File]::ReadAllText((Join-Path $here '..\scripts\release\Package-Thornswood.ps1'))
@@ -305,8 +305,8 @@ try {
     # their Join-Path $Here reaches Check-Secrets.ps1 in scripts\dev.
     $Here = Join-Path (Split-Path -Parent $here) (Join-Path 'scripts' 'release')
     $pubFrom = '# ---- nothing that must never ship, read off what was built'
-    # The first upload branch, which is the site one since #897.
-    $pubTo = "if (-not `$NoUpload -and `$AssetHost -eq 'site') {"
+    # The upload, which is the site one since #897 and the only one since #907.
+    $pubTo = "if (-not `$NoUpload) {"
     $Launcher = $false; $exePath = ''; $clientRel = $null
     $chunks = @([pscustomobject]@{ Path = $bad })
     $d = Invoke-Hook $pub $pubFrom $pubTo

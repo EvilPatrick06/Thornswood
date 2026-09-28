@@ -114,10 +114,10 @@ namespace Thornswood
             pendingDoc = v;
 
             // Where the answer came from, once, and again if it ever changes.
-            // A line in launcher.log naming thornswood.net is what says the
-            // checks are off the GitHub Contents API and its sixty anonymous
-            // requests an hour, and a line naming api.github.com is what says
-            // the site feed is missing and the fallback is carrying it (#445).
+            // A line in launcher.log naming thornswood.net is what says where
+            // the checks go. Until #907 a line naming api.github.com said the
+            // site feed was missing and the GitHub fallback was carrying it;
+            // that fallback went with Thornswood-Releases.
             if (feedSaid != Updater.LastFeedUrl)
             {
                 feedSaid = Updater.LastFeedUrl;
@@ -153,12 +153,9 @@ namespace Thornswood
             {
                 cfg.VoicePort = v.voicePort; quiet = true;
             }
-            if (!string.IsNullOrEmpty(v.updateRepo) && v.updateRepo != cfg.UpdateRepo)
-            {
-                cfg.UpdateRepo = v.updateRepo; quiet = true;
-            }
-            // Same announce-a-rename pattern as updateRepo (#649): a feed can
-            // ship the new site URL under the old one, then move.
+            // updateRepo is no longer read: it named the GitHub fallback, which
+            // went with Thornswood-Releases (#907). A feed can still announce a
+            // move of the site feed by shipping the new URL under the old one.
             if (!string.IsNullOrEmpty(v.updateFeedUrl) && v.updateFeedUrl != cfg.UpdateFeedUrl)
             {
                 cfg.UpdateFeedUrl = v.updateFeedUrl; quiet = true;

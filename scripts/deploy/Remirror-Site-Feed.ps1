@@ -2,12 +2,21 @@
   Remirror-Site-Feed.ps1
 
   Puts the release feed on the site, so https://thornswood.net/feed/version.json
-  is the same file as the tip of Thornswood-Releases and every asset it names
-  can be downloaded from thornswood.net.
+  is the same file as this machine's working copy of the feed and every asset
+  it names can be downloaded from thornswood.net.
+
+  SINCE #907 THE VPS IS WHERE THE FEED LIVES. Publish-Update.ps1 receives it
+  from there and sends it back itself (scripts\release\Feed-Store.ps1), so
+  after a Ship this finds version.json up there already and only checks the
+  assets. version.json goes up through the same Feed-Store check as a Ship: it
+  replaces the site's copy only while that copy is still the one this machine
+  received, and the one it replaces is kept in the feed's history folder.
+  Handed a folder that was never received (-FeedDir at an old clone), it
+  replaces whatever the site has, the way it always did, and says so.
 
   WHY IT EXISTS. Since the #649 host cutover a launcher reads version.json from
-  the site first and only falls back to the GitHub Contents API, and
-  Publish-Update.ps1 -HostAssetUrls writes pack, launcher and clientRuntime urls
+  the site (the GitHub fallback it had went with #907), and Publish-Update.ps1
+  writes pack, launcher and clientRuntime urls
   as https://thornswood.net/feed/assets/<sha256>. Its own comment says "Website
   mirrors the bytes to /feed/assets/<sha256>", and nothing did: the mirror was
   somebody copying files by hand. A feed published without it points every
@@ -43,10 +52,10 @@
 
   in a try/catch, the way Ship calls Publish-News.ps1. It exits 1 when it
   refused to publish the feed, which is a line on screen for whoever shipped
-  rather than a reason to fail a release that is already out on GitHub.
+  rather than a reason to fail a release that is already out.
 
   SENDING ASSETS ON THEIR OWN (#897). Since updates come from the site rather
-  than from Thornswood-Releases, Publish-Update.ps1 sends each new pack, the
+  than from GitHub, Publish-Update.ps1 sends each new pack, the
   launcher and the client runtime up BEFORE it writes version.json, with
 
       .\scripts\deploy\Remirror-Site-Feed.ps1 [-Dev] -Send <file>, <file>
@@ -63,13 +72,14 @@
   That upload belongs to whoever publishes the installer, and
   scripts\release\Publish-Installer.ps1 says what the site needs from it.
 
-  Reads the releases clone, and writes only to the site's feed folders.
+  Reads this machine's working copy of the feed, and writes only to the site's
+  feed folders.
 #>
 [CmdletBinding()]
 param(
-  # The clone or worktree holding version.json. Left out, it is
-  # Thornswood-Releases beside this repository, or Thornswood-Releases-dev with
-  # -Dev, which is where Publish-Update.ps1 keeps them.
+  # The folder holding version.json. Left out, it is this machine's working
+  # copy for the channel, %LOCALAPPDATA%\Thornswood\feed\main or ...\dev,
+  # where Publish-Update.ps1 receives and edits it (Feed-Store.ps1).
   [string]$FeedDir,
   # The dev feed, to /feed-dev. The last dev Ship wins, the same as everywhere.
   [switch]$Dev,
@@ -179,18 +189,20 @@ Move-Item -LiteralPath `$p -Destination `$f -Force
   if ($said -notmatch 'in place') { throw "$sha did not land: $said" }
 }
 
-function Send-VersionJson([string]$local) {
-  if ($SiteDir) {
-    $dir = Join-Path $SiteDir $prefix
-    New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    # Through a temporary name as well, so a reader never sees half a file.
-    $tmp = Join-Path $dir 'version.json.part'
-    Copy-Item -LiteralPath $local -Destination $tmp -Force
-    Move-Item -LiteralPath $tmp -Destination (Join-Path $dir 'version.json') -Force
-    return
+# version.json through the feed store (#907): .part then renamed on the VPS,
+# the one it replaces kept in history, and only while the feed and baseline up
+# there are what this folder received. A folder that was never received (an
+# old clone passed as -FeedDir) is checked against what is up there right now,
+# which replaces whatever the site has, as this script always did.
+function Send-FeedJson([string]$dir) {
+  $to = @{ Vps = $Vps; User = $User; Root = $Root }
+  $expect = $null
+  if ($null -eq (Read-FeedStoreRead $dir)) {
+    Say "  $dir was never received from the VPS, so its version.json replaces whatever the site has" 'Yellow'
+    $expect = Get-FeedStoreThere $(if ($Dev) { 'dev' } else { 'main' }) @('version.json') -SiteDir $SiteDir -To $to
   }
-  & scp @ssh $local "$User@${Vps}:$Root/$prefix/version.json"
-  if ($LASTEXITCODE -ne 0) { throw 'scp failed: version.json' }
+  $r = Send-FeedStore $(if ($Dev) { 'dev' } else { 'main' }) $dir @('version.json') -SiteDir $SiteDir -To $to -Expect $expect
+  return (@($r.Sent).Count -gt 0)
 }
 
 # Runs a script up there and hands back what it said. The same block every
@@ -248,6 +260,8 @@ function PropList($obj, $name) {
 
 # Which urls the site is supposed to serve, and the sha256 in each one.
 . (Join-Path $Here '..\release\Feed-Rules.ps1')
+# Where the feed lives and how it is sent (#907).
+. (Join-Path $Here '..\release\Feed-Store.ps1')
 
 # ------------------------------------------------- -Send: these files only --
 if ($PSBoundParameters.ContainsKey('Send')) {
@@ -299,16 +313,11 @@ if ($PSBoundParameters.ContainsKey('Send')) {
 }
 
 # ------------------------------------------------------------------ the feed
-if (-not $FeedDir) {
-  $repo   = & (Join-Path $Here '..\release\Where.ps1') Repo
-  $beside = Split-Path -Parent $repo
-  $clone  = if ($Dev) { 'Thornswood-Releases-dev' } else { 'Thornswood-Releases' }
-  $FeedDir = Join-Path $beside $clone
-}
+if (-not $FeedDir) { $FeedDir = Get-FeedStoreDir $(if ($Dev) { 'dev' } else { 'main' }) }
 $versionFile = Join-Path $FeedDir 'version.json'
 if (-not (Test-Path -LiteralPath $versionFile)) {
-  throw ("No version.json in $FeedDir. Clone Thornswood-Releases beside this repository " +
-         '(Check-ShipReady.ps1 says how), or pass -FeedDir.')
+  throw ("No version.json in $FeedDir. It is received there by the first Ship or feed edit on this machine " +
+         '(Feed-Store.ps1); or pass -FeedDir.')
 }
 # A byte order mark is not JSON, and ConvertFrom-Json stops on the first
 # character with something unhelpful about a token.
@@ -325,9 +334,9 @@ Say ("  launcher {0}, {1} pack(s), for /{2}/ on the site" -f (Prop $doc 'launche
 # $wrongChannel, and talks to nothing.
 #
 # Every asset the feed names that the site is supposed to serve, in feed order,
-# keyed by the sha256 in its own url. A url on GitHub needs no mirror: the
-# launcher downloads it from there, and Thornswood-Releases stays the rollback
-# path whether this script has run or not.
+# keyed by the sha256 in its own url. A url off the site (an old GitHub one)
+# is counted and left alone: this cannot mirror what it does not name by
+# sha256, and Publish-Update moves such a url once the site holds its bytes.
 $need = [ordered]@{}
 $script:offSite = 0
 $script:wrongChannel = @()
@@ -360,7 +369,7 @@ foreach ($p in (PropList $doc 'optional')) {
 }
 # ==== end thornswood feed assets wanted ====
 
-Say ("  {0} asset(s) named on the site, {1} still named on GitHub" -f $need.Count, $script:offSite)
+Say ("  {0} asset(s) named on the site, {1} still named somewhere else" -f $need.Count, $script:offSite)
 foreach ($w in $script:wrongChannel) {
   Say "  NOT MIRRORED: $w, and this run is /$prefix/. Run it for that channel." 'Yellow'
 }
@@ -468,8 +477,7 @@ if ($missing.Count) {
   Say ("$($missing.Count) asset(s) the feed names are neither on the site nor on this machine.") 'Red'
   Say '  Nothing was sent, because a feed pointing at a 404 stops every update.' 'Red'
   Say '  They are usually still on the machine that built them. Copy them anywhere' 'Yellow'
-  Say '  and pass it as -AssetDir, or take them from the Thornswood-Releases release' 'Yellow'
-  Say '  named for that pack id, which keeps every asset for rollback.' 'Yellow'
+  Say '  and pass it as -AssetDir.' 'Yellow'
   exit 1
 }
 if ($Check) {
@@ -497,8 +505,9 @@ foreach ($sha in $need.Keys) {
 # version.json last. Everything it names is up there by now, so a launcher
 # reading it the same second finds every asset it asks for.
 Head 'Sending version.json'
-Send-VersionJson $versionFile
+$feedSent = Send-FeedJson $FeedDir
+if (-not $feedSent) { Say '  the site already serves this version.json' 'DarkGray' }
 
 Head 'Done'
-Say ("  {0} asset(s) sent, {1} already there, version.json published" -f $sent, $there.Count) 'Green'
+Say ("  {0} asset(s) sent, {1} already there, version.json {2}" -f $sent, $there.Count, $(if ($feedSent) { 'published' } else { 'already there' })) 'Green'
 Say "  https://thornswood.net/$prefix/version.json" 'Green'

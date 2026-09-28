@@ -32,8 +32,10 @@ param(
   # Where the LIVE version.json is. Releases moved into their own public repo,
   # and the copy still sitting in this repo stopped being updated the day that
   # happened. Reading the stale one is why a run right after shipping 1.0.198
-  # announced launcher 1.0.196 to the world.
-  [string]$ReleaseDir = (Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))) 'Thornswood-Releases'),
+  # announced launcher 1.0.196 to the world. Since #907 it is this machine's
+  # working copy of the live feed, which the Ship that runs this has just
+  # received from the VPS and sent back (Feed-Store.ps1).
+  [string]$ReleaseDir = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main'),
   # Everything before this date is development history and stays off the site.
   # Read from scripts\ops\news-from.txt when not given, so it is one line to change.
   [string]$From,
@@ -85,7 +87,7 @@ if (-not $From) {
 # and it was deleted on 25 September rather than fallen back to.
 $vf = Join-Path $ReleaseDir 'version.json'
 if (-not (Test-Path -LiteralPath $vf)) {
-  throw "No version.json in $ReleaseDir. Clone Thornswood-Releases there, or pass -ReleaseDir."
+  throw "No version.json in $ReleaseDir. A Ship or feed edit on this machine receives the live feed there; or pass -ReleaseDir."
 }
 
 # A byte order mark is not JSON. ConvertFrom-Json stops on the first character

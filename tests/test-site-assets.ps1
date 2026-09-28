@@ -322,14 +322,14 @@ http.createServer((req, res) => {
     Yes '  pack order, ids, notes and the rest are kept' ((($moved.packs | ForEach-Object { $_.id }) -join ',') -eq 'old,C,D-dev' -and $moved.updateRepo -eq 'EvilPatrick06/Thornswood-Releases')
     $raw = [IO.File]::ReadAllBytes((Join-Path $feedCopy 'version.json'))
     Yes '  written with no byte order mark' (-not ($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB))
-    Yes '  and it says how to put it on the site' ($r.Out -match 'Remirror-Site-Feed\.ps1 -Dev')
+    Yes '  and, told not to send, it says so' ($r.Out -match 'Not pushed, as asked')
 
     # ----------------------------------------------- the remirror, whole --
     Write-Host ''
     Write-Host 'Remirror-Site-Feed.ps1'
     $r = Run-Child $mirror @('-Dev', '-FeedDir', $feedCopy, '-SiteDir', $siteDir)
     Yes ("a remirror into the scratch site finishes (exit {0})" -f $r.Code) ($r.Code -eq 0)
-    Yes '  it counts the one still on GitHub' ($r.Out -match '3 asset\(s\) named on the site, 1 still named on GitHub')
+    Yes '  it counts the one still named off the site' ($r.Out -match '3 asset\(s\) named on the site, 1 still named somewhere else')
     $servedFeed = [Text.Encoding]::UTF8.GetString((Get-Bytes "$site/feed-dev/version.json"))
     Yes '  and the site now serves the moved feed' ($servedFeed -eq [IO.File]::ReadAllText((Join-Path $feedCopy 'version.json')))
     Yes '  the live feed folder was not touched' ((ShaFile $mainJson) -eq $mainWas)
@@ -367,16 +367,14 @@ http.createServer((req, res) => {
     $mvBlock = Block 'move feed urls'
     Yes 'the site upload block is between its markers' ($up -ne '')
     Yes 'the move-the-urls block is between its markers' ($mvBlock -ne '')
-    Yes 'site is where downloads go unless told otherwise' ($src -match "\[ValidateSet\('site', 'github'\)\]\[string\]\`$AssetHost = 'site'")
+    Yes 'the site is the only place downloads go: no -AssetHost, no GitHub release (#907)' (-not $src.Contains('$AssetHost') -and -not $src.Contains('gh release'))
     $iUp = $src.IndexOf('# ==== thornswood site upload ====')
-    $iGh = $src.IndexOf('& gh release create')
     $iMove = $src.IndexOf('# ==== thornswood move feed urls ====')
-    $iPull = $src.IndexOf('git -C $ReleaseDir pull --rebase --quiet')
+    $iPull = $src.IndexOf('# ==== thornswood feed recheck ====')
     $iAppend = $src.IndexOf('# ==== thornswood feed append ====')
     $iSecrets = $src.IndexOf("Check-Secrets.ps1')")
     Yes 'the secret scan runs before anything goes to the site' ($iSecrets -ge 0 -and $iUp -gt $iSecrets)
-    Yes 'the site upload is the path taken before the GitHub one' ($iUp -ge 0 -and $iGh -gt $iUp)
-    Yes 'the urls move after the feed is pulled and before packs are added' ($iPull -ge 0 -and $iMove -gt $iPull -and $iAppend -gt $iMove)
+    Yes 'the urls move after the feed is checked again on the VPS and before packs are added' ($iPull -ge 0 -and $iMove -gt $iPull -and $iAppend -gt $iMove)
 
     # The upload block with what Publish-Update has by then.
     function Run-Upload($chunksIn, [bool]$launcherIn, [string]$exeIn, $clientIn, [string]$siteDirIn) {
@@ -410,7 +408,7 @@ http.createServer((req, res) => {
     function Run-Move($docIn, [bool]$devIn, [bool]$noUploadIn) {
         $script:said = @()
         function Say($m, $c = 'Gray') { $script:said += [string]$m }
-        $AssetHost = 'site'; $NoUpload = $noUploadIn; $Dev = $devIn; $SiteUrl = $site; $doc = $docIn
+        $NoUpload = $noUploadIn; $Dev = $devIn; $SiteUrl = $site; $doc = $docIn
         Invoke-Expression $mvBlock
         return $doc
     }
@@ -421,7 +419,7 @@ http.createServer((req, res) => {
     $after = Run-Move $pulled $false $false
     Yes 'a publish moves the urls the site holds' ($after.launcherUrl -eq "https://thornswood.net/feed/assets/$shaExe" -and $after.packs[0].url -eq "https://thornswood.net/feed/assets/$shaB")
     Yes '  leaves the one it does not' ($after.packs[1].url -eq "$gh/pack-Z.zip")
-    Yes '  and says what is left and what puts it up' ((($script:said -join "`n") -match 'still download from GitHub') -and (($script:said -join "`n") -match 'Copy-ReleaseAssets-ToSite'))
+    Yes '  and says what is left and what puts it up' ((($script:said -join "`n") -match 'still point off the site') -and (($script:said -join "`n") -match 'Remirror-Site-Feed\.ps1 -Send'))
     $untouched = [pscustomobject]@{ packs = @([pscustomobject]@{ id = 'B'; url = "$gh/pack-B.zip"; sha256 = $shaB }) }
     $after = Run-Move $untouched $false $true
     Yes '  a dry run (-NoUpload) moves nothing' ($after.packs[0].url -eq "$gh/pack-B.zip")

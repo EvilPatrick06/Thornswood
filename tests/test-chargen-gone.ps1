@@ -467,8 +467,9 @@ if (Test-Path -LiteralPath $steamFile) {
 } else {
     Write-Host ("SKIP  no {0} in the Steam copy at {1}" -f $name, $Steam)
 }
-$releasesMain = Join-Path (Split-Path -Parent $repoRoot) 'Thornswood-Releases'
-$releasesDev  = Join-Path (Split-Path -Parent $repoRoot) 'Thornswood-Releases-dev'
+# This machine's working copies of the baselines (Feed-Store.ps1, #907).
+$releasesMain = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main' } else { '' }
+$releasesDev  = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev' } else { '' }
 $legacyDir = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Thornswood' } else { '' }
 foreach ($ch in @(
     @{ Label = 'main'; Base = 'published.json'; Rel = $releasesMain; Legacy = 'published.json';     Root = $Root },

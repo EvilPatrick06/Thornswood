@@ -1,8 +1,9 @@
 <#
   test-pack-feed.ps1
 
-  Publish-Pack.ps1 pulls the releases clone before it edits version.json, and
-  never writes a pack into the feed that a launcher cannot download.
+  Publish-Pack.ps1 receives the live feed from the VPS before it edits
+  version.json (it pulled the releases clone until #907), and never writes a
+  pack into the feed that a launcher cannot download.
 
   WHY THIS EXISTS. Publish-Pack uploads the optional packs as release assets
   first and edits version.json afterwards, then commits and pushes it. It read
@@ -18,11 +19,11 @@
   launcher. Publish-Update refuses a required pack like that. Until this,
   -Repo pointed at another repository wrote optional ones in without a word.
 
-  It never reaches GitHub. The block between the pack feed markers is lifted
-  out of the script by the parser and run against real git repositories under
-  this harness's own temp folder: a bare one standing in for GitHub, a clone
-  standing in for the releases clone on the machine publishing, and a second
-  clone standing in for somebody else's machine.
+  It never reaches GitHub or the VPS. The block between the pack feed markers
+  is lifted out of the script by the parser and run against a folder under
+  this harness's own temp folder standing in for the VPS store
+  (THORNSWOOD_TEST_SITE_DIR, Feed-Store.ps1), which another machine's release
+  is written into between runs.
 
   Read only apart from files under its own temp folder.
 #>
@@ -87,11 +88,11 @@ foreach ($mark in 'WriteAllText($vf', "Head 'Pushing'", 'git commit') {
     $at = $src.IndexOf($mark)
     Yes ("the block comes before the first " + $mark) ($at -lt 0 -or $a -lt $at)
 }
-# And the pull has to come before the read, not after it.
-$pullAt = $block.IndexOf('pull --rebase')
+# And the receive has to come before the read, not after it (#907).
+$pullAt = $block.IndexOf('Receive-FeedStore')
 $readAt = $block.IndexOf('ReadAllText($vf)')
-Yes 'the block pulls the clone' ($pullAt -ge 0)
-Yes 'and reads version.json only after the pull' ($readAt -gt $pullAt)
+Yes 'the block receives the feed from the VPS' ($pullAt -ge 0)
+Yes 'and reads version.json only after the receive' ($readAt -gt $pullAt)
 
 . $RulesPath
 
@@ -100,10 +101,15 @@ $priv = 'EvilPatrick06/Thornswood'
 function Asset([string]$repo, [string]$id) { return "https://github.com/$repo/releases/download/packs-20260927-0100/$id.zip" }
 function Pack([string]$id, [string]$url) { return [pscustomobject]@{ Id = $id; Url = $url } }
 
-# Runs the lifted block the way the script does: $ReleaseDir is a scratch
-# clone, $built is what the upload came back with, and Die is the script's
-# stop, so here it throws and the message comes back.
-function Run-Block([string]$releaseDir, $built) {
+# The store it receives from (Feed-Store.ps1, #907), with the VPS stood in for
+# by a folder through the test variable, so nothing connects anywhere.
+. (Join-Path (Split-Path -Parent $PackPath) 'Feed-Store.ps1')
+
+# Runs the lifted block the way the script does: $ReleaseDir is the working
+# folder, $receive says whether it was left to default (and so is received
+# from the VPS first), $built is what the upload came back with, and Die is
+# the script's stop, so here it throws and the message comes back.
+function Run-Block([string]$releaseDir, $built, [bool]$receive = $true) {
     $ReleaseDir = $releaseDir
     $vf = ''
     $doc = $null
@@ -115,111 +121,73 @@ function Run-Block([string]$releaseDir, $built) {
     catch { $died = [string]$_.Exception.Message }
     return [pscustomobject]@{ Doc = $doc; FeedRepo = $feedRepo; Died = $died }
 }
-
-# Called RunGit rather than Git: PowerShell resolves a function before a
-# command and does not care about case, so a function called Git calling git
-# calls itself until the stack runs out.
-$GitExe = ''
-$found = Get-Command git -ErrorAction SilentlyContinue
-if ($found) { $GitExe = $found.Source }
-function RunGit() {
-    $old = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try { $out = (@(& $GitExe @args 2>&1) | ForEach-Object { [string]$_ }) -join "`n" } finally { $ErrorActionPreference = $old }
-    if ($LASTEXITCODE -ne 0) { throw ("git " + ($args -join ' ') + " failed: " + $out) }
-    return $out
-}
 function Feed([string]$dir, $doc) {
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $dir 'version.json'), ($doc | ConvertTo-Json -Depth 8), (New-Object Text.UTF8Encoding($false)))
 }
 
-if (-not $GitExe) {
-    Write-Host 'SKIP  no git on PATH, so the pull was not measured'
-    Done
-}
-
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-pack-feed-' + [Guid]::NewGuid().ToString('N'))
+$oldSite = $env:THORNSWOOD_TEST_SITE_DIR
 try {
     New-Item -ItemType Directory -Path $work -Force | Out-Null
-    $bare = Join-Path $work 'remote.git'
-    $mine = Join-Path $work 'Thornswood-Releases'
-    $theirs = Join-Path $work 'Thornswood-Releases-other'
+    $siteRoot = Join-Path $work 'site-store'
+    $env:THORNSWOOD_TEST_SITE_DIR = $siteRoot
+    $up = Join-Path $siteRoot 'feed'
+    $mine = Join-Path $work 'store\main'
+    Feed $up ([pscustomobject]@{ launcherVersion = '1.1.101'; optional = @() })
+    [IO.File]::WriteAllText((Join-Path $up 'published.json'), '{}')
+    $siteAsset = 'https://thornswood.net/feed/assets/' + ('c' * 64)
 
-    RunGit init --bare -b main $bare | Out-Null
-    RunGit init -b main $mine | Out-Null
-    RunGit -C $mine config user.email 'harness@example.com' | Out-Null
-    RunGit -C $mine config user.name 'Harness' | Out-Null
-    Feed $mine ([pscustomobject]@{ launcherVersion = '1.1.101'; updateRepo = $pub; optional = @() })
-    RunGit -C $mine add version.json | Out-Null
-    RunGit -C $mine commit -m 'first feed' | Out-Null
-    RunGit -C $mine remote add origin $bare | Out-Null
-    RunGit -C $mine push -u origin main | Out-Null
-    RunGit clone $bare $theirs | Out-Null
-    RunGit -C $theirs config user.email 'other@example.com' | Out-Null
-    RunGit -C $theirs config user.name 'Other' | Out-Null
+    # ---- the ordinary run: the feed is received, reads, nothing stops
+    $r = Run-Block $mine @((Pack 'hd-textures' $siteAsset))
+    Yes 'a pack on the site does not stop the publish' ($r.Died -eq '')
+    Yes 'and the feed it read is the one on the VPS, received into the working folder' ($null -ne $r.Doc -and $r.Doc.launcherVersion -eq '1.1.101' -and
+        (Test-Path -LiteralPath (Join-Path $mine 'read.json')))
 
-    # ---- the ordinary run: nothing to pull, the feed reads, nothing stops
-    $r = Run-Block $mine @((Pack 'hd-textures' (Asset $pub 'hd-textures')))
-    Yes 'a pack in the feed repository does not stop the publish' ($r.Died -eq '')
-    Yes 'and the feed it read is the one in the clone' ($null -ne $r.Doc -and $r.Doc.launcherVersion -eq '1.1.101')
-    Yes 'and the repository it holds packs to is the one the feed names' ($r.FeedRepo -eq $pub)
+    # ---- somebody else published while this machine was building
+    Feed $up ([pscustomobject]@{ launcherVersion = '1.1.102'; optional = @() })
+    $r = Run-Block $mine @((Pack 'hd-textures' $siteAsset))
+    Yes 'the run receives it again, so the edit lands on their release and not over it' ($r.Died -eq '' -and $r.Doc.launcherVersion -eq '1.1.102')
 
-    # ---- somebody else published while this machine was uploading
-    $was = [IO.File]::ReadAllText((Join-Path $mine 'version.json'))
-    Feed $theirs ([pscustomobject]@{ launcherVersion = '1.1.102'; updateRepo = $pub; optional = @() })
-    RunGit -C $theirs add version.json | Out-Null
-    RunGit -C $theirs commit -m 'their release' | Out-Null
-    RunGit -C $theirs push origin main | Out-Null
-    Yes 'the clone on this machine is behind before the run' (
-        [IO.File]::ReadAllText((Join-Path $mine 'version.json')) -eq $was)
-    $r = Run-Block $mine @((Pack 'hd-textures' (Asset $pub 'hd-textures')))
-    Yes 'the run pulls it, so the edit lands on their release and not over it' ($r.Died -eq '' -and $r.Doc.launcherVersion -eq '1.1.102')
-
-    # ---- a pull that cannot work stops before the file is read
-    $good = RunGit -C $mine remote get-url origin
-    RunGit -C $mine remote set-url origin (Join-Path $work 'not-a-repo.git') | Out-Null
+    # ---- a VPS that does not answer stops before the file is read
+    $env:THORNSWOOD_TEST_SITE_DIR = ''
+    function Receive-FeedStore { throw 'the VPS did not answer' }
     $before = [IO.File]::ReadAllText((Join-Path $mine 'version.json'))
-    $r = Run-Block $mine @((Pack 'hd-textures' (Asset $pub 'hd-textures')))
-    Yes 'a pull that fails stops the publish' ($r.Died -like 'DIE: *')
-    Yes 'and says which clone and that version.json was not touched' (
-        $r.Died.Contains($mine) -and $r.Died -match '(?i)has not been touched')
+    $r = Run-Block $mine @((Pack 'hd-textures' $siteAsset))
+    Yes 'a receive that fails stops the publish' ($r.Died -like 'DIE: *')
+    Yes 'and says that version.json was not touched' ($r.Died -match '(?i)has not been touched')
     Yes 'and the file really was not touched' ([IO.File]::ReadAllText((Join-Path $mine 'version.json')) -eq $before)
     Yes 'and it never got as far as reading the feed' ($null -eq $r.Doc)
-    RunGit -C $mine remote set-url origin $good | Out-Null
+    Remove-Item Function:\Receive-FeedStore
+    . (Join-Path (Split-Path -Parent $PackPath) 'Feed-Store.ps1')
+    $env:THORNSWOOD_TEST_SITE_DIR = $siteRoot
 
-    # ---- a pack outside the feed repository is refused
-    $r = Run-Block $mine @((Pack 'hd-textures' (Asset $pub 'hd-textures')), (Pack 'weather' (Asset $priv 'weather')))
-    Yes 'a pack held in another repository stops the publish' ($r.Died -like 'DIE: *')
-    Yes 'and names the repository launchers read the feed from' ($r.Died.Contains($pub))
+    # ---- a pack on GitHub is refused, now the feed names no repository
+    $r = Run-Block $mine @((Pack 'hd-textures' $siteAsset), (Pack 'weather' (Asset $pub 'weather')))
+    Yes 'a pack held on GitHub stops the publish (#907)' ($r.Died -like 'DIE: *')
+    Yes 'and says a launcher cannot download it' ($r.Died -match 'cannot download')
     Yes 'and says version.json was not touched' ($r.Died -match '(?i)has not been touched')
 
     # ---- an empty url is refused the same way, which is what took Play out
     $r = Run-Block $mine @((Pack 'hd-textures' ''))
     Yes 'a pack whose upload came back with no url stops the publish' ($r.Died -like 'DIE: *')
 
-    # ---- a thornswood.net feed asset is allowed, by the same rule (#649)
-    $sha = 'a' * 64
-    $r = Run-Block $mine @((Pack 'hd-textures' ("https://thornswood.net/feed/assets/$sha")))
-    Yes 'a thornswood.net feed asset is allowed' ($r.Died -eq '')
-
-    # ---- a folder that is not a clone still reads, and is not pulled
+    # ---- a folder passed with -ReleaseDir is read as it is, not received
     $loose = Join-Path $work 'loose'
-    New-Item -ItemType Directory -Path $loose -Force | Out-Null
-    Feed $loose ([pscustomobject]@{ launcherVersion = '1.1.103'; updateRepo = $pub; optional = @() })
-    $r = Run-Block $loose @((Pack 'hd-textures' (Asset $pub 'hd-textures')))
-    Yes 'a -ReleaseDir that is not a git clone is read without a pull' ($r.Died -eq '' -and $r.Doc.launcherVersion -eq '1.1.103')
+    Feed $loose ([pscustomobject]@{ launcherVersion = '1.1.103'; optional = @() })
+    $r = Run-Block $loose @((Pack 'hd-textures' $siteAsset)) $false
+    Yes 'a -ReleaseDir is read as it stands, without receiving' ($r.Died -eq '' -and $r.Doc.launcherVersion -eq '1.1.103' -and
+        -not (Test-Path -LiteralPath (Join-Path $loose 'read.json')))
 
     # ---- no version.json at all stops, and says where it looked
     $empty = Join-Path $work 'empty'
     New-Item -ItemType Directory -Path $empty -Force | Out-Null
-    $r = Run-Block $empty @((Pack 'hd-textures' (Asset $pub 'hd-textures')))
+    $r = Run-Block $empty @((Pack 'hd-textures' $siteAsset)) $false
     Yes 'no version.json where it looked stops the publish' ($r.Died -like 'DIE: *' -and $r.Died.Contains($empty))
 
     # ---- #897: the packs go to the site, not to a GitHub release -------------
-    $hostParam = @($ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'AssetHost' })
-    Yes 'Publish-Pack.ps1 takes -AssetHost' ($hostParam.Count -eq 1)
-    Yes 'and its default is site, the same as Publish-Update.ps1' (
-        $hostParam.Count -eq 1 -and $hostParam[0].DefaultValue -and $hostParam[0].DefaultValue.SafeGetValue() -eq 'site')
+    $gone = @($ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -in 'AssetHost', 'Repo' })
+    Yes 'Publish-Pack.ps1 takes no -AssetHost and no -Repo: packs go to the site and nowhere else (#907)' ($gone.Count -eq 0)
     $sOpen = '# ==== thornswood pack site upload ===='
     $sShut = '# ==== end thornswood pack site upload ===='
     $sa = $src.IndexOf($sOpen)
@@ -228,12 +196,11 @@ try {
     if ($sa -ge 0 -and $sb -gt $sa) {
         $siteBlock = $src.Substring($sa, $sb - $sa)
         Yes 'the site upload comes before the feed is read or written' ($sb -lt $a)
-        Yes 'and before GitHub is ever asked for a token, which only the github way does' (
-            $sb -lt $src.IndexOf('gh auth token'))
+        Yes 'and GitHub is never asked for a token (#907)' ($src -notmatch 'gh auth token' -and $src -notmatch 'GITHUB_TOKEN')
         Yes 'the site upload never talks to GitHub' ($siteBlock -notmatch 'api\.github\.com|Invoke-RestMethod')
         $fOpen = $src.IndexOf('# ==== thornswood pack site feed ====')
-        Yes 'the feed goes to the site after it is pushed, so launchers hear of the packs' (
-            $fOpen -gt $src.IndexOf('& git push') -and $src.Substring($fOpen) -match 'Remirror-Site-Feed\.ps1')
+        Yes 'the feed goes to the site after it is written, so launchers hear of the packs' (
+            $fOpen -gt $src.IndexOf('WriteAllText($vf') -and $src.Substring($fOpen) -match 'Remirror-Site-Feed\.ps1')
 
         # Runs the lifted block with Remirror-Site-Feed.ps1 -Send into a scratch
         # site folder, the same way test-site-assets.ps1 drives Publish-Update.
@@ -279,6 +246,7 @@ try {
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+    $env:THORNSWOOD_TEST_SITE_DIR = $oldSite
 }
 
 Done

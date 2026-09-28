@@ -1,11 +1,12 @@
 # The update feed
 
 Every Thornswood launcher decides what to download from one file:
-`version.json`. After the #649 host cutover that file is served from
-**thornswood.net** (`/feed/version.json` live, `/feed-dev/version.json` for
-dev), with `EvilPatrick06/Thornswood-Releases` kept as the GitHub Contents API
-fallback and rollback. This page is every field in it, who writes each one,
-who reads it, and what goes wrong when it is wrong.
+`version.json`. It is served from **thornswood.net** (`/feed/version.json`
+live, `/feed-dev/version.json` for dev), and since #907 from nowhere else:
+the GitHub repository `EvilPatrick06/Thornswood-Releases`, once the feed, its
+fallback and the home of the release baseline, is retired. This page is every
+field in it, who writes each one, who reads it, and what goes wrong when it is
+wrong.
 
 ## Where it is and how a launcher reads it
 
@@ -21,11 +22,10 @@ what it does not is under "Checks on every download".
 | Live assets | `https://thornswood.net/feed/assets/<sha256>` |
 | Dev assets | `https://thornswood.net/feed-dev/assets/<sha256>` |
 
-- **Primary request.** The launcher prefers `config.json` `UpdateFeedUrl` (a
-  direct https GET of `version.json`). Defaults in `Config.AfterLoad`: main ->
-  live URL above; `Channel` or `UpdateBranch` `dev` -> dev URL
-  (`Config.cs`, `Updater.Check`). Host allowlist already includes
-  `thornswood.net`.
+- **The request.** The launcher reads `config.json` `UpdateFeedUrl` (a direct
+  https GET of `version.json`). Defaults in `Config.AfterLoad`: main -> live
+  URL above; `Channel` or `UpdateBranch` `dev` -> dev URL (`Config.cs`,
+  `Updater.Check`). Host allowlist includes `thornswood.net`.
 - **Conditional, since #445.** `Updater.FromSite` keeps the last document it
   read with the `ETag` the site sent, sends `If-None-Match` on the next check,
   and reads a 304 as that same document. The site answers the tag it issued
@@ -37,11 +37,19 @@ what it does not is under "Checks on every download".
   would ask, be told nothing had changed, and have nothing to read.
   `Cache-Control` stays `no-cache`, which means ask every time, so a release is
   still seen inside the server's five minute window.
-- **Fallback / rollback.** If the site feed fails (or `UpdateFeedUrl` is
-  empty), `Updater.Check` falls back to the GitHub Contents API on
-  `UpdateRepo`/`UpdateBranch` (`EvilPatrick06/Thornswood-Releases`). Do **not**
-  delete that repository yet: see "Downloads come from the site" below for
-  when it can go. Since #897 nothing new is uploaded there.
+- **No fallback since #907.** Until then a site feed that did not answer sent
+  the check, at most once every five minutes, to the GitHub Contents API on
+  `UpdateRepo` (Thornswood-Releases). That is gone from the launcher: a miss is
+  what the caller gets, which reads as no answer rather than as no update, so
+  the in play countdown clock is left where it is and the next check, thirty
+  seconds on, asks the site again. `UpdateRepo` and `UpdateToken` stay in
+  `config.json` only so an old one still loads.
+- **Launchers in the field.** Every launcher from the #649 cutover on (26 Sep)
+  reads the site first, so deleting the repository changes nothing for it: its
+  old fallback asks a repository that answers 404 while the site is down, and
+  the site answering is all it needs. A launcher last run before 26 Sep reads
+  only GitHub, so once the repository is deleted it finds no feed and has to be
+  reinstalled from the site; `site\data\known.md` says so to the person.
 
 ### Downloads come from the site (#897)
 
@@ -64,102 +72,107 @@ use the website".
   both. Ten files no feed names any more (old launchers and client runtimes,
   35 MB) and two old `version.json` copies in `feed-dev` are left for a person
   to clear.
-- **How a release gets there.** `Publish-Update.ps1` (default `-AssetHost site`)
-  sends every pack, the launcher and the client runtime with
-  `Remirror-Site-Feed.ps1 -Send` (scp to `<sha256>.part`, then renamed) BEFORE
-  `version.json` is written, and names them by their site url. An asset that
-  does not land stops the publish with the feed untouched. `-AssetHost github`
-  is the old GitHub release per pack, kept for rolling back to it.
+- **How a release gets there.** `Publish-Update.ps1` sends every pack, the
+  launcher and the client runtime with `Remirror-Site-Feed.ps1 -Send` (scp to
+  `<sha256>.part`, then renamed) BEFORE `version.json` is written, and names
+  them by their site url. An asset that does not land stops the publish with
+  the feed untouched. The `-AssetHost github` path it kept for rolling back
+  went with the repository (#907).
 - **The urls already on a feed** move over with `Move-FeedUrlsToSite`
   (`Feed-Rules.ps1`): each GitHub url whose bytes the site answers for (a HEAD
   on the asset url, and its size when the feed gives one) is rewritten, and any
   other stays. Every Ship does it for its own channel;
-  `Repair-Manifest.ps1 -MoveToSite` does it without a release, then
-  `Remirror-Site-Feed.ps1` puts that feed on the site.
-- **The old bytes** go up once with `scripts\oneoff\Copy-ReleaseAssets-ToSite.ps1`,
-  which reads both live feeds, downloads each missing asset (from the other
-  channel's folder on the site when it is there), checks it against the feed's
-  sha256 and sends it. It never writes a feed.
+  `Repair-Manifest.ps1 -MoveToSite` does it without a release and sends the
+  feed.
+- **The old bytes** went up once with `scripts\oneoff\Copy-ReleaseAssets-ToSite.ps1`,
+  which read both live feeds, downloaded each missing asset, checked it against
+  the feed's sha256 and sent it. It never wrote a feed. It reads GitHub, so it
+  does nothing once the repository is gone.
 - **Launchers in the field** need nothing new: `thornswood.net` has been on the
   host allow list since before 25 Sep, and a download is checked for https, the
   host and the sha256, plus the signer for a launcher exe (see "Checks on every
   download").
-- **The urls on the feeds today.** Both live feeds still name GitHub for every
-  download (main 77, dev 94), though the site holds every one of them. The dev
-  ones move at the next dev Ship. Main's move at the next main Ship, or now
-  with `Repair-Manifest.ps1 -MoveToSite` then `Remirror-Site-Feed.ps1`, which
-  is Patrick's call; its `-DryRun` on 28 Sep said all 77 would move.
-- **Still on GitHub for now:** `version.json` history and the baseline
-  (`published.json`) live in the Releases clones, which are pushed to
-  `Thornswood-Releases` as before, and `updateRepo` keeps naming it. That is
-  harmless: the launcher only asks it when the site feed does not answer, at
-  most once every five minutes. Moving those two files off GitHub is its own
-  issue.
-- **When the repository can go**, a person's step. First: both live feeds name
-  no `github.com` or `api.github.com` url (a GET of each has no `github` in any
-  url), and the feed and baseline have moved off it. Then ARCHIVE it rather
-  than delete it: an archived repository still answers the Contents API and
-  its release downloads, which is what a launcher last run before the #649
-  cutover (26 Sep) still asks, once, before it saves `updateFeedUrl` and moves
-  to the site. Nothing on our side can see those launchers, so the sign is
-  GitHub's own count: the total `download_count` over the releases
-  (`gh api repos/EvilPatrick06/Thornswood-Releases/releases --paginate --jq
-  '[.[].assets[].download_count] | add'`) stops rising for a few weeks. Only
-  then delete it; a launcher that has not run since before 26 Sep is then
-  reinstalled from the site.
-- **The fallback waits, since #445.** That fallback is the request with a quota
-  on it, so it is taken at most once every five minutes (`Updater.GithubRest`).
-  Before that, a site feed that missed sent every thirty second check to
-  GitHub: 120 Contents API calls an hour against an allowance of 60 per
-  address, so one site hiccup spent the hour in half of it. The site is still
-  asked every thirty seconds. While the fallback is resting, the site's failure
-  is what the caller gets, which reads as no answer rather than as no update,
-  so the in-play countdown clock is left where it is.
-- **Announce a move.** The feed field `updateFeedUrl` works like `updateRepo`:
-  publish the new URL under the old feed first, then move. Shell saves it
-  quietly into `config.json`.
-- **One file per channel on GitHub (fallback).** The `main` branch of
-  Thornswood-Releases is the live fallback feed; `dev` is the dev fallback. A
-  launcher reads `UpdateBranch`, `main` when empty; the dev build is installed
-  with `UpdateBranch` and `Channel` set to `dev` (`DevBuild.cs`).
-- **GitHub request (fallback).** `GET https://api.github.com/repos/<UpdateRepo>/contents/version.json?ref=<branch>`
-  with `Accept: application/vnd.github.raw`, no token unless the config holds
-  one. With no token, GitHub allows sixty of these an hour per address; a 403
-  or 429 is reported as a rate limit, not a fault. While the game is running
-  the launcher checks every 30 seconds (`Shell.cs`). An `ETag` buys nothing
-  here: GitHub only makes a 304 free to a request carrying an `Authorization`
-  header, and these carry none, which is the other reason the feed moved.
+
+### The feed store on the VPS (#907)
+
+Patrick, 28 Sep: "I just want the repo deleted in general if we won't be using
+it anymore". Until then every script that edits a feed pulled, committed and
+pushed a clone of Thornswood-Releases beside the repository, and the baseline
+Ship diffs against (`published.json`) was committed there too. Both live on
+the VPS now, beside the feed the site already serves:
+
+| On the VPS | What | Served |
+| --- | --- | --- |
+| `C:\Thornswood-Docs\feed\version.json` | the live feed | yes, `/feed/version.json` |
+| `C:\Thornswood-Docs\feed\published.json` | the live baseline | no |
+| `C:\Thornswood-Docs\feed\launchers.txt` | every launcher version the channel has published, oldest first | no |
+| `C:\Thornswood-Docs\feed\history\<utc stamp>-<name>` | each of those files as it was before it was replaced | no |
+| `C:\Thornswood-Docs\feed\assets\<sha256>` | the downloads | yes |
+
+and the same under `feed-dev` for dev. `site\server.js` answers only
+`/feed[-dev]/version.json` and `/feed[-dev]/assets/<64 hex>`, so nothing else
+in those folders can be fetched: `tests\test-feed-store.ps1` asks a copy of
+the site for `published.json`, `launchers.txt`, `history\`, a `.part` and
+`read.json` under both and gets 404 for each. Deploy-Docs denies the site
+process write to both folders (#923), so only a publisher over ssh writes them.
+
+- **The one piece of code.** `scripts\release\Feed-Store.ps1`. `Receive-FeedStore`
+  fetches the files into this machine's working folder for the channel,
+  `%LOCALAPPDATA%\Thornswood\feed\main` or `\dev` (not a git repository), checks
+  each against the sha256 the VPS gave for it, writes `read.json` with those
+  sha256s, and keeps the last twenty of each in `backup\`. `Send-FeedStore`
+  sends a file back to `<name>.part` and, in one step on the VPS, checks that
+  every file this folder read still has the sha256 it had, copies the one it
+  replaces into `history\`, and renames the `.part` over it (`File.Replace`, so
+  the site never answers 404 in between). If anything moved up there it
+  replaces nothing and throws: that is two publishers at once, the push git
+  used to refuse.
+- **Who uses it.** Ship and Publish-Update receive both files at the start
+  (a run that sends nothing, Ship `-DryRun`, uses what it last received),
+  ask again before editing the feed (a feed edited meanwhile is received again
+  and the release goes on top; a baseline moved meanwhile stops the release
+  with nothing written), send `version.json`, then the baseline. Repair-Manifest,
+  Set-Server, Set-Collection, Publish-Server's news entry and Publish-Pack
+  receive, edit and send the feed the same way. Remirror-Site-Feed sends
+  `version.json` through it too. A main Ship's reset of dev receives the dev
+  store, writes main's feed and baseline into it and sends both, so the site's
+  dev feed is reset at once rather than at the next remirror.
+- **The dev number.** Ship climbs a dev build's fourth part past every
+  version in `feed-dev\launchers.txt`, which every send of the dev feed adds
+  to, and past main's feed as the site serves it. Until #907 it read the same
+  out of the dev branch's git history.
+- **The move.** `scripts\oneoff\Move-FeedStore-ToVps.ps1` copied the last
+  baseline each clone held, and every launcher version its history named, to
+  the VPS, read both back byte for byte, and saved the whole repository as a
+  git bundle under `%LOCALAPPDATA%\Thornswood\feed`. #907 has the steps.
+- **When a baseline is lost.** Put the last good one back from `history\` on
+  the VPS or from any shipping machine's `feed\<channel>\backup\`, or run
+  `Publish-Update.ps1 -Baseline` after the launcher has brought the game up to
+  date.
+- **Announce a move.** The feed field `updateFeedUrl`: publish the new URL
+  under the old feed first, then move. Shell saves it quietly into
+  `config.json`.
 - **What the log says.** One line per feed address, written once and again if
-  it changes: `Update checks read <url>.` (`Shell.OnVersionDoc`). A line naming
-  `thornswood.net` is the proof the checks are off the quota; one naming
-  `api.github.com` says the site feed is missing and the fallback is carrying
-  it. A check that could not be made at all while the game runs writes one line
-  a session with what came back (`Shell.CheckUpdatesInPlay`); until #445 that
-  catch was empty, so a launcher that had spent the hour's sixty requests left
-  no trace anywhere.
+  it changes: `Update checks read <url>.` (`Shell.OnVersionDoc`). A check that
+  could not be made at all while the game runs writes one line a session with
+  what came back (`Shell.CheckUpdatesInPlay`).
 - **Parsing.** `VersionDoc.Parse` with the .NET `DataContractJsonSerializer`.
   A byte order mark is skipped. A value of the wrong JSON type can make the
   serializer throw, and then the whole document is unread and every launcher
   reports no answer from the update source and shuts Play. Unknown fields are
   ignored.
-- **On disk.** Publishers keep a clone beside the source repo:
-  `Thornswood-Releases` on `main`, and the worktree `Thornswood-Releases-dev` on
-  `dev` (`Publish-Update.ps1`). The same `version.json`, and the assets it names
-  by sha256, are mirrored onto the site paths above by
-  `scripts\deploy\Remirror-Site-Feed.ps1`, which
+- **The remirror.** `scripts\deploy\Remirror-Site-Feed.ps1`, which
   `scripts\release\Publish-PostShip.ps1` runs at the end of every release for
-  the channel that shipped. `-SkipRemirror` leaves it out, and then the site
-  goes on serving the feed it last had, which is the release launchers are
-  offered until somebody runs it: the GitHub fallback only answers when the site
-  feed does not answer at all. Assets go up first and `version.json` last, so
-  the feed never names bytes the site does not hold; an asset the feed sends
-  launchers to thornswood.net for that is neither on the site nor on the
-  publishing machine stops the mirror before `version.json` moves. `-Check` says
-  what it would send and sends nothing.
+  the channel that shipped, checks every asset the feed names is on the site,
+  sends any that are missing, and sends `version.json` last, through the store,
+  so the feed never names bytes the site does not hold. After a Ship it finds
+  `version.json` already there. `-Check` says what it would send and sends
+  nothing. Handed an old clone with `-FeedDir`, it replaces whatever the site
+  has, as it always did, and says so.
 
 ## A real entry, trimmed
 
-From the live feed on `EvilPatrick06/Thornswood-Releases` (main, commit a22e4ef).
+From the live feed as it stood on 26 Sep, then in `EvilPatrick06/Thornswood-Releases` (main, commit a22e4ef).
 `packs` holds 69 entries and `news` 40; one of each is shown, trimmed. Nothing
 here is a secret: the hashes are public and `discordAppId` is a public
 application id (`Config.cs:160-164`).
@@ -209,11 +222,10 @@ application id (`Config.cs:160-164`).
 ```
 
 Those `api.github.com/.../releases/assets/<id>` addresses are what the
-publisher wrote before #445. They still work and are left alone; the site feed
-at `https://thornswood.net/feed/version.json` serves the same packs as
-`/feed/assets/<sha256>`. A release published since #445 wrote the browser
-download address on the GitHub side, and one published since #897 writes the
-site address.
+publisher wrote before #445, and a release published since #445 wrote the
+browser download address on the GitHub side. Both stop working when
+Thornswood-Releases is deleted, which is why every one is moved to the site
+first (#897, #907). A release published since #897 writes the site address.
 
 The dev feed (branch `dev`, commit 12f71c8) has the same shape with
 `serverPort` `"7787"`, `voicePort` `"7789"`, `voiceUrl`
@@ -233,19 +245,19 @@ launcher.
 | Field | Type | Written by | Read by | If wrong or missing |
 | --- | --- | --- | --- | --- |
 | `launcherVersion` | string, dotted numbers | `Publish-Update.ps1:1251`, from `Version` in `launcher/app/Updater.cs:13` or Ship's dev number | `Shell.cs:4610`, `Updater.IsNewer` (`Updater.cs:87-108`) | Offered only when higher, part by part. Equal or lower offers nothing. A number that does not parse is offered whenever it differs. Not saved. |
-| `launcherUrl` | string, https | `Publish-Update.ps1`: since #897 the site address `/feed[-dev]/assets/<sha256>`; with `-AssetHost github`, the asset's browser download address (#445) | `Updater.SelfUpdate` (`Updater.cs:945-948`) | Empty: no launcher update is offered (`Shell.cs:4610-4611`). Must pass the host list below. |
+| `launcherUrl` | string, https | `Publish-Update.ps1`: since #897 the site address `/feed[-dev]/assets/<sha256>` | `Updater.SelfUpdate` (`Updater.cs:945-948`) | Empty: no launcher update is offered (`Shell.cs:4610-4611`). Must pass the host list below. |
 | `launcherSha256` | string, 64 hex | `Publish-Update.ps1:1253` | `Updater.Download` (`Updater.cs:436-448`) | Empty: download refused. Mismatch: file deleted, update fails. |
 | `serverAddress` | string | `Publish-Update.ps1:1316-1321` from config `ServerAddress`; `Set-Server.ps1:97`; `Set-Vps.ps1` | `Shell.cs:4548` | Saved. A change stops Ship unless `-MoveServer` (`Publish-Update.ps1:1289-1303`); the dev channel skips that check. Wrong: everybody connects to the wrong box. |
 | `serverPort` | string | as above, `ServerPort` | `Shell.cs:4550` | Saved. Must be a string; the launcher field is a string. |
 | `maxOnline` | number | `Publish-Update.ps1:1348-1352` | `Shell.cs:4551` | Saved when above 0. Written as a number because a quoted `"25"` reads as 0 (`Publish-Update.ps1:1344-1347`). |
 | `collectionUrl` | string | `Set-Collection.ps1:98-101` only; Ship carries it forward untouched | `Shell.cs:4549` | Saved. Where the Collection button sends people. |
 | `collectionRevision` | number | `Publish-Update.ps1:1371-1379`, read off the shipping machine's Vortex | `Shell.cs:4564`, then `Shell.cs:4814-4860` | Not saved. 0 or missing: the launcher says nothing about the collection being behind or ahead. Wrong: tells people to reinstall a collection that is fine. |
-| `updateRepo` | string `owner/name` | `Publish-Update.ps1` from `UpdateRepo` | `Shell.cs`, `Feed-Rules.ps1` | Saved, quietly. Wrong: every launcher asks the wrong repository next time and may never find its way back. This is how a rename is announced. GitHub Contents API fallback (#649). |
-| `updateFeedUrl` | string, https | `Publish-Update.ps1` from `UpdateFeedUrl` (defaults to the site live/dev URL by channel) | `Shell.cs`, `Updater.Check` | Saved, quietly. Primary `version.json` fetch after #649. Same announce-a-move pattern as `updateRepo`. Empty/absent: keep the launcher default / fall back to GitHub. |
+| `updateRepo` | string `owner/name` | Nobody since #907: `Publish-Update.ps1` takes it out of the feed | `Feed-Rules.ps1` only (a feed that still names one keeps its GitHub pack urls legal until its next Ship) | Launchers from #907 on ignore it. Older ones save it and ask that repository, via the GitHub Contents API, when the site does not answer; once it is deleted that answers 404 and they ask the site again. |
+| `updateFeedUrl` | string, https | `Publish-Update.ps1` from `UpdateFeedUrl` (defaults to the site live/dev URL by channel) | `Shell.cs`, `Updater.Check` | Saved, quietly. The one `version.json` fetch since #907. Publish the new URL under the old feed first, then move. Empty/absent: keep the launcher default. |
 | `voicePort` | string | from `VoicePort` | `Shell.cs:4569-4572` | Saved, quietly. Used when `voiceUrl` is empty. |
 | `voiceUrl` | string or absent | `Publish-Update.ps1:1328-1342`; `-dev` appended on the dev channel | `Shell.cs:4581-4585` | Saved, quietly. The one field that can be cleared: `""` sends launchers back to the raw port, absent changes nothing (`Config.cs:511-526`). |
 | `discordAppId`, `siteUrl`, `presenceImage` | string | from config, `Publish-Update.ps1:1316-1321` | `Shell.cs:4579-4586` | Saved, quietly. The Discord presence card and its buttons. |
-| `message` | string | Nobody: set by hand in the releases repo (`FeedNotice.cs:15-20`) | `FeedNotice.From` (`FeedNotice.cs:53-82`) | A bar above Play until a feed without it arrives. Never holds Play on its own. |
+| `message` | string | Nobody: set by hand in the feed (received, edited and sent with `Feed-Store.ps1`; `FeedNotice.cs:15-20`) | `FeedNotice.From` (`FeedNotice.cs:53-82`) | A bar above Play until a feed without it arrives. Never holds Play on its own. |
 | `maintenance` | string (read as on only for `true`, `1`, `yes`, `on`) | By hand | `FeedNotice.cs:61-68,91-96` | On: Play held, button says CLOSED FOR MAINTENANCE. Absent in the current feeds. |
 | `minLauncher` | string, dotted numbers | By hand | `FeedNotice.cs:58-77` | A launcher below it holds Play. A value that is not digits and dots is ignored, so a typo cannot lock everybody out (`FeedNotice.cs:98-120`). Absent in the current feeds. |
 | `packs` | array | `Publish-Update.ps1:1210-1233` appends; `Repair-Manifest.ps1` removes | `Updater.Pending` (`Updater.cs:360-368`) | See below. |
@@ -260,7 +272,7 @@ launcher.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | `yyyyMMdd-HHmm`, `-dev` added on the dev channel, `-<part>` added when a release is split to stay under GitHub's 2 GiB asset limit (`Publish-Update.ps1:762,768-804`). Compared case-insensitively with `applied.txt`. An empty id is never offered. |
-| `url` | string | A GitHub release asset in the feed's `updateRepo`, **or** a thornswood.net host asset under `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>` (`Feed-Rules.ps1`). Since #897 a new pack is written as the site address. A GitHub one (`-AssetHost github`, or a pack published before 28 Sep) is the browser download address, `https://github.com/<owner>/<name>/releases/download/<tag>/<file>`, since #445: it hands over the same bytes as the `api.github.com` asset id address and counts against no quota. Empty: the launcher skips it and writes it off as applied. A url that answers 404 fails the whole update and Play stays off. |
+| `url` | string | A thornswood.net host asset under `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>`, **or**, on a feed that still names `updateRepo`, a GitHub release asset in it (`Feed-Rules.ps1`). Since #897 a new pack is written as the site address. A GitHub one (a pack published before 28 Sep) is the browser download address, `https://github.com/<owner>/<name>/releases/download/<tag>/<file>`, since #445, or the older `api.github.com` asset id address; both stop answering when Thornswood-Releases is deleted (#907). Empty: the launcher skips it and writes it off as applied. A url that answers 404 fails the whole update and Play stays off. |
 | `sha256` | string, 64 hex | Mandatory; checked after download (`Updater.cs:436-448`). |
 | `notes` | string | The whole Ship note, first line first. The update card shows it (`Shell.cs:4669-4670`). |
 | `name`, `bytes` | string, number | Optional packs only: the Add-ons tab shows them (`Config.cs:354-360`). Publish-Pack also writes `notes` as a file count. |
@@ -335,25 +347,24 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
   CDN, no quota) or older `api.github.com` asset id addresses; the next Ship on
   each channel, or `Repair-Manifest.ps1 -MoveToSite`, moves them all to the
   site.
-- **Publish side.** `Feed-Rules.ps1` refuses a new pack whose url is neither a
-  release asset in `updateRepo` nor a thornswood.net feed asset under
-  `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>`. Since #897 every new
-  pack, launcher and client runtime is sent to the site and named there, and
-  nothing is uploaded to Thornswood-Releases (`-AssetHost github` is the old
-  way). `Check-Secrets.ps1` scans every zip
+- **Publish side.** `Feed-Rules.ps1` refuses a new pack whose url is not a
+  thornswood.net feed asset under `/feed/assets/<sha256>` or
+  `/feed-dev/assets/<sha256>`; a GitHub release asset passes only on a feed
+  that still names that repository as `updateRepo`, and since #907 a publish
+  takes `updateRepo` out. Since #897 every new pack, launcher and client
+  runtime is sent to the site and named there. `Check-Secrets.ps1` scans every zip
   and exe before upload. Nothing is written to the feed if any asset failed to
   upload, and `version.json` is written without a byte order mark.
 - **Signing.** On since 27 Sep: `Ship.ps1` and `Publish-Installer.ps1` refuse
   a launcher or setup program that is not Authenticode Valid under
   `ExpectedSigner` (CONTRIBUTING.md, `records\signing\README.md`), or that
   the launcher's own `Signature.cs` check refuses (#912).
-- **Optional packs go to the site too.** `Publish-Pack.ps1` (default
-  `-AssetHost site`) sends each zip to `/feed/assets/<sha256>` with
-  `Remirror-Site-Feed.ps1 -Send` before `version.json` is touched, names it
-  there, and after the push puts the feed on the site with
-  `Remirror-Site-Feed.ps1`. `-AssetHost github` is the old GitHub release,
-  kept for rolling back. It publishes nothing today (`optional-packs.txt`
-  lists none).
+- **Optional packs go to the site too.** `Publish-Pack.ps1` sends each zip to
+  `/feed/assets/<sha256>` with `Remirror-Site-Feed.ps1 -Send` before
+  `version.json` is touched, names it there, and sends the feed to the VPS
+  store with `Remirror-Site-Feed.ps1`. The GitHub release path went with
+  Thornswood-Releases (#907). It publishes nothing today
+  (`optional-packs.txt` lists none).
 
 ## Main and dev
 
@@ -363,13 +374,15 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
 - **dev** is written by `Ship.ps1 -Channel dev` from any branch on any
   developer's machine; the last dev Ship wins. Its launcher version is main's
   published number plus a fourth part, `.1`, `.2` (`Ship.ps1:487-552`).
-- **After a main Ship** (not a hotfix), Ship copies the main feed over the
-  dev feed, keeping dev's `serverPort`, `voicePort` and `voiceUrl`, pushes it,
-  and copies the main baseline over the dev one (`Ship.ps1:1099-1140`). Dev
+- **After a main Ship** (not a hotfix), Ship receives the dev store, copies the
+  main feed over the dev feed, keeping dev's `serverPort`, `voicePort` and
+  `voiceUrl`, copies the main baseline over the dev one, and sends both back
+  (Ship.ps1, "dev follows main"), so the site's dev feed is reset at once. Dev
   launchers then take main's launcher and packs.
-- **Before editing**, Publish-Update and Repair-Manifest pull the feed they are
-  about to change (`Publish-Update.ps1:1180-1192`, `Repair-Manifest.ps1:66-79`).
-  A refused push leaves the release marked NOT SHIPPED and resumable.
+- **Before editing**, every script that edits a feed receives it from the VPS
+  store, and each send replaces it there only if it has not changed since
+  (`Feed-Store.ps1`, #907). A refused send leaves the release marked NOT
+  SHIPPED and resumable.
 
 ## There is no rollback
 
@@ -391,13 +404,15 @@ feed) are still cleared: main holds 75 packs and dev 92, none under the private
 source repository; main's `launcherVersion` is `1.1.101`, the same as `Version`
 in `Updater.cs` and as the dev feed's `mainVersion`; dev is on `1.1.101.34`.
 Both feeds carry `collectionUrl` ending `7essxf` and `collectionRevision` 1.
-The stale-main-clone hazard in `Publish-Update.ps1` still exists, so keep the
-releases clone pulled before a dev Ship.
+The stale-main-clone hazard in `Publish-Update.ps1` is gone with the clones
+(#907): a dev publish reads main's feed from the site every time.
 
 What differs, none of it broken:
 
-- **Every download url still names GitHub** (main 77, dev 94), though the site
-  holds every one; see "Downloads come from the site" for when they move.
+- **Download urls on GitHub**, on 28 Sep every one (main 77, dev 94), though
+  the site holds every one; each channel's next Ship moves them (see
+  "Downloads come from the site"). Thornswood-Releases is deleted only once
+  neither feed names one (#907).
 - **Main's client runtime is behind the record.** Main names fork
   commit `9732d2cc`; `records\client-build.json` and the dev feed are on
   `ccf71644`. The next main Ship carries it.

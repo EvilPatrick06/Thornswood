@@ -31,8 +31,9 @@
   says so quietly, so a machine without the Discord set up still ships fine.
 
   -Dev is the dev build's release, and it is a different channel, a different
-  feed and a different webhook. It reads the dev release worktree
-  (Thornswood-Releases-dev) rather than the live one, and it posts through
+  feed and a different webhook. It reads this machine's working copy of the
+  dev feed (%LOCALAPPDATA%\Thornswood\feed\dev, Feed-Store.ps1) rather than
+  the live one, and it posts through
   bot\dev-webhook.txt, which Set-DevNews.ps1 writes and which points
   at the dev updates channel. Nothing about a dev release reaches #news, the
   website or the main launcher: Ship.ps1 does not run Publish-News.ps1 on a
@@ -64,8 +65,10 @@ param(
   # Where the LIVE version.json is. Same reason Publish-News.ps1 has this:
   # releases moved into their own public repo, and the copy still sitting in
   # this repo stopped being updated the day that happened. Reading the stale
-  # one would post a release nobody shipped.
-  [string]$ReleaseDir = (Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))) 'Thornswood-Releases'),
+  # one would post a release nobody shipped. Since #907 it is this machine's
+  # working copy of the live feed, which the Ship that runs this has just
+  # received from the VPS and sent back (Feed-Store.ps1).
+  [string]$ReleaseDir = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main'),
   [string]$Site = 'https://thornswood.net',
   [switch]$Quiet
 )
@@ -117,11 +120,11 @@ if (-not $Webhook) {
   return
 }
 
-# The dev build follows its own release branch, checked out as a worktree
-# beside the live clone. Reading the live one here would announce main's last
-# release into the dev channel every time a dev build went out.
+# The dev build has its own feed, in its own working folder beside the live
+# one. Reading the live one here would announce main's last release into the
+# dev channel every time a dev build went out.
 if ($Dev -and -not $PSBoundParameters.ContainsKey('ReleaseDir')) {
-  $ReleaseDir = Join-Path (Split-Path -Parent $ReleaseDir) 'Thornswood-Releases-dev'
+  $ReleaseDir = Join-Path (Split-Path -Parent $ReleaseDir) 'dev'
 }
 
 # The live feed only. This repository's own version.json, the stale copy this
