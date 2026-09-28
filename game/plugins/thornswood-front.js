@@ -6867,6 +6867,7 @@
     parser to work out.
   */
   let dumpedOrder = false;
+  let orderToReport = null;
   sp.on('update', guard('loadorder', () => {
     if (dumpedOrder) { return; }
     dumpedOrder = true;
@@ -6881,6 +6882,7 @@
       }
       fs.writeFileSync('Data/Platform/thornswood-loadorder.txt',
                        names.join('\n') + '\n');
+      orderToReport = names.slice();
 
       /* A build without the light index must still get the file above, so this
          is separate and its failure is not the other one's. */
@@ -6907,6 +6909,66 @@
     } catch (e) {
       log('could not write the load order:', e);
     }
+  }));
+
+  /*
+    And the same list to the server, which compares it with its manifest and
+    tells the person, in one sentence, where it parts and to press Fix (#402).
+    The game's own check only paints LOAD ORDER ERROR and carries on, and on
+    17 Sep a tester reported bugs from a session showing that caption.
+
+    Five hex a plugin, because a chat line stops at 400 characters: see the
+    load order refusal block in gamemode.js, which carries the other copy of
+    loadOrderMark. tests\test-load-order-refusal.js holds the two together.
+
+    The ten files Steam owns go by name alone, the ones Verify.cs leaves out of
+    its byte check, because Fix cannot mend them and the sentence says press
+    Fix. That also skips reading Skyrim.esm, a quarter of a gigabyte. The rest
+    are read one plugin a frame, since getFileInfo reads the whole file for its
+    crc32 and sixty of them in one frame would be a hitch you could see.
+  */
+  const LOAD_ORDER_STOREFRONT = [
+    'skyrim.esm', 'update.esm', 'dawnguard.esm', 'hearthfires.esm', 'dragonborn.esm',
+    'ccbgssse001-fish.esm', 'ccbgssse025-advdsgs.esm', 'ccbgssse037-curios.esl',
+    'ccqdrsse001-survivalmode.esl', '_resourcepack.esl'
+  ];
+  const LOAD_ORDER_CHUNK = 64;
+
+  function loadOrderMark(name, size, crc32) {
+    var s = String(name == null ? '' : name).trim().toLowerCase();
+    if (size !== undefined && size !== null) { s += '|' + Number(size) + '|' + (Number(crc32) >>> 0); }
+    var h = 0x811c9dc5;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return ('00000' + ((h >>> 0) & 0xfffff).toString(16)).slice(-5);
+  }
+
+  const orderMarks = [];
+  sp.on('update', guard('loadorderreport', () => {
+    if (!orderToReport) { return; }
+    if (orderMarks.length < orderToReport.length) {
+      const name = orderToReport[orderMarks.length];
+      let mark = loadOrderMark(name);
+      if (LOAD_ORDER_STOREFRONT.indexOf(String(name).toLowerCase()) < 0) {
+        try {
+          const info = sp.getFileInfo(name);
+          if (info) { mark = loadOrderMark(name, info.size, info.crc32); }
+        } catch (e) {
+          log('could not read ' + name + ' for the load order report, sent by name only:', e);
+        }
+      }
+      orderMarks.push(mark);
+      return;
+    }
+    const total = orderMarks.length;
+    orderToReport = null;
+    for (let from = 0; from < total; from += LOAD_ORDER_CHUNK) {
+      tellServer('/loadorder ' + total + ' ' + from + ' ' +
+                 orderMarks.slice(from, from + LOAD_ORDER_CHUNK).join(''));
+    }
+    say('reported ' + total + ' plugins to the server to check against its own');
   }));
 
   /*
