@@ -90,9 +90,8 @@ Object.keys(plugins).forEach(function (k) {
   });
 });
 
-// And nothing in the template is read by nobody. MenuKey is the one known
-// exception, filed as #831: take it out of this list when that is settled.
-const UNREAD_KNOWN = ['MenuKey'];
+// And nothing in the template is read by nobody. MenuKey was, until #831.
+const UNREAD_KNOWN = [];
 Object.keys(template).forEach(function (k) {
   if (UNREAD_KNOWN.indexOf(k) !== -1) { return; }
   yes('the template\'s ' + k + ' is read by a plugin',

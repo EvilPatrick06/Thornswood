@@ -502,10 +502,10 @@ namespace Thornswood
             l.Add(Dx("chat", "ThornsWood", "Talk in chat",
                      "Hands the keyboard to the chat box and puts the cursor in it. Escape gives it back to the game. Nothing in Skyrim uses Enter while you are playing, which is why it is here.",
                      ThornIni, "ChatKey", 28));
+            l.Add(Dx("command", "ThornsWood", "Type a command",
+                     "Opens the chat with a slash already typed. The game's skill tree, also on this key, stays shut.",
+                     ThornIni, "CommandKey", 53));
 
-            l.Add(Dx("chargenmenu", "ThornsWood", "Open the creation menu",
-                     "During character creation, brings up the trade or town question by hand if it has not appeared on its own. Does nothing afterwards.",
-                     ThornIni, "MenuKey", 50));
 
             l.Add(Dx("skills", "ThornsWood", "Profession, class and skill tree",
                      "Your profession and which half of it you work, your class, and the fifteen sub-skills under Health, Magicka and Stamina. Opens over the world without pausing it. Escape closes it too.",
@@ -567,6 +567,9 @@ namespace Thornswood
             l.Add(Dx("voicemode", "Voice", "Whisper, talk or yell",
                      "Steps your voice from a whisper to your normal voice to a yell and round again.",
                      ThornIni, "VoiceModeKey", 48));
+            l.Add(Dx("voicelock", "Voice", "Keep talking",
+                     "Locks the microphone open until you press it again, for a song or a long speech without holding the talk key. The corner of the screen says when it opens and when it shuts.",
+                     ThornIni, "VoiceLockKey", 24));
 
             // No SkyMP client keys here, deliberately. that server's build reads a
             // "keybinds" block out of skymp5-client-settings.txt with voice,

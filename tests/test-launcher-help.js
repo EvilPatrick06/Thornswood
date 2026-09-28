@@ -290,7 +290,7 @@ yes('the voice page says how many units are a metre (' + UPM + ')', UPM > 0);
 const LETTER = {
   30: 'A', 48: 'B', 46: 'C', 32: 'D', 18: 'E', 33: 'F', 34: 'G', 35: 'H', 23: 'I',
   36: 'J', 37: 'K', 38: 'L', 50: 'M', 49: 'N', 24: 'O', 25: 'P', 16: 'Q', 19: 'R',
-  31: 'S', 20: 'T', 22: 'U', 47: 'V', 17: 'W', 45: 'X', 21: 'Y', 44: 'Z', 28: 'Enter'
+  31: 'S', 20: 'T', 22: 'U', 47: 'V', 17: 'W', 45: 'X', 21: 'Y', 44: 'Z', 28: 'Enter', 53: '/'
 };
 function templateKey(name) {
   const r = new RegExp('^\\s*' + name + '\\s*=\\s*(\\d+)', 'm').exec(ini);
@@ -315,7 +315,9 @@ function freshKey(name) {
   ['TradeWithKey', 'Chat and commands', 'Friends and trading', function (k) { return k + ' to offer a trade'; }],
   ['MuteThemKey', 'Chat and commands', 'Friends and trading', function (k) { return k + ' to stop hearing them'; }],
   ['StopKey', 'Emotes', 'Getting out of one', function (k) { return k + ' stands you up'; }],
-  ['PushToTalk', 'Chat and commands', 'Voice', function (k) { return 'Hold ' + k + ' to talk'; }]
+  ['PushToTalk', 'Chat and commands', 'Voice', function (k) { return 'Hold ' + k + ' to talk'; }],
+  ['VoiceLockKey', 'Chat and commands', 'Voice', function (k) { return 'press ' + k + ' to keep the microphone open until you press ' + k + ' again'; }],
+  ['CommandKey', 'Chat and commands', 'The chat box', function (k) { return k + ' opens it with the slash already typed'; }]
 ].forEach(function (row) {
   const code = freshKey(row[0]);
   const t = templateKey(row[0]);

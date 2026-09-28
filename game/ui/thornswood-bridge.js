@@ -248,7 +248,7 @@
    * with nothing to type into used to raise focus anyway, which took the
    * keyboard and the mouse away with nothing on screen to give them back.
    */
-  function focusInput() {
+  function focusInput(prefill) {
     var el = input();
     if (!el) {
       window.thornswoodTyping = false;
@@ -260,6 +260,16 @@
     lastKey = Date.now();
     unfade();
     try { el.focus(); } catch (e) { }
+    /*
+      What the / key opens with: a slash, typed into an empty box. The box is
+      skymp's contentEditable span, whose text is React state fed by its input
+      event, so it is typed the way skymp's own paste handler types, with
+      insertText, which fires that event. Setting innerText would draw a slash
+      React never heard of, and the line sent would be missing it.
+    */
+    if (prefill && !String(el.innerText || '').replace(/\s+/g, '')) {
+      try { document.execCommand('insertText', false, String(prefill)); } catch (e) { }
+    }
     tell('typing-on');
     startBeat();
     return true;
