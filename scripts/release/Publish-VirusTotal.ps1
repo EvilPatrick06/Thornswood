@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-  Sends a published file to VirusTotal so the report the site links to exists,
-  or says plainly that it is not sending and carries on.
+  Optional manual tool: sends a file to VirusTotal, or says plainly that it is
+  not sending and carries on. Not called from publish.
 
 .DESCRIPTION
   The Downloads page prints the installer's SHA-256 with a link to VirusTotal's

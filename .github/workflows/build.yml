@@ -44,7 +44,9 @@
 # issue #752: it runs in a tenth of a second and what it guards, the page
 # naming where every credential lives, went wrong on a pull request that
 # nobody caught for days (#697, found in #750 and #751). A harness earns a
-# place here by being that fast and that cheap to be wrong about.
+# place here by being that fast and that cheap to be wrong about. Six more
+# joined it on 28 September (issue #875), under a minute between them, after
+# all six had sat red on main with this build green.
 #
 # ON AGAIN, ON THE VPS, 25 SEPTEMBER. It was off for part of that day while
 # no runner existed. Then Patrick: "I want it set so they can commit+merge
@@ -132,6 +134,39 @@ jobs:
             Write-Host '::error file=docs/OWNERSHIP.md::the ownership page does not match what the scripts and the launcher name; the FAIL lines above say which rows'
             exit 1
           }
+
+      - name: Run the harnesses that went red unseen
+        shell: pwsh
+        run: |
+          # Issue #875. These six failed on main for days while this build
+          # stayed green, because it ran none of them and the nightly run that
+          # holds them was not finishing: the script index and the script paths
+          # falling behind a change, the architecture page naming methods that
+          # had moved file, and three launcher harnesses whose stand-ins no
+          # longer compiled against the code they lift. All six read only the
+          # checkout and a temp folder of their own, and together take under a
+          # minute, so they earn a place here the way test-ownership.js did.
+          # pwsh on purpose: test-script-paths.ps1 needs .NET's
+          # Path.GetRelativePath, and test-script-index.ps1 starts Windows
+          # PowerShell 5.1 itself to compare what the two write.
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=tests/test-architecture.js::no node on this runner, so the architecture page was not checked'
+            exit 1
+          }
+          $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
+                 'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1'
+          $failed = @()
+          foreach ($n in $six) {
+            $p = Join-Path 'tests' $n
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            Write-Host ("--- {0}" -f $n)
+            if ($n -like '*.js') { & node $p } else { & pwsh -NoProfile -File $p }
+            $code = $LASTEXITCODE
+            Write-Host ("--- {0}: exit {1}, {2}s" -f $n, $code, [Math]::Round($sw.Elapsed.TotalSeconds, 1))
+            if ($code -ne 0) { $failed += $n; Write-Host ("::error file=tests/{0}::harness failed, the FAIL lines above say what" -f $n) }
+          }
+          if ($failed.Count) { Write-Host ("{0} harness(es) failed: {1}" -f $failed.Count, ($failed -join ', ')); exit 1 }
+          Write-Host 'all six passed'
 
       - name: Check the launcher window
         shell: powershell

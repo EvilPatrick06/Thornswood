@@ -156,7 +156,7 @@ install is. Owns no files.
 and written by Save, which encrypts the update token with Windows' DPAPI and
 locks the file to this Windows account. The server address, port, collection
 link, voice port and update repository in it are facts about the server, not
-settings: `Shell.cs:4540 OnVersionDoc()` overwrites them from version.json on
+settings: `ShellUpdate.cs:111 OnVersionDoc()` overwrites them from version.json on
 every update check. So is the Skyrim build pin (the exe size the checks look
 for and the depots the Downgrade button asks Steam for), taken through
 `Downgrade.AdoptPin()` when the feed carries it; the numbers compiled into
@@ -176,10 +176,10 @@ script in the temp folder, `st-update-<process id>.cmd`, that swaps it in once
 this process has gone and keeps the old one until the new one has started
 (see SelfSwap below). `Version` at the top of the file is the launcher's
 version, moved by `scripts\release\Bump-Version.ps1` before a Ship. In the launcher,
-`Shell.cs:4457 CheckUpdatesBackground()` asks, `OnVersionDoc` decides,
-`Shell.cs:4903 RunUpdate()` installs, and `Shell.cs:4477 CheckFailed()` keeps
+`ShellUpdate.cs:28 CheckUpdatesBackground()` asks, `OnVersionDoc` decides,
+`ShellUpdate.cs:384 RunUpdate()` installs, and `ShellUpdate.cs:48 CheckFailed()` keeps
 Play shut and asks again every thirty seconds when the source does not answer.
-Every document that was read also goes to `Shell.cs:4520 ShowNotice()`, which
+Every document that was read also goes to `ShellUpdate.cs:91 ShowNotice()`, which
 asks FeedNotice what the bar above Play says and whether Play is held.
 
 **SelfSwap** (SelfSwap.cs). The launcher's own replacement, and the way back
@@ -413,14 +413,14 @@ configured at all, which is a developer's own build and never a tester's.
 | # | Where | What happens | Left behind |
 |---|---|---|---|
 | 1 | `Shell.cs:1136 btnPlay.Click` | Wired in Wire. A game this launcher already started goes to Play; otherwise StartPlay. | |
-| 2 | `Shell.cs:4195 StartPlay()` | | |
-| 3 | `Shell.cs:4200 OwnGameRequired` | `ShellOwnGame.cs:165 OwnGameRequired()` returns straight away in this shape. In the shared shape it offers to make the folder, or says what is in the way, and Play stops. | nothing |
-| 4 | `Shell.cs:4207 Door.RecentlyCleared` | A yes from the site in the last five minutes skips the next step. | |
-| 5 | `Shell.cs:4212 Door.Check` | `Door.cs:106 Check()` on a pool thread: `Discord.cs:315 Join()` posts the ticket and the profile id currently in `skymp5-client-settings.txt` to thornswood.net `/api/play/join`. A yes comes back through `Shell.cs:4226 StartPlay`, which runs StartPlay again from the top and passes this step. A no shows why (`Door.cs:200 Explain()`) and nothing more runs. | `Profile\door.txt` (the answer and when); `discord-name.txt` and `dev-allowed.txt` when they changed |
-| 6 | `Shell.cs:4244 Checks.GameRunning` | A Skyrim started by hand goes straight to Play with nothing under Data touched, because a write to the client settings reloads every plugin in a running game. | |
-| 7 | `Shell.cs:4255 Chars.Prepare` | Under Waiting. `Chars.cs:694 Prepare()`, below in its own table. It throws when the client settings or the character list cannot be written, and Play stops. | see below |
-| 8 | `Shell.cs:4267 Chars.KnownIds` | Every profile id this install could pick, then `Shell.cs:4273 CheckIn` for each on a pool thread, posting each one to `/api/play/join` so the server's allowed list has it before the person picks. A failure is a log line; the game still starts. | |
-| 9 | `Shell.cs:4278 Play` | Into `Shell.cs:3870 Play()`. Its first four lines check `updatePending`, `collectionBarUp`, `ownGameBusy` and the feed's hold again, because the button is not the only way in. | |
+| 2 | `ShellChars.cs:38 StartPlay()` | | |
+| 3 | `ShellChars.cs:43 OwnGameRequired` | `ShellOwnGame.cs:165 OwnGameRequired()` returns straight away in this shape. In the shared shape it offers to make the folder, or says what is in the way, and Play stops. | nothing |
+| 4 | `ShellChars.cs:50 Door.RecentlyCleared` | A yes from the site in the last five minutes skips the next step. | |
+| 5 | `ShellChars.cs:55 Door.Check` | `Door.cs:106 Check()` on a pool thread: `Discord.cs:315 Join()` posts the ticket and the profile id currently in `skymp5-client-settings.txt` to thornswood.net `/api/play/join`. A yes comes back through `ShellChars.cs:69 StartPlay`, which runs StartPlay again from the top and passes this step. A no shows why (`Door.cs:200 Explain()`) and nothing more runs. | `Profile\door.txt` (the answer and when); `discord-name.txt` and `dev-allowed.txt` when they changed |
+| 6 | `ShellChars.cs:87 Checks.GameRunning` | A Skyrim started by hand goes straight to Play with nothing under Data touched, because a write to the client settings reloads every plugin in a running game. | |
+| 7 | `ShellChars.cs:98 Chars.Prepare` | Under Waiting. `Chars.cs:694 Prepare()`, below in its own table. It throws when the client settings or the character list cannot be written, and Play stops. | see below |
+| 8 | `ShellChars.cs:111 Chars.KnownIds` | Every profile id this install could pick, then `ShellChars.cs:117 CheckIn` for each on a pool thread, posting each one to `/api/play/join` so the server's allowed list has it before the person picks. A failure is a log line; the game still starts. | |
+| 9 | `ShellChars.cs:122 Play` | Into `Shell.cs:3870 Play()`. Its first four lines check `updatePending`, `collectionBarUp`, `ownGameBusy` and the feed's hold again, because the button is not the only way in. | |
 | 10 | `Shell.cs:3887 Paths.Loader` | `Game\skse64_loader.exe` has to exist, and `Shell.cs:3888 Paths.MpClient` (`Game\Data\SKSE\Plugins\MpClientPlugin.dll`). | |
 | 11 | `Shell.cs:3893 ClearStuckGame` | A Skyrim with no window is closed; one on screen is asked about. | |
 | 12 | `Shell.cs:3899 Verify.Run` | Under Waiting. Reads the plugin list, the server's manifest and the plugins' bytes. Any problem that would get the person refused: the Mods page opens with a message saying what to do, and Play stops. | nothing |

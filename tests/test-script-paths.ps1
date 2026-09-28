@@ -45,6 +45,8 @@ $notInGit = @{
     'version.json'                  = 'the releases clone''s feed; the scripts that name it are pointed at that clone'
     'tools/mod-audit.json'          = 'what Audit-Mods.ps1 writes, ignored by git'
     'tools/setup-stub.exe'          = 'built by Build-Launcher.ps1, ignored with every exe'
+    'tools/setup-stub.pdb'          = 'built beside setup-stub.exe by Build-Launcher.ps1, ignored with every pdb'
+    'out/dist'                      = 'the release output, under out, which git ignores (CONTRIBUTING, the fork and its build)'
     'tools/signing.json'            = 'a machine''s signing settings, ignored by git'
     'tools/backup-key.txt'          = 'the backup passphrase, a secret kept out of git'
     'tools/thornswood-front.zip'    = 'the front build, made outside the repository and dropped beside Go.ps1'
@@ -86,6 +88,20 @@ foreach ($f in $scan) {
     if ($skipScripts -contains $f.Name) { continue }
     $inTests = ((Split-Path -Leaf (Split-Path -Parent $f.FullName)) -eq 'tests')
     $text = [IO.File]::ReadAllText($f.FullName)
+    # Comments build no path. A comment that quotes another script's line
+    # (test-deploy-gamemode-warning.ps1 quotes Deploy-DevGamemode's
+    # '..\vps\Request-Restart.ps1') would otherwise be resolved from the wrong
+    # folder, so every comment is blanked before the paths are read.
+    $tokens = $null; $perr = $null
+    [void][System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$tokens, [ref]$perr)
+    $sb = New-Object System.Text.StringBuilder($text)
+    foreach ($tk in $tokens) {
+        if ($tk.Kind -eq 'Comment') {
+            $s = $tk.Extent.StartOffset; $n = $tk.Extent.EndOffset - $s
+            [void]$sb.Remove($s, $n).Insert($s, (New-Object string ' ', $n))
+        }
+    }
+    $text = $sb.ToString()
     foreach ($m in $rx.Matches($text)) {
         if ($inTests -and $m.Groups[1].Value -eq 'PSScriptRoot') { continue }
         # In a script $Tools is a folder it was given (New-ScriptIndex's -Tools is
@@ -102,6 +118,9 @@ foreach ($f in $scan) {
             elseif ($seg -and $seg -ne '.') { $parts.Add($seg) }
         }
         $full = $parts -join '/'
+        # Nothing left is the repository root itself (Package-Thornswood's
+        # '..\..', test-gamemode-consts' '..'), which is always there.
+        if (-not $full) { $found++; continue }
         if ($tracked.ContainsKey($full)) { $found++; continue }
         if ($notInGit.ContainsKey($full)) { $allowedSeen[$full] = $true; continue }
         $missing += ('{0} (named in {1})' -f $full, $f.Name)
