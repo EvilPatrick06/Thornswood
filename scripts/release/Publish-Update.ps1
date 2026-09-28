@@ -652,6 +652,40 @@ function Clear-Pending([string]$stateFile) {
 }
 # ==== end thornswood publish resume ====
 
+# ==== thornswood baseline commit ====
+#
+# THE BASELINE IS COMMITTED WHEN IT MOVES, or the next Ship cannot start.
+#
+# Since the baseline moved into the Releases clone (#437), Save-State writes
+# published.json AFTER the push, on purpose, so it only moves once the release
+# is really out. Nothing committed it, so every Ship left it modified, and the
+# next Ship's pull --rebase refused ("cannot pull with rebase: You have
+# unstaged changes") and stopped with nothing published. Measured on 27 Sep:
+# the 18:55 dev release left it modified and the 19:02 Ship stopped on it.
+#
+# So it goes up as its own commit once it is written. And a clone where an
+# older Ship left it that way (the only change is published.json) has it
+# committed as that baseline before the pull, which is what that Ship should
+# have done. Anything else modified in the clone still stops the pull: that is
+# somebody's hand edit, and not this script's to commit.
+function Push-Baseline([string]$id, [switch]$Left) {
+    if ($NoPush -or -not (Test-Path (Join-Path $ReleaseDir '.git'))) { return }
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+        $dirty = @(& git -C $ReleaseDir status --porcelain 2>$null | Where-Object { $_ })
+        if ($dirty.Count -ne 1 -or $dirty[0] -notmatch '^ ?M +published\.json$') { return }
+        $msg = if ($Left) { 'Baseline left by an earlier Ship' } else { "Baseline $id" }
+        & git -C $ReleaseDir add published.json 2>&1 | Out-Null
+        & git -C $ReleaseDir commit -q -m $msg 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { Say '  could not commit published.json; the next Ship will try again' 'Yellow'; return }
+        if ($Left) { Say '  published.json was left modified by an earlier Ship; committed it before pulling' 'DarkGray'; return }
+        & git -C $ReleaseDir push --quiet origin HEAD 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { Say '  the baseline is committed but did not push; the next Ship pushes it with its release' 'Yellow' }
+        else { Say '  baseline committed and pushed' 'DarkGray' }
+    } finally { $ErrorActionPreference = $old }
+}
+# ==== end thornswood baseline commit ====
+
 if ($Baseline) {
     Save-State
     Head 'Done'
@@ -1345,6 +1379,7 @@ if ($HostAssetUrls) {
 if (-not $NoPush -and (Test-Path (Join-Path $ReleaseDir '.git'))) {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
+        Push-Baseline '' -Left
         $pulled = & git -C $ReleaseDir pull --rebase --quiet 2>&1
         if ($LASTEXITCODE -ne 0) {
             Write-Host ($pulled | Out-String) -ForegroundColor Red
@@ -2005,6 +2040,7 @@ if ($pushFailed) {
 } else {
     Save-State
     Clear-Pending $StateFile
+    Push-Baseline $Id
 }
 
 Head 'Done'
