@@ -45,16 +45,27 @@ namespace Thornswood
         // line is never cut off: any progress at all resets it. See the loop
         // below for why a deadline is needed at all.
         const int GiveUpMinutes = 25;
-        // Depot id -> the manifest of that depot at 1.6.1170. Same three as
-        // Setup-Thornswood.ps1. (Build-Thornswood.ps1 was deleted on 23
-        // September: it could not produce a working build any more.)
-        static readonly string[][] Depots = {
+        // ---- THE COMPILED FALLBACK (#471) ----
+        // The pin comes from the update feed: version.json carries
+        // expectedExeBytes, newerExeBytes and depots, written by Publish-Update
+        // from records\skyrim-pin.json, and AdoptPin keeps them in config.json.
+        // What follows is only for a launcher that has never had them from the
+        // feed. The same numbers are in records\skyrim-pin.json,
+        // Config.ExpectedExeBytes and Setup-Thornswood.ps1, and
+        // tests\test-skyrim-pin.ps1 fails when any of them disagree.
+        //
+        // Depot id -> the manifest of that depot at 1.6.1170.
+        static readonly string[][] FallbackDepots = {
             new[] { "489831", "8442952117333549665" },
             new[] { "489832", "8042843504692938467" },
             new[] { "489833", "1914580699073641964" },
         };
         /// <summary>SkyrimSE.exe at 1.7.104, the Steam build we never want.</summary>
         public const long NewerExeBytes = 37910440;
+        // ---- end of the compiled fallback ----
+
+        // The depots this run asks Steam for. Run sets it from PinnedDepots.
+        static string[][] Depots = FallbackDepots;
 
         // How many stretches the bar under the button is divided into: one for
         // each of the three downloads, then one for the copy into the game.
@@ -149,7 +160,7 @@ namespace Thornswood
                 if (!File.Exists(exe)) return "missing";
                 long n = new FileInfo(exe).Length;
                 if (n == cfg.ExpectedExeBytes) return "1.6.1170";
-                if (n == NewerExeBytes) return "1.7.104, the server runs 1.6.1170";
+                if (n == Newer(cfg)) return "1.7.104, the server runs 1.6.1170";
                 return "not 1.6.1170";
             }
             catch { return "unknown"; }
@@ -161,11 +172,89 @@ namespace Thornswood
         /// Run types the same strings, so the question cannot name one command
         /// and the keyboard send another.
         /// </summary>
-        public static string[] Commands()
+        public static string[] Commands(Config cfg)
         {
-            var all = new string[Depots.Length];
-            for (int i = 0; i < Depots.Length; i++) all[i] = Command(Depots[i]);
+            string[][] depots = PinnedDepots(cfg);
+            var all = new string[depots.Length];
+            for (int i = 0; i < depots.Length; i++) all[i] = Command(depots[i]);
             return all;
+        }
+
+        /// <summary>
+        /// The depots to ask Steam for: the ones the feed sent, kept in
+        /// config.json, or the compiled fallback when it has sent none that
+        /// can be used.
+        /// </summary>
+        static string[][] PinnedDepots(Config cfg)
+        {
+            if (cfg == null || !Usable(cfg.SkyrimDepots)) return FallbackDepots;
+            var all = new string[cfg.SkyrimDepots.Length][];
+            for (int i = 0; i < all.Length; i++) all[i] = new[] { cfg.SkyrimDepots[i].id, cfg.SkyrimDepots[i].manifest };
+            return all;
+        }
+
+        /// <summary>The newer build's exe size, from the feed or the fallback.</summary>
+        static long Newer(Config cfg)
+        {
+            return cfg != null && cfg.NewerExeBytes > 0 ? cfg.NewerExeBytes : NewerExeBytes;
+        }
+
+        /// <summary>
+        /// A depot list worth using: as many parts as the fallback, because the
+        /// card, the bar and every "Part 2 of 3" are built on that many, and each
+        /// one an id and a manifest in digits. Anything else is ignored whole,
+        /// never half used.
+        /// </summary>
+        static bool Usable(PinDepot[] d)
+        {
+            if (d == null || d.Length != FallbackDepots.Length) return false;
+            foreach (PinDepot p in d)
+                if (p == null || !AllDigits(p.id) || !AllDigits(p.manifest)) return false;
+            return true;
+        }
+
+        static bool AllDigits(string s)
+        {
+            if (string.IsNullOrEmpty(s) || s.Length > 20) return false;
+            foreach (char c in s) if (c < '0' || c > '9') return false;
+            return true;
+        }
+
+        /// <summary>A size from the feed, or 0 when it is not a plain number.</summary>
+        static long FeedBytes(string s)
+        {
+            long n;
+            return AllDigits(s) && long.TryParse(s, out n) ? n : 0;
+        }
+
+        /// <summary>
+        /// Takes the Skyrim pin from a version document into cfg (#471). Only
+        /// what the feed carries is taken: a size that is not a number above 0
+        /// and a missing or unusable depot list leave cfg as it is, so a feed
+        /// written before these fields changes nothing. True when anything
+        /// moved; the caller saves.
+        /// </summary>
+        public static bool AdoptPin(Config cfg, VersionDoc v)
+        {
+            if (cfg == null || v == null) return false;
+            bool moved = false;
+            long exe = FeedBytes(v.expectedExeBytes), newer = FeedBytes(v.newerExeBytes);
+            if (exe > 0 && exe != cfg.ExpectedExeBytes) { cfg.ExpectedExeBytes = exe; moved = true; }
+            if (newer > 0 && newer != cfg.NewerExeBytes) { cfg.NewerExeBytes = newer; moved = true; }
+            if (Usable(v.depots))
+            {
+                bool same = cfg.SkyrimDepots != null && cfg.SkyrimDepots.Length == v.depots.Length;
+                for (int i = 0; same && i < v.depots.Length; i++)
+                    same = cfg.SkyrimDepots[i] != null && cfg.SkyrimDepots[i].id == v.depots[i].id && cfg.SkyrimDepots[i].manifest == v.depots[i].manifest;
+                if (!same)
+                {
+                    var copy = new PinDepot[v.depots.Length];
+                    for (int i = 0; i < copy.Length; i++) copy[i] = new PinDepot { id = v.depots[i].id, manifest = v.depots[i].manifest };
+                    cfg.SkyrimDepots = copy;
+                    moved = true;
+                }
+            }
+            return moved;
         }
 
         static string Command(string[] depot)
@@ -239,6 +328,8 @@ namespace Thornswood
             // the longest wait in the whole run was the one with nothing on
             // screen moving. Every early stop hides it again through Stop.
             Progress(-2);
+            // The same depots Commands showed in the question.
+            Depots = PinnedDepots(cfg);
             string steam = Steam.Path_();
             if (string.IsNullOrEmpty(steam) || !Directory.Exists(steam))
                 return Stop("Could not find where Steam is installed, so Steam cannot be asked for the files. Open Steam once, then press the button again.", log, status);

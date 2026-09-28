@@ -13,6 +13,15 @@ read it (issue #440, phase 8):
 - `steam-build.json`: the public Steam build of Skyrim last looked at and
   accepted. `scripts\dev\Check-Outside.ps1` goes red when Steam moves past it,
   which is the day to try the downgrade on one machine.
+- `skyrim-pin.json`: the build of Skyrim a release is pinned to, its
+  SkyrimSE.exe size, the size of the newer build Steam hands out, and the
+  three depot manifests the Downgrade button asks Steam for (issue #471).
+  Publish-Update writes it into version.json and launchers take it from
+  there. No script writes this one: it is changed by hand, in the same pull
+  request as the script extender, the collection revision, the launcher's
+  compiled fallback (Downgrade.cs, Config.cs) and Setup-Thornswood.ps1,
+  because a pin move is one release. `tests\test-skyrim-pin.ps1` fails while
+  they disagree.
 - `signing\`: the code signing setup, with its own README. It is switched off
   until it is finished.
 

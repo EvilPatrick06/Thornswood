@@ -120,7 +120,7 @@ $wanted = [ordered]@{
     'ProgressLine'      = 'static string ProgressLine(int part, int of, long bytes, bool pasted)'
     'Next'              = 'static string Next(int part, int of)'
     'Parts'             = 'static string Parts(int from, int to, string one, string many)'
-    'Depots'            = 'static readonly string[][] Depots ='
+    'FallbackDepots'    = 'static readonly string[][] FallbackDepots ='
     'Command'           = 'static string Command(string[] depot)'
 }
 $lifted = [ordered]@{}
@@ -218,6 +218,8 @@ namespace Probe
 
         // ---- lifted from launcher\app\Downgrade.cs ----
 __LIFTED__
+        // What Run sets from PinnedDepots; a feed with no pin leaves the fallback (#471).
+        static string[][] Depots = FallbackDepots;
     }
 }
 '@
