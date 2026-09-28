@@ -724,6 +724,13 @@ $srcChanged     = @($changed | Where-Object { $_ -like ':src:*' })
 $orderMoved     = $prev.ContainsKey(':order:plugins') -and $now.ContainsKey(':order:plugins') -and ($prev[':order:plugins'] -ne $now[':order:plugins'])
 $changed        = @($changed | Where-Object { $_ -notlike ':profile:*' -and $_ -notlike ':src:*' -and $_ -notlike ':order:*' })
 $removed        = @($removed | Where-Object { $_ -notlike ':profile:*' -and $_ -notlike ':src:*' -and $_ -notlike ':order:*' -and -not (Test-Machine $_) })
+# ==== thornswood travels with ====
+# A page's own pictures ride in any pack that carries the page, changed or not:
+# see $ShipTravelsWith in Ship-Rules.ps1 (issue #883, the scroll's pictures).
+foreach ($w in @(Get-ShipTravelsWith $changed)) {
+    if ($now.ContainsKey($w)) { $changed += $w }
+}
+# ==== end thornswood travels with ====
 
 # ---- what a removal is allowed to be --------------------------------------
 #

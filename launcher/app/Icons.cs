@@ -285,6 +285,20 @@ namespace Thornswood
                             // path or a shortcut to the game gets an icon that
                             // is not the game's.
                             if (string.IsNullOrEmpty(target)) continue;
+                            // The update that renames an install from the
+                            // old name deletes the old exe, so a shortcut
+                            // still aimed at it in this launcher's folder is
+                            // ours and is pointed at this one. Issue #497,
+                            // release 1 of 2: goes with SelfSwap.OldName.
+                            bool repointed = false;
+                            if (SelfSwap.AimsAtOld(target, exe))
+                            {
+                                t.InvokeMember("TargetPath", BindingFlags.SetProperty, null, sc, new object[] { exe });
+                                t.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, sc,
+                                               new object[] { Path.GetDirectoryName(exe) });
+                                target = exe;
+                                repointed = true;
+                            }
                             if (!string.Equals(Full(target), Full(exe),
                                                StringComparison.OrdinalIgnoreCase)) continue;
 
@@ -313,7 +327,7 @@ namespace Thornswood
                                 continue;
                             }
 
-                            bool touched = false;
+                            bool touched = repointed;
                             string now = t.InvokeMember("IconLocation", BindingFlags.GetProperty,
                                                         null, sc, null) as string;
                             // Force rewrites even when the string matches: the

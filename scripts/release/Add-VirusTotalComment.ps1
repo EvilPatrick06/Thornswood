@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Leaves one community comment on a build's VirusTotal report saying what the file is, or says plainly that it is not commenting and carries on.
+  Optional manual tool: leaves one community comment on a build's VirusTotal report, or says plainly that it is not commenting and carries on.
 
 .DESCRIPTION
   The setup program is not signed yet, issue #390, and the engines that flag it

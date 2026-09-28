@@ -20,8 +20,9 @@
       foreign host is compiled in (the two http:// left are XAML namespaces,
       which are names and not places);
     - what it downloads is a zip it checks against a SHA-256 before anything in
-      it runs, and the only thing it starts is Setup.bat, so no second unsigned
-      program is fetched and run;
+      it runs, and the only thing it starts is PowerShell on the payload's
+      Setup-Thornswood.ps1 (Setup.bat until issue #889), so no second
+      unsigned program is fetched and run;
     - the age gate's else-branch, which enables Install when the checkbox is
       missing, is left exactly as it is (locked for #429).
 
@@ -86,10 +87,14 @@ Yes 'and a mismatch is deleted and stops the install' (
 $iCheck = $bs.IndexOf('CheckPayload(target, sha);')
 $iReturn = if ($iCheck -ge 0) { $bs.IndexOf('return target;', $iCheck) } else { -1 }
 Yes 'the SHA is checked before the download is handed back' ($iCheck -ge 0 -and $iReturn -gt $iCheck)
-$iStart = $bs.IndexOf('Process.Start(psi);')
-Yes 'the only program it starts is the payload''s Setup.bat, not a downloaded exe' (
-    $bs.Contains('string bat = Path.Combine(temp, "Setup.bat");') -and
-    $bs.Contains('new ProcessStartInfo(bat)') -and $iStart -gt 0)
+# Since issue #889 that is PowerShell on the payload's Setup-Thornswood.ps1,
+# started hidden, the same thing Setup.bat runs (test-setup-in-window.ps1).
+$iStart = $bs.IndexOf('p.Start();')
+Yes 'the only program it starts is PowerShell on the payload''s script, not a downloaded exe' (
+    $bs.Contains('string script = Path.Combine(temp, "Setup-Thornswood.ps1");') -and
+    $bs.Contains('SetupStartInfo(PowerShellExe(), script, installRoot)') -and
+    $bs.Contains('var psi = new ProcessStartInfo(ps);') -and $iStart -gt 0 -and
+    @([regex]::Matches($bs, 'Process\.Start\(')).Count -eq 0)
 
 # ---- 4. the #429 age lock, left alone --------------------------------------
 # Install starts disabled and the checkbox is the only thing that enables it,

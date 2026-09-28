@@ -5,8 +5,10 @@
 What a new person gets before they have a launcher. `setup\Bootstrap.cs` is the
 small program they download and run first, `Thornswood-Setup.exe`; its own
 README says what it does. The rest is the installer's payload, which that
-program downloads and unpacks: `Setup.bat` and `Install.bat`, which start
-`Setup-Thornswood.ps1`, and `READ ME FIRST.txt`, the page a person reads
+program downloads and unpacks: `Setup-Thornswood.ps1`, which the setup program
+runs inside its own window; `Setup.bat` and `Install.bat`, which start the same
+script in a console for a person running an unpacked payload by hand; and
+`READ ME FIRST.txt`, the page a person reads
 beside them. `Setup-Thornswood.ps1` runs inside the unpacked payload, so its
 paths are the payload's layout and not this repository's.
 
