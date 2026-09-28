@@ -46,12 +46,10 @@ $steps = @(
         Name  = 'Localised combat damage'
         Script = 'Add-Accuracy.ps1'
         Wants = @('SKSE\Plugins\CoreImpactFramework.dll', 'SKSE\Plugins\Accuracy.dll')
-    },
-    @{
-        Name  = 'Bodies and physics'
-        Script = 'Add-Bodies.ps1'
-        Wants = @('XPMSE.esp', 'SKSE\Plugins\cbp.dll', 'SKSE\Plugins\CBPConfig.txt')
     }
+    # Bodies and physics (Add-Bodies.ps1) was a step here until issue #405
+    # retired that script: it put the nude female body back over the build on
+    # every run. The bodies come from the Nexus collection now.
 )
 
 $done = @()
@@ -110,7 +108,6 @@ $notes = @"
 Carriages, and damage that knows where it hit
 - carriages and ferries run between the holds, as a fade rather than a scripted ride so it survives co-op
 - where you hit somebody now matters, with the settings shipped identically to everyone
-- new bodies for everyone, CBBE and 3BA for women, HIMBO and The New Gentleman for men, with CBPC physics
 - three starter classes to test, Smith, Thief and Warrior
 "@
 
