@@ -9614,7 +9614,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 
   // ==== ITEM_NAMES ====
   /* Built by scripts\dev\Build-ItemNameTable.js out of game\data\recipes.json. Do not hand edit.
-     2003 item names: every recipe output and every ingredient, owned or not,
+     2002 item names: every recipe output and every ingredient, owned or not,
      out of 3693 recipes. 101 name(s) belong to more than one record; each went to the earliest plugin
      (Skyrim.esm, Update.esm, Dawnguard.esm, HearthFires.esm, Dragonborn.esm, then by name).
      Lower-case name -> [name as written, record]. /give reads it through buildThings. */
@@ -10352,7 +10352,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "goat meat": ["Goat Meat", "65c9a:Skyrim.esm"],
     "goat roast": ["Goat Roast", "7224c:Skyrim.esm"],
     "goat stew": ["Goat Stew", "81c:Gourmet.esp"],
-    "gold": ["Gold", "f:Skyrim.esm"],
     "gold ingot": ["Gold Ingot", "5ad9e:Skyrim.esm"],
     "goldbrand": ["Goldbrand", "844d62:Immersive Weapons.esp"],
     "gourd": ["Gourd", "10d666:Skyrim.esm"],

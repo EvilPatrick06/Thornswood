@@ -48,6 +48,13 @@ function better(a, b) {
   return a < b;
 }
 
+// NEVER GOLD. Some recipes take gold as an ingredient, so the first run put
+// "gold" -> f:Skyrim.esm in the table and /give could mint coin. Patrick:
+// "gold are not spawned in the world at all"; the forty in purse() is the one
+// mint, and tests\test-one-mint.js holds every descriptor in gamemode.js to
+// that (#830).
+const NEVER = ['f:skyrim.esm'];
+
 const data = JSON.parse(fs.readFileSync(RECIPES, 'utf8').replace(/^﻿/, ''));
 const rows = data.recipes || {};
 const byName = {};
@@ -55,6 +62,7 @@ let seen = 0;
 const clashed = {};
 function add(name, desc) {
   if (!name || !desc || typeof name !== 'string') return;
+  if (NEVER.indexOf(String(desc).toLowerCase()) >= 0) return;
   const clean = name.replace(/\s+/g, ' ').trim();
   if (!clean) return;
   const key = clean.toLowerCase();
