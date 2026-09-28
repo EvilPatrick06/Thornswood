@@ -166,6 +166,9 @@ try {
         $from = Join-Path $realRepo ('launcher\' + $f)
         if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination (Join-Path $fakeRepo 'launcher') }
     }
+    # The application manifest (PerMonitorV2, #463): Build-Launcher stops
+    # without it, since a launcher built without it has no DPI awareness.
+    Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\Thornswood.manifest') -Destination (Join-Path $fakeRepo 'launcher\app')
     Copy-Item -Path (Join-Path $realRepo 'launcher\lib\webview2\*') -Destination (Join-Path $fakeRepo 'launcher\lib\webview2')
     Copy-Item -LiteralPath (Join-Path $realRepo 'records\client-build.json') -Destination (Join-Path $fakeRepo 'records')
     Set-Content -LiteralPath (Join-Path $tools '..\launcher\app\Program.cs') -Value 'static class Program { [System.STAThread] static void Main() { } }' -Encoding ASCII
