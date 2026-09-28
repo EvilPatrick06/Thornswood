@@ -60,11 +60,22 @@
   // it to remove. This file is a plain script in <head> and the bundle is
   // deferred, so this runs first and the listener is never added at all.
   var addListener = window.addEventListener.bind(window);
-  var DEAF_TO = ['skymp5-client:browserUnfocused'];
+  // browserUnfocused: every chat close used to fire quitHandler -> /skill quit.
+  // initSkillMenu: SweetTaffySkillMenuService (SweetPie altar) would fire
+  // /skill init. Neither menu is used here; drop both at registration.
+  var DEAF_TO = ['skymp5-client:browserUnfocused', 'initSkillMenu'];
   window.addEventListener = function (type, fn, opts) {
     if (DEAF_TO.indexOf(type) !== -1) { return; }
     return addListener(type, fn, opts);
   };
+
+  // Belt: the unused skymp skills/test menus still call send('/skill ...').
+  // Thornswood has no /skill command. Drop those lines before they reach chat.
+  function isSkillSpam(text) {
+    var s = String(text == null ? '' : text).replace(/^\s+/, '');
+    return s.length >= 6 && s.slice(0, 6).toLowerCase() === '/skill'
+      && (s.length === 6 || /\s/.test(s.charAt(6)));
+  }
 
   var sp = (window.skyrimPlatform = window.skyrimPlatform || {});
 
@@ -364,6 +375,7 @@
     // Must be a function. See note 4 at the top.
     send: function (text) {
       try {
+        if (isSkillSpam(text)) { return; }
         if (window.thornswoodNet && window.thornswoodNet.say) {
           window.thornswoodNet.say(text);
           return;
