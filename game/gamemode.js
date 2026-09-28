@@ -36669,9 +36669,11 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     onPutItem     Putting into a container. mp.onPutItem refuses anything but
                   coin into a hold's box, and says nothing about any other
                   container.
-    onTakeItem    Taking out of a container or a body. Watched below, never
-                  refused. TakeItemEvent::OnFireSuccess is what removes the
-                  items, so a false here would refuse the take.
+    onTakeItem    Taking out of a container or a body. Watched below, and
+                  refused on one path only: THE TAKE LIMIT, another person's
+                  body or a container in a building another person holds.
+                  TakeItemEvent::OnFireSuccess is what removes the items, so
+                  a false here refuses the take.
     onDropItem    Dropping from the pack onto the ground. Watched below, never
                   refused. MpActor::DropItem stops before RemoveItems on a
                   false. Gold cannot be dropped at all: DropItem returns before
@@ -36793,13 +36795,14 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   and /give and /spawn log what they made. That is the one way a person can
   make an item on this server, and it is logged.
 
-  WHAT IS NOT REFUSED YET, AND WHY. The rules page asks for "no griefing", and
-  rule 4 in the world says "You cannot empty someone's house because you found
-  it unlocked while they were offline". Which take the server should refuse
-  to hold that rule, a box inside somebody else's claim or another person's
-  body, is a decision Patrick has not made. A handler that answers false too
-  eagerly shuts every chest in Skyrim for everybody at once, so until he makes
-  it the two handlers below watch and refuse nothing.
+  WHAT IS REFUSED, AND WHY ONLY THAT. The rules page asks for "no griefing",
+  and rule 4 in the world says "You cannot empty someone's house because you
+  found it unlocked while they were offline". Patrick decided on 28 September
+  (issue #475) which takes the server holds to that rule: another person's
+  body and another person's containers, online or offline, a few things each
+  and only a share of a stack. THE TAKE LIMIT below is that and nothing more.
+  A handler that answers false too eagerly shuts every chest in Skyrim for
+  everybody at once, so every other take is watched and let through.
 
   Hits are a different case: nothing here can refuse one, only hear it,
   through onPapyrusEvent:OnHit. Nothing listens to it yet. It is raised for
@@ -36823,9 +36826,11 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   of, and the cell the person was standing in, which for a house is the house.
   Grep for "take:" and "drop:".
 
-  THEY NEVER RETURN ANYTHING, and that is the whole of the safety. guard()
-  turns a throw into undefined and every read below has its own try, so the
-  worst a fault here can do is a line with less in it.
+  THEY RETURN NOTHING, with one exception, and that is the whole of the
+  safety. guard() turns a throw into undefined and every read below has its
+  own try, so the worst a fault here can do is a line with less in it. The
+  exception is a take THE TAKE LIMIT refuses: a false then, and a "take
+  refused:" line. A limit that is missing or throws lets the take through.
 */
 
 /*
@@ -36878,6 +36883,15 @@ function auditCell(actorId) {
 }
 
 mp.onTakeItem = guard('onTakeItem', function (sourceRefrId, actorId, baseId, count) {
+  var limit = globalThis.__thornswoodTakeLimit;
+  var no = null;
+  try { no = (limit && limit.take) ? limit.take(sourceRefrId, actorId, baseId, count) : null; }
+  catch (e) { no = null; }
+  if (no) {
+    log('take refused:', auditPerson(actorId), 'asked for', Number(count) || 0, auditItem(baseId),
+        'from', auditSource(sourceRefrId), 'in', auditCell(actorId), '(' + no + ')');
+    return false;
+  }
   log('take:', auditPerson(actorId), 'took', Number(count) || 0, auditItem(baseId),
       'from', auditSource(sourceRefrId), 'in', auditCell(actorId));
 });
@@ -36886,6 +36900,221 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   log('drop:', auditPerson(actorId), 'dropped', Number(count) || 0, auditItem(baseId),
       'in', auditCell(actorId));
 });
+
+/*
+  THE TAKE LIMIT: A FEW THINGS FROM ANOTHER PERSON, AND ONLY A SHARE OF A STACK.
+
+  Patrick, 28 September, issue #475: "Bodies and storages even if they are
+  offline they should be allowed to take some things. They should not be
+  allowed to just take alot off of them and if they take spetum it should only
+  be a percentages and still count as one of the few so let's say they can take
+  3 things and if they are taking something that is a stack only a percentage
+  of that stack". Rule 4 on the rules page says the same thing in the world's
+  words: "Take something. Take a good thing. Leave the rest".
+
+  WHAT IS LIMITED. A take from another person's body, and a take from a
+  container in a building another person holds (the property register,
+  holderOf, which is the one record of who owns what). Whether that person is
+  online makes no difference. Everything else is let through untouched: a
+  world container nobody holds, an NPC's body, your own body and anything in
+  a building you hold. A hold's box belongs to the hold rather than to a
+  person, so it is not limited either, unless it stands in somebody's house.
+
+  THE RULE. At most TAKE_LIMIT takes per taker, per body or container, per
+  TAKE_WINDOW_MS. A stack counts as one take, and one take may carry off no
+  more than STACK_SHARE of that stack, rounded down and never less than one.
+  The taker is a profile, not a character, so a second character on the same
+  account does not start a fresh count.
+
+  WHY 24 HOURS AND NOT A RESPAWN. A body here is the person's own actor: it
+  gets up where it respawns and falls again as the same reference, so there is
+  no new body to hang a fresh count on, and a container has no natural end at
+  all. One real day is the same answer for both, and it is easy to say in
+  chat. The window starts at the first take and the fourth is refused until it
+  has run out.
+
+  WHY A TAKE OVER THE SHARE IS REFUSED RATHER THAN SHRUNK. The engine hands
+  mp.onTakeItem a count and moves exactly that count on success
+  (TakeItemEvent::OnFireSuccess, RemoveItems on the entry it was given, which
+  is const). A handler can only say yes or no. So the taker is told in chat how
+  many of that stack they may take, and takes again.
+
+  THE CLIENT MOVES THE ITEM FIRST and then asks (containersService.ts), so on a
+  refusal the taker's own pack is sent back to them as the server has it, the
+  same message every successful take sends, and the thing leaves their pack
+  again. It is still in the body or container, and opening it again shows it.
+
+  THE COUNTS SURVIVE A RESTART, in the private folder as take-limit.json,
+  written to a temp copy and renamed like characters.json. A deploy restarts
+  the server, and a limit that a restart forgets is a limit a thief waits out.
+  Rows past their window are dropped whenever the file is read or written.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+
+  // How many takes one person may make from one body or one container.
+  var TAKE_LIMIT = 3;
+  // How long those takes are counted for: 24 real hours from the first one.
+  var TAKE_WINDOW_MS = 24 * 60 * 60 * 1000;
+  // How much of one stack one take may carry off: a quarter, rounded down, at least 1.
+  var STACK_SHARE = 0.25;
+
+  var fs = null, path = null;
+  try { fs = require('fs'); path = require('path'); } catch (e) { return; }
+
+  var privDir = 'private';
+  try {
+    var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+    if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
+  } catch (e) { }
+  var FILE = path.join(privDir, 'take-limit.json');
+
+  function now() { return Date.now(); }
+
+  // "<taker profile>|<source form id in hex>" -> { n: takes counted, at: first take }
+  var counts = loadCounts();
+
+  function loadCounts() {
+    var out = {};
+    var raw = null;
+    try { raw = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { return out; }
+    var rows = (raw && typeof raw === 'object' && raw.counts && typeof raw.counts === 'object')
+      ? raw.counts : {};
+    var t = now();
+    for (var k in rows) {
+      if (!Object.prototype.hasOwnProperty.call(rows, k) || k === '__proto__') { continue; }
+      var r = rows[k];
+      var n = Number(r && r.n) || 0;
+      var at = Number(r && r.at) || 0;
+      if (n <= 0 || at <= 0 || t - at >= TAKE_WINDOW_MS) { continue; }
+      out[k] = { n: n, at: at };
+    }
+    return out;
+  }
+
+  function saveCounts() {
+    var t = now();
+    for (var k in counts) {
+      if (Object.prototype.hasOwnProperty.call(counts, k) && t - counts[k].at >= TAKE_WINDOW_MS) {
+        delete counts[k];
+      }
+    }
+    var text = JSON.stringify({ at: t, counts: counts });
+    var tmp = FILE + '.tmp';
+    try {
+      try { fs.mkdirSync(privDir, { recursive: true }); } catch (e) { }
+      fs.writeFileSync(tmp, text);
+      try {
+        fs.renameSync(tmp, FILE);
+      } catch (e) {
+        fs.writeFileSync(FILE, text);
+        try { fs.unlinkSync(tmp); } catch (e2) { }
+      }
+    } catch (e) {
+      console.log('[thornswood] could not write the take limit: ' + e);
+    }
+  }
+
+  function profileOf(refrId) {
+    var pid = 0;
+    try { pid = Number(mp.get(refrId, 'profileId')) || 0; } catch (e) { pid = 0; }
+    return pid > 0 ? pid : 0;
+  }
+
+  /*
+    Whose this body or container is, or null when it is nobody's. A body
+    answers its own profile id (an NPC answers -1, which is nobody). A
+    container answers whoever holds the building it stands in, found by the
+    cell it is in, since a building here is its interior cell.
+  */
+  function ownerOf(refrId) {
+    var pid = profileOf(refrId);
+    if (pid) { return { pid: pid, what: 'body' }; }
+    var prop = g.__thornswoodProperty;
+    if (!prop || !prop.holderOf) { return null; }
+    var cell = '';
+    try { cell = String(mp.get(refrId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    if (!cell) { return null; }
+    var held = null;
+    try { held = prop.holderOf(cell); } catch (e) { held = null; }
+    var by = held ? (Number(held.by) || 0) : 0;
+    return by > 0 ? { pid: by, what: 'container' } : null;
+  }
+
+  /* How many of this item the body or container holds before the take. */
+  function stackOf(refrId, baseId) {
+    var inv = null;
+    try { inv = mp.get(refrId, 'inventory'); } catch (e) { inv = null; }
+    var entries = (inv && inv.entries) || [];
+    var n = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && Number(e.baseId) === Number(baseId)) { n += Number(e.count) || 0; }
+    }
+    return n;
+  }
+
+  /* Send the taker their pack as the server has it, so a refused item leaves it. */
+  function packAsServerHasIt(actorId) {
+    try { mp.set(actorId, 'inventory', mp.get(actorId, 'inventory')); } catch (e) { }
+  }
+
+  function refuse(actorId, text, why) {
+    say(actorId, text);
+    packAsServerHasIt(actorId);
+    return why;
+  }
+
+  /*
+    The answer to one take: null lets it through, a short reason refuses it
+    (mp.onTakeItem logs the reason and answers false).
+  */
+  function limitTake(sourceRefrId, actorId, baseId, count) {
+    var taker = profileOf(actorId);
+    if (!taker) { return null; }
+    var owner = ownerOf(sourceRefrId);
+    if (!owner || owner.pid === taker) { return null; }
+
+    var n = Number(count) || 0;
+    if (n < 1) { n = 1; }
+    var key = taker + '|' + ((Number(sourceRefrId) || 0) >>> 0).toString(16);
+    var row = Object.prototype.hasOwnProperty.call(counts, key) ? counts[key] : null;
+    if (row && now() - row.at >= TAKE_WINDOW_MS) { row = null; }
+    var used = row ? row.n : 0;
+    var where = owner.what === 'body' ? 'this body' : 'this container';
+
+    if (used >= TAKE_LIMIT) {
+      var hours = Math.max(1, Math.ceil((row.at + TAKE_WINDOW_MS - now()) / 3600000));
+      return refuse(actorId, 'You have already taken ' + TAKE_LIMIT + ' things from ' + where +
+                    '. Leave the rest. You may take again in ' + hours +
+                    (hours === 1 ? ' hour.' : ' hours.'),
+                    'the limit of ' + TAKE_LIMIT + ' takes');
+    }
+
+    var stack = stackOf(sourceRefrId, baseId);
+    if (stack < n) { stack = n; }
+    if (stack > 1) {
+      var share = Math.max(1, Math.floor(stack * STACK_SHARE));
+      if (n > share) {
+        return refuse(actorId, 'You may take up to ' + share + ' of those ' + stack +
+                      ', not ' + n + '. Only ' + Math.round(STACK_SHARE * 100) +
+                      '% of a stack may be taken from ' + where + '.',
+                      'over the share, ' + share + ' of ' + stack);
+      }
+    }
+
+    counts[key] = { n: used + 1, at: row ? row.at : now() };
+    saveCounts();
+    return null;
+  }
+
+  g.__thornswoodTakeLimit = {
+    take: limitTake, ownerOf: ownerOf,
+    TAKE_LIMIT: TAKE_LIMIT, TAKE_WINDOW_MS: TAKE_WINDOW_MS, STACK_SHARE: STACK_SHARE
+  };
+})();
+// end of the take limit
 
 
 // ==== thornswood needs: hunger, thirst and exhaustion ====
