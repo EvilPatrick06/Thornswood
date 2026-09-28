@@ -164,6 +164,14 @@ namespace Probe
         }
     }
 
+    // Stands in for launcher\app\Swallow.cs, which the lifted text calls from
+    // its catch blocks since the silent catches were given a log line.
+    static class Swallow
+    {
+        public static List<string> Notes = new List<string>();
+        public static void Note(string where, Exception e) { Notes.Add(where + ": " + e.Message); }
+    }
+
     public class Win
     {
         public IntPtr Handle; public uint Pid; public bool Visible; public int Width, Height; public string Title; public IntPtr Root;

@@ -283,8 +283,10 @@ the team before code; nobody settles it alone, and a Claude never does.
   1.1.101, predates signing; the next main Ship is the first signed one.
 - Every pull request gets the build check (.github/workflows/build.yml, about
   two minutes: the secret scan, every script and file parses, the writing
-  rules, the ownership page (`tests\test-ownership.js`, the one harness fast
-  enough to run here, added by issue #752), the launcher window, the count of
+  rules, the ownership page (`tests\test-ownership.js`, added by issue #752),
+  six more harnesses that are just as quick (the script index, the script
+  paths, the architecture page and three launcher harnesses, issue #875),
+  the launcher window, the count of
   silent catches in the launcher, and the launcher compiles with the .NET
   Framework csc). Red means the branch would stop Ship at the build step;
   fix that, and merge once it is green and you have said so in
