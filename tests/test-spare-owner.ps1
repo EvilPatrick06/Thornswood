@@ -132,6 +132,9 @@ namespace Thornswood
         public static void SetChooseAtMenu(int id) { Point = id; }
     }
     public static class Voice { public static void Reconfigure(int id) { } }
+    // Stands in for launcher\app\Swallow.cs, which Chars.cs calls from its
+    // catch blocks since the silent catches were given a log line (#461).
+    public static class Swallow { public static void Note(string where, Exception e) { } }
     public static class Door { public static Standing Last; }
     public static class Roster
     {

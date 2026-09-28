@@ -265,6 +265,7 @@ $ck = [IO.File]::ReadAllText((Join-Path $Here '..\launcher\app\Checks.cs'))
 $lifted = [ordered]@{
     'OwnGame.Skip'             = Get-CsMember $og 'static string Skip(string rel)'
     'OwnGame.CrashesUs'        = Get-CsMember $og 'static bool CrashesUs(string rel)'
+    'OwnGame.Parked'           = Get-CsMember $og 'static bool Parked(string rel)'
     'OwnGame.wantedPlugins'    = Get-CsLine $og '(?m)^\s*static HashSet<string> wantedPlugins = [^\r\n]*;'
     'OwnGame.UnwantedCreation' = Get-CsMember $og 'static bool UnwantedCreation(string rel)'
     'OwnGame.ClientFiles'      = (Get-CsMember $og 'public static readonly string[] ClientFiles =') + ';'
@@ -292,6 +293,10 @@ using System.Text.RegularExpressions;
 namespace $ns
 {
     public static class Paths { public static string PacksDir; public static string ProfileDir; public static string Game; }
+    // Stands in for launcher\app\Swallow.cs, which the lifted Keep.Forget
+    // calls from its catch blocks since the silent catches were given a log
+    // line (#461).
+    public static class Swallow { public static void Note(string where, Exception e) { } }
     public static class Checks
     {
         $($lifted['Checks.OffSuffix'])
@@ -300,6 +305,7 @@ namespace $ns
     {
         $($lifted['OwnGame.Skip'])
         $($lifted['OwnGame.CrashesUs'])
+        $($lifted['OwnGame.Parked'])
         $($lifted['OwnGame.wantedPlugins'])
         $($lifted['OwnGame.UnwantedCreation'])
         $($lifted['OwnGame.ClientFiles'])
@@ -346,8 +352,11 @@ foreach ($a in $apart) { Write-Host "      they disagree on $a" }
 
 $rulesNum = [regex]::Match($og, '(?m)^\s*const int Rules = (\d+);')
 $rulesDoc = [regex]::Match($og, '(?m)^\s*/// (\d+): the retired dresser, thornswood-chargen\.js')
+# At least the dresser's number, not equal to it: rules 5 and 6 (#640 and the
+# Distribution links) moved Rules on past it on purpose, and a folder made
+# under anything before 4 still refreshes once.
 Yes 'OwnGame.Rules moved for it, so every folder made under the old rules refreshes once and records it as left out' (
-    $rulesNum.Success -and $rulesDoc.Success -and $rulesNum.Groups[1].Value -eq $rulesDoc.Groups[1].Value)
+    $rulesNum.Success -and $rulesDoc.Success -and [int]$rulesNum.Groups[1].Value -ge [int]$rulesDoc.Groups[1].Value)
 
 # The model of Refresh below has two branches: a name Skip lets through that
 # the folder lacks is copied in, and one it holds is left alone. That is only

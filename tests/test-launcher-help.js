@@ -46,7 +46,14 @@ const vpage   = read('..', 'game', 'ui', 'thornswood-voice.js');
 const vserver = read('..', 'voice', 'voice-server.js');
 const vinstall = read('../scripts/deploy/Install-Voice.ps1');
 const keys    = read('..', 'launcher', 'app', 'Keys.cs');
-const shell   = read('..', 'launcher', 'app', 'Shell.cs');
+// Shell is one partial class across Shell.cs and the Shell*.cs files since
+// the split (#500), so the update code the address check reads is in
+// ShellUpdate.cs now. All of them, read as the one class they compile to.
+const shell   = fs.readdirSync(path.join(TOOLS_DIR, '..', 'launcher', 'app'))
+  .filter(function (f) { return /^Shell\w*\.cs$/.test(f); })
+  .sort()
+  .map(function (f) { return read('..', 'launcher', 'app', f); })
+  .join('\n');
 const enforce = read('..', 'launcher', 'app', 'Enforce.cs');
 const ini     = read('..', 'launcher', 'Thornswood.ini');
 
