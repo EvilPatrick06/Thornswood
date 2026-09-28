@@ -360,7 +360,8 @@ launcher. It has its own Profile, and makes its own `Game` folder the same way
 from its own Settings, under Maintenance.
 
 **Smaller pieces.** Stats.cs (`Profile\stats.txt`), Leaks.cs (the shipped sign
-in file), Icons.cs (the shortcut icon), Stall.cs and Waiting.cs
+in file), Icons.cs (the shortcut icon), BrowserArgs.cs (switches for the
+launcher's WebView2 browsers, such as no mDNS in the voice browser), Stall.cs and Waiting.cs
 (section 1), Diag.cs (`Profile\Reports`), Files.cs (saves and logs for the
 pages), Secrets.cs (DPAPI and locking a file to this account), Junction.cs
 (making and reading junctions without cmd), Steam.cs (finding Steam and its
