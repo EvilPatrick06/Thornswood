@@ -132,32 +132,82 @@ jobs:
           # step hung for twenty minutes where one at a time it finished in five
           # and a half, so it stays serial. Each harness's time is printed, and
           # the step ends with the ten slowest and the ones that failed.
-          $all = @(Get-ChildItem tests -File | Where-Object { $_.Name -like 'test-*.js' -or $_.Name -like 'test-*.ps1' } | Sort-Object Name)
-          $results = foreach ($t in $all) {
+          #
+          # AND EACH ONE ON A CLOCK, and printed the moment it ends. On 26 and
+          # 28 September this step ran until the job's 45 minutes were up and
+          # was cancelled with nothing in the log, because every harness's
+          # output was held until all of them had finished, and one never did.
+          # So each runs as its own process with its output in a file, gets
+          # PER_HARNESS seconds, and past that it and everything it started are
+          # killed and it is named as timed out. The rest still run.
+          #
+          # And what a harness leaves running when it ends is killed too, and
+          # named. The runner killed three node processes nobody had stopped
+          # when it cancelled the job, and one of those holding the output
+          # pipe open is enough to keep the old "| Out-String" waiting for ever.
+          $PER_HARNESS = 300
+          $tmp = Join-Path $env:RUNNER_TEMP 'harness-out'
+          New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+          # An empty file for stdin: no harness reads it, and one that tried
+          # would otherwise wait on the runner's for ever.
+          $nothing = Join-Path $tmp 'stdin.empty'
+          Set-Content -Path $nothing -Value $null -NoNewline
+          # What a harness left running after it ended: the processes it
+          # started, and theirs, found by parent id and killed. Only ones
+          # started after the harness, so a pid Windows has since handed to
+          # something else is left alone.
+          function Kill-Left($id, $since) {
+            $procs = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, Name, CreationDate)
+            $mine = @{ $id = $true }; $left = @()
+            do {
+              $more = @($procs | Where-Object { $mine[[int]$_.ParentProcessId] -and -not $mine[[int]$_.ProcessId] -and $_.CreationDate -ge $since })
+              foreach ($q in $more) { $mine[[int]$q.ProcessId] = $true; $left += $q }
+            } while ($more.Count)
+            foreach ($q in $left) { Stop-Process -Id $q.ProcessId -Force -ErrorAction SilentlyContinue }
+            @($left | ForEach-Object { $_.Name })
+          }
+          # Start-Process joins -ArgumentList with spaces and quotes nothing,
+          # so a path is quoted here. $p.Handle is read at once because
+          # without it ExitCode comes back empty once the process is gone.
+          function Run-One($exe, $argList, $name, $path) {
+            $file = $name -replace '[\\/]', '_'
+            $o = Join-Path $tmp ($file + '.out'); $e = Join-Path $tmp ($file + '.err')
+            $since = (Get-Date).AddSeconds(-1)
             $sw = [Diagnostics.Stopwatch]::StartNew()
-            $out = if ($t.Extension -eq '.js') { & node $t.FullName 2>&1 | Out-String } else { & pwsh -NoProfile -File $t.FullName 2>&1 | Out-String }
-            [pscustomobject]@{ Name = $t.Name; Path = $t.FullName; Code = $LASTEXITCODE; Out = $out; Secs = [Math]::Round($sw.Elapsed.TotalSeconds, 1) }
+            $p = Start-Process -FilePath $exe -ArgumentList $argList -NoNewWindow -PassThru `
+                   -RedirectStandardInput $nothing -RedirectStandardOutput $o -RedirectStandardError $e
+            $null = $p.Handle
+            $timedOut = -not $p.WaitForExit($PER_HARNESS * 1000)
+            if ($timedOut) { & taskkill.exe /T /F /PID $p.Id 2>&1 | Out-Null; $null = $p.WaitForExit(10000) }
+            $code = if ($timedOut) { -1 } else { $p.ExitCode }
+            $secs = [Math]::Round($sw.Elapsed.TotalSeconds, 1)
+            $left = @(Kill-Left $p.Id $since)
+            Write-Host ("--- {0}  ({1}s)" -f $name, $secs)
+            foreach ($f in $o, $e) { if (Test-Path $f) { $txt = Get-Content -Raw $f; if ($txt) { Write-Host $txt.TrimEnd() } } }
+            if ($timedOut) { Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $path, $PER_HARNESS) }
+            elseif ($code -ne 0) { Write-Host ("::error file={0}::harness failed (exit {1})" -f $path, $code) }
+            if ($left.Count) { Write-Host ("::warning file={0}::harness left {1} process(es) running when it ended, now killed: {2}" -f $path, $left.Count, ($left -join ', ')) }
+            [pscustomobject]@{ Name = $name; Path = $path; Code = $code; TimedOut = $timedOut; Secs = $secs }
           }
-          $failed = @()
-          foreach ($r in ($results | Sort-Object Name)) {
-            Write-Host ("--- {0}  ({1}s)" -f $r.Name, $r.Secs)
-            Write-Host $r.Out
-            if ($r.Code -ne 0) { $failed += $r.Name; Write-Host ("::error file={0}::harness failed" -f $r.Path) }
-          }
+          $all = @(Get-ChildItem tests -File | Where-Object { $_.Name -like 'test-*.js' -or $_.Name -like 'test-*.ps1' } | Sort-Object Name)
+          $results = @(foreach ($t in $all) {
+            if ($t.Extension -eq '.js') { Run-One 'node' @('"' + $t.FullName + '"') $t.Name $t.FullName }
+            else { Run-One 'pwsh' @('-NoProfile', '-File', ('"' + $t.FullName + '"')) $t.Name $t.FullName }
+          })
+          $failed = @($results | Where-Object { $_.Code -ne 0 } | ForEach-Object { if ($_.TimedOut) { $_.Name + ' (timed out)' } else { $_.Name } })
           $bad = $failed.Count
           Write-Host ''
           Write-Host ('slowest: ' + ((@($results | Sort-Object Secs -Descending | Select-Object -First 10) | ForEach-Object { '{0} {1}s' -f $_.Name, $_.Secs }) -join ', '))
           Write-Host ('all of them, added up: {0}s' -f [Math]::Round(($results | Measure-Object Secs -Sum).Sum))
           $voiceFailed = @()
-          # The five in voice, which run nowhere else. They spawn the
+          # The ones in voice (eleven by 28 September), which run nowhere else. They spawn the
           # real service in a temp folder and drive it over HTTP, so they need
           # node and nothing else, and node is already here. Added 23
           # September: the harness step globbed tools with no -Recurse, so
           # thirty ran and these five never had.
           foreach ($t in (Get-ChildItem voice -Filter 'test-*.js' -File | Sort-Object Name)) {
-            Write-Host ("--- voice/{0}" -f $t.Name)
-            & node $t.FullName
-            if ($LASTEXITCODE -ne 0) { $bad++; $voiceFailed += ('voice/' + $t.Name); Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+            $r = Run-One 'node' @('"' + $t.FullName + '"') ('voice/' + $t.Name) $t.FullName
+            if ($r.Code -ne 0) { $bad++; $voiceFailed += ('voice/' + $t.Name + $(if ($r.TimedOut) { ' (timed out)' } else { '' })) }
           }
           if ($bad) {
             Write-Host ''
@@ -196,12 +246,22 @@ jobs:
             Write-Host '::warning::could not install discord.py, so the bot harnesses did not run'
             exit 0
           }
+          #
+          # Each on a clock, as in the step above: 300 seconds, then it and
+          # everything it started are killed and it is named, and the rest
+          # still run. Their output comes straight through as it is written.
           $env:DISCORD_TOKEN = 'not-a-real-token'
+          $PER_HARNESS = 300
           $bad = 0
           foreach ($t in (Get-ChildItem bot -Filter 'test-*.py' -File | Sort-Object Name)) {
             Write-Host ("--- {0}" -f $t.Name)
-            & $py $t.FullName
-            if ($LASTEXITCODE -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed" -f $t.FullName) }
+            $p = Start-Process -FilePath $py -ArgumentList ('"' + $t.FullName + '"') -NoNewWindow -PassThru
+            $null = $p.Handle
+            if (-not $p.WaitForExit($PER_HARNESS * 1000)) {
+              & taskkill.exe /T /F /PID $p.Id 2>&1 | Out-Null
+              $bad++; Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $t.FullName, $PER_HARNESS)
+            }
+            elseif ($p.ExitCode -ne 0) { $bad++; Write-Host ("::error file={0}::harness failed (exit {1})" -f $t.FullName, $p.ExitCode) }
           }
           if ($bad) { exit 1 }
           Write-Host 'every bot harness passed'
