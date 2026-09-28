@@ -30,7 +30,15 @@ param(
     # (issue #889). Nothing waits on Enter; a stop exits 1 and the window shows
     # it; the one question left, the Steam depots, goes to the window as an
     # ASK line and the answer comes back on standard input.
-    [switch]$NonInteractive
+    [switch]$NonInteractive,
+    # The setup window's own folder card (issue #906). Ticked, the launcher
+    # makes Thornswood's own Skyrim folder without asking once Vortex has
+    # deployed: MakeOwnGame in config.json. Left out, the launcher asks, as it
+    # always has. Only a collection install has a folder to make.
+    [switch]$MakeOwnGame,
+    # Choose Vortex's folder, from the same card: saved as VortexGame in
+    # config.json, as the launcher's Settings button saves it.
+    [string]$VortexGame
 )
 
 
@@ -538,7 +546,38 @@ foreach ($f in 'Thornswood.exe', 'SkyrimTogether.exe') {
 # overwrites a filled one on the disk.
 $cfgFrom = Join-Path $Here 'config.json'
 $cfgTo   = Join-Path $Root 'config.json'
-if (Test-Path $cfgFrom) {
+
+# Thornswood's own Skyrim folder, as the setup window's card left it. The
+# launcher makes the folder itself (OwnGame.Make) once Vortex has deployed, so
+# all this does is answer its question in advance and name Vortex's folder.
+# The same check as the launcher's OwnGame.PointAt: a Skyrim, with Vortex's
+# record in it. Anything else is said and left out, never a stop, because the
+# launcher's own Settings button can still set it.
+$ownGame = [ordered]@{}
+if ($MakeOwnGame -or $VortexGame) {
+    Head "Thornswood's own Skyrim folder"
+    if (-not $Collection) {
+        Say '  This install already has a Game folder of its own, so there is nothing to make.' 'DarkGray'
+    } else {
+        if ($MakeOwnGame) {
+            $ownGame['MakeOwnGame'] = $true
+            Say '  On. The launcher makes it by itself once Vortex has deployed the Thornswood collection.' 'Green'
+        }
+        if ($VortexGame) {
+            $vg = $VortexGame.Trim().Trim('"').Trim().TrimEnd('\')
+            if (-not (Test-Path -LiteralPath (Join-Path $vg 'SkyrimSE.exe'))) {
+                Say "  $vg has no SkyrimSE.exe in it, so it is not a Skyrim folder. Choose Vortex's folder in the launcher's Settings instead." 'Yellow'
+            } elseif (-not (Test-Path -LiteralPath (Join-Path $vg 'Data\vortex.deployment.json'))) {
+                Say "  Vortex has not deployed into $vg, so it was not saved. Choose Vortex's folder in the launcher's Settings instead." 'Yellow'
+            } else {
+                $ownGame['VortexGame'] = $vg
+                Say "  Vortex's folder is set to $vg" 'Green'
+            }
+        }
+    }
+}
+
+if ((Test-Path $cfgFrom) -or $ownGame.Count) {
     function Read-Json($p) {
         if (-not (Test-Path $p)) { return $null }
         try {
@@ -556,6 +595,8 @@ if (Test-Path $cfgFrom) {
             if ("$($pr.Value)" -ne '' -or -not $out.Contains($pr.Name)) { $out[$pr.Name] = $pr.Value }
         }
     }
+    # The card's answer is this run's, so it goes over whatever was there.
+    foreach ($k in $ownGame.Keys) { $out[$k] = $ownGame[$k] }
     [IO.File]::WriteAllText($cfgTo, ($out | ConvertTo-Json -Depth 6),
         (New-Object Text.UTF8Encoding($false)))
     # Nobody but this account has any business reading it. It holds the server
@@ -722,6 +763,10 @@ if ($bad) {
         Say 'The launcher opens on the collection if your mods are not in yet.' 'DarkGray'
         Say 'Install it in Vortex and switch to the profile it makes. Without' 'DarkGray'
         Say 'that you have a launcher and no mods.' 'DarkGray'
+        if ($ownGame.Contains('MakeOwnGame')) {
+            Say "Once Vortex has deployed it, the launcher makes Thornswood's own" 'DarkGray'
+            Say 'Skyrim folder by itself and restarts.' 'DarkGray'
+        }
     } else {
         Say 'Your Steam copy of Skyrim was not modified.' 'DarkGray'
     }
