@@ -896,6 +896,48 @@ async function standingCached(id) {
   return v;
 }
 
+/* Every linked account's standing, for /api/allowed, inside the door's time.
+
+   The route asked one account at a time. The door gives up after ten
+   seconds (req.setTimeout in the gamemode's refresh), and when the bulk
+   member list is refused each account is its own request to Discord: at
+   100ms a call, a hundred linked accounts is ten seconds and the door never
+   hears an answer at all (issue #415).
+
+   So four at a time, and all of it inside DOOR_BUDGET_MS. An account not
+   answered by then, or not asked because Discord said to wait longer than
+   the time left, comes back as a failed lookup, which the route names in
+   failedProfiles and the door keeps exactly as it was. A wait that ends
+   inside the time left is waited out once, not once per account. */
+const DOOR_BUDGET_MS = 7000;
+const DOOR_LANES = 4;
+async function standingsForDoor(ids) {
+  const got = new Map();
+  const started = Date.now();
+  let timer = null;
+  const late = new Promise((r) => { timer = setTimeout(() => r(null), DOOR_BUDGET_MS); });
+  let next = 0;
+  async function lane() {
+    while (next < ids.length) {
+      const id = ids[next++];
+      const left = DOOR_BUDGET_MS - (Date.now() - started);
+      const quiet = discordQuietMs();
+      if (left <= 0) { got.set(id, { lookupFailed: 'ran out of time asking Discord' }); continue; }
+      if (quiet >= left) { got.set(id, { lookupFailed: 'rate limited by Discord' }); continue; }
+      if (quiet > 0) await new Promise((r) => setTimeout(r, quiet));
+      let st;
+      try { st = await Promise.race([standingCached(String(id)), late]); }
+      catch (e) { st = { lookupFailed: String(e) }; }
+      got.set(id, st || { lookupFailed: 'ran out of time asking Discord' });
+    }
+  }
+  const lanes = [];
+  for (let i = 0; i < Math.min(DOOR_LANES, ids.length); i++) lanes.push(lane());
+  await Promise.all(lanes);
+  clearTimeout(timer);
+  return got;
+}
+
 async function who(req) {
   const me = identity(req);
   if (!me) return { member: isMember(req), admin: false, dev: false, name: '', id: '', play: false };
@@ -1136,10 +1178,37 @@ function post(url, form) {
    them they were not in the Discord. The one person that never affected was
    whoever is on the hand written admin list, because that is checked first, so
    it looked fine from the only account that could have noticed. */
+/* QUIET UNTIL. discordGet recognised a 429 and then asked again straight
+   away, for the next person on the list, so one rate limit became a run of
+   them. Discord says how long to wait: Retry-After or x-ratelimit-reset-after
+   on the 429, and x-ratelimit-remaining 0 with x-ratelimit-reset-after on the
+   last answer before one. That time is kept here, once for the whole site,
+   and until it passes discordGet answers "rate limited" without asking. It
+   is not a sleep: a sleep here would be paid once per linked account and
+   blow the door's ten seconds (issue #415). Capped at a minute, so a strange
+   header cannot shut the site out of Discord for longer than that. */
+let discordQuietUntil = 0;
+function discordQuietMs() { return Math.max(0, discordQuietUntil - Date.now()); }
+function discordWaitMs(headers, text) {
+  const h = headers || {};
+  let s = parseFloat(h['retry-after']);
+  if (!(s >= 0) && h['retry-after']) {
+    // Retry-After may also be a date (RFC 9110); Discord sends seconds.
+    const at = Date.parse(h['retry-after']);
+    if (at) s = (at - Date.now()) / 1000;
+  }
+  if (!(s >= 0)) s = parseFloat(h['x-ratelimit-reset-after']);
+  if (!(s >= 0)) { try { s = parseFloat(JSON.parse(text).retry_after); } catch (e) { } }
+  if (!(s >= 0)) return -1;
+  return Math.min(60000, Math.ceil(s * 1000));
+}
 function discordGet(path) {
   return new Promise((resolve) => {
     if (!cfg.discord.botToken) {
       return resolve({ ok: false, status: 0, body: null, why: 'no bot token set' });
+    }
+    if (discordQuietMs() > 0) {
+      return resolve({ ok: false, status: 429, body: null, why: 'rate limited by Discord' });
     }
     const req = https.get({
       hostname: 'discord.com', path: '/api/v10' + path,
@@ -1148,6 +1217,13 @@ function discordGet(path) {
       let out = '';
       res.on('data', (d) => out += d);
       res.on('end', () => {
+        const hdr = res.headers || {};
+        if (res.statusCode === 429 || String(hdr['x-ratelimit-remaining']) === '0') {
+          const wait = discordWaitMs(res.statusCode === 429 ? hdr : { 'x-ratelimit-reset-after': hdr['x-ratelimit-reset-after'] }, out);
+          // A 429 with no readable wait still backs off for a second.
+          const ms = wait >= 0 ? wait : (res.statusCode === 429 ? 1000 : 0);
+          discordQuietUntil = Math.max(discordQuietUntil, Date.now() + ms);
+        }
         if (res.statusCode === 200) {
           try { return resolve({ ok: true, status: 200, body: JSON.parse(out) }); }
           catch (e) { return resolve({ ok: false, status: 200, body: null, why: 'unreadable answer' }); }
@@ -3627,13 +3703,15 @@ async function handle(req, res) {
     const seenAdmin = new Set();
     const seenJarl = new Set();
     const seenFailed = new Set();
+    const hasProfiles = (d) => (Array.isArray((linked[d] || {}).profiles) ? linked[d].profiles : [])
+      .map(Number).some((n) => n > 0);
+    const answers = await standingsForDoor(Object.keys(linked).filter(hasProfiles));
     for (const d of Object.keys(linked)) {
       const row = linked[d] || {};
       const profiles = (Array.isArray(row.profiles) ? row.profiles : [])
         .map(Number).filter((n) => n > 0);
       if (!profiles.length) continue;
-      let st;
-      try { st = await standingCached(String(d)); } catch (e) { st = { lookupFailed: String(e) }; }
+      const st = answers.get(d) || { lookupFailed: 'not asked' };
       if (st.lookupFailed) {
         /* WHY, NOT JUST THAT. This reduced a specific reason to a boolean, so
            the game server could only ever say "the site could not reach
