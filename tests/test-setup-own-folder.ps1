@@ -226,7 +226,7 @@ using System.Runtime.Serialization;
         $pay = Join-Path $case 'payload'
         $inst = Join-Path $case 'install'
         New-Item -ItemType Directory -Force -Path $pay, $inst | Out-Null
-        [IO.File]::WriteAllText((Join-Path $pay 'config.json'), '{ "ServerAddress": "192.135.112.23", "VortexGame": "", "ServerPassword": "" }')
+        [IO.File]::WriteAllText((Join-Path $pay 'config.json'), '{ "ServerAddress": "203.0.113.23", "VortexGame": "", "ServerPassword": "" }')
         if ($oldJson) { [IO.File]::WriteAllText((Join-Path $inst 'config.json'), $oldJson) }
         $pre = @(
             'Set-StrictMode -Version Latest'
