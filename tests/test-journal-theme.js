@@ -347,6 +347,24 @@ yes('the K panel\'s stylesheet was read out of thornswood-skills.js', !!K['#ts-s
   keys.keydown({ key: 'Escape', preventDefault() { } });
   yes('Escape closes it and tells the plugin', root.className === '' &&
       told.indexOf('thornswood-front journal:closed') >= 0);
+
+  // J, as the foot says (#530). While the page holds the keyboard the plugin
+  // hears no key at all, so the page has to close itself on J. Not while
+  // somebody is typing a j into a page or a title, and not Ctrl+J.
+  const shutWas = told.filter(function (t) { return t === 'thornswood-front journal:closed'; }).length;
+  J.open();
+  keys.keydown({ key: 'j', target: makeEl('textarea'), preventDefault() { } });
+  yes('J typed into the page text leaves it open', J.isOpen());
+  keys.keydown({ key: 'j', target: makeEl('input'), preventDefault() { } });
+  yes('J typed into a title or a name leaves it open', J.isOpen());
+  keys.keydown({ key: 'j', ctrlKey: true, target: doc.body, preventDefault() { } });
+  yes('Ctrl+J leaves it open', J.isOpen());
+  keys.keydown({ key: 'j', target: doc.body, preventDefault() { } });
+  yes('J anywhere else closes it and tells the plugin', !J.isOpen() && root.className === '' &&
+      told.filter(function (t) { return t === 'thornswood-front journal:closed'; }).length === shutWas + 1);
+  J.open();
+  keys.keydown({ key: 'J', target: doc.body, preventDefault() { } });
+  yes('and so does Shift+J', !J.isOpen());
 }
 
 console.log('');

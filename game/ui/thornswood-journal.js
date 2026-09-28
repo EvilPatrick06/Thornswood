@@ -161,13 +161,27 @@
       '</div>';
     document.body.appendChild(root);
     root.querySelector('#' + ID + '-close').onclick = close;
-    // The page answers its own Escape; no plugin can see a key while the
-    // browser holds the keyboard. See thornswood-bridge.js.
+    // The page answers its own Escape, and its own J; no plugin can see a key
+    // while the browser holds the keyboard. See thornswood-bridge.js. The
+    // footer has said "Escape or J closes this" since #288, and J reached
+    // neither the game nor the plugin while this panel held the keyboard, so
+    // it did nothing (#530). J closes only when the caret is not in a title
+    // or a page, where it is a letter somebody is writing.
     document.addEventListener('keydown', function (ev) {
       if (!shown) { return; }
-      if (ev.key === 'Escape') { ev.preventDefault(); close(); }
+      if (ev.key === 'Escape') { ev.preventDefault(); close(); return; }
+      if ((ev.key === 'j' || ev.key === 'J') && !ev.ctrlKey && !ev.altKey && !ev.metaKey && !typing(ev.target)) {
+        ev.preventDefault(); close();
+      }
     });
     return root;
+  }
+
+  // True when a key would go into a title, a page or any other text field.
+  function typing(el) {
+    if (!el || !el.tagName) { return false; }
+    var t = String(el.tagName).toUpperCase();
+    return t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || !!el.isContentEditable;
   }
 
   function esc(s) {

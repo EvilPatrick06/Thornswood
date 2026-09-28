@@ -1329,20 +1329,21 @@
   // The keyboard is only handed over once the page has said it has a box to
   // type into, and it is handed back on a message from the page.
   //
-  // This used to say that a plugin cannot watch for the key that would undo
-  // what it just did, because raising focus withholds DirectInput and
-  // buttonEvent is built from the game's own input. That is half right and the
-  // wrong half mattered. DInputHook::GetDeviceData reads the keyboard, calls
-  // ProcessKeyboardData, which is what feeds buttonEvent, and only THEN checks
-  // ChromeFocus and zeroes the length:
+  // A plugin cannot hear a key as a buttonEvent while focus is up.
+  // DInputHook::GetDeviceData does read the keyboard and call
+  // ProcessKeyboardData before it checks ChromeFocus, but ProcessKeyboardData
+  // feeds OnKeyStateChange in the fork's main.cpp, which only injects the key
+  // into the browser. buttonEvent comes from the game's own input events, and
+  // the game gets an empty buffer:
   //
-  //     if (hr == DI_OK) { ProcessKeyboardData(rawData); ... }
-  //     if (DInputHook::ChromeFocus()) { *outDataLen = 0; return result; }
+  //     if (hr == DI_OK) { ProcessKeyboardData(rawData); ... }   // to the page
+  //     if (DInputHook::ChromeFocus()) { *outDataLen = 0; ... }   // not the game
   //
-  // So the game is starved and the plugins are not. Escape below is reachable
-  // the whole time focus is up, and the cap further down does not need any key
-  // at all. Both exist because everything that routes through the page is one
-  // stopPropagation away from leaving somebody frozen.
+  // So the game and the plugins are both starved; only the page hears keys.
+  // Escape below is caught by asking Input.isKeyPressed, the way F6 is (see
+  // watchFocusKeys), not by waiting for a buttonEvent, and the cap further down
+  // does not need any key at all. Both exist because everything that routes
+  // through the page is one stopPropagation away from leaving somebody frozen.
   //
   // Which is exactly what went wrong. Enter raised focus whether or not
   // anything had drawn a chat box, and when there was no box there was nothing
