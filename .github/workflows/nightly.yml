@@ -317,10 +317,14 @@ jobs:
           # CONTRIBUTING.md: no stray branches and no stray pull requests.
           $h = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'thornswood-nightly'; Accept = 'application/vnd.github+json' }
           $api = "https://api.github.com/repos/$env:REPO"
+          # Each call in brackets: Invoke-RestMethod hands a JSON array down the
+          # pipe as ONE object, so without them $_ was the whole list and the
+          # first run that got this far (28 September) died on
+          # [DateTime]$_.created_at.
           $old = [DateTime]::UtcNow.AddDays(-2)
-          $prs = @(Invoke-RestMethod -Headers $h -Uri "$api/pulls?state=open&per_page=100" | Where-Object { [DateTime]$_.created_at -lt $old })
-          $branches = @(Invoke-RestMethod -Headers $h -Uri "$api/branches?per_page=100" | Where-Object { $_.name -ne 'main' } | ForEach-Object { $_.name })
-          $open = @(Invoke-RestMethod -Headers $h -Uri "$api/pulls?state=open&per_page=100" | ForEach-Object { $_.head.ref })
+          $prs = @((Invoke-RestMethod -Headers $h -Uri "$api/pulls?state=open&per_page=100") | Where-Object { [DateTime]$_.created_at -lt $old })
+          $branches = @((Invoke-RestMethod -Headers $h -Uri "$api/branches?per_page=100") | Where-Object { $_.name -ne 'main' } | ForEach-Object { $_.name })
+          $open = @((Invoke-RestMethod -Headers $h -Uri "$api/pulls?state=open&per_page=100") | ForEach-Object { $_.head.ref })
           $stray = @($branches | Where-Object { $open -notcontains $_ })
           foreach ($p in $prs) { Write-Host ("::error::pull request #{0} has been open since {1}: {2}" -f $p.number, $p.created_at, $p.title) }
           foreach ($b in $stray) { Write-Host ("::error::branch {0} has no open pull request" -f $b) }
@@ -339,7 +343,9 @@ jobs:
           $api = "https://api.github.com/repos/$env:REPO"
           $title = 'Nightly checks failed'
           $line = "The nightly checks failed on $((Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')): $env:RUN. The failed step says which check; the harness step's last lines name every harness that failed."
-          $mine = @(Invoke-RestMethod -Headers $h -Uri "$api/issues?state=open&per_page=100" | Where-Object { $_.title -eq $title -and -not $_.pull_request })
+          # In brackets for the reason in the step above: without them $_ is
+          # the whole list, and the test matched on any one issue in it.
+          $mine = @((Invoke-RestMethod -Headers $h -Uri "$api/issues?state=open&per_page=100") | Where-Object { $_.title -eq $title -and -not $_.pull_request })
           if ($mine.Count) {
             Invoke-RestMethod -Method Post -Headers $h -Uri "$api/issues/$($mine[0].number)/comments" -Body (@{ body = $line } | ConvertTo-Json) -ContentType 'application/json' | Out-Null
             Write-Host "added to #$($mine[0].number)"
