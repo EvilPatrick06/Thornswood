@@ -17985,9 +17985,16 @@ log('gamemode loaded:',
     PEOPLE ONLY. The engine hands back everything in the squares around a
     position, chests and NPCs with it, and a chest with the deed in it is not
     a householder at the door. So only the people online are looked at. The
-    same filter steps over the empty slots the list starts with: the fork
-    makes the array at its full length and then appends, so the ids come after
-    as many holes as there are ids.
+    same filter steps over the empty slots a server built before #529 puts at
+    the front of the list (the fork made the array at its full length and then
+    appended); the fork now hands back the ids alone.
+
+    THE HOLDER BEFORE ANY DEED, AND THE PRESSER BEFORE ANYBODY NEARBY (#529).
+    It used to take the first person it came to who was either, neighbours
+    first, so somebody standing there with a stolen deed was handed the mold
+    ahead of the holder beside them. Now the holder counts first, wherever
+    they stand in the list, and a deed carrier only when the holder is not
+    there; within each, the person pressing is asked before anybody else.
   */
   function holderNearby(actorId, building, held) {
     var near = [];
@@ -17998,17 +18005,19 @@ log('gamemode loaded:',
     } catch (e) { near = []; }
     var online = [];
     try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
-    var all = [];
+    var all = [actorId];
     for (var n = 0; n < near.length; n++) {
       if (near[n] !== actorId && online.indexOf(near[n]) !== -1) { all.push(near[n]); }
     }
-    all.push(actorId);
+    var pids = [];
     for (var i = 0; i < all.length; i++) {
-      var id = all[i];
       var pid = 0;
-      try { pid = Number(mp.get(id, 'profileId')) || 0; } catch (e) { pid = 0; }
-      if (pid && pid === held.by) { return { actorId: id, profileId: pid }; }
-      if (holdsDeed(id, building)) { return { actorId: id, profileId: pid }; }
+      try { pid = Number(mp.get(all[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+      pids.push(pid);
+      if (pid && pid === held.by) { return { actorId: all[i], profileId: pid }; }
+    }
+    for (var j = 0; j < all.length; j++) {
+      if (holdsDeed(all[j], building)) { return { actorId: all[j], profileId: pids[j] }; }
     }
     return null;
   }
@@ -22461,7 +22470,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
       if (topic === 'people' || topic === 'friends' || topic === 'party') {
         toProfile(profileId,
-          'Look at somebody and press G to ask them to be friends, H to offer a ' +
+          'Look at somebody and press Y to ask them to be friends, H to offer a ' +
           'trade, L to stop hearing them. P opens your friends and your party; ' +
           'J opens your journals. Work done with your party in the same place ' +
           'counts for more. /yes and /no answer whatever somebody has asked you.');

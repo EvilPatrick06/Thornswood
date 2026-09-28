@@ -256,6 +256,13 @@ let PTT_KEY = 47;
  * sit on before it moved to G. */
 let MODE_KEY = 48;
 
+/* Locks the microphone open until it is pressed again, so a bard can sing,
+ * or somebody can talk for a while, without holding V. O. Patrick, 27
+ * September: "I want a key you can press that will lock voice so like when a
+ * bard sings they don't have to hold the key down or put something heavy on
+ * their keyboard". */
+let LOCK_KEY = 24;
+
 /*
  * Which microphone, by name.
  *
@@ -301,6 +308,7 @@ try {
   PTT_KEY = grab('PushToTalk', PTT_KEY);
   VOICE_PORT = grab('VoicePort', VOICE_PORT);
   MODE_KEY = grab('VoiceModeKey', MODE_KEY);
+  LOCK_KEY = grab('VoiceLockKey', LOCK_KEY);
   MIC_ON = grab('Microphone', 1) !== 0;
   // Spaces and tabs only around the value, never \s: with the value left
   // empty, \s* ran over the line break and (.+?) took the next line of the
@@ -594,6 +602,10 @@ let portCheckedAt = 0;
 */
 let myMode = 'local';
 let pttHeld = false;
+// The lock. Talking is the key held OR the lock on, so letting go of V while
+// it is locked leaves the microphone open, and the lock key is what shuts it.
+let voiceLocked = false;
+function talkingNow() { return pttHeld || voiceLocked; }
 const MODE_ORDER = ['whisper', 'local', 'yell'];
 let lastPttWritten = '';
 
@@ -715,7 +727,7 @@ sp.on('buttonEvent', guard('keys', (e) => {
       const at = MODE_ORDER.indexOf(myMode);
       myMode = MODE_ORDER[(at + 1) % MODE_ORDER.length];
       lastPttWritten = '';
-      writePtt(pttHeld);
+      writePtt(talkingNow());
 
       const ok = js('try{window.thornswoodVoice&&window.thornswoodVoice.setMode("' + myMode + '");}' +
                     'catch(e){window.skyrimPlatform.sendMessage("thornswood-voice",' +
@@ -725,23 +737,54 @@ sp.on('buttonEvent', guard('keys', (e) => {
     return;
   }
 
+  // The lock, on the way down only, for the same reason as the mode key. Said
+  // in the corner of the screen both ways, because a microphone left open by
+  // mistake is everybody nearby hearing the room.
+  if (e.code === LOCK_KEY) {
+    if (e.isDown && !e.isUp) {
+      voiceLocked = !voiceLocked;
+      sendTalking();
+      try {
+        sp.Debug.notification(voiceLocked ? 'Microphone locked open. Press ' + letterOf(LOCK_KEY) +
+                                            ' again to close it.'
+                                          : 'Microphone closed.');
+      } catch (err) { }
+      log('voice lock ' + (voiceLocked ? 'on' : 'off'));
+    }
+    return;
+  }
+
   if (e.code !== PTT_KEY) { return; }
 
   if (e.isDown && !e.isUp) {
     pttHeld = true;
-    writePtt(true);
-    const ok = js('try{window.thornswoodVoice&&window.thornswoodVoice.setTalking(true);}' +
-                  'catch(e){window.skyrimPlatform.sendMessage("thornswood-voice",' +
-                  '"talk on threw | "+e);}');
+    const ok = sendTalking();
     once('talk-sent', 'push to talk sent to the page' + (ok ? '' : ', but the send failed'));
   } else if (e.isUp) {
     pttHeld = false;
-    writePtt(false);
-    js('try{window.thornswoodVoice&&window.thornswoodVoice.setTalking(false);}' +
-       'catch(e){window.skyrimPlatform.sendMessage("thornswood-voice",' +
-       '"talk off threw | "+e);}');
+    sendTalking();
   }
 }));
+
+// A scan code's letter, for the notice, so a rebound lock names its own key.
+function letterOf(code) {
+  const rows = [[16, 'QWERTYUIOP'], [30, 'ASDFGHJKL'], [44, 'ZXCVBNM']];
+  for (let i = 0; i < rows.length; i++) {
+    const at = code - rows[i][0];
+    if (at >= 0 && at < rows[i][1].length) { return rows[i][1][at]; }
+  }
+  return 'the lock key';
+}
+
+// Push to talk and the lock both end here: the launcher's file first, then
+// the page's microphone icon.
+function sendTalking() {
+  const on = talkingNow();
+  writePtt(on);
+  return js('try{window.thornswoodVoice&&window.thornswoodVoice.setTalking(' + on + ');}' +
+            'catch(e){window.skyrimPlatform.sendMessage("thornswood-voice",' +
+            '"talk ' + (on ? 'on' : 'off') + ' threw | "+e);}');
+}
 
 /*
   Who this person has muted, on its way to the launcher.
