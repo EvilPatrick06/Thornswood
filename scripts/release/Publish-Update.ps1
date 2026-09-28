@@ -55,6 +55,10 @@ param(
     # the one written in app\Updater.cs. Ship uses it for dev builds, whose
     # number lives only in the exe.
     ,[string]$VersionOverride
+    # With -Launcher: the fingerprint of what that exe is compiled from, which
+    # Ship works out (Get-LauncherInputHash). Written to the feed as
+    # launcherInputs, issue #921.
+    ,[string]$LauncherInputs
     # After uploading to GitHub, rewrite pack/launcher/clientRuntime urls in
     # version.json to https://thornswood.net/feed/assets/<sha256> (or
     # /feed-dev/assets/<sha256> on the dev channel) for the #649 host cutover.
@@ -1539,6 +1543,10 @@ if ($Launcher -and (Test-Path $exePath)) {
     Set-Prop $doc 'launcherVersion' $launcherVersion
     Set-Prop $doc 'launcherUrl' $exeUrl
     Set-Prop $doc 'launcherSha256' $nowSha
+    # What that exe was compiled from, so the next Ship can keep it rather than
+    # rebuild and re-sign an identical one (issue #921). Cleared when nobody
+    # said, so a launcher published by hand never inherits the last fingerprint.
+    Set-Prop $doc 'launcherInputs' ([string]$LauncherInputs)
     Say "  launcher $launcherVersion recorded" 'Green'
 
     # The updater decides by version number alone. A changed exe under an
