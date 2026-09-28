@@ -124,7 +124,7 @@ function key(name, fallback) {
   return isNaN(n) ? fallback : n;
 }
 
-const OPEN_KEY  = key('WheelKey', 48);   // B
+const OPEN_KEY  = key('WheelKey', 34);   // G, the template's since 13 Sep
 const PAGE_KEY  = key('PageKey', 15);    // Tab, while the wheel is open
 const CLOSE_KEY = key('CloseKey', 1);    // Escape
 const STOP_KEY  = key('StopKey', 49);    // N

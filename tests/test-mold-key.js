@@ -116,7 +116,7 @@ yes('the shipped Thornswood.ini carries MoldKey = 22', !!iniM && Number(iniM[1])
   const keys = read(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Keys.cs'));
   const rxCs = /ThornIni, "(\w+)", (-?\d+)\)/g;
   let rows = 0;
-  while ((m = rxCs.exec(keys)) !== null) { rows++; take(Number(m[2]), 'Controls ' + m[1]); }
+  while ((m = rxCs.exec(keys)) !== null) { rows++; if (m[1] !== 'MoldKey') { take(Number(m[2]), 'Controls ' + m[1]); } }
   // Vanilla Skyrim, keyboard: W A S D, E, R, Q, Z, F, T, M, I, C, X, J, P,
   // Tab, Escape, Space, Shift, Alt, Ctrl, Caps Lock and the hotkeys 1 to 8.
   [17, 30, 31, 32, 18, 19, 16, 44, 33, 20, 50, 23, 46, 45, 36, 25, 15, 1, 57,
@@ -166,6 +166,8 @@ function client(opt) {
     recipe: opt.recipe !== false,
     crosshair: null,          // { id, type }
     carried: 1,
+    stamped: 0,        // of those, how many carry a door's name
+    changesThrow: false,
     menus: {},
     claims: {},
     sent: [], logs: [], verbs: [],
@@ -197,6 +199,19 @@ function client(opt) {
   w.T = T;
   const sp = {
     on: function (name, fn) { (w.handlers[name] = w.handlers[name] || []).push(fn); },
+    // What SkyrimPlatform hands back: a stamped mold is one with a
+    // TextDisplayData name, the way skymp5-client applies the server's name.
+    getExtraContainerChanges: function (id) {
+      if (w.changesThrow) { throw new Error('no container changes'); }
+      if (id !== 0x14) { return null; }
+      const lists = [];
+      if (w.stamped > 0) {
+        lists.push([{ type: 'Count', count: w.stamped },
+                    { type: 'TextDisplayData', name: 'Key mold for Breezehome' }]);
+      }
+      return [{ baseId: 0x0f00aaaa, countDelta: 3, extendDataList: [] },
+              { baseId: MOLD_RUNTIME, countDelta: w.carried, extendDataList: lists }];
+    },
     Game: {
       getPlayer: function () {
         return {
@@ -234,8 +249,9 @@ function client(opt) {
     PIECES_FRONT.gameMenuOpen, PIECES_FRONT.menus, PIECES_FRONT.busyMenuOpenNow,
     'const MOLD_KEY = iniNumber(iniText, "MoldKey", ' + MOLD_DEFAULT + ');',
     'const MOLD_NAME = keyName(MOLD_KEY);',
-    'const FRIEND_KEY = 34, TRADE_KEY = 35, MUTE_KEY = 38, PARTY_KEY = 25, JOURNAL_KEY = 36;',
+    'const FRIEND_KEY = 21, TRADE_KEY = 35, MUTE_KEY = 38, PARTY_KEY = 25, JOURNAL_KEY = 36;',
     'const SKILLS_KEY = 37, CHAT_KEY = 28, ESC = 1;',
+    'const COMMAND_KEY = 53; let statsPressAt = 0; function commandKeyPressed() { }',
     'let keysSeen = 0, stuckKeys = 0, stuckMoveKeys = 0, sawAnyKey = true;',
     'function busyMenuOpen() { return busyMenuOpenNow(); }',
     'function rememberKey() {}',
@@ -432,12 +448,33 @@ try {
       yes('C9 X does', w.sent.length === 1);
     }
 
+    // C11 (#529): only a blank mold puts the line up. A holder carrying the
+    // stamped mold for their own house used to see it at every door.
+    {
+      const w = client(); clockOf = w;
+      w.carried = 1; w.stamped = 1;
+      w.crosshair = { id: DOOR, type: 29 };
+      w.tick();
+      yes('C11 a stamped mold and no blank draws nothing', !w.lineUp());
+      w.press(22);
+      yes('C11 and U sends nothing', w.sent.length === 0);
+      w.carried = 3; w.stamped = 2;
+      w.tick();
+      yes('C11 a blank beside two stamped ones brings the line up', w.lineUp());
+      w.carried = 2;
+      w.tick();
+      yes('C11 and once the blank is spent it goes', !w.lineUp());
+      w.changesThrow = true;
+      w.tick();
+      yes('C11 if the names in the pack cannot be read, it shows as it did and the server decides', w.lineUp());
+    }
+
     // C10: the social keys are untouched.
     {
       const w = client(); clockOf = w;
       w.crosshair = null;
-      w.press(34);
-      yes('C10 G still goes to the friend verb', w.verbs.length === 1 && w.verbs[0] === 'friend');
+      w.press(21);
+      yes('C10 Y still goes to the friend verb', w.verbs.length === 1 && w.verbs[0] === 'friend');
     }
   }
 } finally {
@@ -492,6 +529,8 @@ const HOUSE_CELL = '165a7:Skyrim.esm';
 const ALICE = { actor: 0xff000058, pid: 101, name: 'Alice' };   // holds the house
 const BOB = { actor: 0xff000059, pid: 202, name: 'Bob' };       // has a blank
 const CARL = { actor: 0xff00005a, pid: 303, name: 'Carl' };     // a smith
+// Lower than Alice's id, so the engine lists him ahead of her.
+const DIRK = { actor: 0xff000057, pid: 404, name: 'Dirk' };     // a stolen deed
 const CHEST = 0x000a1b2c;
 
 /*
@@ -820,6 +859,40 @@ if (missingGm.length === 0 && KEY_DESC && MOLD_DESC && DEED_DESC && RECIPE_DESC 
     yes('S12 and the mold is the holder\'s', E.molds(ALICE, LABEL) === 1 && E.blanks(CARL) === 0);
     const told2 = s.say(BOB, '/mold');
     yes('S12 and /mold is still a smith\'s word', /a smith's work/.test(first(told2, BOB)));
+  }
+
+  // S13 (#529): a stolen deed beside the real holder. Dirk comes first in the
+  // engine's list; the mold still goes to Alice.
+  {
+    const E = engine();
+    E.person(DIRK, TAMRIEL, [1090, 1000, 0], [E.deed(DEED_LABEL)]);
+    E.person(ALICE, TAMRIEL, [1100, 1050, 0]);
+    E.person(BOB, TAMRIEL, [1080, 1000, 0], [E.blank()]);
+    const s = boot(E, held());
+    s.say(BOB, '/moldhere', HEX);
+    yes('S13 with the holder there, the mold is hers and not the deed carrier\'s',
+        E.molds(ALICE, LABEL) === 1 && E.molds(DIRK, LABEL) === 0 && E.blanks(BOB) === 0);
+  }
+  {
+    const E = engine();
+    E.person(DIRK, TAMRIEL, [1090, 1000, 0], [E.deed(DEED_LABEL)]);
+    E.person(BOB, TAMRIEL, [1080, 1000, 0], [E.blank()]);
+    const c = held(); c[HOUSE].by = BOB.pid;
+    const s = boot(E, c);
+    s.say(BOB, '/moldhere', HEX);
+    yes('S13 and when the holder is the one pressing, a deed beside him does not take it',
+        E.molds(BOB, LABEL) === 1 && E.molds(DIRK, LABEL) === 0);
+  }
+
+  // S14 (#529): no holder there, two deed carriers: the one pressing first.
+  {
+    const E = engine();
+    E.person(DIRK, TAMRIEL, [1090, 1000, 0], [E.deed(DEED_LABEL)]);
+    E.person(BOB, TAMRIEL, [1080, 1000, 0], [E.blank(), E.deed(DEED_LABEL)]);
+    const s = boot(E, held());
+    s.say(BOB, '/moldhere', HEX);
+    yes('S14 with no holder there, the deed carrier pressing is asked before one nearby',
+        E.molds(BOB, LABEL) === 1 && E.molds(DIRK, LABEL) === 0);
   }
 }
 

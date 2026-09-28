@@ -235,6 +235,13 @@ namespace Thornswood
         /// SkyUI writes iSearchKey=57 with no spaces and reads its own file
         /// back strictly, so reformatting it is how a settings file gets
         /// silently ignored.
+        ///
+        /// A key that is not in the file is only added to Thornswood.ini
+        /// (#529). The template is written once, on a machine with no file,
+        /// so every key added to it later is missing on every older install,
+        /// and those rows failed with "Could not write Thornswood.ini". Our
+        /// plugins read a key wherever it is in the file, so it goes on the
+        /// end. Another mod's file is never added to: that is its own format.
         /// </summary>
         static bool WriteIni(string file, string key, string value)
         {
@@ -254,6 +261,12 @@ namespace Thornswood
                     File.WriteAllLines(file, lines.ToArray());
                     return true;
                 }
+                if (!string.Equals(Path.GetFullPath(file), Path.GetFullPath(ThornIni), StringComparison.OrdinalIgnoreCase))
+                    return false;
+                if (lines.Count > 0 && lines[lines.Count - 1].Trim().Length > 0) lines.Add("");
+                lines.Add(key + " = " + value);
+                File.WriteAllLines(file, lines.ToArray());
+                return true;
             }
             catch (Exception ex) { Swallow.Note("Keys.WriteIni", ex); }
             return false;
@@ -475,7 +488,7 @@ namespace Thornswood
             // here is a rebind in game with nothing to regenerate.
             l.Add(Dx("emotewheel", "ThornsWood", "The emote wheel",
                      "Twelve gestures, and a second ring of working animations behind them. Everyone else sees what you play.",
-                     ThornIni, "WheelKey", 48));
+                     ThornIni, "WheelKey", 34));
             l.Add(Dx("emotepage", "ThornsWood", "The other ring",
                      "With the wheel open, turns between the gestures and the working animations.",
                      ThornIni, "PageKey", 15));
@@ -489,10 +502,10 @@ namespace Thornswood
             l.Add(Dx("chat", "ThornsWood", "Talk in chat",
                      "Hands the keyboard to the chat box and puts the cursor in it. Escape gives it back to the game. Nothing in Skyrim uses Enter while you are playing, which is why it is here.",
                      ThornIni, "ChatKey", 28));
+            l.Add(Dx("command", "ThornsWood", "Type a command",
+                     "Opens the chat with a slash already typed. The game's skill tree, also on this key, stays shut.",
+                     ThornIni, "CommandKey", 53));
 
-            l.Add(Dx("chargenmenu", "ThornsWood", "Open the creation menu",
-                     "During character creation, brings up the trade or town question by hand if it has not appeared on its own. Does nothing afterwards.",
-                     ThornIni, "MenuKey", 50));
 
             l.Add(Dx("skills", "ThornsWood", "Profession, class and skill tree",
                      "Your profession and which half of it you work, your class, and the fifteen sub-skills under Health, Magicka and Stamina. Opens over the world without pausing it. Escape closes it too.",
@@ -504,10 +517,8 @@ namespace Thornswood
             // nobody in front of you the key falls through to whatever else
             // wants it. P and J open their panels either way.
             //
-            // MuteThemKey is deliberately not MuteKey. MuteKey is the
-            // microphone, further down this file, and one row setting two
-            // different things is how somebody rebinds their microphone and
-            // silences a friend by accident.
+            // MuteThemKey is deliberately not MuteKey, the microphone's old
+            // name, so one row can never set two different things.
             l.Add(Dx("party", "ThornsWood", "Friends and party",
                      "Who your friends are, who is online, your party, and the bonus for working together. Escape closes it.",
                      ThornIni, "PartyKey", 25));
@@ -516,13 +527,16 @@ namespace Thornswood
                      ThornIni, "JournalKey", 36));
             l.Add(Dx("friendkey", "ThornsWood", "Add or remove a friend",
                      "While you are looking at somebody, asks them to be friends. Pressed on somebody already on your list, takes them off it.",
-                     ThornIni, "FriendKey", 34));
+                     ThornIni, "FriendKey", 21));
             l.Add(Dx("tradewith", "ThornsWood", "Offer a trade",
                      "While you are looking at somebody, offers to trade. They have forty five seconds to take it, and nothing moves until you have both agreed to what is on the table.",
                      ThornIni, "TradeWithKey", 35));
             l.Add(Dx("mutethem", "ThornsWood", "Mute somebody",
                      "While you are looking at somebody, stops hearing them. Yours only: they are not told, and nobody else is affected. Press again to hear them.",
                      ThornIni, "MuteThemKey", 38));
+            l.Add(Dx("moldkey", "ThornsWood", "Press a key mold into a lock",
+                     "While you are looking at a building's door with a blank key mold in your pack, presses it into the lock so it becomes that building's mold. The holder has to be you or be standing there.",
+                     ThornIni, "MoldKey", 22));
 
             l.Add(Dx("cyclehold", "Reaching things", "Cycle modifier",
                      "Held down, the two keys below step through everything you could reach instead of the game picking for you.",
@@ -546,9 +560,16 @@ namespace Thornswood
             l.Add(Dx("ptt", "Voice", "Hold to talk",
                      "Everyone near you hears you while it is held. Voice is positional: the further away somebody is standing the quieter you are, and past thirty metres they hear nothing.",
                      ThornIni, "PushToTalk", 47));
-            l.Add(Dx("voicemute", "Voice", "Mute the microphone",
-                     "Off and on outright, whatever the talk key is doing. For when somebody walks into the room.",
-                     ThornIni, "MuteKey", 21));
+            // There was a "Mute the microphone" row here, MuteKey, Y. Nothing
+            // has read MuteKey since the voice plugin dropped its mute (push to
+            // talk already keeps the microphone shut), so the row wrote a
+            // setting nothing read, and Y went to FriendKey (#529).
+            l.Add(Dx("voicemode", "Voice", "Whisper, talk or yell",
+                     "Steps your voice from a whisper to your normal voice to a yell and round again.",
+                     ThornIni, "VoiceModeKey", 48));
+            l.Add(Dx("voicelock", "Voice", "Keep talking",
+                     "Locks the microphone open until you press it again, for a song or a long speech without holding the talk key. The corner of the screen says when it opens and when it shuts.",
+                     ThornIni, "VoiceLockKey", 24));
 
             // No SkyMP client keys here, deliberately. that server's build reads a
             // "keybinds" block out of skymp5-client-settings.txt with voice,
