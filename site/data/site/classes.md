@@ -262,7 +262,7 @@ front of an empty plot is not permission to grow whatever you like in it.
 | Rank | What opens |
 |---|---|
 | **Novice** | The common field crops: cabbage, leek, potato, gourd, carrot |
-| **Advanced** | The ones that take a season: wheat, tundra cotton, ash yam, tomato |
+| **Advanced** | The ones that take a season: wheat, ash yam, tomato |
 | **Expert** | The orchard |
 | **Master** | Everything |
 
