@@ -2,13 +2,13 @@
   Publish-Update.ps1
 
   Diffs the current build against the last published state, packs only what
-  changed, uploads it as a release asset, and updates version.json so everyone's
-  launcher picks it up.
+  changed, sends it to the site (thornswood.net/feed[-dev]/assets/<sha256>,
+  #897), and updates version.json so everyone's launcher picks it up.
 
   First time:   .\Publish-Update.ps1 -Baseline
   After that:   .\Publish-Update.ps1 -Notes "Swapped the map mod"
   Launcher:     .\Publish-Update.ps1 -Launcher -Notes "New launcher"
-  Host urls:    .\Publish-Update.ps1 -HostAssetUrls   # rewrite pack urls to thornswood.net (#649)
+  Old way:      .\Publish-Update.ps1 -AssetHost github   # a GitHub release per pack, as before #897
 #>
 [CmdletBinding()]
 param(
@@ -58,9 +58,22 @@ param(
     # After uploading to GitHub, rewrite pack/launcher/clientRuntime urls in
     # version.json to https://thornswood.net/feed/assets/<sha256> (or
     # /feed-dev/assets/<sha256> on the dev channel) for the #649 host cutover.
-    # Uploads still go to Thornswood-Releases so rollback stays hot; Website
-    # must have mirrored the bytes at those paths. No secrets invented.
+    # Only with -AssetHost github; the site path below writes those urls anyway.
     ,[switch]$HostAssetUrls
+    # Where launchers download what this release adds (#897). site, the
+    # default: every pack, the launcher and the client runtime are sent to
+    # /feed[-dev]/assets/<sha256> on thornswood.net BEFORE version.json is
+    # written, the feed names them there, and nothing is uploaded to
+    # Thornswood-Releases. The urls already on the feed move to the site too,
+    # each one only once the site answers for its bytes. github is the old
+    # way, a GitHub release per pack, kept for rolling back to it.
+    ,[ValidateSet('site', 'github')][string]$AssetHost = 'site'
+    # Where the site answers, for the check that moves old urls over. The
+    # tests point it at a copy of site\server.js on this machine.
+    ,[string]$SiteUrl = 'https://thornswood.net'
+    # A folder standing in for the site's feed root, passed to
+    # Remirror-Site-Feed.ps1 so nothing connects to the VPS. Tests only.
+    ,[string]$SiteDir
 )
 
 
@@ -1051,8 +1064,11 @@ if (-not $Repo) {
     $ErrorActionPreference = $old
     if ($remote -and $remote -match 'github\.com[:/](.+?)(?:\.git)?\s*$') { $Repo = $Matches[1] }
 }
-if (-not $Repo) { Die 'Could not work out which repo to publish to. Pass -Repo owner/name.' }
-Say "  repo: $Repo" 'DarkGray'
+# Only a GitHub release needs a repository to go to. The site path (#897)
+# uploads nothing to GitHub, so a feed folder with no GitHub remote is fine.
+if (-not $Repo -and $AssetHost -eq 'github') { Die 'Could not work out which repo to publish to. Pass -Repo owner/name.' }
+if ($Repo) { Say "  repo: $Repo" 'DarkGray' }
+if ($AssetHost -eq 'site') { Say "  downloads go to $SiteUrl/$(if ($Dev) { 'feed-dev' } else { 'feed' })/assets/" 'DarkGray' }
 
 # Packs go only into the repository launchers read this feed from, because it
 # is the one they can download from with no token. On 24 September 164 packs
@@ -1061,7 +1077,7 @@ Say "  repo: $Repo" 'DarkGray'
 # to the wrong place.
 . (Join-Path $Here 'Feed-Rules.ps1')
 $feedRepo = Get-FeedRepo $doc
-if (-not [string]::Equals($Repo, $feedRepo, [StringComparison]::OrdinalIgnoreCase)) {
+if ($AssetHost -eq 'github' -and -not [string]::Equals($Repo, $feedRepo, [StringComparison]::OrdinalIgnoreCase)) {
     Die ("This would upload to $Repo, but launchers read this feed from $feedRepo and cannot download a pack from anywhere else. " +
          "Nothing was uploaded and version.json has not been touched. Pass -Repo $feedRepo, or point the origin of $ReleaseDir at it.")
 }
@@ -1190,7 +1206,52 @@ function Get-ReleaseSourceFooter([string]$ClientRecord, [string]$ServerRecord) {
     )
     return ($lines -join "`n")
 }
-if (-not $NoUpload -and $gh) {
+if (-not $NoUpload -and $AssetHost -eq 'site') {
+    # ==== thornswood site upload ====
+    # tests\test-site-assets.ps1 runs this block on its own. If the markers
+    # move, it stops rather than quietly testing nothing.
+    #
+    # UPDATES COME FROM THE SITE (#897). Every asset this release adds goes to
+    # /feed[-dev]/assets/<sha256> on thornswood.net, the path site\server.js
+    # already serves with Range resume, and the feed names it there. It goes
+    # up BEFORE version.json is touched, the same rule the GitHub path keeps:
+    # nothing is written to the feed if an asset did not land, so nobody is
+    # sent a pack the site does not hold. Remirror-Site-Feed.ps1 -Send is the
+    # one way bytes reach the site, .part then rename, skipping any already up.
+    Head 'Sending to the site'
+    $siteFiles = @()
+    foreach ($c in $chunks) { $siteFiles += $c.Path }
+    $exeSite = ''
+    if ($Launcher -and (Test-Path -LiteralPath $exePath)) {
+        $siteFiles += $exePath
+        $exeSite = (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash.ToLower()
+    }
+    if ($clientRel) { $siteFiles += $clientRel.path }
+    if ($siteFiles.Count) {
+        $sendArgs = @{ Dev = $Dev; Send = $siteFiles }
+        if ($SiteDir) { $sendArgs['SiteDir'] = $SiteDir }
+        $global:LASTEXITCODE = 0
+        $sendWhy = ''
+        try { & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @sendArgs }
+        catch { $sendWhy = $_.Exception.Message }
+        if (-not $sendWhy -and $LASTEXITCODE -ne 0) { $sendWhy = "Remirror-Site-Feed.ps1 -Send exited $LASTEXITCODE" }
+        if ($sendWhy) {
+            Say "  $sendWhy" 'Red'
+            Die ('Not every asset reached the site, so version.json has not been touched and nobody has been sent a half release. ' +
+                 'Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test, then run Ship again.')
+        }
+    }
+    foreach ($c in $chunks) { $c.Url = Get-HostFeedAssetUrl $c.Sha -Dev:$Dev }
+    if ($clientRel) { $clientRel.url = Get-HostFeedAssetUrl $clientRel.sha256 -Dev:$Dev }
+    if ($exeSite) { $exeUrl = Get-HostFeedAssetUrl $exeSite -Dev:$Dev }
+    if ($Launcher -and -not $exeUrl) {
+        Die 'The launcher was not found to send, so version.json has not been touched and the feed still points at the last launcher that went up.'
+    }
+    if ($chunks.Count) { Say "  $($chunks.Count) pack asset$(if ($chunks.Count -eq 1) { '' } else { 's' }) on the site" 'Green' }
+    if ($clientRel) { Say '  client runtime on the site' 'Green' }
+    if ($exeUrl) { Say '  launcher on the site' 'Green' }
+    # ==== end thornswood site upload ====
+} elseif (-not $NoUpload -and $gh) {
     Head 'Uploading'
     $assets = @()
     foreach ($c in $chunks) { $assets += $c.Path }
@@ -1395,6 +1456,28 @@ if (-not $NoPush -and (Test-Path (Join-Path $ReleaseDir '.git'))) {
         $doc = Get-Content $VersionFile -Raw | ConvertFrom-Json
     } finally { $ErrorActionPreference = $old }
 }
+# ==== thornswood move feed urls ====
+# tests\test-site-assets.ps1 runs this block on its own.
+#
+# THE URLS ALREADY ON THE FEED MOVE TO THE SITE, a few at a time or all at
+# once, and only by a publish, never by editing the live feed by hand (#897).
+# Each GitHub url whose bytes the site already answers for, by sha256 and by
+# size where the feed gives one, is rewritten to /feed[-dev]/assets/<sha256>.
+# Any other stays where it is, so the feed never names a url that answers 404.
+# scripts\oneoff\Copy-ReleaseAssets-ToSite.ps1 is what puts the old bytes up.
+if ($AssetHost -eq 'site' -and -not $NoUpload) {
+    $sitePrefix = if ($Dev) { 'feed-dev' } else { 'feed' }
+    $siteBase = $SiteUrl
+    $mv = Move-FeedUrlsToSite $doc -Dev:$Dev -OnSite { param($sha, $bytes) Test-SiteAsset $siteBase $sitePrefix $sha $bytes }
+    if ($mv.Moved.Count) { Say ("  {0} url(s) already on the feed now download from the site" -f $mv.Moved.Count) 'Green' }
+    $mvLeft = @($mv.Stayed | Where-Object { -not (Test-HostFeedAssetUrl $_.Url) })
+    if ($mvLeft.Count) {
+        Say ("  {0} url(s) on the feed still download from GitHub, because the site does not hold them yet:" -f $mvLeft.Count) 'Yellow'
+        foreach ($mvOne in @($mvLeft | Select-Object -First 5)) { Say "    $($mvOne.What)" 'Yellow' }
+        Say '  .\scripts\oneoff\Copy-ReleaseAssets-ToSite.ps1 puts them up; the next publish moves them.' 'Yellow'
+    }
+}
+# ==== end thornswood move feed urls ====
 Head 'version.json'
 # ==== thornswood feed append ====
 # tests\test-feed-rules.ps1 runs this block on its own. If the markers move,
@@ -2010,7 +2093,7 @@ if ($KeepPacks -gt 0) {
                 Say ("  -NoClose: would remove {0} older pack(s) from $DistDir, {1:N1} MB; leaving them" -f $go.Count, $mb) 'Yellow'
             } else {
                 foreach ($f in $go) { Remove-Item -LiteralPath $f.FullName -Force -EA SilentlyContinue }
-                Say ("  {0} older pack(s) removed from $DistDir, {1:N1} MB. They are all on the releases repository." -f $go.Count, $mb) 'DarkGray'
+                Say ("  {0} older pack(s) removed from $DistDir, {1:N1} MB. They are all on the site." -f $go.Count, $mb) 'DarkGray'
             }
         }
     } catch {
@@ -2084,7 +2167,7 @@ if ($pushFailed) {
 Head 'Done'
 if ($pushFailed) {
     Say "NOT SHIPPED. $pushFailed" 'Red'
-    Say 'The assets are on GitHub but version.json is not, so no launcher will' 'Red'
+    Say 'The assets are up but version.json is not, so no launcher will' 'Red'
     Say 'see this update. Fix the line above and push, then it is live.' 'Red'
     Say "The baseline was NOT moved, so the next run finishes $Id rather than" 'Yellow'
     Say 'starting a new one. Nothing here is lost by running it again.' 'Yellow'

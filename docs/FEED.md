@@ -39,9 +39,57 @@ Confirmed with Website. Signing / `ExpectedSigner` is still **off**.
 - **Fallback / rollback.** If the site feed fails (or `UpdateFeedUrl` is
   empty), `Updater.Check` falls back to the GitHub Contents API on
   `UpdateRepo`/`UpdateBranch` (`EvilPatrick06/Thornswood-Releases`). Do **not**
-  delete that repository yet - it stays hot for rollback until the cutover
-  sticks. Publishers still upload release assets there; `-HostAssetUrls` on
-  `Publish-Update.ps1` only rewrites the urls written into `version.json`.
+  delete that repository yet: see "Downloads come from the site" below for
+  when it can go. Since #897 nothing new is uploaded there.
+
+### Downloads come from the site (#897)
+
+Asked for by Patrick on 28 Sep: "let's get it so we don't need the repo and we
+use the website".
+
+- **Where the bytes are.** On the VPS, `C:\Thornswood-Docs\feed\assets\<sha256>`
+  and `C:\Thornswood-Docs\feed-dev\assets\<sha256>`, served by `site\server.js`
+  at the asset urls in the table above, with Range resume and immutable
+  caching. Measured 28 Sep: both feeds together name 94 distinct assets,
+  532,163,762 bytes (0.50 GiB); one copy per channel folder is at most about
+  0.74 GB, and most of it was already up there.
+- **How a release gets there.** `Publish-Update.ps1` (default `-AssetHost site`)
+  sends every pack, the launcher and the client runtime with
+  `Remirror-Site-Feed.ps1 -Send` (scp to `<sha256>.part`, then renamed) BEFORE
+  `version.json` is written, and names them by their site url. An asset that
+  does not land stops the publish with the feed untouched. `-AssetHost github`
+  is the old GitHub release per pack, kept for rolling back to it.
+- **The urls already on a feed** move over with `Move-FeedUrlsToSite`
+  (`Feed-Rules.ps1`): each GitHub url whose bytes the site answers for (a HEAD
+  on the asset url, and its size when the feed gives one) is rewritten, and any
+  other stays. Every Ship does it for its own channel;
+  `Repair-Manifest.ps1 -MoveToSite` does it without a release, then
+  `Remirror-Site-Feed.ps1` puts that feed on the site.
+- **The old bytes** go up once with `scripts\oneoff\Copy-ReleaseAssets-ToSite.ps1`,
+  which reads both live feeds, downloads each missing asset (from the other
+  channel's folder on the site when it is there), checks it against the feed's
+  sha256 and sends it. It never writes a feed.
+- **Launchers in the field** need nothing new: `thornswood.net` has been on the
+  host allow list since before 25 Sep, and a download is checked for https, the
+  host and the sha256 only.
+- **Still on GitHub for now:** `version.json` history and the baseline
+  (`published.json`) live in the Releases clones, which are pushed to
+  `Thornswood-Releases` as before, and `updateRepo` keeps naming it. That is
+  harmless: the launcher only asks it when the site feed does not answer, at
+  most once every five minutes. Moving those two files off GitHub is its own
+  issue.
+- **When the repository can go**, a person's step. First: both live feeds name
+  no `github.com` or `api.github.com` url (a GET of each has no `github` in any
+  url), and the feed and baseline have moved off it. Then ARCHIVE it rather
+  than delete it: an archived repository still answers the Contents API and
+  its release downloads, which is what a launcher last run before the #649
+  cutover (26 Sep) still asks, once, before it saves `updateFeedUrl` and moves
+  to the site. Nothing on our side can see those launchers, so the sign is
+  GitHub's own count: the total `download_count` over the releases
+  (`gh api repos/EvilPatrick06/Thornswood-Releases/releases --paginate --jq
+  '[.[].assets[].download_count] | add'`) stops rising for a few weeks. Only
+  then delete it; a launcher that has not run since before 26 Sep is then
+  reinstalled from the site.
 - **The fallback waits, since #445.** That fallback is the request with a quota
   on it, so it is taken at most once every five minutes (`Updater.GithubRest`).
   Before that, a site feed that missed sent every thirty second check to
@@ -255,10 +303,10 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
   were published with; `Repair-Manifest.ps1` is what takes an old one off.
 - **Publish side.** `Feed-Rules.ps1` refuses a new pack whose url is neither a
   release asset in `updateRepo` nor a thornswood.net feed asset under
-  `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>`. Pass `-HostAssetUrls`
-  on `Publish-Update.ps1` to rewrite uploaded pack (and launcher /
-  clientRuntime) urls to the site shape after the GitHub upload; assets still
-  land on Thornswood-Releases for rollback. `Check-Secrets.ps1` scans every zip
+  `/feed/assets/<sha256>` or `/feed-dev/assets/<sha256>`. Since #897 every new
+  pack, launcher and client runtime is sent to the site and named there, and
+  nothing is uploaded to Thornswood-Releases (`-AssetHost github` is the old
+  way). `Check-Secrets.ps1` scans every zip
   and exe before upload. Nothing is written to the feed if any asset failed to
   upload, and `version.json` is written without a byte order mark.
 - **Signing.** `ExpectedSigner` is still empty/absent - Azure Artifact Signing

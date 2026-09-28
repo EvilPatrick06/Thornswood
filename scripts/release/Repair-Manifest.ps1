@@ -33,6 +33,17 @@
       .\Repair-Manifest.ps1            show what is broken and fix it
       .\Repair-Manifest.ps1 -DryRun    show it and change nothing
       .\Repair-Manifest.ps1 -Channel dev -DryRun    the same for the dev feed
+
+  MOVING THE URLS TO THE SITE (#897). With -MoveToSite it takes nothing out:
+  every url on the feed that still points at GitHub, and whose bytes the site
+  already answers for at /feed[-dev]/assets/<sha256>, is rewritten to that
+  address, and the feed is pushed like any other repair. A url the site does
+  not answer for stays where it is. It is how the main feed moves without
+  waiting for a main Ship; the site copy follows with
+  .\scripts\deploy\Remirror-Site-Feed.ps1 (-Dev for dev).
+
+      .\Repair-Manifest.ps1 -MoveToSite -DryRun     what would move
+      .\Repair-Manifest.ps1 -MoveToSite             move it and push
 #>
 [CmdletBinding()]
 param(
@@ -41,6 +52,9 @@ param(
     [switch]$NoPush,
     [switch]$NoPause
     ,[ValidateSet('main', 'dev')][string]$Channel = 'main'
+    ,[switch]$MoveToSite
+    # Where the site answers. The tests point it at a copy on this machine.
+    ,[string]$SiteUrl = 'https://thornswood.net'
     # The applied.txt settled on this machine. Left out, it is the install for
     # the channel, found the way Publish-Update.ps1 finds it rather than
     # assumed to be on C:. The harness points it at a scratch file, because the
@@ -107,6 +121,46 @@ $doc = Get-Content -LiteralPath $VersionFile -Raw | ConvertFrom-Json
 $packs = @()
 if ($doc.PSObject.Properties['packs'] -and $doc.packs) { $packs = @($doc.packs) }
 Say ("  {0} pack(s)" -f $packs.Count) 'DarkGray'
+
+if ($MoveToSite) {
+    $dev = ($Channel -eq 'dev')
+    $prefix = if ($dev) { 'feed-dev' } else { 'feed' }
+    Head "Moving urls to $SiteUrl/$prefix/assets/"
+    $mv = Move-FeedUrlsToSite $doc -Dev:$dev -OnSite { param($sha, $bytes) Test-SiteAsset $SiteUrl $prefix $sha $bytes }
+    $left = @($mv.Stayed)
+    Say ("  {0} url(s) move to the site" -f $mv.Moved.Count) $(if ($mv.Moved.Count) { 'Green' } else { 'DarkGray' })
+    if ($left.Count) {
+        Say ("  {0} stay where they are, because the site does not answer for them:" -f $left.Count) 'Yellow'
+        foreach ($l in $left) { Say "    $($l.What)" 'Yellow' }
+        Say '  .\scripts\oneoff\Copy-ReleaseAssets-ToSite.ps1 puts them up.' 'Yellow'
+    }
+    if ($DryRun -or -not $mv.Moved.Count) {
+        if ($DryRun) { Say '  Dry run. Nothing was written.' 'Yellow' }
+        Write-Host ''
+        if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+        exit 0
+    }
+    [IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+    Say '  version.json written' 'Green'
+    if ($NoPush) {
+        Say 'Not pushed, as asked.' 'Yellow'
+    } else {
+        Head 'Pushing'
+        $old = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        & git -C $RepoDir add version.json 2>&1 | Out-Host
+        & git -C $RepoDir commit -m "Downloads come from the site: $($mv.Moved.Count) url(s)" 2>&1 | Out-Host
+        & git -C $RepoDir push 2>&1 | Out-Host
+        $rc = $LASTEXITCODE
+        $ErrorActionPreference = $old
+        if ($rc -ne 0) { Die "git push exited with $rc. The file is moved here, it just is not up yet." }
+        Say '  pushed' 'Green'
+    }
+    Say ("Now put it on the site: .\scripts\deploy\Remirror-Site-Feed.ps1{0}" -f $(if ($dev) { ' -Dev' } else { '' })) 'Green'
+    Write-Host ''
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
+}
 
 $feedRepo = Get-FeedRepo $doc
 $split = Split-FeedPacks $packs $feedRepo
