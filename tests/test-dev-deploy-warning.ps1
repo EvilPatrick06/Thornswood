@@ -278,6 +278,24 @@ try {
     Yes "and the data folder the gamemode writes online.json to (got $($r.Data))" ($r.Data -eq $wantData)
     Yes "and online.json gives the head count (got $($r.Online))" ($r.Online -eq 3)
     Yes 'and it sees the server on its port' ($r['Up'] -eq $true)
+    Yes 'a gamemode older than the names file gives no names, and the count stands alone' (
+        @($r.Names).Count -eq 0 -and $r.Online -eq 3)
+
+    # Issue #520: who, not just how many. The names live in the private
+    # folder, never beside online.json, which is served to anybody who asks.
+    $boxPriv = Join-Path $box 'private'
+    New-Item -ItemType Directory -Path $boxPriv -Force | Out-Null
+    $namesFile = Join-Path $boxPriv 'online-names.json'
+    [IO.File]::WriteAllText($namesFile, '{"at":1790000000000,"names":["Ahlam","Brynjolf","Camilla"]}')
+    $r = Get-DevRoom
+    Yes "the private online-names.json gives who is on (got $(@($r.Names) -join ', '))" (
+        (@($r.Names) -join ',') -eq 'Ahlam,Brynjolf,Camilla')
+    Yes 'and the names do not stand in for the count' ($r.Online -eq 3)
+    [IO.File]::WriteAllText($namesFile, '{"at":17')
+    $r = Get-DevRoom
+    Yes 'a half written names file is no names, and the count still reads' (
+        @($r.Names).Count -eq 0 -and $r.Online -eq 3)
+    [IO.File]::WriteAllText($namesFile, '{"at":1790000000000,"names":["Ahlam","Brynjolf","Camilla"]}')
 
     Remove-Item -LiteralPath $online -Force
     $r = Get-DevRoom
@@ -314,6 +332,7 @@ try {
     Yes "nothing on the port is read as nothing there (port $downPort)" ($r['Up'] -eq $false)
     Yes 'so a count left in online.json by a server that is gone is nobody on' ($r.Online -eq 0)
     Yes 'and the count it left is kept to say so' ($r['Stale'] -eq 1)
+    Yes 'and the names it left are dropped with it' (@($r.Names).Count -eq 0)
 
     # And the stop, run here. The things that would stop a task or a process
     # are functions in front of the cmdlets, which PowerShell prefers, so
@@ -393,6 +412,10 @@ function Start-Sleep { }
     Drive "$dev|$devDat|ONLINE 3"
     $asked = @(Asked)
     Yes 'three on: it says how many before anything stops' (Said '^\s*3 on the dev server')
+
+    Drive "$dev|$devDat|ONLINE 2|NAME Ahlam|NAME Brynjolf"
+    Yes 'and with the names file there, it says who' (Said '^\s*2 \(Ahlam, Brynjolf\) on the dev server')
+    Drive "$dev|$devDat|ONLINE 3"
     Yes 'Request-Restart is asked once' ($asked.Count -eq 1)
     if ($asked.Count -eq 1) {
         $q = $asked[0]
