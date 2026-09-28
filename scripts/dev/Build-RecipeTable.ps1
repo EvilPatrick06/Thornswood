@@ -830,7 +830,10 @@ $STATION_VERBS = @(
     # and gave it to nobody, which left Butter, 46 of the Cook's inputs, with no
     # producer at all. Patrick, 21 September: "give milk and butter to farmers".
     @{ Fn = 'churn';        Who = 'farmer';
-       What = 'the butter churn in HearthFires.esm, BYOHButterChurn, which is a farmer''s verb: classGate(actorId, ''farm'')' }
+       What = 'the butter churn in HearthFires.esm, BYOHButterChurn, which is a farmer''s verb: classGate(actorId, ''farm'')' },
+    # Added for #396: living cows give Jug of Milk to a farmer. Goats wait on Patrick.
+    @{ Fn = 'milk';         Who = 'farmer';
+       What = 'a living cow, the Cow rows in hunts.json, which is a farmer''s verb: classGate(actorId, ''farm'') and null for everybody else so the living-actor fall through stays' }
 )
 
 # WHERE THE STATIONS ARE READ FROM. The shipped gamemode, in this folder, which
