@@ -191,7 +191,10 @@ try {
 }
 cfg.discord = Object.assign({ clientId:'', clientSecret:'', botToken:'', guildId:'', invite:'' },
                             cfg.discord || {});
-cfg.access  = Object.assign({ admin:[], play:[], banned:[], jarl:[] }, cfg.access || {});
+// No jarl here: an empty list seeded here is an array, so the Jarl default
+// below never applied and a config.json without access.jarl let nobody hold
+// the office (#905). dev, jarl and slots3 get their defaults below.
+cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
 // Who may use the dev build and join the dev server. Left out of config.json
 // it is the Discord staff roles, the same set the bot's STAFF_ROLES names
 // (Owner, Dev, Gamemaster, Moderator, Loremaster; Content Creator is not
