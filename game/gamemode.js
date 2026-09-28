@@ -26556,7 +26556,16 @@ log('gamemode loaded:',
           if (an) adminIds[an] = true;
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, count: Object.keys(ids).length };
+      // Discord Jarl role holders, from the same allowed.json answer as
+      // adminProfiles. Eligibility only; the office sits on one character.
+      var jarlIds = {};
+      if (Array.isArray(doc.jarlProfiles)) {
+        for (var jn = 0; jn < doc.jarlProfiles.length; jn++) {
+          var jid = Number(doc.jarlProfiles[jn]);
+          if (jid) jarlIds[jid] = true;
+        }
+      }
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -26580,6 +26589,16 @@ log('gamemode loaded:',
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsAdmin = function (profileId) {
     var l = load();
     return !!(l && l.adminIds && l.adminIds[Number(profileId)]);
+  };
+
+  /*
+    Discord Jarl role on the account. Eligibility for the office, not the
+    office itself: isJarl in the property block also asks which character
+    holds it (#397).
+  */
+(typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsJarl = function (profileId) {
+    var l = load();
+    return !!(l && l.jarlIds && l.jarlIds[Number(profileId)]);
   };
 
   /*
@@ -26815,6 +26834,7 @@ log('gamemode loaded:',
       profiles: merged(doc.profiles, had.profiles),
       devProfiles: merged(doc.devProfiles, had.devProfiles),
       adminProfiles: merged(doc.adminProfiles, had.adminProfiles),
+      jarlProfiles: merged(doc.jarlProfiles, had.jarlProfiles),
       people: people
     };
   }
@@ -26922,6 +26942,7 @@ log('gamemode loaded:',
             doc.profiles = kept.profiles;
             doc.devProfiles = kept.devProfiles;
             doc.adminProfiles = kept.adminProfiles;
+            doc.jarlProfiles = kept.jarlProfiles;
             doc.people = kept.people;
             note(doc.failedProfiles.length + ' profiles could not be checked with Discord ' +
                  'and keep the standing they had' +
@@ -26934,6 +26955,7 @@ log('gamemode loaded:',
               profiles: doc.profiles,
               devProfiles: Array.isArray(doc.devProfiles) ? doc.devProfiles : [],
               adminProfiles: Array.isArray(doc.adminProfiles) ? doc.adminProfiles : [],
+              jarlProfiles: Array.isArray(doc.jarlProfiles) ? doc.jarlProfiles : [],
               people: doc.people || [],
               at: new Date().toISOString(),
               note: 'Written by the gamemode from the site. Set enforce true to turn the door on.'
@@ -27866,7 +27888,7 @@ log('gamemode loaded:',
   function fresh() {
     return { cls: null, prof: null, half: null, schools: [],
              ranks: {}, taught: [], spells: null, tree: {}, points: 0,
-             work: {}, placed: {} };
+             work: {}, placed: {}, office: null };
   }
 
   function clone(s) { return JSON.parse(JSON.stringify(s || fresh())); }
@@ -30146,12 +30168,12 @@ log('gamemode loaded:',
     taking a house back. They cannot make one, cannot lock one, and cannot see
     anybody's pack.
 
-    STILL OPEN, and it is on the list rather than decided here: a Discord role
-    sits on the ACCOUNT, so being a jarl follows somebody onto every character
-    they play, which is the exact thing Patrick objected to for admins. The
-    recommendation was that the role grants eligibility and one named character
-    holds the office. That needs a field beside class and profession and is not
-    built.
+    SETTLED 21 September, built #397: the Discord Jarl role is eligibility
+    only (__thornswoodIsJarl on the account). One named character holds the
+    office, stored as thornswoodCharacter.office beside class and profession.
+    /jarl seats it on the character who says it. A second character on the
+    same account is ordinary. Admins still count as jarl so the first office
+    can be placed and the chain tested.
   */
   var stewards = loadStewards();
 
@@ -30171,23 +30193,33 @@ log('gamemode loaded:',
     }
   }
 
-  /** The Jarl role, which only ever comes from outside. */
-  function isJarl(profileId) {
-    var fn = g['__thornswoodIsJarl'];
-    try { if (typeof fn === 'function' && fn(profileId)) { return true; } } catch (e) { }
-    // An admin counts, because somebody has to be able to place the first one
-    // and test the chain. It is the only admin power anywhere in this block.
+  /**
+   * Jarl on THIS character, or an admin placing / testing the chain.
+   * Discord Jarl (__thornswoodIsJarl) is eligibility only; the office is
+   * thornswoodCharacter.office === "jarl" on the pressing actor (#397).
+   */
+  function isJarl(profileId, actorId) {
     var adm = g['__thornswoodIsAdmin'];
     try { if (typeof adm === 'function' && adm(profileId)) { return true; } } catch (e2) { }
-    return false;
+    var fn = g['__thornswoodIsJarl'];
+    var eligible = false;
+    try { if (typeof fn === 'function' && fn(profileId)) { eligible = true; } } catch (e) { }
+    if (!eligible) { return false; }
+    if (!actorId) { return false; }
+    var c = g['__thornswoodCharacter'];
+    if (!c || typeof c.stateOf !== 'function') { return false; }
+    try {
+      var s = c.stateOf(actorId);
+      return !!(s && s.office === 'jarl');
+    } catch (e3) { return false; }
   }
 
   /** Named by a jarl, or a jarl themselves. */
-  function isSteward(profileId) {
+  function isSteward(profileId, actorId) {
     var pid = Number(profileId) || 0;
     if (!pid) { return false; }
     if (stewards.indexOf(pid) !== -1) { return true; }
-    return isJarl(pid);
+    return isJarl(pid, actorId);
   }
 
   /*
@@ -31461,7 +31493,7 @@ log('gamemode loaded:',
       return true;
     }
 
-    if (!isSteward(profileId)) {
+    if (!isSteward(profileId, actorId)) {
       toProfile(profileId, 'Only a steward sets a hold\'s box.');
       return true;
     }
@@ -32218,7 +32250,8 @@ log('gamemode loaded:',
       if (!here(actorId)) { return false; }
       return claim(actorId, profileId, toProfile);
     }
-    if (word === '/steward') { return stewardCmd(parts, profileId, toProfile); }
+    if (word === '/jarl') { return jarlCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/steward') { return stewardCmd(parts, actorId, profileId, toProfile); }
     if (word === '/evict') { return evict(actorId, profileId, toProfile); }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
@@ -32244,7 +32277,49 @@ log('gamemode loaded:',
     apart. The id is what the register keys on everywhere else. It is on the
     person's own K panel, so asking somebody for theirs is a sentence.
   */
-  function stewardCmd(parts, profileId, toProfile) {
+  /*
+    Seat the Jarl office on THIS character.
+
+        /jarl
+
+    Discord Jarl (or admin) eligibility is required. The office is the
+    character property, so a second character on the same account stays
+    ordinary. Admins may seat without the Discord role so the first
+    office can be placed out of character (#397).
+  */
+  function jarlCmd(parts, actorId, profileId, toProfile) {
+    var adm = g['__thornswoodIsAdmin'];
+    var isAdmin = false;
+    try { if (typeof adm === 'function' && adm(profileId)) { isAdmin = true; } } catch (e) { }
+    var fn = g['__thornswoodIsJarl'];
+    var eligible = isAdmin;
+    try { if (typeof fn === 'function' && fn(profileId)) { eligible = true; } } catch (e2) { }
+    if (!eligible) {
+      toProfile(profileId, 'Only someone with the Jarl role (or an admin) can take the office.');
+      return true;
+    }
+    var c = g['__thornswoodCharacter'];
+    if (!c || typeof c.stateOf !== 'function' || typeof c.writeState !== 'function') {
+      toProfile(profileId, 'The character block is not loaded.');
+      return true;
+    }
+    var s = c.stateOf(actorId);
+    if (!s) {
+      toProfile(profileId, 'Your character is not ready yet.');
+      return true;
+    }
+    if (s.office === 'jarl') {
+      toProfile(profileId, 'This character already holds the Jarl office.');
+      return true;
+    }
+    s.office = 'jarl';
+    c.writeState(actorId, s, true);
+    plog('seated jarl office on actor', actorId, 'profile', profileId);
+    toProfile(profileId, 'This character holds the Jarl office now.');
+    return true;
+  }
+
+  function stewardCmd(parts, actorId, profileId, toProfile) {
     var who = [];
     for (var i = 0; i < stewards.length; i++) { who.push(String(stewards[i])); }
 
@@ -32256,7 +32331,7 @@ log('gamemode loaded:',
       return true;
     }
 
-    if (!isJarl(profileId)) {
+    if (!isJarl(profileId, actorId)) {
       toProfile(profileId, 'Only a jarl names a steward.');
       return true;
     }
@@ -33310,6 +33385,8 @@ log('gamemode loaded:',
       profession: s.prof || null,
       'class': s.cls || null,
       half: s.half || null,
+      // Jarl or steward office on this character, not the account (#397).
+      office: s.office || null,
       schools: s.schools || [],
       ranks: s.ranks || {},
       tree: s.tree || {},
@@ -34085,7 +34162,7 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/pick', '/spend',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
-               '/steward', '/evict', '/box', '/rent',
+               '/jarl', '/steward', '/evict', '/box', '/rent',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
                // Playtesters', like /tp, and gated the same way. Deliberately
@@ -34136,7 +34213,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // /evict answers "only a steward ends a claim" to
                       // everybody else, which is the rule stated rather than
                       // a power hidden.
-                      '/steward', '/evict',
+                      '/jarl', '/steward', '/evict',
                       // The board and the box are everybody's. /rent with no
                       // argument says what a place costs, which is the first
                       // thing somebody standing at a door wants to know, and

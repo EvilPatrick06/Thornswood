@@ -191,7 +191,7 @@ try {
 }
 cfg.discord = Object.assign({ clientId:'', clientSecret:'', botToken:'', guildId:'', invite:'' },
                             cfg.discord || {});
-cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
+cfg.access  = Object.assign({ admin:[], play:[], banned:[], jarl:[] }, cfg.access || {});
 // Who may use the dev build and join the dev server. Left out of config.json
 // it is the Discord staff roles, the same set the bot's STAFF_ROLES names
 // (Owner, Dev, Gamemaster, Moderator, Loremaster; Content Creator is not
@@ -201,6 +201,11 @@ cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
 // Add role names here to widen it further.
 if (!Array.isArray(cfg.access.dev)) {
   cfg.access.dev = ['Owner', 'Dev', 'Gamemaster', 'Moderator', 'Loremaster'];
+}
+// Who may hold a Jarl office in the world. Discord role eligibility only;
+// the office itself sits on one named character (#397).
+if (!Array.isArray(cfg.access.jarl)) {
+  cfg.access.jarl = ['Jarl'];
 }
 // Who gets a third character slot at the game's main menu. Everybody gets
 // two; a Patreon tier or a Gamemaster gets three, and so do the admin roles.
@@ -1920,6 +1925,7 @@ async function standing(discordId) {
   if (has(cfg.access.admin)) out.admin = true;
   out.play = out.admin || has(cfg.access.play);
   out.dev = out.admin || has(cfg.access.dev);
+  out.jarl = out.admin || has(cfg.access.jarl);
   return out;
 }
 
@@ -3615,10 +3621,11 @@ async function handle(req, res) {
                   'September. The address form goes once no door says this.');
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], jarlProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
+    const seenJarl = new Set();
     const seenFailed = new Set();
     for (const d of Object.keys(linked)) {
       const row = linked[d] || {};
@@ -3659,6 +3666,9 @@ async function handle(req, res) {
       // the same standing as the one profile number in its own settings.
       if (st.admin) {
         for (const n of profiles) if (!seenAdmin.has(n)) { seenAdmin.add(n); out.adminProfiles.push(n); }
+      }
+      if (st.jarl) {
+        for (const n of profiles) if (!seenJarl.has(n)) { seenJarl.add(n); out.jarlProfiles.push(n); }
       }
       out.people.push({ id: String(d), name: st.name || row.name || '', profiles });
     }
