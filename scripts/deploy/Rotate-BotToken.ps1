@@ -1,0 +1,215 @@
+<#
+  Rotate-BotToken.ps1
+
+  Puts a new Discord bot token into both places on the VPS that use it, in one
+  go, and restarts both programs that read it.
+
+      .\scripts\deploy\Rotate-BotToken.ps1            asks for the new token, writes both, restarts both
+      .\scripts\deploy\Rotate-BotToken.ps1 -Check     writes nothing: says whether each file holds a token
+
+  The token lives in two files on the VPS:
+
+    C:\Thornswood-Bot\bot.env.json    DISCORD_TOKEN     the bot logs in with it
+    C:\Thornswood-Docs\config.json    discord.botToken  the site reads roles with it
+
+  A token that reaches the first and not the second leaves the site unable to
+  read anybody's roles, so everybody except the hand written admins is turned
+  away. That is why this is one command: scripts\vps\Write-BotToken.ps1 writes
+  both files or neither, and Install-Bot.ps1 and Set-DiscordLogin.ps1 use the
+  same writer when they are given a token.
+
+  Before running it: the Discord developer portal, the Thornswood application,
+  Bot, Reset Token, Copy. The old token stops working the moment it is reset,
+  so the bot drops off Discord until this has run. Pick a quiet moment: the
+  restart throws anybody who is part way through a ticket.
+
+  What it does:
+
+    1. Asks for the new token at a prompt, hidden, never as a parameter and
+       never as a word on a command line, and checks it looks like a bot token
+       before anything leaves this machine.
+    2. Sends the writer up, then the token inside a base64 payload, the same way
+       Install-Bot.ps1 and Set-DiscordLogin.ps1 always have.
+    3. Writes both files, reads both back, and refuses a token for a different
+       application than the one they hold (-AnyApplication, only when moving to
+       a new application on purpose).
+    4. Restarts the bot and the site, and prints what each said on the way up:
+       who the bot logged in as, and whether the site can read the server.
+
+  Every line it prints names a file and a state. The token is never printed.
+
+  The old token is still inside every backup made before the rotation: the
+  nightly ones in C:\Thornswood-Backup on the VPS, and any zip Fetch-Backups.ps1
+  or Backup-Server.ps1 brought down to Downloads\Thornswood-Backups. Discord
+  stopped accepting it at the reset, but the same zips hold the client secret,
+  which is still live, so they stay where the rest of that is kept.
+#>
+[CmdletBinding()]
+param(
+  [string]$Vps      = '',
+  [string]$User     = 'Administrator',
+  [string]$BotRoot  = 'C:/Thornswood-Bot',
+  [string]$DocsRoot = 'C:/Thornswood-Docs',
+  [string]$BotTask  = 'Thornswood Bot',
+  [string]$SiteTask = 'Thornswood Docs',
+  # Writes nothing and restarts nothing. Says whether each file parses and
+  # holds a token, and for which application.
+  [switch]$Check,
+  # Accept a token for a different Discord application than the files hold.
+  # For moving to a new application, never for a rotation.
+  [switch]$AnyApplication,
+  [switch]$NoPause
+)
+
+$ErrorActionPreference = 'Stop'
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
+$writer = Join-Path $Here '..\vps\Write-BotToken.ps1'
+. $writer
+
+$botWin  = $BotRoot.Replace('/','\')
+$docsWin = $DocsRoot.Replace('/','\')
+$envFile = $botWin + '\bot.env.json'
+$cfgFile = $docsWin + '\config.json'
+$far     = 'C:/Windows/Temp/thornswood-write-bottoken.ps1'
+$farWin  = $far.Replace('/','\')
+
+function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
+function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
+function Done([int]$code) { Write-Host ''; if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit $code }
+function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Done 1 }
+
+# The remote scripts here are short on purpose: the writer goes up as a file
+# first, so what goes on the command line is a few lines and the payload. That
+# keeps the token off the disk on both machines, where the long form, a script
+# sent as a temp file, would have put it.
+function Remote($script) {
+  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+  # Bypass, because the script dot-sources the writer from a file, and a file
+  # is what an execution policy looks at.
+  $cmd = "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $e"
+  if ($cmd.Length -gt 8000) { throw 'the remote script is too long for one command line' }
+  return & ssh @ssh "$User@$Vps" $cmd 2>&1
+}
+
+function Show($lines) {
+  foreach ($l in @($lines)) {
+    $s = "$l"
+    $c = 'Gray'
+    if ($s -match '^(NOT WRITTEN|CANNOT READ|BOT HAS NOT|SITE DID NOT|PUTTING)' -or $s -match 'NOT SET|NOT A BOT TOKEN|BYTE ORDER MARK|CANNOT READ THE SERVER|NO ROLES') { $c = 'Red' }
+    elseif ($s -match '(written and read back|already holds|is present|reconnected|site restarted|roles visible|can read)') { $c = 'Green' }
+    Say "  $s" $c
+  }
+}
+
+function SendWriter {
+  & scp @ssh $writer "${User}@${Vps}:$far" 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { Die "could not send Write-BotToken.ps1 to $Vps. Is the VPS key set up? .\scripts\vps\Setup-SshKey.ps1 -Test" }
+}
+
+Write-Host ''
+Write-Host '  THORNSWOOD  -  rotate the bot token' -ForegroundColor White
+
+# ---------------------------------------------------------------- check ---
+if ($Check) {
+  Head 'What the VPS holds now'
+  SendWriter
+  $out = Remote @"
+`$ErrorActionPreference = 'Continue'
+try {
+  . '$farWin'
+  if (-not (Get-Command Get-ThornswoodBotTokenState -EA SilentlyContinue)) { 'CANNOT READ: Write-BotToken.ps1 did not load on the VPS'; return }
+  Get-ThornswoodBotTokenState -BotEnv '$envFile' -SiteConfig '$cfgFile'
+} finally { Remove-Item -LiteralPath '$farWin' -Force -EA SilentlyContinue }
+"@
+  Show $out
+  Say ''
+  Say '  Read only. Nothing was written and nothing was restarted.' 'DarkGray'
+  Done 0
+}
+
+# ---------------------------------------------------------------- token ---
+Head 'The new bot token'
+Say '  Discord developer portal, the Thornswood application, Bot, Reset Token, Copy.' 'DarkGray'
+Say '  It is hidden while you paste it and never shown afterwards.' 'DarkGray'
+$ss = Read-Host '  Paste it' -AsSecureString
+if (-not $ss -or $ss.Length -eq 0) { Die 'Nothing pasted, nothing sent.' }
+$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($ss)
+try { $token = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr).Trim() }
+finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+$ss = $null
+
+$app = Get-ThornswoodTokenApp $token
+if (-not $app) {
+  $token = $null
+  Say '  That is not a bot token. A bot token is three parts with dots between them.' 'Red'
+  Say '  The client secret (OAuth2, one run of 32 characters) is the one it gets mixed up with.' 'DarkGray'
+  Die 'Nothing was sent. Run it again.'
+}
+Say "  a bot token for application $app" 'Green'
+
+# Base64 so the token is never a word on a command line on either machine.
+$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($token))
+$token = $null
+
+$any = ''
+if ($AnyApplication) { $any = ' -AnyApplication' }
+
+# --------------------------------------------------------------- write ---
+Head 'Writing both files, then restarting the bot and the site'
+SendWriter
+$out = Remote @"
+`$ErrorActionPreference = 'Continue'
+try {
+  . '$farWin'
+  if (-not (Get-Command Write-ThornswoodBotToken -EA SilentlyContinue)) {
+    'NOT WRITTEN: Write-BotToken.ps1 did not load on the VPS. Nothing changed.'
+    return
+  }
+  # Caught and never shown: an error on this line would print the line, and
+  # the line holds the payload.
+  `$t = ''
+  try { `$t = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64')) } catch { }
+  `$r = Write-ThornswoodBotToken -Token `$t -BotEnv '$envFile' -SiteConfig '$cfgFile'$any
+  `$t = `$null
+  `$r.Lines
+  if (`$r.Ok) {
+    '--- the bot ---'
+    Restart-ThornswoodBot -Root '$botWin' -Task '$BotTask'
+    '--- the site ---'
+    Restart-ThornswoodSite -Root '$docsWin' -Task '$SiteTask'
+  }
+  '--- on the disk now ---'
+  Get-ThornswoodBotTokenState -BotEnv '$envFile' -SiteConfig '$cfgFile'
+} finally { Remove-Item -LiteralPath '$farWin' -Force -EA SilentlyContinue }
+"@
+$b64 = $null
+Show $out
+
+if ("$out" -match 'NOT WRITTEN') {
+  Say ''
+  Say '  Nothing was changed on the VPS, so the bot and the site still agree with each other.' 'Yellow'
+  Die 'The token was not rotated.'
+}
+if ("$out" -notmatch 'written and read back|already holds') {
+  Die 'The VPS did not say the token was written. Run it again with -Check to see what it holds.'
+}
+
+Head 'Consumers updated'
+Say "  $envFile  DISCORD_TOKEN, read by the bot ($BotTask)" 'Green'
+Say "  $cfgFile  discord.botToken, read by the site ($SiteTask)" 'Green'
+Write-Host ''
+Say '  The old token is still inside every backup made before now:' 'Yellow'
+Say '    C:\Thornswood-Backup on the VPS, the nightly ones' 'Yellow'
+Say ('    ' + (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads\Thornswood-Backups') + ' here, whatever Fetch-Backups.ps1 or Backup-Server.ps1 brought down') 'Yellow'
+Say '  Discord stopped taking it at the reset, but those zips hold the live client' 'DarkGray'
+Say '  secret too, so they stay where the rest of that is kept.' 'DarkGray'
+Write-Host ''
+Say '  Then check from the outside, the way the site sees Discord:' 'DarkGray'
+Say '    .\scripts\vps\Check-Site.ps1' 'Green'
+Say '    .\scripts\vps\Show-BotLog.ps1' 'Green'
+if ("$out" -match 'BOT HAS NOT|SITE DID NOT|CANNOT READ THE SERVER') { Done 1 }
+Done 0
