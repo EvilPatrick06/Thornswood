@@ -28,10 +28,11 @@
   with the two files it dot-sources, and the third, Close-Launcher.ps1, is
   replaced by a stub: the real Stop-Game closes any Skyrim on the machine,
   whatever folder it runs from, and nothing here may do that. LOCALAPPDATA
-  points into the temp folder for pending notes; the baseline lives in the
-  stand-in releases clone under -ReleaseDir, so the real one is never read or written.
-  -NoUpload and -NoPush, no config.json and no gh, so it cannot reach GitHub
-  or a server. Every case stops before the pack is built.
+  points into the temp folder for pending notes; the feed and the baseline are
+  in a stand-in working folder under -ReleaseDir, so the real ones are never
+  read or written. -NoUpload and -NoPush with both files already there, so
+  Feed-Store.ps1 receives and sends nothing, and no config.json: it cannot
+  reach the VPS or a server. Every case stops before the pack is built.
 #>
 [CmdletBinding()]
 param([string]$PublishPath)
@@ -130,6 +131,7 @@ try {
     # Each where it is in the repository since phase 8 of issue #440.
     $repoRoot = Split-Path -Parent (Split-Path -Parent $ToolsDir)
     foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
+                   'scripts\release\Feed-Store.ps1',
                    'scripts\release\Where.ps1', 'records\client-build.json') {
         $from = Join-Path $repoRoot $f
         $to = Join-Path (Split-Path -Parent $tools) $f

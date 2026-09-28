@@ -42,7 +42,7 @@
 
 .PARAMETER Channel
   main or dev, and dev when it is left out. Dev deploys the gamemode to the
-  VPS Dev server and remirrors the Thornswood-Releases-dev tip to
+  VPS Dev server and remirrors this machine's working copy of the dev feed to
   /feed-dev. Main builds the live gamemode into the server dist, pushes it
   with Deploy-Server.ps1, and remirrors the main tip to /feed.
 

@@ -64,8 +64,8 @@ try {
 
     # 1. A machine that never had the old folder: Djinn's, or a fresh clone.
     Yes 'Repo is the folder above tools' (Same (Ask 'Repo') $repo)
-    Yes 'Releases is the sibling Thornswood-Releases' (Same (Ask 'Releases') (Join-Path (Split-Path -Parent $repo) 'Thornswood-Releases'))
-    Yes 'ReleasesDev is the sibling Thornswood-Releases-dev' (Same (Ask 'ReleasesDev') (Join-Path (Split-Path -Parent $repo) 'Thornswood-Releases-dev'))
+    Yes 'Releases is this machine''s working copy of the main feed (#907)' (Same (Ask 'Releases') (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main'))
+    Yes 'ReleasesDev is the dev one' (Same (Ask 'ReleasesDev') (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev'))
     Yes 'with nothing anywhere, the engine is engine\skymp' (Same (Ask 'Engine') $newEngine)
     Yes 'and the output is out' (Same (Ask 'Out') $newOut)
     Yes 'and ServerDist is under the engine''s build' (Same (Ask 'ServerDist') (Join-Path $newEngine 'build\dist\server'))
@@ -125,7 +125,7 @@ try {
     # ---- the scripts --------------------------------------------------------
     # A string naming C:\Thornswood-Dev, other than in Where.ps1 itself, in
     # the release test's made-up asset names.
-    $allowed = @('Where.ps1', 'test-release-prerelease.ps1', 'test-where.ps1')
+    $allowed = @('Where.ps1', 'test-where.ps1')
     $named = @()
     $keys = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Releases', 'ReleasesDev')
     $badKeys = @()

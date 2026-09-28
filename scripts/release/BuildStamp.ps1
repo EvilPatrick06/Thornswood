@@ -40,10 +40,11 @@
   TWO VERSIONS, because a dev build carries a number no source file does.
   Ship puts 1.1.92.2 into Updater.cs for the build and then puts 1.1.92 back,
   so the four part number exists only in the dev feed's version.json. The
-  feeds are the clones Ship.ps1 publishes to, Thornswood-Releases and
-  Thornswood-Releases-dev, beside the repo or beside the main checkout when
-  this runs from a worktree. Not the version.json inside the repo, which Ship
-  falls back to: it stopped being the feed when releases moved to their own
+  feeds are this machine's working copies of what Ship.ps1 publishes,
+  %LOCALAPPDATA%\Thornswood\feed\main and ...\feed\dev (Feed-Store.ps1,
+  #907), the same from every checkout and worktree; until #907 they were the
+  Thornswood-Releases clones beside the repo. Not the version.json inside the
+  repo: it stopped being the feed when releases moved to their own
   repository, and on 24 September it said 1.0.196 while Updater.cs and the
   real feed both said 1.1.92. feedVersion is empty when no feed is found,
   because a wrong number here is worse than none.
@@ -92,21 +93,10 @@ function New-ThornswoodBuildStamp {
   }
 
   if (-not $FeedDir) {
-    # Beside this checkout, and beside the main one when this is a worktree,
-    # because a worktree's parent is .claude\worktrees and has no feed in it.
-    $roots = @(Split-Path -Parent $RepoDir)
-    try {
-      $common = & git -C $RepoDir rev-parse --path-format=absolute --git-common-dir 2>$null
-      if ($LASTEXITCODE -eq 0 -and $common) {
-        $roots += Split-Path -Parent (Split-Path -Parent ([string]($common | Select-Object -First 1)).Trim())
-      }
-    } catch { }
-    $name = 'Thornswood-Releases'
-    if ($Channel -eq 'dev') { $name = 'Thornswood-Releases-dev' }
-    foreach ($r in $roots) {
-      $c = Join-Path $r $name
-      if (Test-Path -LiteralPath (Join-Path $c 'version.json')) { $FeedDir = $c; break }
-    }
+    # This machine's working copy of the channel's feed (Feed-Store.ps1), the
+    # same folder whichever checkout or worktree this runs from.
+    $c = Join-Path (Join-Path (Join-Path $env:LOCALAPPDATA 'Thornswood') 'feed') $Channel
+    if (Test-Path -LiteralPath (Join-Path $c 'version.json')) { $FeedDir = $c }
   }
   $feed = ''
   if ($FeedDir) {

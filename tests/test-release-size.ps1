@@ -106,7 +106,7 @@ Yes 'a lower cap given on the command line is the one used' ((Get-ReleaseSizeRef
 $sum    = $src.IndexOf('$changedBytes += ')
 $call   = $src.IndexOf('Get-ReleaseSizeRefusal $changedBytes $MaxReleaseMB $AcceptSize')
 $zip    = $src.IndexOf('[IO.Compression.ZipFile]::Open(')
-$upload = $src.IndexOf('gh release create')
+$upload = $src.IndexOf('# ==== thornswood site upload ====')
 Yes 'the gate is asked about $changedBytes, with the cap and the override' ($call -gt $b)
 Yes '  after the total is added up' ($sum -ge 0 -and $call -gt $sum)
 Yes '  before the first pack is zipped' ($zip -gt $call)

@@ -1,7 +1,7 @@
 <#
   Repair-Manifest.ps1
 
-  Takes packs with no download url back out of version.json and pushes the fix.
+  Takes packs with no download url back out of version.json and sends the fix.
   Since 24 September it takes out packs held anywhere but the repository
   launchers read the feed from as well.
 
@@ -24,11 +24,15 @@
   built from a game they were applied to, which is why Package-Thornswood.ps1
   seeds applied.txt with their ids.
 
-  It works on the feed launchers read: version.json in the releases clone
-  beside this repository, Thornswood-Releases, or Thornswood-Releases-dev with
-  -Channel dev. Until 24 September it read version.json in the source
-  repository, which stopped being the feed on 15 September, so it would have
-  repaired a file no launcher downloads and pushed it to the source repository.
+  It works on the feed launchers read: since #907 it receives version.json
+  from the VPS store into this machine's working folder for the channel
+  (scripts\release\Feed-Store.ps1), and sends the repaired one back, which is
+  the moment the site serves it. The send refuses, replacing nothing, if the
+  feed or the baseline changed up there after it was received. Until #907 it
+  worked on the Thornswood-Releases clone and pushed; until 24 September on
+  version.json in the source repository, which no launcher read.
+  -RepoDir <folder> works on the version.json in that folder instead and
+  receives nothing; the tests use it with -NoPush.
 
       .\Repair-Manifest.ps1            show what is broken and fix it
       .\Repair-Manifest.ps1 -DryRun    show it and change nothing
@@ -37,13 +41,12 @@
   MOVING THE URLS TO THE SITE (#897). With -MoveToSite it takes nothing out:
   every url on the feed that still points at GitHub, and whose bytes the site
   already answers for at /feed[-dev]/assets/<sha256>, is rewritten to that
-  address, and the feed is pushed like any other repair. A url the site does
+  address, and the feed is sent like any other repair. A url the site does
   not answer for stays where it is. It is how the main feed moves without
-  waiting for a main Ship; the site copy follows with
-  .\scripts\deploy\Remirror-Site-Feed.ps1 (-Dev for dev).
+  waiting for a main Ship.
 
       .\Repair-Manifest.ps1 -MoveToSite -DryRun     what would move
-      .\Repair-Manifest.ps1 -MoveToSite             move it and push
+      .\Repair-Manifest.ps1 -MoveToSite             move it and send it
 #>
 [CmdletBinding()]
 param(
@@ -65,9 +68,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-if (-not $RepoDir) {
-    $RepoDir = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $Here))) $(if ($Channel -eq 'dev') { 'Thornswood-Releases-dev' } else { 'Thornswood-Releases' })
-}
+. (Join-Path $Here 'Feed-Store.ps1')
+$receive = -not $RepoDir
+if (-not $RepoDir) { $RepoDir = Get-FeedStoreDir $Channel }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -97,22 +100,21 @@ function Find-Root {
 
 . (Join-Path $Here 'Feed-Rules.ps1')
 
+# Received first, dry run or not, so the repair is made on the feed launchers
+# read right now rather than on whatever this machine last saw (#907).
+if ($receive) {
+    try { [void](Receive-FeedStore $Channel $RepoDir) }
+    catch { Die ("Could not receive the $Channel feed from the VPS. Nothing was written: " + $_.Exception.Message) }
+}
 $VersionFile = Join-Path $RepoDir 'version.json'
-if (-not (Test-Path -LiteralPath $VersionFile)) { Die "not found: $VersionFile. That is where the releases clone is expected; pass -RepoDir if it is somewhere else." }
+if (-not (Test-Path -LiteralPath $VersionFile)) { Die "not found: $VersionFile. Pass -RepoDir with the folder holding version.json." }
 
-# Pulled first, the way Publish-Update does it, so the repair lands on top of
-# whatever was published since this clone last looked rather than on a copy
-# git push then refuses. A dry run reads the clone as it stands.
-if (-not $DryRun -and -not $NoPush -and (Test-Path -LiteralPath (Join-Path $RepoDir '.git'))) {
-    $old = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    $pulled = & git -C $RepoDir pull --rebase --quiet 2>&1
-    $rc = $LASTEXITCODE
-    $ErrorActionPreference = $old
-    if ($rc -ne 0) {
-        Write-Host ($pulled | Out-String) -ForegroundColor Red
-        Die "Could not pull $RepoDir. Nothing was written."
-    }
+# Sends the repaired feed back to the VPS, which is when the site serves it.
+function Send-Repaired {
+    Head 'Sending'
+    try { [void](Send-FeedStore $Channel $RepoDir @('version.json')) }
+    catch { Die ("The feed was not sent: " + $_.Exception.Message + " It is repaired here in $RepoDir, and nobody has it yet.") }
+    Say '  sent; the site serves it now' 'Green'
 }
 
 Head 'Reading version.json'
@@ -132,7 +134,7 @@ if ($MoveToSite) {
     if ($left.Count) {
         Say ("  {0} stay where they are, because the site does not answer for them:" -f $left.Count) 'Yellow'
         foreach ($l in $left) { Say "    $($l.What)" 'Yellow' }
-        Say '  .\scripts\oneoff\Copy-ReleaseAssets-ToSite.ps1 puts them up.' 'Yellow'
+        Say '  .\scripts\deploy\Remirror-Site-Feed.ps1 -Send <file> puts their bytes up.' 'Yellow'
     }
     if ($DryRun -or -not $mv.Moved.Count) {
         if ($DryRun) { Say '  Dry run. Nothing was written.' 'Yellow' }
@@ -145,18 +147,8 @@ if ($MoveToSite) {
     if ($NoPush) {
         Say 'Not pushed, as asked.' 'Yellow'
     } else {
-        Head 'Pushing'
-        $old = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        & git -C $RepoDir add version.json 2>&1 | Out-Host
-        & git -C $RepoDir commit -m "Downloads come from the site: $($mv.Moved.Count) url(s)" 2>&1 | Out-Host
-        & git -C $RepoDir push 2>&1 | Out-Host
-        $rc = $LASTEXITCODE
-        $ErrorActionPreference = $old
-        if ($rc -ne 0) { Die "git push exited with $rc. The file is moved here, it just is not up yet." }
-        Say '  pushed' 'Green'
+        Send-Repaired
     }
-    Say ("Now put it on the site: .\scripts\deploy\Remirror-Site-Feed.ps1{0}" -f $(if ($dev) { ' -Dev' } else { '' })) 'Green'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
@@ -168,7 +160,7 @@ $bad = @($split.Drop | ForEach-Object { $_.Pack })
 $good = @($split.Keep)
 
 if ($bad.Count -eq 0) {
-    Say "  every pack downloads from $feedRepo. Nothing to repair." 'Green'
+    Say "  every pack downloads from $(if ($feedRepo) { $feedRepo + ' or the site' } else { 'the site' }). Nothing to repair." 'Green'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
@@ -221,20 +213,10 @@ if (Test-Path -LiteralPath $applied) {
 
 if ($NoPush) {
     Write-Host ''
-    Say 'Not pushed, as asked. Push it yourself with:' 'Yellow'
-    Say "  git -C `"$RepoDir`" add version.json; git -C `"$RepoDir`" commit -m 'Drop packs no launcher can download'; git -C `"$RepoDir`" push" 'DarkGray'
+    Say 'Not pushed, as asked. Nobody has this repair until it is sent.' 'Yellow'
 }
 else {
-    Head 'Pushing'
-    $old = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    & git -C $RepoDir add version.json 2>&1 | Out-Host
-    & git -C $RepoDir commit -m "Drop $($bad.Count) pack(s) no launcher can download" 2>&1 | Out-Host
-    & git -C $RepoDir push 2>&1 | Out-Host
-    $rc = $LASTEXITCODE
-    $ErrorActionPreference = $old
-    if ($rc -ne 0) { Die "git push exited with $rc. The file is fixed here, it just is not up yet." }
-    Say '  pushed' 'Green'
+    Send-Repaired
 }
 
 Write-Host ''

@@ -30,10 +30,9 @@
 param(
     [Parameter(Position = 0)][string]$Notes = '',
     [string]$RepoDir,
-    # The public releases clone, which is the feed every launcher reads.
-    # Same shape as Set-Server.ps1, and for the same reason: releases moved
-    # into their own repository and the version.json still sitting in this one
-    # stopped being the live feed that day. See the News section below.
+    # A folder holding the version.json to add the News entry to. Left out,
+    # the live feed is received from the VPS store and sent back (#907), the
+    # same shape as Set-Server.ps1. See the News section below.
     [string]$ReleaseDir,
     <#
       Which server this goes to. 'main' is the one everybody plays on.
@@ -430,9 +429,17 @@ if (-not $NoNews -and $up) {
     # launcher reads the copy in the public releases clone. So a server change
     # was written down in a file nobody reads, which is the same as not being
     # announced at all, and the whole reason this News section exists.
-    if (-not $ReleaseDir) {
-        $guess = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
-        $ReleaseDir = if (Test-Path (Join-Path $guess '.git')) { $guess } else { $RepoDir }
+    #
+    # Since #907 the live feed is on the VPS store (Feed-Store.ps1): received
+    # into this machine's working folder for main, the entry added, and sent
+    # back. Until then it was the Thornswood-Releases clone, pushed. -ReleaseDir
+    # works on a folder instead and receives nothing.
+    . (Join-Path $Here 'Feed-Store.ps1')
+    $receive = -not $ReleaseDir
+    if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir 'main' }
+    if ($receive -and -not $NoPush) {
+        try { [void](Receive-FeedStore 'main' $ReleaseDir) }
+        catch { Say "  could not receive the live feed from the VPS: $($_.Exception.Message)" 'Yellow' }
     }
     $VersionFile = Join-Path $ReleaseDir 'version.json'
 
@@ -543,34 +550,22 @@ if (-not $NoNews -and $up) {
                 Say ("  added: {0}" -f $entry.title) 'Green'
 
                 if (-not $NoPush) {
-                    # THE RELEASES CLONE, BY -C, AND NEVER THE SOURCE REPO.
+                    # THE LIVE FEED ON THE VPS, NEVER THE SOURCE REPO.
                     #
                     # This used to Push-Location into the source repo and run a
-                    # bare git push there. Two things wrong with that, and the
-                    # second is the dangerous one. It pushed the file nobody
-                    # reads, so the news still did not reach anybody. And a
-                    # bare push takes whatever branch the source repo happens
-                    # to have checked out, which on the machine that ships is
-                    # usually main: a deploy script quietly pushing main is how
-                    # the rule that main is only ever what shipped gets broken
-                    # by accident.
-                    #
-                    # -C keeps it in the releases clone whatever this shell is
-                    # standing in, which is the shape Set-Server.ps1 uses for
-                    # the same file.
-                    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+                    # bare git push there, which pushed a file nobody reads and
+                    # whatever branch the source repo had checked out, usually
+                    # main. Then it pushed the Thornswood-Releases clone by -C.
+                    # Since #907 the entry goes to the VPS store, where the
+                    # site serves it at once; a feed that changed up there
+                    # since it was received is refused, not overwritten.
                     try {
-                        # git writes progress to stderr, and Out-Host renders
-                        # anything on stderr as a red error even on success.
-                        function Relay { process { Write-Host ('  ' + $_.ToString()) -ForegroundColor DarkGray } }
-                        & git -C $ReleaseDir add version.json 2>&1 | Relay
-                        & git -C $ReleaseDir commit -m "Server: $($entry.title)" 2>&1 | Relay
-                        & git -C $ReleaseDir push 2>&1 | Relay
-                        if ($LASTEXITCODE -ne 0) {
-                            Say '  the feed did not push, so nobody has the News entry yet' 'Yellow'
-                            Say ("  git -C $ReleaseDir push   sends it") 'Yellow'
-                        }
-                    } finally { $ErrorActionPreference = $old }
+                        [void](Send-FeedStore 'main' $ReleaseDir @('version.json'))
+                        Say '  sent; the News entry is on the live feed' 'DarkGray'
+                    } catch {
+                        Say "  the feed was not sent, so nobody has the News entry yet: $($_.Exception.Message)" 'Yellow'
+                        Say '  Run this again to add it.' 'Yellow'
+                    }
                 }
             }
         } catch {

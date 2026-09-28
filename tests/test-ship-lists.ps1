@@ -44,7 +44,7 @@
        and every file whose fate changed is listed by name.
 
   Read only. The game folder, the launcher's record and the baselines under
-  Thornswood-Releases (and legacy LOCALAPPDATA copies) are read and never written. -Before writes the old scripts and
+  this machine's working copies of the VPS store (%LOCALAPPDATA%\Thornswood\feed, #907) and legacy LOCALAPPDATA copies are read and never written. -Before writes the old scripts and
   client-build.json into a temp folder of its own and removes it.
 
   About a minute on the machine that ships, nearly all of it the installer's
@@ -483,8 +483,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $Game 'SkyrimSE.exe')) -or -not (Tes
     $repoRoot = Split-Path -Parent $Tools
     $relSibling = Split-Path -Parent $repoRoot
     $baselinePaths = @(
-        @{ Name = 'main Releases'; Path = (Join-Path $relSibling 'Thornswood-Releases\published.json') },
-        @{ Name = 'dev Releases';  Path = (Join-Path $relSibling 'Thornswood-Releases-dev\published.json') },
+        @{ Name = 'main store';    Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main\published.json') },
+        @{ Name = 'dev store';     Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev\published.json') },
         @{ Name = 'legacy main';   Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\published.json') },
         @{ Name = 'legacy dev';    Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\published-dev.json') }
     )
