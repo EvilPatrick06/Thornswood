@@ -37593,11 +37593,46 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
     return 'id ' + Number(baseId).toString(16);
   }
 
-  function wornList(actorId) {
-    var out = [];
+  /*
+    WHAT SOMEBODY IS ACTUALLY WEARING, for warmth.
+
+    Inventory worn flags and the equipment record disagree. The client dresses
+    from equipment; inventory worn is what the server asked for and can lag or
+    stay set after somebody took the coat off. #608: no temp difference with
+    clothes on or off. Prefer equipment when it is readable (even if empty);
+    fall back to inventory worn only when equipment cannot be read.
+  */
+  function wornEntries(actorId) {
+    try {
+      var eq = mp.get(actorId, 'equipment');
+      if (eq) {
+        var ee = (eq.inv && eq.inv.entries) || eq.entries;
+        if (ee) {
+          var fromEq = [];
+          for (var i = 0; i < ee.length; i++) {
+            var e = ee[i];
+            if (e && e.worn && e.baseId) { fromEq.push(e); }
+          }
+          return fromEq;
+        }
+      }
+    } catch (e) { }
     try {
       var inv = mp.get(actorId, 'inventory');
       var entries = (inv && inv.entries) || [];
+      var out = [];
+      for (var j = 0; j < entries.length; j++) {
+        var en = entries[j];
+        if (en && en.worn && en.baseId) { out.push(en); }
+      }
+      return out;
+    } catch (e2) { return []; }
+  }
+
+  function wornList(actorId) {
+    var out = [];
+    try {
+      var entries = wornEntries(actorId);
       for (var i = 0; i < entries.length; i++) {
         var e = entries[i];
         if (!e || !e.worn) { continue; }
@@ -37624,8 +37659,7 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   function insulation(actorId) {
     var total = 0;
     try {
-      var inv = mp.get(actorId, 'inventory');
-      var entries = (inv && inv.entries) || [];
+      var entries = wornEntries(actorId);
       for (var i = 0; i < entries.length; i++) {
         var e = entries[i];
         if (!e || !e.worn) { continue; }
