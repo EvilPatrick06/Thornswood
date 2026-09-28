@@ -2330,6 +2330,11 @@ function putBackScript() {
   ].join('\n');
 }
 
+/** True when the toast means produce was handed over; leave the flora empty. */
+function floraHanded(message) {
+  return typeof message === 'string' && /^(You pick |You take )/.test(message);
+}
+
 /** Put back whatever that press just picked. See PUTBACK_PROPERTY. */
 function putBack(actorId, refrId) {
   if (!actorId || !refrId) { return; }
@@ -7401,7 +7406,16 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   // salmon as a flower for a gatherer. plantAt() refuses a fish base on its own
   // account as well, so neither half of that depends on this line staying where
   // it is. Same arrangement as the crops two lines up, same reason.
-  else if (isFish(baseDesc)) message = fish(casterRefrId, refrId, baseDesc);
+  else if (isFish(baseDesc)) {
+    message = fish(casterRefrId, refrId, baseDesc);
+    /*
+      Same put-back rule as plants below (#382 leftovers). A refused fish press
+      still empties the FLOR on the presser's machine; without putBack a clam
+      stays stripped for everybody and nobody got the meat. A successful
+      "You take ..." toast must leave it empty.
+    */
+    if (message && message !== ALLOW && !floraHanded(message)) { putBack(casterRefrId, refrId); }
+  }
   // Hanging game before the plants, for the same reason and with the same
   // safety net. All seven bases were rows in the plant table until the food
   // rule of 21 September took them out, so on a gamemode built before that ran
@@ -7415,7 +7429,15 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   // actors, so loot() answers null for every one of them and the press would
   // fall out of this function untouched, with the engine handing the pheasant
   // to whoever pressed it.
-  else if (isGame(baseDesc)) message = game(casterRefrId, refrId, baseDesc);
+  else if (isGame(baseDesc)) {
+    message = game(casterRefrId, refrId, baseDesc);
+    /*
+      Same put-back rule as fish and plants (#382 leftovers). A refused hanging
+      game press empties the rack on the client; put it back unless the toast
+      says produce was handed over.
+    */
+    if (message && message !== ALLOW && !floraHanded(message)) { putBack(casterRefrId, refrId); }
+  }
   // The butter churn, which is the farmer's. It is in no plant table, so the
   // order against the plants does not matter today; it sits with the other
   // food the food rule moved off the gatherer.
@@ -7443,8 +7465,12 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
       client has already emptied the bush by the time this runs, so a refusal
       that only blocks the handover leaves a stripped plant nobody got
       anything from. ALLOW and an empty answer both mean it went ahead.
+
+      A SUCCESS TOAST ("You pick ...") ALSO MEANS IT WENT AHEAD (#382). The
+      old line put every non-ALLOW string back, which un-picked a real gather
+      the moment the toast was said. Only refusals put the plant back.
     */
-    if (message && message !== ALLOW) { putBack(casterRefrId, refrId); }
+    if (message && message !== ALLOW && !floraHanded(message)) { putBack(casterRefrId, refrId); }
   }
   else if (isVein(baseDesc)) message = mineOre(casterRefrId, refrId, baseDesc);
   else {
