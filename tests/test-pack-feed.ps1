@@ -214,6 +214,68 @@ try {
     New-Item -ItemType Directory -Path $empty -Force | Out-Null
     $r = Run-Block $empty @((Pack 'hd-textures' (Asset $pub 'hd-textures')))
     Yes 'no version.json where it looked stops the publish' ($r.Died -like 'DIE: *' -and $r.Died.Contains($empty))
+
+    # ---- #897: the packs go to the site, not to a GitHub release -------------
+    $hostParam = @($ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'AssetHost' })
+    Yes 'Publish-Pack.ps1 takes -AssetHost' ($hostParam.Count -eq 1)
+    Yes 'and its default is site, the same as Publish-Update.ps1' (
+        $hostParam.Count -eq 1 -and $hostParam[0].DefaultValue -and $hostParam[0].DefaultValue.SafeGetValue() -eq 'site')
+    $sOpen = '# ==== thornswood pack site upload ===='
+    $sShut = '# ==== end thornswood pack site upload ===='
+    $sa = $src.IndexOf($sOpen)
+    $sb = $src.IndexOf($sShut)
+    Yes 'the site upload block markers are in Publish-Pack.ps1' ($sa -ge 0 -and $sb -gt $sa)
+    if ($sa -ge 0 -and $sb -gt $sa) {
+        $siteBlock = $src.Substring($sa, $sb - $sa)
+        Yes 'the site upload comes before the feed is read or written' ($sb -lt $a)
+        Yes 'and before GitHub is ever asked for a token, which only the github way does' (
+            $sb -lt $src.IndexOf('gh auth token'))
+        Yes 'the site upload never talks to GitHub' ($siteBlock -notmatch 'api\.github\.com|Invoke-RestMethod')
+        $fOpen = $src.IndexOf('# ==== thornswood pack site feed ====')
+        Yes 'the feed goes to the site after it is pushed, so launchers hear of the packs' (
+            $fOpen -gt $src.IndexOf('& git push') -and $src.Substring($fOpen) -match 'Remirror-Site-Feed\.ps1')
+
+        # Runs the lifted block with Remirror-Site-Feed.ps1 -Send into a scratch
+        # site folder, the same way test-site-assets.ps1 drives Publish-Update.
+        function Run-Site($built, [string]$siteDir) {
+            $Here = Split-Path -Parent $PackPath
+            $SiteDir = $siteDir
+            function Say($m, $c = 'Gray') { Write-Host ("      " + $m) -ForegroundColor DarkGray }
+            function Head($m) { }
+            function Die($m) { throw ('DIE: ' + $m) }
+            $died = ''
+            try { . ([scriptblock]::Create($siteBlock)) *>&1 | Out-Null }
+            catch { $died = [string]$_.Exception.Message }
+            return $died
+        }
+        $zipDir = Join-Path $work 'zips'
+        New-Item -ItemType Directory -Path $zipDir -Force | Out-Null
+        $zipA = Join-Path $zipDir 'hd-textures.zip'
+        [IO.File]::WriteAllBytes($zipA, [Text.Encoding]::UTF8.GetBytes('pretend pack, hd textures'))
+        $shaA = (Get-FileHash -LiteralPath $zipA -Algorithm SHA256).Hash.ToLowerInvariant()
+        $siteDir = Join-Path $work 'site'
+        $builtA = @([pscustomobject]@{ Id = 'hd-textures'; Name = 'HD'; Zip = $zipA; Sha = $shaA; Bytes = 25; Files = 1 })
+        $died = Run-Site $builtA $siteDir
+        $landed = Join-Path (Join-Path (Join-Path $siteDir 'feed') 'assets') $shaA
+        Yes ('site: the pack is sent to feed\assets under its sha256' + $(if ($died) { " ($died)" } else { '' })) (
+            $died -eq '' -and (Test-Path -LiteralPath $landed))
+        Yes 'site: the bytes up there are the zip''s' (
+            (Test-Path -LiteralPath $landed) -and (Get-FileHash -LiteralPath $landed -Algorithm SHA256).Hash.ToLowerInvariant() -eq $shaA)
+        Yes 'site: nothing goes to feed-dev' (-not (Test-Path -LiteralPath (Join-Path (Join-Path $siteDir 'feed-dev') 'assets')))
+        Yes 'site: no .part is left behind' (@(Get-ChildItem -LiteralPath (Split-Path -Parent $landed) -Filter '*.part' -ErrorAction SilentlyContinue).Count -eq 0)
+        $urlA = ''
+        if ($builtA[0].PSObject.Properties['Url']) { $urlA = [string]$builtA[0].Url }
+        Yes 'site: the feed names it at its site url' ($urlA -eq "https://thornswood.net/feed/assets/$shaA")
+        Yes 'site: and that url passes the rule the feed block holds packs to' (Test-FeedPackUrl $urlA $pub)
+        $r = Run-Block $mine @((Pack 'hd-textures' $urlA))
+        Yes 'site: and the feed block takes it' ($r.Died -eq '')
+
+        $missing = @([pscustomobject]@{ Id = 'weather'; Name = 'W'; Zip = (Join-Path $zipDir 'no-such.zip'); Sha = ('b' * 64); Bytes = 1; Files = 1 })
+        $died = Run-Site $missing $siteDir
+        Yes 'site: a pack that does not reach the site stops the publish' ($died -like 'DIE: *')
+        Yes 'site: and says version.json was not touched' ($died -match '(?i)has not been touched')
+        Yes 'site: and gives it no url, so nothing could name it' (-not $missing[0].PSObject.Properties['Url'])
+    }
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
