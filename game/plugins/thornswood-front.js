@@ -4594,6 +4594,12 @@
     for (let i = 0; i < TOWN_GATES.length; i++) {
       const id = TOWN_GATES[i];
       try {
+        // A claimed locked gate is property's to hold shut (#615). The lock
+        // script publishes __thornswoodPropertyShut; do not force those open.
+        try {
+          const shut = globalThis.__thornswoodPropertyShut;
+          if (shut && shut[id]) { continue; }
+        } catch (e) { }
         const refr = sp.ObjectReference.from(sp.Game.getFormEx(id));
         // Not loaded is not a problem. The next pass will find it.
         if (!refr) { continue; }
