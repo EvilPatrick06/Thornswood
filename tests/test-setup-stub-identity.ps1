@@ -92,7 +92,7 @@ Yes 'the SHA is checked before the download is handed back' ($iCheck -ge 0 -and 
 $iStart = $bs.IndexOf('p.Start();')
 Yes 'the only program it starts is PowerShell on the payload''s script, not a downloaded exe' (
     $bs.Contains('string script = Path.Combine(temp, "Setup-Thornswood.ps1");') -and
-    $bs.Contains('SetupStartInfo(PowerShellExe(), script, installRoot)') -and
+    $bs.Contains('SetupStartInfo(PowerShellExe(), script, installRoot, makeOwnGame, vortexGame)') -and
     $bs.Contains('var psi = new ProcessStartInfo(ps);') -and $iStart -gt 0 -and
     @([regex]::Matches($bs, 'Process\.Start\(')).Count -eq 0)
 
