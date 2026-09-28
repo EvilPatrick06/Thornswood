@@ -110,14 +110,19 @@ function Get-Place([string]$name) {
         'Engine' { return Get-Engine }
         'Out'    { return Get-Out }
     }
-    $sib = $layout.siblings.$name
+    # Looked up by name rather than read as $layout.siblings.$name. Ship.ps1
+    # runs with Set-StrictMode -Version Latest, and a script it calls runs
+    # under it too, where reading a property an object does not have throws.
+    # ClientDist is not a sibling, so every Ship stopped at Sync-Client on
+    # "The property 'ClientDist' cannot be found on this object".
+    $sib = $layout.siblings.PSObject.Properties[$name]
     if ($null -ne $sib) {
-        return Join-Path (Split-Path -Parent $repo) ([string]$sib)
+        return Join-Path (Split-Path -Parent $repo) ([string]$sib.Value)
     }
-    $der = $layout.derived.$name
+    $der = $layout.derived.PSObject.Properties[$name]
     if ($null -ne $der) {
-        $base = Get-Place ([string]$der.from)
-        return Join-Under $base ([string]$der.join)
+        $base = Get-Place ([string]$der.Value.from)
+        return Join-Under $base ([string]$der.Value.join)
     }
     return $null
 }
