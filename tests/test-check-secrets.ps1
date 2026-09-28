@@ -305,7 +305,8 @@ try {
     # their Join-Path $Here reaches Check-Secrets.ps1 in scripts\dev.
     $Here = Join-Path (Split-Path -Parent $here) (Join-Path 'scripts' 'release')
     $pubFrom = '# ---- nothing that must never ship, read off what was built'
-    $pubTo = 'if (-not $NoUpload -and $gh) {'
+    # The first upload branch, which is the site one since #897.
+    $pubTo = "if (-not `$NoUpload -and `$AssetHost -eq 'site') {"
     $Launcher = $false; $exePath = ''; $clientRel = $null
     $chunks = @([pscustomobject]@{ Path = $bad })
     $d = Invoke-Hook $pub $pubFrom $pubTo
