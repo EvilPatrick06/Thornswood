@@ -215,6 +215,8 @@ h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
 .live{margin-top:30px;font:400 13px/1 var(--sans);letter-spacing:.1em;
   text-transform:uppercase;color:rgba(240,230,206,.7);display:flex;gap:9px;
   align-items:center;justify-content:center;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.live a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+.live a:hover{color:var(--gold)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
 .dot.on{background:#79B05F;box-shadow:0 0 0 4px rgba(121,176,95,.16)}
 
@@ -1568,8 +1570,17 @@ fetch('/api/public', { credentials:'same-origin' })
       if (d.status && d.status.up) {
         dot.className = 'dot on';
         var n = d.status.online || 0;
-        t.textContent = n === 0 ? 'The world is open, apply to be an alpha playtester in the Discord!'
-          : (n === 1 ? '1 person in the world' : n + ' people in the world');
+        if (n === 0) {
+          /* Patrick's line, 28 Sep (#884). The second half goes to /join,
+             which says how to apply. Built from nodes, not markup. */
+          t.textContent = 'The world is open, ';
+          var apply = document.createElement('a');
+          apply.href = '/join';
+          apply.textContent = 'apply to be an alpha playtester in the Discord!';
+          t.appendChild(apply);
+        } else {
+          t.textContent = n === 1 ? '1 person in the world' : n + ' people in the world';
+        }
         var f = document.getElementById('figOnline');
         var w = document.getElementById('figOnlineWrap');
         // Only worth a tile of its own once there is somebody in it.
