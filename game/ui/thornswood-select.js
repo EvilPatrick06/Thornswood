@@ -83,9 +83,16 @@
     'font-family:"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;color:#e4d9bf;user-select:none;pointer-events:auto}',
     '#ts-select.gone{display:none}',
     '#ts-select *{box-sizing:border-box}',
-    // the painting behind everything: the loop when it plays, the still under it
-    '#ts-select .bg{position:absolute;inset:0;z-index:0;background:#0b0907 center/cover no-repeat}',
-    '#ts-select .bg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}',
+    // the painting behind everything. Issue #609: one zoomed animated
+    // backdrop from the first paint, not a still then a darker still then
+    // the loop. The loop starts already scaled (same drift as the site's
+    // hero), so there is no wide-then-zoom, and the still is only used when
+    // the loop is missing.
+    '#ts-select .bg{position:absolute;inset:0;z-index:0;overflow:hidden;background:#0b0907}',
+    '#ts-select .bg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 25%;',
+    'transform-origin:center 25%;will-change:transform;',
+    'animation:tsPaintDrift 36s ease-in-out infinite alternate}',
+    '@keyframes tsPaintDrift{from{transform:scale(1.08) translateY(0)}to{transform:scale(1.14) translateY(-10px)}}',
     '#ts-select .shade{position:absolute;inset:0;z-index:0;',
     'background:radial-gradient(ellipse at center,rgba(0,0,0,.40) 0%,rgba(0,0,0,.76) 100%)}',
     '#ts-select .panel{position:relative;z-index:1;width:960px;max-height:92vh;display:flex;flex-direction:column;transform-origin:center center;',
@@ -262,25 +269,38 @@
   var elList = root.querySelector('.list');
 
   /*
-    The painting. The still goes on as the background at once; the loop is
-    laid over it and plays if this browser decodes it, and is taken away
-    again if it cannot, so what is behind the panel is the painting either
-    way and never a black box. Muted, because the music is its own element.
+    The painting. Issue #609: when the loop is here, it is the only backdrop
+    from the first paint, already zoomed by tsPaintDrift, and the still is
+    not put behind it. A still under a late-starting loop was the lighter
+    then darker flash people saw before the animation arrived. The still is
+    kept only as the fallback when this browser cannot play the loop, so
+    what is behind the panel is the painting either way and never a black
+    box. Muted, because the music is its own element.
   */
-  if (LIST.still) { try { elBg.style.backgroundImage = 'url("' + String(LIST.still) + '")'; } catch (e) { } }
   if (LIST.video) {
     try {
       var vid = document.createElement('video');
       vid.muted = true; vid.loop = true; vid.autoplay = true;
       vid.setAttribute('muted', ''); vid.setAttribute('playsinline', '');
       vid.preload = 'auto';
-      vid.onerror = function () { try { vid.remove(); } catch (e) { } tell('painting: the loop would not play here, the still stays'); };
+      // A touch faster than the 24 s source loop so the motion reads smooth
+      // rather than sticky, without leaving the painting's own timing.
+      try { vid.playbackRate = 1.2; } catch (eRate) { }
+      vid.onerror = function () {
+        try { vid.remove(); } catch (e) { }
+        if (LIST.still) {
+          try { elBg.style.backgroundImage = 'url("' + String(LIST.still) + '")'; } catch (e2) { }
+        }
+        tell('painting: the loop would not play here, the still stays');
+      };
       vid.onplaying = function () { tell('painting: the loop is playing'); };
       vid.src = String(LIST.video);
       elBg.appendChild(vid);
       var vp = vid.play();
       if (vp && typeof vp.catch === 'function') { vp.catch(function () { }); }
     } catch (e) { tell('painting: ' + e); }
+  } else if (LIST.still) {
+    try { elBg.style.backgroundImage = 'url("' + String(LIST.still) + '")'; } catch (e) { }
   }
   var elCount = root.querySelector('.count');
   var elStatus = root.querySelector('.status');
