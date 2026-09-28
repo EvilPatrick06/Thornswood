@@ -3467,20 +3467,29 @@ function blockIsOff(refrId) {
 }
 
 function chopWood(actorId, refrId, fromSwing) {
+  /*
+    #842: Skyrim starts the chopping FURN on the client the moment E is
+    pressed. mp.onActivate returning false only stops the server's
+    ProcessActivateNormal; the axe loop is already running locally. A
+    refused press (wrong half, no axe, off-limits block, or no firewood
+    form) must kick that loop the same way a mining spell ends:
+    IdleChairExitStart then IdleForceDefaultState via swingEnd.
+  */
   // Before the class and the axe, because this block is not work for anybody
   // and telling a woodworker they lack a tool at one would be a lie.
   const off = blockIsOff(refrId);
   if (off) {
+    swingEnd(actorId);
     return fromSwing ? '' : 'Nobody works this block. There are others in ' + off + '.';
   }
 
   const half = halfGate(actorId, 'woodwright', 'novice',
     'A chopping block is a woodworker\'s. Only a woodworker who took Woodwright can ' +
     'work one, and a charburner gets the novice yield. Ask one.');
-  if (half) return half;
+  if (half) { swingEnd(actorId); return half; }
 
   const tool = toolGate(actorId, 'woodworker');
-  if (tool) return tool;
+  if (tool) { swingEnd(actorId); return tool; }
 
   /*
     NO WAIT BETWEEN SWINGS, because a swing is the unit now.
@@ -3517,6 +3526,7 @@ function chopWood(actorId, refrId, fromSwing) {
   */
   const yielded = 2;
   if (!addItem(actorId, ITEMS.firewood, yielded)) {
+    swingEnd(actorId);
     return 'The block gives up firewood and there is nothing in this load order to ' +
            'put in your hands. Say so in #bugs.';
   }
