@@ -288,7 +288,9 @@ Because the point of this server is that it should be worth logging into.
 Somebody talks to you first. Almost every problem on a server this size is a
 misunderstanding and ends there.
 
-After that, a Moderator gets involved. After that, a Gamemaster.
+After that, a Gamemaster or a Moderator times you out in the Discord. After
+that, a Moderator removes you from it, and with it the world, because getting
+in is decided in the Discord. Nothing inside the game does either.
 
 Rules 8 and 9 skip to the end.
 
