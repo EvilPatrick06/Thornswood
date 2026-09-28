@@ -99,6 +99,7 @@ namespace Thornswood
             }
             catch (Exception ex) { Log(ex.Message); return; }
             if (saveNote != null) Log(saveNote);
+            RecordBrowserBackend();
 
             // The Discord check above went out carrying the id the settings
             // file held, which is one of several now. Check in again for every
@@ -119,6 +120,44 @@ namespace Thornswood
             chosenId = 0;
             Log("Starting. You pick your character at the game's main menu.");
             Play();
+        }
+
+        /// <summary>
+        /// Which in game browser this Play left SkyrimPlatform.ini naming,
+        /// written down where a report can quote it. Chars.WriteBrowserBackend
+        /// decides from the game folder on every Play and used to tell nobody,
+        /// so a report about the interface could not say which one was
+        /// running. Now launcher.log gets a line on every Play, config.json
+        /// keeps the answer across a restart, and the Settings page shows it.
+        /// The deciding itself is untouched.
+        /// </summary>
+        static void RecordBrowserBackend()
+        {
+            string backend = Chars.BrowserBackend;
+            LogOnly(backend != null
+                ? "In-game browser: " + backend
+                : "In-game browser: not known, SkyrimPlatform.ini is missing or could not be read or written");
+            string keep = backend ?? "";
+            if (keep != (cfg.BrowserBackend ?? ""))
+            {
+                cfg.BrowserBackend = keep;
+                cfg.Save(Paths.CfgFile);
+            }
+            DrawInGameBrowser();
+        }
+
+        /// <summary>
+        /// The line under Folders on the Settings page, worded so a tester can
+        /// read it straight back: "In-game browser: tilted".
+        /// </summary>
+        static void DrawInGameBrowser()
+        {
+            var line = F<System.Windows.Controls.TextBlock>("TxtInGameBrowser");
+            if (line == null || cfg == null) return;
+            string b = cfg.BrowserBackend;
+            line.Text = string.IsNullOrEmpty(b)
+                ? "In-game browser: not known yet. The launcher settles it each time you press Play."
+                : "In-game browser: " + b;
         }
 
         /// <summary>

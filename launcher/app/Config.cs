@@ -233,6 +233,13 @@ namespace Thornswood
         // has been moved to a folder of its own so the Steam copy can stay clean.
         [DataMember] public string VortexGame = "";
 
+        // Which in game browser the last Play left SkyrimPlatform.ini naming,
+        // "nirnlab" or "tilted", so the Settings page can say it after a
+        // restart and a report about the interface can quote it. Blank (or
+        // absent, which comes back null) means no Play has settled it yet.
+        // Written by StartPlay (ShellChars.cs) from Chars.BrowserBackend.
+        [DataMember] public string BrowserBackend = "";
+
         // These two default to ON, which a plain bool cannot express here: the
         // serializer skips field initialisers, and false and absent look the
         // same afterwards. So an older config.json, which has neither key,

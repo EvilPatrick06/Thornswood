@@ -1383,7 +1383,8 @@
 
 
                 <TextBlock Text="Folders" Style="{StaticResource Eyebrow}"/>
-                <StackPanel x:Name="PathRows" Margin="0,0,0,16"/>
+                <StackPanel x:Name="PathRows" Margin="0,0,0,8"/>
+                <TextBlock x:Name="TxtInGameBrowser" Style="{StaticResource Small}" Margin="0,0,0,16"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,30">
                   <Button x:Name="BtnFolder"  Style="{StaticResource Ghost}" Content="Open install folder" Margin="0,0,8,0"/>
                   <Button x:Name="BtnOpenLog" Style="{StaticResource Ghost}" Content="Open log" Margin="0,0,8,0"/>
