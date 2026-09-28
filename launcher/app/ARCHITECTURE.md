@@ -163,8 +163,10 @@ for and the depots the Downgrade button asks Steam for), taken through
 Downgrade.cs are the fallback until it does.
 
 **Updater** (Updater.cs). The update feed, the packs and the launcher's own
-replacement. `Updater.cs:152 Check()` reads version.json from the releases
-repository on GitHub. `Updater.cs:479 ApplyPack()` downloads a pack and
+replacement. `Updater.cs:152 Check()` reads version.json from the site feed
+on thornswood.net, asking with the ETag of the copy it keeps in
+`Profile\feed-cache.txt` so an unchanged feed answers 304, and falls back to
+the releases repository on GitHub. `Updater.cs:479 ApplyPack()` downloads a pack and
 `Updater.cs:496 Install()` unpacks it: `game\...` entries into Game (hard link
 names dropped first), `profile\...` entries into `Profile\Default`, the list of
 what it wrote into `Profile\Packs\<pack id>.files`, the id into
