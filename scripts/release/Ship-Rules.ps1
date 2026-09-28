@@ -368,8 +368,8 @@ $ShipVanillaDataDirs     = @('Video', 'Strings')
 # NirnLab is still an open question for Patrick and Djinn, and merging the
 # lists does not answer it. The note over Checks.ForeignNames in the launcher
 # says NirnLabUIPlugin.dll is this build's own browser and must never be
-# treated as foreign. This file, the installer, OwnGame.Foreign and
-# Firewall.cs all treat it as foreign. What this machine runs on, read
+# treated as foreign. This file, the installer and OwnGame.Foreign
+# all treat it as foreign. What this machine runs on, read
 # 24 September: SkyrimPlatform.ini says BackendName = tilted, the plugin log of
 # the 10:20 session on 23 September says "browser backend: tilted", and there
 # is no Data\NirnLabUIPlatform in C:\Thornswood\Game.
