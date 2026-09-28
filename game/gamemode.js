@@ -2721,13 +2721,27 @@ function swingScript() {
     '    var pc = sp.Game.getPlayer();',
     '    if (!pc) { return; }',
     /*
-      THE END OF A SPELL: put the tool away and leave the state.
+      THE END OF A SPELL: leave the state, and put the real pickaxe back
+      if it was on them when the spell started.
+
+      IdlePickaxeEnter carries its own pick, so the real one comes off at
+      the start (see below). Until 27 September the end path never put it
+      back: a miner who walked up with the pick on their hip, or drawn,
+      finished the seam bare-handed. #611. Remembered on ctx.state under
+      thornswoodSwingHadTool, set only when isEquipped was true before
+      unequip, so a pick that lived only in the pack stays unequipped.
     */
     '    if (v.end) {',
     '      try { sp.Debug.sendAnimationEvent(pc, v.stop); } catch (e) { }',
     '      try { if (v.free) { sp.Debug.sendAnimationEvent(pc, v.free); } } catch (e) { }',
-    // Nothing to put away: the tool was taken off at the start and the
-    // animation's own pick goes with the animation.
+    '      var restore = (v.tool && st.thornswoodSwingHadTool === v.tool) ? v.tool : 0;',
+    '      st.thornswoodSwingHadTool = 0;',
+    '      if (restore) {',
+    '        try {',
+    '          var back = sp.Form.from(sp.Game.getFormEx(restore));',
+    '          if (back) { pc.equipItem(back, false, true); }',
+    '        } catch (e) { }',
+    '      }',
     '      return;',
     '    }',
     '    if (!v.anim) { return; }',
@@ -2747,11 +2761,23 @@ function swingScript() {
       somebody who walked up with theirs drawn does not end up swinging two.
       Silently, and without preventing removal, so nothing here can trap
       anything on anybody.
+
+      AND REMEMBER WHETHER IT WAS ON THEM. unequipItem of something that
+      was never equipped is a no-op, but we still need to know: the end
+      path only puts it back when isEquipped was true here (#611).
     */
     '    if (v.tool) {',
     '      try {',
     '        var it = sp.Form.from(sp.Game.getFormEx(v.tool));',
-    '        if (it) { pc.unequipItem(it, false, true); }',
+    '        if (it) {',
+    '          var had = false;',
+    '          try {',
+    '            var ac = sp.Actor.from(pc);',
+    '            if (ac) { had = !!ac.isEquipped(it); }',
+    '          } catch (e2) { had = false; }',
+    '          st.thornswoodSwingHadTool = had ? v.tool : 0;',
+    '          if (had) { pc.unequipItem(it, false, true); }',
+    '        }',
     '      } catch (e) { }',
     '    }',
     '    sp.Debug.sendAnimationEvent(pc, v.anim);',
