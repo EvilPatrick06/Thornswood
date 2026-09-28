@@ -56,6 +56,18 @@ function between(src, start, end) {
   return b < 0 ? null : src.slice(a, b);
 }
 
+// ======================================================== #609  one zoomed painting ==
+
+// Patrick: three versions of the backdrop (lighter still, darker still, then
+// the loop that zooms). The page now starts on the zoomed loop alone.
+yes('the painting starts already zoomed, no wide-then-zoom',
+    page.indexOf('animation:tsPaintDrift') >= 0 &&
+    page.indexOf('@keyframes tsPaintDrift{from{transform:scale(1.08)') >= 0);
+yes('the loop is the first painting when it is present, still only on failure',
+    /if \(LIST\.video\) \{/.test(page) &&
+    page.indexOf('} else if (LIST.still) {') >= 0 &&
+    page.indexOf("vid.playbackRate = 1.2") >= 0);
+
 // ================================================ #619  the scroll glows ==
 
 // The halo is one rule and one keyframe. It sits behind the picture of the
