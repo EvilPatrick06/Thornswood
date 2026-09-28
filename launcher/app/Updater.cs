@@ -53,6 +53,7 @@ namespace Thornswood
         {
             public string Url;
             public string Etag;
+            public string LastModified;
             public VersionDoc Doc;
         }
 
@@ -65,11 +66,16 @@ namespace Thornswood
         // ten megabytes an hour per launcher to be told the same thing. With
         // the tag on the next request the site answers 304 and no body.
         //
-        // In memory and not in config.json on purpose: the tag is worth
-        // nothing without the document it belongs to, and a config that kept
-        // the tag alone would start up, ask with it, be told nothing had
-        // changed, and have nothing to read.
+        // Not in config.json on purpose: the tag is worth nothing without the
+        // document it belongs to, and a config that kept the tag alone would
+        // start up, ask with it, be told nothing had changed, and have nothing
+        // to read. So the tag and the document are kept together, in memory
+        // and in one file in Profile (CacheFile, #443), and the file is only
+        // believed when the document in it still reads. Before the file, every
+        // start of the launcher downloaded the whole feed again.
         static Cached cached;
+        static bool cacheRead;
+        const string CacheMagic = "Thornswood feed cache 1";
 
         // How long the GitHub Contents API fallback is left alone after a try.
         //
@@ -91,10 +97,21 @@ namespace Thornswood
         class Quick : WebClient
         {
             public int Ms = 10000;
+            // For the feed only (#443): If-Modified-Since has to go through
+            // the request's own property, because WebClient refuses it as a
+            // plain header, and a compressed feed is a quarter of the size.
+            public DateTime Since = DateTime.MinValue;
+            public bool Gzip;
             protected override WebRequest GetWebRequest(Uri address)
             {
                 var r = base.GetWebRequest(address);
                 if (r != null) { r.Timeout = Ms; }
+                var h = r as HttpWebRequest;
+                if (h != null)
+                {
+                    if (Since != DateTime.MinValue) h.IfModifiedSince = Since;
+                    if (Gzip) h.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+                }
                 return r;
             }
         }
@@ -353,17 +370,46 @@ namespace Thornswood
         static VersionDoc FromSite(Config cfg, string feedUrl)
         {
             CheckUrl(feedUrl);
+            return Conditional(cfg, feedUrl);
+        }
+
+        /// <summary>
+        /// The conditional request itself, apart from CheckUrl so a test can
+        /// point it at a server of its own (tests\test-feed-conditional.ps1).
+        /// Asks with the ETag, and with Last-Modified when the server gave one,
+        /// of the copy in memory, or on the first check of a session the copy
+        /// in Profile (#443), so a restart is a 304 too.
+        /// </summary>
+        static VersionDoc Conditional(Config cfg, string feedUrl)
+        {
             // Read once. Anything that replaces it while this check is out
             // replaces the whole object, so what is used below cannot change
             // underneath it.
             Cached have = cached;
+            if (have == null && !cacheRead)
+            {
+                cacheRead = true;
+                have = ReadCache();
+                if (have != null) cached = have;
+            }
+            DateTime since = DateTime.MinValue;
+            if (have != null && !string.IsNullOrEmpty(have.LastModified))
+            {
+                DateTime t;
+                if (DateTime.TryParseExact(have.LastModified.Trim(), "r", System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out t))
+                    since = t;
+            }
             bool asked = have != null
                          && have.Doc != null
-                         && !string.IsNullOrEmpty(have.Etag)
+                         && (!string.IsNullOrEmpty(have.Etag) || since != DateTime.MinValue)
                          && string.Equals(have.Url, feedUrl, StringComparison.Ordinal);
             using (var wc = Client(cfg, false, feedUrl))
             {
-                if (asked) wc.Headers["If-None-Match"] = have.Etag;
+                var q = wc as Quick;
+                if (q != null) q.Gzip = true;
+                if (asked && !string.IsNullOrEmpty(have.Etag)) wc.Headers["If-None-Match"] = have.Etag;
+                if (asked && q != null) q.Since = since;
                 byte[] body;
                 try { body = wc.DownloadData(feedUrl); }
                 catch (WebException wex)
@@ -389,14 +435,103 @@ namespace Thornswood
                 VersionDoc doc = VersionDoc.Parse(body);
                 // Kept only once the document parsed, so a tag is never held
                 // beside something the launcher could not read.
-                string tag = null;
-                if (wc.ResponseHeaders != null) tag = wc.ResponseHeaders["ETag"];
+                string tag = null, mod = null;
+                if (wc.ResponseHeaders != null)
+                {
+                    tag = wc.ResponseHeaders["ETag"];
+                    mod = wc.ResponseHeaders["Last-Modified"];
+                }
                 var fresh = new Cached();
                 fresh.Url = feedUrl;
                 fresh.Etag = tag == null ? "" : tag.Trim();
+                fresh.LastModified = mod == null ? "" : mod.Trim();
                 fresh.Doc = doc;
                 cached = fresh;
+                if (fresh.Etag.Length > 0 || fresh.LastModified.Length > 0) WriteCache(fresh, body);
                 return doc;
+            }
+        }
+
+        /// <summary>
+        /// Profile\feed-cache.txt: four lines (what the file is, the feed
+        /// address, the ETag, the Last-Modified) and then the document exactly
+        /// as it arrived. One file, so the tag can never be read beside some
+        /// other copy's document. Null when Profile is not known.
+        /// </summary>
+        static string CacheFile
+        {
+            get { return string.IsNullOrEmpty(Paths.ProfileDir) ? null : Path.Combine(Paths.ProfileDir, "feed-cache.txt"); }
+        }
+
+        static void WriteCache(Cached c, byte[] body)
+        {
+            string file = CacheFile;
+            if (file == null || body == null) return;
+            string tmp = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                byte[] head = new UTF8Encoding(false).GetBytes(
+                    CacheMagic + "\n" + OneLine(c.Url) + "\n" + OneLine(c.Etag) + "\n" + OneLine(c.LastModified) + "\n");
+                using (var f = File.Create(tmp))
+                {
+                    f.Write(head, 0, head.Length);
+                    f.Write(body, 0, body.Length);
+                }
+                // Written aside and copied over, so a check that reads while
+                // another writes finds the old copy or the new one, and a
+                // copy cut short does not parse and is not believed.
+                File.Copy(tmp, file, true);
+            }
+            catch (Exception ex) { Swallow.Note("Updater.WriteCache", ex); }
+            finally
+            {
+                try { if (File.Exists(tmp)) File.Delete(tmp); } catch (Exception ex) { Swallow.Note("Updater.WriteCache, tidy", ex); }
+            }
+        }
+
+        static string OneLine(string s)
+        {
+            return s == null ? "" : s.Replace("\r", "").Replace("\n", "");
+        }
+
+        /// <summary>
+        /// The copy in Profile, or null when there is none, it is from an older
+        /// shape, or its document does not read. Null only ever costs one full
+        /// download, which is what every start of the launcher did before.
+        /// </summary>
+        static Cached ReadCache()
+        {
+            string file = CacheFile;
+            try
+            {
+                if (file == null || !File.Exists(file)) return null;
+                byte[] raw = File.ReadAllBytes(file);
+                var lines = new string[4];
+                int at = 0;
+                for (int i = 0; i < 4; i++)
+                {
+                    int nl = Array.IndexOf(raw, (byte)'\n', at);
+                    if (nl < 0) return null;
+                    lines[i] = Encoding.UTF8.GetString(raw, at, nl - at).TrimEnd('\r');
+                    at = nl + 1;
+                }
+                if (!string.Equals(lines[0], CacheMagic, StringComparison.Ordinal)) return null;
+                if (at >= raw.Length) return null;
+                byte[] body = new byte[raw.Length - at];
+                Buffer.BlockCopy(raw, at, body, 0, body.Length);
+                VersionDoc doc = VersionDoc.Parse(body);
+                if (doc == null) return null;
+                var c = new Cached();
+                c.Url = lines[1];
+                c.Etag = lines[2];
+                c.LastModified = lines[3];
+                c.Doc = doc;
+                return c;
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("Updater.ReadCache", ex);
+                return null;
             }
         }
 
