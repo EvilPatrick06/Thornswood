@@ -20,6 +20,13 @@ if ($a -lt 0 -or $b -lt 0) {
     Write-Host 'the resume block markers are not in Publish-Update.ps1' -ForegroundColor Red
     exit 1
 }
+# Since #780 (#437) the script sets $script:PendingFile near its top, to the
+# channel's note under LOCALAPPDATA, before any of these run, and
+# Get-PendingFile answers with it when it is set. The block alone never sets
+# it, and under strict mode reading it unset throws, so it is set here empty,
+# which is the beside-the-baseline answer the checks below drive. The
+# override itself is checked at the end.
+$script:PendingFile = ''
 Invoke-Expression $src.Substring($a, $b - $a)
 
 $pass = 0
@@ -89,6 +96,15 @@ try {
     Clear-Pending $state
     Check 'clearing twice is not an error' (Test-Path -LiteralPath (Get-PendingFile $state)) 'False'
     Check 'the dev note survived all of that' (Read-Pending $devState).id '20260923-2312-dev'
+
+    # ---- the machine's own note, as the script sets it (#780)
+    $script:PendingFile = Join-Path $work 'local\published-pending.json'
+    Check 'a note file the script names wins over the one beside the baseline' (Get-PendingFile $state) $script:PendingFile
+    New-Item -ItemType Directory -Path (Join-Path $work 'local') -Force | Out-Null
+    Write-Pending $state '20260928-0101' 'gh exited with 1'
+    Check 'and it is the one written' (Test-Path -LiteralPath $script:PendingFile) 'True'
+    Check 'and read back' (Read-Pending $state).id '20260928-0101'
+    $script:PendingFile = ''
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

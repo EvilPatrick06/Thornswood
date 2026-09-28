@@ -50,7 +50,23 @@ Yes '  and stops when node is missing, rather than skipping' (($g -join "`n") -m
 $s = @(Get-Content -LiteralPath (Join-Path $Tools '..\scripts\deploy\Deploy-Server.ps1'))
 $check = LineOf $s '^\s*& node --check \$built'
 $list = LineOf $s "^\`$files = 'scam_native.node'"
-$first = LineOf $s '^\$(online|who)\s*=\s*OnlineNow|^OnlineNow|^\s*Remote '
+# The first line that runs a call to the VPS: Remote, scp or ssh, or one of
+# the functions that ask the live server who is on it. Read off the syntax
+# tree, and only outside a function body, because a body runs where it is
+# called and not where it is written: since #865 Warn-LiveRoom holds two
+# Remote lines near the top of the file and is called after the check.
+$vpsCalls = @('Remote', 'scp', 'ssh', 'OnlineNow', 'Get-LiveOnline', 'Warn-LiveRoom')
+$tk = $null; $pe = $null
+$sAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $Tools '..\scripts\deploy\Deploy-Server.ps1'), [ref]$tk, [ref]$pe)
+$first = 0
+foreach ($c in $sAst.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+    if ($vpsCalls -notcontains $c.GetCommandName()) { continue }
+    $inFn = $false
+    for ($p = $c.Parent; $p; $p = $p.Parent) { if ($p -is [System.Management.Automation.Language.FunctionDefinitionAst]) { $inFn = $true; break } }
+    if ($inFn) { continue }
+    $at = $c.Extent.StartLineNumber
+    if ($first -eq 0 -or $at -lt $first) { $first = $at }
+}
 Yes 'Deploy-Server runs node --check on the gamemode.js it sends' ($check -gt 0)
 Yes '  before it lists what it sends' ($check -gt 0 -and $list -gt $check)
 Yes '  and before anything talks to the VPS' ($check -gt 0 -and ($first -eq 0 -or $first -gt $check))
