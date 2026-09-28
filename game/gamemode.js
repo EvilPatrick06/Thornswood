@@ -467,8 +467,12 @@ function resolveArrival(site) {
 
 function ensureProperties() {
   try {
+    // Seen by its owner, the same as the character property the K panel
+    // reads: an old trade left here by migrate() is still on their screen
+    // (issue #509). Neighbours see nothing. makeProperty cannot change a
+    // property already made, so this takes a real restart, not a hot reload.
     mp.makeProperty(CHARGEN_PROPERTY, {
-      isVisibleByOwner: false,
+      isVisibleByOwner: true,
       isVisibleByNeighbors: false,
       updateOwner: '',
       updateNeighbor: '',
@@ -4557,6 +4561,22 @@ function chargenTick() {
         if (c && c.grantKnown) { c.grantKnown(actorId); }
       } catch (e) {
         log('login', actorId.toString(16), 'could not put the known spells back:', e);
+      }
+
+      // Their own profession, said back to them as they arrive, which proves
+      // the route from the server to the person's own screen (issue #509).
+      try {
+        const c = globalThis.__thornswoodCharacter;
+        const P = globalThis.__thornswoodProgression;
+        const s = c && c.stateOf ? c.stateOf(actorId) : null;
+        const prof = s && s.prof && P && P.has(P.TABLE.professions, s.prof)
+          ? P.TABLE.professions[s.prof] : null;
+        if (prof) {
+          notify(actorId, 'Your profession: ' + prof.name +
+                 (s.half && c.nameOf ? ', ' + c.nameOf(s.half) : '') + '.');
+        }
+      } catch (e) {
+        log('login', actorId.toString(16), 'could not say the profession:', e);
       }
 
       /*
