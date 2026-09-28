@@ -23,6 +23,10 @@
 // pointers are there and lead somewhere real, and that the warning never to
 // put NirnLabUIPlugin.dll back on the list survived the rewrite.
 //
+// Since 27 September (issue #474) it also checks the record itself: the
+// choice WriteBrowserBackend makes reaches launcher.log on every Play,
+// config.json across a restart, and a line on the Settings page.
+//
 // Read only.
 const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
 const fs = require('fs');
@@ -134,6 +138,61 @@ yes('thornswood-front.js writes to Data/Platform/thornswood-front.log',
   /LOG_FILE = 'Data\/Platform\/thornswood-front\.log'/.test(front));
 yes('thornswood-front.js logs the backend SkyrimPlatform answered',
   /sp\.browser\.getBackend\(\)/.test(front) && /say\('browser backend: '/.test(front));
+
+// 5. The choice is recorded (issue #474). WriteBrowserBackend used to be void,
+//    so nothing afterwards knew what it had decided. It returns the name now
+//    from every way out, the steady state included: on a healthy install the
+//    ini already says the right thing and `if (next == text) return` is the
+//    exit that runs on every Play, so a return added only at the end would
+//    leave the record blank exactly when it matters.
+const wbb = body(chars, 'static string WriteBrowserBackend()');
+yes('WriteBrowserBackend returns a string', /static string WriteBrowserBackend\(\)/.test(chars) && wbb.length > 0);
+yes('WriteBrowserBackend has no bare return left', wbb.length > 0 && !/\breturn\s*;/.test(wbb));
+yes('no SkyrimPlatform.ini returns null', /if \(!File\.Exists\(PlatformIni\)\) return null;/.test(wbb));
+yes('the steady state (ini already right) returns the choice', /if \(next == text\) return want;/.test(wbb));
+yes('a written ini returns the choice',
+  /File\.WriteAllText\(PlatformIni, next, new UTF8Encoding\(true\)\);\s*return want;/.test(wbb));
+yes('a read or write that threw returns null, after the Swallow note',
+  /Swallow\.Note\("Chars\.WriteBrowserBackend, write", ex\);\s*\}[\s\S]*return null;\s*\}$/.test(wbb));
+yes('the ini keeps its byte order mark (UTF8Encoding(true))', /new UTF8Encoding\(true\)/.test(wbb));
+const prepare = body(chars, 'public static string Prepare(Config cfg)');
+yes('Chars.Prepare keeps the answer in Chars.BrowserBackend',
+  /BrowserBackend = WriteBrowserBackend\(\);/.test(prepare));
+yes('Chars.BrowserBackend is readable from Shell',
+  /public static string BrowserBackend \{ get; private set; \}/.test(chars));
+
+const config = read('../launcher/app/Config.cs');
+yes('config.json has a BrowserBackend field, so the answer survives a restart',
+  /\[DataMember\] public string BrowserBackend = "";/.test(config));
+
+const shellChars = read('../launcher/app/ShellChars.cs');
+const startPlay = body(shellChars, 'static void StartPlay()');
+yes('StartPlay records the backend right after Chars.Prepare',
+  /Chars\.Prepare\(cfg\)[\s\S]{0,300}RecordBrowserBackend\(\);/.test(startPlay));
+const record = body(shellChars, 'static void RecordBrowserBackend()');
+yes('RecordBrowserBackend reads Chars.BrowserBackend', /Chars\.BrowserBackend/.test(record));
+yes('launcher.log gets "In-game browser: <name>" on every Play',
+  /LogOnly\([\s\S]*"In-game browser: " \+ backend/.test(record));
+yes('launcher.log says so when the answer is not known',
+  /"In-game browser: not known/.test(record));
+yes('config.json is saved only when the answer changed',
+  /if \(keep != \(cfg\.BrowserBackend \?\? ""\)\)[\s\S]*cfg\.Save\(Paths\.CfgFile\);/.test(record));
+yes('the Settings line is redrawn after a Play', /DrawInGameBrowser\(\);/.test(record));
+
+const draw = body(shellChars, 'static void DrawInGameBrowser()');
+yes('DrawInGameBrowser looks up TxtInGameBrowser', /F<[\w.]*TextBlock>\("TxtInGameBrowser"\)/.test(draw));
+yes('the Settings line reads "In-game browser: <name>"', /"In-game browser: " \+ b/.test(draw));
+const ui = read('../launcher/ui.xaml');
+const settingsPage = ui.slice(ui.indexOf('x:Name="PageSettings"'));
+yes('ui.xaml has TxtInGameBrowser on the Settings page',
+  ui.indexOf('x:Name="PageSettings"') >= 0 && /x:Name="TxtInGameBrowser"/.test(settingsPage));
+const shell = read('../launcher/app/Shell.cs');
+yes('the Settings line is drawn at startup with the folder rows',
+  /DrawInGameBrowser\(\);/.test(body(shell, 'static void BuildPathRows()')));
+
+// The inference itself is not changed by the record: the folder still decides.
+yes('the folder still decides: NirnLabUIPlatform.dll present means nirnlab',
+  /bool nirnlab = File\.Exists\(Path\.Combine\(\s*Paths\.Game, "Data\\\\NirnLabUIPlatform\\\\NirnLabUIPlatform\.dll"\)\);/.test(wbb));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

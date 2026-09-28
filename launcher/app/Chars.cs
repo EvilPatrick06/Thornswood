@@ -841,7 +841,7 @@ namespace Thornswood
             AutoJoin.SetChooseAtMenu(point);
 
             WriteStartIni();
-            WriteBrowserBackend();
+            BrowserBackend = WriteBrowserBackend();
             KeepPlatformLogReadable();
 
             // Voice read the old id out of the settings file at startup and has
@@ -1059,12 +1059,19 @@ namespace Thornswood
         /// The file is edited, never rewritten. It also carries the log level,
         /// the console window geometry and the plugin folder list, none of
         /// which are ours to invent.
+        ///
+        /// Returns the backend the ini names once this is done, "nirnlab" or
+        /// "tilted", and null when there is no ini or it could not be read or
+        /// written. Every way out returns, the steady state included: on a
+        /// healthy install the ini already says the right thing and the
+        /// early return below is the one that runs, every Play. Until 27 Sep
+        /// this was void and nothing afterwards knew what it had decided.
         /// </summary>
-        static void WriteBrowserBackend()
+        static string WriteBrowserBackend()
         {
             try
             {
-                if (!File.Exists(PlatformIni)) return;
+                if (!File.Exists(PlatformIni)) return null;
 
                 // One file, and it is not in SKSE\Plugins.
                 //
@@ -1116,15 +1123,27 @@ namespace Thornswood
                            "BackendName = " + want + Environment.NewLine;
                 }
 
-                if (next == text) return;
+                if (next == text) return want;
 
                 // The file arrives with a byte order mark and SkyrimPlatform
                 // reads it happily, so keep one rather than quietly changing
                 // the encoding of a file this launcher does not own.
                 File.WriteAllText(PlatformIni, next, new UTF8Encoding(true));
+                return want;
             }
             catch (Exception ex) { Swallow.Note("Chars.WriteBrowserBackend, write", ex); }
+            // The read or the write threw, so what the ini names is not known.
+            return null;
         }
+
+        /// <summary>
+        /// What WriteBrowserBackend left the ini naming at the last Play:
+        /// "nirnlab", "tilted", or null when it could not say (no
+        /// SkyrimPlatform.ini, or reading or writing it failed). Null too
+        /// until the first Play of this session. StartPlay puts it in
+        /// launcher.log and config.json, and the Settings page shows it.
+        /// </summary>
+        public static string BrowserBackend { get; private set; }
 
         /// <summary>
         /// Stop the client's log being switched off, and nothing more.

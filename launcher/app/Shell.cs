@@ -3916,6 +3916,7 @@ namespace Thornswood
             AddPathRow("Game", Paths.Game);
             AddPathRow("Saves", Path.Combine(Paths.LiveMyGames, "Saves"));
             AddPathRow("Settings", Paths.LiveMyGames);
+            DrawInGameBrowser();
         }
 
         static void AddPathRow(string label, string value)
