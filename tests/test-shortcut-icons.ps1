@@ -81,7 +81,10 @@ namespace Thornswood
     $stubCs = Join-Path $work 'Stubs.cs'
     Set-Content -LiteralPath $stubCs -Value $stub -Encoding ASCII
     $dll = Join-Path $work 'IconsUnderTest.dll'
-    $out = & $csc /nologo /target:library /langversion:5 "/out:$dll" "/resource:$appIco,app.ico" "/resource:$devIco,app-dev.ico" $iconsCs $stubCs 2>&1
+    # The real SelfSwap.cs too: Icons asks it which shortcuts still aim at the
+    # launcher's old name (#497). It needs nothing but the framework.
+    $swapCs = Join-Path $Repo 'launcher\app\SelfSwap.cs'
+    $out = & $csc /nologo /target:library /langversion:5 "/out:$dll" "/resource:$appIco,app.ico" "/resource:$devIco,app-dev.ico" $iconsCs $swapCs $stubCs 2>&1
     Yes 'Icons.cs compiles with the launcher''s csc as C# 5' ($LASTEXITCODE -eq 0)
     if ($LASTEXITCODE -ne 0) { $out | ForEach-Object { Write-Host "  $_" }; Done }
 
