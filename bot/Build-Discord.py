@@ -317,7 +317,7 @@ PLAN = [
  ]),
  ('In Character', [
    dict(kind='text',  name='game-rules',  key='GAMERULES', mode='membersread',
-        topic='How roleplay works here. Ten rules, and what we let slide.',
+        topic='How roleplay works here. Nine rules, and what we let slide.',
         post=C.GAME_RULES),
    dict(kind='text',  name='lore',        key='LORE',     mode='membersread',
         topic='4E 252. What happened and who you can be.',

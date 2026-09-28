@@ -153,6 +153,10 @@ try:
     os.makedirs(os.path.join(TMP, 'bot'))
     os.makedirs(os.path.join(TMP, 'site', 'data', 'site'))
     shutil.copy(os.path.join(HERE, 'content.py'), os.path.join(TMP, 'bot', 'content.py'))
+    # #game-rules is read out of rules.md since issue #430, so content.py
+    # needs it beside join.md to load at all. test-game-rules.py edits it.
+    shutil.copy(os.path.join(HERE, '..', 'site', 'data', 'site', 'rules.md'),
+                os.path.join(TMP, 'site', 'data', 'site', 'rules.md'))
 
     def load_with(md, tag):
         with open(os.path.join(TMP, 'site', 'data', 'site', 'join.md'), 'w',
