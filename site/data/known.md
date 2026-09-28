@@ -16,7 +16,7 @@ Report one of these only if it does something this table does not describe.
 
 | Behaviour | Reason |
 |---|---|
-| Mod settings menus reset every session | Your character lives on the server rather than in a save file, so there is no co-save for a mod to write its settings into |
+| A few mod settings menus still reset every session | Your character lives on the server rather than in a save file, so there is no co-save for a mod to write its settings into. Menus built on MCM Helper, such as TrueHUD and Precision, keep theirs in a file on your machine. The server keeps the settings of Apocalypse, moreHUD, Atlas Map Markers, Skyrim Unbound and chfshVariousActions for each character and puts them back when you come in. QuickLoot, the instrument menu, MCM Recorder and SkyUI's favourite group and unequip options still start from their defaults |
 | Most mod scripts never fire | All Papyrus events except OnUpdate are blocked. Records still work, scripted behaviour does not |
 | Killmoves and stagger do not show on other people | Those animation events are blanked |
 | Fishing in Skyrim's rods, nets and fishing powers do nothing | They run on mod scripts, which never fire here. Fishing is the Fisher's trade instead: press E at salmon, clams, pearl oysters, horker meat and slaughterfish egg nests in the water, no rod needed. See the Classes page |
