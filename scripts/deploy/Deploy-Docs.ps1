@@ -406,6 +406,47 @@ if (`$principal) {
     if (`$LASTEXITCODE -eq 0) { 'granted ' + `$runAs + ' ' + `$g[1] + ' on ' + `$g[0] }
     else { 'COULD NOT GRANT ' + `$runAs + ' ' + `$g[1] + ' on ' + `$g[0] + ': ' + ((`$said | Out-String).Trim()) }
   }
+
+  # #913, approved by Patrick on 28 Sep. The site reads the update feed and
+  # never writes it: only Remirror-Site-Feed and Publish-Update do, over scp
+  # as Administrator. So the site account is denied writing and deleting in
+  # feed and feed-dev, and keeps the read it inherits from the Modify above.
+  # The deny names the write rights one by one and is built in .NET, NOT with
+  # icacls (W,D,DC): icacls' W is FILE_GENERIC_WRITE, which carries
+  # SYNCHRONIZE, node opens every file asking for SYNCHRONIZE, and that deny
+  # took both feeds off the site for about four minutes on 28 Sep. A Deny rule
+  # built here leaves SYNCHRONIZE out, and adding the same rule twice keeps one.
+  `$fsr = [Security.AccessControl.FileSystemRights]
+  `$noWrite = `$fsr::WriteData -bor `$fsr::AppendData -bor `$fsr::WriteExtendedAttributes -bor ``
+    `$fsr::WriteAttributes -bor `$fsr::Delete -bor `$fsr::DeleteSubdirectoriesAndFiles
+  `$who = New-Object Security.Principal.SecurityIdentifier(`$sid)
+  foreach (`$n in 'feed', 'feed-dev') {
+    `$f = Join-Path '$rootWin' `$n
+    if (-not (Test-Path -LiteralPath `$f)) { 'not here, nothing denied: ' + `$f; continue }
+    try {
+      `$acl = Get-Acl -LiteralPath `$f
+      `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(`$who, `$noWrite,
+        [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
+        [Security.AccessControl.PropagationFlags]::None, [Security.AccessControl.AccessControlType]::Deny)))
+      Set-Acl -LiteralPath `$f -AclObject `$acl -ErrorAction Stop
+      'denied ' + `$runAs + ' writing and deleting in ' + `$f
+    } catch { 'COULD NOT DENY ' + `$runAs + ' writing in ' + `$f + ': ' + `$_.Exception.Message }
+  }
+
+  # BUILTIN\Users inherits read and create on C:\ and so on the whole site
+  # folder, config.json included; nothing here runs as a plain user. The
+  # folder stops inheriting, keeping a copy of what it had, and every Users
+  # rule goes. SYSTEM, Administrators and the site account above stay.
+  try {
+    `$users = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
+    `$acl = Get-Acl -LiteralPath '$rootWin'
+    `$acl.SetAccessRuleProtection(`$true, `$true)
+    Set-Acl -LiteralPath '$rootWin' -AclObject `$acl -ErrorAction Stop
+    `$acl = Get-Acl -LiteralPath '$rootWin'
+    `$acl.PurgeAccessRules(`$users)
+    Set-Acl -LiteralPath '$rootWin' -AclObject `$acl -ErrorAction Stop
+    'BUILTIN\Users no longer reaches $rootWin'
+  } catch { 'COULD NOT TAKE BUILTIN\Users OFF ' + '$rootWin' + ': ' + `$_.Exception.Message }
 }
 # ==== end thornswood site account ====
 
