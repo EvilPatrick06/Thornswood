@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
-  Runs what follows a published tip: the host feed remirror. Says plainly when
-  it did not happen.
+  Runs what follows a published tip: the host feed remirror. VirusTotal is no
+  longer part of publish; use Publish-VirusTotal.ps1 by hand if you want a
+  report.
 
 .DESCRIPTION
   WHAT A TIP IS. The tip customers get is `version.json`, written and pushed by
