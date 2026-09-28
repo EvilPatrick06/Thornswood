@@ -187,7 +187,7 @@ function world(opts) {
     'notify', 'say', 'globalThis', 'mp', 'kindIsContainer', 'STATIONS', 'mineSalt',
     'burnCharcoal', 'isChoppingBlock', 'chopWood', 'SHRINES', 'bless', 'isCrop',
     'farmActivate', 'isFish', 'fish', 'isGame', 'game', 'isPlant', 'harvest', 'ALLOW',
-    'isVein', 'mineOre', 'loot', 'log', 'ITEMS'];
+    'isVein', 'mineOre', 'loot', 'log', 'ITEMS', 'floraHanded'];
   const body = "'use strict';\n" +
     [parts.coolBlock, parts.waitLine, parts.churnsLine,
      parts.waitWord, parts.isChurn, parts.churn].filter(Boolean).join('\n') + '\n' +
@@ -209,7 +209,10 @@ function world(opts) {
       function (d) { return d === 'cabbage:Test.esp'; }, tag('farmActivate'),
       never, tag('fish'), never, tag('game'),
       function (d) { return d === 'flower:Test.esp'; }, tag('harvest'),
-      { thornswoodAllow: true }, never, tag('mineOre'), loot, function () { }, ITEMS]);
+      { thornswoodAllow: true }, never, tag('mineOre'), loot, function () { }, ITEMS,
+      function (message) {
+        return typeof message === 'string' && /^(You pick |You take )/.test(message);
+      }]);
   } catch (e) {
     console.log('      the world would not build: ' + e.message);
     api = null;
@@ -363,7 +366,7 @@ function world(opts) {
     const put1 = w.rec.putBack.length;
     yes('a flower still goes to harvest()', on(FLOWER, GATHERER) === false &&
         w.rec.branch[w.rec.branch.length - 1] === 'harvest');
-    yes('and is still put back after an answer, the line the churn copies',
+    yes('and a non-hand-over answer (stub harvest toast) is still put back',
         w.rec.putBack.length === put1 + 1 && w.rec.putBack[put1].refrId === FLOWER);
     yes('a press with nobody behind it is dropped before anything is asked',
         on(CHURN_REF, 0) === undefined);
