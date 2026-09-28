@@ -71,18 +71,27 @@ for (const o of offenders) console.log('      ' + o);
   Mods row green when the count passes its test.
 */
 const noneRe = /if \(Checks\.EnabledPlugins\(\) (<=|>=|<|>) Checks\.MostPluginsWithoutCollection\) return "none";/;
+// Two shapes of the Mods row. The first was one line; ModsRow (#709) asks the
+// same question as an if that returns the red row, then the green one. Either
+// way the test below runs the comparison it actually makes.
 const modsRe = /new Check\("Mods", plugins (<=|>=|<|>) MostPluginsWithoutCollection, plugins \+ " plugins"\)/;
+const modsIfRe = /if \(plugins (<=|>=|<|>) MostPluginsWithoutCollection\)\s*return new Check\("Mods", (true|false), plugins \+ " plugins"\);\s*return new Check\("Mods", (true|false), plugins \+ " plugins"\);/;
 const noneM = noneRe.exec(SHELL);
-const modsM = modsRe.exec(CHECKS);
+const modsOne = modsRe.exec(CHECKS);
+const modsIf = modsOne ? null : modsIfRe.exec(CHECKS);
+const modsM = modsOne ? [modsOne[0], modsOne[1], 'true']
+            : modsIf && modsIf[2] !== modsIf[3] ? [modsIf[0], modsIf[1], modsIf[2]] : null;
 yes('CollectionProblem asks the constant before saying "none"', !!noneM);
 yes('the Mods row asks the same constant', !!modsM);
 
-function compare(op, a, b) {
-  if (op === '<=') return a <= b;
-  if (op === '>=') return a >= b;
-  if (op === '<') return a < b;
-  if (op === '>') return a > b;
-  return false;
+function compare(op, a, b, when) {
+  let r = false;
+  if (op === '<=') r = a <= b;
+  else if (op === '>=') r = a >= b;
+  else if (op === '<') r = a < b;
+  else if (op === '>') r = a > b;
+  // The Mods row is green on the branch that says true.
+  return when === 'false' ? !r : r;
 }
 
 if (noneM && modsM && !Number.isNaN(value)) {
@@ -90,16 +99,16 @@ if (noneM && modsM && !Number.isNaN(value)) {
   let firstGreen = -1;
   for (let n = 0; n <= 200; n++) {
     const none = compare(noneM[1], n, value);
-    const green = compare(modsM[1], n, value);
+    const green = compare(modsM[1], n, value, modsM[2]);
     if (none === green) agree = false;
     if (green && firstGreen < 0) firstGreen = n;
   }
   yes('for every count from 0 to 200 the Mods row is green exactly when there is no "none" card', agree);
   yes('41 plugins is the first count that reads as installed, as it was before', firstGreen === 41);
-  yes('40 plugins still reads as not installed', compare(noneM[1], 40, value) && !compare(modsM[1], 40, value));
+  yes('40 plugins still reads as not installed', compare(noneM[1], 40, value) && !compare(modsM[1], 40, value, modsM[2]));
   yes('the 94 the shipped reference list enables reads as installed',
-      !compare(noneM[1], 94, value) && compare(modsM[1], 94, value));
-  yes('nothing installed reads as not installed', compare(noneM[1], 0, value) && !compare(modsM[1], 0, value));
+      !compare(noneM[1], 94, value) && compare(modsM[1], 94, value, modsM[2]));
+  yes('nothing installed reads as not installed', compare(noneM[1], 0, value) && !compare(modsM[1], 0, value, modsM[2]));
 } else {
   yes('both comparisons could be read out of the source', false);
 }

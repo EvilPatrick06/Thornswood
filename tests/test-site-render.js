@@ -116,8 +116,10 @@ const clientPages = (/var PAGES = \{([^}]*)\}/.exec(home) || [])[1] || '';
 const clientList = (clientPages.match(/'\/[a-z-]+'/g) || []).map(function (s) { return s.slice(1, -1); }).sort();
 const serverPages = (/const MD_PAGES = \[([^\]]*)\]/.exec(serverText) || [])[1] || '';
 const serverList = (serverPages.match(/'\/[a-z-]+'/g) || []).map(function (s) { return s.slice(1, -1); }).sort();
-yes('home.html PAGES and server.js MD_PAGES name the same nine pages',
-    clientList.length === 9 && clientList.join(',') === serverList.join(','));
+// Not a fixed count: /cookies made it ten (#794) and the next page will make
+// it eleven. What matters is that neither list is empty or short of the other.
+yes('home.html PAGES and server.js MD_PAGES name the same ' + clientList.length + ' pages',
+    clientList.length >= 9 && clientList.join(',') === serverList.join(','));
 
 // --------------------------------------------------------------- renderer --
 console.log('');

@@ -178,7 +178,7 @@ Start menu.
 | 17 | Read the setup window before pressing anything. Write down the folder it offers, the free space line under the drives, and the Installing from box. | | | |
 | 18 | Leave the folder at `C:\Thornswood`, tick the box that says 18 or over, and press Install. Write down the download's size, its speed and when it finished. | | | |
 | 19 | Write down the unpacking count, and when the black setup console opened. | | | |
-| 20 | Write down the console's first lines, up to the heading The base game, including whether it says Thornswood installs into this copy. If it says to change the build under Betas in Steam, look there without changing anything, and write down what the list offers. | | | |
+| 20 | Write down the console's first lines, up to the heading The base game, including whether it says Thornswood installs into this copy. If it says this Skyrim is not build 1.6.1170, write down what it says to do about it (the launcher's Downgrade button), and do not change anything in Steam. | | | |
 | 21 | Screenshot the console once it prints Checking, before it can close, and copy every line marked ok, next or MISS. | | | |
 | 22 | Write down how the console ended: whether it opened the launcher itself or waited for Enter, and its last lines. | | | |
 
@@ -380,15 +380,15 @@ tester confused by a list that no longer matches.
 | --- | --- | --- |
 | 3 | `Anniversary Edition is not required` | `site\data\site\join.md` |
 | 3 | `Thornswood leaves the Skyrim you already have alone.` | `site\data\site\join.md` |
-| 17 | `This puts in the launcher, the script extender and Thornswood's own content.` | `installer\setup\Bootstrap.cs` |
-| 17 | `leaves your own Skyrim alone.` | `installer\setup\Bootstrap.cs` |
+| 17 | `This puts the launcher, the script extender and Thornswood's own content into a folder of its own.` | `installer\setup\Bootstrap.cs` |
+| 17 | `that copy is left as it is.` | `installer\setup\Bootstrap.cs` |
 | 17 | `Nothing to unpack yet.` | `installer\setup\Bootstrap.cs` |
 | 17 | `C:\Thornswood` | `installer\setup\Bootstrap.cs` |
 | 18 | `I am 18 or over. Thornswood is an adult server.` | `installer\setup\Bootstrap.cs` |
 | 18 | `Getting Thornswood's own files` | `installer\setup\Bootstrap.cs` |
 | 20 | `Thornswood installs into this copy.` | `installer\Setup-Thornswood.ps1` |
 | 20 | `This Skyrim is not build 1.6.1170, which is the one the server runs.` | `installer\Setup-Thornswood.ps1` |
-| 20 | `In Steam: Properties, Betas, and pick 1.6.1170.` | `installer\Setup-Thornswood.ps1` |
+| 20 | `Thornswood installs anyway. Open the launcher and press Downgrade;` | `installer\Setup-Thornswood.ps1` |
 | 21 | `the collection installs this` | `installer\Setup-Thornswood.ps1` |
 | 22 | `checks failed. Send staff a screenshot of this window in the Discord.` | `installer\Setup-Thornswood.ps1` |
 | 22 | `Opening Thornswood now.` | `installer\Setup-Thornswood.ps1` |
