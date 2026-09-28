@@ -114,6 +114,14 @@ function grab(name) {
   return '';
 }
 const HELPERS = grab('hasLeft') + '\n' + grab('departed') + '\n';
+// /api/allowed asks standingsForDoor for everybody at once since issue #415;
+// lifted with the two constants above it and run over the same stand-in.
+const FOR_DOOR = src.slice(src.indexOf('const DOOR_BUDGET_MS'), src.indexOf('async function standingsForDoor(')) +
+                 grab('standingsForDoor');
+function forDoor(standingCached) {
+  return new Function('standingCached', 'discordQuietMs', FOR_DOOR + '\nreturn standingsForDoor;')(
+    standingCached, function () { return 0; });
+}
 yes('hasLeft and departed are in server.js', HELPERS.length > 10 &&
     HELPERS.indexOf('async function hasLeft(') === 0 && HELPERS.indexOf('async function departed(') > 0);
 
@@ -206,6 +214,7 @@ async function allowed(table, over) {
     keyInAddress: new Set(),
     sameSecret: function (a, b) { return a === b; },
     standingCached: standingFrom(over),
+    standingsForDoor: forDoor(standingFrom(over)),
     jsonFile: function (f, fallback) { return f === 'linked.json' ? clone(table) : fallback; },
     LINKED: 'linked.json',
     sendJson: null
