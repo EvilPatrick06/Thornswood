@@ -56,6 +56,58 @@ namespace Thornswood
         public static string OldOf(string exe) { return exe + ".old"; }
         public static string BadOf(string exe) { return exe + ".bad"; }
 
+        /// <summary>
+        /// The launcher's name before the move off Skyrim Together, and its
+        /// name now. Issue #497, release 1 of 2: an install made before the
+        /// rename still runs as SkyrimTogether.exe, because every update used
+        /// to put the new build in at the path of the running one.
+        ///
+        /// REMOVE in the second release of #497 (OldName, Target, AimsAtOld,
+        /// their use in Script and in Icons.Ensure, and every other fallback
+        /// that issue lists), no earlier than 28 October 2026 and on the date
+        /// Patrick picks. Never in the same release as this: an install still
+        /// called SkyrimTogether.exe needs one update from a launcher that
+        /// carries this before it is called Thornswood.exe.
+        /// </summary>
+        public const string OldName = "SkyrimTogether.exe";
+        public const string NewName = "Thornswood.exe";
+
+        /// <summary>
+        /// Where the downloaded launcher goes: the running exe's own path, or
+        /// Thornswood.exe beside it when the running one still has the old
+        /// name.
+        /// </summary>
+        public static string Target(string exe)
+        {
+            if (String.IsNullOrEmpty(exe)) return exe;
+            if (!String.Equals(Path.GetFileName(exe), OldName, StringComparison.OrdinalIgnoreCase)) return exe;
+            return Path.Combine(Path.GetDirectoryName(exe), NewName);
+        }
+
+        /// <summary>
+        /// True when a shortcut target is the old SkyrimTogether.exe in the
+        /// running launcher's own folder, and the running launcher is not it.
+        /// Only that folder: the old Skyrim Together client carries the same file
+        /// name under Data, and a shortcut to it is not ours.
+        /// </summary>
+        public static bool AimsAtOld(string target, string exe)
+        {
+            if (String.IsNullOrEmpty(target) || String.IsNullOrEmpty(exe)) return false;
+            try
+            {
+                string t = Path.GetFullPath(target);
+                string me = Path.GetFullPath(exe);
+                if (String.Equals(t, me, StringComparison.OrdinalIgnoreCase)) return false;
+                if (!String.Equals(Path.GetFileName(t), OldName, StringComparison.OrdinalIgnoreCase)) return false;
+                return String.Equals(Path.GetDirectoryName(t), Path.GetDirectoryName(me), StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception)
+            {
+                // A target Windows cannot read as a path is not the old launcher.
+                return false;
+            }
+        }
+
         public static string Script(string exe, string neu, int pid)
         {
             return Script(exe, neu, pid, WatchChecks);
@@ -63,12 +115,25 @@ namespace Thornswood
 
         /// <summary>
         /// The whole cmd script, CRLF line ends, for File.WriteAllText.
+        ///
+        /// exe is the running launcher. The new one goes in at Target(exe),
+        /// which is the same path unless exe is the old SkyrimTogether.exe.
+        /// Then the old one is kept as Thornswood.exe.old, because that is
+        /// what the new launcher clears in Settle, and a way back puts it back
+        /// under its own name with the failed build at SkyrimTogether.exe.bad,
+        /// where the launcher that comes back looks. On a good start the old
+        /// file goes when Settle deletes the .old, so nothing called
+        /// SkyrimTogether.exe is left. For any other name the script is
+        /// exactly what it was before.
         /// </summary>
         public static string Script(string exe, string neu, int pid, int checks)
         {
-            string old = OldOf(exe);
+            string dest = Target(exe);
+            bool renames = !String.Equals(dest, exe, StringComparison.OrdinalIgnoreCase);
+            string old = OldOf(dest);
             string bad = BadOf(exe);
             string e = "\"" + exe + "\"";
+            string d = "\"" + dest + "\"";
             string n = "\"" + neu + "\"";
             string o = "\"" + old + "\"";
             string b = "\"" + bad + "\"";
@@ -114,7 +179,7 @@ namespace Thornswood
             bs.Append("move /y " + e + " " + o + " >nul 2>&1\r\n");
             bs.Append("if errorlevel 1 goto again\r\n");
             bs.Append(":place\r\n");
-            bs.Append("move /y " + n + " " + e + " >nul 2>&1\r\n");
+            bs.Append("move /y " + n + " " + d + " >nul 2>&1\r\n");
             bs.Append("if not errorlevel 1 goto swapped\r\n");
             // The new one would not go in. The old one goes straight back, so
             // there is a launcher at the path between tries and after them.
@@ -127,8 +192,17 @@ namespace Thornswood
             bs.Append("if %tries% lss 30 ( ping 127.0.0.1 -n 2 >nul & goto swap )\r\n");
             bs.Append(":run\r\n");
             bs.Append("if not exist " + e + " if exist " + o + " move /y " + o + " " + e + " >nul 2>&1\r\n");
+            // Renaming, with no old exe left to start: the new name is what
+            // is there.
+            if (renames) bs.Append("if not exist " + e + " if exist " + d + " goto runnew\r\n");
             bs.Append("start \"\" " + e + "\r\n");
             bs.Append("goto done\r\n");
+            if (renames)
+            {
+                bs.Append(":runnew\r\n");
+                bs.Append("start \"\" " + d + "\r\n");
+                bs.Append("goto done\r\n");
+            }
 
             // The new one is in and the old one is kept beside it.
             bs.Append(":swapped\r\n");
@@ -136,27 +210,27 @@ namespace Thornswood
             // start on a file that is not there puts up a "Windows cannot
             // find" box and waits on it, so a new exe that went missing (this
             // is where a quarantine shows) goes straight to the way back.
-            bs.Append("if not exist " + e + " goto back\r\n");
+            bs.Append("if not exist " + d + " goto back\r\n");
             bs.Append("set /a looked=0\r\n");
             // start leaves errorlevel as it found it when it works, measured
             // 24 September: after a failed command, a good start still reads
             // 1. So it is cleared first, and a non-zero one after start is
             // start's own.
             bs.Append("(call )\r\n");
-            bs.Append("start \"\" " + e + "\r\n");
+            bs.Append("start \"\" " + d + "\r\n");
             bs.Append("if errorlevel 1 goto back\r\n");
             bs.Append(":watch\r\n");
             bs.Append("ping 127.0.0.1 -n 2 >nul\r\n");
             // The new launcher deletes the .old once its window has drawn.
             bs.Append("if not exist " + o + " goto done\r\n");
-            bs.Append("if not exist " + e + " goto back\r\n");
+            bs.Append("if not exist " + d + " goto back\r\n");
             // Is the new launcher still running? A rename cannot say: measured
             // 24 September, a running exe renames without complaint. It cannot
             // be opened for writing, though, and can be the moment it exits.
             // Opening it that way writes nothing and leaves its size and time
             // alone. So an open that works means it has gone without ever
             // clearing the .old, and that is a launcher that did not start.
-            bs.Append("2>nul ( >>" + e + " (call ) ) && goto back\r\n");
+            bs.Append("2>nul ( >>" + d + " (call ) ) && goto back\r\n");
             bs.Append("set /a looked+=1\r\n");
             bs.Append("if %looked% lss " + checks + " goto watch\r\n");
             bs.Append("goto done\r\n");
@@ -166,16 +240,16 @@ namespace Thornswood
             bs.Append(":back\r\n");
             bs.Append("if not exist " + o + " goto done\r\n");
             bs.Append("if exist " + b + " del /f /q " + b + " >nul 2>&1\r\n");
-            bs.Append("if exist " + e + " move /y " + e + " " + b + " >nul 2>&1\r\n");
+            bs.Append("if exist " + d + " move /y " + d + " " + b + " >nul 2>&1\r\n");
             // Could not move the new one aside: leave everything where it is.
             // The .old stays for whoever looks next.
-            bs.Append("if exist " + e + " goto done\r\n");
+            bs.Append("if exist " + d + " goto done\r\n");
             bs.Append("move /y " + o + " " + e + " >nul 2>&1\r\n");
             bs.Append("if not exist " + e + " goto unback\r\n");
             bs.Append("start \"\" " + e + "\r\n");
             bs.Append("goto done\r\n");
             bs.Append(":unback\r\n");
-            bs.Append("if exist " + b + " move /y " + b + " " + e + " >nul 2>&1\r\n");
+            bs.Append("if exist " + b + " move /y " + b + " " + d + " >nul 2>&1\r\n");
             bs.Append(":done\r\n");
             bs.Append("del \"%~f0\"\r\n");
             return bs.ToString();
