@@ -221,6 +221,17 @@ if (block) {
         /indoors \? 1 : 0/.test(where) && /pz \/ 500/.test(where));
     yes('and the server takes all five off the command',
         /pl\.place\(actorId, String\(parts\[1\] \|\| ''\), parts\[2\], parts\[3\],/.test(src));
+    /*
+      #841: night must follow GameHour (what paints the sky), not
+      Utility.getCurrentGameTime (GameDaysPassed). SkyMP TimeService writes
+      0x38 and never GameDaysPassed, so the old clock could disagree with
+      what is on screen.
+    */
+    yes('night reads GameHour 0x38 for what is on screen (#841)',
+        /GlobalVariable\.from\(sp\.Game\.getFormEx\(0x38\)\)/.test(where) &&
+        /hour < 6 \|\| hour >= 20/.test(where));
+    yes('night does not use getCurrentGameTime any more (#841)',
+        !/getCurrentGameTime\(\)/.test(where));
   }
 
   // ------------------------------------------------------ the fire table

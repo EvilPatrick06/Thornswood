@@ -3341,9 +3341,18 @@
       tools\weather.json. So the weather's form id goes over with everything
       else and the server looks it up.
 
-      NIGHT is the game clock, which is twenty times real time, so it turns
-      over every seventy two real minutes and the small hours are genuinely
-      colder than the afternoon.
+      NIGHT is what is on the sky, not GameDaysPassed.
+
+      Patrick / Discord close-out #841: day and night for warmth must match
+      what people see. SkyMP's TimeService drives the sky from the GameHour
+      global (form 0x38), set from UTC (plus optional hoursOffset) every two
+      seconds. Utility.getCurrentGameTime reads GameDaysPassed instead, and
+      TimeService never writes that global, so the fractional day can say
+      afternoon while the sky is night (or the other way). Warmth then cooled
+      people in daylight or skipped the night bite when it was dark.
+
+      So night is GameHour itself: under 6 or at/after 20, the same cut the
+      old clock used, but against the value that paints the sky.
 
       HEIGHT is the one environment factor that needs nothing but a number
       already in hand. The tundra sits near zero, High Hrothgar is above
@@ -3352,8 +3361,9 @@
     */
     let night = 0;
     try {
-      const day = sp.Utility.getCurrentGameTime();
-      const hour = (day - Math.floor(day)) * 24;
+      // GameHour 0x38: same global TimeService writes for the sky (#841).
+      const gh = sp.GlobalVariable.from(sp.Game.getFormEx(0x38));
+      const hour = gh ? gh.getValue() : 12;
       night = (hour < 6 || hour >= 20) ? 1 : 0;
     } catch (e) { }
     // Asking is 44 native calls, and nobody in the water is at a fire.
