@@ -32600,14 +32600,29 @@ log('gamemode loaded:',
     'd8e8b:Skyrim.esm',    // TGCoinPurseMediumNEW
     'd8e8c:Skyrim.esm'     // TGCoinPurseSmallNEW
   ];
-  var purseIds = null;
+  /*
+    Resolve the six form ids lazily, and KEEP TRYING until they all land.
+
+    idOf answers 0 while the load order is still coming up. The old memo
+    built an empty map on the first press and then never looked again, so
+    every purse after that first empty resolve paid out (and on one machine
+    the client's own roll of the leveled gold list then crashed the client).
+    Retry until all six descriptors have a non-zero id, then freeze.
+  */
+  var purseIds = {};
+  var pursesAllIn = false;
   function isPurse(baseId) {
-    if (!purseIds) {
-      purseIds = {};
+    if (!baseId) { return false; }
+    if (!pursesAllIn) {
+      var n = 0;
       for (var i = 0; i < PURSES.length; i++) {
         var id = idOf(PURSES[i]);
-        if (id) { purseIds[id] = true; }
+        if (id) {
+          purseIds[id] = true;
+          n++;
+        }
       }
+      if (n >= PURSES.length) { pursesAllIn = true; }
     }
     return Object.prototype.hasOwnProperty.call(purseIds, baseId);
   }
@@ -32755,17 +32770,20 @@ log('gamemode loaded:',
       would otherwise show every refused purse as taken.
     */
     if (isPurse(baseId)) {
+      slog('purse: refused world purse', baseDesc, 'at', refrId.toString(16), 'by', actorId.toString(16));
       if (typeof putBack === 'function') {
         try { putBack(actorId, refrId); } catch (e) { slog('could not put purse', refrId.toString(16), 'back:', e); }
       }
-      return 'That coin purse was left here by nobody. Coin comes from people ' +
-             'in this world, not off the ground.';
+      // #627: say plainly it was not left by a player (the old 'by nobody'
+      // line was read as flavour rather than as the rule).
+      return 'That coin purse was not left here by a player. Coin comes from ' +
+             'people in this world, not off the ground.';
     }
     // Made at runtime rather than placed by a plugin, so somebody put it there.
     if (refrId >= 0xff000000) { return null; }
     if (!isSpoil(baseId)) { return null; }
-    return 'That was left here by nobody. Weapons, armour and coin come from ' +
-           'people in this world, not off the ground.';
+    return 'That was not left here by a player. Weapons, armour and coin come ' +
+           'from people in this world, not off the ground.';
   }
 
   // ------------------------------------------------- where gold comes from --
