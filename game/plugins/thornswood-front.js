@@ -496,6 +496,117 @@
   }
 
   /*
+    RIEKLING / GOBLIN CLOTHES REMOUNT (#614)
+
+    Patrick via Smeagle: any clothes a Goblin/Riekling wears break on
+    rejoin or leaving a building. Neck placement and transparency. Not
+    race-default gear only, and not a list of clothing form ids.
+
+    Equipment still reads as equipped. The 3D remount is what fails:
+    after appearance queueNiNodeUpdate on spawn, or after a cell load
+    rebuilds the body, armor addons for these races sit on the wrong
+    neck and show through. Human races do not show it the same way.
+
+    So this remounts what is ALREADY worn: silent unequip+equip of each
+    equipped Armor, then queueNiNodeUpdate. Race is matched by name
+    (Riekling / Goblin), never by inventing outfit form ids.
+  */
+  function raceNeedsClothesRemount(ac) {
+    if (!ac) { return false; }
+    let race = null;
+    try { race = ac.getRace(); } catch (e) { return false; }
+    if (!race) { return false; }
+    let name = "";
+    try { name = String(race.getName() || ""); } catch (e) { name = ""; }
+    return /riekling|goblin/i.test(name);
+  }
+
+  function remountWornClothes(why) {
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { return 0; }
+    if (!pc) { return 0; }
+    const ac = sp.Actor.from(pc);
+    if (!ac) { return 0; }
+    if (!raceNeedsClothesRemount(ac)) { return 0; }
+    let nItems = 0;
+    try { nItems = pc.getNumItems(); } catch (e) { return 0; }
+    let put = 0;
+    for (let i = 0; i < nItems; i++) {
+      let form = null;
+      try { form = pc.getNthForm(i); } catch (e) { continue; }
+      if (!form) { continue; }
+      let armo = null;
+      try { armo = sp.Armor.from(form); } catch (e) { armo = null; }
+      if (!armo) { continue; }
+      let on = false;
+      try { on = ac.isEquipped(form); } catch (e) { on = false; }
+      if (!on) { continue; }
+      try {
+        ac.unequipItem(form, false, true);
+        ac.equipItem(form, false, true);
+        put++;
+      } catch (e) {
+        log("could not remount clothes item: " + e);
+      }
+    }
+    try { ac.queueNiNodeUpdate(); } catch (e) {
+      log("could not queueNiNodeUpdate after clothes remount: " + e);
+    }
+    if (put) { log("remounted " + put + " worn armour for " + (why || "race")); }
+    return put;
+  }
+
+  let clothesRemountCell = -1;
+  let clothesRemountLast = 0;
+  const CLOTHES_REMOUNT_CELL_GAP = 1200;
+  function clothesRemountTick() {
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { return; }
+    if (!pc) { return; }
+    const ac = sp.Actor.from(pc);
+    if (!raceNeedsClothesRemount(ac)) { return; }
+    let cellId = 0;
+    try {
+      const cell = pc.getParentCell();
+      cellId = cell ? cell.getFormID() : 0;
+    } catch (e) { cellId = 0; }
+    if (!cellId) { return; }
+    if (cellId === clothesRemountCell) { return; }
+    const now = Date.now();
+    // First sighting of a cell: remember it. Remount on the *change*.
+    if (clothesRemountCell === -1) {
+      clothesRemountCell = cellId;
+      return;
+    }
+    if (now - clothesRemountLast < CLOTHES_REMOUNT_CELL_GAP) { return; }
+    clothesRemountCell = cellId;
+    clothesRemountLast = now;
+    // Cell loads finish a beat after getParentCell moves. Wait, then remount.
+    try {
+      sp.Utility.wait(0.4).then(guard("clothes remount cell", function () {
+        remountWornClothes("cell");
+      }));
+    } catch (e) {
+      remountWornClothes("cell-now");
+    }
+  }
+
+  function scheduleSpawnClothesRemount() {
+    // Spawn/rejoin: appearance and equipment settle on different clocks.
+    // A few remounts cover slow loads without inventing outfit form ids.
+    const delays = [0.8, 2.5, 6.0];
+    for (let i = 0; i < delays.length; i++) {
+      (function (ms) {
+        try {
+          sp.Utility.wait(ms).then(guard("clothes remount spawn", function () {
+            remountWornClothes("spawn+" + Math.round(ms * 1000));
+          }));
+        } catch (e) { }
+      })(delays[i]);
+    }
+  }
+
+  /*
     KEEP SAYING THE CHOICE UNTIL THE WORLD ACTUALLY LOADS.
 
     The page sends its pick to skymp5-client and repeats it every two seconds
@@ -3272,6 +3383,8 @@
     } catch (err) { }
   });
 
+  sp.on('update', guard('clothes remount', clothesRemountTick));
+
   sp.on('update', guard('place', () => {
     const now = Date.now();
     // Fast only when a fire is close enough to be about to burn somebody.
@@ -5392,6 +5505,7 @@
         is the same reason the flag above is set here.
       */
       wearTheShift();
+      scheduleSpawnClothesRemount();
       // Cleared again on the way out, below. Nothing in the shipped client
       // bundle reads this today, so it costs nothing either way, but a flag
       // that is only ever set true is a flag that lies the moment anything
