@@ -369,6 +369,21 @@ namespace Thornswood
             string profile = Path.Combine(Paths.ProfileDir, "VoiceBrowser");
             try { Directory.CreateDirectory(profile); } catch (Exception ex) { Swallow.Note("Voice.Begin, create profile", ex); }
 
+            // No mDNS responder in the voice browser, so nothing in it listens
+            // on the network and Windows Firewall has nothing to ask about,
+            // even on a WebView2 installed for one account, which comes with
+            // no rule (#911). The environment variable, not
+            // CoreWebView2EnvironmentOptions: see MenuMusic for why options
+            // made CreateAsync fault on the shipping machine. It is read when
+            // the environment is created, which is the next line.
+            try
+            {
+                string key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
+                Environment.SetEnvironmentVariable(key,
+                    BrowserArgs.DisableFeature(Environment.GetEnvironmentVariable(key), BrowserArgs.NoMdns));
+            }
+            catch (Exception ex) { Swallow.Note("Voice.Begin, browser arguments", ex); }
+
             var envTask = Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
                 null, profile, null);
 
@@ -414,8 +429,11 @@ namespace Thornswood
         /// reaches half the people it was built for.
         ///
         /// Microsoft's evergreen bootstrapper is a permanent link and a tiny
-        /// download that fetches the real thing itself. It may raise a UAC
-        /// prompt; nothing here can avoid that, and it happens once ever.
+        /// download that fetches the real thing itself. Its manifest asks for
+        /// asInvoker (read 28 Sep), and started from this launcher, which is
+        /// not elevated, it installs the runtime for this Windows account
+        /// only, with no administrator prompt. That copy comes without
+        /// Microsoft's mDNS firewall rule, which is why Begin turns mDNS off.
         ///
         /// Failure is not fatal anywhere. Voice stays off, the launcher is
         /// untouched, and it tries again next start.
