@@ -1195,6 +1195,67 @@
   // Focus that is up while nothing here claimed it, and since when.
   let strayFocusSince = 0;
 
+  /*
+    A PANEL TAKES THE KEYBOARD ONLY ONCE EVERY KEY IS UP. Issue 528.
+
+    Djinn on dev, 24 September: after picking a character F and the mouse
+    wheel stopped at a very close third person view and Tab did not open the
+    Tween Menu. His platform log for that session names it:
+
+      14:59:36.506 input: 84 keys in 5s, browser focus no, menu yes [RaceSex Menu]
+      14:59:41.108 focus claimed by party (holding: party)
+      14:59:44.104 focus released by party (holding: nobody)
+      14:59:46.512 input: 1878 keys in 5s, browser focus no, menu yes [RaceSex Menu]
+      15:00:01.522 input: 1800 keys in 5s, browser focus yes, menu no, controls on
+
+    Shift and P were down, for the P in the name he typed, when the party
+    window opened and raised focus. While focus is up DInputHook.cpp in the
+    fork reads the keyboard buffer and hands the game none of it, so the two
+    key ups went nowhere and the game held Shift and P down for the rest of
+    the session: 1800 button events every five seconds at 180 frames a
+    second is two keys repeating every frame, with no menu open and the
+    controls on. Blade's dev session of 25 September shows the same after K
+    (one key, 715 every five seconds at 143 frames), and Djinn's of 26 and
+    27 September after the emote wheel and K.
+
+    So a claim that arrives while a key is down waits for it to come up,
+    which the game then sees, and only then raises focus. Input's count is
+    SKSE's, which still hears the keyboard while focus is up (the note on
+    watchFocusKeys below), so it is the keys under the fingers and not the
+    ones the game already believes held. A key somebody keeps holding does
+    not keep the panel from the keyboard for ever: after CLAIM_WAIT_MS focus
+    goes up anyway and the log names the keys, because that is the one case
+    left that can leave a key down in the game. An F6 focus is not held back:
+    skymp5-client raises that one itself on the same press.
+  */
+  const CLAIM_WAIT_MS = 1000;
+  let claimWaitSince = 0;
+
+  function keysHeldNow() {
+    try { return sp.Input.getNumKeysPressed() || 0; } catch (e) { return 0; }
+  }
+
+  function heldKeyCodes() {
+    const codes = [];
+    for (let k = 1; k < 256; k++) {
+      try { if (sp.Input.isKeyPressed(k)) { codes.push(k); } } catch (e) { break; }
+    }
+    return codes.join(', ') || 'none on the keyboard';
+  }
+
+  function keysUpForClaim() {
+    const held = keysHeldNow();
+    if (!held) { claimWaitSince = 0; return true; }
+    const now = Date.now();
+    if (!claimWaitSince) { claimWaitSince = now; return false; }
+    if (now - claimWaitSince < CLAIM_WAIT_MS) { return false; }
+    say('a panel waited ' + CLAIM_WAIT_MS + 'ms for ' + held + ' held key(s) [' +
+        heldKeyCodes() + '] to come up and takes the keyboard anyway; the game ' +
+        'may keep them down until they are pressed again');
+    claimWaitSince = 0;
+    return true;
+  }
+
   /**
    * Put the focus flag where the claims say it should be.
    *
@@ -1254,9 +1315,14 @@
     if (claimed) { manualFocusSince = 0; }
     const want = claimed || manualFocusHeld();
 
-    if (up === want) { strayFocusSince = 0; return; }
+    if (up === want) { strayFocusSince = 0; claimWaitSince = 0; return; }
+
+    // A panel is only handed the keyboard once every key is up (issue 528,
+    // the note on CLAIM_WAIT_MS above).
+    if (want && claimed && !keysUpForClaim()) { return; }
 
     if (!want) {
+      claimWaitSince = 0;
       if (!strayFocusSince) { strayFocusSince = Date.now(); }
       const waited = Date.now() - strayFocusSince;
       if (raceMenuOpen() && waited < 1200) { return; }
