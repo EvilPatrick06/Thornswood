@@ -47,8 +47,9 @@
   restart request in that log before either of them.
 
   So it now reads online.json on the dev box before anything is stopped and
-  says how many are on. That file carries a count and not names, so the count
-  is what it says. Nobody on means straight down, as before. Anybody on means
+  says how many are on, and who: the gamemode keeps their names in
+  online-names.json in the private folder, not the served one. Nobody on
+  means straight down, as before. Anybody on means
   the same warning Ship.ps1 and Deploy-Server.ps1 give: Request-Restart.ps1
   drops restart.json into the dev server's data folder, the dev gamemode
   announces it in chat and on screen, and this waits out the countdown before
@@ -313,12 +314,13 @@ if ($LoadOrder) {
 function Read-DevRoom($lines) {
   # What the box answered, as the port, the data folder and a head count.
   # Online -1 means it could not tell, which is not the same thing as nobody.
-  $room = @{ Port = 0; Data = ''; Online = -1; Up = $null; Stale = -1; Said = @($lines) }
+  $room = @{ Port = 0; Data = ''; Online = -1; Up = $null; Stale = -1; Names = @(); Said = @($lines) }
   foreach ($line in @($lines)) {
     $t = "$line".Trim()
     if ($t -match '^PORT (\d+)$') { $room.Port = [int]$Matches[1] }
     elseif ($t -match '^DATA (.+)$') { $room.Data = $Matches[1].Trim() }
     elseif ($t -match '^ONLINE (\d+)$') { $room.Online = [int]$Matches[1] }
+    elseif ($t -match '^NAME (.+)$') { $room.Names += $Matches[1].Trim() }
     elseif ($t -match '^UP (yes|no)$') { $room.Up = ($Matches[1] -eq 'yes') }
   }
   # Nothing on the game port is no server, and no server has nobody on it,
@@ -329,7 +331,7 @@ function Read-DevRoom($lines) {
   # there, waited 80 seconds, and left restart.json for the next boot. When
   # the box could not list its ports there is no UP line, and the count is
   # kept, which errs toward a warning.
-  if ($room.Up -eq $false) { $room.Stale = $room.Online; $room.Online = 0 }
+  if ($room.Up -eq $false) { $room.Stale = $room.Online; $room.Online = 0; $room.Names = @() }
   return $room
 }
 
@@ -351,6 +353,8 @@ function Get-DevRoom {
 `$d = 'data'
 if (`$s.dataDir) { `$d = [string]`$s.dataDir }
 `$d = [IO.Path]::Combine('$rootWin', `$d)
+`$p = 'private'
+if (`$s.privDir) { `$p = [string]`$s.privDir }
 'DATA ' + `$d.Replace('\', '/')
 if (`$port -gt 0) {
   try {
@@ -367,7 +371,20 @@ else {
     'ONLINE ' + [int]`$j.now
   } catch { 'ONLINE unreadable' }
 }
+# Names, for saying whose evening this interrupts. Kept in the private folder,
+# not the served one. A gamemode older than the file writes none, and then the
+# count is all there is to say.
+try {
+  `$n = Get-Content ([IO.Path]::Combine('$rootWin', `$p, 'online-names.json')) -Raw -EA Stop | ConvertFrom-Json
+  foreach (`$x in @(`$n.names)) { if (`$x) { 'NAME ' + `$x } }
+} catch { }
 "@)
+}
+
+function Format-DevNames($names) {
+  $n = @($names | Where-Object { $_ })
+  if (-not $n.Count) { return '' }
+  return ' (' + ($n -join ', ') + ')'
 }
 
 function Warn-DevRoom {
@@ -384,11 +401,12 @@ function Warn-DevRoom {
     throw "Refused: $Root is on port 7777, which is the live server. Nobody was warned and nothing was stopped."
   }
   $known = ($room.Port -gt 0 -and $room.Online -ge 0 -and $room.Data)
+  $who = Format-DevNames $room.Names
 
   if ($Now) {
     if (-not $known) { Write-Host '  -Now: could not tell who is on the dev server, and nobody is warned' -ForegroundColor Yellow }
     elseif ($room.Online -gt 0) {
-      Write-Host ('  -Now: {0} on the dev server and not warned. They respawn when it comes back.' -f $room.Online) -ForegroundColor Yellow
+      Write-Host ('  -Now: {0}{1} on the dev server and not warned. They respawn when it comes back.' -f $room.Online, $who) -ForegroundColor Yellow
     }
     else { Write-Host '  -Now: nobody is on the dev server' }
     return
@@ -417,8 +435,8 @@ function Warn-DevRoom {
 
   $unit = 'minutes'
   if ($Minutes -eq 1) { $unit = 'minute' }
-  Write-Host ('  {0} on the dev server. Warning them in the game: {1}, {2} {3}.' -f
-              $room.Online, $Mode, $Minutes, $unit) -ForegroundColor Yellow
+  Write-Host ('  {0}{4} on the dev server. Warning them in the game: {1}, {2} {3}.' -f
+              $room.Online, $Mode, $Minutes, $unit, $who) -ForegroundColor Yellow
 
   $ask = Join-Path $Here '..\vps\Request-Restart.ps1'
   $code = 1
@@ -442,7 +460,7 @@ function Warn-DevRoom {
   # countdown had been given.
   if ($code -ne 0) {
     Write-Host ''
-    Write-Host ('  THE WARNING DID NOT GO OUT. {0} on the dev server would be dropped with' -f $room.Online) -ForegroundColor Red
+    Write-Host ('  THE WARNING DID NOT GO OUT. {0}{1} on the dev server would be dropped with' -f $room.Online, $who) -ForegroundColor Red
     Write-Host '  no notice. Nothing has been sent or stopped. Run this again once the box' -ForegroundColor Red
     Write-Host '  answers, or pass -Now to go down without warning them.' -ForegroundColor Red
     throw 'the warning did not go out, so the dev server was left running'

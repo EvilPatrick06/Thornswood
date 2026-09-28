@@ -26032,13 +26032,28 @@ log('gamemode loaded:',
     var fs = require('fs');
     var path = require('path');
     var dataDir = 'data';
+    var privDir = 'private';
     try {
       var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
       if (cfg && cfg.dataDir) dataDir = String(cfg.dataDir);
+      if (cfg && cfg.privDir) privDir = String(cfg.privDir);
     } catch (e) { }
 
     var onlineFile = path.join(dataDir, 'online.json');
     var lastWritten = -1;
+
+    /*
+      Who is on, by character name, for the deploy scripts (issue #520).
+
+      Deploy-DevGamemode and Deploy-Server read the count before they stop
+      anything and warn the room, but a count cannot say whose evening is
+      about to be interrupted. The names go into the private folder, never
+      next to online.json: that folder is served over HTTP to anybody who
+      asks, and who is on right now is nobody else's business. The deploy
+      reads this one over ssh.
+    */
+    var namesFile = path.join(privDir, 'online-names.json');
+    var lastNames = null;
 
     // Cleared on a hot reload, so reloading does not leave two writers
     // racing each other over the same file.
@@ -26049,7 +26064,28 @@ log('gamemode loaded:',
 
     globalThis.__thornswoodOnlineWriter = setInterval(function () {
       var n = 0;
-      try { n = (mp.get(0, 'onlinePlayers') || []).length; } catch (e) { return; }
+      var on = [];
+      try { on = mp.get(0, 'onlinePlayers') || []; n = on.length; } catch (e) { return; }
+
+      // Written on its own test, before the count's: one person leaving and
+      // another arriving between two passes leaves the count where it was.
+      var names = [];
+      for (var i = 0; i < on.length; i++) {
+        var nm = '';
+        try { nm = String((mp.get(on[i], 'appearance') || {}).name || ''); } catch (e) { }
+        if (!nm) {
+          try { nm = 'profile ' + mp.get(on[i], 'profileId'); } catch (e) { nm = 'somebody'; }
+        }
+        names.push(nm);
+      }
+      names.sort();
+      var namesKey = names.join('\n');
+      if (namesKey !== lastNames) {
+        try {
+          fs.writeFileSync(namesFile, JSON.stringify({ at: Date.now(), names: names }));
+          lastNames = namesKey;
+        } catch (e) { }
+      }
 
       /*
         Whether a countdown is running, for the client's own probe.
