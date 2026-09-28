@@ -129,3 +129,24 @@ refuse: whether the launcher may fall back to copies instead, at about 26 to 41
 GB, is the team's call in #staff-general (issue #473).
 `tests\test-setup-skyrim-drive.ps1` holds all of that to what is here.
 
+## Thornswood's own Skyrim folder
+
+Issue #906, 28 September: "let's offer the own folder during install as
+well". Under the drive card is a card with the words of the
+launcher's Settings, Maintenance panel (`launcher\ui.xaml`, `PnlOwnGame`), a
+tick box, "Give Thornswood a Skyrim folder of its own", and Choose Vortex's
+folder.
+
+The installer does not make the folder. The launcher does (`OwnGame.Make`),
+out of what Vortex has deployed, and nothing is deployed while this window is
+up. So the tick answers the launcher's own question in advance: it goes to the
+script as `-MakeOwnGame`, into `config.json` as `MakeOwnGame`, and the launcher
+then makes the folder without asking once Vortex has deployed, asking Windows
+for administrator once for the firewall rule as it always does. Left unticked,
+which is the default, nothing changes: no argument, no field, and the launcher
+asks as it did before. A chosen Vortex folder is checked the way
+`OwnGame.PointAt` checks it (SkyrimSE.exe and `Data\vortex.deployment.json`)
+and saved as `VortexGame`, the field the Settings button writes. A standalone
+install has its Game folder already and writes neither.
+`tests\test-setup-own-folder.ps1` holds all of that to what is here.
+

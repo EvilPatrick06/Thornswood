@@ -239,6 +239,14 @@ namespace Thornswood
         // has been moved to a folder of its own so the Steam copy can stay clean.
         [DataMember] public string VortexGame = "";
 
+        // Thornswood's own Skyrim folder was asked for when Thornswood was
+        // installed: the setup window's tick box, written here by
+        // Setup-Thornswood.ps1 -MakeOwnGame (issue #906). True, the launcher
+        // makes the folder without asking the moment it can (AskOwnGame in
+        // ShellOwnGame.cs). False or absent, which is every install before
+        // that and every install left unticked, it asks first as it always has.
+        [DataMember] public bool MakeOwnGame;
+
         // Which in game browser the last Play left SkyrimPlatform.ini naming,
         // "nirnlab" or "tilted", so the Settings page can say it after a
         // restart and a report about the interface can quote it. Blank (or

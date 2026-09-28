@@ -123,7 +123,7 @@ public static class Ts889 {
     New-Item -ItemType Directory -Force -Path $payload | Out-Null
     $script = Join-Path $payload 'Setup-Thornswood.ps1'
     $root = 'D:\Games Here\Thornswood'
-    $psi = [Ts889]::SetupStartInfo('powershell.exe', $script, $root)
+    $psi = [Ts889]::SetupStartInfo('powershell.exe', $script, $root, $false, '')
     Yes 'no console window' ($psi.CreateNoWindow)
     Yes 'and no shell execute' (-not $psi.UseShellExecute)
     Yes 'its output and its errors come back to the window' ($psi.RedirectStandardOutput -and $psi.RedirectStandardError)
@@ -137,7 +137,7 @@ public static class Ts889 {
     Yes 'PowerShell itself is told -NonInteractive, before -File' ($a.IndexOf('-NonInteractive') -ge 0 -and $a.IndexOf('-NonInteractive') -lt $iFile)
     Yes 'and so is the script, after it' ($a.LastIndexOf('-NonInteractive') -gt $iFile)
     Yes 'a root with a trailing backslash does not escape its closing quote' (
-        ([Ts889]::SetupStartInfo('powershell.exe', $script, 'E:\')).Arguments.Contains('-Root "E:"'))
+        ([Ts889]::SetupStartInfo('powershell.exe', $script, 'E:\', $false, '')).Arguments.Contains('-Root "E:"'))
 
     # ---- 2. run: Setup.bat by cmd against the start info, same stand-in -------
     # A stand-in script that writes down how it was called and whether it had
@@ -180,7 +180,7 @@ exit 7
     $bare = Invoke-Psi $bat
     Yes 'Setup.bat with no folder, as by hand, leaves the script''s own default' ((Field $bare.Out 'ROOT') -eq '(default)' -and (Field $bare.Out 'MOVE') -eq 'True')
 
-    $mine = Invoke-Psi ([Ts889]::SetupStartInfo([Ts889]::PowerShellExe(), $script, $root))
+    $mine = Invoke-Psi ([Ts889]::SetupStartInfo([Ts889]::PowerShellExe(), $script, $root, $false, ''))
     Yes 'Bootstrap''s start info runs to the end' ($mine.Done)
     Yes 'and the exit code comes back as the script left it' ($mine.Code -eq 7)
     Yes 'the script gets the same -Root as from Setup.bat' ((Field $mine.Out 'ROOT') -eq (Field $byBat.Out 'ROOT'))
@@ -198,7 +198,7 @@ exit 7
     Yes 'nothing in Bootstrap starts anything through the shell' (-not $bs.Contains('UseShellExecute = true'))
     Yes 'Work runs the payload''s Setup-Thornswood.ps1 through SetupStartInfo' (
         $work.Contains('Path.Combine(temp, "Setup-Thornswood.ps1")') -and
-        $work.Contains('RunSetupScript(SetupStartInfo(PowerShellExe(), script, installRoot)'))
+        $work.Contains('RunSetupScript(SetupStartInfo(PowerShellExe(), script, installRoot, makeOwnGame, vortexGame)'))
     Yes 'the window closes only on exit code 0' ($work -match '(?s)if \(code == 0\)\s*\{[^}]*win\.Close\(\)')
     Yes 'otherwise it says why and where the log is' ($work.Contains('saved in " + log'))
     $run = Get-Method $bs 'static int RunSetupScript('
@@ -256,7 +256,7 @@ exit 7
     $bare2 = Join-Path $tmp 'bare'
     New-Item -ItemType Directory -Force -Path $bare2 | Out-Null
     Copy-Item -LiteralPath $setupPath -Destination $bare2
-    $real = Invoke-Psi ([Ts889]::SetupStartInfo([Ts889]::PowerShellExe(), (Join-Path $bare2 'Setup-Thornswood.ps1'), (Join-Path $tmp 'root'))) 60
+    $real = Invoke-Psi ([Ts889]::SetupStartInfo([Ts889]::PowerShellExe(), (Join-Path $bare2 'Setup-Thornswood.ps1'), (Join-Path $tmp 'root'), $false, '')) 60
     Yes 'the real script with -NonInteractive ends by itself on a stop' ($real.Done)
     Yes 'with exit code 1' ($real.Code -eq 1)
     Yes 'and the STOP line the window shows' ($real.Out -match "(?m)^STOP\. The 'payload' folder is missing")
