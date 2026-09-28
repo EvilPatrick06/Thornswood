@@ -258,14 +258,18 @@ namespace TsTest264
       ($all -and $all.Contains('l.Add(AddressLibraryRow(Paths.Game, bytes == cfg.ExpectedExeBytes));'))
   Yes 'and the Game build row it follows asks the same question' `
       ($all -and $all.Contains('new Check("Game build", bytes == cfg.ExpectedExeBytes,'))
-  Yes 'Checks.All now has ten rows' `
-      ($all -and ([regex]::Matches($all, 'l\.Add\(')).Count -eq 10)
+  # Ten when this was written; nine since #772 took the Auto load row out.
+  Yes 'Checks.All has nine rows' `
+      ($all -and ([regex]::Matches($all, 'l\.Add\(')).Count -eq 9)
 
+  # Since #607 DrawStatus also counts the problems for the Play summary, and
+  # the colours moved into FillStatusRow, which fills each row in place.
   $draw = LiftAfter $shellSrc 'static bool DrawStatus()'
   Yes 'DrawStatus shuts Play on Blocks, so an advisory row leaves it alone' `
-      ($draw -and $draw.Contains('if (c.Blocks) all = false;') -and -not $draw.Contains('if (!c.Ok) all = false;'))
-  Yes 'DrawStatus draws a failing advisory row amber, not red' `
-      ($draw -and ([regex]::Matches($draw, 'c\.Advisory \? "Warn" : "Bad"')).Count -eq 2)
+      ($draw -and $draw -match 'if \(c\.Blocks\)\s*\{?\s*all = false;' -and $draw -notmatch 'if \(!c\.Ok\)')
+  $fill = LiftAfter $shellSrc 'static void FillStatusRow(Border back, Check c)'
+  Yes 'FillStatusRow draws a failing advisory row amber, not red, dot and text both' `
+      ($fill -and ([regex]::Matches($fill, 'c\.Advisory \? "Warn" : "Bad"')).Count -eq 2)
   Yes 'the Warn brush it uses exists in ui.xaml' `
       ($uiSrc.Contains('x:Key="Warn"'))
 
