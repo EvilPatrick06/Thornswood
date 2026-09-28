@@ -2251,7 +2251,22 @@ process.on('uncaughtException', (e) => {
 });
 
 async function handle(req, res) {
-  const url = new URL(req.url, 'http://x');
+  /* The address is a path on this site, so it is read as one (#929).
+
+     new URL(req.url, 'http://x') read an address that starts with two slashes
+     as a scheme relative one, //host/path, so the first segment became a host
+     name rather than part of the path. // and /// have no host at all and
+     threw Invalid URL, which answered 500. //rules, //config.json and ///x
+     came out as the path "/" and were all answered with the front page. A
+     backslash counts as a slash there, so /\ did the same. Putting the origin
+     in front of a path keeps every slash of it in the path. An address that
+     is not a path (the absolute form a proxy sends, or *) is read as before,
+     and one that still cannot be read is the request's fault: 400, like a
+     bad percent sign, never 500. */
+  const raw = String(req.url || '/');
+  let url;
+  try { url = new URL(raw.charAt(0) === '/' ? 'http://x' + raw : raw, 'http://x'); }
+  catch (e) { return failed(req, res, new URIError('not an address: ' + e.message)); }
   const p = decodeURIComponent(url.pathname);
   const route = p.replace(/\/+$/, '').toLowerCase() || '/';
   // HEAD is GET without a body. Every route below asks for GET by name, so a
@@ -2274,6 +2289,21 @@ async function handle(req, res) {
      is left off. */
   if (secureHere(req)) {
     try { res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains'); } catch (e) { }
+  }
+
+  /* Two slashes together are one (#929). The site already reads /rules/ and
+     /rules// as /rules, so //rules, /feed//version.json and // itself are
+     sent to the same address with one slash, by the same 301 that sends
+     /download to /downloads. Slashes only at the end are left to the routes
+     below, exactly as before. The address sent is the one the URL parser
+     already read, with its dot segments resolved and every backslash made a
+     slash, and every run of slashes is one after this, so it always starts
+     with exactly one slash and can never name another site. Where it lands is
+     asked for again and goes through every check below, the /feed assets'
+     64 hex name included. Only GET and HEAD: a POST to //api/login is not a
+     door, and falls to the 404 at the bottom. */
+  if (req.method === 'GET' && (/\/\/(?!\/*$)/.test(url.pathname) || /^\/\/+$/.test(url.pathname))) {
+    return send(res, 301, '', 'text/plain', { Location: url.pathname.replace(/\/{2,}/g, '/') + url.search });
   }
 
   const w = await who(req);
