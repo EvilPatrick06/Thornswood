@@ -195,6 +195,19 @@ deletes the `.bad`. It is kept apart from Updater so that
 `tests\test-self-update.ps1` can compile it on its own and run the real script
 against stand-in launchers.
 
+**Signature** (Signature.cs). Whether a downloaded launcher is really ours,
+asked by CheckSigner in Updater before the `.new` is written (issue
+#912). `Signature.cs:97 Refusal()` has Windows verify the signature and its
+chain (WinVerifyTrust, the call behind Get-AuthenticodeSignature's Valid),
+takes the chain Windows built from `Signature.cs:290 Trust()`, and then pins
+Microsoft's Artifact Signing: the root, an "ID Verified CS" issuer, a
+timestamp, and Thornswood's durable identity value in the certificate, which
+stays the same when the three day certificate renews. Only then does it look
+for `ExpectedSigner` in the Subject. `scripts\release\Assert-PublishSigned.ps1`
+runs the same class before a Ship publishes, and
+`tests\test-signer-check.ps1` compiles it on its own and points it at signed,
+unsigned, self-signed and changed files.
+
 **FeedNotice** (FeedNotice.cs). What the feed says to everybody. Three
 optional fields in version.json, set by hand in the releases repository:
 `message` (a bar above Play, never a hold on its own), `maintenance` (holds
