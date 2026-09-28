@@ -155,16 +155,27 @@ try {
     # asks for in words could be left for somebody else, and Checks.cs and
     # Verify.cs each sat a catch above their real count from #706 and #709
     # until the two were found by eye and lowered in #753.
+    # Shell.cs has had no empty catch of its own since the last #461 slice
+    # (27 Sep, the baseline is at zero), so one is planted in the copy first
+    # and the copy's baseline made again to allow it. Taking it out is then
+    # the fall, whatever the real count is.
     $shell = Join-Path $copy 'Shell.cs'
     $shellText = [IO.File]::ReadAllText($shell)
+    $planted = $shellText + "`r`nclass PlantedFall { void M() { try { M(); } catch { } } }`r`n"
+    [IO.File]::WriteAllText($shell, $planted)
+    $fallBase = Join-Path $tmp 'fall-baseline.txt'
+    $r = Run-Check $copy $base -List
+    [IO.File]::WriteAllText($fallBase, "# made by test-swallow.ps1 from its own copy, one catch planted in Shell.cs`r`n" + $r.Out)
+    $r = Run-Check $copy $fallBase
+    Yes 'the planted catch in Shell.cs is allowed by a baseline made with it' ($r.Code -eq 0)
     $rx = [regex]'catch \{ \}'
-    [IO.File]::WriteAllText($shell, $rx.Replace($shellText, 'catch (Exception ex) { Swallow.Note("Shell", ex); }', 1))
-    $r = Run-Check $copy $base
+    [IO.File]::WriteAllText($shell, $rx.Replace($planted, 'catch (Exception ex) { Swallow.Note("Shell", ex); }', 1))
+    $r = Run-Check $copy $fallBase
     Yes 'a file that fell goes red' ($r.Code -eq 1)
     Yes 'and says to lower its line' ($r.Out -match 'DOWN\s+Shell\.cs' -and $r.Out -match 'Lower its line')
 
     $lowered = Join-Path $tmp 'lowered-baseline.txt'
-    $lines = foreach ($l in (Get-Content -LiteralPath $base)) {
+    $lines = foreach ($l in (Get-Content -LiteralPath $fallBase)) {
         if ($l -match '^(Shell\.cs\s+)(\d+)$') { $Matches[1] + ([int]$Matches[2] - 1) } else { $l }
     }
     [IO.File]::WriteAllText($lowered, (($lines -join "`r`n") + "`r`n"))

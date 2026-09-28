@@ -167,6 +167,10 @@ namespace Probe
 
     public class Win { public IntPtr Handle; public uint Pid; public uint Thread; public bool Hung; public bool Unreachable; }
 
+    // Stands in for launcher\app\Swallow.cs, which the lifted text calls from
+    // its catch blocks since the silent catches were given a log line (#461).
+    static class Swallow { public static void Note(string where, Exception e) { } }
+
     public static class Downgrade
     {
         public static List<Win> Desktop = new List<Win>();
