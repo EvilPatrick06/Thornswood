@@ -32,7 +32,7 @@
   Play shut for everybody. Under pwsh this hands itself to powershell.exe for
   that reason; the harness step on GitHub runs pwsh.
 
-  It also reads Shell.cs and ui.xaml for the wiring: the bar is found by name,
+  It also reads every file of the Shell class and ui.xaml for the wiring: the bar is found by name,
   the log line is gone, the hold is on the button and in Play(), it can only be
   set from a document that was read, and the bar has a grid row of its own.
 
@@ -99,7 +99,15 @@ $swallowSrc = Read-Text (Join-Path $AppDir 'Swallow.cs')
 $pathsStub = "namespace Thornswood`r`n{`r`n    static class Paths { public static string LogFile; }`r`n}`r`n"
 $updaterSrc = Read-Text $updaterPath
 $noticeSrc = Read-Text $noticePath
+# The Shell class is split across files (#500): ShowNotice, OnVersionDoc and
+# CheckFailed moved to ShellUpdate.cs. Every file of the class is read, so the
+# counts below cover the whole class whichever file the code is in next.
 $shellSrc = Read-Text $shellPath
+foreach ($f in (Get-ChildItem -LiteralPath $AppDir -Filter '*.cs' | Sort-Object Name)) {
+    if ($f.Name -eq 'Shell.cs') { continue }
+    $t = Read-Text $f.FullName
+    if ($t -match '\bpartial class Shell\b') { $shellSrc += "`r`n" + $t }
+}
 
 # ---- lift Updater.IsNewer and Parts out of the shipped Updater.cs -----------
 # Updater.cs as a whole needs half the launcher to compile. The comparison is
@@ -264,7 +272,7 @@ $banned = 'play' + 'er'
 Yes 'S6 no text in FeedNotice.cs uses the word CLAUDE.md rules out for people' (-not ($said -match ('(?i)' + $banned)))
 Yes 'S6 no text in FeedNotice.cs carries an em dash' (-not $said.Contains([string][char]0x2014))
 
-# ---- S7: the wiring in Shell.cs ----------------------------------------------
+# ---- S7: the wiring in the Shell class ---------------------------------------
 Yes 'S7 the message no longer goes only to the log' (-not $shellSrc.Contains('Log(v.message)'))
 Yes 'S7 the bar is found by name' ($shellSrc.Contains('F<Border>("NoticeBar")'))
 Yes 'S7 its heading is found by name' ($shellSrc.Contains('F<TextBlock>("TxtNoticeTitle")'))
