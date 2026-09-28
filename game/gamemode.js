@@ -25080,6 +25080,41 @@ function benchGate(actorId, baseDesc) {
   under it would turn this rule off without a word.
 */
 const HANDLE_DESC = '15490:Thornswood-Content.esp';
+/*
+  Charcoal for the forge fire. Same shape as the handle rule: not a CNTO on the
+  COBJ (that would couple us to every smithing plugin), taken here when the
+  craft is allowed. Ordered cheapest grade first so a novice Charburner's Poor
+  Charcoal is what goes, and vanilla charcoal is last as a fallback.
+*/
+const CHARCOAL_DESCS = [
+  ITEMS.charcoalT1,
+  ITEMS.charcoalT2,
+  ITEMS.charcoalT3,
+  ITEMS.charcoalT4,
+  ITEMS.charcoal
+];
+const CHARCOAL_BENCHES = {
+  CraftingSmithingForge: true,
+  CraftingSmithingSkyforge: true
+};
+
+/** True when this recipe is beaten out at a forge that burns charcoal. */
+function wantsCharcoal(row) {
+  if (!row || typeof row !== 'object') { return false; }
+  return !!CHARCOAL_BENCHES[String(row.benchName || '')];
+}
+
+/** Take one piece of any charcoal grade. Returns true when something went. */
+function takeCharcoal(actorId) {
+  for (let i = 0; i < CHARCOAL_DESCS.length; i++) {
+    const desc = CHARCOAL_DESCS[i];
+    if (!desc) { continue; }
+    if (takeItem(actorId, desc, 1)) { return true; }
+  }
+  return false;
+}
+
+
 const HAFTED_FAMILIES = ['War axes', 'Battleaxes', 'Warhammers', 'Maces', 'Other weapons'];
 
 /** True when this recipe makes something fitted to a wooden handle. */
@@ -25698,6 +25733,16 @@ ecipes.json are hafted, and 126 of those are rows the server is
     thing from having a handle fitted to them, and a bow that wanted a handle
     would read as a mistake to anybody holding one.
   */
+  if (!answer.refusal && wantsCharcoal(row)) {
+    if (!takeCharcoal(actorId)) {
+      const no = 'A forge burns charcoal, and you have none. A Charburner makes it from firewood at a kiln.';
+      notify(actorId, no);
+      say(actorId, no);
+      log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no charcoal');
+      return false;
+    }
+  }
+
   if (!answer.refusal && wantsAHandle(row)) {
     if (!takeItem(actorId, HANDLE_DESC, 1)) {
       const no = 'A ' + String(row.name || 'that') + ' is fitted to a wooden handle and you ' +
