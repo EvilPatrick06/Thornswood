@@ -6,7 +6,8 @@
 // is open', and Djinn read it on 28 September as the game being open to the
 // public. It is alpha and application based everywhere else on the site; the
 // dot only says the server is up. Patrick: "The green light shows the server
-// is up also".
+// is up also", and then the line itself: "The world is open, apply to be an
+// alpha playtester in the discord!" So it keeps saying open, and says how in.
 //
 // This cuts the status branch out of home.html and runs it with a stand-in
 // document for nobody on, one on, three on, and the server down.
@@ -44,11 +45,10 @@ function run(status) {
 
 let e = run({ up: true, online: 0 });
 yes('nobody on: the dot is lit', e.dot.className === 'dot on');
-yes("nobody on: it no longer says 'The world is open' (got '" + e.livetext.textContent + "')",
-    !/world is open/i.test(e.livetext.textContent));
-yes('nobody on: it says the alpha server is up and nobody is in the world',
-    /alpha/i.test(e.livetext.textContent) && /server up/i.test(e.livetext.textContent) &&
-    /nobody/i.test(e.livetext.textContent));
+yes("nobody on: Patrick's line, word for word (got '" + e.livetext.textContent + "')",
+    e.livetext.textContent === 'The world is open, apply to be an alpha playtester in the Discord!');
+yes('nobody on: it says it is an alpha and that getting in is an application',
+    /alpha/i.test(e.livetext.textContent) && /apply/i.test(e.livetext.textContent));
 yes('nobody on: no head count tile', e.figOnlineWrap.hidden === true);
 
 e = run({ up: true, online: 1 });
