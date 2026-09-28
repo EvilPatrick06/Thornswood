@@ -113,19 +113,21 @@ function Remote($script) {
 # ==== thornswood live deploy warning ====
 # Shared with tests\test-deploy-gamemode-warning.ps1 and the OnlineNow harness.
 # Deploy-Gamemode.ps1 builds locally and never stops the live server; this is
-# the live half of issue #520 (count only: online.json has no names).
+# the live half of issue #520. The names come from private\online-names.json,
+# which the gamemode keeps beside online.json but outside the served folder.
 function Read-LiveOnline($lines) {
   # Online stays a courtesy count: unreadable or missing is nobody, not a gate.
   # Data is where restart.json must land so the gamemode sees it.
-  $room = @{ Data = ''; Online = 0; Up = $null; Said = @($lines) }
+  $room = @{ Data = ''; Online = 0; Up = $null; Names = @(); Said = @($lines) }
   foreach ($line in @($lines)) {
     $t = "$line".Trim()
     if ($t -match '^DATA (.+)$') { $room.Data = $Matches[1].Trim() }
+    elseif ($t -match '^NAME (.+)$') { $room.Names += $Matches[1].Trim() }
     elseif ($t -match '^ONLINE (\d+)$') { $room.Online = [int]$Matches[1] }
     elseif ($t -match '^UP (yes|no)$') { $room.Up = ($Matches[1] -eq 'yes') }
   }
   # Nothing on the game port is nobody on, whatever online.json still says.
-  if ($room.Up -eq $false) { $room.Online = 0 }
+  if ($room.Up -eq $false) { $room.Online = 0; $room.Names = @() }
   if (-not $room.Data) {
     $room.Data = (($Root -replace '\\', '/').TrimEnd('/') + '/data')
   }
@@ -137,10 +139,12 @@ function Get-LiveOnline {
 `$root = '$Root'.Replace('/','\')
 `$port = 0
 `$d = 'data'
+`$p = 'private'
 try {
   `$s = Get-Content (Join-Path `$root 'server-settings.json') -Raw -EA Stop | ConvertFrom-Json
   `$port = [int]`$s.port
   if (`$s.dataDir) { `$d = [string]`$s.dataDir }
+  if (`$s.privDir) { `$p = [string]`$s.privDir }
 } catch { }
 `$dataPath = [IO.Path]::Combine(`$root, `$d)
 'DATA ' + `$dataPath.Replace('\', '/')
@@ -159,8 +163,20 @@ else {
     if (`$null -eq `$j -or `$null -eq `$j.now) { throw 'no count' }
     'ONLINE ' + [int]`$j.now
   } catch { 'ONLINE 0' }
+  try {
+    `$n = Get-Content ([IO.Path]::Combine(`$root, `$p, 'online-names.json')) -Raw -EA Stop | ConvertFrom-Json
+    foreach (`$x in @(`$n.names)) { if (`$x) { 'NAME ' + `$x } }
+  } catch { }
 }
 "@)
+}
+
+function Format-Names($names) {
+  # Who, for the person running the deploy. A gamemode older than the names
+  # file writes none, and then the count is all there is to say.
+  $n = @($names | Where-Object { $_ })
+  if (-not $n.Count) { return '' }
+  return ': ' + ($n -join ', ')
 }
 
 function OnlineNow {
@@ -176,10 +192,11 @@ function Warn-LiveRoom {
   Write-Host ''
   $room = Get-LiveOnline
   $on = [int]$room.Online
+  $who = Format-Names $room.Names
 
   if ($Now) {
     if ($on -gt 0) {
-      Write-Host ("  -Now: {0} online and not warned. They respawn when it comes back." -f $on) -ForegroundColor Yellow
+      Write-Host ("  -Now: {0} online{1}, not warned. They respawn when it comes back." -f $on, $who) -ForegroundColor Yellow
     } else {
       Write-Host '  -Now: nobody is online'
     }
@@ -195,7 +212,7 @@ function Warn-LiveRoom {
     return
   }
 
-  Write-Host ("  $on online, $Mode, giving them $Minutes " +
+  Write-Host ("  $on online$who, $Mode, giving them $Minutes " +
               $(if ($Minutes -eq 1) { 'minute' } else { 'minutes' }))
   $ask = Join-Path $Here '..\vps\Request-Restart.ps1'
   if (-not (Test-Path -LiteralPath $ask)) {
