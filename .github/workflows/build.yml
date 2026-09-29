@@ -265,6 +265,16 @@ jobs:
           .\scripts\release\Build-Launcher.ps1 -Root $root -NoPause
           if (-not (Test-Path (Join-Path $root 'Launcher\Thornswood.exe'))) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
 
+      - name: Check the manifests in the built exes
+        shell: pwsh
+        run: |
+          # Issue #463. Reads the manifest embedded in the launcher and the
+          # setup program this build made: per-monitor DPI, asInvoker (neither
+          # ever asks for administrator), and an identity version equal to
+          # Updater.cs. Also runs the window fit at 100 to 200 percent.
+          & pwsh -NoProfile -File tests\test-app-manifest.ps1 -Exe (Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe') -Scratch (Join-Path $env:RUNNER_TEMP 'app-manifest')
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-app-manifest.ps1::the built exes do not carry the manifest they should, see the lines above'; exit 1 }
+
       - name: Scan the built launcher for secrets
         shell: pwsh
         run: |

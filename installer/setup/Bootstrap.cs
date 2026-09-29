@@ -158,6 +158,11 @@ namespace ThornswoodSetup
         [STAThread]
         static void Main()
         {
+            // Per-monitor DPI is in the setup program's manifest (#463,
+            // installer\setup\Setup.manifest). Framework WPF only rescales on a
+            // change of monitor scale when this switch is false, and reads it
+            // once, so it is set before any window or message box exists.
+            AppContext.SetSwitch("Switch.System.Windows.DoNotScaleForDpiChanges", false);
             try { Run(); }
             catch (Exception ex)
             {
@@ -1269,9 +1274,11 @@ namespace ThornswoodSetup
             // desktop, which on a two monitor setup is the gap between them.
             try
             {
+                // No bigger than the screen at any display scale, minimum
+                // included, so Install is never below its edge (#463).
+                // WindowFit.cs is launcher\app's, compiled in by Build-Launcher.
+                Thornswood.WindowFit.Keep(win);
                 Rect work = SystemParameters.WorkArea;
-                // No taller than the screen, so Install is never below its edge.
-                if (win.Height > work.Height) win.Height = Math.Max(win.MinHeight, work.Height);
                 win.Left = work.Left + Math.Max(0, (work.Width - win.Width) / 2);
                 win.Top = work.Top + Math.Max(0, (work.Height - win.Height) / 2);
             }

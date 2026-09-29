@@ -191,6 +191,13 @@ namespace Thornswood
         [STAThread]
         static void Main(string[] args)
         {
+            // PerMonitorV2 is in the application manifest (#463). Framework WPF
+            // only rescales on WM_DPICHANGED when this switch is false; its
+            // default depends on a TargetFrameworkAttribute we do not emit.
+            // WPF reads it once and keeps the answer, so it is set here, before
+            // any window, message box or XAML exists.
+            AppContext.SetSwitch("Switch.System.Windows.DoNotScaleForDpiChanges", false);
+
             bool fresh;
             using (var mutex = new Mutex(true, MutexName(args), out fresh))
             {
@@ -535,6 +542,8 @@ namespace Thornswood
                 });
             };
 
+            // Inside the screen at any display scale, before it is centred (#463).
+            try { WindowFit.Keep(win); } catch (Exception ex) { Swallow.Note("Shell.Run, fitting the window to the screen", ex); }
             CentreOnMainScreen();
 
             /*
@@ -551,12 +560,6 @@ namespace Thornswood
               OnMainWindowClose ties the app's life to this window, which is
               what anyone closing it means.
             */
-            // PerMonitorV2 is in the application manifest (#463). Framework WPF
-            // only rescales on WM_DPICHANGED when this switch is false; its
-            // default depends on a TargetFrameworkAttribute we do not emit, so
-            // set it here before Application is created.
-            AppContext.SetSwitch("Switch.System.Windows.DoNotScaleForDpiChanges", false);
-
             var app = new Application();
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
             app.Exit += delegate { Voice.Stop(); try { Presence.Stop(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } try { Hold.Release(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } };
@@ -631,16 +634,9 @@ namespace Thornswood
 
         static T F<T>(string name) where T : class { return win.FindName(name) as T; }
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        static extern int GetSystemMetrics(int index);
-
         /// <summary>How far a maximized window hangs past the screen: the sizing frame plus its padding, in WPF units.</summary>
         static Thickness MaximizedInset()
         {
-            double px = 0;
-            try { px = GetSystemMetrics(32) + GetSystemMetrics(92); }   // SM_CXSIZEFRAME + SM_CXPADDEDBORDER
-            catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, asking Windows for the frame size", ex); }
-            if (px <= 0) px = 8;
             double scale = 1;
             try
             {
@@ -649,6 +645,12 @@ namespace Thornswood
             }
             catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, reading the screen scale", ex); }
             if (scale <= 0) scale = 1;
+            // At the scale of the monitor the window is on, not the one
+            // Windows started with: they differ on a second monitor (#463).
+            double px = 0;
+            try { px = WindowFit.FramePixels(scale); }   // SM_CXSIZEFRAME + SM_CXPADDEDBORDER
+            catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, asking Windows for the frame size", ex); }
+            if (px <= 0) px = 8;
             return new Thickness(px / scale);
         }
 
@@ -2130,6 +2132,8 @@ namespace Thornswood
             {
                 Action fit = delegate { frame.Margin = win.WindowState == WindowState.Maximized ? MaximizedInset() : new Thickness(0); };
                 win.StateChanged += delegate { fit(); };
+                // Maximized onto a monitor with another scale: that monitor's frame.
+                win.DpiChanged += delegate { fit(); };
                 fit();
             }
 

@@ -215,6 +215,21 @@ if (Test-Path $updaterCs) {
 $verFour = $ver
 while (($verFour -split '\.').Count -lt 4) { $verFour = "$verFour.0" }
 
+# The application manifests (issue #463) carry a placeholder version. The one
+# csc embeds is a copy with this build's four part version in assemblyIdentity,
+# so the identity cannot drift from Updater.cs the way a kept number did
+# (1.1.101.0 while the launcher was 1.1.102). Written before signing, because
+# csc embeds it and signing comes after the compile.
+function New-StampedManifest([string]$template, [string]$v4, [string]$leaf) {
+    if (-not (Test-Path -LiteralPath $template)) { Die "$([IO.Path]::GetFileName($template)) is not at $template. It is in the repository, so the path is wrong; the exe would ship without its per-monitor DPI manifest." }
+    $text = [IO.File]::ReadAllText($template)
+    $rx = [regex]'(<assemblyIdentity\b[^>]*?\bversion=")[0-9.]+(")'
+    if ($rx.Matches($text).Count -ne 1) { Die "$template does not have exactly one assemblyIdentity version to stamp." }
+    $out = Join-Path $env:TEMP $leaf
+    [IO.File]::WriteAllText($out, $rx.Replace($text, ('${1}' + $v4 + '${2}'), 1), (New-Object Text.UTF8Encoding($false)))
+    $out
+}
+
 # Product and company default to Thornswood, which is what the launcher wants.
 # The setup stub keeps its own Title/Product/Company/Copyright in Bootstrap.cs
 # and gets FileVersion/ProductVersion from a generated ThornswoodSetupVersion.cs
@@ -263,10 +278,11 @@ Head 'Compiling'
 # Reference Assemblies, and csc stopped with CS1703, one identity imported
 # twice. Everything the launcher needs is in $refs by hand, so csc.rsp has
 # nothing to add.
-# Application manifest: PerMonitorV2 DPI, supportedOS through Win10/11, asInvoker.
+# Application manifest: PerMonitorV2 DPI, supportedOS through Win10/11, asInvoker,
+# identity version stamped from Updater.cs (New-StampedManifest above).
 # /win32icon can stay beside /win32manifest; /win32res would conflict (issue #463).
-$manifest = Join-Path $Src 'Thornswood.manifest'
-if (-not (Test-Path -LiteralPath $manifest)) { Die "Thornswood.manifest is not at $manifest. It is in the repository, so the path is wrong; the launcher would ship without per-monitor DPI awareness." }
+$manifest = New-StampedManifest (Join-Path $Src 'Thornswood.manifest') $verFour 'Thornswood.stamped.manifest'
+Say "  manifest identity Thornswood.Launcher.Thornswood $verFour" 'DarkGray'
 $cscArgs = @(
     '/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+', '/debug:pdbonly',
     "/out:$exe",
@@ -383,6 +399,14 @@ using System.Reflection;
 Set-Content -Path $stubVerCs -Value $stubVerBody -Encoding ASCII
 $stubArgs += (Resolve-Path $stubSrc).Path
 $stubArgs += $stubVerCs
+# Its own manifest (issue #463): per-monitor DPI and asInvoker, identity
+# Thornswood.Installer.Setup at this version. Without it csc embedded its
+# default, MyApplication.app 1.0.0.0 with no DPI awareness. And the launcher's
+# WindowFit.cs, which keeps the window inside the screen at any scale; it uses
+# nothing else from launcher\app.
+$stubManifest = New-StampedManifest (Join-Path $Here '..\..\installer\setup\Setup.manifest') $verFour 'ThornswoodSetup.stamped.manifest'
+$stubArgs += "/win32manifest:$stubManifest"
+$stubArgs += (Resolve-Path (Join-Path $Src 'WindowFit.cs')).Path
 
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
 & $csc @stubArgs
