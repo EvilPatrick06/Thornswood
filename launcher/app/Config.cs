@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Runtime.Serialization;
@@ -407,6 +408,12 @@ namespace Thornswood
 
         public string Title { get { return string.IsNullOrEmpty(name) ? id : name; } }
 
+        // Set only on the entry Updater.Pending makes for a whole release the
+        // install syncs to (Sync.cs, #1050), never read from the feed: the
+        // record, and the feed it came in, whose packs it stands in for.
+        public RecordRef Record;
+        public VersionDoc Doc;
+
         public string Size
         {
             get
@@ -642,6 +649,14 @@ namespace Thornswood
         [DataMember] public string mainVersion = "";
         [DataMember] public NewsItem[] news = new NewsItem[0];
 
+        /// <summary>
+        /// The record of the release the feed is on, its "baseline" (#1011),
+        /// which the launcher syncs the install to (#1050). Not a DataMember:
+        /// Parse reads it apart, so a "baseline" of any unexpected shape costs
+        /// that one field and never the whole feed. Null when there is none.
+        /// </summary>
+        public RecordRef record;
+
         public static VersionDoc Parse(byte[] raw)
         {
             // A UTF-8 byte order mark is not JSON. The serializer stops on it and
@@ -649,8 +664,195 @@ namespace Thornswood
             // check for everyone at once, and with it their route to a fix.
             int at = 0;
             if (raw.Length >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF) at = 3;
+            VersionDoc doc;
             using (var ms = new MemoryStream(raw, at, raw.Length - at))
-                return (VersionDoc)new DataContractJsonSerializer(typeof(VersionDoc)).ReadObject(ms);
+                doc = (VersionDoc)new DataContractJsonSerializer(typeof(VersionDoc)).ReadObject(ms);
+            if (doc != null) doc.record = RecordRef.FromFeed(raw, at);
+            return doc;
+        }
+    }
+
+    /// <summary>
+    /// The record of a release the feed names as "baseline" (#1011): what that
+    /// release left installed, every file of ours as "&lt;bytes&gt;:&lt;sha256&gt;",
+    /// itself an asset on the site named by its sha256.
+    ///
+    /// Not a DataMember on VersionDoc on purpose. A value of the wrong JSON
+    /// type makes the serializer throw, and a throw there is the whole feed
+    /// unread and Play shut on every launcher. So VersionDoc.Parse reads this
+    /// one field on its own, with Json below, and a feed whose "baseline" is
+    /// anything unexpected simply has no record: the launcher takes the packs.
+    /// </summary>
+    public class RecordRef
+    {
+        public string id = "";
+        public string sha256 = "";
+        public string url = "";
+
+        /// <summary>The "baseline" of a feed, or null when it names none or
+        /// names one this launcher cannot use. Never throws.</summary>
+        public static RecordRef FromFeed(byte[] raw, int at)
+        {
+            try
+            {
+                var root = Json.Parse(Encoding.UTF8.GetString(raw, at, raw.Length - at)) as Dictionary<string, object>;
+                if (root == null) return null;
+                object b;
+                if (!root.TryGetValue("baseline", out b)) return null;
+                var o = b as Dictionary<string, object>;
+                if (o == null) return null;
+                var r = new RecordRef();
+                r.id = Json.Str(o, "id");
+                r.sha256 = Json.Str(o, "sha256").ToLowerInvariant();
+                r.url = Json.Str(o, "url").Trim();
+                if (!IsSha(r.sha256) || r.url.Length == 0) return null;
+                if (r.id.Length == 0) r.id = r.sha256.Substring(0, 12);
+                return r;
+            }
+            catch (Exception)
+            {
+                // A feed whose "baseline" cannot be read has no record: the
+                // launcher takes the packs, and the rest of the feed stands.
+                return null;
+            }
+        }
+
+        /// <summary>64 lowercase hex characters.</summary>
+        public static bool IsSha(string s)
+        {
+            if (s == null || s.Length != 64) return false;
+            foreach (char c in s)
+                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// A small JSON reader, for the two things the launcher reads that must
+    /// never stop the feed being read: the feed's "baseline" and the release
+    /// record itself (an object of a few thousand strings). Objects come back
+    /// as Dictionary&lt;string, object&gt;, arrays as List&lt;object&gt;, strings as
+    /// string, numbers as their text, true and false as bool, null as null.
+    /// Throws on anything that is not JSON.
+    /// </summary>
+    static class Json
+    {
+        public static object Parse(string s)
+        {
+            int i = 0;
+            object v = Value(s, ref i);
+            Space(s, ref i);
+            if (i != s.Length) throw new FormatException("JSON has more after its end");
+            return v;
+        }
+
+        public static string Str(Dictionary<string, object> o, string k)
+        {
+            object v;
+            if (o == null || !o.TryGetValue(k, out v) || v == null) return "";
+            var s = v as string;
+            return s == null ? "" : s;
+        }
+
+        static void Space(string s, ref int i)
+        {
+            while (i < s.Length && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n' || s[i] == '﻿')) i++;
+        }
+
+        static object Value(string s, ref int i)
+        {
+            Space(s, ref i);
+            if (i >= s.Length) throw new FormatException("JSON ends early");
+            char c = s[i];
+            if (c == '{') return Obj(s, ref i);
+            if (c == '[') return Arr(s, ref i);
+            if (c == '"') return Text(s, ref i);
+            if (Word(s, ref i, "true")) return true;
+            if (Word(s, ref i, "false")) return false;
+            if (Word(s, ref i, "null")) return null;
+            int start = i;
+            while (i < s.Length && "+-0123456789.eE".IndexOf(s[i]) >= 0) i++;
+            if (i == start) throw new FormatException("JSON has an unexpected character at " + i);
+            return s.Substring(start, i - start);
+        }
+
+        static bool Word(string s, ref int i, string w)
+        {
+            if (string.CompareOrdinal(s, i, w, 0, w.Length) != 0) return false;
+            i += w.Length;
+            return true;
+        }
+
+        static Dictionary<string, object> Obj(string s, ref int i)
+        {
+            var o = new Dictionary<string, object>(StringComparer.Ordinal);
+            i++;
+            Space(s, ref i);
+            if (i < s.Length && s[i] == '}') { i++; return o; }
+            while (true)
+            {
+                Space(s, ref i);
+                if (i >= s.Length || s[i] != '"') throw new FormatException("JSON object key expected at " + i);
+                string k = Text(s, ref i);
+                Space(s, ref i);
+                if (i >= s.Length || s[i] != ':') throw new FormatException("JSON colon expected at " + i);
+                i++;
+                o[k] = Value(s, ref i);
+                Space(s, ref i);
+                if (i >= s.Length) throw new FormatException("JSON object not closed");
+                if (s[i] == ',') { i++; continue; }
+                if (s[i] == '}') { i++; return o; }
+                throw new FormatException("JSON comma expected at " + i);
+            }
+        }
+
+        static List<object> Arr(string s, ref int i)
+        {
+            var a = new List<object>();
+            i++;
+            Space(s, ref i);
+            if (i < s.Length && s[i] == ']') { i++; return a; }
+            while (true)
+            {
+                a.Add(Value(s, ref i));
+                Space(s, ref i);
+                if (i >= s.Length) throw new FormatException("JSON array not closed");
+                if (s[i] == ',') { i++; continue; }
+                if (s[i] == ']') { i++; return a; }
+                throw new FormatException("JSON comma expected at " + i);
+            }
+        }
+
+        static string Text(string s, ref int i)
+        {
+            i++;
+            var sb = new StringBuilder();
+            while (true)
+            {
+                if (i >= s.Length) throw new FormatException("JSON string not closed");
+                char c = s[i++];
+                if (c == '"') return sb.ToString();
+                if (c != '\\') { sb.Append(c); continue; }
+                if (i >= s.Length) throw new FormatException("JSON string not closed");
+                char e = s[i++];
+                switch (e)
+                {
+                    case '"': sb.Append('"'); break;
+                    case '\\': sb.Append('\\'); break;
+                    case '/': sb.Append('/'); break;
+                    case 'b': sb.Append('\b'); break;
+                    case 'f': sb.Append('\f'); break;
+                    case 'n': sb.Append('\n'); break;
+                    case 'r': sb.Append('\r'); break;
+                    case 't': sb.Append('\t'); break;
+                    case 'u':
+                        if (i + 4 > s.Length) throw new FormatException("JSON escape cut short");
+                        sb.Append((char)int.Parse(s.Substring(i, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+                        i += 4;
+                        break;
+                    default: throw new FormatException("JSON escape not known at " + i);
+                }
+            }
         }
     }
 }

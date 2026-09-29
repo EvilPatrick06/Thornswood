@@ -256,6 +256,137 @@ function Get-FeedAssetFile([string]$Url, [string]$Sha, [string]$Dest, [string]$S
     return $Dest
 }
 
+# ---- a release's files, each on the site by its own sha256 (#1050) -----------
+#
+# Since #1050 a launcher syncs the install to the record the feed names instead
+# of replaying packs: it compares every file of ours with the record and
+# downloads only the ones that differ, from the folder the record itself is in
+# (/feed[-dev]/assets/<sha256> of each file). A record carries:
+#   '<path>'              '<bytes>:<sha256>'  a file of ours in the game folder
+#   ':golden:plugins.txt' '<bytes>:<sha256>'  the reference plugin list as a pack
+#   ':golden:loadorder.txt'                   carries it, into Profile\Default
+#   ':gone:<path>'        'removed'           a file of ours a release stopped
+#                                             shipping; left alone on a machine
+#                                             whose Vortex deploys that path now
+#                         'always'            Ship-Rules' delete list, taken out
+#                                             whatever put it there
+#   ':record:files'       '1'                 every file above is on the site
+#                                             beside the record. Without it (every
+#                                             record before #1050) a launcher
+#                                             takes the packs instead.
+# plus the keys that were already there (:profile:, :order:, :src:), which no
+# launcher reads.
+$RecordFilesKey = ':record:files'
+
+# The files a record names that a launcher downloads: sha256 to size, for the
+# game files and the plugin list.
+function Get-RecordFileShas($map) {
+    $out = @{}
+    foreach ($k in @($map.Keys)) {
+        if ($k.StartsWith(':') -and -not $k.StartsWith(':golden:')) { continue }
+        $m = [regex]::Match([string]$map[$k], '^(\d+):([0-9a-f]{64})$')
+        if ($m.Success) { $out[$m.Groups[2].Value] = [int64]$m.Groups[1].Value }
+    }
+    return $out
+}
+
+# The address of one file beside a record: the record's own url with its sha256
+# swapped for the file's. '' when the url is not an asset on the site.
+function Get-RecordFileUrl([string]$RecordUrl, [string]$Sha) {
+    $m = [regex]::Match([string]$RecordUrl, '^(.*/(?:feed|feed-dev)/assets/)[0-9a-fA-F]{64}(?:[?#].*)?$')
+    if (-not $m.Success) { return '' }
+    return ($m.Groups[1].Value + $Sha.ToLowerInvariant())
+}
+
+# Some bytes of one asset: $Count from $From, or the last $Count when $From is
+# negative. From -SiteDir by seeking the file, otherwise with an https Range
+# request. Hands back @{ Bytes; Start }.
+function Get-FeedAssetRange([string]$Url, [int64]$From, [int64]$Count, [string]$SiteDir, [string]$SiteUrl = 'https://thornswood.net') {
+    $m = [regex]::Match([string]$Url, '/(feed|feed-dev)/assets/([0-9a-fA-F]{64})(?:[?#].*)?$')
+    if (-not $m.Success) { throw "$Url is not an asset on the site." }
+    $prefix = $m.Groups[1].Value; $name = $m.Groups[2].Value.ToLowerInvariant()
+    if ($SiteDir) {
+        $fs = [IO.File]::OpenRead((Join-Path (Join-Path (Join-Path $SiteDir $prefix) 'assets') $name))
+        try {
+            $start = if ($From -lt 0) { [Math]::Max([int64]0, $fs.Length - $Count) } else { $From }
+            $n = [int][Math]::Min($Count, $fs.Length - $start)
+            $buf = New-Object byte[] $n
+            $fs.Position = $start
+            $got = 0
+            while ($got -lt $n) { $r = $fs.Read($buf, $got, $n - $got); if ($r -le 0) { break }; $got += $r }
+            return @{ Bytes = $buf; Start = $start }
+        } finally { $fs.Dispose() }
+    }
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    $req = [Net.HttpWebRequest]::Create($SiteUrl.TrimEnd('/') + '/' + $prefix + '/assets/' + $name)
+    $req.UserAgent = 'Thornswood-Publish'
+    if ($From -lt 0) { $req.AddRange([int64](-$Count)) } else { $req.AddRange([int64]$From, [int64]($From + $Count - 1)) }
+    $resp = $req.GetResponse()
+    try {
+        if ([int]$resp.StatusCode -ne 206) { throw "/$prefix/assets/$name did not answer a range request" }
+        $cr = [regex]::Match([string]$resp.Headers['Content-Range'], 'bytes (\d+)-(\d+)/')
+        if (-not $cr.Success) { throw "/$prefix/assets/$name answered a range without saying which" }
+        $ms = New-Object IO.MemoryStream
+        $s = $resp.GetResponseStream()
+        try { $s.CopyTo($ms) } finally { $s.Dispose() }
+        return @{ Bytes = $ms.ToArray(); Start = [int64]$cr.Groups[1].Value }
+    } finally { $resp.Close() }
+}
+
+# The lines of delete.txt in one pack on the site, reading only the zip's
+# directory and that one entry, not the whole pack. @() when it has none.
+function Get-FeedPackDeleteLines($Pack, [string]$SiteDir, [string]$SiteUrl = 'https://thornswood.net') {
+    $url = [string]$Pack.url
+    $tail = Get-FeedAssetRange $url -1 66000 $SiteDir $SiteUrl
+    $b = [byte[]]$tail.Bytes
+    $eocd = -1
+    for ($i = $b.Length - 22; $i -ge 0; $i--) { if ($b[$i] -eq 0x50 -and $b[$i + 1] -eq 0x4b -and $b[$i + 2] -eq 5 -and $b[$i + 3] -eq 6) { $eocd = $i; break } }
+    if ($eocd -lt 0) { throw "pack $([string]$Pack.id) is not a zip" }
+    $cdSize = [int64][BitConverter]::ToUInt32($b, $eocd + 12)
+    $cdOff = [int64][BitConverter]::ToUInt32($b, $eocd + 16)
+    if ($cdOff -ge $tail.Start) { $cd = $b; $at = [int]($cdOff - $tail.Start) }
+    else { $cd = [byte[]](Get-FeedAssetRange $url $cdOff $cdSize $SiteDir $SiteUrl).Bytes; $at = 0 }
+    $end = $at + $cdSize
+    while ($at + 46 -le $end -and [BitConverter]::ToUInt32($cd, $at) -eq 0x02014b50) {
+        $method = [BitConverter]::ToUInt16($cd, $at + 10)
+        $csize = [int64][BitConverter]::ToUInt32($cd, $at + 20)
+        $nlen = [BitConverter]::ToUInt16($cd, $at + 28); $xlen = [BitConverter]::ToUInt16($cd, $at + 30); $clen = [BitConverter]::ToUInt16($cd, $at + 32)
+        $loff = [int64][BitConverter]::ToUInt32($cd, $at + 42)
+        $name = [Text.Encoding]::UTF8.GetString($cd, $at + 46, $nlen)
+        if ($name -eq 'delete.txt') {
+            $lh = [byte[]](Get-FeedAssetRange $url $loff 30 $SiteDir $SiteUrl).Bytes
+            $skip = 30 + [BitConverter]::ToUInt16($lh, 26) + [BitConverter]::ToUInt16($lh, 28)
+            $data = [byte[]]@()
+            if ($csize -gt 0) { $data = [byte[]](Get-FeedAssetRange $url ($loff + $skip) $csize $SiteDir $SiteUrl).Bytes }
+            if ($method -eq 8) {
+                $ds = New-Object IO.Compression.DeflateStream ((New-Object IO.MemoryStream (, $data)), [IO.Compression.CompressionMode]::Decompress)
+                $out = New-Object IO.MemoryStream
+                try { $ds.CopyTo($out) } finally { $ds.Dispose() }
+                $data = $out.ToArray()
+            } elseif ($method -ne 0) { throw "pack $([string]$Pack.id) stores delete.txt in a way this cannot read" }
+            return @(([Text.Encoding]::UTF8.GetString($data) -split "`r?`n") | ForEach-Object { $_.Trim().Replace('/', '\') } | Where-Object { $_ -and -not $_.StartsWith('#') })
+        }
+        $at += 46 + $nlen + $xlen + $clen
+    }
+    return @()
+}
+
+# Every path the packs on the feed took out, oldest pack first. What the first
+# record with its files on the site starts its ':gone:' list from, so a launcher
+# that syncs to it takes out what the packs it never replayed would have.
+function Get-FeedPackDeletes($doc, [string]$SiteDir, [string]$SiteUrl = 'https://thornswood.net', [scriptblock]$Say) {
+    Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
+    $all = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $packs = @()
+    if ($null -ne $doc -and $doc.PSObject.Properties['packs'] -and $doc.packs) { $packs = @($doc.packs | Where-Object { $null -ne $_ }) }
+    foreach ($p in $packs) {
+        if (-not $p.PSObject.Properties['url'] -or -not [string]$p.url) { continue }
+        foreach ($l in @(Get-FeedPackDeleteLines $p $SiteDir $SiteUrl)) { [void]$all.Add($l) }
+    }
+    if ($Say) { & $Say ("  read what {0} pack(s) took out: {1} path(s)" -f $packs.Count, $all.Count) }
+    return @($all)
+}
+
 # Case 4: every pack the feed lists, applied in order the way a launcher
 # applies them, reduced to the entry each game file would have. Only game
 # files: the plugin list and launcher source keys are left out, so the next
