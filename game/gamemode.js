@@ -28570,8 +28570,20 @@ log('gamemode loaded:',
     collegeSemester: 2,   // points a mage earns per semester at the College
     outsiderSemester: 1,  // points a non-mage earns per semester, novice only
     outsiderSpells: 2,    // the most spells a non-mage can ever hold
+    // An Enchanter's staff spells, built the way a mage's spells are (#1128):
+    enchanterStartStaff: 2,   // staff spell points an Enchanter begins with
+    enchanterMasterStaff: 2,  // more at Master Bladebinder, as a mage's at Master
     skillCap: 5           // NOT IN THE RULEBOOK. Placeholder, see above.
   };
+
+  /*
+    THE HALF THAT MAKES STAVES, and the rank an Enchanter's staff spells climb
+    on (#1128). Staves are Bladebinder work: the craft gate asks this half's
+    rank before a staff is made, so the staff spells ask the same one. A
+    Bladebinder climbs it as their own half; a Wardweaver holds it as the
+    sister half, at Novice until a Master Bladebinder takes them on.
+  */
+  var STAFF_HALF = 'bladebinder';
 
   /*
     The spell book, school by school and rank by rank.
@@ -29169,6 +29181,11 @@ log('gamemode loaded:',
       taught     ['hearthcook']                 halves learned from a Master
                  of another profession, novice only, at most LIMITS.secondaries
       spells     { points: 2, known: [...] }    a mage's spell points and spells
+      staffSpells ['12fcd:Skyrim.esm', ...]     the staff spells unlocked, by the
+                 spell's form id desc: what a staff may bind (#967, #1128)
+      staffPoints 2                             an Enchanter's staff spell points.
+                 Missing on an Enchanter from before #1128: staffPoints()
+                 reads it as what their Bladebinder rank has given them.
       tree       { vitality: 3, ... }           points spent per sub-skill
       points     4                              unspent tree points
       work       { miner: 7, charburner: 2 }    yields handed out since the
@@ -29424,6 +29441,9 @@ log('gamemode loaded:',
     s.ranks[half] = 'novice';
     var sister = sisterOf(prof, half);
     if (sister) { s.ranks[sister] = 'novice'; }
+    // An Enchanter starts with staff spell points the way a mage starts with
+    // spell points (#1128).
+    if (prof === 'enchanter') { s.staffPoints = LIMITS.enchanterStartStaff; }
     place(s, 'professions', prof);
     place(s, 'halves', half);
     return yes(s);
@@ -29477,6 +29497,9 @@ log('gamemode loaded:',
     }
 
     var next = RANKS[rankIndex(cur) + 1];
+    // Read before the rank moves: an Enchanter from before #1128 has no stored
+    // staff points, and what they hold is what the rank below gave them.
+    var staffWas = (s.prof === 'enchanter' && half === STAFF_HALF) ? staffPoints(s) : null;
     s.ranks[half] = next;
 
     /*
@@ -29492,6 +29515,11 @@ log('gamemode loaded:',
       s.spells.points += LIMITS.mageMasterSpells;
     } else if (s.prof === 'mage' && mine) {
       s.spells.points += 1;   // one more spell point with every rank
+    }
+    // The same for an Enchanter's staff spells (#1128): one more staff spell
+    // point with every Bladebinder rank, and two at Master.
+    if (staffWas !== null) {
+      s.staffPoints = staffWas + (next === 'master' ? LIMITS.enchanterMasterStaff : 1);
     }
     return yes(s);
   }
@@ -29556,6 +29584,7 @@ log('gamemode loaded:',
     var was = rankOf(s, k);
     var pointsWas = s.points || 0;
     var spellsWas = (s.spells && s.spells.points) || 0;
+    var staffWas = staffPoints(s);
     var up = rankUp(s, k, masterState);
     if (!up.ok) {
       // Held at the ceiling. The count waits there rather than climbing
@@ -29569,7 +29598,8 @@ log('gamemode loaded:',
     for (var f in up.state) { if (own(up.state, f)) { s[f] = up.state[f]; } }
     return { key: k, from: was, to: rankOf(s, k),
              points: (s.points || 0) - pointsWas,
-             spellPoints: ((s.spells && s.spells.points) || 0) - spellsWas };
+             spellPoints: ((s.spells && s.spells.points) || 0) - spellsWas,
+             staffPoints: s.prof === 'enchanter' ? staffPoints(s) - staffWas : 0 };
   }
 
   /*
@@ -29931,6 +29961,193 @@ log('gamemode loaded:',
     return addToBook(s, spell);
   }
 
+  /*
+    STAFF SPELLS, AN ENCHANTER'S OWN SPELL BOOK. Patrick, 29 September, on
+    issue #1128: "Enchanters also get their own spell point and spell
+    unlocking system like the Mages have, so they can actually learn staff
+    spells: like Mages, they do not need the tomes; their Enchanter rank
+    decides which ranks they can unlock", and "just like mages enchanters
+    can't unlock a spell even if they are the correct rank and have the spell
+    points, they must also have at least one spell of the level below".
+
+    So it is the Mage's system, point for point, with the Bladebinder half in
+    place of a school:
+      points  staff spell points. An Enchanter starts with two
+              (LIMITS.enchanterStartStaff), earns one with every Bladebinder
+              rank and two at Master (rankUp), and spends one per spell, on
+              K, with no tome (pickStaffSpell).
+      level   the Enchanter's Bladebinder rank has reached the spell's rank.
+      below   they have already unlocked a staff spell one rank down; Novice
+              has nothing below it.
+    What a staff binds is recorded in staffSpells, by the spell's form id
+    desc, and the staff gate asks that list and nothing else.
+
+    AND FOR EVERYBODY ELSE, THE NON-MAGE RULES. "A non-Enchanter taught by a
+    Master Enchanter follows the same rules a non-Mage has for magic: needs
+    the tome and an earned spell point, and can only learn Novice." A Master
+    Bladebinder teaching them (teach, once, and it counts as one of their two
+    other trades) is what gives them standing in the half, at Novice for good.
+    They learn a staff spell only from its tome (learnStaffFromTome), and
+    what they hold is places under the same cap a non-mage has for spells,
+    LIMITS.outsiderSpells, never more.
+
+    The staff table (STAFF_SPELLS) lives in the staff spells block further
+    down, so these rules are handed the spell as { desc, name, rank } and a
+    rankOfStaff(desc) that answers the rank of any staff spell, the way
+    learnFromTome is handed its spell by the tomes block.
+  */
+
+  /** Is this character an Enchanter, whose staff spells are unlocked on K. */
+  function isEnchanter(state) { return !!state && state.prof === 'enchanter'; }
+
+  /** Taught the Bladebinder half by a Master Enchanter, and not an Enchanter. */
+  function staffTaught(state) {
+    var s = state || fresh();
+    return !isEnchanter(s) && (s.taught || []).indexOf(STAFF_HALF) !== -1 && !!rankOf(s, STAFF_HALF);
+  }
+
+  /** The staff spells unlocked, as a fresh array of descs. */
+  function staffKnown(state) {
+    var list = state && state.staffSpells;
+    return Array.isArray(list) ? list.slice() : [];
+  }
+
+  function knowsStaff(state, desc) { return staffKnown(state).indexOf(desc) !== -1; }
+
+  /** Staff spell points an Enchanter has been given by reaching this Bladebinder rank. */
+  function staffEarned(rank) {
+    var n = LIMITS.enchanterStartStaff;
+    var at = rankIndex(rank || 'novice');
+    for (var i = 1; i <= at; i++) {
+      n += RANKS[i] === 'master' ? LIMITS.enchanterMasterStaff : 1;
+    }
+    return n;
+  }
+
+  /**
+    Staff spell points to spend right now. An Enchanter's are stored, like a
+    mage's; one from before #1128 has none stored and holds what their rank
+    has given them, with the staves they already learned from tomes kept for
+    nothing. Somebody a Master Enchanter taught has the places left under
+    the non-mage cap. Anybody else has none.
+  */
+  function staffPoints(state) {
+    var s = state || fresh();
+    if (isEnchanter(s)) {
+      if (typeof s.staffPoints === 'number') { return s.staffPoints; }
+      return staffEarned(rankOf(s, STAFF_HALF));
+    }
+    if (!staffTaught(s)) { return 0; }
+    return Math.max(0, LIMITS.outsiderSpells - staffKnown(s).length);
+  }
+
+  /** Has this character unlocked any staff spell of that rank. */
+  function knowsStaffRank(state, rank, rankOfStaff) {
+    var known = staffKnown(state);
+    for (var i = 0; i < known.length; i++) {
+      if (typeof rankOfStaff === 'function' && rankOfStaff(known[i]) === rank) { return true; }
+    }
+    return false;
+  }
+
+  /**
+    Which of the three this character is missing for this staff spell, as
+    { what: 'points' | 'level' | 'below', why }, the shape tomeMissing gives.
+    Empty when nothing is missing. spell is { desc, name, rank }.
+  */
+  function staffMissing(state, spell, rankOfStaff) {
+    var s = state || fresh();
+    var out = [];
+    if (staffPoints(s) <= 0) {
+      var because = isEnchanter(s)
+        ? 'an Enchanter earns one with every Bladebinder rank'
+        : (staffTaught(s)
+          ? 'somebody a Master Enchanter taught holds ' + LIMITS.outsiderSpells + ' staff spells at most'
+          : 'staff spells are an Enchanter\'s, or taught by a Master Enchanter');
+      out.push({ what: 'points', why: 'a staff spell point to spend, and you have none (' + because + ')' });
+    }
+    var have = rankOf(s, STAFF_HALF);
+    if (!have || rankIndex(have) < rankIndex(spell.rank)) {
+      out.push({ what: 'level', why: word(spell.rank) + ' rank as a Bladebinder, the half that makes staves, and you ' +
+                 (have ? 'are ' + word(have) + (staffTaught(s) ? ', which a taught trade never goes past' : '')
+                       : 'have no rank in it') });
+    }
+    var below = RANKS[rankIndex(spell.rank) - 1];
+    if (below && !knowsStaffRank(s, below, rankOfStaff)) {
+      out.push({ what: 'below', why: (/^[aeiou]/.test(below) ? 'an ' : 'a ') + word(below) +
+                 ' staff spell you have already unlocked, and you have none' });
+    }
+    return out;
+  }
+
+  /** The refusal for a list of missing requirements, every one of them named. */
+  function staffNeeds(spell, missing) {
+    var needs = missing.map(function (m) { return m.why; });
+    var list = needs.length === 1 ? needs[0]
+      : needs.slice(0, -1).join('; ') + '; and ' + needs[needs.length - 1];
+    return 'to unlock ' + spell.name + ' (' + word(spell.rank) + ') for staves you need ' + list;
+  }
+
+  /** The staff spell into a state already cloned and checked, and the point it costs. */
+  function addStaff(s, spell) {
+    // An Enchanter spends a stored point. Somebody a Master Enchanter taught
+    // spends a place under the cap, which is the push below and nothing else.
+    if (isEnchanter(s)) { s.staffPoints = staffPoints(s) - 1; }
+    s.staffSpells = staffKnown(s);
+    s.staffSpells.push(spell.desc);
+    return yes(s);
+  }
+
+  function badStaff(spell) {
+    return !spell || !spell.desc || !spell.name || rankIndex(spell.rank) < 0;
+  }
+
+  /**
+    An Enchanter unlocks a staff spell on K, with no tome: pickSpell's rules
+    over the Bladebinder rank. Answers { ok, state } or { ok: false, why,
+    missing } with every one of the three that stands in the way.
+  */
+  function pickStaffSpell(state, spell, rankOfStaff) {
+    if (badStaff(spell)) { return no('that is not a staff spell whose rank can be read'); }
+    var s = clone(state);
+    if (!isEnchanter(s)) {
+      return no(staffTaught(s)
+        ? 'somebody a Master Enchanter taught learns a staff spell from its tome, not here'
+        : 'staff spells are unlocked by Enchanters');
+    }
+    if (knowsStaff(s, spell.desc)) { return no('you have already unlocked ' + spell.name + ' for staves'); }
+    var missing = staffMissing(s, spell, rankOfStaff);
+    if (missing.length) {
+      var r = no(staffNeeds(spell, missing));
+      r.missing = missing;
+      return r;
+    }
+    return addStaff(s, spell);
+  }
+
+  /**
+    Somebody a Master Enchanter taught reads the tome of a staff spell: the
+    non-mage rules, a place under the cap and Novice only (the taught half
+    never leaves Novice, so the level rule is what holds them there).
+  */
+  function learnStaffFromTome(state, spell, rankOfStaff) {
+    if (badStaff(spell)) { return no('that tome\'s spell is not a staff spell whose rank can be read'); }
+    var s = clone(state);
+    if (!staffTaught(s)) {
+      return no(isEnchanter(s)
+        ? 'an Enchanter unlocks staff spells on K, with no tome'
+        : 'staff spells are an Enchanter\'s, or taught by a Master Enchanter');
+    }
+    if (knowsStaff(s, spell.desc)) { return no('you have already unlocked ' + spell.name + ' for staves'); }
+    var missing = staffMissing(s, spell, rankOfStaff);
+    if (missing.length) {
+      var r = no(staffNeeds(spell, missing));
+      r.missing = missing;
+      return r;
+    }
+    return addStaff(s, spell);
+  }
+
   /** Every perk this character holds right now, from state alone. */
   function perks(state) {
     var out = [];
@@ -29980,7 +30197,11 @@ log('gamemode loaded:',
     pickSpell: pickSpell, spellAt: spellAt, spellPoints: spellPoints,
     knowsSpell: knowsSpell, schoolsOf: schoolsOf,
     rankForLevel: rankForLevel, spellByDesc: spellByDesc,
-    tomeMissing: tomeMissing, learnFromTome: learnFromTome
+    tomeMissing: tomeMissing, learnFromTome: learnFromTome,
+    STAFF_HALF: STAFF_HALF, isEnchanter: isEnchanter, staffTaught: staffTaught,
+    staffKnown: staffKnown, knowsStaff: knowsStaff, staffPoints: staffPoints,
+    staffMissing: staffMissing, pickStaffSpell: pickStaffSpell,
+    learnStaffFromTome: learnStaffFromTome
   };
 })();
 // ==== end thornswood progression ====
@@ -34895,6 +35116,14 @@ log('gamemode loaded:',
     if (!creating) {
       var book = bookView(s);
       if (book) { view.book = book; }
+      /*
+        An Enchanter's staff spells (#1128), drawn as a spell book of its own
+        and left off for everybody else. The staff spells block owns the table
+        and loads after this one, so it is asked at write time.
+      */
+      var SS = g.__thornswoodStaffSpells;
+      var staff = (SS && SS.view) ? SS.view(P, s) : null;
+      if (staff) { view.staff = staff; }
     }
     // Left out entirely when there is nothing to say, per the contract.
     var climbing = progressView(s);
@@ -35172,6 +35401,10 @@ log('gamemode loaded:',
       line += ' ' + raised.spellPoints + ' more spell point' +
               (raised.spellPoints === 1 ? '' : 's') + ' as well.';
     }
+    if (raised.staffPoints > 0) {
+      line += ' ' + raised.staffPoints + ' more staff spell point' +
+              (raised.staffPoints === 1 ? '' : 's') + ' to unlock staff spells with, on K.';
+    }
     return line;
   }
 
@@ -35259,6 +35492,24 @@ log('gamemode loaded:',
     if (known.length) {
       clog('spawn:', n, 'of', known.length, 'known spells put back on', actorId.toString(16));
     }
+    /*
+      And every staff spell unlocked (#1128), by its form id desc. The game's
+      crafting menu lists a staff only for somebody who holds its spell (the
+      recipe's HasSpell), so an unlocked staff spell has to be on the
+      character as well as in the record, or the staff never shows.
+    */
+    var staff = P.staffKnown ? P.staffKnown(s) : [];
+    var put = 0;
+    for (var j = 0; j < staff.length; j++) {
+      try {
+        if (typeof spellOn === 'function' && spellOn(actorId, staff[j], true)) { put++; }
+      } catch (e) {
+        clog('could not put staff spell', staff[j], 'back on', actorId.toString(16), e);
+      }
+    }
+    if (staff.length) {
+      clog('spawn:', put, 'of', staff.length, 'staff spells put back on', actorId.toString(16));
+    }
     return n;
   }
 
@@ -35273,6 +35524,8 @@ log('gamemode loaded:',
       /pick profession mage destruction,restoration
       /pick town riften                  while creating, and never after
       /pick spell Ice Spike              one spell out of the book
+      /pick staffspell Thunderbolt       an Enchanter unlocks a staff spell (#1128);
+                                         the K page sends the spell's desc
       /pick spend vitality               the panel's spelling of /spend
       /spend vitality
 
@@ -35359,6 +35612,7 @@ log('gamemode loaded:',
     var r = null;
     var spellPicked = null;   // set when this command was a spell, so it can
                               // be put on the character after the write
+    var staffPicked = null;   // the same for a staff spell: { desc, name, rank }
     /*
       WHICH PICK A REFUSAL ANSWERS. Part of the contract with the panel: a
       note carries about, so the panel clears that one pick and leaves the
@@ -35431,11 +35685,23 @@ log('gamemode loaded:',
           var book = P.spellAt(wanted);
           spellPicked = book ? book.name : null;
         }
+      } else if (what === 'staffspell') {
+        /*
+          An Enchanter unlocks a staff spell (#1128): the K page sends the
+          spell's desc, and a person typing can give its name. Everything
+          after the word is the spell, spaces and all ('Odin - Skyrim Magic
+          Overhaul.esp' has them).
+        */
+        about = 'staffspell';
+        var SS = g.__thornswoodStaffSpells;
+        r = (SS && SS.unlock) ? SS.unlock(P, s, parts.slice(2).join(' '))
+          : { ok: false, why: 'staff spells are not running on this server right now' };
+        if (r.ok) { staffPicked = r.spell; }
       } else if (what === 'spend') {
         about = 'spend';
         r = P.spendPoint(s, String(parts[2] || '').toLowerCase(), parts[3]);
       } else {
-        toProfile(profileId, 'Pick what? class, profession, spell or town.');
+        toProfile(profileId, 'Pick what? class, profession, spell, staffspell or town.');
         return true;
       }
     } else {
@@ -35544,6 +35810,23 @@ log('gamemode loaded:',
       // a threshold, and a rank reached is something a person is told.
       var climbed = raiseLines(actorId, r);
       if (climbed) { toProfile(profileId, climbed); }
+    }
+
+    /*
+      A staff spell unlocked goes on the character too, by its desc: the
+      crafting menu lists a staff only for somebody who holds its spell (the
+      recipe's HasSpell), and grantKnown puts it back on every spawn.
+    */
+    if (staffPicked) {
+      try {
+        if (typeof spellOn === 'function') { spellOn(actorId, staffPicked.desc, true); }
+      } catch (eStaff) {
+        clog('could not put staff spell', staffPicked.desc, 'on', actorId.toString(16), eStaff);
+      }
+      var left = P.staffPoints(st);
+      toProfile(profileId, 'You unlock ' + staffPicked.name + ' for staves, and you can bind it into a staff ' +
+                'at a staff enchanter now. ' + (left ? left + ' staff spell point' + (left === 1 ? '' : 's') + ' left.'
+                                                      : 'No staff spell points left; more come with every Bladebinder rank.'));
     }
 
     // The home is the one pick that ends creation. Class and profession may
@@ -35754,10 +36037,40 @@ log('gamemode loaded:',
            ') from this tome yet, so you keep it. You need ' + list + '.';
   }
 
+  /** Every missing requirement in one list: 'a; b; and c'. */
+  function joinNeeds(missing) {
+    var needs = missing.map(function (m) { return m.why; });
+    return needs.length === 1 ? needs[0]
+      : needs.slice(0, -1).join('; ') + '; and ' + needs[needs.length - 1];
+  }
+
+  /*
+    The tome goes when it unlocked a staff spell and the engine will not
+    spend it: the engine spends a book only when it taught the spell itself
+    (MpActor.cpp, spellLearned), and it does not when the character already
+    knew the spell. Same helper the tools use, so the pack is written once.
+  */
+  function spendTome(actorId, bookBaseId) {
+    try {
+      if (typeof takeItemById === 'function') { return !!takeItemById(actorId, bookBaseId, 1); }
+    } catch (e) {
+      tlog('could not spend the tome', Number(bookBaseId).toString(16), 'of', Number(actorId).toString(16) + ':', e);
+    }
+    return false;
+  }
+
   /*
     Somebody read a book. Answers null to let it read as Skyrim reads it and
     say nothing, or { refused, line }: refused true keeps the book and the
     spell away from them, and line is said either way.
+
+    A tome of a staff spell does one more thing for one kind of reader (#1128):
+    somebody a Master Enchanter taught learns it for staves under the non-mage
+    rules (a place under the cap, Novice only), whether or not the Mage rules
+    would have taught it, and the engine then teaches the spell and spends
+    the tome as it does for anybody, because the crafting menu shows a staff
+    only to somebody who holds its spell. An Enchanter is told that staves
+    need no tome: they unlock the spell on K.
   */
   function read(actorId, bookBaseId) {
     var spell = tomeSpell(bookBaseId);
@@ -35777,33 +36090,70 @@ log('gamemode loaded:',
                'its school and rank cannot be read. You keep the tome; tell staff with /helpme.' };
     }
 
+    var staffDesc = (S && S.isStaffSpell && spell.desc && S.isStaffSpell(spell.desc)) ? spell.desc : null;
+    var fresh = !!staffDesc && !!P.knowsStaff && !P.knowsStaff(s, staffDesc);
+    var outsider = fresh && !!P.staffTaught && P.staffTaught(s);
+    var enchNote = (fresh && P.isEnchanter && P.isEnchanter(s))
+      ? ' Staves need no tome for an Enchanter: press K and unlock ' + spell.name + ' under Staff spells.'
+      : '';
+
     // Already in their book: nothing to spend, and the engine keeps a tome
-    // whose spell the character has. Only the staff record can be new (#967:
-    // a spell known before the profession opens its staves when its tome is
-    // read again).
+    // whose spell the character has. Only the staff record can be new, for
+    // somebody a Master Enchanter taught.
     if (P.knowsSpell(s, spell.name)) {
-      var again = (S && spell.desc) ? S.learn(P, s, spell.desc) : null;
-      if (again && again.ok) {
-        C.writeState(actorId, again.state);
-        return { refused: false, line: 'You know ' + spell.name + ' already, and you can bind it into a staff ' +
-                 'at a staff enchanter now.' };
+      if (outsider) {
+        var again = S.learn(P, s, staffDesc);
+        if (again.ok) {
+          C.writeState(actorId, again.state);
+          var gone = spendTome(actorId, bookBaseId);
+          return { refused: false, line: 'You know ' + spell.name + ' already, and the tome unlocks it for staves: ' +
+                   'you can bind it into a staff at a staff enchanter now.' + (gone ? ' The tome is spent.' : '') };
+        }
+        return { refused: false, line: 'You know ' + spell.name + ' already, and you cannot unlock it for staves yet. You need ' +
+                 joinNeeds(again.missing || [{ why: again.why }]) + '.' };
       }
-      return null;
+      return enchNote ? { refused: false, line: 'You know ' + spell.name + ' already.' + enchNote } : null;
     }
 
     var r = P.learnFromTome(s, spell);
     if (!r.ok) {
       tlog(Number(actorId).toString(16), 'was refused', spell.name, spell.desc + ':', r.why);
-      return { refused: true, line: r.missing ? refusalLine(spell, r.missing)
-               : 'You cannot learn ' + spell.name + ' from this tome: ' + r.why + '. You keep the tome.' };
+      if (outsider) {
+        var st = S.learn(P, s, staffDesc);
+        if (st.ok) {
+          /*
+            Unlocked for staves under the non-mage rules, so the engine is let
+            teach the spell and spend the tome: the game's crafting menu lists
+            a staff only for somebody who knows its spell (the recipe's
+            HasSpell), so a staff spell nobody holds is a staff nobody sees.
+            It is not written into their spell book, so it takes none of the
+            places a Master mage's teaching gives.
+          */
+          C.writeState(actorId, st.state);
+          tlog(Number(actorId).toString(16), 'unlocked', spell.name, spell.desc, 'for staves from a tome');
+          return { refused: false, line: 'The tome unlocks ' + spell.name + ' for staves: you can bind it into a staff ' +
+                   'at a staff enchanter now. It took one of your ' + P.TABLE.limits.outsiderSpells +
+                   ' staff spell places, and the tome is spent.' };
+        }
+        var both = r.missing ? refusalLine(spell, r.missing)
+          : 'You cannot learn ' + spell.name + ' from this tome: ' + r.why + '. You keep the tome.';
+        return { refused: true, line: both + ' Nor can you unlock it for staves yet: you need ' +
+                 joinNeeds(st.missing || [{ why: st.why }]) + '.' };
+      }
+      return { refused: true, line: (r.missing ? refusalLine(spell, r.missing)
+               : 'You cannot learn ' + spell.name + ' from this tome: ' + r.why + '. You keep the tome.') + enchNote };
     }
 
     var next = r.state;
-    var staffLine = '';
-    var st = (S && spell.desc) ? S.learn(P, next, spell.desc) : null;
-    if (st && st.ok) {
-      next = st.state;
-      staffLine = ' You can bind it into a staff at a staff enchanter now.';
+    var staffLine = enchNote;
+    if (outsider) {
+      var st2 = S.learn(P, next, staffDesc);
+      if (st2.ok) {
+        next = st2.state;
+        staffLine = ' It is unlocked for staves too: you can bind it into a staff at a staff enchanter now.';
+      } else {
+        staffLine = ' It is not unlocked for staves: you need ' + joinNeeds(st2.missing || [{ why: st2.why }]) + '.';
+      }
     }
     C.writeState(actorId, next);
     var raised = C.raiseLines ? C.raiseLines(actorId, r) : null;
@@ -35818,45 +36168,45 @@ log('gamemode loaded:',
 
 // ==== thornswood staff spells ====
 /*
-  THE STAFF SPELLS: AN ENCHANTER LEARNS WHAT A STAFF BINDS FROM A SPELL TOME.
+  THE STAFF SPELLS: WHAT A STAFF BINDS, AND WHO HAS UNLOCKED IT.
 
-  Patrick, 28 September, answering issue #967: "Enchanters learn staff spells
-  from spell tomes". 160 of the Bladebinder's 161 staff recipes carry a
-  HasSpell condition naming the staff's own spell, and until this nobody could
-  make one: an Enchanter starts with no spells at all.
+  160 of the Bladebinder's 161 staff recipes carry a HasSpell condition naming
+  the staff's own spell. A staff is made only when its spell is unlocked for
+  staves: recorded in staffSpells on the character (the thornswoodCharacter
+  property, so it survives a restart), which craftAnswer asks through
+  refusal() below once rank and half have said yes.
 
-  HOW IT WORKS.
-    - Reading a spell tome raises onReadBook, and since 29 September (#1026)
-      THE SPELL TOMES block above decides it under the Mage rules, for an
-      Enchanter as for anybody: a spell point, the rank in the spell's school,
-      and a spell of that school one rank down. When one is missing the tome
-      is refused and kept, and the line says which. When they hold, the engine
-      teaches the spell and spends the tome (ReadBookEvent in the fork), which
-      is also what makes the game's own crafting menu list the staff, because
-      the menu checks HasSpell itself; and when the spell is one a staff binds
-      (STAFF_SPELLS, generated below) and the reader may make staves at all,
-      it is recorded on their character too (staffSpells in the character
-      state, the thornswoodCharacter property, so it survives a restart) and
-      the line says it can go into a staff.
-    - Somebody who may not make staves learns the spell under the same rules
-      and nothing is recorded for staves.
-    - Making a staff asks craftAnswer, and craftAnswer asks refusal() below
-      once rank and half have said yes: a staff whose spell is not recorded
-      is refused with the sentence saying which tome to read. So a spell known
-      some other way (read before this existed, or before the profession was
-      picked) does not open a staff; reading its tome again does, without a
-      second spell point, and the engine keeps that tome when the spell is
-      already known.
+  HOW A SPELL IS UNLOCKED, since 29 September (#1128). Patrick: "Enchanters
+  also get their own spell point and spell unlocking system like the Mages
+  have ... like Mages, they do not need the tomes; their Enchanter rank
+  decides which ranks they can unlock", and "they must also have at least one
+  spell of the level below".
+    - An Enchanter (either half) unlocks it on K, under Staff spells, which
+      sends '/pick staffspell <desc>' (unlock below, P.pickStaffSpell in the
+      rules). Three things, the Mage's three: a staff spell point (two to
+      start, one with every Bladebinder rank, two at Master), Bladebinder rank
+      at or above the spell's rank, and a staff spell of the rank below
+      already unlocked (Novice needs none). No tome.
+    - Somebody a Master Enchanter taught the Bladebinder half learns it only
+      from its tome, under the non-mage rules (learn below,
+      P.learnStaffFromTome): a place under LIMITS.outsiderSpells, and Novice
+      only, since a taught half never leaves Novice. The spell tomes block
+      calls learn when they read one, and spends the tome when the engine
+      would not.
+    - Reading a tome is otherwise the Mage rules for the spell itself, for an
+      Enchanter as for anybody (THE SPELL TOMES block above), and records
+      nothing for an Enchanter's staves: the K page is their way in.
+  What was recorded under #967 and #1026, when a tome was the only way in,
+  stays unlocked.
 
-  WHO MAY LEARN. Anybody with standing in the Bladebinder half, which is the
-  one question the craft gate asks before it lets a staff through: both
-  halves of the Enchanter (the Wardweaver has the Bladebinder's novice as
-  its sister half) and anybody a Master Enchanter taught. Recording it for
-  somebody who could never make a staff would promise them something.
+  WHAT RANK A STAFF SPELL IS. rankOf below: the rulebook's SPELLS when it
+  lists the spell, otherwise the rank Build-RecipeTable read out of the game's
+  records and wrote beside it in STAFF_SPELLS (the half cost perk's editor
+  id, then the effects, the same reading the tomes block does at runtime).
 
   A SPELL NO TOME TEACHES. Some Apocalypse staves name the copy of a spell only
-  a creature casts. Build-RecipeTable prints every one, STAFF_SPELLS lists
-  them with no tomes, and the refusal says nobody can learn it here yet.
+  a creature casts. Build-RecipeTable prints every one and STAFF_SPELLS lists
+  them with no tomes: an Enchanter can still unlock one, and nobody else can.
 */
 (function () {
   'use strict';
@@ -35865,174 +36215,171 @@ log('gamemode loaded:',
   // ==== STAFF_SPELLS ====
   /* Built by scripts\dev\Build-RecipeTable.ps1 out of the game's own records. Do not hand edit.
      160 spells a staff recipe binds, 160 of them taught by a spell tome.
-     Spell desc -> its name and every BOOK record whose teaches spell flag names it.
-     A spell with no tome is one nobody can learn here, so its staves stay closed. */
+     Spell desc -> its name, its school and rank read out of the records (#1128; null when they cannot be),
+     and every BOOK record whose teaches spell flag names it. */
   var STAFF_SPELLS = {
-    "10f7ee:Skyrim.esm": { "name": "Thunderbolt", "tomes": ["10f7f5:Skyrim.esm"] },
-    "35d81:Skyrim.esm": { "name": "Wall of Storms", "tomes": ["a270b:Skyrim.esm"] },
-    "35d80:Skyrim.esm": { "name": "Wall of Frost", "tomes": ["a270a:Skyrim.esm"] },
-    "35d7f:Skyrim.esm": { "name": "Wall of Flames", "tomes": ["a2709:Skyrim.esm"] },
-    "4b146:Skyrim.esm": { "name": "Turn Lesser Undead", "tomes": ["a271f:Skyrim.esm"] },
-    "5dd5d:Skyrim.esm": { "name": "Turn Undead", "tomes": ["a2721:Skyrim.esm"] },
-    "5dd5e:Skyrim.esm": { "name": "Turn Greater Undead", "tomes": ["a2729:Skyrim.esm"] },
-    "2dd2a:Skyrim.esm": { "name": "Sparks", "tomes": ["9cd53:Skyrim.esm"] },
-    "4dba4:Skyrim.esm": { "name": "Soul Trap", "tomes": ["9cd54:Skyrim.esm"] },
-    "4deef:Skyrim.esm": { "name": "Rout", "tomes": ["a2718:Skyrim.esm"] },
-    "96d94:Skyrim.esm": { "name": "Reanimate Greater Corpse", "tomes": ["a26f2:Skyrim.esm"] },
-    "247c86:Odin - Skyrim Magic Overhaul.esp": { "name": "Toxic Cloud", "tomes": ["a2726:Skyrim.esm"] },
-    "26121c:Odin - Skyrim Magic Overhaul.esp": { "name": "Black Hand", "tomes": ["a2725:Skyrim.esm"] },
-    "65bd7:Skyrim.esm": { "name": "Reanimate Corpse", "tomes": ["a26eb:Skyrim.esm"] },
-    "4deec:Skyrim.esm": { "name": "Rally", "tomes": ["a2713:Skyrim.esm"] },
-    "7e8e1:Skyrim.esm": { "name": "Reanimate Lesser Corpse", "tomes": ["9e2aa:Skyrim.esm"] },
-    "5ad5f:Skyrim.esm": { "name": "Paralyze", "tomes": ["a26e8:Skyrim.esm"] },
-    "43323:Skyrim.esm": { "name": "Magelight", "tomes": ["a26e2:Skyrim.esm"] },
-    "10f7ed:Skyrim.esm": { "name": "Incinerate", "tomes": ["10f7f4:Skyrim.esm"] },
-    "10f7ec:Skyrim.esm": { "name": "Icy Spear", "tomes": ["10f7f3:Skyrim.esm"] },
-    "45f9c:Skyrim.esm": { "name": "Ice Storm", "tomes": ["a2707:Skyrim.esm"] },
-    "2b96c:Skyrim.esm": { "name": "Ice Spike", "tomes": ["a26fe:Skyrim.esm"] },
-    "12fd2:Skyrim.esm": { "name": "Heal Other", "tomes": ["a2727:Skyrim.esm"] },
-    "4d3f2:Skyrim.esm": { "name": "Healing Hands", "tomes": ["a271e:Skyrim.esm"] },
-    "4deeb:Skyrim.esm": { "name": "Fury", "tomes": ["9e2ac:Skyrim.esm"] },
-    "2b96b:Skyrim.esm": { "name": "Frostbite", "tomes": ["9cd52:Skyrim.esm"] },
-    "4deee:Skyrim.esm": { "name": "Frenzy", "tomes": ["a2714:Skyrim.esm"] },
-    "12fcd:Skyrim.esm": { "name": "Flames", "tomes": ["9cd51:Skyrim.esm"] },
-    "12fd0:Skyrim.esm": { "name": "Firebolt", "tomes": ["a26fd:Skyrim.esm"] },
-    "1c789:Skyrim.esm": { "name": "Fireball", "tomes": ["a2706:Skyrim.esm"] },
-    "4deea:Skyrim.esm": { "name": "Fear", "tomes": ["a2712:Skyrim.esm"] },
-    "6f952:Skyrim.esm": { "name": "Expel Daedra", "tomes": ["a26f8:Skyrim.esm"] },
-    "96d95:Skyrim.esm": { "name": "Dread Zombie", "tomes": ["a26f7:Skyrim.esm"] },
-    "4dee8:Skyrim.esm": { "name": "Courage", "tomes": ["9e2ad:Skyrim.esm"] },
-    "204c5:Skyrim.esm": { "name": "Conjure Storm Atronach", "tomes": ["a26f0:Skyrim.esm"] },
-    "204c4:Skyrim.esm": { "name": "Conjure Frost Atronach", "tomes": ["a26ef:Skyrim.esm"] },
-    "204c3:Skyrim.esm": { "name": "Conjure Flame Atronach", "tomes": ["a26ec:Skyrim.esm"] },
-    "640b6:Skyrim.esm": { "name": "Conjure Familiar", "tomes": ["9e2ab:Skyrim.esm"] },
-    "6f953:Skyrim.esm": { "name": "Command Daedra", "tomes": ["a26f6:Skyrim.esm"] },
-    "45f9d:Skyrim.esm": { "name": "Chain Lightning", "tomes": ["a2708:Skyrim.esm"] },
-    "4dee9:Skyrim.esm": { "name": "Calm", "tomes": ["a2711:Skyrim.esm"] },
-    "6d22c:Skyrim.esm": { "name": "Banish Daedra", "tomes": ["a26ee:Skyrim.esm"] },
-    "2dd29:Skyrim.esm": { "name": "Lightning Bolt", "tomes": ["a26ff:Skyrim.esm"] },
-    "17b5c9:Odin - Skyrim Magic Overhaul.esp": { "name": "Panic", "tomes": ["17b5db:Odin - Skyrim Magic Overhaul.esp"] },
-    "18c58c:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Clannfear", "tomes": ["1afd19:Odin - Skyrim Magic Overhaul.esp"] },
-    "8558a:Odin - Skyrim Magic Overhaul.esp": { "name": "Simulacrum", "tomes": ["21a2f7:Odin - Skyrim Magic Overhaul.esp"] },
-    "247c89:Odin - Skyrim Magic Overhaul.esp": { "name": "Sun Storm", "tomes": ["261216:Odin - Skyrim Magic Overhaul.esp"] },
-    "27a7b1:Odin - Skyrim Magic Overhaul.esp": { "name": "Corrosion", "tomes": ["293d18:Odin - Skyrim Magic Overhaul.esp"] },
-    "173074:Odin - Skyrim Magic Overhaul.esp": { "name": "Vulnerability", "tomes": ["275692:Odin - Skyrim Magic Overhaul.esp"] },
-    "17b5c2:Odin - Skyrim Magic Overhaul.esp": { "name": "Soothe", "tomes": ["17b5d8:Odin - Skyrim Magic Overhaul.esp"] },
-    "17b5d1:Odin - Skyrim Magic Overhaul.esp": { "name": "Subjugate", "tomes": ["17b5da:Odin - Skyrim Magic Overhaul.esp"] },
-    "27569c:Odin - Skyrim Magic Overhaul.esp": { "name": "Purge Magic", "tomes": ["27569e:Odin - Skyrim Magic Overhaul.esp"] },
-    "2a3051:Odin - Skyrim Magic Overhaul.esp": { "name": "Frosthand", "tomes": ["2a3054:Odin - Skyrim Magic Overhaul.esp"] },
-    "d4349:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Gloom Wraith", "tomes": ["d4351:Odin - Skyrim Magic Overhaul.esp"] },
-    "3f52:Dawnguard.esm": { "name": "Sun Fire", "tomes": ["3f51:Dawnguard.esm"] },
-    "1e78ad:Odin - Skyrim Magic Overhaul.esp": { "name": "Arctic Frost", "tomes": ["26b450:Odin - Skyrim Magic Overhaul.esp"] },
-    "27f2e:Odin - Skyrim Magic Overhaul.esp": { "name": "Ice Shards", "tomes": ["3e090:Odin - Skyrim Magic Overhaul.esp"] },
-    "18c58e:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Daedroth", "tomes": ["1afd1a:Odin - Skyrim Magic Overhaul.esp"] },
-    "1967b9:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Houndmaster", "tomes": ["1afd1b:Odin - Skyrim Magic Overhaul.esp"] },
-    "1a5ad7:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Ursine Familiar", "tomes": ["1afd1e:Odin - Skyrim Magic Overhaul.esp"] },
-    "1916b1:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Dread Shade", "tomes": ["1afd22:Odin - Skyrim Magic Overhaul.esp"] },
-    "224526:Odin - Skyrim Magic Overhaul.esp": { "name": "Discordant Wail", "tomes": ["23897e:Odin - Skyrim Magic Overhaul.esp"] },
-    "1e279f:Odin - Skyrim Magic Overhaul.esp": { "name": "Lightning Grasp", "tomes": ["3db25:Odin - Skyrim Magic Overhaul.esp"] },
-    "1a5aea:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Feline Familiar", "tomes": ["1afd1d:Odin - Skyrim Magic Overhaul.esp"] },
-    "2a304f:Odin - Skyrim Magic Overhaul.esp": { "name": "Firehand", "tomes": ["2a3053:Odin - Skyrim Magic Overhaul.esp"] },
-    "21f3fd:Odin - Skyrim Magic Overhaul.esp": { "name": "Mute", "tomes": ["21f417:Odin - Skyrim Magic Overhaul.esp"] },
-    "27a7b4:Odin - Skyrim Magic Overhaul.esp": { "name": "Dire Corrosion", "tomes": ["293d19:Odin - Skyrim Magic Overhaul.esp"] },
-    "159d8:Odin - Skyrim Magic Overhaul.esp": { "name": "Enervate", "tomes": ["3eb87:Odin - Skyrim Magic Overhaul.esp"] },
-    "1dd699:Odin - Skyrim Magic Overhaul.esp": { "name": "Shockbloom", "tomes": ["26b44c:Odin - Skyrim Magic Overhaul.esp"] },
-    "3e0f:Odin - Skyrim Magic Overhaul.esp": { "name": "Destroy Living", "tomes": ["3eb82:Odin - Skyrim Magic Overhaul.esp"] },
-    "21a2eb:Odin - Skyrim Magic Overhaul.esp": { "name": "Shadow Legion", "tomes": ["21a2f8:Odin - Skyrim Magic Overhaul.esp"] },
-    "1d347b:Odin - Skyrim Magic Overhaul.esp": { "name": "Arctic Blast", "tomes": ["26b446:Odin - Skyrim Magic Overhaul.esp"] },
-    "24e49:Odin - Skyrim Magic Overhaul.esp": { "name": "Charged Storm", "tomes": ["26b44e:Odin - Skyrim Magic Overhaul.esp"] },
-    "1d3482:Odin - Skyrim Magic Overhaul.esp": { "name": "Taldam's Scorcher", "tomes": ["26b445:Odin - Skyrim Magic Overhaul.esp"] },
-    "17b5bb:Odin - Skyrim Magic Overhaul.esp": { "name": "Bravery", "tomes": ["17b5d9:Odin - Skyrim Magic Overhaul.esp"] },
-    "1d8588:Odin - Skyrim Magic Overhaul.esp": { "name": "Firebloom", "tomes": ["26b44a:Odin - Skyrim Magic Overhaul.esp"] },
-    "293d0e:Odin - Skyrim Magic Overhaul.esp": { "name": "Dire Vulnerability", "tomes": ["293d12:Odin - Skyrim Magic Overhaul.esp"] },
-    "1dd697:Odin - Skyrim Magic Overhaul.esp": { "name": "Frostbloom", "tomes": ["26b44b:Odin - Skyrim Magic Overhaul.esp"] },
-    "1d347e:Odin - Skyrim Magic Overhaul.esp": { "name": "Flame Darts", "tomes": ["26b44d:Odin - Skyrim Magic Overhaul.esp"] },
-    "2100d4:Odin - Skyrim Magic Overhaul.esp": { "name": "Dominate", "tomes": ["2100db:Odin - Skyrim Magic Overhaul.esp"] },
-    "1e27a7:Odin - Skyrim Magic Overhaul.esp": { "name": "Thundering Grasp", "tomes": ["3db2c:Odin - Skyrim Magic Overhaul.esp"] },
-    "1d858b:Odin - Skyrim Magic Overhaul.esp": { "name": "Wildfire", "tomes": ["26b44f:Odin - Skyrim Magic Overhaul.esp"] },
-    "17b5b3:Odin - Skyrim Magic Overhaul.esp": { "name": "Rage", "tomes": ["17b5d7:Odin - Skyrim Magic Overhaul.esp"] },
-    "38b6:Dawnguard.esm": { "name": "Vampire's Bane", "tomes": ["3f4d:Dawnguard.esm"] },
-    "7c83b:Odin - Skyrim Magic Overhaul.esp": { "name": "Stormhand", "tomes": ["2a3055:Odin - Skyrim Magic Overhaul.esp"] },
-    "233865:Odin - Skyrim Magic Overhaul.esp": { "name": "Greater Simulacrum", "tomes": ["23386c:Odin - Skyrim Magic Overhaul.esp"] },
-    "229634:Odin - Skyrim Magic Overhaul.esp": { "name": "Crying Eye", "tomes": ["22e73b:Odin - Skyrim Magic Overhaul.esp"] },
-    "20afc9:Odin - Skyrim Magic Overhaul.esp": { "name": "Command", "tomes": ["20afd0:Odin - Skyrim Magic Overhaul.esp"] },
-    "2c169f:Odin - Skyrim Magic Overhaul.esp": { "name": "Hush", "tomes": ["2c16a3:Odin - Skyrim Magic Overhaul.esp"] },
-    "256fce:Odin - Skyrim Magic Overhaul.esp": { "name": "Viperbolt", "tomes": ["2611fa:Odin - Skyrim Magic Overhaul.esp"] },
-    "224524:Odin - Skyrim Magic Overhaul.esp": { "name": "Dirge", "tomes": ["23897f:Odin - Skyrim Magic Overhaul.esp"] },
-    "21f405:Odin - Skyrim Magic Overhaul.esp": { "name": "Wizard Rend", "tomes": ["21f416:Odin - Skyrim Magic Overhaul.esp"] },
-    "289aec:Odin - Skyrim Magic Overhaul.esp": { "name": "Haste Mount", "tomes": ["298e2d:Odin - Skyrim Magic Overhaul.esp"] },
-    "b646:Apocalypse - Magic of Skyrim.esp": { "name": "Drop Zone", "tomes": ["3c51a:Apocalypse - Magic of Skyrim.esp"] },
-    "15e721:Apocalypse - Magic of Skyrim.esp": { "name": "Poisoned Chalice", "tomes": ["15e723:Apocalypse - Magic of Skyrim.esp"] },
-    "133d6:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Honor Guard", "tomes": ["3d5b2:Apocalypse - Magic of Skyrim.esp"] },
-    "27144:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Cat Totem", "tomes": ["3d048:Apocalypse - Magic of Skyrim.esp"] },
-    "12364:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Pit Fighter", "tomes": ["3d049:Apocalypse - Magic of Skyrim.esp"] },
-    "15e73e:Apocalypse - Magic of Skyrim.esp": { "name": "Ice Prism", "tomes": ["16160a:Apocalypse - Magic of Skyrim.esp"] },
-    "1228a8:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Xivilai Sorcerer", "tomes": ["3d04b:Apocalypse - Magic of Skyrim.esp"] },
-    "3789f:Apocalypse - Magic of Skyrim.esp": { "name": "Seidstone", "tomes": ["3e60f:Apocalypse - Magic of Skyrim.esp"] },
-    "128e8:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Herne", "tomes": ["3d5b3:Apocalypse - Magic of Skyrim.esp"] },
-    "85910:Apocalypse - Magic of Skyrim.esp": { "name": "Incendiary Flow", "tomes": ["3db2b:Apocalypse - Magic of Skyrim.esp"] },
-    "7c83b:Apocalypse - Magic of Skyrim.esp": { "name": "Thundercrack", "tomes": ["3db25:Apocalypse - Magic of Skyrim.esp"] },
-    "294cd:Apocalypse - Magic of Skyrim.esp": { "name": "Bolide", "tomes": ["3db27:Apocalypse - Magic of Skyrim.esp"] },
-    "1879:Apocalypse - Magic of Skyrim.esp": { "name": "Electrosphere", "tomes": ["3db28:Apocalypse - Magic of Skyrim.esp"] },
-    "24b44:Apocalypse - Magic of Skyrim.esp": { "name": "Ice Shiv", "tomes": ["3db2a:Apocalypse - Magic of Skyrim.esp"] },
-    "17509:Apocalypse - Magic of Skyrim.esp": { "name": "Curse of the Silent", "tomes": ["3e5ff:Apocalypse - Magic of Skyrim.esp"] },
-    "1f1fb:Apocalypse - Magic of Skyrim.esp": { "name": "Decompose", "tomes": ["3eb8e:Apocalypse - Magic of Skyrim.esp"] },
-    "2878:Apocalypse - Magic of Skyrim.esp": { "name": "Lightning Strike", "tomes": ["3e092:Apocalypse - Magic of Skyrim.esp"] },
-    "294d4:Apocalypse - Magic of Skyrim.esp": { "name": "Bombardment", "tomes": ["3e094:Apocalypse - Magic of Skyrim.esp"] },
-    "159d8:Apocalypse - Magic of Skyrim.esp": { "name": "Ruin", "tomes": ["3eb87:Apocalypse - Magic of Skyrim.esp"] },
-    "3682f:Apocalypse - Magic of Skyrim.esp": { "name": "Illusory Flames", "tomes": ["3e602:Apocalypse - Magic of Skyrim.esp"] },
-    "378a9:Apocalypse - Magic of Skyrim.esp": { "name": "Mind Vision", "tomes": ["3e603:Apocalypse - Magic of Skyrim.esp"] },
-    "12dc:Apocalypse - Magic of Skyrim.esp": { "name": "Nature's Balance", "tomes": ["3eb8c:Apocalypse - Magic of Skyrim.esp"] },
-    "31c4d:Apocalypse - Magic of Skyrim.esp": { "name": "Shadowbond", "tomes": ["3e60a:Apocalypse - Magic of Skyrim.esp"] },
-    "a4ef7:Apocalypse - Magic of Skyrim.esp": { "name": "Empathic Agony", "tomes": ["3e60c:Apocalypse - Magic of Skyrim.esp"] },
-    "378ae:Apocalypse - Magic of Skyrim.esp": { "name": "Mind Control", "tomes": ["3e60d:Apocalypse - Magic of Skyrim.esp"] },
-    "13e4fd:Apocalypse - Magic of Skyrim.esp": { "name": "Leech Seed", "tomes": ["3eb7f:Apocalypse - Magic of Skyrim.esp"] },
-    "3e0f:Apocalypse - Magic of Skyrim.esp": { "name": "Slay Living", "tomes": ["3eb82:Apocalypse - Magic of Skyrim.esp"] },
-    "35452:Apocalypse - Magic of Skyrim.esp": { "name": "Finger of Death", "tomes": ["3eb84:Apocalypse - Magic of Skyrim.esp"] },
-    "2cd7e:Apocalypse - Magic of Skyrim.esp": { "name": "Atronach Mark", "tomes": ["3d043:Apocalypse - Magic of Skyrim.esp"] },
-    "85594:Apocalypse - Magic of Skyrim.esp": { "name": "Blaze", "tomes": ["89709:Apocalypse - Magic of Skyrim.esp"] },
-    "128df:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Champion", "tomes": ["3d5b1:Apocalypse - Magic of Skyrim.esp"] },
-    "88694:Apocalypse - Magic of Skyrim.esp": { "name": "Azure Reconstruction", "tomes": ["89706:Apocalypse - Magic of Skyrim.esp"] },
-    "124ec5:Apocalypse - Magic of Skyrim.esp": { "name": "Summoning Rune", "tomes": ["3d04e:Apocalypse - Magic of Skyrim.esp"] },
-    "2e31:Apocalypse - Magic of Skyrim.esp": { "name": "Undermine", "tomes": ["3c520:Apocalypse - Magic of Skyrim.esp"] },
-    "8558a:Apocalypse - Magic of Skyrim.esp": { "name": "Pale Shadow", "tomes": ["8970c:Apocalypse - Magic of Skyrim.esp"] },
-    "1fcd9:Apocalypse - Magic of Skyrim.esp": { "name": "Welling Blood", "tomes": ["3eb7d:Apocalypse - Magic of Skyrim.esp"] },
-    "12214:Apocalypse - Magic of Skyrim.esp": { "name": "Horrid Wilting", "tomes": ["3eb85:Apocalypse - Magic of Skyrim.esp"] },
-    "36a03:Apocalypse - Magic of Skyrim.esp": { "name": "Lamb of Mara", "tomes": ["3eb7e:Apocalypse - Magic of Skyrim.esp"] },
-    "1a1b79:Apocalypse - Magic of Skyrim.esp": { "name": "Gank", "tomes": ["1a1b7b:Apocalypse - Magic of Skyrim.esp"] },
-    "803f2:Apocalypse - Magic of Skyrim.esp": { "name": "Perilous Path", "tomes": ["3c51b:Apocalypse - Magic of Skyrim.esp"] },
-    "109653:Apocalypse - Magic of Skyrim.esp": { "name": "Crackle", "tomes": ["3db1f:Apocalypse - Magic of Skyrim.esp"] },
-    "15b843:Apocalypse - Magic of Skyrim.esp": { "name": "Silvery Barbs", "tomes": ["15b845:Apocalypse - Magic of Skyrim.esp"] },
-    "37e17:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Deadeye Captain", "tomes": ["3d046:Apocalypse - Magic of Skyrim.esp"] },
-    "43ce1:Apocalypse - Magic of Skyrim.esp": { "name": "Figment of Pain", "tomes": ["3e607:Apocalypse - Magic of Skyrim.esp"] },
-    "15b847:Apocalypse - Magic of Skyrim.esp": { "name": "Hrormir's Misdirection", "tomes": ["15b84c:Apocalypse - Magic of Skyrim.esp"] },
-    "2388c:Apocalypse - Magic of Skyrim.esp": { "name": "Scorching Hands", "tomes": ["3e08f:Apocalypse - Magic of Skyrim.esp"] },
-    "1212eb:Apocalypse - Magic of Skyrim.esp": { "name": "Corpse Explosion", "tomes": ["3d04d:Apocalypse - Magic of Skyrim.esp"] },
-    "1a4a46:Apocalypse - Magic of Skyrim.esp": { "name": "Dust in the Clockwork", "tomes": ["1a4a48:Apocalypse - Magic of Skyrim.esp"] },
-    "58655:Apocalypse - Magic of Skyrim.esp": { "name": "Compelling Whispers", "tomes": ["3e606:Apocalypse - Magic of Skyrim.esp"] },
-    "279bd:Apocalypse - Magic of Skyrim.esp": { "name": "Creeping Cold", "tomes": ["3db22:Apocalypse - Magic of Skyrim.esp"] },
-    "2e25:Apocalypse - Magic of Skyrim.esp": { "name": "Tharn's Prison", "tomes": ["3c524:Apocalypse - Magic of Skyrim.esp"] },
-    "27f2e:Apocalypse - Magic of Skyrim.esp": { "name": "Sleet Storm", "tomes": ["3e090:Apocalypse - Magic of Skyrim.esp"] },
-    "24361:Apocalypse - Magic of Skyrim.esp": { "name": "Dragon's Teeth", "tomes": ["3db21:Apocalypse - Magic of Skyrim.esp"] },
-    "279c0:Apocalypse - Magic of Skyrim.esp": { "name": "Fracture", "tomes": ["3db23:Apocalypse - Magic of Skyrim.esp"] },
-    "253c2:Apocalypse - Magic of Skyrim.esp": { "name": "Rift Bolt", "tomes": ["3db26:Apocalypse - Magic of Skyrim.esp"] },
-    "18ae7:Apocalypse - Magic of Skyrim.esp": { "name": "Oathbound Guardian", "tomes": ["3d5b5:Apocalypse - Magic of Skyrim.esp"] },
-    "32c8b:Apocalypse - Magic of Skyrim.esp": { "name": "Illusory Pyre", "tomes": ["3e609:Apocalypse - Magic of Skyrim.esp"] },
-    "34d12:Apocalypse - Magic of Skyrim.esp": { "name": "Necroplague", "tomes": ["3eb81:Apocalypse - Magic of Skyrim.esp"] },
-    "12359:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Churl", "tomes": ["3d045:Apocalypse - Magic of Skyrim.esp"] },
-    "161621:Apocalypse - Magic of Skyrim.esp": { "name": "Monarch Mark", "tomes": ["161623:Apocalypse - Magic of Skyrim.esp"] },
-    "24e49:Apocalypse - Magic of Skyrim.esp": { "name": "Scattershock", "tomes": ["3db2c:Apocalypse - Magic of Skyrim.esp"] },
-    "17a8e:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Avenging Wraith", "tomes": ["3d041:Apocalypse - Magic of Skyrim.esp"] },
-    "12370:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Xivilai Lord", "tomes": ["3d5b4:Apocalypse - Magic of Skyrim.esp"] },
-    "2e634:Apocalypse - Magic of Skyrim.esp": { "name": "Hailstone", "tomes": ["3db20:Apocalypse - Magic of Skyrim.esp"] },
-    "12649c:Apocalypse - Magic of Skyrim.esp": { "name": "Wither", "tomes": ["3c51e:Apocalypse - Magic of Skyrim.esp"] },
-    "4581c:Apocalypse - Magic of Skyrim.esp": { "name": "Entomb", "tomes": ["3f65b:Apocalypse - Magic of Skyrim.esp"] },
-    "ab69:Apocalypse - Magic of Skyrim.esp": { "name": "Detonate Lock", "tomes": ["3c527:Apocalypse - Magic of Skyrim.esp"] }
+    "10f7ee:Skyrim.esm": { "name": "Thunderbolt", "school": "destruction", "rank": "expert", "tomes": ["10f7f5:Skyrim.esm"] },
+    "35d81:Skyrim.esm": { "name": "Wall of Storms", "school": "destruction", "rank": "expert", "tomes": ["a270b:Skyrim.esm"] },
+    "35d80:Skyrim.esm": { "name": "Wall of Frost", "school": "destruction", "rank": "expert", "tomes": ["a270a:Skyrim.esm"] },
+    "35d7f:Skyrim.esm": { "name": "Wall of Flames", "school": "destruction", "rank": "expert", "tomes": ["a2709:Skyrim.esm"] },
+    "4b146:Skyrim.esm": { "name": "Turn Lesser Undead", "school": "restoration", "rank": "advanced", "tomes": ["a271f:Skyrim.esm"] },
+    "5dd5d:Skyrim.esm": { "name": "Turn Undead", "school": "restoration", "rank": "advanced", "tomes": ["a2721:Skyrim.esm"] },
+    "5dd5e:Skyrim.esm": { "name": "Turn Greater Undead", "school": "restoration", "rank": "expert", "tomes": ["a2729:Skyrim.esm"] },
+    "2dd2a:Skyrim.esm": { "name": "Sparks", "school": "destruction", "rank": "novice", "tomes": ["9cd53:Skyrim.esm"] },
+    "4dba4:Skyrim.esm": { "name": "Soul Trap", "school": "conjuration", "rank": "advanced", "tomes": ["9cd54:Skyrim.esm"] },
+    "4deef:Skyrim.esm": { "name": "Rout", "school": "illusion", "rank": "expert", "tomes": ["a2718:Skyrim.esm"] },
+    "96d94:Skyrim.esm": { "name": "Reanimate Greater Corpse", "school": "conjuration", "rank": "advanced", "tomes": ["a26f2:Skyrim.esm"] },
+    "247c86:Odin - Skyrim Magic Overhaul.esp": { "name": "Toxic Cloud", "school": "restoration", "rank": "expert", "tomes": ["a2726:Skyrim.esm"] },
+    "26121c:Odin - Skyrim Magic Overhaul.esp": { "name": "Black Hand", "school": "restoration", "rank": "advanced", "tomes": ["a2725:Skyrim.esm"] },
+    "65bd7:Skyrim.esm": { "name": "Reanimate Corpse", "school": "conjuration", "rank": "advanced", "tomes": ["a26eb:Skyrim.esm"] },
+    "4deec:Skyrim.esm": { "name": "Rally", "school": "illusion", "rank": "advanced", "tomes": ["a2713:Skyrim.esm"] },
+    "7e8e1:Skyrim.esm": { "name": "Reanimate Lesser Corpse", "school": "conjuration", "rank": "novice", "tomes": ["9e2aa:Skyrim.esm"] },
+    "5ad5f:Skyrim.esm": { "name": "Paralyze", "school": "alteration", "rank": "expert", "tomes": ["a26e8:Skyrim.esm"] },
+    "43323:Skyrim.esm": { "name": "Magelight", "school": "alteration", "rank": "advanced", "tomes": ["a26e2:Skyrim.esm"] },
+    "10f7ed:Skyrim.esm": { "name": "Incinerate", "school": "destruction", "rank": "expert", "tomes": ["10f7f4:Skyrim.esm"] },
+    "10f7ec:Skyrim.esm": { "name": "Icy Spear", "school": "destruction", "rank": "expert", "tomes": ["10f7f3:Skyrim.esm"] },
+    "45f9c:Skyrim.esm": { "name": "Ice Storm", "school": "destruction", "rank": "advanced", "tomes": ["a2707:Skyrim.esm"] },
+    "2b96c:Skyrim.esm": { "name": "Ice Spike", "school": "destruction", "rank": "advanced", "tomes": ["a26fe:Skyrim.esm"] },
+    "12fd2:Skyrim.esm": { "name": "Heal Other", "school": "restoration", "rank": "advanced", "tomes": ["a2727:Skyrim.esm"] },
+    "4d3f2:Skyrim.esm": { "name": "Healing Hands", "school": "restoration", "rank": "advanced", "tomes": ["a271e:Skyrim.esm"] },
+    "4deeb:Skyrim.esm": { "name": "Fury", "school": "illusion", "rank": "novice", "tomes": ["9e2ac:Skyrim.esm"] },
+    "2b96b:Skyrim.esm": { "name": "Frostbite", "school": "destruction", "rank": "novice", "tomes": ["9cd52:Skyrim.esm"] },
+    "4deee:Skyrim.esm": { "name": "Frenzy", "school": "illusion", "rank": "advanced", "tomes": ["a2714:Skyrim.esm"] },
+    "12fcd:Skyrim.esm": { "name": "Flames", "school": "destruction", "rank": "novice", "tomes": ["9cd51:Skyrim.esm"] },
+    "12fd0:Skyrim.esm": { "name": "Firebolt", "school": "destruction", "rank": "advanced", "tomes": ["a26fd:Skyrim.esm"] },
+    "1c789:Skyrim.esm": { "name": "Fireball", "school": "destruction", "rank": "advanced", "tomes": ["a2706:Skyrim.esm"] },
+    "4deea:Skyrim.esm": { "name": "Fear", "school": "illusion", "rank": "advanced", "tomes": ["a2712:Skyrim.esm"] },
+    "6f952:Skyrim.esm": { "name": "Expel Daedra", "school": "conjuration", "rank": "expert", "tomes": ["a26f8:Skyrim.esm"] },
+    "96d95:Skyrim.esm": { "name": "Dread Zombie", "school": "conjuration", "rank": "expert", "tomes": ["a26f7:Skyrim.esm"] },
+    "4dee8:Skyrim.esm": { "name": "Courage", "school": "illusion", "rank": "novice", "tomes": ["9e2ad:Skyrim.esm"] },
+    "204c5:Skyrim.esm": { "name": "Conjure Storm Atronach", "school": "conjuration", "rank": "expert", "tomes": ["a26f0:Skyrim.esm"] },
+    "204c4:Skyrim.esm": { "name": "Conjure Frost Atronach", "school": "conjuration", "rank": "advanced", "tomes": ["a26ef:Skyrim.esm"] },
+    "204c3:Skyrim.esm": { "name": "Conjure Flame Atronach", "school": "conjuration", "rank": "advanced", "tomes": ["a26ec:Skyrim.esm"] },
+    "640b6:Skyrim.esm": { "name": "Conjure Familiar", "school": "conjuration", "rank": "novice", "tomes": ["9e2ab:Skyrim.esm"] },
+    "6f953:Skyrim.esm": { "name": "Command Daedra", "school": "conjuration", "rank": "expert", "tomes": ["a26f6:Skyrim.esm"] },
+    "45f9d:Skyrim.esm": { "name": "Chain Lightning", "school": "destruction", "rank": "advanced", "tomes": ["a2708:Skyrim.esm"] },
+    "4dee9:Skyrim.esm": { "name": "Calm", "school": "illusion", "rank": "advanced", "tomes": ["a2711:Skyrim.esm"] },
+    "6d22c:Skyrim.esm": { "name": "Banish Daedra", "school": "conjuration", "rank": "advanced", "tomes": ["a26ee:Skyrim.esm"] },
+    "2dd29:Skyrim.esm": { "name": "Lightning Bolt", "school": "destruction", "rank": "advanced", "tomes": ["a26ff:Skyrim.esm"] },
+    "17b5c9:Odin - Skyrim Magic Overhaul.esp": { "name": "Panic", "school": "illusion", "rank": "advanced", "tomes": ["17b5db:Odin - Skyrim Magic Overhaul.esp"] },
+    "18c58c:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Clannfear", "school": "conjuration", "rank": "advanced", "tomes": ["1afd19:Odin - Skyrim Magic Overhaul.esp"] },
+    "8558a:Odin - Skyrim Magic Overhaul.esp": { "name": "Simulacrum", "school": "illusion", "rank": "advanced", "tomes": ["21a2f7:Odin - Skyrim Magic Overhaul.esp"] },
+    "247c89:Odin - Skyrim Magic Overhaul.esp": { "name": "Sun Storm", "school": "restoration", "rank": "expert", "tomes": ["261216:Odin - Skyrim Magic Overhaul.esp"] },
+    "27a7b1:Odin - Skyrim Magic Overhaul.esp": { "name": "Corrosion", "school": "alteration", "rank": "advanced", "tomes": ["293d18:Odin - Skyrim Magic Overhaul.esp"] },
+    "173074:Odin - Skyrim Magic Overhaul.esp": { "name": "Vulnerability", "school": "alteration", "rank": "advanced", "tomes": ["275692:Odin - Skyrim Magic Overhaul.esp"] },
+    "17b5c2:Odin - Skyrim Magic Overhaul.esp": { "name": "Soothe", "school": "illusion", "rank": "advanced", "tomes": ["17b5d8:Odin - Skyrim Magic Overhaul.esp"] },
+    "17b5d1:Odin - Skyrim Magic Overhaul.esp": { "name": "Subjugate", "school": "illusion", "rank": "advanced", "tomes": ["17b5da:Odin - Skyrim Magic Overhaul.esp"] },
+    "27569c:Odin - Skyrim Magic Overhaul.esp": { "name": "Purge Magic", "school": "illusion", "rank": "expert", "tomes": ["27569e:Odin - Skyrim Magic Overhaul.esp"] },
+    "2a3051:Odin - Skyrim Magic Overhaul.esp": { "name": "Frosthand", "school": "destruction", "rank": "advanced", "tomes": ["2a3054:Odin - Skyrim Magic Overhaul.esp"] },
+    "d4349:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Gloom Wraith", "school": "conjuration", "rank": "advanced", "tomes": ["d4351:Odin - Skyrim Magic Overhaul.esp"] },
+    "3f52:Dawnguard.esm": { "name": "Sun Fire", "school": "restoration", "rank": "advanced", "tomes": ["3f51:Dawnguard.esm"] },
+    "1e78ad:Odin - Skyrim Magic Overhaul.esp": { "name": "Arctic Frost", "school": "destruction", "rank": "expert", "tomes": ["26b450:Odin - Skyrim Magic Overhaul.esp"] },
+    "27f2e:Odin - Skyrim Magic Overhaul.esp": { "name": "Ice Shards", "school": "destruction", "rank": "advanced", "tomes": ["3e090:Odin - Skyrim Magic Overhaul.esp"] },
+    "18c58e:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Daedroth", "school": "conjuration", "rank": "advanced", "tomes": ["1afd1a:Odin - Skyrim Magic Overhaul.esp"] },
+    "1967b9:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Houndmaster", "school": "conjuration", "rank": "expert", "tomes": ["1afd1b:Odin - Skyrim Magic Overhaul.esp"] },
+    "1a5ad7:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Ursine Familiar", "school": "conjuration", "rank": "expert", "tomes": ["1afd1e:Odin - Skyrim Magic Overhaul.esp"] },
+    "1916b1:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Dread Shade", "school": "conjuration", "rank": "expert", "tomes": ["1afd22:Odin - Skyrim Magic Overhaul.esp"] },
+    "224526:Odin - Skyrim Magic Overhaul.esp": { "name": "Discordant Wail", "school": "illusion", "rank": "advanced", "tomes": ["23897e:Odin - Skyrim Magic Overhaul.esp"] },
+    "1e279f:Odin - Skyrim Magic Overhaul.esp": { "name": "Lightning Grasp", "school": "destruction", "rank": "advanced", "tomes": ["3db25:Odin - Skyrim Magic Overhaul.esp"] },
+    "1a5aea:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Feline Familiar", "school": "conjuration", "rank": "advanced", "tomes": ["1afd1d:Odin - Skyrim Magic Overhaul.esp"] },
+    "2a304f:Odin - Skyrim Magic Overhaul.esp": { "name": "Firehand", "school": "destruction", "rank": "advanced", "tomes": ["2a3053:Odin - Skyrim Magic Overhaul.esp"] },
+    "21f3fd:Odin - Skyrim Magic Overhaul.esp": { "name": "Mute", "school": "illusion", "rank": "advanced", "tomes": ["21f417:Odin - Skyrim Magic Overhaul.esp"] },
+    "27a7b4:Odin - Skyrim Magic Overhaul.esp": { "name": "Dire Corrosion", "school": "alteration", "rank": "expert", "tomes": ["293d19:Odin - Skyrim Magic Overhaul.esp"] },
+    "159d8:Odin - Skyrim Magic Overhaul.esp": { "name": "Enervate", "school": "restoration", "rank": "expert", "tomes": ["3eb87:Odin - Skyrim Magic Overhaul.esp"] },
+    "1dd699:Odin - Skyrim Magic Overhaul.esp": { "name": "Shockbloom", "school": "destruction", "rank": "expert", "tomes": ["26b44c:Odin - Skyrim Magic Overhaul.esp"] },
+    "3e0f:Odin - Skyrim Magic Overhaul.esp": { "name": "Destroy Living", "school": "restoration", "rank": "advanced", "tomes": ["3eb82:Odin - Skyrim Magic Overhaul.esp"] },
+    "21a2eb:Odin - Skyrim Magic Overhaul.esp": { "name": "Shadow Legion", "school": "illusion", "rank": "expert", "tomes": ["21a2f8:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d347b:Odin - Skyrim Magic Overhaul.esp": { "name": "Arctic Blast", "school": "destruction", "rank": "advanced", "tomes": ["26b446:Odin - Skyrim Magic Overhaul.esp"] },
+    "24e49:Odin - Skyrim Magic Overhaul.esp": { "name": "Charged Storm", "school": "destruction", "rank": "advanced", "tomes": ["26b44e:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d3482:Odin - Skyrim Magic Overhaul.esp": { "name": "Taldam's Scorcher", "school": "destruction", "rank": "advanced", "tomes": ["26b445:Odin - Skyrim Magic Overhaul.esp"] },
+    "17b5bb:Odin - Skyrim Magic Overhaul.esp": { "name": "Bravery", "school": "illusion", "rank": "expert", "tomes": ["17b5d9:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d8588:Odin - Skyrim Magic Overhaul.esp": { "name": "Firebloom", "school": "destruction", "rank": "expert", "tomes": ["26b44a:Odin - Skyrim Magic Overhaul.esp"] },
+    "293d0e:Odin - Skyrim Magic Overhaul.esp": { "name": "Dire Vulnerability", "school": "alteration", "rank": "expert", "tomes": ["293d12:Odin - Skyrim Magic Overhaul.esp"] },
+    "1dd697:Odin - Skyrim Magic Overhaul.esp": { "name": "Frostbloom", "school": "destruction", "rank": "expert", "tomes": ["26b44b:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d347e:Odin - Skyrim Magic Overhaul.esp": { "name": "Flame Darts", "school": "destruction", "rank": "advanced", "tomes": ["26b44d:Odin - Skyrim Magic Overhaul.esp"] },
+    "2100d4:Odin - Skyrim Magic Overhaul.esp": { "name": "Dominate", "school": "illusion", "rank": "expert", "tomes": ["2100db:Odin - Skyrim Magic Overhaul.esp"] },
+    "1e27a7:Odin - Skyrim Magic Overhaul.esp": { "name": "Thundering Grasp", "school": "destruction", "rank": "expert", "tomes": ["3db2c:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d858b:Odin - Skyrim Magic Overhaul.esp": { "name": "Wildfire", "school": "destruction", "rank": "expert", "tomes": ["26b44f:Odin - Skyrim Magic Overhaul.esp"] },
+    "17b5b3:Odin - Skyrim Magic Overhaul.esp": { "name": "Rage", "school": "illusion", "rank": "expert", "tomes": ["17b5d7:Odin - Skyrim Magic Overhaul.esp"] },
+    "38b6:Dawnguard.esm": { "name": "Vampire's Bane", "school": "restoration", "rank": "advanced", "tomes": ["3f4d:Dawnguard.esm"] },
+    "7c83b:Odin - Skyrim Magic Overhaul.esp": { "name": "Stormhand", "school": "destruction", "rank": "advanced", "tomes": ["2a3055:Odin - Skyrim Magic Overhaul.esp"] },
+    "233865:Odin - Skyrim Magic Overhaul.esp": { "name": "Greater Simulacrum", "school": "illusion", "rank": "advanced", "tomes": ["23386c:Odin - Skyrim Magic Overhaul.esp"] },
+    "229634:Odin - Skyrim Magic Overhaul.esp": { "name": "Crying Eye", "school": "illusion", "rank": "novice", "tomes": ["22e73b:Odin - Skyrim Magic Overhaul.esp"] },
+    "20afc9:Odin - Skyrim Magic Overhaul.esp": { "name": "Command", "school": "illusion", "rank": "advanced", "tomes": ["20afd0:Odin - Skyrim Magic Overhaul.esp"] },
+    "2c169f:Odin - Skyrim Magic Overhaul.esp": { "name": "Hush", "school": "illusion", "rank": "advanced", "tomes": ["2c16a3:Odin - Skyrim Magic Overhaul.esp"] },
+    "256fce:Odin - Skyrim Magic Overhaul.esp": { "name": "Viperbolt", "school": "restoration", "rank": "advanced", "tomes": ["2611fa:Odin - Skyrim Magic Overhaul.esp"] },
+    "224524:Odin - Skyrim Magic Overhaul.esp": { "name": "Dirge", "school": "illusion", "rank": "expert", "tomes": ["23897f:Odin - Skyrim Magic Overhaul.esp"] },
+    "21f405:Odin - Skyrim Magic Overhaul.esp": { "name": "Wizard Rend", "school": "illusion", "rank": "expert", "tomes": ["21f416:Odin - Skyrim Magic Overhaul.esp"] },
+    "289aec:Odin - Skyrim Magic Overhaul.esp": { "name": "Haste Mount", "school": "alteration", "rank": "advanced", "tomes": ["298e2d:Odin - Skyrim Magic Overhaul.esp"] },
+    "b646:Apocalypse - Magic of Skyrim.esp": { "name": "Drop Zone", "school": "alteration", "rank": "advanced", "tomes": ["3c51a:Apocalypse - Magic of Skyrim.esp"] },
+    "15e721:Apocalypse - Magic of Skyrim.esp": { "name": "Poisoned Chalice", "school": "restoration", "rank": "expert", "tomes": ["15e723:Apocalypse - Magic of Skyrim.esp"] },
+    "133d6:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Honor Guard", "school": "conjuration", "rank": "expert", "tomes": ["3d5b2:Apocalypse - Magic of Skyrim.esp"] },
+    "27144:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Cat Totem", "school": "conjuration", "rank": "advanced", "tomes": ["3d048:Apocalypse - Magic of Skyrim.esp"] },
+    "12364:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Pit Fighter", "school": "conjuration", "rank": "advanced", "tomes": ["3d049:Apocalypse - Magic of Skyrim.esp"] },
+    "15e73e:Apocalypse - Magic of Skyrim.esp": { "name": "Ice Prism", "school": "destruction", "rank": "expert", "tomes": ["16160a:Apocalypse - Magic of Skyrim.esp"] },
+    "1228a8:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Xivilai Sorcerer", "school": "conjuration", "rank": "advanced", "tomes": ["3d04b:Apocalypse - Magic of Skyrim.esp"] },
+    "3789f:Apocalypse - Magic of Skyrim.esp": { "name": "Seidstone", "school": "illusion", "rank": "expert", "tomes": ["3e60f:Apocalypse - Magic of Skyrim.esp"] },
+    "128e8:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Herne", "school": "conjuration", "rank": "expert", "tomes": ["3d5b3:Apocalypse - Magic of Skyrim.esp"] },
+    "85910:Apocalypse - Magic of Skyrim.esp": { "name": "Incendiary Flow", "school": "destruction", "rank": "advanced", "tomes": ["3db2b:Apocalypse - Magic of Skyrim.esp"] },
+    "7c83b:Apocalypse - Magic of Skyrim.esp": { "name": "Thundercrack", "school": "destruction", "rank": "advanced", "tomes": ["3db25:Apocalypse - Magic of Skyrim.esp"] },
+    "294cd:Apocalypse - Magic of Skyrim.esp": { "name": "Bolide", "school": "destruction", "rank": "advanced", "tomes": ["3db27:Apocalypse - Magic of Skyrim.esp"] },
+    "1879:Apocalypse - Magic of Skyrim.esp": { "name": "Electrosphere", "school": "destruction", "rank": "advanced", "tomes": ["3db28:Apocalypse - Magic of Skyrim.esp"] },
+    "24b44:Apocalypse - Magic of Skyrim.esp": { "name": "Ice Shiv", "school": "destruction", "rank": "advanced", "tomes": ["3db2a:Apocalypse - Magic of Skyrim.esp"] },
+    "17509:Apocalypse - Magic of Skyrim.esp": { "name": "Curse of the Silent", "school": "illusion", "rank": "advanced", "tomes": ["3e5ff:Apocalypse - Magic of Skyrim.esp"] },
+    "1f1fb:Apocalypse - Magic of Skyrim.esp": { "name": "Decompose", "school": "restoration", "rank": "expert", "tomes": ["3eb8e:Apocalypse - Magic of Skyrim.esp"] },
+    "2878:Apocalypse - Magic of Skyrim.esp": { "name": "Lightning Strike", "school": "destruction", "rank": "expert", "tomes": ["3e092:Apocalypse - Magic of Skyrim.esp"] },
+    "294d4:Apocalypse - Magic of Skyrim.esp": { "name": "Bombardment", "school": "destruction", "rank": "expert", "tomes": ["3e094:Apocalypse - Magic of Skyrim.esp"] },
+    "159d8:Apocalypse - Magic of Skyrim.esp": { "name": "Ruin", "school": "restoration", "rank": "advanced", "tomes": ["3eb87:Apocalypse - Magic of Skyrim.esp"] },
+    "3682f:Apocalypse - Magic of Skyrim.esp": { "name": "Illusory Flames", "school": "illusion", "rank": "advanced", "tomes": ["3e602:Apocalypse - Magic of Skyrim.esp"] },
+    "378a9:Apocalypse - Magic of Skyrim.esp": { "name": "Mind Vision", "school": "illusion", "rank": "advanced", "tomes": ["3e603:Apocalypse - Magic of Skyrim.esp"] },
+    "12dc:Apocalypse - Magic of Skyrim.esp": { "name": "Nature's Balance", "school": "restoration", "rank": "expert", "tomes": ["3eb8c:Apocalypse - Magic of Skyrim.esp"] },
+    "31c4d:Apocalypse - Magic of Skyrim.esp": { "name": "Shadowbond", "school": "illusion", "rank": "advanced", "tomes": ["3e60a:Apocalypse - Magic of Skyrim.esp"] },
+    "a4ef7:Apocalypse - Magic of Skyrim.esp": { "name": "Empathic Agony", "school": "illusion", "rank": "expert", "tomes": ["3e60c:Apocalypse - Magic of Skyrim.esp"] },
+    "378ae:Apocalypse - Magic of Skyrim.esp": { "name": "Mind Control", "school": "illusion", "rank": "expert", "tomes": ["3e60d:Apocalypse - Magic of Skyrim.esp"] },
+    "13e4fd:Apocalypse - Magic of Skyrim.esp": { "name": "Leech Seed", "school": "restoration", "rank": "advanced", "tomes": ["3eb7f:Apocalypse - Magic of Skyrim.esp"] },
+    "3e0f:Apocalypse - Magic of Skyrim.esp": { "name": "Slay Living", "school": "restoration", "rank": "advanced", "tomes": ["3eb82:Apocalypse - Magic of Skyrim.esp"] },
+    "35452:Apocalypse - Magic of Skyrim.esp": { "name": "Finger of Death", "school": "restoration", "rank": "advanced", "tomes": ["3eb84:Apocalypse - Magic of Skyrim.esp"] },
+    "2cd7e:Apocalypse - Magic of Skyrim.esp": { "name": "Atronach Mark", "school": "conjuration", "rank": "advanced", "tomes": ["3d043:Apocalypse - Magic of Skyrim.esp"] },
+    "85594:Apocalypse - Magic of Skyrim.esp": { "name": "Blaze", "school": "destruction", "rank": "novice", "tomes": ["89709:Apocalypse - Magic of Skyrim.esp"] },
+    "128df:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Champion", "school": "conjuration", "rank": "expert", "tomes": ["3d5b1:Apocalypse - Magic of Skyrim.esp"] },
+    "88694:Apocalypse - Magic of Skyrim.esp": { "name": "Azure Reconstruction", "school": "conjuration", "rank": "novice", "tomes": ["89706:Apocalypse - Magic of Skyrim.esp"] },
+    "124ec5:Apocalypse - Magic of Skyrim.esp": { "name": "Summoning Rune", "school": "conjuration", "rank": "advanced", "tomes": ["3d04e:Apocalypse - Magic of Skyrim.esp"] },
+    "2e31:Apocalypse - Magic of Skyrim.esp": { "name": "Undermine", "school": "alteration", "rank": "advanced", "tomes": ["3c520:Apocalypse - Magic of Skyrim.esp"] },
+    "8558a:Apocalypse - Magic of Skyrim.esp": { "name": "Pale Shadow", "school": "illusion", "rank": "novice", "tomes": ["8970c:Apocalypse - Magic of Skyrim.esp"] },
+    "1fcd9:Apocalypse - Magic of Skyrim.esp": { "name": "Welling Blood", "school": "restoration", "rank": "advanced", "tomes": ["3eb7d:Apocalypse - Magic of Skyrim.esp"] },
+    "12214:Apocalypse - Magic of Skyrim.esp": { "name": "Horrid Wilting", "school": "restoration", "rank": "advanced", "tomes": ["3eb85:Apocalypse - Magic of Skyrim.esp"] },
+    "36a03:Apocalypse - Magic of Skyrim.esp": { "name": "Lamb of Mara", "school": "restoration", "rank": "advanced", "tomes": ["3eb7e:Apocalypse - Magic of Skyrim.esp"] },
+    "1a1b79:Apocalypse - Magic of Skyrim.esp": { "name": "Gank", "school": "conjuration", "rank": "advanced", "tomes": ["1a1b7b:Apocalypse - Magic of Skyrim.esp"] },
+    "803f2:Apocalypse - Magic of Skyrim.esp": { "name": "Perilous Path", "school": "alteration", "rank": "advanced", "tomes": ["3c51b:Apocalypse - Magic of Skyrim.esp"] },
+    "109653:Apocalypse - Magic of Skyrim.esp": { "name": "Crackle", "school": "destruction", "rank": "novice", "tomes": ["3db1f:Apocalypse - Magic of Skyrim.esp"] },
+    "15b843:Apocalypse - Magic of Skyrim.esp": { "name": "Silvery Barbs", "school": "illusion", "rank": "novice", "tomes": ["15b845:Apocalypse - Magic of Skyrim.esp"] },
+    "37e17:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Deadeye Captain", "school": "conjuration", "rank": "advanced", "tomes": ["3d046:Apocalypse - Magic of Skyrim.esp"] },
+    "43ce1:Apocalypse - Magic of Skyrim.esp": { "name": "Figment of Pain", "school": "illusion", "rank": "advanced", "tomes": ["3e607:Apocalypse - Magic of Skyrim.esp"] },
+    "15b847:Apocalypse - Magic of Skyrim.esp": { "name": "Hrormir's Misdirection", "school": "illusion", "rank": "expert", "tomes": ["15b84c:Apocalypse - Magic of Skyrim.esp"] },
+    "2388c:Apocalypse - Magic of Skyrim.esp": { "name": "Scorching Hands", "school": "destruction", "rank": "expert", "tomes": ["3e08f:Apocalypse - Magic of Skyrim.esp"] },
+    "1212eb:Apocalypse - Magic of Skyrim.esp": { "name": "Corpse Explosion", "school": "conjuration", "rank": "advanced", "tomes": ["3d04d:Apocalypse - Magic of Skyrim.esp"] },
+    "1a4a46:Apocalypse - Magic of Skyrim.esp": { "name": "Dust in the Clockwork", "school": "restoration", "rank": "advanced", "tomes": ["1a4a48:Apocalypse - Magic of Skyrim.esp"] },
+    "58655:Apocalypse - Magic of Skyrim.esp": { "name": "Compelling Whispers", "school": "illusion", "rank": "advanced", "tomes": ["3e606:Apocalypse - Magic of Skyrim.esp"] },
+    "279bd:Apocalypse - Magic of Skyrim.esp": { "name": "Creeping Cold", "school": "destruction", "rank": "advanced", "tomes": ["3db22:Apocalypse - Magic of Skyrim.esp"] },
+    "2e25:Apocalypse - Magic of Skyrim.esp": { "name": "Tharn's Prison", "school": "alteration", "rank": "advanced", "tomes": ["3c524:Apocalypse - Magic of Skyrim.esp"] },
+    "27f2e:Apocalypse - Magic of Skyrim.esp": { "name": "Sleet Storm", "school": "destruction", "rank": "expert", "tomes": ["3e090:Apocalypse - Magic of Skyrim.esp"] },
+    "24361:Apocalypse - Magic of Skyrim.esp": { "name": "Dragon's Teeth", "school": "destruction", "rank": "advanced", "tomes": ["3db21:Apocalypse - Magic of Skyrim.esp"] },
+    "279c0:Apocalypse - Magic of Skyrim.esp": { "name": "Fracture", "school": "destruction", "rank": "advanced", "tomes": ["3db23:Apocalypse - Magic of Skyrim.esp"] },
+    "253c2:Apocalypse - Magic of Skyrim.esp": { "name": "Rift Bolt", "school": "destruction", "rank": "advanced", "tomes": ["3db26:Apocalypse - Magic of Skyrim.esp"] },
+    "18ae7:Apocalypse - Magic of Skyrim.esp": { "name": "Oathbound Guardian", "school": "conjuration", "rank": "expert", "tomes": ["3d5b5:Apocalypse - Magic of Skyrim.esp"] },
+    "32c8b:Apocalypse - Magic of Skyrim.esp": { "name": "Illusory Pyre", "school": "illusion", "rank": "advanced", "tomes": ["3e609:Apocalypse - Magic of Skyrim.esp"] },
+    "34d12:Apocalypse - Magic of Skyrim.esp": { "name": "Necroplague", "school": "restoration", "rank": "advanced", "tomes": ["3eb81:Apocalypse - Magic of Skyrim.esp"] },
+    "12359:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Churl", "school": "conjuration", "rank": "advanced", "tomes": ["3d045:Apocalypse - Magic of Skyrim.esp"] },
+    "161621:Apocalypse - Magic of Skyrim.esp": { "name": "Monarch Mark", "school": "conjuration", "rank": "expert", "tomes": ["161623:Apocalypse - Magic of Skyrim.esp"] },
+    "24e49:Apocalypse - Magic of Skyrim.esp": { "name": "Scattershock", "school": "destruction", "rank": "advanced", "tomes": ["3db2c:Apocalypse - Magic of Skyrim.esp"] },
+    "17a8e:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Avenging Wraith", "school": "conjuration", "rank": "expert", "tomes": ["3d041:Apocalypse - Magic of Skyrim.esp"] },
+    "12370:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Xivilai Lord", "school": "conjuration", "rank": "expert", "tomes": ["3d5b4:Apocalypse - Magic of Skyrim.esp"] },
+    "2e634:Apocalypse - Magic of Skyrim.esp": { "name": "Hailstone", "school": "destruction", "rank": "novice", "tomes": ["3db20:Apocalypse - Magic of Skyrim.esp"] },
+    "12649c:Apocalypse - Magic of Skyrim.esp": { "name": "Wither", "school": "alteration", "rank": "advanced", "tomes": ["3c51e:Apocalypse - Magic of Skyrim.esp"] },
+    "4581c:Apocalypse - Magic of Skyrim.esp": { "name": "Entomb", "school": "alteration", "rank": "expert", "tomes": ["3f65b:Apocalypse - Magic of Skyrim.esp"] },
+    "ab69:Apocalypse - Magic of Skyrim.esp": { "name": "Detonate Lock", "school": "alteration", "rank": "expert", "tomes": ["3c527:Apocalypse - Magic of Skyrim.esp"] }
   };
   // ==== end STAFF_SPELLS ====
-
-  // The half that makes staves, in the rules' spelling.
-  var HALF = 'bladebinder';
 
   function own(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
 
@@ -36058,6 +36405,44 @@ log('gamemode loaded:',
     return own(STAFF_SPELLS, spellDesc) && (STAFF_SPELLS[spellDesc].tomes || []).length > 0;
   }
 
+  function isStaffSpell(spellDesc) { return own(STAFF_SPELLS, spellDesc); }
+
+  /*
+    THE RANK OF A STAFF SPELL (#1128). A spell the rulebook's SPELLS lists is
+    the book's, rank and all, the same rule the tomes block keeps; any other
+    takes the rank Build-RecipeTable read out of the game's records (the half
+    cost perk, then the effects), written beside it in STAFF_SPELLS. null when
+    neither can say, and nobody can unlock a spell whose rank cannot be read.
+  */
+  function rankOf(spellDesc) {
+    if (!own(STAFF_SPELLS, spellDesc)) { return null; }
+    var P = g.__thornswoodProgression;
+    var listed = (P && P.spellByDesc) ? P.spellByDesc(spellDesc) : null;
+    if (listed) { return listed.rank; }
+    return STAFF_SPELLS[spellDesc].rank || null;
+  }
+
+  /** A staff spell as the rules take it: { desc, name, rank }, or null. */
+  function spellFor(spellDesc) {
+    if (!own(STAFF_SPELLS, spellDesc)) { return null; }
+    return { desc: spellDesc, name: spellName(spellDesc), rank: rankOf(spellDesc) };
+  }
+
+  /** A staff spell by its desc or by its name as somebody typed it, or null. */
+  function find(words) {
+    var want = String(words || '').trim();
+    if (!want) { return null; }
+    if (own(STAFF_SPELLS, want)) { return spellFor(want); }
+    var lower = want.toLowerCase();
+    for (var sp in STAFF_SPELLS) {
+      if (own(STAFF_SPELLS, sp) && sp.toLowerCase() === lower) { return spellFor(sp); }
+    }
+    for (var sp2 in STAFF_SPELLS) {
+      if (own(STAFF_SPELLS, sp2) && String(STAFF_SPELLS[sp2].name || '').toLowerCase() === lower) { return spellFor(sp2); }
+    }
+    return null;
+  }
+
   /** The staff spells recorded on this character state, as a fresh array. */
   function known(state) {
     var list = state && state.staffSpells;
@@ -36066,21 +36451,64 @@ log('gamemode loaded:',
 
   function knows(state, spellDesc) { return known(state).indexOf(spellDesc) !== -1; }
 
-  /** May this character learn staff spells: anybody who may make a staff. */
-  function canLearn(P, state) { return !!(state && P.rankOf(state, HALF)); }
+  /**
+    An Enchanter unlocks a staff spell on K (/pick staffspell <name>). words
+    is the spell's desc or its name. Pure: { ok, state, spell } or
+    { ok: false, why, missing }.
+  */
+  function unlock(P, state, words) {
+    var spell = find(words);
+    if (!spell) { return { ok: false, why: 'no staff binds a spell called ' + String(words || '').trim() }; }
+    if (!spell.rank) { return { ok: false, why: 'nobody can unlock ' + spell.name + ' yet, because its rank cannot be read' }; }
+    var r = P.pickStaffSpell(state, spell, rankOf);
+    if (r.ok) { r.spell = spell; }
+    return r;
+  }
 
   /**
-    The state after reading a tome that teaches spellDesc. Pure: it is handed
-    the rules and a state and gives back { ok, state } or { ok: false, why }.
+    Somebody a Master Enchanter taught reads the tome of a staff spell: the
+    non-mage rules (P.learnStaffFromTome). Pure, the same answer as unlock.
   */
   function learn(P, state, spellDesc) {
-    if (!spellDesc) { return { ok: false, why: 'not a staff spell' }; }
-    if (!canLearn(P, state)) { return { ok: false, why: 'may not make staves' }; }
-    if (knows(state, spellDesc)) { return { ok: false, why: 'already known' }; }
-    var s = P.clone(state);
-    s.staffSpells = known(s);
-    s.staffSpells.push(spellDesc);
-    return { ok: true, state: s };
+    var spell = spellFor(spellDesc);
+    if (!spell) { return { ok: false, why: 'not a staff spell' }; }
+    if (!spell.rank) { return { ok: false, why: 'nobody can learn ' + spell.name + ' for staves yet, because its rank cannot be read' }; }
+    var r = P.learnStaffFromTome(state, spell, rankOf);
+    if (r.ok) { r.spell = spell; }
+    return r;
+  }
+
+  /*
+    THE STAFF SPELL PAGE ON K, for an Enchanter, and null for anybody else.
+
+      { points: n, rank: '<their Bladebinder rank>', mine: [desc, ...],
+        spells: [[desc, name, rank], ...] }
+
+    spells is every staff spell whose rank can be read, Novice first, then by
+    name: 160 short rows, sent only to an Enchanter and only when the panel
+    changes. The page draws it the way it draws a mage's spell book and sends
+    back '/pick staffspell <desc>' for each one marked.
+  */
+  var pageRows = null;
+  function view(P, state) {
+    if (!state || !P || !P.isEnchanter || !P.isEnchanter(state)) { return null; }
+    if (!pageRows) {
+      var order = { novice: 0, advanced: 1, expert: 2, master: 3 };
+      var rows = [];
+      for (var sp in STAFF_SPELLS) {
+        if (!own(STAFF_SPELLS, sp)) { continue; }
+        var rk = rankOf(sp);
+        if (!rk || !own(order, rk)) { continue; }
+        rows.push([sp, spellName(sp), rk]);
+      }
+      rows.sort(function (a, b) {
+        if (order[a[2]] !== order[b[2]]) { return order[a[2]] - order[b[2]]; }
+        return a[1] < b[1] ? -1 : (a[1] > b[1] ? 1 : 0);
+      });
+      pageRows = rows;
+    }
+    return { points: P.staffPoints(state), rank: P.rankOf(state, P.STAFF_HALF) || 'novice',
+             mine: known(state), spells: pageRows };
   }
 
   /** null when this state may bind this row's spell, otherwise the sentence. */
@@ -36089,17 +36517,29 @@ log('gamemode loaded:',
     var made = aWord(row.name || 'staff');
     made = made.charAt(0).toUpperCase() + made.slice(1);
     var name = spellName(row.spell);
+    var rk = rankOf(row.spell);
+    if (!rk) {
+      return made + ' binds ' + name + ', and its rank cannot be read, so nobody can make one yet.';
+    }
+    var P = g.__thornswoodProgression;
+    if (P && P.isEnchanter && P.isEnchanter(state)) {
+      return made + ' binds ' + name + ', and you have not unlocked it for staves yet. ' +
+             'Press K and unlock it under Staff spells: it takes a staff spell point, ' +
+             rk.charAt(0).toUpperCase() + rk.slice(1) +
+             ' rank as a Bladebinder, and a staff spell of the rank below. No tome is needed.';
+    }
     if (!taught(row.spell)) {
-      return made + ' binds ' + name + ', and no spell tome here teaches it, so nobody can make one yet.';
+      return made + ' binds ' + name + ', and no spell tome here teaches it, so only an Enchanter can unlock it.';
     }
     return made + ' binds ' + name + ', and you have not learned it for staves yet. ' +
-           'Read a spell tome of ' + name + ' once you meet its Mage rules (a spell point, ' +
-           'the rank in its school and a spell of the rank below) and you can make it.';
+           'Read a spell tome of ' + name + ': somebody a Master Enchanter taught learns Novice staff spells ' +
+           'from their tomes, up to ' + ((P && P.TABLE && P.TABLE.limits.outsiderSpells) || 2) + ' of them.';
   }
 
   g.__thornswoodStaffSpells = {
     STAFF_SPELLS: STAFF_SPELLS, spellForTome: spellForTome, known: known, knows: knows,
-    canLearn: canLearn, learn: learn, refusal: refusal
+    isStaffSpell: isStaffSpell, rankOf: rankOf, spellFor: spellFor, find: find,
+    unlock: unlock, learn: learn, view: view, refusal: refusal
   };
 })();
 
