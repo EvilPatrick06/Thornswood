@@ -311,11 +311,21 @@
                : '#8d857a';                // cannot speak at all
     var word = usable ? modeOf(myMode).label.toUpperCase() : 'LISTENING ONLY';
 
-    b.className = live ? 'tw-live' : '';
-    b.style.opacity = live ? '1' : (usable ? '.72' : '.5');
-    b.innerHTML = micSvg(colour) +
-                  '<span class="tw-word" style="color:' + colour + '">' +
-                  word + '</span>';
+    /*
+      ONLY WHAT CHANGED IS WRITTEN (#963). draw() comes here every 300 ms while
+      anybody is connected and on every relay answer, and the microphone reads
+      the same for minutes at a time. Rewriting the svg each pass rebuilt it
+      and repainted the game's browser layer for nothing.
+    */
+    var cls = live ? 'tw-live' : '';
+    // Written as the browser reads them back, so the comparison holds.
+    var op = live ? '1' : (usable ? '0.72' : '0.5');
+    var html = micSvg(colour) +
+               '<span class="tw-word" style="color:' + colour + '">' +
+               word + '</span>';
+    if (b.className !== cls) { b.className = cls; }
+    if (b.style.opacity !== op) { b.style.opacity = op; }
+    if (b.__twHtml !== html) { b.__twHtml = html; b.innerHTML = html; }
   }
 
   function esc(s) {
@@ -346,7 +356,7 @@
       is what decides how loud they sound. Only the drawing is gone.
     */
     var b = overlay();
-    if (b) { b.style.display = 'none'; b.innerHTML = ''; }
+    if (b && (b.style.display !== 'none' || b.innerHTML !== '')) { b.style.display = 'none'; b.innerHTML = ''; }
   }
 
   // ------------------------------------------------------------- the mic ----
