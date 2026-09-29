@@ -328,8 +328,11 @@ SIX.forEach(function (d) {
   const bl = read('scripts/release/Build-Launcher.ps1') || '';
   const boot = read('installer/setup/Bootstrap.cs') || '';
   const held = files('installer/setup').filter(function (f) { return f !== 'README.md'; });
-  yes('installer' + BS + 'setup: holds the one file its README says, Bootstrap.cs (' + held.join(', ') + ')',
-      held.length === 1 && held[0] === 'Bootstrap.cs');
+  // Setup.manifest since issue #463: the setup program's own application
+  // manifest (per-monitor DPI, asInvoker), embedded by Build-Launcher.ps1.
+  yes('installer' + BS + 'setup: holds the two files its README says, Bootstrap.cs and Setup.manifest (' + held.join(', ') + ')',
+      held.length === 2 && held.indexOf('Bootstrap.cs') >= 0 && held.indexOf('Setup.manifest') >= 0 &&
+      t.indexOf('`Bootstrap.cs`') >= 0 && t.indexOf('`Setup.manifest`') >= 0);
   yes('installer' + BS + 'setup: Build-Launcher.ps1 compiles Bootstrap.cs by name into setup-stub.exe',
       bl.indexOf("'.." + BS + ".." + BS + "installer" + BS + "setup" + BS + "Bootstrap.cs'") >= 0 && bl.indexOf("setup-stub.exe'") >= 0 &&
       t.indexOf('setup-stub.exe') >= 0);
