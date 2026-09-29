@@ -18,6 +18,11 @@
   Club form id without declaring the master, and it cannot see a mesh or a
   texture that only ships with the upgrade. Those need xEdit and a pair of
   eyes. A clean run here is a floor, not a ceiling, and the message says so.
+  The first of those now has its own check (#479): a form id can only point
+  into a file its plugin declares, so the undeclared case is a plugin pointing
+  at one of the Creation Club records Bethesda keeps in Update.esm, and
+  scripts\mods\Check-CreationForms.js reads every record of every plugin for
+  that, and the gamemode's tables too. The mesh and texture case is still eyes.
 
   _ResourcePack.esl is NOT a cut candidate. Bethesda's own free update
   1.6.1130 put it and its archive in every Data folder, and Skyrim.ccc names
@@ -182,11 +187,12 @@ if ($bad) {
 
 Say '  Special Edition is enough for everything in this load order.' 'Green'
 Write-Host ''
-Say '  What this could NOT check, and nothing automatic can:' 'DarkGray'
-Say '    a plugin using a Creation Club form id without declaring the master' 'DarkGray'
-Say '    a mesh or texture that only ships with the upgrade' 'DarkGray'
-Say '  Those need xEdit over the order and somebody looking. A clean run here' 'DarkGray'
-Say '  is the floor, not the ceiling.' 'DarkGray'
+Say '  What this does NOT check:' 'DarkGray'
+Say '    a plugin pointing at a Creation Club record without declaring a master:' 'DarkGray'
+Say '      node scripts\mods\Check-CreationForms.js reads every record for that' 'DarkGray'
+Say '    a mesh or texture that only ships with the upgrade: nothing automatic can.' 'DarkGray'
+Say '  That last one needs somebody looking, in a playtest on a machine with no' 'DarkGray'
+Say '  Creation Club files. A clean run here is the floor, not the ceiling.' 'DarkGray'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 exit 0
