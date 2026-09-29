@@ -132,6 +132,33 @@ and otherwise which profession halves may, from which rank. `craftAnswer`
 (`gamemode.js:9834`) then checks the recipe in `RECIPES_BY_ID`, and
 `raceGate` (`gamemode.js:9718`) the race lock on a people's own dress.
 
+## Spells, tomes and staff spells
+
+The rules are in progression and the three blocks after the character block.
+
+- **A mage's spells.** Spell points are `spells.points` (two to start, one per
+  rank of a school, two at Master). `pickSpell` (K panel, `/pick spell`) and
+  `learnFromTome` (reading a tome) ask the same three things: a point, the
+  rank in the spell's school, and a spell of that school one rank down.
+  Somebody a Master mage taught (`teach`) holds `LIMITS.outsiderSpells`
+  places instead of points, and their school never leaves Novice.
+- **Spell tomes** (`thornswood spell tomes`). `mp.onReadBook` asks `read`,
+  which resolves the tome's spell from the records and runs `learnFromTome`;
+  answering false keeps the tome and takes the spell back.
+- **Staff spells** (`thornswood staff spells`, #1128). What a staff binds is
+  unlocked into `staffSpells` (spell descs), and `craftAnswer` refuses a staff
+  whose spell is not there. An Enchanter unlocks on K with staff spell points
+  (`staffPoints`: two to start, one per Bladebinder rank, two at Master),
+  their Bladebinder rank capping the spell's rank and a staff spell of the
+  rank below needed (`pickStaffSpell`, `/pick staffspell <desc or name>`), no
+  tome. Somebody a Master Bladebinder taught learns one only from its tome,
+  under `LIMITS.outsiderSpells` and Novice only (`learnStaffFromTome`). Each
+  staff spell's rank is the rulebook's when `SPELLS` lists it, else the one
+  `Build-RecipeTable.ps1` read from the records into `STAFF_SPELLS`. An
+  unlocked staff spell is put on the character with `spellOn` (and again on
+  every spawn in `grantKnown`), because Skyrim's crafting menu lists a staff
+  only for somebody who knows its spell.
+
 ## Property, offices, rent and gold
 
 The register is `private\property.json` (`registerPath`, `gamemode.js:14529`;
@@ -227,6 +254,7 @@ because each reads the one before.
 | `HARVESTS_BY_BASE` 5341-5454, `FISH_BY_BASE` 5509-5528, `GAME_BY_BASE` 5644-5655, `CROPS_BY_BASE` 5901-5920 | `Build-HarvestTable.ps1` | `harvests.json` | `Build-HarvestTable.ps1:2302-2479` |
 | `HUNTS_BY_BASE` 6491-6857 | `Build-HuntTable.ps1` | `hunts.json` | `Build-HuntTable.ps1:1603-1619` |
 | `RECIPES_BY_ID` 7549-9499 | `Build-RecipeTable.ps1` | `recipes.json` | `Build-RecipeTable.ps1:5093-5095` |
+| `STAFF_SPELLS` (staff spells block) | `Build-RecipeTable.ps1`, with each spell's school and rank | none | the STAFF_SPELLS markers |
 | `BUILDING_BY_DOOR` 9575-9582, `BUILDING_NAME` 9584-9590, `WAY_OUT` 9592-9599 | `Build-DoorTable.py` | `doors.json` | `Build-DoorTable.py:450-483` |
 | `BENCH_BY_BASE` 9627-9633, `BENCH_ACCESS` 9635-9736 | `Build-BenchTable.py`, from `recipes.json` | none | `Build-BenchTable.py:362-376` |
 | `SPELL_IDS` 11826-11930 | `Build-SpellTable.ps1` | `spells.json` | `Build-SpellTable.ps1:622-628` |
@@ -274,7 +302,7 @@ These read `gamemode.js`, most by running one block against a stubbed `mp`.
 | Logging and identity | `test-thornswood-log.js`, `test-gamemode-id.js`, `test-build-stamp.ps1` |
 | Chargen and arrival | `test-arrivals.js`, `test-arrival-line.js`, `test-creation-close.js`, `test-creation-lines.js`, `test-creation-quiet.js`, `test-new-character.js`, `test-stuck-in-the-hall.js` |
 | Gathering and mining | `test-deposit.js`, `test-chopping-gate.js`, `test-cooldown-sweep.js`, `test-mine-buildings.js`, `test-farming.js` |
-| Crafting and rules | `test-rulebook.js`, `test-nobody-makes.js`, `test-race-gate.js`, `test-race-table.js`, `test-recipeless-craft.js`, `test-bard-instruments.js`, `test-staff-spells.js`, `test-spell-tomes.js` |
+| Crafting and rules | `test-rulebook.js`, `test-nobody-makes.js`, `test-race-gate.js`, `test-race-table.js`, `test-recipeless-craft.js`, `test-bard-instruments.js`, `test-staff-spells.js`, `test-spell-tomes.js`, `test-enchanter-staff-spells.js`, `test-classes-page.js` |
 | Property and economy | `test-deed-title.js`, `test-locks.js`, `test-key-chain.js`, `test-mold-key.js`, `test-cut-key.js`, `test-offices.js`, `test-coffers.js`, `test-boards.js`, `test-unpin.js`, `test-spoils.js`, `test-one-mint.js` |
 | Needs | `test-needs.js`, `test-temp.js`, `test-food-table.js`, `test-hud.js` |
 | Chat, commands, door | `test-command-ack.js`, `test-held-commands.js`, `test-help.js`, `test-tp.js`, `test-dice.js`, `test-door.js`, `test-allowed-failed.js`, `test-audit-handlers.js` |

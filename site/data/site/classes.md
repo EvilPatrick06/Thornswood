@@ -166,8 +166,34 @@ spell anyway, mage or not, Enchanter or not. Reading one asks three things:
   Novice spell needs none.
 
 If any of the three is missing, nothing is learned, you keep the tome, and the
-line in chat says which ones. An Enchanter learns the spell a staff binds the
-same way, and only then can make that staff.
+line in chat says which ones. What a staff binds is not learned this way: see
+Staff spells, below.
+
+### Staff spells
+
+A staff binds one spell, and a staff enchanter only makes the staff for
+somebody who has unlocked that spell for staves. Enchanters do it the way a
+mage learns spells, with points of their own and no tome:
+
+- **A staff spell point** to spend. An Enchanter starts with two, earns one
+  with every Bladebinder rank, and two more at Master.
+- **The rank.** Your Bladebinder rank decides how high you can go: a Novice
+  unlocks Novice staff spells, an Advanced one Advanced, and so on up to
+  Master. Bladebinders climb it as their own half; a Wardweaver holds it as
+  the sister half, at Novice until a Master Bladebinder takes them on.
+- **A staff spell from the rank below**, already unlocked. A Novice one needs
+  none.
+
+Press K and open **Staff spells**, mark the ones you want, and press Unlock.
+If one of the three is missing, nothing is spent and the line says which.
+
+Somebody who is not an Enchanter can only have staff spells the way a
+non-mage has magic. A Master Bladebinder has to teach them first, which is one
+of their two other trades. Then they learn a staff spell from its tome, it
+takes one of their places, they hold two at most, and only Novice ones.
+
+An unlocked staff spell is on your character as a spell too, because Skyrim's
+crafting menu lists a staff only for somebody who knows its spell.
 
 ## Classes
 
