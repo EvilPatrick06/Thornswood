@@ -9,7 +9,7 @@
       . .\Write-BotToken.ps1
       Write-ThornswoodBotToken -Token $t -BotEnv C:\Thornswood-Bot\bot.env.json -SiteConfig C:\Thornswood-Docs\config.json
       Get-ThornswoodBotTokenState -BotEnv ... -SiteConfig ...
-      Restart-ThornswoodBot -Root C:\Thornswood-Bot -Task 'Thornswood Bot'
+      Restart-ThornswoodBot -Root C:\Thornswood-Bot -Service ThornswoodBot
       Restart-ThornswoodSite -Root C:\Thornswood-Docs -Task 'Thornswood Docs'
 
   WHY. The token lives in two files on the VPS, and two programs read it:
@@ -232,20 +232,17 @@ function Get-ThornswoodLogLength([string]$Log) {
   return 0
 }
 
-# The same stop and start as Install-Bot.ps1 -CodeOnly, then the bot's own
-# lines from this start: "up as" is who it logged in as, and "watching N
-# server(s)" is it connected.
-function Restart-ThornswoodBot([string]$Root, [string]$Task, [int]$WaitSeconds = 60) {
-  $leaf = Split-Path -Leaf $Root
+# The bot's service restarted by its name (issue #465; Install-Bot.ps1 puts
+# it there), then the bot's own lines from this start: "up as" is who it
+# logged in as, and "watching N server(s)" is it connected. Stopping the
+# service stops python and anything it started, so nothing is looked for by
+# its command line. Restart-Service starts a service that was stopped.
+function Restart-ThornswoodBot([string]$Root, [string]$Service = 'ThornswoodBot', [int]$WaitSeconds = 60) {
   $log = Join-Path $Root 'bot.log'
   $before = Get-ThornswoodLogLength $log
   $out = @()
-  Get-CimInstance Win32_Process |
-    Where-Object { $_.Name -like 'python*' -and $_.CommandLine -like ('*' + $leaf + '*') } |
-    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }
-  Start-Sleep -Seconds 2
-  Stop-ScheduledTask -TaskName $Task -EA SilentlyContinue
-  Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
+  try { Restart-Service -Name $Service -Force -ErrorAction Stop }
+  catch { return @('BOT NOT RESTARTED: the service ' + $Service + ' would not restart (' + $_.Exception.Message + '). Install-Bot.ps1 puts it on the box.') }
   $up = $false
   for ($i = 0; $i -lt $WaitSeconds; $i += 2) {
     Start-Sleep -Seconds 2

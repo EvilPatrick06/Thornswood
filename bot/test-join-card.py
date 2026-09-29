@@ -298,11 +298,11 @@ for ln in lines:
     if re.search(r'&\s*scp\b', ln):
         m = re.search(r':(\$[^"\s]+)"', ln)
         dests.append(m.group(1) if m else ln.strip())
-# roll-log.ps1 is the log roller Install-Bot sends beside the bot (entry 220,
-# log rotation). It is a script, not the record, and I4 below still refuses
-# any write that names joins.json.
+# service/BotService.cs is the source of the Windows service the bot runs
+# under (issue #465), which replaced roll-log.ps1 here. It is a program, not
+# the record, and I4 below still refuses any write that names joins.json.
 allowed = ['$Root/$f', '$Root/staff-channel.txt', '$Root/assets/join-card.png',
-           '$Root/roll-log.ps1', '$far']
+           '$Root/service/BotService.cs', '$far']
 yes('I2 every file Install-Bot copies up lands on a name it chose, none of '
     'them joins.json (got %r)' % (dests,),
     bool(dests) and all(d in allowed for d in dests))

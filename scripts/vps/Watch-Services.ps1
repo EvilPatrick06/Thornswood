@@ -58,7 +58,9 @@
     bot       a python process is alive with the bot script in its command line.
               And its heartbeat, heartbeat.json beside bot.py, says it is on
               Discord: a bot hung or off Discord for ten minutes while its
-              process runs is told about, not restarted for (issue #449)
+              process runs is down too (issue #449). The bot is the Windows
+              service ThornswoodBot (issue #465), so either way it is
+              restarted by that name, under the same three an hour
     dev game  answers on 7788, the dev server's resources port
     dev voice answers on 7789
     disk      free space on C:, which every one of the above shares. Under
@@ -226,9 +228,10 @@ function BotAlive() {
 # handled something Discord sent it. More than $beatStale seconds of any of
 # those going quiet is the bot being down while its process is alive.
 #
-# That is told about and not restarted for, like a failed health check: the
-# only way to stop a running bot today is to kill python by its command line
-# (issue #465), and that belongs to a proper service, not to this.
+# Since issue #465 the bot is the service ThornswoodBot, which stops python
+# and everything it started when it is stopped, so a hung bot is restarted by
+# that name like a bot whose process is gone, under the same three restarts
+# an hour. Nothing here reads a command line to stop anything.
 #
 # No file at all says nothing either way: that is a bot from before this
 # went in, and the process check above is all there is for it.
@@ -417,7 +420,10 @@ function HowWords($c, $how) {
   switch ($how) {
     'back'    { return 'The watchdog restarted it and it answered again. If it stays up, a message saying it is back follows in about ten minutes.' }
     'stuck'   { return 'The watchdog restarted it and it is still not answering. It tries every five minutes, three times an hour at most, then leaves it for a person.' }
-    'refused' { return ('Windows would not start its task, ' + $c.Task + ', which usually means the task is missing or was renamed. It needs a person.') }
+    'refused' {
+      if ($c.ContainsKey('Svc')) { return ('Windows would not restart its service, ' + $c.Svc + ', which usually means the service is not installed. It needs a person.') }
+      return ('Windows would not start its task, ' + $c.Task + ', which usually means the task is missing or was renamed. It needs a person.')
+    }
     'gaveup'  { return 'The watchdog has restarted it three times this hour and has stopped trying. It needs a person.' }
     'soft'    { return 'It is still running, so the watchdog does not restart it for this. It may be hung. It needs a person.' }
     default   { return 'Nothing restarts this by itself. It needs a person.' }
@@ -598,7 +604,8 @@ $checks = @(
   @{ Name = 'website'; Task = 'Thornswood Docs';   Port = 3001; Say = 'The website''s app'; Health = 'http://127.0.0.1:3001/api/public' },
   @{ Name = 'game';    Task = 'Thornswood Server'; Port = 3000; Say = 'The live game server'; Health = 'http://127.0.0.1:3000/api/servers/thornswood/manifest.json' },
   @{ Name = 'voice';   Task = 'Thornswood Voice';  Port = 7778; Say = 'Live voice'; Health = 'http://127.0.0.1:7778/health' },
-  @{ Name = 'bot';     Task = 'Thornswood Bot';    Port = 0; Say = 'The Discord bot'; Beat = $botBeat },
+  # A Windows service, not a task (#465): restarted by its name, Svc.
+  @{ Name = 'bot';     Svc = 'ThornswoodBot';      Port = 0; Say = 'The Discord bot'; Beat = $botBeat },
   # The dev pair. The dev game server's own traffic is UDP on 7787 and
   # cannot be connected to, so its resources port stands in, exactly as
   # 3000 does for the live one.
@@ -630,43 +637,59 @@ function IsUp($c) {
 $fresh = @()
 $told = ReadOutages
 foreach ($c in $checks) {
+  # What is wrong with it in words, when it is down.
+  $why = DownWords $c
   if (IsUp $c) {
     $sick = ''
     if ($c.ContainsKey('Health')) { $sick = HealthProblem $c.Health }
     # Running is not working (#449). Ten quiet minutes is already the grace,
-    # so one run is enough, and it is told about, never restarted for.
+    # so one run is enough. A hung bot is restarted by its service's name
+    # below, like one whose process is gone (#465).
     $hung = ''
     if ($c.ContainsKey('Beat')) { $hung = BotSilent $c.Beat }
-    if ($sick) { Observe $told $c $true $true ('It answers on port ' + $c.Port + ', but ' + $c.Health + ' ' + $sick) 'soft' }
-    elseif ($hung) { Observe $told $c $true $false $hung 'soft' }
-    else { Observe $told $c $false $false '' '' }
-    continue
+    if ($sick) { Observe $told $c $true $true ('It answers on port ' + $c.Port + ', but ' + $c.Health + ' ' + $sick) 'soft'; continue }
+    if (-not $hung) { Observe $told $c $false $false '' ''; continue }
+    if (-not $c.ContainsKey('Svc')) { Observe $told $c $true $false $hung 'soft'; continue }
+    $why = $hung
   }
 
   $already = 0
   if ($recent.ContainsKey($c.Name)) { $already = $recent[$c.Name] }
   if ($already -ge 3) {
     Note ($c.Name + ' is still down after ' + $already + ' restarts this hour. Leaving it. This one needs a look.')
-    Observe $told $c $true $false (DownWords $c) 'gaveup'
+    Observe $told $c $true $false $why 'gaveup'
     continue
   }
 
-  Note ($c.Name + ' is not answering. Starting ' + $c.Task)
-  $null = & schtasks /run /tn $c.Task 2>&1
-  $rc = $LASTEXITCODE
   $fresh += ((Get-Date).ToString('o') + '|' + $c.Name)
-
-  if ($rc -ne 0) {
-    Note ($c.Name + ' could not be started. schtasks exited with ' + $rc + '. Is the task called ' + $c.Task + ' ?')
-    Observe $told $c $true $false (DownWords $c) 'refused'
-    continue
+  if ($c.ContainsKey('Svc')) {
+    # By the service's name. Restart-Service starts one that is stopped, and
+    # stopping this one stops python and anything it started.
+    Note ($c.Name + ' is not working (' + $why + '). Restarting the service ' + $c.Svc)
+    $rc = 0
+    $err = ''
+    try { Restart-Service -Name $c.Svc -Force -ErrorAction Stop } catch { $rc = 1; $err = $_.Exception.Message }
+    if ($rc -ne 0) {
+      Note ($c.Name + ' could not be restarted: ' + $err + ' Is the service called ' + $c.Svc + ' ?')
+      Observe $told $c $true $false $why 'refused'
+      continue
+    }
+  } else {
+    Note ($c.Name + ' is not answering. Starting ' + $c.Task)
+    $null = & schtasks /run /tn $c.Task 2>&1
+    $rc = $LASTEXITCODE
+    if ($rc -ne 0) {
+      Note ($c.Name + ' could not be started. schtasks exited with ' + $rc + '. Is the task called ' + $c.Task + ' ?')
+      Observe $told $c $true $false $why 'refused'
+      continue
+    }
   }
 
   # Caddy's first start after a gap waits on its certificate, so it is given
   # longer before the watcher decides it did not come back.
   Start-Sleep -Seconds $(if ($c.ContainsKey('Url')) { 45 } else { 25 })
-  if (IsUp $c) { Note ($c.Name + ' is back'); Observe $told $c $true $false (DownWords $c) 'back' }
-  else { Note ($c.Name + ' did not come back in time'); Observe $told $c $true $false (DownWords $c) 'stuck' }
+  if (IsUp $c) { Note ($c.Name + ' is back'); Observe $told $c $true $false $why 'back' }
+  else { Note ($c.Name + ' did not come back in time'); Observe $told $c $true $false $why 'stuck' }
 }
 
 if ($fresh.Count -gt 0) { Add-Content -LiteralPath $hist -Value $fresh }
@@ -927,6 +950,9 @@ foreach (`$p in (Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -EA
 'game      ' + `$(if (Answers 3000) { 'up' } else { 'DOWN' })
 'voice     ' + `$(if (Answers 7778) { 'up' } else { 'DOWN' })
 'bot       ' + `$(if (`$bot) { 'up' } else { 'DOWN' })
+# The service the bot runs as (#465), which is what the watcher restarts.
+`$bs = Get-Service -Name 'ThornswoodBot' -EA SilentlyContinue
+'bot svc   ' + `$(if (`$bs) { 'ThornswoodBot ' + `$bs.Status } else { 'NOT INSTALLED. Run Install-Bot.ps1' })
 # What the bot last said about itself (#449). The watcher's own rule is in
 # BeatProblem above; this is only what a person looking wants to see.
 `$hb = 'C:\Thornswood-Bot\heartbeat.json'
@@ -961,8 +987,8 @@ if (`$down.Count) { 'told      DOWN: ' + (`$down -join ', ') } else { 'told     
 "@
 foreach ($l in $out) {
   $c = 'Gray'
-  if ("$l" -match 'DOWN|NOT installed|LOW$|CRITICAL$|OFF DISCORD') { $c = 'Red' }
-  if ("$l" -match '\bup$|installed$') { $c = 'Green' }
+  if ("$l" -match 'DOWN|NOT installed|LOW$|CRITICAL$|OFF DISCORD|Stopped$') { $c = 'Red' }
+  if ("$l" -match '\bup$|installed$|Running$') { $c = 'Green' }
   Say "  $l" $c
 }
 

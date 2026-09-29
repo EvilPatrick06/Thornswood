@@ -359,15 +359,17 @@ are kept. The oldest past five is the only thing that is ever removed. The
 watchdog's files and the door's log are kept a different way, or not at all,
 and are listed below.
 
-- `server.log` (game server, live and dev), `voice.log` (live and dev) and
-  `bot.log` are written by cmd's `>>` from the scheduled task, and Windows
-  will not move a file held that way while the service runs. So
-  `roll-log.ps1`, beside each service, rolls it just before the service
-  starts. A service that runs for days grows one file until its next restart.
-  An install of the game server or of voice rolls its log whatever the size,
-  so the run it starts has a file of its own and the one before is `.1`.
-- `thornswood.log` (the gamemode) and `site.log` (the website) roll
-  themselves.
+- `server.log` (game server, live and dev) and `voice.log` (live and dev)
+  are written by cmd's `>>` from the scheduled task, and Windows will not
+  move a file held that way while the service runs. So `roll-log.ps1`,
+  beside each service, rolls it just before the service starts. A service
+  that runs for days grows one file until its next restart. An install of
+  the game server or of voice rolls its log whatever the size, so the run it
+  starts has a file of its own and the one before is `.1`.
+- `thornswood.log` (the gamemode), `site.log` (the website) and `bot.log`
+  roll themselves. The bot's is written by its Windows service,
+  `ThornswoodBot` (`scripts\vps\BotService.cs`, issue #465), which rolls it
+  by size while the bot runs.
 - `C:\Thornswood-Watch\watch.log` and `restarts.txt` beside it are not
   rolled. Past 2,000 lines the watcher keeps the last 1,000 of each and the
   rest is gone.

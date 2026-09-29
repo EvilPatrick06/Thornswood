@@ -50,7 +50,7 @@ param(
   [string]$User     = '',
   [string]$BotRoot  = 'C:/Thornswood-Bot',
   [string]$DocsRoot = 'C:/Thornswood-Docs',
-  [string]$BotTask  = 'Thornswood Bot',
+  [string]$BotService = 'ThornswoodBot',
   [string]$SiteTask = 'Thornswood Docs',
   # Writes nothing and restarts nothing. Says whether each file parses and
   # holds a token, and for which application.
@@ -176,7 +176,7 @@ try {
   `$r.Lines
   if (`$r.Ok) {
     '--- the bot ---'
-    Restart-ThornswoodBot -Root '$botWin' -Task '$BotTask'
+    Restart-ThornswoodBot -Root '$botWin' -Service '$BotService'
     '--- the site ---'
     Restart-ThornswoodSite -Root '$docsWin' -Task '$SiteTask'
   }
@@ -197,7 +197,7 @@ if ("$out" -notmatch 'written and read back|already holds') {
 }
 
 Head 'Consumers updated'
-Say "  $envFile  DISCORD_TOKEN, read by the bot ($BotTask)" 'Green'
+Say "  $envFile  DISCORD_TOKEN, read by the bot (the service $BotService)" 'Green'
 Say "  $cfgFile  discord.botToken, read by the site ($SiteTask)" 'Green'
 Write-Host ''
 Say '  The old token is still inside every backup made before now:' 'Yellow'
