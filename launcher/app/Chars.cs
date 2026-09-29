@@ -906,7 +906,8 @@ namespace Thornswood
             AutoJoin.SetChooseAtMenu(point);
 
             BrowserBackend = WriteBrowserBackend();
-            KeepPlatformLogReadable();
+            // The log level and the text window are Enforce's now (#963):
+            // normal logging and no window, every Play, for everybody.
 
             // Voice read the old id out of the settings file at startup and has
             // been using it ever since. The write above just changed it, and
@@ -1128,50 +1129,5 @@ namespace Thornswood
         /// launcher.log and config.json, and the Settings page shows it.
         /// </summary>
         public static string BrowserBackend { get; private set; }
-
-        /// <summary>
-        /// Stop the client's log being switched off, and nothing more.
-        ///
-        /// The comment above says the log level is not ours to invent, and that
-        /// was true while nothing depended on it. It is not any more: everything
-        /// skymp5-client says goes through printConsole, and printConsole now
-        /// writes to skyrim-platform.log. Above info that file holds nothing a
-        /// person can use, and on 21 September an evening went into a fault
-        /// whose answer was four lines the client had already written and
-        /// nobody could read.
-        ///
-        /// So this only ever lowers, and only from a level that is silent.
-        /// 0 trace, 1 debug and 2 info are all left exactly as found, because
-        /// somebody sitting at trace chose trace. 3 warn through 6 none become
-        /// 2. Choosing how much to log stays theirs; switching it off entirely
-        /// does not, because the first thing anybody is asked for when they
-        /// cannot play is that file.
-        /// </summary>
-        static void KeepPlatformLogReadable()
-        {
-            try
-            {
-                if (!File.Exists(PlatformIni)) return;
-
-                string text = File.ReadAllText(PlatformIni);
-                var rx = new System.Text.RegularExpressions.Regex(
-                    @"(?im)^[ \t]*LogLevel[ \t]*=[ \t]*(\d+)[ \t]*$");
-                System.Text.RegularExpressions.Match m = rx.Match(text);
-
-                // No LogLevel line at all means the default, which InitLog
-                // takes as info. That is already readable, so leave it.
-                if (!m.Success) return;
-
-                int level;
-                if (!int.TryParse(m.Groups[1].Value, out level)) return;
-                if (level <= 2) return;
-
-                string next = rx.Replace(text, "LogLevel = 2");
-                if (next == text) return;
-
-                File.WriteAllText(PlatformIni, next, new UTF8Encoding(true));
-            }
-            catch (Exception ex) { Swallow.Note("Chars.KeepPlatformLogReadable, write", ex); }
-        }
     }
 }

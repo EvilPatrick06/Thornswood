@@ -36,8 +36,15 @@ namespace Thornswood
         static readonly List<string> stubs = new List<string>();
         static readonly HashSet<string> said = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         static readonly object gate = new object();
-        static FileSystemWatcher watcher;
+        static readonly List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
         static Action<string> say;
+
+        /// <summary>
+        /// How many times a watcher has called in this session, for
+        /// tests\test-963-perf-settings.ps1: every log line the game wrote
+        /// used to be one (#979).
+        /// </summary>
+        public static int Wakes;
 
         /// <summary>
         /// Files of ours in the game folder that are not kept copies but are
@@ -106,12 +113,12 @@ namespace Thornswood
         {
             try
             {
-                if (watcher != null)
+                foreach (FileSystemWatcher w in watchers)
                 {
-                    watcher.EnableRaisingEvents = false;
-                    watcher.Dispose();
-                    watcher = null;
+                    w.EnableRaisingEvents = false;
+                    w.Dispose();
                 }
+                watchers.Clear();
             }
             // Every failure in Release is logged and none is thrown. It runs
             // as the launcher closes, and a file it could not let go of stays
@@ -160,27 +167,41 @@ namespace Thornswood
 
         // ----------------------------------------------------------- watching
 
+        /// <summary>
+        /// Plugins and UI, each with what is under it, and not the Platform
+        /// folder above them. Notice only ever cared about those two, but the
+        /// one watcher sat on Data\Platform with everything under it, so every
+        /// line the game's plugins wrote to their logs there (thousands a
+        /// minute) woke the launcher to be thrown away (#979). Those logs and
+        /// the voice files live in the Platform folder itself, which nothing
+        /// watches now.
+        /// </summary>
         static void Watch()
         {
-            try
+            foreach (string sub in new string[] { "Data\\Platform\\Plugins", "Data\\Platform\\UI" })
             {
-                string dir = Path.Combine(Paths.Game, "Data\\Platform");
-                if (!Directory.Exists(dir)) return;
-                watcher = new FileSystemWatcher(dir);
-                watcher.IncludeSubdirectories = true;
-                watcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size;
-                watcher.Changed += OnChange;
-                watcher.Created += OnChange;
-                watcher.Deleted += OnChange;
-                watcher.Renamed += OnRename;
-                watcher.EnableRaisingEvents = true;
+                try
+                {
+                    string dir = Path.Combine(Paths.Game, sub);
+                    if (!Directory.Exists(dir)) continue;
+                    var w = new FileSystemWatcher(dir);
+                    w.IncludeSubdirectories = true;
+                    w.NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size;
+                    w.Changed += OnChange;
+                    w.Created += OnChange;
+                    w.Deleted += OnChange;
+                    w.Renamed += OnRename;
+                    w.EnableRaisingEvents = true;
+                    watchers.Add(w);
+                }
+                catch (Exception ex) { Swallow.Note("Hold.Watch, " + sub, ex); }
             }
-            catch { watcher = null; }
         }
 
-        static void OnRename(object sender, RenamedEventArgs e) { Notice(e.FullPath, "renamed into place"); }
+        static void OnRename(object sender, RenamedEventArgs e) { System.Threading.Interlocked.Increment(ref Wakes); Notice(e.FullPath, "renamed into place"); }
         static void OnChange(object sender, FileSystemEventArgs e)
         {
+            System.Threading.Interlocked.Increment(ref Wakes);
             string what = e.ChangeType == WatcherChangeTypes.Deleted ? "deleted" :
                           e.ChangeType == WatcherChangeTypes.Created ? "written" : "changed";
             Notice(e.FullPath, what);
