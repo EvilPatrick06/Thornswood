@@ -278,7 +278,13 @@ try {
         [IO.File]::WriteAllLines($run, [string[]]$lines, (New-Object Text.ASCIIEncoding))
         $dlog = Join-Path $devVoice 'voice.log'
         Fill $dlog (4MB + 3)
-        [void](RunCmd ('/c "' + $run + '"') $devVoice)
+        # The task's own argument, lifted from the script and run the way the
+        # task runs it, so a path with an & in it (the temp folder here may be
+        # under C:\ThornswoodTemps&Worktrees) is proved to hold (#1042, #1115).
+        $ta = [regex]::Match($dtext, '\$taskArg = \((''/c [^'']*'') -f \$run\)')
+        Yes 'the dev voice task line is in vps-dev-instance.ps1' $ta.Success
+        $taskArg = if ($ta.Success) { ($ta.Groups[1].Value.Trim("'") -f $run) } else { '/c "' + $run + '"' }
+        [void](RunCmd $taskArg $devVoice)
         Yes 'the dev voice run file rolls voice.log before node' ((Size ($dlog + '.1')) -eq (4MB + 3))
         Yes 'and dev voice writes to a fresh one' ((Count (Get $dlog) 'stand-in dev voice up on 7989') -eq 1)
     }

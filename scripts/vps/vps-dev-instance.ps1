@@ -92,7 +92,11 @@ if (Test-Path $liveVoice) {
     [IO.File]::WriteAllLines($run, [string[]]$lines, (New-Object Text.ASCIIEncoding))
     $liveVoiceTask = Get-ScheduledTask -TaskName 'Thornswood Voice'
     if (-not (Get-ScheduledTask -TaskName 'Thornswood Dev Voice' -ErrorAction SilentlyContinue)) {
-        $action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" -Argument ('/c "{0}"' -f $run) -WorkingDirectory $devVoice
+        # The run file's path in two pairs of quotes: cmd /c drops the outer
+        # pair whenever the path holds an & or another of its own characters,
+        # and the inner pair keeps the path whole (issues #1042, #1115).
+        $taskArg = ('/c ""{0}""' -f $run)
+        $action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" -Argument $taskArg -WorkingDirectory $devVoice
         Register-ScheduledTask -TaskName 'Thornswood Dev Voice' -Action $action -Trigger $liveVoiceTask.Triggers -Principal $liveVoiceTask.Principal -Settings $liveVoiceTask.Settings | Out-Null
         Say '  task Thornswood Dev Voice registered'
     } else { Say '  task Thornswood Dev Voice already there' }

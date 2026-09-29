@@ -18,7 +18,7 @@
   rather than quietly testing nothing.
 
   Cross platform on purpose, so it runs in the cloud and on the VPS: the fake gh
-  is a .cmd on Windows and a shell script elsewhere, both calling this same
+  is a .ps1 on Windows and a shell script elsewhere calling the same
   PowerShell. Read only apart from files under its own temp folder.
 #>
 [CmdletBinding()]
@@ -117,8 +117,11 @@ Set-Content -LiteralPath (Join-Path $dir 'SHA256SUMS') -Value ("$h  $name") -Enc
 exit 0
 '@)
     if ($onWindows) {
-        [IO.File]::WriteAllText((Join-Path $bin 'gh.cmd'),
-            "@echo off`r`n`"$ps`" -NoProfile -ExecutionPolicy Bypass -File `"$helper`" %*`r`nexit /b %ERRORLEVEL%`r`n")
+        # A .ps1, not a .cmd (issue #1092): PowerShell finds it on PATH ahead of
+        # the real gh.exe and hands it every argument whole. A .cmd gets them
+        # through cmd.exe, which ends a command at a bare &, so a temp folder
+        # under C:\ThornswoodTemps&Worktrees cut --dir in two.
+        Copy-Item -LiteralPath $helper -Destination (Join-Path $bin 'gh.ps1')
     } else {
         $sh = Join-Path $bin 'gh'
         [IO.File]::WriteAllText($sh, "#!/usr/bin/env bash`nexec `"$ps`" -NoProfile -File `"$helper`" `"`$@`"`n")
