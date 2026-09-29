@@ -514,14 +514,22 @@ if (`$principal) {
   # folder, config.json included; nothing here runs as a plain user. The
   # folder stops inheriting, keeping a copy of what it had, and every Users
   # rule goes. SYSTEM, Administrators and the site account above stay.
+  # Only the access rules are written back, through .NET: Set-Acl also tried
+  # to write the audit part here, which needs SeSecurityPrivilege, and an
+  # account without it (the build runner's) was refused (issue #1120).
+  function SetAccess(`$p, `$a) {
+    `$item = Get-Item -LiteralPath `$p -Force
+    if (`$PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]`$item, [Security.AccessControl.DirectorySecurity]`$a) }
+    else { `$item.SetAccessControl(`$a) }
+  }
   try {
     `$users = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
     `$acl = Get-Acl -LiteralPath '$rootWin'
     `$acl.SetAccessRuleProtection(`$true, `$true)
-    Set-Acl -LiteralPath '$rootWin' -AclObject `$acl -ErrorAction Stop
+    SetAccess '$rootWin' `$acl
     `$acl = Get-Acl -LiteralPath '$rootWin'
     `$acl.PurgeAccessRules(`$users)
-    Set-Acl -LiteralPath '$rootWin' -AclObject `$acl -ErrorAction Stop
+    SetAccess '$rootWin' `$acl
     'BUILTIN\Users no longer reaches $rootWin'
   } catch { 'COULD NOT TAKE BUILTIN\Users OFF ' + '$rootWin' + ': ' + `$_.Exception.Message }
 }
