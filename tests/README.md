@@ -11,11 +11,14 @@ servers' manifests over plain HTTP unless given `-Offline`). The nightly checks 
 on the VPS each night and open an issue when one fails; on a pull request,
 run the ones your change touches yourself.
 
-One of them runs on every pull request as well, in the build check
-(`.github/workflows/build.yml`): `test-ownership.js`, added there by issue
-#752 because a secret file reached main with no row on `docs\OWNERSHIP.md`
-and nothing said so for days. It takes a tenth of a second. The rest are
-minutes together, which is why they are nightly.
+A few of them run on every pull request as well, in the build check
+(`.github/workflows/build.yml`), because each one's failure once sat on main
+unseen: `test-ownership.js` (issue #752, a secret file reached main with no
+row on `docs\OWNERSHIP.md`), and the list in its step "Run the harnesses that
+went red unseen" (issues #875, #454 and #1088, the last three being the VPS
+address kept in one place and deploys that are the same bytes for the same
+commit). Each is under a minute. The rest are minutes together, which is why
+they are nightly.
 
 The voice service's own harnesses stay beside it in `voice\`, and the bot's in
 `bot\`, because they are run from there.
