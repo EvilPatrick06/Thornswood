@@ -181,7 +181,8 @@ try:
 
     # M8: every action the gamemode writes has words here.
     gm = open(os.path.join(HERE, '..', 'game', 'gamemode.js'), encoding='utf-8').read()
-    dids = ['kick', 'freeze', 'unfreeze', 'bring', 'goto', 'silence', 'unsilence', 'warn']
+    dids = ['kick', 'freeze', 'unfreeze', 'bring', 'goto', 'silence', 'unsilence', 'warn',
+            'give', 'spawn', 'tp']
     yes('M8 every action the staff block records has a sentence here',
         all(("record('%s'" % d) in gm and d in bot._MOD_DID for d in dids))
 

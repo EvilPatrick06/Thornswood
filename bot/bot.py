@@ -2354,6 +2354,9 @@ _MOD_DID = {
     'silence': 'silenced %s',
     'unsilence': 'let %s speak again',
     'warn': 'warned %s',
+    'give': 'gave %s',
+    'spawn': 'spawned beside %s',
+    'tp': 'sent %s',
 }
 
 

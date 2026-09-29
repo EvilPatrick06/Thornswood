@@ -53,10 +53,16 @@ const COMMANDS = slice('const WORDS = [', '// ==== end thornswood chat commands 
 const STAFF = slice('// ==== thornswood staff ====', '// ==== end thornswood staff ====');
 yes('the chat command block is in gamemode.js', !!COMMANDS);
 yes('the staff block is in gamemode.js', !!STAFF);
-yes('handle() hands staff words to the staff block with isStaff',
-    !!COMMANDS && /staffCmd\.command\(cmd, word, parts, profileId, actorId, isStaff\)/.test(COMMANDS));
+yes('handle() hands staff words to the staff block with isStaff and /give\'s, /spawn\'s and /tp\'s lookups',
+    !!COMMANDS && /staffCmd\.command\(cmd, word, parts, profileId, actorId, isStaff,\s*\{ findThing: findThing, findBeast: findBeast,\s*byFormId: byFormId, findPlace: findPlace \}\)/.test(COMMANDS));
+yes('and before the /give, /spawn and /tp branches, so a line aimed at a person reaches it first',
+    !!COMMANDS && COMMANDS.indexOf('staffCmd.command(') < COMMANDS.indexOf("if (word === '/give' || word === '/spawn') {") &&
+    COMMANDS.indexOf('staffCmd.command(') < COMMANDS.indexOf("if (word === '/tp' || word === '/goto') {"));
 yes('isStaff is the dev tier, which carries the staff roles',
     !!COMMANDS && /function isStaff\(profileId\) \{\s*return isDev\(profileId\);/.test(COMMANDS));
+
+// What resolves in the pretend load order. Missing.esp is a plugin that is not.
+const KNOWN = { '71cf3:Skyrim.esm': 0x71cf3, 'f:Skyrim.esm': 0xf, '23aba:Skyrim.esm': 0x23aba };
 
 const STAFFER = 1001, BJORN = 2002, NOBODY = 3003, SERA = 4004;
 const A_STAFF = 0xff000001, A_BJORN = 0xff000002, A_NOBODY = 0xff000003, A_SERA = 0xff000004;
@@ -73,7 +79,7 @@ function world() {
       [A_SERA]: { desc: 'Markarth:4', pos: [9, 9, 9], rot: [0, 0, 0] }
     },
     staff: {}, kicked: [], set: [], said: [], silencedPosts: [], logged: [], records: [],
-    queue: [], timers: [], timeouts: []
+    queue: [], timers: [], timeouts: [], placed: [], given: []
   };
   w.staff[STAFFER] = true;
   return w;
@@ -99,6 +105,8 @@ function load(w) {
     getServerSettings: function () { return { privDir: 'private' }; },
     getUserByActor: function (a) { return w.online.indexOf(a) >= 0 ? 70 + w.online.indexOf(a) : -1; },
     kick: function (u) { w.kicked.push(u); },
+    // A reference made from a base record, the way the server makes one.
+    place: function (baseId) { const id = 0xff100000 + w.placed.length; w.placed.push({ id: id, base: baseId }); return id; },
     makeProperty: function () { },
     callPapyrusFunction: function () { }
   };
@@ -144,7 +152,25 @@ function load(w) {
     setInterval: function (fn, ms) { w.timers.push({ fn: fn, ms: ms }); return w.timers.length; },
     clearInterval: function () { },
     setTimeout: function (fn, ms) { w.timeouts.push({ fn: fn, ms: ms }); return w.timeouts.length; },
-    clearTimeout: function () { }
+    clearTimeout: function () { },
+    /*
+      The top-level pieces /give, /spawn and /tp read, small. The lookups that
+      read them (findThing, findBeast, byFormId, findPlace) are the real ones
+      out of the command block; test-give-names.js and test-admin-names.js
+      check the real tables.
+    */
+    idOf: function (desc) { return KNOWN[desc] || 0; },
+    addItem: function (actorId, desc, count) {
+      if (!KNOWN[desc]) { return false; }
+      w.given.push({ actorId: actorId, desc: desc, count: count }); return true;
+    },
+    ORES_BY_BASE: {}, HARVESTS_BY_BASE: {}, CROPS_BY_BASE: {}, FISH_BY_BASE: {},
+    HUNTS_BY_BASE: {}, GAME_BY_BASE: {}, RECIPES_BY_ID: {}, ITEM_NAMES: {}, ITEMS: {},
+    ADMIN_ITEMS: { 'iron ore': ['Iron Ore', '71cf3:Skyrim.esm'], 'gold': ['Gold', 'f:Skyrim.esm'] },
+    ADMIN_ACTORS: { 'troll': ['Troll', '23aba:Skyrim.esm'], 'giant': ['Giant', 'deadbe:Missing.esp'] },
+    HALL: { desc: 'Hall:0', pos: [0, 0, 0], rot: [0, 0, 0] },
+    PASSAGES: { a: { key: 'whiterun', town: 'Whiterun', arrival: { desc: 'Tamriel:w', pos: [10, 20, 30], rot: [0, 0, 45] } } },
+    BUILDING_BY_DOOR: {}, BUILDING_NAME: {}, DATA: { cellToHold: {}, capitals: {} }
   };
   vm.createContext(box);
   box.__thornswoodIsDev = function (p) { return !!w.staff[p]; };
@@ -276,9 +302,62 @@ if (COMMANDS && STAFF) {
   got = run(w, STAFFER, '/kick Aela');
   yes('staff cannot kick themselves by accident', to(got, STAFFER)[0] === 'That is you.');
 
+  console.log('\n/give, /spawn and /tp aimed at a person (Patrick, 28 September):');
+  got = run(w, STAFFER, '/give Bjorn iron ore 5');
+  yes('/give <person> <item> <count> puts it in their pack, through /give\'s own lookup',
+      w.given.length === 1 && w.given[0].actorId === A_BJORN && w.given[0].desc === '71cf3:Skyrim.esm' &&
+      w.given[0].count === 5);
+  yes('and answers both', to(got, STAFFER)[0] === 'Gave Bjorn Iron-Hand 5 Iron Ore.' &&
+      to(got, BJORN)[0] === 'Staff gave you 5 Iron Ore.');
+  got = run(w, STAFFER, '/give Bjorn unobtainium');
+  yes('an item nobody has says so, from the same lookup', w.given.length === 1 &&
+      /Nothing called that/.test(to(got, STAFFER)[0] || ''));
+  got = run(w, STAFFER, '/give gold 3');
+  yes('/give with no person is still the staffer\'s own /give',
+      w.given.length === 2 && w.given[1].actorId === A_STAFF && w.given[1].count === 3 &&
+      to(got, STAFFER)[0] === 'Given 3 Gold.');
+  got = run(w, NOBODY, '/give Bjorn iron ore');
+  yes('a playtester who is not staff cannot give to somebody else',
+      w.given.length === 2 && !to(got, BJORN).length);
+
+  const spotB = JSON.parse(JSON.stringify(w.where[A_BJORN]));
+  got = run(w, STAFFER, '/spawn troll 2 on Bjorn');
+  yes('/spawn <creature> <count> on <person> places them from the base record',
+      w.placed.length === 2 && w.placed.every(function (p) { return p.base === 0x23aba; }));
+  const moved = w.placed.map(function (p) { return w.where[p.id]; });
+  yes('beside the person, in their cell', moved.every(function (m) {
+    if (!m || m.desc !== spotB.desc) { return false; }
+    const dx = m.pos[0] - spotB.pos[0], dy = m.pos[1] - spotB.pos[1];
+    return Math.abs(Math.sqrt(dx * dx + dy * dy) - 150) < 1;
+  }));
+  yes('and answers both', to(got, STAFFER)[0] === 'Spawned 2 Troll beside Bjorn Iron-Hand.' &&
+      to(got, BJORN)[0] === 'Staff put 2 Troll beside you.');
+  got = run(w, STAFFER, '/spawnat Sera troll');
+  yes('/spawnat <person> <creature> does the same', w.placed.length === 3 &&
+      w.where[w.placed[2].id].desc === w.where[A_SERA].desc && to(got, SERA)[0] === 'Staff put 1 Troll beside you.');
+  got = run(w, STAFFER, '/spawnat Sera giant');
+  yes('a creature whose plugin is not loaded says so and places nothing',
+      w.placed.length === 3 && /plugin is not in this load order/.test(to(got, STAFFER)[0] || ''));
+  got = run(w, NOBODY, '/spawnat Sera troll');
+  yes('/spawnat from somebody not staff: "' + REFUSED + '"', to(got, NOBODY)[0] === REFUSED && w.placed.length === 3);
+
+  got = run(w, STAFFER, '/tp Bjorn whiterun');
+  yes('/tp <person> <place> sends them to one of /tp\'s places',
+      w.where[A_BJORN].desc === 'Tamriel:w' && JSON.stringify(w.where[A_BJORN].pos) === '[10,20,30]');
+  yes('and answers both', to(got, STAFFER)[0] === 'Sent Bjorn Iron-Hand to Whiterun.' &&
+      to(got, BJORN)[0] === 'Staff sent you to Whiterun.');
+  got = run(w, STAFFER, '/tp Bjorn Sera');
+  yes('/tp <person> <person> sends them to that person', w.where[A_BJORN].desc === w.where[A_SERA].desc &&
+      to(got, STAFFER)[0] === 'Sent Bjorn Iron-Hand to Sera.');
+  got = run(w, STAFFER, '/tp Bjorn nowhere at all');
+  yes('a place nobody knows says so, from /tp\'s own list', /No place called that/.test(to(got, STAFFER)[0] || ''));
+  got = run(w, NOBODY, '/tp Bjorn whiterun');
+  yes('a playtester who is not staff cannot move somebody else', w.where[A_BJORN].desc === w.where[A_SERA].desc &&
+      !to(got, BJORN).length);
+
   const dids = w.records.map(function (r) { return JSON.parse(r.text).did; }).join(',');
   yes('every action wrote one line for the staff channel: ' + dids,
-      dids === 'warn,freeze,unfreeze,bring,goto,silence,unsilence,kick');
+      dids === 'warn,freeze,unfreeze,bring,goto,silence,unsilence,kick,give,spawn,spawn,tp,tp');
 
   console.log('\nstaff whose identity is not proven:');
   const recs = w.records.length;

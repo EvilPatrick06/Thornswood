@@ -34958,7 +34958,7 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // Staff's, gated on the staff roles and left out of
                // PLAYER_WORDS for the same reason. See the staff block.
                '/kick', '/freeze', '/unfreeze', '/bring', '/silence',
-               '/unsilence', '/warn',
+               '/unsilence', '/warn', '/spawnat',
                /*
                  NOT A COMMAND ANYBODY TYPES. The client reports each fall of
                  the axe with it, because the server sees a press and Skyrim's
@@ -36292,15 +36292,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
 
     /*
       Staff: /kick, /freeze, /unfreeze, /bring, /goto <person>, /silence,
-      /unsilence and /warn (#412). The staff block at the end of this file
-      does the work and says whether it took the line. /goto that names no
-      person goes on to the place teleport below, and /ooc or /roll from
+      /unsilence, /warn, /spawnat, and /give, /spawn and /tp aimed at a
+      person (#412). The staff block at the end of this file does the work
+      and says whether it took the line; it reuses /give's, /spawn's and
+      /tp's lookups, handed over here. A /give, /spawn, /tp or /goto that
+      names no person goes on to the branches below, and /ooc or /roll from
       somebody staff silenced stops here.
     */
     var staffCmd = g.__thornswoodStaff;
     if (staffCmd) {
       try {
-        if (staffCmd.command(cmd, word, parts, profileId, actorId, isStaff)) { return; }
+        if (staffCmd.command(cmd, word, parts, profileId, actorId, isStaff,
+                             { findThing: findThing, findBeast: findBeast,
+                               byFormId: byFormId, findPlace: findPlace })) { return; }
       } catch (eStaff) { log('staff command failed:', eStaff); }
     }
 
@@ -41913,6 +41917,16 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
     /silence <person> [minutes] [why]   nothing they type reaches anybody; 30 minutes unless said
     /unsilence <person>           lets them speak again
     /warn <person> <why>          tells them, in their chat, that staff have warned them
+    /give <person> <item> [count]         puts it in their pack
+    /spawn <creature> [count] on <person> and /spawnat <person> <creature> [count]
+                                  puts it beside them
+    /tp <person> <place or person>        sends them there
+
+  The last three were asked for by Patrick on 28 September. They reuse the
+  lookups /give, /spawn and /tp already have (every named item, every named
+  actor, every town and named building, or a form id), handed in by handle().
+  /give, /spawn and /tp that name no person are left to those branches, which
+  is how a playtester's /give iron ore still works.
 
   A person is a name (the start of it is enough while it is unique), the form
   id the crosshair gives, or a profile number. Every one answers the moderator
@@ -41945,7 +41959,12 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   try { fs = require('fs'); path = require('path'); http = require('http'); } catch (e) { }
 
   var WORDS_STAFF = ['/kick', '/freeze', '/unfreeze', '/bring', '/goto',
-                     '/silence', '/unsilence', '/warn'];
+                     '/silence', '/unsilence', '/warn', '/spawnat'];
+  // Everybody's (or a playtester's) words that staff can also aim at a person.
+  var AIMED = ['/give', '/spawn', '/tp'];
+  var GIVE_MOST = 100000;           // the same caps as /give and /spawn
+  var SPAWN_MOST = 40;
+  var SPAWN_AWAY = 150;             // units from the person, so it is beside them
   var REFUSED = 'That one is not yours to run.';
   // What a silenced person cannot say through the game server. Plain lines,
   // /me, /do, /w and /s are held back by the voice service itself.
@@ -42139,13 +42158,144 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
     }
   }
 
+  // ---------------------------------------- give, spawn and tp at a person --
+  /* A count as the last word, only when it is a number with something before it. */
+  function countOff(words) {
+    if (words.length > 1 && /^\d+$/.test(words[words.length - 1])) {
+      return { words: words.slice(0, words.length - 1), count: Number(words[words.length - 1]) };
+    }
+    return { words: words, count: 1 };
+  }
+  function lower(ws) { return ws.join(' ').trim().toLowerCase(); }
+
+  /*
+    What an aimed line asks for, or null when it names no person, which leaves
+    it to handle(): "/give iron ore" is a playtester's own /give, "/tp whiterun"
+    their own /tp.
+  */
+  function aimed(word, words) {
+    if (word === '/give' || word === '/spawnat') {
+      var p = takePerson(words);
+      if (!p.actorId || !p.rest.length) { return word === '/spawnat' ? { kind: 'spawn', them: p, want: '' } : null; }
+      var c = countOff(p.rest);
+      return { kind: word === '/give' ? 'give' : 'spawn', them: p, want: lower(c.words), count: c.count };
+    }
+    if (word === '/spawn') {
+      var at = -1;
+      for (var i = words.length - 2; i >= 1; i--) {
+        if (String(words[i]).toLowerCase() === 'on') { at = i; break; }
+      }
+      if (at < 0) { return null; }
+      var who = takePerson(words.slice(at + 1));
+      if (!who.actorId) { return null; }
+      var left = countOff(words.slice(0, at));
+      var n = left.count;
+      if (who.rest.length === 1 && /^\d+$/.test(who.rest[0])) { n = Number(who.rest[0]); }
+      else if (who.rest.length) { return null; }
+      return { kind: 'spawn', them: who, want: lower(left.words), count: n };
+    }
+    if (word === '/tp') {
+      var t = takePerson(words);
+      if (!t.actorId || !t.rest.length) { return null; }
+      return { kind: 'tp', them: t, to: t.rest };
+    }
+    return null;
+  }
+
+  /* Places a creature beside where, spread round them. The new reference from
+     mp.place(base) and then a locationalData move, because createActor's first
+     argument is the id the NEW actor gets, not the record to make it from. */
+  function spawnBeside(baseId, where, count) {
+    var made = 0, why = '';
+    for (var s = 0; s < count; s++) {
+      var ang = (s / Math.max(1, count)) * Math.PI * 2;
+      try {
+        var ref = mp.place(baseId);
+        mp.set(ref, 'locationalData', {
+          cellOrWorldDesc: where.desc,
+          pos: [where.pos[0] + Math.cos(ang) * SPAWN_AWAY, where.pos[1] + Math.sin(ang) * SPAWN_AWAY, where.pos[2]],
+          rot: [0, 0, where.rot[2] || 0]
+        });
+        made++;
+      } catch (e) { why = String(e && e.message ? e.message : e); break; }
+    }
+    return { made: made, why: why };
+  }
+
+  function doAimed(a, pid, actorId, me, look) {
+    var them = a.them;
+    if (!them.actorId) { tell(pid, them.why); return true; }
+
+    if (a.kind === 'give') {
+      var hit = look.findThing(a.want);
+      if (!hit.desc && look.byFormId) { hit = look.byFormId(a.want) || hit; }
+      if (!hit.desc) { tell(pid, hit.why); return true; }
+      var n = Math.min(a.count, GIVE_MOST);
+      if (!addItem(them.actorId, hit.desc, n)) {
+        tell(pid, hit.name + ' is named in this server\'s tables but its plugin is not in the load order, so there is nothing to give.');
+        return true;
+      }
+      tell(pid, 'Gave ' + them.name + ' ' + n + ' ' + hit.name + '.');
+      if (them.pid !== pid) { tell(them.pid, 'Staff gave you ' + n + ' ' + hit.name + '.'); }
+      record('give', pid, me, them.pid, them.name, n + ' ' + hit.name, 0);
+      return true;
+    }
+
+    if (a.kind === 'spawn') {
+      if (!a.want) {
+        tell(pid, 'Spawn what? /spawnat ' + them.name + ' troll, or /spawn troll 3 on ' + them.name + '.');
+        return true;
+      }
+      var beast = look.findBeast(a.want);
+      if (!beast.desc && look.byFormId) { beast = look.byFormId(a.want) || beast; }
+      if (!beast.desc) { tell(pid, beast.why); return true; }
+      var baseId = idOf(beast.desc);
+      if (!baseId) { tell(pid, beast.name + '\'s plugin is not in this load order.'); return true; }
+      var spot = placeOf(them.actorId);
+      if (!spot || !spot.desc) { tell(pid, 'The server cannot tell where ' + them.name + ' is right now. Try again.'); return true; }
+      var r = spawnBeside(baseId, spot, Math.min(a.count, SPAWN_MOST));
+      if (!r.made) {
+        tell(pid, 'Nothing was spawned beside ' + them.name + ': ' + (r.why || 'the server would not place it') + '.');
+        log('staff: spawning ' + beast.name + ' beside ' + them.name + ' failed: ' + r.why);
+        return true;
+      }
+      tell(pid, 'Spawned ' + r.made + ' ' + beast.name + ' beside ' + them.name + '.');
+      if (them.pid !== pid) { tell(them.pid, 'Staff put ' + r.made + ' ' + beast.name + ' beside you.'); }
+      record('spawn', pid, me, them.pid, them.name, r.made + ' ' + beast.name, 0);
+      return true;
+    }
+
+    // tp: another person first, then /tp's own places.
+    var dp = takePerson(a.to);
+    var dest = null, destName = '';
+    if (dp.actorId && !dp.rest.length) {
+      dest = placeOf(dp.actorId);
+      destName = dp.name;
+    } else {
+      var fp = look.findPlace(lower(a.to));
+      if (!fp.where) { tell(pid, fp.why); return true; }
+      dest = { desc: fp.where.desc, pos: fp.where.pos, rot: fp.where.rot || [0, 0, 0] };
+      destName = fp.where.town;
+    }
+    if (!dest || !dest.desc) { tell(pid, 'The server cannot tell where that is right now. Try again.'); return true; }
+    try { moveTo(them.actorId, dest); } catch (e) { tell(pid, 'That did not work: ' + e); return true; }
+    if (state.frozen[them.pid]) {
+      state.frozen[them.pid] = { desc: dest.desc, pos: dest.pos.slice(0, 3), rot: dest.rot.slice(0, 3), by: state.frozen[them.pid].by };
+    }
+    tell(pid, 'Sent ' + them.name + ' to ' + destName + '.');
+    if (them.pid !== pid) { tell(them.pid, 'Staff sent you to ' + destName + '.'); }
+    record('tp', pid, me, them.pid, them.name, 'to ' + destName, 0);
+    return true;
+  }
+
   // ------------------------------------------------------------ command --
   /*
     Called from handle() with the queued command, its word and parts, the
-    profile and actor it came from, and isStaff. True when this answered the
-    line, false to let handle() carry on.
+    profile and actor it came from, isStaff, and /give's, /spawn's and /tp's
+    lookups (findThing, findBeast, byFormId, findPlace). True when this
+    answered the line, false to let handle() carry on.
   */
-  function command(cmd, word, parts, pid, actorId, isStaff) {
+  function command(cmd, word, parts, pid, actorId, isStaff, look) {
     if (SILENCED_WORDS.indexOf(word) !== -1) {
       var left = silencedFor(pid);
       if (!left) { return false; }
@@ -42153,11 +42303,27 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
                 (left === 1 ? ' minute' : ' minutes') + ', so that did not reach anybody.');
       return true;
     }
-    if (WORDS_STAFF.indexOf(word) === -1) { return false; }
+    var isAimed = AIMED.indexOf(word) !== -1;
+    if (!isAimed && WORDS_STAFF.indexOf(word) === -1) { return false; }
 
     var staff = false;
     try { staff = !!isStaff(pid); } catch (e) { staff = false; }
     var words = parts.slice(1);
+
+    // /give, /spawn and /tp at a person are staff's; anything else is left.
+    if (isAimed) {
+      if (!staff || !look) { return false; }
+      var am = aimed(word, words);
+      if (!am) { return false; }
+      var whyA = unproven(cmd, pid);
+      if (whyA) {
+        tell(pid, whyA);
+        log('staff: ' + word + ' refused profile ' + pid + ', ' +
+            (cmd && cmd.proven === true ? 'no join pass on hand' : 'the voice service did not prove the connection'));
+        return true;
+      }
+      return doAimed(am, pid, actorId, actorId ? nameOf(actorId) : ('profile ' + pid), look);
+    }
 
     // /goto a place is the playtester teleport in handle(); only a person is ours.
     if (word === '/goto') {
@@ -42183,6 +42349,10 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
     if (!words.length) {
       tell(pid, word + ' who? ' + word + ' <name, or the start of it, or a profile number>.');
       return true;
+    }
+    if (word === '/spawnat') {
+      if (!look) { tell(pid, 'The server has no creature list to spawn from right now.'); return true; }
+      return doAimed(aimed(word, words), pid, actorId, me, look);
     }
     var them = takePerson(words);
     var reason = (them.rest || []).join(' ').trim();
@@ -42305,6 +42475,7 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
     freezeTick: freezeTick, pushSilenced: pushSilenced, silencedFor: silencedFor,
     state: state, REFUSED: REFUSED, WORDS: WORDS_STAFF
   };
-  log('staff commands ready: ' + WORDS_STAFF.join(', ') + ', for the staff roles with a join pass');
+  log('staff commands ready: ' + WORDS_STAFF.join(', ') + ', and ' + AIMED.join(', ') +
+      ' at a person, for the staff roles with a join pass');
 })();
 // ==== end thornswood staff ====
