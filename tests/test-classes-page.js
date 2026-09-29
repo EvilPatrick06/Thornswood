@@ -384,8 +384,33 @@ if (tomes) {
       /\*\*A spell point\*\*/.test(t) && /\*\*The rank\*\*/.test(t) && /\*\*A spell from the rank below\*\*/.test(t));
   yes('  saying the tome is kept and chat says which is missing',
       /you keep the tome/i.test(t) && /says which/i.test(t));
-  yes('  and that an Enchanter learns a staff spell the same way',
-      /An Enchanter learns the spell a staff binds the\s+same way/i.test(t));
+  yes('  and that what a staff binds is not learned this way (#1128)',
+      /What a staff binds is not learned this way/i.test(t));
+}
+
+// Staff spells (#1128): the page names the three rules pickStaffSpell runs and
+// the numbers the rules hold, and the non-Enchanter path.
+const staffSec = section(page, '### Staff spells');
+yes('the page has a Staff spells section', staffSec !== null);
+if (staffSec && P.pickStaffSpell) {
+  const t = flat(staffSec);
+  const L = T.limits;
+  yes('  naming the three rules: a staff spell point, the rank, a staff spell from the rank below',
+      /\*\*A staff spell point\*\*/.test(t) && /\*\*The rank\.\*\*/.test(t) && /\*\*A staff spell from the rank below\*\*/.test(t));
+  yes('  with the numbers the rules hold: ' + L.enchanterStartStaff + ' to start, one a Bladebinder rank, ' + L.enchanterMasterStaff + ' more at Master',
+      new RegExp('starts with ' + NUM[L.enchanterStartStaff]).test(t) && /earns one\s+with every Bladebinder rank/.test(t) &&
+      new RegExp(NUM[L.enchanterMasterStaff] + ' more at Master').test(t));
+  yes('  no tome for an Enchanter, and Unlock on K', /no tome/i.test(t) && /Press K and open \*\*Staff spells\*\*/.test(t) && /press Unlock/.test(t));
+  yes('  and a non-Enchanter: a Master Bladebinder, the tome, ' + NUM[L.outsiderSpells] + ' at most, Novice only',
+      /A Master Bladebinder has to teach them first/.test(t) && /from its tome/.test(t) &&
+      new RegExp('they hold ' + NUM[L.outsiderSpells] + ' at most, and only Novice ones').test(t));
+  const ench = P.pickProfession(P.fresh(), 'enchanter', 'bladebinder').state;
+  const rankOfStaff = function (d) { return d === 'n' ? 'novice' : (d === 'a' ? 'advanced' : 'expert'); };
+  const e1 = P.pickStaffSpell(ench, { desc: 'e', name: 'Thunderbolt', rank: 'expert' }, rankOfStaff);
+  yes('the rules the page names are the rules that run: a new Enchanter asking for an Expert staff spell misses the rank and the one below',
+      !e1.ok && sameSet(e1.missing.map(function (m) { return m.what; }), ['level', 'below']));
+  const e2 = P.pickStaffSpell(ench, { desc: 'n', name: 'Flames', rank: 'novice' }, rankOfStaff);
+  yes('  and unlocks a Novice one, spending a point', e2.ok && P.staffPoints(e2.state) === L.enchanterStartStaff - 1);
 }
 if (P.learnFromTome) {
   const smithState = smith('edgewright');

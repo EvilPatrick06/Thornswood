@@ -18,11 +18,15 @@
 //      no magic is refused and keeps the tome, the line saying which rules are
 //      missing; one a Master mage taught the school learns a Novice spell,
 //      has it recorded for staves, and is told so in chat
-//   C. a staff whose spell is not recorded is refused with a sentence saying
-//      which tome to read and that the Mage rules apply, and allowed once it is
+//   C. since #1128 (Patrick, 29 September: Enchanters get "their own spell
+//      point and spell unlocking system like the Mages have ... they do not
+//      need the tomes") a tome records nothing for an Enchanter's staves: the
+//      tome's line points at K, a staff whose spell is not unlocked is refused
+//      with the sentence saying to unlock it on K, and it is allowed once it
+//      is (tests/test-enchanter-staff-spells.js has the unlock rules)
 //   D. anybody who may not make staves learns the spell under the same rules
 //      and nothing is recorded for staves
-//   E. what was learned survives a restart, in the character store
+//   E. what was unlocked survives a restart, in the character store
 //
 // Read only.
 const fs = require('fs');
@@ -271,18 +275,23 @@ function chat(srv, actor) {
   yes('a taught Enchanter reading Flames passes the rules: not refused, so the engine teaches it and spends the tome',
       back === undefined);
   const after = srv.C.stateOf(ENCH);
-  yes('  Flames is recorded for staves and is in their book, one of their two places spent',
-      srv.S.knows(after, FLAMES) && after.spells.known.indexOf('Flames') !== -1 &&
+  yes('  Flames is in their book, one of their two places spent, and since #1128 nothing is recorded for staves',
+      !srv.S.knows(after, FLAMES) && after.spells.known.indexOf('Flames') !== -1 &&
       srv.P.spellPoints(after) === 1);
   const ch = chat(srv, ENCH);
-  yes('  and one chat line says what was learned and that it can go into a staff (' + ((ch[0] || {}).text || '') + ')',
-      ch.length === 1 && /The tome teaches you Flames/.test(ch[0].text) && /staff/.test(ch[0].text));
+  yes('  and one chat line says what was learned and that staves are unlocked on K (' + ((ch[0] || {}).text || '') + ')',
+      ch.length === 1 && /The tome teaches you Flames/.test(ch[0].text) && /press K and unlock Flames under Staff spells/.test(ch[0].text));
 
   srv.said.length = 0;
   srv.read(ENCH, FLAMES_TOME);
-  yes('reading it again records nothing twice, spends nothing and says nothing',
-      srv.S.known(srv.C.stateOf(ENCH)).length === 1 && srv.P.spellPoints(srv.C.stateOf(ENCH)) === 1 &&
-      srv.said.length === 0);
+  yes('reading it again records nothing and spends nothing, and points at K again',
+      srv.S.known(srv.C.stateOf(ENCH)).length === 0 && srv.P.spellPoints(srv.C.stateOf(ENCH)) === 1 &&
+      chat(srv, ENCH).length === 1 && /Staff spells/.test(chat(srv, ENCH)[0].text));
+
+  // The way in since #1128: unlocked on K, no tome.
+  const un = srv.S.unlock(srv.P, srv.C.stateOf(ENCH), 'Flames');
+  if (un.ok) { srv.C.writeState(ENCH, un.state); }
+  yes('the Enchanter unlocks Flames for staves on K instead', un.ok && srv.S.knows(srv.C.stateOf(ENCH), FLAMES));
 
   srv.said.length = 0;
   const thunder = srv.read(ENCH, TOME);
@@ -296,8 +305,8 @@ function chat(srv, actor) {
   make(srv, WARD, 'miner', 'enchanter', 'wardweaver');
   taught(srv, WARD);
   srv.read(WARD, FLAMES_TOME);
-  yes('a taught Wardweaver, who makes novice staves as the sister half, learns Flames for staves too',
-      srv.S.knows(srv.C.stateOf(WARD), FLAMES));
+  yes('a taught Wardweaver learns Flames from the tome and, like any Enchanter, has nothing recorded for staves by it',
+      !srv.S.knows(srv.C.stateOf(WARD), FLAMES) && srv.C.stateOf(WARD).spells.known.indexOf('Flames') !== -1);
 }
 
 // ------------------------------------------------ D. anybody else reading --
@@ -349,9 +358,9 @@ function chat(srv, actor) {
 
   const no = srv.craft(ENCH, thunderRow);
   yes('a staff whose spell they could not learn is refused', !!no.refusal);
-  yes('  and the refusal names the spell, says to read its tome, and that the Mage rules apply',
-      !!no.refusal && no.refusal.indexOf('Thunderbolt') !== -1 && /spell tome/.test(no.refusal) &&
-      /Mage rules/.test(no.refusal));
+  yes('  and the refusal names the spell and says to unlock it on K, with no tome (#1128)',
+      !!no.refusal && no.refusal.indexOf('Thunderbolt') !== -1 && /Press K and unlock it under Staff spells/.test(no.refusal) &&
+      /No tome is needed/.test(no.refusal));
   yes('  with no em dash and no word player',
       !!no.refusal && no.refusal.indexOf('\u2014') === -1 && !/player/i.test(no.refusal));
 
@@ -359,8 +368,8 @@ function chat(srv, actor) {
     const closed = withSpell.map(function (k) { return TABLE[k]; })
       .filter(function (r) { return r.spell === untaught[0]; })[0];
     const n = srv.craft(ENCH, closed);
-    yes('a staff whose spell no tome teaches is refused and says nobody can learn it here yet',
-        !!n.refusal && /no spell tome here teaches it/.test(n.refusal));
+    yes('a staff whose spell no tome teaches is refused to an Enchanter who has not unlocked it',
+        !!n.refusal);
   }
 
   // The spell known some other way does not open a staff: only the record does.
@@ -369,15 +378,16 @@ function chat(srv, actor) {
   const s = taught(srv, fresh);
   s.spells = { points: 0, known: ['Flames'] };
   srv.C.writeState(fresh, s);
-  yes('a spell in the book but not learned from a tome does not open the staff',
+  yes('a spell in the book but not unlocked for staves does not open the staff',
       !!flamesRow && !!srv.craft(fresh, flamesRow).refusal);
   srv.said.length = 0;
   const again = srv.read(fresh, FLAMES_TOME);
-  yes('  reading its tome then records it for staves, without spending another place',
-      again === undefined && srv.S.knows(srv.C.stateOf(fresh), FLAMES) &&
-      srv.C.stateOf(fresh).spells.known.length === 1 &&
-      chat(srv, fresh).length === 1 && /staff/.test(chat(srv, fresh)[0].text));
-  yes('  and the staff opens', !!flamesRow && !srv.craft(fresh, flamesRow).refusal);
+  yes('  reading its tome records nothing for staves and spends nothing (#1128)',
+      again === undefined && !srv.S.knows(srv.C.stateOf(fresh), FLAMES) &&
+      srv.C.stateOf(fresh).spells.known.length === 1);
+  const un2 = srv.S.unlock(srv.P, srv.C.stateOf(fresh), FLAMES);
+  if (un2.ok) { srv.C.writeState(fresh, un2.state); }
+  yes('  unlocking it on K does, and the staff opens', un2.ok && !!flamesRow && !srv.craft(fresh, flamesRow).refusal);
 
   // The staff gate asks after rank and half, so the old answers stand.
   const smith = srv.craft(SMITH, thunderRow);
