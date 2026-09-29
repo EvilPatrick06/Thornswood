@@ -82,6 +82,7 @@ function Copy-With($from, [string]$k, $v) {
 $base = [ordered]@{
     port = 7787; thornswoodVoicePort = 7789
     equipmentSlotCheckEnabled = $false; equipmentSpellCheckEnabled = $false; equipmentInventoryCheckEnabled = $false
+    npcAllowCrimeFaction = $true; npcAllowEssential = $true
     loadOrder = @('C:/p/Skyrim.esm'); maxPlayers = 10
 }
 
