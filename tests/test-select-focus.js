@@ -223,6 +223,8 @@ function rig(opts) {
     'let menuStayAt = 0;\n' +
     'let menuFgAt = 0;\n' +
     'let menuFgWas = null;\n' +
+    // Back at the choice after being idle (#1142); never, here.
+    'let menuAgain = null;\n' +
     "const UI_URL = '" + PAGE + "';\n" +
     'let PROFILE = ' + (opts.fallback || 0) + ';\n' +
     'let menuChosenId = 0, menuChosenAt = 0, menuSaidAt = 0, menuSaidTimes = 0;\n' +
