@@ -340,6 +340,18 @@ $ErrorActionPreference = 'Stop'
 
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\game\data\hunts.json' }
 
+# Update.esm's own Creation Club records (#479). Every Special Edition has
+# them, but their art comes with the Creation Club files Thornswood leaves out,
+# so a creature that is one is left out of the table (and so out of /spawn) and
+# listed under skipped with the reason. scripts\mods\Check-CreationForms.js
+# --write keeps the list, and tests\test-special-edition-only.js holds the
+# gamemode to it.
+$creation = @{}
+$creationList = Join-Path $PSScriptRoot '..\..\records\update-creation-club.json'
+foreach ($c in ([IO.File]::ReadAllText($creationList) | ConvertFrom-Json).records.PSObject.Properties) {
+    $creation[[string]$c.Name + ':Update.esm'] = $true
+}
+
 $fail = 0
 function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
 function Bad ($m) { Write-Host "  FAIL  $m" -ForegroundColor Red; $script:fail++ }
@@ -1184,6 +1196,10 @@ $namedByTemplate = 0
 $namedByEdid = New-Object 'System.Collections.Generic.List[string]'
 foreach ($d in $animals.Keys) {
     $a = $animals[$d]
+    if ($creation.ContainsKey([string]$d)) {
+        $skipped.Add([pscustomobject]@{ Desc = $d; Edid = $a.Npc.Edid; Why = 'a Creation Club creature: every Special Edition has the record, but its art comes with the Creation Club files Thornswood leaves out' })
+        continue
+    }
     $withItem = @($a.Pairs | Where-Object { [string]$_.Item -and $yieldOf.ContainsKey([string]$_.Item) })
     if ($withItem.Count -eq 0) {
         $skipped.Add([pscustomobject]@{ Desc = $d; Edid = $a.Npc.Edid; Why = 'nothing in its traits chain names a death item, so its body gives nothing' })

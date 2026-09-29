@@ -727,6 +727,18 @@ $ErrorActionPreference = 'Stop'
 
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\game\data\harvests.json' }
 
+# Update.esm's own Creation Club records (#479). Every Special Edition has
+# them, but their art comes with the Creation Club files Thornswood leaves out,
+# so a plant that is one, or whose produce is one, is nobody's to pick: it goes
+# in the unranked list with the reason. scripts\mods\Check-CreationForms.js
+# --write keeps the list, and tests\test-special-edition-only.js holds the
+# gamemode to it.
+$creation = @{}
+$creationList = Join-Path $PSScriptRoot '..\..\records\update-creation-club.json'
+foreach ($c in ([IO.File]::ReadAllText($creationList) | ConvertFrom-Json).records.PSObject.Properties) {
+    $creation[[string]$c.Name + ':Update.esm'] = $true
+}
+
 $fail = 0
 function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
 function Bad ($m) { Write-Host "  FAIL  $m" -ForegroundColor Red; $script:fail++ }
@@ -1433,7 +1445,9 @@ foreach ($d in ($plants.Keys | Sort-Object)) {
     }
 
     $why = ''
-    if ($ourStations.Contains([string]$d)) {
+    if ($creation.ContainsKey([string]$d) -or $creation.ContainsKey([string]$q.Desc)) {
+        $why = 'it or its produce is a Creation Club record: every Special Edition has it, but its art comes with the Creation Club files Thornswood leaves out, so nobody is handed one'
+    } elseif ($ourStations.Contains([string]$d)) {
         $why = 'this server places this one itself and answers it with the station code written for it, so it is not a plant for this pass to rank'
     } elseif ($PRODUCE_WITHOUT_A_PRICE -contains $q.Type) {
         $why = 'its produce is a ' + $q.Type + ', which is a list of things rather than one thing, and carries no price'
