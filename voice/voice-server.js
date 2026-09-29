@@ -583,6 +583,14 @@ class Sock {
 
     socket.on('drain', () => { this.backed = false; this.flushLatest(); });
     socket.on('data', (d) => { this.heard = Date.now(); this.feed(d); });
+    /*
+      The other end has shut its side without a close frame: a process
+      killed, a tab gone, a raw socket ended. The HTTP server hands the
+      socket over half open, so nothing here closed it, and it stayed a peer
+      until the next write to it failed. That write was the position tick
+      five times a second; for a socket sent nothing, it is the next ping.
+    */
+    socket.on('end', () => this.close());
     socket.on('error', () => this.close());
     socket.on('close', () => {
       live.delete(this);

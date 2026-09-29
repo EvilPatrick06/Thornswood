@@ -233,6 +233,20 @@ function textFrame(obj) {
   talks.sock.write(textFrame({ t: 'ping' }));
   for (let i = 0; i < 20 && !got.some((m) => m.t === 'pong'); i++) { await sleep(100); }
   check('a page ping once joined is answered with a pong', got.some((m) => m.t === 'pong'), true);
+  check('it is in the room', (await (await fetch('http://127.0.0.1:' + PORT + '/health')).json()).peers, 1);
+
+  /*
+    Its end shut with no close frame, a process killed or a tab gone. The
+    service used to notice only when its next write failed, so a socket sent
+    nothing stayed in the room. It goes at once now, well inside a ping.
+  */
+  talks.sock.end();
+  let left = false;
+  for (let i = 0; i < 10 && !left; i++) {
+    await sleep(20);
+    left = (await (await fetch('http://127.0.0.1:' + PORT + '/health')).json()).peers === 0;
+  }
+  check('a socket whose other end shuts leaves the room before the next ping', left, true);
   try { talks.sock.destroy(); } catch (e) { }
 
   console.log('');
