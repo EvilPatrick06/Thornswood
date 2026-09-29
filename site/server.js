@@ -1056,10 +1056,56 @@ async function standingsForDoor(ids) {
   return got;
 }
 
-async function who(req) {
+/*
+  How long a Submit waits on Discord before answering anyway (#467).
+
+  who() asks Discord who a signed in visitor is before any route looks at what
+  they sent, and discordGet gives Discord ten seconds a question, two
+  questions when the guild list is refused. So with Discord slow or not
+  answering, a signed in visitor pressing Send it on the report page watched
+  the button for ten to twenty seconds, and a report about a person was then
+  told to sign in, which they had.
+
+  On the doors below, who() now waits this long and no longer. The question
+  keeps going, one at a time per account (standAsking), and lands in
+  standCache as before, so the next press has the answer. Until then the
+  visitor counts as signed in with the lookup failed, which each door turns
+  into words: a problem or an idea goes anyway, and anything that needs
+  their roles says Discord could not be asked. A ban in the site's own file
+  and the hand written admin list need no Discord, so they still count.
+*/
+const SUBMIT_WAIT_MS = 700;
+const SUBMIT_DOORS = new Set(['/api/report', '/api/gallery/submit', '/api/gallery/report']);
+// Shared for at most STAND_ASKING_MS: three questions of ten seconds is the
+// longest a lookup should take, and one that never settles must not hold
+// every later request for that account behind it.
+const STAND_ASKING_MS = 35000;
+const standAsking = new Map();
+function standingSoon(id, waitMs) {
+  let ask = standAsking.get(id);
+  if (!ask || Date.now() - ask.at > STAND_ASKING_MS) {
+    const mine = { p: standingCached(id), at: Date.now() };
+    standAsking.set(id, mine);
+    const done = () => { if (standAsking.get(id) === mine) standAsking.delete(id); };
+    mine.p.then(done, done);
+    ask = mine;
+  }
+  if (!(waitMs > 0)) return ask.p;
+  let timer = null;
+  const late = new Promise((r) => { timer = setTimeout(() => r(null), waitMs); });
+  return Promise.race([ask.p, late]).then((st) => {
+    clearTimeout(timer);
+    if (st) return st;
+    const listed = cfg.admins.indexOf(String(id)) >= 0;
+    return { id: String(id), inGuild: listed, banned: false, admin: listed, play: listed, dev: listed,
+             roles: [], name: '', lookupFailed: 'Discord did not answer in time' };
+  });
+}
+
+async function who(req, waitMs) {
   const me = identity(req);
   if (!me) return { member: isMember(req), admin: false, dev: false, name: '', id: '', play: false };
-  const st = await standingCached(me.id);
+  const st = await standingSoon(me.id, waitMs);
   return {
     // "member" is now "may use the hub", and only staff may. Being allowed
     // into the GAME is st.play, and that is asked separately by the launcher.
@@ -1072,6 +1118,7 @@ async function who(req) {
     play: st.play,
     banned: st.banned,
     inGuild: st.inGuild,
+    lookupFailed: st.lookupFailed || '',
     id: me.id,
     name: st.name || me.name
   };
@@ -2809,7 +2856,7 @@ async function handle(req, res) {
     return send(res, 301, '', 'text/plain', { Location: url.pathname.replace(/\/{2,}/g, '/') + url.search });
   }
 
-  const w = await who(req);
+  const w = await who(req, req.method === 'POST' && SUBMIT_DOORS.has(route) ? SUBMIT_WAIT_MS : 0);
 
   // ---------------------------------------------------------- member login
   if (p === '/api/login' && req.method === 'POST') {
@@ -3161,9 +3208,23 @@ async function handle(req, res) {
        counted per account as well as per connection. */
     let person = null;
     if (o.kind === 'report') {
-      if (!w.id || w.banned || !w.play) {
+      if (!w.id) {
         return sendJson(res, 401, { error: 'Sign in with Discord to report somebody, ' +
           'so staff can come back to you about it.' });
+      }
+      // Signed in already, so "sign in" is the wrong thing to tell them
+      // (#467). Discord not answering in time is said as that.
+      if (w.banned) {
+        return sendJson(res, 403, { error: 'That Discord account is banned from Thornswood.' });
+      }
+      if (!w.play && w.lookupFailed) {
+        return sendJson(res, 503, { error: 'Thornswood could not ask Discord who you are just ' +
+          'now, so a report about a person cannot go yet. Try again in a minute. A problem or ' +
+          'an idea goes without it.' });
+      }
+      if (!w.play) {
+        return sendJson(res, 403, { error: 'Your Discord account is not let into Thornswood ' +
+          'yet, so it cannot report somebody from here. Ask staff in the Discord instead.' });
       }
       const about = String(o.about || '').trim().slice(0, 60);
       if (!about) return sendJson(res, 400, { error: 'say who it is about in the Who box' });
@@ -3728,6 +3789,9 @@ async function handle(req, res) {
       discordId = w.id || '';
     } else {
       const t = readTicket(url.searchParams.get('ticket'));
+      // Signed in, and Discord did not answer in time (#467): say that.
+      if (!t && w.id && w.lookupFailed) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
+        'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
       if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
         'Sign in to the hub, or send a valid launcher ticket.' });
       const st = await standing(t.d);
@@ -3878,6 +3942,9 @@ async function handle(req, res) {
       discordId = w.id || '';
     } else {
       const t = readTicket(url.searchParams.get('ticket'));
+      // Signed in, and Discord did not answer in time (#467): say that.
+      if (!t && w.id && w.lookupFailed) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
+        'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
       if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
         'Sign in, or send a valid launcher ticket.' });
       const st = await standing(t.d);
