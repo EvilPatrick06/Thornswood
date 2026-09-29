@@ -4074,7 +4074,7 @@ function beginChoosing(actorId, state, why) {
   closeRaceMenu(actorId);
   const opened = openCreation(actorId);
   /*
-    THE LINE IS FOR THE PANEL THAT DID NOT OPEN, AND FOR NOBODY ELSE.
+    THE PRESS K LINE IS FOR THE PANEL THAT DID NOT OPEN, AND FOR NOBODY ELSE.
 
     Patrick, 21 September: "during creation it shouldnt put in chat to press k
     to begin blah blah because it brings the menu up automically and that is
@@ -4088,11 +4088,17 @@ function beginChoosing(actorId, state, why) {
     then, and it says what has actually happened rather than pretending this is
     the normal greeting.
   */
-  if (!opened) {
-    say(actorId, 'Welcome to Thornswood. The starting panel did not open by ' +
-                 'itself. Press K to choose where you will start. Your class ' +
-                 'and profession can be chosen there too, or later in the world.');
-  }
+  /*
+    AND ONE LINE EITHER WAY, issue #416, once (tellOnce). The pack has just
+    changed under them (giveShift) and the next pick moves them to a town,
+    and neither is on the screen. The welcome is beginAppearance's.
+  */
+  tellOnce(actorId, 'choosing', opened
+    ? 'You have been given plain clothes. Choose a home town, and you will ' +
+      'wake up at its inn.'
+    : 'You have been given plain clothes. The starting panel did not open by ' +
+      'itself. Press K to choose where you will start. Your class and ' +
+      'profession can be chosen there too, or later in the world.');
   log('chargen', actorId.toString(16), '-> choosing (' + why + ')' +
       (opened ? ', panel opened' : ', panel NOT opened'));
 }
@@ -4150,8 +4156,8 @@ function arriveAt(actorId, townKey) {
     spam and is unnescery". That line described what was already on the
     screen. This one is said once, after the one pick that ends creation, and
     it says where the server has just moved them, which nothing else does.
-    Lines for the other steps of creation are his to decide, and none are
-    added here.
+    The other steps have one line each since issue #416, through tellOnce,
+    each saying what changed and not what is already on the screen.
 
     say() and not notify(), whose own comment says it may well do nothing
     from here.
@@ -4340,6 +4346,36 @@ function setChargen(actorId, state) {
   mp.set(actorId, CHARGEN_PROPERTY, state);
 }
 
+/*
+  ONE LINE PER STEP OF CREATION, ONCE PER CHARACTER, issue #416.
+
+  Patrick, 28 September, on these lines: "Yes I want it, the problem was it
+  kept spamming the same message every like 5 seconds". The old creation line
+  was said from the choosing reminder, which runs on a timer and runs again
+  straight away every time the tick sees somebody afresh (a reconnect, a drop
+  out of onlinePlayers, a hot reload emptying firstSeen). A line that rides a
+  timer or a first sighting repeats; a line that rides a stage change should
+  not, but only while the stage write sticks, and chargenTick re-reads the
+  record every 500 ms.
+
+  So the step is written on the record (told) BEFORE the line goes, and the
+  line goes only when the record read back says so. A step already told is
+  never told again, whatever calls this; a write that did not stick says
+  nothing rather than saying it on every tick. A new character is a new actor
+  with no record, so they are told again.
+*/
+function tellOnce(actorId, step, text) {
+  const st = chargenOf(actorId);
+  if (!st || (st.told && st.told[step])) { return false; }
+  st.told = Object.assign({}, st.told);
+  st.told[step] = Date.now();
+  setChargen(actorId, st);
+  const back = chargenOf(actorId);
+  if (!back || !back.told || !back.told[step]) { return false; }
+  say(actorId, text);
+  return true;
+}
+
 /** Add or remove a set of [descriptor, count] pairs in one inventory write. */
 function giveItems(actorId, pairs, sign) {
   const inv = mp.get(actorId, 'inventory') || { entries: [] };
@@ -4431,6 +4467,11 @@ function beginAppearance(actorId) {
   setChargen(actorId, state);
   log('chargen', actorId.toString(16), '-> appearance',
       state.moved ? '(moving to the hall, menu to follow)' : '(already in the hall)');
+  // Issue #416, once (tellOnce): the stone room, and the teleport into it. The
+  // race menu is not described: it is on their screen.
+  tellOnce(actorId, 'hall', state.moved
+    ? 'Welcome to Thornswood. You are going to the creation hall to make your character.'
+    : 'Welcome to Thornswood. This is the creation hall, where you make your character.');
 }
 
 /**
@@ -4732,6 +4773,8 @@ function chargenTick() {
             ', so creation is skipped for them');
         setChargen(actorId, { stage: 'done', at: now, legacy: true });
         closeRaceMenu(actorId);
+        // Issue #416, once (tellOnce): why the race menu shut, if it was up.
+        tellOnce(actorId, 'back', 'Welcome back to Thornswood. This character is already made.');
         continue;
       }
 
@@ -4787,10 +4830,14 @@ function chargenTick() {
         for the case it was written for: the push failed, so there is nothing
         on their screen and a key press is the only way on.
       */
+      //
+      // And said once (tellOnce, issue #416): this is the timer that repeated
+      // the old line, and beginChoosing has already said it on the same step,
+      // so a reminder, a reconnect or a hot reload after that says nothing.
       if (!openCreation(actorId)) {
-        say(actorId, 'The starting panel did not open. Press K to choose where ' +
-                     'you will start. Your class and profession can wait until ' +
-                     'you are there.');
+        tellOnce(actorId, 'choosing', 'The starting panel did not open. Press K ' +
+                     'to choose where you will start. Your class and profession ' +
+                     'can wait until you are there.');
       }
       continue;
     }
