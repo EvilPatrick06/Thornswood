@@ -146,13 +146,21 @@ function Mend($from, $to) {
 }
 
 # How many people a world folder holds: the change forms named with a bare
-# number are characters (scripts\ops\Reset-Character.ps1 reads them the same
-# way), everything else in there describes the world.
+# number are character slots (scripts\ops\Reset-Character.ps1 reads them the
+# same way), everything else in there describes the world. A deleted
+# character keeps its slot with profileId -1 and isDeleted true, so only a
+# slot with a profile id that is not deleted is a person (#401: the first
+# rehearsal found 18 slots on live and 11 people).
 function People($to) {
   $forms = Join-Path $stage ($to + '\changeForms')
   if (-not (Test-Path -LiteralPath $forms)) { return 0 }
-  return @(Get-ChildItem -LiteralPath $forms -File -Filter *.json -EA SilentlyContinue |
-           Where-Object { $_.BaseName -match '^[0-9]+$' }).Count
+  $n = 0
+  foreach ($f in @(Get-ChildItem -LiteralPath $forms -File -Filter *.json -EA SilentlyContinue |
+                   Where-Object { $_.BaseName -match '^[0-9]+$' })) {
+    try { $o = [IO.File]::ReadAllText($f.FullName) -replace '^\uFEFF', '' | ConvertFrom-Json } catch { continue }
+    if ($null -ne $o.profileId -and [long]$o.profileId -gt 0 -and $o.isDeleted -ne $true) { $n++ }
+  }
+  return $n
 }
 
 # The live server, then the dev one, the same five things from each.

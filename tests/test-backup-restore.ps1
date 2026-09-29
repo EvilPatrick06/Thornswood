@@ -22,6 +22,11 @@
       whose load order pointed at another server's plugins, points it at its
       own, and says RESTORE OK, with the original server folder deleted first
       so nothing can resolve against it
+    - it counts living characters (a slot with a profile id, not deleted),
+      finds -Expect by profile id, and refuses a world of deleted slots; the
+      nightly NOTES.txt counts the same way (first rehearsal, 28 September)
+    - a live restore into a folder holding the dev payload takes the port,
+      name and server keys from the backup, so live comes back as live
     - a folder missing one plugin is refused and the plugin is named
     - -Which dev restores the dev character and not the live one
     - a second restore keeps what it replaced, and a running server is refused
@@ -97,9 +102,14 @@ function Settings([string]$root, [string]$pluginRoot, [int]$port) {
         ([ordered]@{ port = $port; name = 'Thornswood Test'; loadOrder = @($plugins | ForEach-Object { $far + $_ }) } |
          ConvertTo-Json -Depth 5))
 }
-# A server as the box has it: plugins, settings, a world of change forms (the
-# characters are the ones named with a bare number), private and data.
-function Server([string]$root, [int]$port, [string]$who, [int]$worldFiles) {
+# A server as the box has it: plugins, settings, a world of change forms,
+# private and data. Characters are shaped as the real world has them (seen in
+# the first rehearsal, 28 September): slots named 0.json, 1.json, ... with the
+# profile id inside, and a deleted character's slot left behind with
+# profileId -1 and isDeleted true. $who is in slot 0, another person in slot 4,
+# and slots 1 to 3 are deleted, so a world holds two characters.
+$otherWho = '2000001'
+function Server([string]$root, [int]$port, [string]$who, [int]$worldFiles, [switch]$DeadOnly) {
     Plugins $root $plugins
     Settings $root $root $port
     Put (Join-Path $root 'gamemode.js') '// gamemode'
@@ -110,8 +120,14 @@ function Server([string]$root, [int]$port, [string]$who, [int]$worldFiles) {
     Put (Join-Path $root 'private\door.json') '{"key":"not-a-real-key"}'
     Put (Join-Path $root 'private\allowed.json') '{"allowed":[]}'
     $forms = Join-Path $root 'world\changeForms'
-    Put (Join-Path $forms "$who.json") ('{"formId":' + $who + ',"marker":"' + [Guid]::NewGuid().ToString('N') + '","inv":"' + (Noise 900) + '"}')
-    foreach ($i in 1..4) { Put (Join-Path $forms ("{0}.json" -f (1000 + $i))) ('{"formId":' + (1000 + $i) + ',"x":"' + (Noise 600) + '"}') }
+    $gone = '{"profileId":-1,"isDeleted":true,"isDisabled":false,"x":"' + (Noise 300) + '"}'
+    if ($DeadOnly) {
+        foreach ($i in 0..4) { Put (Join-Path $forms "$i.json") $gone }
+    } else {
+        Put (Join-Path $forms '0.json') ('{"profileId":' + $who + ',"isDeleted":false,"marker":"' + [Guid]::NewGuid().ToString('N') + '","inv":"' + (Noise 900) + '"}')
+        foreach ($i in 1..3) { Put (Join-Path $forms "$i.json") $gone }
+        Put (Join-Path $forms '4.json') ('{"profileId":' + $otherWho + ',"isDeleted":false,"isDisabled":true,"x":"' + (Noise 600) + '"}')
+    }
     foreach ($i in 1..$worldFiles) { Put (Join-Path $forms ("ff{0:x6}.json" -f $i)) ('{"ref":' + $i + ',"x":"' + (Noise 1100) + '"}') }
 }
 
@@ -128,7 +144,7 @@ try {
     Server $dev  45787 $devWho 30
     Put $key (Noise 48)
     Put (Join-Path $work 'wrong-key.txt') (Noise 48)
-    $keep = [IO.File]::ReadAllBytes((Join-Path $live "world\changeForms\$liveWho.json"))
+    $keep = [IO.File]::ReadAllBytes((Join-Path $live 'world\changeForms\0.json'))
     $keepBook = [IO.File]::ReadAllText((Join-Path $live 'private\characters.json'))
     $worldCount = @(Get-ChildItem -LiteralPath (Join-Path $live 'world') -Recurse -File).Count
 
@@ -158,8 +174,8 @@ try {
     $encPath = if ($enc.Count) { $enc[0].FullName } else { '' }
     $encKB = if ($enc.Count) { [math]::Round($enc[0].Length / 1KB) } else { 0 }
     Yes "  far larger than the 195 KB of the 15 September pair ($encKB KB)" ($encKB -gt 5 * 195)
-    Yes '  and the log counts the characters in each world' (
-        (Said 'game\\world\s+5 character') -and (Said 'game-dev\\world\s+5 character'))
+    Yes '  and the log counts the living characters in each world, not the deleted slots' (
+        (Said 'game\\world\s+2 character') -and (Said 'game-dev\\world\s+2 character'))
 
     $daily = @(Get-ChildItem -LiteralPath $out -File | Where-Object { $_.Name -match '^thornswood-(\d{8})-\d{6}\.zip(\.enc)?$' } |
                Where-Object { ([datetime]::ParseExact($_.Name.Substring(11, 8), 'yyyyMMdd', $null)).DayOfWeek -ne 'Sunday' })
@@ -179,12 +195,12 @@ try {
         $z.Dispose()
         $gw = @($names | Where-Object { $_ -like 'game/world/*' })
         Yes ("the zip lists entries under game/world ({0} of {1})" -f $gw.Count, $worldCount) ($gw.Count -eq $worldCount)
-        Yes '  including the character' ($names -contains "game/world/changeForms/$liveWho.json")
+        Yes '  including the character' ($names -contains 'game/world/changeForms/0.json')
         $want = 'characters.json', 'mod-settings.json', 'take-limit.json', 'door.json', 'allowed.json'
         Yes '  and every private file of the live server' (@($want | Where-Object { $names -notcontains "game/private/$_" }).Count -eq 0)
         Yes '  and of the dev server, with its world' (
             @($want | Where-Object { $names -notcontains "game-dev/private/$_" }).Count -eq 0 -and
-            $names -contains "game-dev/world/changeForms/$devWho.json")
+            $names -contains 'game-dev/world/changeForms/0.json')
         Yes '  and data and the settings from both' (
             $names -contains 'game/data/keep.txt' -and $names -contains 'game-dev/server-settings.json')
         Yes ("  and the zip is far larger than 195 KB ({0} KB)" -f [math]::Round($zip[0].Length / 1KB)) ($zip[0].Length -gt 5 * 195KB)
@@ -193,7 +209,7 @@ try {
     # ---- opening it ----------------------------------------------------------
     $code = Run $Unpack @('-Backup', $encPath, '-KeyFile', $key, '-CheckOnly', '-NoPause')
     Yes "Restore-Backup.ps1 -CheckOnly opens it (exit $code)" ($code -eq 0 -and (Said 'signature matches'))
-    Yes '  and prints what the box wrote in NOTES.txt' (Said 'game\s+5 character\(s\), 0 torn')
+    Yes '  and prints what the box wrote in NOTES.txt' (Said 'game\s+2 character\(s\), 0 torn')
     $code = Run $Unpack @('-Backup', $encPath, '-KeyFile', (Join-Path $work 'wrong-key.txt'), '-CheckOnly', '-NoPause')
     Yes '  and refuses the wrong passphrase before decrypting anything' ($code -ne 0 -and (Said 'Nothing was decrypted'))
 
@@ -217,13 +233,22 @@ try {
     $restored = Join-Path $work 'restore-test'
     Plugins $restored $plugins
     Settings $restored $live 45797
+    # And, as on the box on 28 September, the payload unpacked there was the
+    # dev channel's: the dev name and a thornswoodServer the live backup has not.
+    $rsPath = Join-Path $restored 'server-settings.json'
+    $rs = [IO.File]::ReadAllText($rsPath) | ConvertFrom-Json
+    $rs.name = 'Thornswood Dev'
+    $rs | Add-Member -NotePropertyName thornswoodServer -NotePropertyValue 'dev'
+    Put $rsPath ($rs | ConvertTo-Json -Depth 5)
     Remove-Item -LiteralPath $live -Recurse -Force
     Yes 'the original server folder is gone before the restore' (-not (Test-Path -LiteralPath $live))
 
     $code = Run $Restore @('-Backup', $encPath, '-KeyFile', $key, '-Root', $restored, '-Expect', $liveWho, '-NoPause')
-    Yes "Restore-Server.ps1 puts it back (exit $code)" ($code -eq 0 -and (Said 'RESTORE OK: 5 character'))
+    Yes "Restore-Server.ps1 puts it back (exit $code)" ($code -eq 0 -and (Said 'RESTORE OK: 2 character'))
     if ($code -ne 0) { Show }
-    $back = Join-Path $restored "world\changeForms\$liveWho.json"
+    Yes '  counting the two living characters and not the three deleted slots' (Said '3 slot\(s\) a deleted character left behind')
+    Yes '  and -Expect finds the character by its profile id, in slot 0' (Said "character $liveWho is there, in 0\.json")
+    $back = Join-Path $restored 'world\changeForms\0.json'
     Yes '  the character is there, byte for byte' (
         (Test-Path -LiteralPath $back) -and ([Convert]::ToBase64String([IO.File]::ReadAllBytes($back)) -eq [Convert]::ToBase64String($keep)))
     Yes ("  and the whole world ({0} files)" -f $worldCount) (
@@ -238,6 +263,8 @@ try {
     Yes '  and the load order names this folder, not the one the backup came from' (
         @($s.loadOrder).Count -eq $plugins.Count -and @($s.loadOrder | Where-Object { -not $_.StartsWith($mine) }).Count -eq 0)
     Yes '  in the same order' ((@($s.loadOrder | ForEach-Object { Split-Path -Leaf $_ }) -join '|') -eq ($plugins -join '|'))
+    Yes '  and it is the live server again: the port and name from the backup, not the dev payload' (
+        $s.port -eq 45777 -and $s.name -eq 'Thornswood Test' -and -not ($s.PSObject.Properties.Name -contains 'thornswoodServer'))
     Yes '  and the decrypted copy is not left in the temp folder' (
         @(Get-ChildItem -LiteralPath ([IO.Path]::GetTempPath()) -Directory -Filter 'thornswood-restore-*' -EA SilentlyContinue |
           Where-Object { $_.LastWriteTime -gt (Get-Date).AddMinutes(-2) }).Count -eq 0)
@@ -245,7 +272,7 @@ try {
     $code = Run $Restore @('-Backup', $encPath, '-KeyFile', $key, '-Root', $restored, '-NoPause')
     $aside = @(Get-ChildItem -LiteralPath $restored -Directory -Filter 'world-before-restore-*')
     Yes 'a second restore keeps the world it replaced' (
-        $code -eq 0 -and $aside.Count -eq 1 -and (Test-Path -LiteralPath (Join-Path $aside[0].FullName "world\changeForms\$liveWho.json")))
+        $code -eq 0 -and $aside.Count -eq 1 -and (Test-Path -LiteralPath (Join-Path $aside[0].FullName 'world\changeForms\0.json')))
 
     $broken = Join-Path $work 'restore-broken'
     Plugins $broken ($plugins | Where-Object { $_ -ne 'Thornswood.esp' })
@@ -258,11 +285,32 @@ try {
     Plugins $devBack $plugins
     Settings $devBack $dev 45817
     $code = Run $Restore @('-Backup', $encPath, '-KeyFile', $key, '-Root', $devBack, '-Which', 'dev', '-Expect', $devWho, '-NoPause')
-    Yes "-Which dev puts the dev world back (exit $code)" ($code -eq 0 -and (Test-Path -LiteralPath (Join-Path $devBack "world\changeForms\$devWho.json")))
-    Yes '  and not the live one' (-not (Test-Path -LiteralPath (Join-Path $devBack "world\changeForms\$liveWho.json")))
+    $slot0 = Join-Path $devBack 'world\changeForms\0.json'
+    $slot0Text = if (Test-Path -LiteralPath $slot0) { [IO.File]::ReadAllText($slot0) } else { '' }
+    Yes "-Which dev puts the dev world back (exit $code)" ($code -eq 0 -and $slot0Text -match ('"profileId":' + $devWho))
+    Yes '  and not the live one' ($slot0Text -notmatch ('"profileId":' + $liveWho))
 
     $code = Run $Restore @('-Backup', $encPath, '-KeyFile', $key, '-Root', $devBack, '-Expect', '999', '-NoPause')
     Yes '-Expect names a character that is not there and refuses' ($code -ne 0 -and (Said 'Character 999 is not in the restored world'))
+    $code = Run $Restore @('-Backup', $encPath, '-KeyFile', $key, '-Root', $devBack, '-Which', 'dev', '-Expect', '0', '-NoPause')
+    Yes '-Expect takes a profile id, not a slot file name (0 refuses)' ($code -ne 0 -and (Said 'Character 0 is not in the restored world'))
+
+    # A world whose every slot is a deleted character holds nobody, and a
+    # restore of it is refused rather than reported as characters.
+    $dead = Join-Path $work 'dead'
+    Server $dead 45827 '0' 3 -DeadOnly
+    $deadOut = Join-Path $work 'dead-out'
+    $code = Run $Nightly @('-GameRoot', $dead, '-DevGameRoot', $dev,
+                           '-SiteRoot', (Join-Path $work 'no-site'), '-BotRoot', (Join-Path $work 'no-bot'),
+                           '-CaddyRoot', (Join-Path $work 'no-caddy'), '-VoiceRoot', (Join-Path $work 'no-voice'),
+                           '-Out', $deadOut, '-KeyFile', $key, '-Plain')
+    Yes '  the nightly log counts 0 characters in a world of deleted slots' ($code -eq 0 -and (Said 'game\\world\s+0 character'))
+    $deadZip = @(Get-ChildItem -LiteralPath $deadOut -Filter 'thornswood-*.zip' -File -EA SilentlyContinue)
+    $deadBack = Join-Path $work 'restore-dead'
+    Plugins $deadBack $plugins
+    Settings $deadBack $deadBack 45837
+    $code = if ($deadZip.Count) { Run $Restore @('-Backup', $deadZip[0].FullName, '-Root', $deadBack, '-NoPause') } else { 0 }
+    Yes 'a backup whose world holds only deleted characters is refused' ($code -ne 0 -and (Said 'holds no characters'))
 
     $node = Get-Command node -EA SilentlyContinue
     if ($node) {

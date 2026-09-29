@@ -18,7 +18,15 @@
     data     only the files the folder does not already have, so a build
              already installed there keeps its own shipped files
     server-settings.json and gamemode.js
-             only when the folder has none, for the same reason
+             only when the folder has none, for the same reason, EXCEPT the
+             keys that say which server this is: port, name,
+             thornswoodVoicePort, thornswoodServer and
+             thornswoodLoadOrderRefuse come from the backup. The payload on
+             the box (C:\thornswood-server.zip) is whichever channel was
+             published last, and on the first rehearsal (28 September) it was
+             a dev one: a live restore kept port 7787 and the name
+             Thornswood Dev, so the live server would have come back as the
+             dev one.
 
   Whatever world and private the folder already had is moved aside into
   world-before-restore-<stamp> inside it, never deleted.
@@ -36,8 +44,13 @@
   refusal Install-ThornswoodServer.ps1 makes.
 
   THE CHARACTER CHECK. A character is a change form named with a bare number
-  in world\changeForms (scripts\ops\Reset-Character.ps1 reads them the same
-  way). No characters is exit 1. -Expect <id> also requires that one.
+  in world\changeForms (0.json, 1.json, ...: a slot number, not the profile
+  id) whose profileId is set and which is not deleted. A deleted character
+  keeps its slot file with profileId -1 and isDeleted true, so counting the
+  files counted the dead too: the first real rehearsal, 28 September, found
+  18 slot files on live and 11 people in them. No characters is exit 1.
+  -Expect <profile id> (the number the launcher and the site show, in
+  decimal) also requires that person's character.
 
   It refuses to touch a folder whose server is running: the server writes
   world while it runs and would write straight back over the restore.
@@ -69,11 +82,24 @@ function Die($m) {
   if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
   exit 1
 }
+# The characters in a world: one entry per living one, with its profile id and
+# slot file. $script:deleted counts the slots a deleted character left behind.
+$deleted = 0
 function People([string]$worldDir) {
+  $script:deleted = 0
   $forms = Join-Path $worldDir 'changeForms'
   if (-not (Test-Path -LiteralPath $forms)) { return @() }
-  return @(Get-ChildItem -LiteralPath $forms -File -Filter *.json -EA SilentlyContinue |
-           Where-Object { $_.BaseName -match '^[0-9]+$' } | Sort-Object Name)
+  $out = @()
+  foreach ($f in @(Get-ChildItem -LiteralPath $forms -File -Filter *.json -EA SilentlyContinue |
+                   Where-Object { $_.BaseName -match '^[0-9]+$' } | Sort-Object { [long]$_.BaseName })) {
+    $o = $null
+    try { $o = [IO.File]::ReadAllText($f.FullName) -replace '^\uFEFF', '' | ConvertFrom-Json } catch { $o = $null }
+    $id = 0L
+    if ($o -and $null -ne $o.profileId) { try { $id = [long]$o.profileId } catch { $id = 0L } }
+    if ($id -le 0 -or ($o -and $o.isDeleted -eq $true)) { $script:deleted++; continue }
+    $out += [pscustomobject]@{ Id = $id; File = $f }
+  }
+  return $out
 }
 
 if (-not (Test-Path -LiteralPath $Root)) {
@@ -142,7 +168,7 @@ $srcWorld = Join-Path $src 'world'
 if (-not (Test-Path -LiteralPath $srcWorld)) {
   Die "This backup has no $tag\world. Backups from before issue #401 carry no dev server; use -Which live or a newer one."
 }
-$had = People $srcWorld
+$had = @(People $srcWorld)
 if (-not $had.Count) { Die "The backup's $tag\world holds no characters. Use an older backup: that is what the weeklies are for." }
 Say ("  {0} character(s) in the backup's {1}\world" -f $had.Count, $tag) 'Green'
 
@@ -207,6 +233,35 @@ if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $by
 $utf8 = New-Object Text.UTF8Encoding($false)
 $s = $utf8.GetString($bytes) | ConvertFrom-Json
 if (-not $s.loadOrder) { Die 'server-settings.json has no loadOrder.' }
+
+# Which server this is comes from the backup, not from whichever channel's
+# payload was unpacked here (see the note at the top).
+$named = 0
+$srcSettings = Join-Path $src 'server-settings.json'
+if (Test-Path -LiteralPath $srcSettings) {
+  $b = $null
+  try { $b = [IO.File]::ReadAllText($srcSettings) -replace '^\uFEFF', '' | ConvertFrom-Json } catch { $b = $null }
+  if ($b) {
+    foreach ($k in 'port', 'name', 'thornswoodVoicePort', 'thornswoodServer', 'thornswoodLoadOrderRefuse') {
+      $has = $s.PSObject.Properties.Name -contains $k
+      $want = $b.PSObject.Properties.Name -contains $k
+      if ($want) {
+        if (-not $has) {
+          Say ("  {0}: {1} from the backup, the folder had none" -f $k, (ConvertTo-Json $b.$k -Compress)) 'Yellow'
+          $s | Add-Member -NotePropertyName $k -NotePropertyValue $b.$k; $named++
+        }
+        elseif ((ConvertTo-Json $s.$k -Compress) -ne (ConvertTo-Json $b.$k -Compress)) {
+          Say ("  {0}: {1} from the backup, was {2}" -f $k, (ConvertTo-Json $b.$k -Compress), (ConvertTo-Json $s.$k -Compress)) 'Yellow'
+          $s.$k = $b.$k; $named++
+        }
+      } elseif ($has) {
+        Say "  $k taken off: the backup's settings do not have it" 'Yellow'
+        $s.PSObject.Properties.Remove($k); $named++
+      }
+    }
+  }
+}
+
 $order = @()
 $moved = 0
 foreach ($p in @($s.loadOrder)) {
@@ -218,10 +273,10 @@ foreach ($p in @($s.loadOrder)) {
   }
   $order += $fwd
 }
-if ($moved) {
+if ($moved -or $named) {
   $s.loadOrder = $order
   [IO.File]::WriteAllText($settingsPath, ($s | ConvertTo-Json -Depth 20), $utf8)
-  Say "  $moved plugin path(s) named another server's folder; pointed at $rootFwd" 'Yellow'
+  if ($moved) { Say "  $moved plugin path(s) named another server's folder; pointed at $rootFwd" 'Yellow' }
 } elseif ($bom) {
   [IO.File]::WriteAllBytes($settingsPath, $bytes)
 }
@@ -237,15 +292,17 @@ Say ("  load order: all {0} plugins present" -f $order.Count) 'Green'
 
 # ------------------------------------------------------------ characters ---
 Head 'Are the characters there'
-$now = People (Join-Path $Root 'world')
+$now = @(People (Join-Path $Root 'world'))
 if (-not $now.Count) { Die 'world\changeForms holds no characters after the restore.' }
-Say ("  {0} character(s): {1}{2}" -f $now.Count, (($now | Select-Object -First 5 | ForEach-Object { $_.BaseName }) -join ', '),
+Say ("  {0} character(s), profile ids {1}{2}" -f $now.Count, (($now | Select-Object -First 5 | ForEach-Object { $_.Id }) -join ', '),
      $(if ($now.Count -gt 5) { ', ...' } else { '' })) 'Green'
+if ($deleted) { Say "  and $deleted slot(s) a deleted character left behind, not counted" 'DarkGray' }
 if ($Expect) {
-  if (-not (Test-Path -LiteralPath (Join-Path $Root "world\changeForms\$Expect.json"))) {
-    Die "Character $Expect is not in the restored world."
+  $hit = @($now | Where-Object { [string]$_.Id -eq $Expect.Trim() })
+  if (-not $hit.Count) {
+    Die "Character $Expect is not in the restored world (no living character has that profile id)."
   }
-  Say "  character $Expect is there" 'Green'
+  Say ("  character {0} is there, in {1}" -f $Expect, $hit[0].File.Name) 'Green'
 }
 $book = Join-Path $Root 'private\characters.json'
 if (Test-Path -LiteralPath $book) {
