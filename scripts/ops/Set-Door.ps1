@@ -124,6 +124,12 @@ foreach (`$d in (Get-ChildItem 'C:\' -Directory -EA SilentlyContinue)) {
 }
 if (-not $root) { Die 'No server-settings.json anywhere on C: of the VPS.' }
 Say "  $root"
+# The dev server's door asks the dev list, /dev/api/allowed, which is only the
+# people the dev build is for (docs\SYSTEM.md, "The door"). Without -Site this
+# wrote the live address into the dev door and it fetched the live list (#964).
+if ($root -match '-Dev$' -and -not $PSBoundParameters.ContainsKey('Site')) {
+  $Site = $Site.TrimEnd('/') + '/dev'
+}
 
 # ------------------------------------------------------------- connecting ---
 if ($Connect) {
