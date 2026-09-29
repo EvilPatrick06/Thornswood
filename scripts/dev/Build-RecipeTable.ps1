@@ -1197,7 +1197,7 @@ $RUNGS_MUST_BE_STANDABLE = $true
 # the build, because a rung nobody can gather for is a rank that opens nothing.
 $HALVES_WITH_AN_UNSTANDABLE_RUNG = [ordered]@{
     'Cook/Confectioner' = 'every one of its 28 rows wants a Sack of Flour and a pat of Butter, counted over the whole half on 21 September, and flour is made from Wheat, which harvests.json ranks advanced for a gatherer and for a farmer alike. So the cheapest thing a Confectioner can bake is advanced work to gather for and the novice rung cannot be stood on whatever rule ranks the half: by input cost all 28 land 20 advanced and 8 expert and none novice (28 September), and filling the empty novice rung (HOLE_FILL_MOVES_ONE_RUNG) only relabels eight of the advanced ones. This appeared the day the hop was followed and it was always true; before it, flour had no producer at all and every row read as costing nothing. It closes when somebody decides where a Confectioner''s flour comes from, which is the same decision HALVES_NOBODY_CAN_START is already waiting on for this half: all 28 rows are behind two vanilla perks nobody here will ever hold, so nothing is being opened to anybody at any rank yet.'
-    'Enchanter/Bladebinder' = '160 of its 161 rows want a Heart Stone, which Patrick made advanced mining on 28 September (issue #398, RANK_BY_ORE in Build-OreTable.ps1), so by input cost 160 land on advanced and the hole fill (HOLE_FILL_MOVES_ONE_RUNG) moves some of them one rung either way: novice 66, advanced 55, expert 39, master 1, none more than a rung from its stone. The 66 on novice are one rung below the stone, so a novice Bladebinder buys stones from an advanced miner rather than digging them. That is the whole cost and it is one rung, not the three the second rule left before. Nothing is opened to anybody at any rank yet either way: HALVES_NOBODY_CAN_START says why for this half.'
+    'Enchanter/Bladebinder' = '160 of its 161 rows want a Heart Stone, which Patrick made advanced mining on 28 September (issue #398, RANK_BY_ORE in Build-OreTable.ps1), so by input cost 160 land on advanced and the hole fill (HOLE_FILL_MOVES_ONE_RUNG) moves some of them one rung either way: novice 66, advanced 55, expert 39, master 1, none more than a rung from its stone. The 66 on novice are one rung below the stone, so a novice Bladebinder buys stones from an advanced miner rather than digging them. That is the whole cost and it is one rung, not the three the second rule left before. Each staff also wants its spell, which an Enchanter learns by reading its tome (TOMES_TEACH_STAFF_SPELLS, issue #967).'
 }
 
 # WHERE THE GOLD VALUE SITS IN EACH KIND OF RECORD. The first five were proved
@@ -1250,9 +1250,32 @@ $NOVICE_MUST_BE_REACHABLE = $true
 # asked separately: a half can own hundreds of rows and still be empty in
 # practice, which is exactly what two of these are. The counts printed every
 # run now carry both numbers side by side for this reason.
+# A SPELL A TOME TEACHES IS A SPELL AN ENCHANTER CAN LEARN, and so a staff
+# recipe whose only condition is that spell is one somebody can reach.
+#
+# Patrick, 28 September, answering issue #967: "Enchanters learn staff spells
+# from spell tomes". 160 of the Bladebinder's 161 recipes carry a HasSpell
+# condition naming the staff's own spell, and the fork evaluates it (function
+# index 264 against MpActor::GetSpellList). Reading a tome teaches the spell in
+# the engine for anybody, and game\gamemode.js (THE STAFF SPELLS) records it for
+# somebody who can make staves, and a staff is refused until its spell is
+# recorded. So a HasSpell row counts as reachable here when some BOOK record
+# with the teaches spell flag names that spell, and the tomes are written into
+# the needs list (taughtBy) and into the STAFF_SPELLS block the gamemode reads.
+# A spell no tome teaches (the NPC copies some Apocalypse staves name) leaves
+# its row closed, and the run prints every one of them.
+#
+# Set this to $false and a HasSpell row is closed again whatever teaches it,
+# which puts the Bladebinder back in HALVES_NOBODY_CAN_START.
+$TOMES_TEACH_STAFF_SPELLS = $true
+# The BOOK DATA flag bit that says the tome teaches a spell: TeachesSpell = 0x04
+# in libespm/include/libespm/BOOK.h.
+$BOOK_TEACHES_SPELL = 0x04
+# The HasSpell condition function index, CONDITION_FUNCTIONS_THE_SERVER_HAS.
+$CONDITION_HAS_SPELL = 264
+
 $HALVES_NOBODY_CAN_START = [ordered]@{
     'Cook/Confectioner'     = 'every one of its 28 recipes carries two vanilla perk conditions, function index 448: MAG_FoodUpgradePerk03 out of Gourmet.esp on all 28, and a second perk named for the recipe itself, MAG_RecipePerkSnowberryDumpling and its like, on all 28 as well. classes.md says no perk menu opens and vanilla progression is off, so nobody here will ever hold either. The server would wave the condition through, because the fork has no function for that index, but Skyrim''s own crafting menu evaluates it first and never lists the recipe, so onCraft is not even reached. The dessert keyword split is right and the half is real; what is missing is somebody deciding what a new Confectioner starts able to bake. Four of the 28 want an item on top of the perks.'
-    'Enchanter/Bladebinder' = '160 of its 161 recipes are the Dragonborn staff enchanter''s, and every one of those 160 carries a HasSpell condition naming the staff''s own spell: Thunderbolt, Turn Undead, the Odin wall spells. That one the server really does evaluate, function index 264 against MpActor::GetSpellList in the fork, so it is refused twice over. A new Enchanter has no spells at all: classes.md gives starting spells to the Mage alone and says nothing is handed out at the start but the clothes you stand in. The 161st is DLC1LD_RecipeAetherialStaff, which wants the Aetherium Crest and is behind the Dawnguard chain that ends in one. So the half is 0 of 161 on the day somebody picks it and stays there until the apprenticeship system classes.md describes is built, or until somebody decides what spells an Enchanter starts holding.'
 }
 
 # WHEN A HALF IS THIN ENOUGH TO NAME OUT LOUD. A half with a handful of rows a
@@ -2652,6 +2675,7 @@ foreach ($pl in $order) {
                     $alchFlags = 0
                     $hasEnit = $false
                     $weapAnim = -1
+                    $teaches = ''
                     $cnam = 0; $hasCnam = $false
                     $bnam = 0; $hasBnam = $false
                     $nam1 = 1
@@ -2706,6 +2730,16 @@ foreach ($pl in $order) {
                             # the first byte of a WEAP DNAM is the animation
                             # type, which is what tells a bow from a sword
                             $weapAnim = [int]$rec[$k]
+                        } elseif ($sub -eq 'DATA' -and $label -eq 'BOOK' -and $sz -ge 8) {
+                            # BOOK DATA: the flag byte, then at offset 4 the
+                            # spell a tome teaches when flag 0x04 (TeachesSpell
+                            # in libespm's BOOK.h) is set. SpellTomeThunderbolt
+                            # reads 4 and 0x10f7ee, which is Thunderbolt. Read
+                            # for issue #967: an Enchanter learns a staff's
+                            # spell from the tome that teaches it.
+                            if (([int]$rec[$k] -band $BOOK_TEACHES_SPELL) -ne 0) {
+                                $teaches = DescOf ([BitConverter]::ToUInt32($rec, $k + 4)) $masters $pl
+                            }
                         } elseif ($label -eq 'COBJ') {
                             if ($sub -eq 'CNAM' -and $sz -eq 4) { $cnam = [BitConverter]::ToUInt32($rec, $k); $hasCnam = $true }
                             elseif ($sub -eq 'BNAM' -and $sz -eq 4) { $bnam = [BitConverter]::ToUInt32($rec, $k); $hasBnam = $true }
@@ -2803,6 +2837,7 @@ foreach ($pl in $order) {
                             Desc = $desc; Type = $label; Edid = $edid; Name = $full; NameFrom = $fullFrom
                             AlchFlags = $alchFlags; HasEnit = $hasEnit; WeapAnim = $weapAnim
                             Keywords = $kwds.ToArray(); SeenIn = $pl; Value = $value
+                            Teaches = $teaches
                         }
                         if ($label -eq 'KYWD') { $kwName[$desc] = $edid }
                     }
@@ -2818,6 +2853,20 @@ foreach ($pl in $order) {
 Ok ("{0} recipes after overrides, out of {1} COBJ records read" -f $recipes.Count, ($recipes.Count + $seenTwice.Count))
 Ok ("{0} item and keyword records to resolve against, {1} of them keywords" -f $items.Count, $kwName.Count)
 if ($recipes.Count -eq 0) { Bad 'no COBJ records found at all, which means the load order or the Data folder is not what this thinks it is' }
+
+# Spell desc -> every spell tome that teaches it, sorted so two runs agree.
+# Read out of the BOOK records the scan above kept, last one in the load order
+# winning as everywhere else. TOMES_TEACH_STAFF_SPELLS says why (#967).
+$tomesBySpell = @{}
+foreach ($d in @($items.Keys | Sort-Object)) {
+    $it = $items[$d]
+    if ($it.Type -ne 'BOOK' -or -not $it.Teaches) { continue }
+    if (-not $tomesBySpell.ContainsKey($it.Teaches)) { $tomesBySpell[$it.Teaches] = New-Object 'System.Collections.Generic.List[string]' }
+    $tomesBySpell[$it.Teaches].Add($d)
+}
+$tomeCount = 0
+foreach ($s in $tomesBySpell.Keys) { $tomeCount += $tomesBySpell[$s].Count }
+Ok ("{0} spell tome(s) teaching {1} spell(s)" -f $tomeCount, $tomesBySpell.Count)
 
 # --------------------------------------------------------------- the split --
 
@@ -3040,11 +3089,36 @@ function ConditionRead($cond, $masters, [string]$plugin) {
     $text = $name
     if ($what) { $text += '(' + $what + ')' }
     $text += ' ' + $op + ' ' + $val
+    # The tomes that teach the spell a HasSpell names, for TOMES_TEACH_STAFF_SPELLS.
+    $tomes = @()
+    if ($idx -eq $CONDITION_HAS_SPELL -and $whatDesc -and $tomesBySpell.ContainsKey($whatDesc)) {
+        $tomes = $tomesBySpell[$whatDesc].ToArray()
+    }
     return [pscustomobject]@{
         Func = $idx; Name = $name; Text = $text
         Param = $what; ParamType = $whatType; ParamDesc = $whatDesc
         ServerSees = $serverSees
+        Tomes = $tomes
     }
+}
+
+# Can a new character get past every condition on a row. No condition at all
+# is the plain yes. Under TOMES_TEACH_STAFF_SPELLS a HasSpell whose spell a
+# tome teaches is also a yes, because the tome is how the spell is learned.
+function NeedsAreReachable($needs) {
+    foreach ($n in $needs) {
+        if ($TOMES_TEACH_STAFF_SPELLS -and $n.Func -eq $CONDITION_HAS_SPELL -and @($n.Tomes).Count -gt 0) { continue }
+        return $false
+    }
+    return $true
+}
+
+# The spell a row's HasSpell names, or '' when it has none.
+function StaffSpellOf($row) {
+    foreach ($n in $row.Needs) {
+        if ($n.Func -eq $CONDITION_HAS_SPELL -and $n.ParamDesc) { return [string]$n.ParamDesc }
+    }
+    return ''
 }
 
 $owned    = New-Object System.Collections.Specialized.OrderedDictionary
@@ -3364,7 +3438,11 @@ foreach ($desc in $recipes.Keys) {
         NameFrom = $o.NameFrom
         Value = $o.Value
         Needs = $needs.ToArray()
-        DayOne = ($needs.Count -eq 0)
+        DayOne = (NeedsAreReachable $needs)
+        # No condition at all. NOVICE_MUST_BE_REACHABLE ranks by this rather than
+        # by DayOne, so a staff opened by its tome (TOMES_TEACH_STAFF_SPELLS) does
+        # not move the Bladebinder's ladder that #398 set.
+        Bare = ($needs.Count -eq 0)
         BehindVanillaPerk = $behindPerk
         ServerChecks = $serverChecks
         Rank = ''
@@ -4363,7 +4441,7 @@ foreach ($p in $PROFESSIONS.Keys) {
         if ($NOVICE_MUST_BE_REACHABLE) {
             $firstOpen = ''
             foreach ($d in $sorted) {
-                if ($owned[$d].Fires -and $owned[$d].DayOne) { $firstOpen = $d; break }
+                if ($owned[$d].Fires -and $owned[$d].Bare) { $firstOpen = $d; break }
             }
             if ($firstOpen -and $owned[$firstOpen].Rank -ne 'novice') {
                 $promoted.Add(("{0}: {1} ({2}), worth {3}, was {4} and is the cheapest row of this half anybody can reach on the day they pick it" -f `
@@ -5049,9 +5127,17 @@ foreach ($desc in $owned.Keys) {
         foreach ($nd in $r.Needs) {
             $sees = 'false'
             if ($nd.ServerSees) { $sees = 'true' }
+            # A HasSpell also says which spell record it is and which tomes
+            # teach it (TOMES_TEACH_STAFF_SPELLS). Nothing else grows a field.
+            $spellTxt = ''
+            if ($nd.Func -eq $CONDITION_HAS_SPELL) {
+                $tomeBits = @()
+                foreach ($tm in @($nd.Tomes)) { $tomeBits += (JsonStr $tm) }
+                $spellTxt = ', "ofDesc": ' + (JsonStr $nd.ParamDesc) + ', "taughtBy": [' + ($tomeBits -join ', ') + ']'
+            }
             $bits += ('{ "asks": ' + (JsonStr $nd.Text) + ', "function": ' + $nd.Func +
                       ', "of": ' + (JsonStr $nd.Param) + ', "ofType": ' + (JsonStr $nd.ParamType) +
-                      ', "serverSees": ' + $sees + ' }')
+                      ', "serverSees": ' + $sees + $spellTxt + ' }')
         }
         $needsTxt = '[' + ($bits -join ', ') + ']'
     }
@@ -5129,13 +5215,64 @@ foreach ($desc in $owned.Keys) {
     $r = $owned[$desc]
     $dayOneTxt = 'false'
     if ($r.DayOne) { $dayOneTxt = 'true' }
+    # The spell a staff binds, on the rows that have one, for the gamemode's
+    # staff gate (STAFF_SPELLS below). Every other row is unchanged.
+    $spellTxt = ''
+    $rowSpell = StaffSpellOf $r
+    if ($rowSpell) { $spellTxt = ', "spell": ' + (JsonStr $rowSpell) }
     $blockRows.Add('    ' + (JsonStr $desc) + ': { "out": ' + (JsonStr $r.OutDesc) + ', "name": ' + (JsonStr $r.OutName) +
                    ', "type": ' + (JsonStr $r.OutType) + ', "makes": ' + $r.Count +
                    ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) +
                    ', "race": ' + (JsonStr $r.Race) +
                    ', "rank": ' + (JsonStr $r.Rank) + ', "family": ' + (JsonStr $r.Family) +
-                   ', "open": ' + $dayOneTxt + ' },')
+                   ', "open": ' + $dayOneTxt + $spellTxt + ' },')
 }
+
+# THE STAFF SPELLS, the second block this script owns in game\gamemode.js
+# (issue #967). Spell desc -> its name and every tome that teaches it, for each
+# spell a staff recipe the server is asked about names in a HasSpell. The
+# gamemode reads a tome off onReadBook against it and a staff off onCraft.
+$staffSpells = [ordered]@{}
+foreach ($desc in $owned.Keys) {
+    $r = $owned[$desc]
+    if (-not $r.Fires) { continue }
+    foreach ($n in $r.Needs) {
+        if ($n.Func -ne $CONDITION_HAS_SPELL -or -not $n.ParamDesc) { continue }
+        if ($staffSpells.Contains($n.ParamDesc)) { continue }
+        $sname = $n.Param
+        if ($items.ContainsKey($n.ParamDesc) -and $items[$n.ParamDesc].Name) { $sname = $items[$n.ParamDesc].Name }
+        $staffSpells[$n.ParamDesc] = [pscustomobject]@{ Name = $sname; Edid = $n.Param; Tomes = @($n.Tomes) }
+    }
+}
+$staffTaught = 0
+$staffUntaught = New-Object 'System.Collections.Generic.List[string]'
+foreach ($k in $staffSpells.Keys) {
+    if ($staffSpells[$k].Tomes.Count -gt 0) { $staffTaught++ }
+    else { $staffUntaught.Add(('{0} ({1}, {2})' -f $staffSpells[$k].Name, $staffSpells[$k].Edid, $k)) }
+}
+Write-Host ''
+Write-Host 'the staff spells' -ForegroundColor Cyan
+Ok ("{0} spell(s) named by staff recipes, {1} of them taught by a tome" -f $staffSpells.Count, $staffTaught)
+if ($staffUntaught.Count -gt 0) {
+    Note ("{0} no tome teaches, so the staves that bind them stay closed:" -f $staffUntaught.Count)
+    foreach ($u in $staffUntaught) { Note ('    ' + $u) }
+}
+$staffLines = New-Object 'System.Collections.Generic.List[string]'
+$staffLines.Add('  /* Built by scripts\dev\Build-RecipeTable.ps1 out of the game''s own records. Do not hand edit.')
+$staffLines.Add('     ' + $staffSpells.Count + ' spells a staff recipe binds, ' + $staffTaught + ' of them taught by a spell tome.')
+$staffLines.Add('     Spell desc -> its name and every BOOK record whose teaches spell flag names it.')
+$staffLines.Add('     A spell with no tome is one nobody can learn here, so its staves stay closed. */')
+$staffLines.Add('  var STAFF_SPELLS = {')
+$sn = 0
+foreach ($k in $staffSpells.Keys) {
+    $sn++
+    $comma = ','
+    if ($sn -eq $staffSpells.Count) { $comma = '' }
+    $tb = @()
+    foreach ($tm in $staffSpells[$k].Tomes) { $tb += (JsonStr $tm) }
+    $staffLines.Add('    ' + (JsonStr $k) + ': { "name": ' + (JsonStr $staffSpells[$k].Name) + ', "tomes": [' + ($tb -join ', ') + '] }' + $comma)
+}
+$staffLines.Add('  };')
 # And the refused rows, which carry a sentence instead of an owner. The gate
 # reads nobody before it reads anything else, so these never reach a question
 # about profession or rank: there is no rank at which a nail becomes useful.
@@ -5231,6 +5368,9 @@ $lines.Add('     open is true when the recipe carries no condition of its own. A
 $lines.Add('     with open false needs something first, an item, a spell or a vanilla')
 $lines.Add('     perk nobody here can hold, and Skyrim''s own crafting menu decides that')
 $lines.Add('     before the server is ever asked. game\data\recipes.json says which.')
+$lines.Add('     A staff whose one condition is a spell some tome teaches is open too:')
+$lines.Add('     the tome is how an Enchanter learns it, and spell names that spell''s')
+$lines.Add('     desc for the staff gate, which reads STAFF_SPELLS below.')
 $lines.Add('')
 $lines.Add('     A recipe id that is not in here is one nobody owns and anybody may')
 $lines.Add('     make. Tempering is not in here either: the server is never asked about')
@@ -5285,6 +5425,22 @@ if (-not $NoInstall -and $fail -eq 0) {
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} recipes and the comment over them into the RECIPES_BY_ID block of {1}" -f $blockRows.Count, $gm)
         }
+        # The staff spells, between their own markers, the same way.
+        $text = [System.IO.File]::ReadAllText($gm)
+        $sOpen  = '  // ==== STAFF_SPELLS ===='
+        $sClose = '  // ==== end STAFF_SPELLS ===='
+        $a = $text.IndexOf($sOpen)
+        $b = $text.IndexOf($sClose)
+        if ($a -lt 0 -or $b -lt 0 -or $b -lt $a) {
+            Note ("there is no STAFF_SPELLS block in {0}, so the staff spells were not written into it." -f $gm)
+        } else {
+            $body = New-Object 'System.Collections.Generic.List[string]'
+            $body.Add($sOpen)
+            foreach ($l in $staffLines) { $body.Add($l) }
+            $new = $text.Substring(0, $a) + (($body -join "`r`n")) + "`r`n" + $text.Substring($b)
+            [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
+            Ok ("wrote {0} staff spells into the STAFF_SPELLS block of {1}" -f $staffSpells.Count, $gm)
+        }
     }
 }
 
@@ -5294,7 +5450,7 @@ $head = [Math]::Min($lines.Count, 24)
 for ($z = 0; $z -lt $head; $z++) { Write-Host $lines[$z] }
 if ($lines.Count -gt $head) { Note ("... and {0} more lines. -JsOut writes the whole block to a file." -f ($lines.Count - $head)) }
 if ($JsOut) {
-    [System.IO.File]::WriteAllText($JsOut, $literal, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($JsOut, $literal + [Environment]::NewLine + ($staffLines -join [Environment]::NewLine), (New-Object System.Text.UTF8Encoding($false)))
     Write-Host ''
     Ok "wrote $JsOut"
 }
