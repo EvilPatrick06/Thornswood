@@ -656,7 +656,8 @@ function reportFrom(req) {
   return crypto.createHmac('sha256', reportSalt).update(addr).digest('hex').slice(0, 32);
 }
 
-function reportRefusal(key, now) {
+function reportRefusal(key, now, whose) {
+  const from = whose || 'your connection';
   const HOUR = 60 * 60 * 1000, DAY = 24 * HOUR;
   const at = Number(now) || Date.now();
   const day = (reportSeen.get(key) || []).filter((t) => t > at - DAY);
@@ -666,13 +667,13 @@ function reportRefusal(key, now) {
     : 'about ' + Math.max(1, Math.ceil(s / 60)) + (s > 60 ? ' minutes' : ' minute');
   if (hour.length >= REPORT_HOUR) {
     const s = wait(hour[0] + HOUR - at);
-    return { wait: s, error: 'That is five reports from your connection in the last hour, ' +
+    return { wait: s, error: 'That is five reports from ' + from + ' in the last hour, ' +
       'which is as many as this page takes. Try again in ' + said(s) +
       ', or open a ticket in the Discord if it cannot wait.' };
   }
   if (day.length >= REPORT_DAY) {
     const s = wait(day[0] + DAY - at);
-    return { wait: s, error: 'That is twenty reports from your connection today, ' +
+    return { wait: s, error: 'That is twenty reports from ' + from + ' today, ' +
       'which is as many as this page takes in a day. Try again in ' + said(s) +
       ', or open a ticket in the Discord if it cannot wait.' };
   }
@@ -2740,21 +2741,102 @@ async function handle(req, res) {
     // other request can run in between and each one sees the last one's count.
     const late = reportRefusal(sender, Date.now());
     if (late) return refuse(late);
+    /* A REPORT ABOUT A PERSON IS NEVER ANONYMOUS (#414). A problem or an idea
+       needs no account, because somebody whose install will not start cannot
+       sign in. A report naming somebody does: it is kept against the Discord
+       account that sent it, so staff can come back to the reporter and so a
+       made up grudge cannot fill the queue from a hundred browsers. It is
+       counted per account as well as per connection. */
+    let person = null;
+    if (o.kind === 'report') {
+      if (!w.id || w.banned || !w.play) {
+        return sendJson(res, 401, { error: 'Sign in with Discord to report somebody, ' +
+          'so staff can come back to you about it.' });
+      }
+      const about = String(o.about || '').trim().slice(0, 60);
+      if (!about) return sendJson(res, 400, { error: 'say who it is about in the Who box' });
+      const acct = 'acct:' + w.id;
+      const mine = reportRefusal(acct, Date.now(), 'your account');
+      if (mine) return refuse(mine);
+      person = { about, acct };
+    }
     const list = jsonFile(INBOX, []);
-    list.unshift({
+    list.unshift(Object.assign({
       id: 'i' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex'),
-      kind: o.kind === 'idea' ? 'idea' : 'bug',
+      kind: person ? 'report' : (o.kind === 'idea' ? 'idea' : 'bug'),
       title,
       detail: String(o.detail || '').slice(0, 8000),
-      by: String(o.by || '').slice(0, 40),
+      by: person ? String(w.name || '').slice(0, 40) : String(o.by || '').slice(0, 40),
       at: Date.now(),
       state: 'new',
-      from: 'the public page'
-    });
+      from: person ? 'the public page, signed in' : 'the public page'
+    }, person ? { about: person.about, discordId: String(w.id) } : {}));
     if (!putJson(INBOX, trimInbox(list))) {
       return sendJson(res, 500, { error: 'could not save' });
     }
     reportTaken(sender, Date.now());
+    if (person) reportTaken(person.acct, Date.now());
+    return sendJson(res, 200, { ok: true });
+  }
+
+  /*
+    From inside the game: /helpme and /report (#414, gamemode.js, the asking
+    staff block). Keyed with the door's key in a header, the same key and the
+    same header /api/allowed takes, so nothing but a game server can write
+    one. The dev server's door.json names the site with /dev on the end, so
+    its reports come in on /dev/api/report/game and say so.
+
+    Counted per profile on the same limits as the public page, as a backstop
+    behind the game's own tighter ones. The profile id is what the game
+    server was told by the client, a claim rather than a proof, and the row
+    says so in words staff read.
+  */
+  if ((route === '/api/report/game' || route === '/dev/api/report/game') && req.method === 'POST') {
+    if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
+    if (!sameSecret(String(req.headers['x-thornswood-key'] || ''), String(cfg.botKey))) {
+      return sendJson(res, 401, { error: 'no' });
+    }
+    let o;
+    try { o = JSON.parse(await body(req, 8000)) || {}; }
+    catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+    const dev = route.indexOf('/dev/') === 0;
+    const kind = o.kind === 'report' ? 'report' : (o.kind === 'help' ? 'help' : '');
+    const pid = Number(o.profileId) || 0;
+    if (!kind || !(pid > 0)) return sendJson(res, 400, { error: 'no kind or no profile' });
+    const key = 'game:' + (dev ? 'dev:' : '') + pid;
+    const no = reportRefusal(key, Date.now(), 'that profile');
+    if (no) return send(res, 429, JSON.stringify({ error: no.error }), null, { 'Retry-After': String(no.wait) });
+    const name = String(o.name || '').trim().slice(0, 60) || 'Somebody';
+    const about = String(o.about || '').trim().slice(0, 60);
+    if (kind === 'report' && !about) return sendJson(res, 400, { error: 'a report names somebody' });
+    const said = String(o.said || '').trim().slice(0, 300);
+    const cell = String(o.cell || '').slice(0, 120);
+    const pos = (Array.isArray(o.pos) ? o.pos : []).slice(0, 3).map((n) => Math.round((Number(n) || 0) * 10) / 10);
+    const aboutPid = Number(o.aboutProfileId) || 0;
+    const list = jsonFile(INBOX, []);
+    list.unshift({
+      id: 'i' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex'),
+      kind,
+      title: kind === 'help' ? (said || 'Asked for help and said nothing more') : said,
+      about: kind === 'report' ? about : '',
+      aboutProfileId: kind === 'report' && aboutPid > 0 ? aboutPid : 0,
+      detail: 'At ' + (cell || 'an unknown place') + (pos.length === 3 ? ', ' + pos.join(', ') : '') + '. ' +
+        'Profile ' + pid + (kind === 'report' && aboutPid > 0 ? ', about profile ' + aboutPid : '') +
+        ': the game takes these numbers from the client, so they are a claim, not proof. ' +
+        (Number(o.staffTold) > 0 ? Number(o.staffTold) + ' of staff in the world were told in game.'
+                                 : 'Nobody from staff was in the world.'),
+      by: name,
+      profileId: pid,
+      cell,
+      pos,
+      at: Date.now(),
+      state: 'new',
+      from: dev ? 'in game on the dev server' : 'in game'
+    });
+    if (!putJson(INBOX, trimInbox(list))) {
+      return sendJson(res, 500, { error: 'could not save' });
+    }
+    reportTaken(key, Date.now());
     return sendJson(res, 200, { ok: true });
   }
 

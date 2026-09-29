@@ -2207,9 +2207,35 @@ def report_text(row):
         v = str(v or '').strip()[:n]
         return discord.utils.escape_mentions(discord.utils.escape_markdown(v))
 
-    kind = 'An idea' if row.get('kind') == 'idea' else 'A problem'
     by = clean(row.get('by'), 40)
     detail = clean(row.get('detail'), 400)
+    kind = row.get('kind')
+
+    # From inside the game (#414): /helpme and /report. The profile ids in
+    # the detail are the client's claim, and the detail says so. A report
+    # about somebody never pings: the send switches every mention off.
+    if str(row.get('from') or '').startswith('in game'):
+        where = ' on the dev server' if 'dev' in str(row.get('from')) else ''
+        if kind == 'help':
+            head = '**%s asked for help in game%s**' % (by or 'Somebody', where)
+        else:
+            head = ('**%s reported %s in game%s**'
+                    % (by or 'Somebody', clean(row.get('about'), 60) or 'somebody',
+                       where))
+        return '%s\n%s%s' % (head, clean(row.get('title'), 300) or '(nothing said)',
+                             ('\n' + detail) if detail else '')
+
+    # A report about a person from the site, which the site only takes from
+    # somebody signed in with Discord, so it always has a name and an account.
+    if kind == 'report':
+        acct = str(row.get('discordId') or '')
+        return ('**%s reported %s on the site**%s.\n%s%s'
+                % (by or 'Somebody', clean(row.get('about'), 60) or 'somebody',
+                   (' (Discord <@%s>)' % acct) if acct.isdigit() else '',
+                   clean(row.get('title'), 200) or '(no title)',
+                   ('\n' + detail) if detail else ''))
+
+    kind = 'An idea' if kind == 'idea' else 'A problem'
     return ('**%s sent in on the public report page**, %s.\n%s%s'
             % (kind,
                ('from ' + by) if by else 'with no name left',
@@ -2287,7 +2313,7 @@ async def watch_reports():
                 said.add(r['id'])
             if len(fresh) > REPORTS_AT_ONCE:
                 await report_say(
-                    '**%d reports came in on the public report page** since the '
+                    '**%d reports came in, from the site and the game,** since the '
                     'last look, which is more than people send and more than '
                     'this channel should carry one at a time. They are in the '
                     'inbox on the site.' % len(fresh))
