@@ -118,6 +118,83 @@ Write-Host '  Setup' -ForegroundColor DarkGray
 
 if (-not (Test-Path $Payload)) { Die "The 'payload' folder is missing. If you extracted this by hand, extract the whole archive and run Install.bat from the extracted folder." }
 
+# ------------------------------------------------------------- agreements
+# The setup window locks Install until the age box and the three agreement
+# boxes are ticked, and writes Profile\accepted.json before it starts this
+# script (issue #1009). Setup.bat and Install.bat run this script by hand from
+# an unpacked payload, and until #1018 that installed with none of the four
+# asked. So:
+#   - from the setup window (-NonInteractive) the note must already be there,
+#     or nothing is installed: a setup program that did not ask is an old one;
+#   - by hand, the same four questions are asked here, all four must be yes,
+#     and the same Profile\accepted.json is written.
+# Before anything is written anywhere else. tests\test-setup-by-hand-agreements.ps1
+# holds it; the wording is the window's (installer\setup\Bootstrap.cs).
+$AcceptedFile = Join-Path $ProfileDir 'accepted.json'
+$AgreePages = [ordered]@{
+    terms   = 'I have read and accept the Terms and Conditions'
+    privacy = 'I have read and accept the Privacy Policy'
+    rules   = 'I have read and agree to the Rules'
+}
+if ($NonInteractive) {
+    if (-not (Test-Path -LiteralPath $AcceptedFile)) {
+        Die ('Setup found no note that you accepted the terms, the privacy policy and the rules, so nothing was installed. ' +
+             'Download the setup again from https://thornswood.net and run it, or run Install.bat in ' + $Here + ' to answer them there.')
+    }
+} else {
+    Head 'Before it installs'
+    Say '  Setup needs a yes to each of these four. Type yes and press Enter for each.'
+    $asks = @(@{ Say = 'I am 18 or over. Thornswood is an adult server.'; Page = '' })
+    foreach ($p in $AgreePages.Keys) { $asks += @{ Say = $AgreePages[$p]; Page = "https://thornswood.net/$p" } }
+    foreach ($a in $asks) {
+        Write-Host ''
+        Say ('  ' + $a.Say) 'White'
+        if ($a.Page) { Say ('  Read it at ' + $a.Page) 'DarkGray' }
+        $answer = Read-Host '  yes or no'
+        # Letters only, as Ask does: a byte order mark or a stray space round
+        # the answer is not a no.
+        if (("$answer" -replace '[^A-Za-z]', '') -notmatch '^(?i)(y|yes)$') {
+            Die 'Setup installs only once all four are a yes. Nothing was installed.'
+        }
+    }
+
+    # The same record the setup window writes: when, which pages, and a
+    # SHA-256 of each page's text as https://thornswood.net/api/page/<name>
+    # serves it now, empty when the site does not answer. Nothing about the
+    # person or the machine. A note that cannot be written stops the install,
+    # because an install with no note is the thing this section closes.
+    $shas = @{}
+    foreach ($p in $AgreePages.Keys) {
+        $shas[$p] = ''
+        try {
+            [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]3072
+            $wc = New-Object Net.WebClient
+            $wc.Encoding = New-Object Text.UTF8Encoding($false)
+            $wc.Headers['User-Agent'] = 'ThornswoodSetup'
+            $md = ($wc.DownloadString("https://thornswood.net/api/page/$p") | ConvertFrom-Json).md
+            if ($null -ne $md) {
+                $h = [Security.Cryptography.SHA256]::Create()
+                $shas[$p] = -join ($h.ComputeHash((New-Object Text.UTF8Encoding($false)).GetBytes([string]$md)) | ForEach-Object { $_.ToString('x2') })
+            }
+        } catch { $shas[$p] = '' }
+    }
+    $pages = [ordered]@{}
+    foreach ($p in $AgreePages.Keys) { $pages[$p] = [ordered]@{ url = "https://thornswood.net/$p"; sha256 = $shas[$p] } }
+    $note = [ordered]@{
+        accepted = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture)
+        pages    = $pages
+        about    = 'Answered yes in Setup-Thornswood.ps1, run by hand, before Install. sha256 is of each page''s text as ' +
+                   'https://thornswood.net/api/page/<name> served it then, and is empty when the site did not answer.'
+    }
+    try {
+        $null = New-Item -ItemType Directory -Force -Path $ProfileDir
+        [IO.File]::WriteAllText($AcceptedFile, ($note | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
+    } catch {
+        Die ('Could not note what you accepted in ' + $AcceptedFile + ': ' + $_.Exception.Message)
+    }
+    Say '  Noted.' 'Green'
+}
+
 # ------------------------------------------------------------- find steam
 function Get-SteamRoot {
     $c = @()
