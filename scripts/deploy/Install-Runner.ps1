@@ -63,6 +63,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
@@ -86,21 +87,9 @@ foreach ($t in 'ssh', 'scp', 'gh') {
 # the same way Setup-Domain.ps1 does it. The registration token is never in
 # the file: it goes on ssh's standard input (Send-Secret.ps1, issue #451).
 function Remote($script) {
-  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  $cmd = "powershell -NoProfile -EncodedCommand $e"
-  if ($cmd.Length -le 6000) {
-    return & ssh @ssh $target $cmd 2>&1
-  }
-  $far = 'C:/Windows/Temp/thornswood-runner-install.ps1'
-  $tmp = [IO.Path]::GetTempFileName()
-  try {
-    Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
-    & scp @ssh $tmp "${target}:$far" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "could not send a script to $VpsHost" }
-    & ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
-    & ssh @ssh $target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-  }
-  finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
+  # name, removed after, and the far side's exit code comes back.
+  return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script
 }
 # gh with its output kept apart from its errors, and a failure that says which
 # call it was. Named so it never shadows gh itself.

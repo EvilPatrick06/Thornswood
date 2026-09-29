@@ -120,6 +120,7 @@ $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Script.ps1')
 if (-not $User -and -not $SiteDir) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps -and -not $SiteDir) { $Vps = Get-ThornswoodVpsAddress }
 $rootWin = $Root.Replace('/','\')
@@ -296,21 +297,9 @@ function Send-FeedJson([string]$dir) {
 # sshd on Windows hands the command to cmd.exe and cmd.exe stops at 8,191
 # characters.
 function Remote($script) {
-  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  $cmd = "powershell -NoProfile -EncodedCommand $e"
-  if ($cmd.Length -le 6000) {
-    return & ssh @ssh "$User@$Vps" $cmd 2>&1
-  }
-  $far = 'C:/Windows/Temp/thornswood-remote.ps1'
-  $tmp = [IO.Path]::GetTempFileName()
-  try {
-    Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
-    & scp @ssh $tmp "$User@${Vps}:$far" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "could not send a script to $Vps" }
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-  }
-  finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
+  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
+  # name, removed after, and the far side's exit code comes back.
+  return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
 # Only the lines, and no throw when ssh has written a word to stderr.

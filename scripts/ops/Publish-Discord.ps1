@@ -54,7 +54,6 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Webhook,
   # The dev build's release, into the dev updates channel. See the note above.
   [switch]$Dev,
   # Print the post and send nothing.
@@ -104,10 +103,12 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # falls back to bot\dev-webhook.txt or bot\news-webhook.txt on this machine. Until then this read
 # only that file, and since the scripts moved into scripts\ops it looked for it
 # in scripts\bot, which does not exist, so no Ship posted anything at all.
+# There is no -Webhook any more (issue #1069): a webhook typed on the command
+# line stays in the shell's history file, and this is the one place it is
+# read from.
 $hookName = if ($Dev) { 'dev' } else { 'news' }
-if (-not $Webhook) {
-  try { $Webhook = [string](& (Join-Path $Here 'Discord-Hook.ps1') -Name $hookName | Select-Object -First 1) } catch { $Webhook = '' }
-}
+$Webhook = ''
+try { $Webhook = [string](& (Join-Path $Here 'Discord-Hook.ps1') -Name $hookName | Select-Object -First 1) } catch { $Webhook = '' }
 if (-not $Webhook) {
   if (-not $Quiet) {
     if ($Dev) {

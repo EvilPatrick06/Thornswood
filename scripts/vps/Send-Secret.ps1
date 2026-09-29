@@ -42,6 +42,9 @@
   Never print the value, including in an error message.
 #>
 
+# How a script goes to the VPS at all: Send-Script.ps1 (issue #1070).
+. (Join-Path $PSScriptRoot 'Send-Script.ps1')
+
 # The first thing the far side runs: one line of standard input, anything that
 # is not base64 dropped (a byte order mark or a stray CR), decoded as UTF-8.
 # Caught and never shown: an error here would print the line.
@@ -79,39 +82,30 @@ function Invoke-ThornswoodSecretRemote {
     # before the secret goes anywhere, rather than quietly overridden.
     $weak = @($SshArgs | Where-Object { $_ -match '(?i)StrictHostKeyChecking\s*=\s*(?!yes\b)' })
     if ($weak.Count) { throw ('ssh options with host key checking turned down (' + ($weak -join ', ') + '). A secret goes only to the box whose key is pinned. Nothing was sent.') }
-    $SshArgs = @($SshArgs) + @('-o', 'StrictHostKeyChecking=yes')
     $full = (Get-ThornswoodSecretPrelude) + "`r`n" + $Script
     $wire = ConvertTo-ThornswoodSecretWire $Secret
     $Secret = $null
-    # Plain ASCII on the pipe whichever PowerShell runs this. Base64 is ASCII,
-    # and this keeps a byte order mark off the front of it.
-    $OutputEncoding = New-Object Text.ASCIIEncoding
-    $policy = ''
-    if ($Bypass) { $policy = ' -ExecutionPolicy Bypass' }
-    $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($full))
-    $cmd = 'powershell -NoProfile' + $policy + ' -EncodedCommand ' + $e
-    try {
-        if ($cmd.Length -le $Limit) {
-            return ($wire | & ssh @SshArgs $Target $cmd 2>&1)
-        }
-        # Too long for one command line (cmd.exe stops at 8,191 characters and
-        # says nothing). The script goes up as a file of its own name, run and
-        # removed; the value still goes on standard input, never in the file.
-        # The path goes bare: ours, no spaces, works under cmd.exe and
-        # PowerShell alike (Remote.ps1 says how that was measured).
-        $far = 'C:/Windows/Temp/thornswood-remote-' + [Guid]::NewGuid().ToString('N') + '.ps1'
-        $tmp = [IO.Path]::GetTempFileName()
-        try {
-            [IO.File]::WriteAllText($tmp, $full, (New-Object Text.UTF8Encoding($true)))
-            & scp @SshArgs $tmp "${Target}:$far" 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw "could not send a script to $Target. Nothing was run." }
-            $wire | & ssh @SshArgs $Target "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
-            $rc = $LASTEXITCODE
-            & ssh @SshArgs $Target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-            # The far end's exit code, not the tidy up's.
-            $global:LASTEXITCODE = $rc
-        }
-        finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
-    }
+    # Send-Script.ps1 does the sending (issue #1070): on the command line when
+    # it fits, otherwise as a file of its own name, run, removed, and the far
+    # side's exit code kept. The value goes on standard input either way,
+    # never on a command line and never in the file.
+    try { Invoke-ThornswoodRemote -Target $Target -SshArgs $SshArgs -Script $full -Bypass:$Bypass -Limit $Limit -Stdin $wire }
     finally { $wire = $null }
+}
+
+# A secret asked for from the person at the keyboard, hidden as it is typed or
+# pasted, so it is in no command line, no history file and no console buffer
+# (issue #1069). Hands back the plain value, '' when nothing was given.
+function Read-ThornswoodSecret([string]$Prompt) {
+    return (ConvertFrom-ThornswoodSecureString (Read-Host $Prompt -AsSecureString))
+}
+
+# A SecureString as plain text, for the moment it is sent. A script that
+# already asked hands the value on to another as a SecureString, which
+# nobody can type on a command line.
+function ConvertFrom-ThornswoodSecureString([System.Security.SecureString]$Value) {
+    if (-not $Value -or $Value.Length -eq 0) { return '' }
+    $b = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Value)
+    try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b) }
+    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }
 }

@@ -9,7 +9,7 @@
   their copy stops connecting.
 
     .\Rotate-ServerPassword.ps1
-    .\Rotate-ServerPassword.ps1 -Password 'something-you-chose'
+    .\Rotate-ServerPassword.ps1 -Password      asks for one you chose, not shown
     .\Rotate-ServerPassword.ps1 -Minutes 10 -Why 'a ban'
 
   READ THIS FIRST. It used to also write the password into the game server's
@@ -29,7 +29,9 @@
 
   What it does, in order:
 
-    1. Makes a new password, or takes yours.
+    1. Makes a new password, or asks for yours without showing it. Never
+       type it on the command line: a typed value stays in the shell's
+       history file (issue #1069).
     2. Writes it into the site's config, so the launcher can be handed it.
 
   It no longer touches the game server or restarts it, because there was
@@ -41,7 +43,9 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Password,
+  # Asks for a password you chose, hidden, instead of making one. A switch,
+  # never a value typed after it (issue #1069).
+  [switch]$Password,
   [int]$Minutes = 5,
   [string]$Why = 'a password change',
   [switch]$Now,
@@ -57,52 +61,15 @@ $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
 function Remote($script) {
-  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  $cmd = "powershell -NoProfile -EncodedCommand $e"
-
-  # A long script does not fit on a command line, and nothing says so.
-  #
-  # sshd on Windows hands the command to cmd.exe, which stops at 8,191
-  # characters. Base64 of UTF-16 is about 2.7 times the script, so a block of
-  # any size arrives cut in half and PowerShell then complains about a brace or
-  # a token in a script nobody can see. Deploy-Docs.ps1 hit this on 17 Sep and
-  # solved it; every other script here carried the short version that cannot,
-  # and on 20 Sep this one truncated at 10,252 characters and reported
-  # "Unexpected token '$?'" about a line fifteen above the one that was cut.
-  # This is that fix, copied across so the sixteen scripts that talk to the VPS
-  # all behave the same way.
-  #
-  # Under the limit it goes on the command line as before, because that is one
-  # round trip. Over it, the script is sent as a file and run from there, which
-  # has no length to run into.
-  if ($cmd.Length -le 6000) {
-    return & ssh @ssh "$User@$Vps" $cmd 2>&1
-  }
-
-  $far = 'C:/Windows/Temp/thornswood-remote.ps1'
-  $tmp = [IO.Path]::GetTempFileName()
-  try {
-    Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
-    & scp @ssh $tmp "$User@${Vps}:$far" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "could not send a script to $Vps" }
-    # The path goes across as it is. Windows PowerShell takes forward
-    # slashes, and converting them was how this shipped with the slashes
-    # stripped out of it entirely: C:WindowsTempthornswood-remote.ps1.
-    # And bare, with no quotes round it; the path above is ours and has no
-    # spaces. Measured on this machine on 24 September, not on the VPS: bare
-    # runs whether cmd.exe or Windows PowerShell hands the line on, and the
-    # old form, the path in single quotes, fails under cmd.exe. The old form
-    # did run on the VPS on 20 and 21 September, so which shell sshd uses
-    # there is not known, and bare is the form that works under either.
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-  }
-  finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
+  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
+  # name, removed after, and the far side's exit code comes back.
+  return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
 if (-not $Yes) {
@@ -115,7 +82,12 @@ if (-not $Yes) {
   if ($a -ne 'yes') { Write-Host '  stopped, nothing changed'; return }
 }
 
-if (-not $Password) {
+$newPassword = ''
+if ($Password) {
+  $newPassword = Read-ThornswoodSecret '  The new password (it is not shown)'
+  if (-not $newPassword) { Write-Host '  nothing was typed, nothing changed'; return }
+}
+if (-not $newPassword) {
   # Long and from a real random source, because nobody types this one any more.
   # Generated until it is long enough: stripping the non alphanumeric characters
   # out of base64 can leave fewer than asked for, and Substring throws on that.
@@ -128,7 +100,7 @@ if (-not $Password) {
     }
     return $out.Substring(0, $n)
   }
-  $Password = NewKey 28
+  $newPassword = NewKey 28
 }
 
 $docsWin = $DocsRoot.Replace('/','\')
@@ -138,7 +110,7 @@ Write-Host ''
 Write-Host 'Handing it to the site...'
 # The password goes on ssh's standard input, never in the script or on a
 # command line on either machine (Send-Secret.ps1, issue #451).
-Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $Password -Script @"
+Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $newPassword -Script @"
 `$ErrorActionPreference = 'Stop'
 `$pw = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 if (-not `$pw) { 'NOTHING ARRIVED on standard input. Nothing written, the password is unchanged.'; return }
@@ -162,7 +134,7 @@ Start-Sleep -Seconds 3
 if (Get-NetTCPConnection -LocalPort 3001 -State Listen -EA SilentlyContinue) { 'site restarted' }
 else { 'SITE DID NOT COME BACK' }
 "@ | ForEach-Object { "  $_" }
-$Password = $null
+$newPassword = $null
 
 # The game server settings used to be written here. They are not any more.
 # There is no sPassword in server-settings.json, nothing in gamemode.js reads

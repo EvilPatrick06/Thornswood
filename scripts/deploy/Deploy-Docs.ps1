@@ -26,6 +26,10 @@
                                here on purpose, when -SeedDocs is too much.
     .\Deploy-Docs.ps1 -PutBack puts the app the last deploy replaced back,
                                checked the same way, and sends nothing
+    .\Deploy-Docs.ps1 -Password
+                               asks for a new member password without
+                               showing it, and sets it. Never type the
+                               password on the command line.
     .\Deploy-Docs.ps1 -RunAs 'LOCAL SERVICE'
                                runs the site as LOCAL SERVICE instead of
                                SYSTEM, with its own folder and nothing else
@@ -57,7 +61,11 @@ param(
   [string]$Root     = 'C:/Thornswood-Docs',
   [string]$Task     = 'Thornswood Docs',
   [int]$Port        = 3001,
-  [string]$Password,
+  # Asks for a new member password for the site, without showing it, and
+  # sets it. A switch, never a value typed after it (issue #1069): a typed
+  # value stays in the shell's history file and in the command line of the
+  # process running this.
+  [switch]$Password,
   # Flattens EVERY document on the VPS with the repo copy, including the ones
   # people have been typing into on the site. It is for a first install and for
   # nothing else. It now takes a backup and says what it stood on.
@@ -97,6 +105,7 @@ $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
@@ -106,6 +115,13 @@ $App  = Join-Path $Here '..\..\site'
 if (-not (Test-Path -LiteralPath $App)) { throw "not found: $App" }
 if ($PutBack -and ($Password -or $SeedDocs -or $Boards -or $Site -or $Docs -or $RunAs)) {
   throw '-PutBack puts the last app back and sends nothing else, so it takes none of -Password, -SeedDocs, -Boards, -Site, -Docs or -RunAs.'
+}
+
+# Asked before anything is sent, so a deploy never stops halfway for it.
+$newPassword = ''
+if ($Password) {
+  $newPassword = Read-ThornswoodSecret '  New site password (it is not shown)'
+  if (-not $newPassword) { throw 'No password was given, so nothing was sent.' }
 }
 
 # -Docs names have to be documents this repo actually has, or a typo would
@@ -143,44 +159,9 @@ Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 # contain a method named 'Trim'" after the files had already gone up. The two
 # places that build a list from this take only the strings.
 function Remote($script) {
-  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  $cmd = "powershell -NoProfile -EncodedCommand $e"
-
-  # A long script does not fit on a command line, and nothing says so.
-  #
-  # sshd on Windows hands the command to cmd.exe, which stops at 8,191
-  # characters. Base64 of UTF-16 is about 2.7 times the script, so the block
-  # that opens the port and registers the scheduled task came to 9,610 and
-  # arrived cut in half. PowerShell then said "Missing closing '}' in statement
-  # block" about a script nobody could see, every single deploy, and the site
-  # came up anyway because it was already running. Measured on 17 Sep.
-  #
-  # Under the limit it goes on the command line as before, because that is one
-  # round trip. Over it, the script is sent as a file and run from there, which
-  # has no length to run into.
-  if ($cmd.Length -le 6000) {
-    return & ssh @ssh "$User@$Vps" $cmd 2>&1
-  }
-
-  $far = 'C:/Windows/Temp/thornswood-remote.ps1'
-  $tmp = [IO.Path]::GetTempFileName()
-  try {
-    Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
-    & scp @ssh $tmp "$User@${Vps}:$far" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "could not send a script to $Vps" }
-    # The path goes across as it is. Windows PowerShell takes forward
-    # slashes, and converting them was how this shipped with the slashes
-    # stripped out of it entirely: C:WindowsTempthornswood-remote.ps1.
-    # And bare, with no quotes round it; the path above is ours and has no
-    # spaces. Measured on this machine on 24 September, not on the VPS: bare
-    # runs whether cmd.exe or Windows PowerShell hands the line on, and the
-    # old form, the path in single quotes, fails under cmd.exe. The old form
-    # did run on the VPS on 20 and 21 September, so which shell sshd uses
-    # there is not known, and bare is the form that works under either.
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-  }
-  finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
+  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
+  # name, removed after, and the far side's exit code comes back.
+  return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
 function Push($local, $remote) {
@@ -360,7 +341,7 @@ if ($Password) {
   # so it is on no command line on either machine and in no file. Until then
   # it was base64'd into this script, which put it on the command line of ssh
   # here and of powershell on the VPS for the length of the call.
-  Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $Password -Script @"
+  Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $newPassword -Script @"
 `$ErrorActionPreference = 'Stop'
 `$pw = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 if (-not `$pw) { 'NOTHING ARRIVED on standard input. Nothing written, the password is unchanged.'; return }
@@ -379,6 +360,7 @@ if (Test-Path -LiteralPath `$f) {
 [IO.File]::WriteAllText(`$f, (ConvertTo-Json -InputObject `$cfg -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
 'set, ' + (`$cfg.Count - 1) + ' other setting(s) kept'
 "@ | ForEach-Object { "  $_" }
+  $newPassword = $null
 }
 
 if (-not $PutBack) {
