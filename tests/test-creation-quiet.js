@@ -326,7 +326,9 @@ function chatPage() {
   const box = {
     window: win, WebSocket: Sock, console: { log: function () { } },
     setTimeout: function (fn) { timers.push(fn); return timers.length; },
-    clearTimeout: function () { }, JSON: JSON, Math: Math
+    clearTimeout: function () { }, JSON: JSON, Math: Math,
+    // The keepalive's tick (issue #519), which nothing here waits for.
+    setInterval: function () { return 0; }, clearInterval: function () { }
   };
   vm.createContext(box);
   vm.runInContext(CHAT, box);

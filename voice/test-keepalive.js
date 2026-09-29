@@ -24,6 +24,9 @@ const { spawn } = require('child_process');
 
 const PORT = 7903;
 const PING_MS = 300;
+// Three pings, the service's default ratio, so a socket that says nothing
+// back is let go in under a second and a half here.
+const SILENT_MS = 900;
 
 let pass = 0, fail = 0;
 function check(what, got, want) {
@@ -45,6 +48,7 @@ const srv = spawn(process.execPath, ['voice-server.js'], {
     THORNSWOOD_VOICE_AUTH: 'off',
     THORNSWOOD_SITE: '',
     THORNSWOOD_VOICE_PING_MS: String(PING_MS),
+    THORNSWOOD_VOICE_SILENT_MS: String(SILENT_MS),
   }),
 });
 let log = '';
@@ -119,6 +123,38 @@ function nextFrame(sock, ms) {
   });
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* Every frame the service sends on a socket, whole, as opcode and body. */
+function frames(sock, on) {
+  let buf = Buffer.alloc(0);
+  sock.on('data', (d) => {
+    buf = Buffer.concat([buf, d]);
+    for (;;) {
+      if (buf.length < 2) { return; }
+      let len = buf[1] & 0x7f, off = 2;
+      if (len === 126) { if (buf.length < 4) { return; } len = buf.readUInt16BE(2); off = 4; }
+      else if (len === 127) { if (buf.length < 10) { return; } len = Number(buf.readBigUInt64BE(2)); off = 10; }
+      if (buf.length < off + len) { return; }
+      const op = buf[0] & 0x0f;
+      const body = buf.slice(off, off + len);
+      buf = buf.slice(off + len);
+      on(op, body);
+    }
+  });
+}
+
+/* A masked text frame, as a browser sends one. */
+function textFrame(obj) {
+  const data = Buffer.from(JSON.stringify(obj), 'utf8');
+  const head = data.length < 126 ? Buffer.from([0x81, 0x80 | data.length])
+                                 : Buffer.from([0x81, 0x80 | 126, data.length >> 8, data.length & 255]);
+  const key = crypto.randomBytes(4);
+  const body = Buffer.alloc(data.length);
+  for (let i = 0; i < data.length; i++) { body[i] = data[i] ^ key[i & 3]; }
+  return Buffer.concat([head, key, body]);
+}
+
 (async () => {
   const h = await ready();
   console.log('service up: build ' + h.build + ', ping every ' + PING_MS + 'ms for this run');
@@ -151,6 +187,67 @@ function nextFrame(sock, ms) {
   await new Promise((r) => setTimeout(r, 300));
   check('the service is still up after the socket goes',
         (await (await fetch('http://127.0.0.1:' + PORT + '/health')).json()).build === h.build, true);
+
+  /*
+    Issue #519, the other half. A laptop that sleeps or loses its Wi-Fi says
+    nothing at all, not even the pong a browser sends by itself, and its
+    socket used to sit in the room until TCP gave up on it. Three pings with
+    no answer and the service lets it go, with a line in its log.
+  */
+  const silent = await open();
+  let silentClosedAt = 0;
+  const silentFrom = Date.now();
+  silent.sock.on('close', () => { silentClosedAt = Date.now(); });
+  silent.sock.on('data', () => { });                  // reads, never answers
+  for (let i = 0; i < 40 && !silentClosedAt; i++) { await sleep(100); }
+  check('a socket that answers nothing is closed by the service', silentClosedAt > 0, true);
+  check('after about three pings, not before (' + (silentClosedAt - silentFrom) + ' ms)',
+        silentClosedAt - silentFrom >= SILENT_MS - PING_MS && silentClosedAt - silentFrom <= SILENT_MS + 3 * PING_MS, true);
+  const h2 = await (await fetch('http://127.0.0.1:' + PORT + '/health')).json();
+  check('/health counts it', h2.closedSilent >= 1, true);
+  check('and the service log says so', /answered nothing for \d+ s/.test(log), true);
+
+  // One that answers every ping the way a browser does stays, however long.
+  const talks = await open();
+  let talksClosed = false;
+  const got = [];
+  talks.sock.on('close', () => { talksClosed = true; });
+  frames(talks.sock, (op, body) => {
+    if (op === 9) { talks.sock.write(Buffer.from([0x8a, 0x80, 0, 0, 0, 0])); return; }
+    if (op !== 1) { return; }
+    try { got.push(JSON.parse(body.toString('utf8'))); } catch (e) { }
+  });
+  await sleep(SILENT_MS * 3);
+  check('a socket that answers its pings is kept, three times as long', talksClosed, false);
+
+  /*
+    And the page's own keepalive. A browser answers the service's pings
+    without telling the page, so a page cannot tell a quiet room from a dead
+    socket that way. It sends { t: 'ping' } and the service answers with
+    { t: 'pong' }, which the page can see.
+  */
+  talks.sock.write(textFrame({ t: 'ping' }));
+  await sleep(300);
+  check('a page ping before it has joined is not answered', got.some((m) => m.t === 'pong'), false);
+  talks.sock.write(textFrame({ t: 'join', profileId: 519, name: 'keepalive' }));
+  talks.sock.write(textFrame({ t: 'ping' }));
+  for (let i = 0; i < 20 && !got.some((m) => m.t === 'pong'); i++) { await sleep(100); }
+  check('a page ping once joined is answered with a pong', got.some((m) => m.t === 'pong'), true);
+  check('it is in the room', (await (await fetch('http://127.0.0.1:' + PORT + '/health')).json()).peers, 1);
+
+  /*
+    Its end shut with no close frame, a process killed or a tab gone. The
+    service used to notice only when its next write failed, so a socket sent
+    nothing stayed in the room. It goes at once now, well inside a ping.
+  */
+  talks.sock.end();
+  let left = false;
+  for (let i = 0; i < 10 && !left; i++) {
+    await sleep(20);
+    left = (await (await fetch('http://127.0.0.1:' + PORT + '/health')).json()).peers === 0;
+  }
+  check('a socket whose other end shuts leaves the room before the next ping', left, true);
+  try { talks.sock.destroy(); } catch (e) { }
 
   console.log('');
   console.log(pass + ' passed, ' + fail + ' failed');
