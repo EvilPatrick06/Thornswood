@@ -1,0 +1,596 @@
+<#
+  test-record-sync.ps1
+
+      pwsh -NoProfile -File .\tests\test-record-sync.ps1
+
+  A launcher syncs its install to the release record the feed names, file by
+  file by sha256 from the site, instead of replaying the chain of packs; the
+  packs stay on the feed for launchers that do not; and a rollback works for
+  both (#1050).
+
+  WHY THIS EXISTS. Until #1050 a launcher only replayed packs, so it never knew
+  what a release was meant to leave installed. Patrick, 29 Sep: fetch each
+  file straight from the site by its fingerprint, syncing the install to the
+  release record. This proves it with the real pieces, nothing copied:
+
+    1. the real Publish-Update.ps1, in a child PowerShell, publishing four
+       releases of a made up build into a folder standing in for the site and
+       the VPS store (-SiteDir): every file of each release goes up as its own
+       asset, the record says so (':record:files'), carries the plugin list as
+       the pack carries it and what is gone, the first one reads what the packs
+       before it took out, and the packs still go on the feed
+    2. the launcher's own Updater compiled from launcher\app with the .NET
+       Framework csc, the way Build-Launcher.ps1 does, syncing scratch installs
+       over http from a copy of site\server.js serving that folder: a fresh
+       install, one release behind, several behind (with files an old pack took
+       out), a download cut off halfway (carried on with a Range request), a
+       sync cut off after its downloads (finished with the network gone), a
+       file changed by hand, a download whose bytes are not its checksum, a
+       file Vortex deploys now, and a record that does not say its files are up
+    3. an old launcher beside them, taking the same feed pack by pack, landing
+       on the same files
+    4. the real Rollback-Feed.ps1 putting the feed back a release and forward
+       again, and both kinds of launcher following it
+
+  Runs under Windows PowerShell 5.1 and restarts itself there from pwsh, like
+  test-updater.ps1, because the launcher runs on the .NET Framework. Needs node
+  on PATH for the copy of the site. Everything it writes is in its own temp
+  folder, and nothing connects anywhere but 127.0.0.1.
+#>
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = 'Stop'
+if ($PSVersionTable.PSEdition -eq 'Core') {
+    $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    if (-not (Test-Path -LiteralPath $winps)) {
+        Write-Host 'FAIL  Windows PowerShell is here to run this on the .NET Framework the launcher runs on'
+        Write-Host ''; Write-Host '0 passed, 1 failed'; exit 1
+    }
+    & $winps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
+    exit $LASTEXITCODE
+}
+
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$repo = Split-Path -Parent $Here
+$app = Join-Path $repo 'launcher\app'
+$winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+
+$script:pass = 0; $script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" -ForegroundColor Red }
+}
+$script:procs = @()
+$T = Join-Path ([IO.Path]::GetTempPath()) ('ts-record-sync-' + [Guid]::NewGuid().ToString('N').Substring(0, 12))
+function Done {
+    foreach ($p in $script:procs) { try { if (-not $p.HasExited) { $p.Kill() } } catch { } }
+    Start-Sleep -Milliseconds 300
+    Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host ''
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    if ($script:fail) { exit 1 }
+    exit 0
+}
+# Anything that throws is a failure, and the servers still go.
+trap { $script:fail++; Write-Host ("FAIL  stopped: " + $_.Exception.Message + ' ' + $_.InvocationInfo.PositionMessage) -ForegroundColor Red; Done }
+
+. (Join-Path $repo 'scripts\release\Release-Baseline.ps1')
+. (Join-Path $repo 'scripts\release\Feed-Store.ps1')
+Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
+Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
+$ascii = New-Object Text.ASCIIEncoding
+$utf8 = New-Object Text.UTF8Encoding($false)
+function Put([string]$path, [string]$text) {
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+    [IO.File]::WriteAllText($path, $text, $utf8)
+}
+function Read-Json([string]$path) { return (([IO.File]::ReadAllText($path)) -replace '^﻿', '') | ConvertFrom-Json }
+function Free-Port { $l = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0); $l.Start(); $p = $l.LocalEndpoint.Port; $l.Stop(); return $p }
+
+$node = Get-Command node -ErrorAction SilentlyContinue
+Yes 'node is on PATH, for the copy of the site and the stand-in game server' ($null -ne $node)
+if ($null -eq $node) { Done }
+
+# ---- the launcher, compiled ------------------------------------------------------
+$csc = @("$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe", "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe") |
+       Where-Object { Test-Path $_ } | Select-Object -First 1
+Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
+if (-not $csc) { Done }
+$refDirs = @(
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2"
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
+    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF"
+    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
+    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF"
+    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319"
+) | Where-Object { Test-Path $_ }
+function Find-Ref([string]$name) {
+    foreach ($d in $refDirs) { $p = Join-Path $d $name; if (Test-Path $p) { return $p } }
+    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32') {
+        $hit = Get-ChildItem (Join-Path "$env:WINDIR\Microsoft.NET\assembly" $gacRoot) -Filter $name -Recurse -File -EA SilentlyContinue |
+               Sort-Object FullName -Descending | Select-Object -First 1
+        if ($hit) { return $hit.FullName }
+    }
+    return $null
+}
+$tokens = $null; $errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts\release\Build-Launcher.ps1'), [ref]$tokens, [ref]$errors)
+$assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
+function ListIn([string]$name) {
+    $a = $assigns | Where-Object { $_.Left.Extent.Text -eq ('$' + $name) } | Select-Object -First 1
+    if (-not $a) { return @() }
+    return @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
+}
+$refs = @(); $missing = @()
+foreach ($n in @(ListIn 'needed')) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
+foreach ($n in @(ListIn 'wv2Managed')) { $p = Join-Path $repo "launcher\lib\webview2\$n"; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
+Yes ('every reference Build-Launcher.ps1 names is here' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0 -and $refs.Count -gt 5)
+if ($missing.Count) { Done }
+New-Item -ItemType Directory -Force -Path $T | Out-Null
+$dll = Join-Path $T 'Thornswood.dll'
+$cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', '/langversion:5', "/out:$dll")
+foreach ($r in $refs) { $cscArgs += "/reference:$r" }
+foreach ($f in @(Get-ChildItem (Join-Path $app '*.cs') -File)) { $cscArgs += $f.FullName }
+$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+$said = & $csc @cscArgs 2>&1
+$ErrorActionPreference = $old
+Yes 'the launcher compiles with the .NET Framework csc, as C# 5' ((Test-Path -LiteralPath $dll) -and $LASTEXITCODE -eq 0)
+if (-not (Test-Path -LiteralPath $dll)) { foreach ($l in @($said | Where-Object { "$_" -match 'error' } | Select-Object -First 10)) { Write-Host "      $l" }; Done }
+$asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))
+$U = $asm.GetType('Thornswood.Updater'); $P = $asm.GetType('Thornswood.Paths'); $VD = $asm.GetType('Thornswood.VersionDoc')
+$flags = [Reflection.BindingFlags]'Static, Public, NonPublic'
+$mPending = $U.GetMethod('Pending', $flags); $mInstall = $U.GetMethod('Install', $flags); $mSync = $U.GetMethod('Sync', $flags)
+$mParse = $VD.GetMethod('Parse', $flags)
+Yes 'Updater.Pending, Updater.Install, Updater.Sync and VersionDoc.Parse are in the build' (
+    $null -ne $mPending -and $null -ne $mInstall -and $null -ne $mSync -and $null -ne $mParse)
+if ($null -eq $mSync) { Done }
+$cfg = [Activator]::CreateInstance($asm.GetType('Thornswood.Config'))
+$script:said = New-Object System.Collections.Generic.List[string]
+$log = [Action[string]] { param($m) $script:said.Add([string]$m) }
+
+# ---- the site and the stand-in game server ---------------------------------------
+$site = Join-Path $T 'site'
+$feedDir = Join-Path $site 'feed'
+New-Item -ItemType Directory -Force -Path (Join-Path $feedDir 'assets'), (Join-Path $site 'feed-dev') | Out-Null
+Copy-Item -LiteralPath (Join-Path $repo 'site\server.js') -Destination (Join-Path $site 'server.js')
+$sitePort = Free-Port; $dead = Free-Port
+Put (Join-Path $site 'config.json') (@{
+    password = ''; secret = ([Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')); botKey = ''; gameCheckPort = $dead
+    onlineFile = (Join-Path $site 'online.json')
+    discord = @{ clientId = ''; clientSecret = ''; botToken = ''; guildId = ''; invite = '' }
+} | ConvertTo-Json -Depth 4)
+$psi = New-Object Diagnostics.ProcessStartInfo
+$psi.FileName = $node.Source; $psi.Arguments = '"server.js"'; $psi.WorkingDirectory = $site
+$psi.UseShellExecute = $false; $psi.CreateNoWindow = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
+$psi.EnvironmentVariables['THORNSWOOD_DOCS_PORT'] = [string]$sitePort
+$psi.EnvironmentVariables['THORNSWOOD_DOCS_LOCAL'] = '1'
+$psi.EnvironmentVariables['THORNSWOOD_CHAT_DIR'] = (Join-Path $site 'chat')
+$sp = [Diagnostics.Process]::Start($psi); $null = $sp.StandardOutput.ReadToEndAsync(); $null = $sp.StandardError.ReadToEndAsync()
+$script:procs += $sp
+$siteUrl = "http://127.0.0.1:$sitePort"
+$at = "$siteUrl/feed/assets/"
+
+$gamePort = Free-Port
+$gameJs = Join-Path $T 'game-server.js'
+Put $gameJs ("require('http').createServer(function (q, s) { s.setHeader('Content-Type', 'application/json'); " +
+             "s.end(JSON.stringify({ mods: [{ filename: 'ours.esp', size: 1, crc32: 1 }] })); }).listen($gamePort, '127.0.0.1');")
+$gpsi = New-Object Diagnostics.ProcessStartInfo
+$gpsi.FileName = $node.Source; $gpsi.Arguments = '"' + $gameJs + '"'
+$gpsi.UseShellExecute = $false; $gpsi.CreateNoWindow = $true; $gpsi.RedirectStandardOutput = $true; $gpsi.RedirectStandardError = $true
+$gp = [Diagnostics.Process]::Start($gpsi); $null = $gp.StandardOutput.ReadToEndAsync(); $null = $gp.StandardError.ReadToEndAsync()
+$script:procs += $gp
+$up = $false
+for ($i = 0; $i -lt 100 -and -not $up; $i++) {
+    try { $q = [Net.HttpWebRequest]::Create("$siteUrl/feed/version.json").GetResponse(); $q.Close(); $up = $true }
+    catch [Net.WebException] { if ($_.Exception.Response) { $up = $true } else { Start-Sleep -Milliseconds 100 } }
+}
+Yes 'a copy of site\server.js serves the stand-in site' $up
+if (-not $up) { Done }
+
+# ---- the build and the publisher ----------------------------------------------
+$fake = Join-Path $T 'repo'
+New-Item -ItemType Directory -Force -Path $fake | Out-Null
+Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
+foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt') {
+    $from = Join-Path $repo $f
+    if (Test-Path -LiteralPath $from) { New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null; Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force }
+}
+$reqFrom = Join-Path $repo 'game\required-data'
+if (Test-Path -LiteralPath $reqFrom) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $fake 'game\required-data') | Out-Null
+    Copy-Item -Path (Join-Path $reqFrom '*') -Destination (Join-Path $fake 'game\required-data') -Recurse -Force
+}
+# The real Stop-Game closes any Skyrim on the machine; nothing here may.
+Put (Join-Path $fake 'scripts\dev\Close-Launcher.ps1') "function Stop-Game { param([string]`$Root) return `$false }`r`nfunction Get-GameProcesses { param([string]`$Root) return @() }`r`n"
+
+$pub = Join-Path $T 'publisher'
+$rel = Join-Path $T 'rel'
+foreach ($dd in 'Game\Data', 'Profile\OwnGame', 'appdata', 'dist') { New-Item -ItemType Directory -Force -Path (Join-Path $pub $dd) | Out-Null }
+New-Item -ItemType Directory -Force -Path $rel | Out-Null
+[IO.File]::WriteAllLines((Join-Path $pub 'Profile\OwnGame\files.txt'), @('F|V|1024|638000000000000000|Data\collection.esp'))
+Put (Join-Path $pub 'Profile\OwnGame\plugins.txt') "*ours.esp`r`n"
+Put (Join-Path $pub 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
+Put (Join-Path $pub 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($gamePort - 1) + '}')
+
+# What the build holds, relative to the game folder, and how to change it.
+$build = @{}
+function Set-Build([string]$relPath, $content) {
+    $f = Join-Path (Join-Path $pub 'Game') $relPath
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $f) | Out-Null
+    if ($content -is [byte[]]) { [IO.File]::WriteAllBytes($f, $content) } else { [IO.File]::WriteAllText($f, [string]$content, $ascii) }
+    $script:build[$relPath] = $true
+}
+function Drop-Build([string]$relPath) { Remove-Item -LiteralPath (Join-Path (Join-Path $pub 'Game') $relPath) -Force; $script:build.Remove($relPath) }
+function Bytes([int]$n, [int]$seed) { $r = New-Object Random $seed; $b = New-Object byte[] $n; $r.NextBytes($b); return ,$b }
+
+Set-Build 'Data\ours.esp' 'the plugin, as the installer had it'
+Set-Build 'Data\ours.bsa' ('x' * 4096)
+Set-Build 'Data\Platform\Plugins\thornswood-ui.js' 'ui as the installer had it'
+Set-Build 'Data\old.esp' 'a plugin the first release drops'
+Set-Build 'Data\keep.txt' 'the same the whole time'
+# The collection's, which no release carries.
+$f = Join-Path $pub 'Game\Data\collection.esp'; [IO.File]::WriteAllText($f, 'from Vortex', $ascii)
+
+# A pack from before any record, already on the feed: it took Data\ancient.esp out.
+function New-Zip([string]$path, [hashtable]$files, [string[]]$deletes) {
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+    $z = [IO.Compression.ZipFile]::Open($path, 'Create')
+    try {
+        if ($deletes) { $w = New-Object IO.StreamWriter ($z.CreateEntry('delete.txt').Open()); foreach ($d in $deletes) { $w.WriteLine($d.Replace('\', '/')) }; $w.Dispose() }
+        foreach ($k in $files.Keys) { $s = $z.CreateEntry('game/' + $k.Replace('\', '/')).Open(); $b = $ascii.GetBytes([string]$files[$k]); $s.Write($b, 0, $b.Length); $s.Dispose() }
+    } finally { $z.Dispose() }
+}
+$ancientZip = Join-Path $T 'ancient.zip'
+New-Zip $ancientZip @{ 'Data\filler.txt' = 'a file an old pack wrote' } @('Data\ancient.esp')
+$ancientSha = Get-BaselineFileSha $ancientZip
+Copy-Item -LiteralPath $ancientZip -Destination (Join-Path $feedDir "assets\$ancientSha")
+Set-Build 'Data\filler.txt' 'a file an old pack wrote'
+Put (Join-Path $feedDir 'version.json') ((@{
+    launcherVersion = '1.1.102'; launcherUrl = ''; launcherSha256 = ''; minLauncher = '1.1.102'; message = ''; news = @()
+    packs = @(@{ id = '20260101-0000'; url = "https://thornswood.net/feed/assets/$ancientSha"; sha256 = $ancientSha; notes = 'An old update' })
+}) | ConvertTo-Json -Depth 5)
+
+$Shell = (Get-Process -Id $PID).Path
+function Publish([string[]]$extra) {
+    $oldA = $env:LOCALAPPDATA; $oldE = $ErrorActionPreference
+    $env:LOCALAPPDATA = Join-Path $pub 'appdata'
+    $ErrorActionPreference = 'Continue'
+    try {
+        $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
+        function Q([string]$s) { return "'" + $s.Replace("'", "''") + "'" }
+        $argText = (@('-Root', (Q $pub), '-ReleaseDir', (Q $rel), '-DistRoot', (Q (Join-Path $pub 'dist')), '-SiteDir', (Q $site),
+                      '-SiteUrl', $siteUrl, '-NoPause', '-NoClose', '-KeepPacks', '0') + @($extra)) -join ' '
+        $cmd = "`$rc = 1; try { & $(Q $pu) $argText; `$rc = `$LASTEXITCODE } finally { }; exit `$rc"
+        $out = (& $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $cmd 2>&1 | Out-String); $code = $LASTEXITCODE
+    } finally { $env:LOCALAPPDATA = $oldA; $ErrorActionPreference = $oldE }
+    return [pscustomobject]@{ Code = $code; Out = $out }
+}
+function Show($r) { if ($r.Code -ne 0) { Write-Host (($r.Out -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 14) -join "`n") -ForegroundColor DarkGray } }
+function Feed { return Read-Json (Join-Path $feedDir 'version.json') }
+function Record-Of($doc) { return Read-BaselineFile (Join-Path $feedDir ("assets\" + [string]$doc.baseline.sha256)) }
+$records = @{}
+function Release([string]$Id, [string]$note) {
+    $r = Publish @('-Id', $Id, '-Notes', ("'" + $note + "`n- what changed'"))
+    Show $r
+    $doc = Feed
+    $ok = ($r.Code -eq 0 -and $doc.PSObject.Properties['baseline'] -and [string]$doc.baseline.id -eq $Id)
+    if ($ok) { $script:records[$Id] = Record-Of $doc }
+    return $ok
+}
+
+Write-Host ''; Write-Host 'the real Publish-Update.ps1'
+$r = Publish @('-Baseline')
+Yes 'the build the installer carries is recorded as published (-Baseline)' ($r.Code -eq 0)
+Show $r
+# What the installer carries: the build as it stood then, with the required data
+# Publish-Update places, and without the collection's file.
+$installerFiles = @{}
+$gameAt = Join-Path $pub 'Game'
+foreach ($f in @(Get-ChildItem -LiteralPath $gameAt -Recurse -File)) {
+    $k = $f.FullName.Substring($gameAt.Length + 1)
+    if ($k -ne 'Data\collection.esp') { $installerFiles[$k] = [IO.File]::ReadAllBytes($f.FullName) }
+}
+
+$R1 = '20260930-0100'; $R2 = '20260930-0200'; $R3 = '20260930-0300'
+Set-Build 'Data\ours.esp' 'the plugin, first release'
+Drop-Build 'Data\old.esp'
+Set-Build 'Data\new1.esp' 'added by the first release'
+Yes 'the first release goes out' (Release $R1 'The first release of the test')
+$d1 = Feed; $m1 = $records[$R1]
+Yes '  its record says every file is on the site beside it' ($null -ne $m1 -and [string]$m1[':record:files'] -eq '1')
+$shas = Get-RecordFileShas $m1
+$absent = @($shas.Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $feedDir "assets\$_")) })
+Yes ("  and every one is: {0} file(s), each at /feed/assets/<its sha256>" -f $shas.Count) ($shas.Count -ge 6 -and $absent.Count -eq 0)
+$okBytes = $true
+foreach ($k in @($m1.Keys | Where-Object { -not $_.StartsWith(':') })) {
+    $sha = ([string]$m1[$k]).Split(':')[1]
+    if ((Get-BaselineFileSha (Join-Path $feedDir "assets\$sha")) -ne $sha) { $okBytes = $false }
+}
+Yes '  each asset''s bytes are its name' $okBytes
+Yes '  the collection''s file is not in it' (-not $m1.ContainsKey('Data\collection.esp'))
+$packZip = Join-Path $feedDir ("assets\" + [string]@($d1.packs)[-1].sha256)
+$z = [IO.Compression.ZipFile]::OpenRead($packZip)
+try { $e = $z.GetEntry('profile/plugins.txt'); $s = $e.Open(); try { $packList = Get-BaselineStreamSha $s } finally { $s.Dispose() } } finally { $z.Dispose() }
+Yes '  it carries the plugin list as the pack carries it' ($m1.ContainsKey(':golden:plugins.txt') -and ([string]$m1[':golden:plugins.txt']).EndsWith(':' + $packList) -and $m1.ContainsKey(':golden:loadorder.txt'))
+Yes '  the file the release dropped is gone' ([string]$m1[':gone:Data\old.esp'] -eq 'removed')
+Yes '  and so is the one a pack took out before any record, read off that pack''s delete.txt' ([string]$m1[':gone:Data\ancient.esp'] -eq 'removed')
+Yes '  the packs are still on the feed, for launchers that replay them' (@($d1.packs).Count -eq 2 -and [string]@($d1.packs)[-1].id -eq $R1)
+
+Set-Build 'Data\Platform\Plugins\thornswood-ui.js' 'ui, second release'
+$big = Bytes (3 * 1048576 + 12345) 7
+Set-Build 'Data\big.bsa' $big
+Yes 'the second release goes out' (Release $R2 'The second release of the test')
+Set-Build 'Data\ours.bsa' ('y' * 4096)
+Set-Build 'Data\new3.esp' 'added by the third release'
+Yes 'the third release goes out' (Release $R3 'The third release of the test')
+$d3 = Feed
+Yes '  every release''s record says its files are up, and the gone list carries forward' (
+    [string]$records[$R2][':record:files'] -eq '1' -and [string]$records[$R3][':record:files'] -eq '1' -and
+    [string]$records[$R3][':gone:Data\old.esp'] -eq 'removed' -and [string]$records[$R3][':gone:Data\ancient.esp'] -eq 'removed')
+Yes ("  the feed still lists the packs ({0}) beside the record" -f @($d3.packs).Count) (@($d3.packs).Count -eq 4)
+
+# ---- the launcher reads it ----------------------------------------------------
+Write-Host ''; Write-Host 'the launcher reads the feed'
+function Raw($x) { if ($x -is [Management.Automation.PSObject]) { return $x.PSObject.BaseObject }; return $x }
+function Parse-Feed { return (Raw ($mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json')))))) }
+function Pending-Of($v) { $a = New-Object 'object[]' 1; $a[0] = (Raw $v); return @($mPending.Invoke($null, $a) | ForEach-Object { Raw $_ }) }
+$v = Parse-Feed
+Yes 'VersionDoc.Parse reads the record the feed names' ($null -ne $v.record -and $v.record.id -eq $R3 -and $v.record.sha256 -eq [string]$d3.baseline.sha256)
+$oddFeeds = @(
+    '{"launcherVersion":"1","packs":[{"id":"a","url":"u","sha256":"s"}],"baseline":5}',
+    '{"launcherVersion":"1","packs":[{"id":"a","url":"u","sha256":"s"}],"baseline":{"id":"x","sha256":"not a hash","url":"https://thornswood.net/feed/assets/x"}}',
+    '{"launcherVersion":"1","packs":[{"id":"a","url":"u","sha256":"s"}]}'
+)
+$allRead = $true
+foreach ($oddText in $oddFeeds) {
+    $o = $mParse.Invoke($null, @(, $utf8.GetBytes($oddText)))
+    if ($null -eq $o -or @($o.packs).Count -ne 1 -or $null -ne $o.record) { $allRead = $false }
+}
+Yes 'a "baseline" of any other shape costs only that field: the feed still reads, and it has no record' $allRead
+
+# ---- installs ---------------------------------------------------------------------
+function New-Install([string]$name, [hashtable]$files, [string[]]$applied) {
+    $root = Join-Path $T "inst\$name"
+    foreach ($d in 'Game\Data', 'Profile\Default', 'Profile\Packs', 'Launcher') { New-Item -ItemType Directory -Force -Path (Join-Path $root $d) | Out-Null }
+    foreach ($k in $files.Keys) {
+        $f = Join-Path (Join-Path $root 'Game') $k
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $f) | Out-Null
+        $c = $files[$k]
+        if ($c -is [byte[]]) { [IO.File]::WriteAllBytes($f, $c) } else { [IO.File]::WriteAllText($f, [string]$c, $ascii) }
+    }
+    if ($null -ne $applied) { [IO.File]::WriteAllLines((Join-Path $root 'Profile\applied.txt'), [string[]]@($applied)) }
+    return $root
+}
+function Use-Install([string]$root) {
+    $prof = Join-Path $root 'Profile'
+    $set = @{ Root = $root; Game = (Join-Path $root 'Game'); LauncherDir = (Join-Path $root 'Launcher'); ProfileDir = $prof
+              MyGames = (Join-Path $prof 'MyGames'); LocalAD = (Join-Path $prof 'LocalAppData'); Golden = (Join-Path $prof 'Default')
+              Personal = (Join-Path $root 'Your Mods'); Isolated = (Join-Path $prof 'Isolated'); Replaced = (Join-Path $prof 'Replaced')
+              StateFile = (Join-Path $prof 'swap.json'); PlayedFile = (Join-Path $prof 'played.flag'); AppliedFile = (Join-Path $prof 'applied.txt')
+              PacksDir = (Join-Path $prof 'Packs'); LogFile = (Join-Path $prof 'launcher.log'); CfgFile = (Join-Path $root 'config.json')
+              WinMyGames = (Join-Path $root 'win-mygames'); WinLocalAD = (Join-Path $root 'win-localappdata') }
+    $set['Live'] = $set['LocalAD']; $set['LiveMyGames'] = $set['MyGames']
+    foreach ($k in $set.Keys) { $P.GetField($k, $flags).SetValue($null, [string]$set[$k]) }
+    $P.GetField('Collection', $flags).SetValue($null, $false)
+}
+# What a launcher from #1050 on does with the feed: Pending, then for the entry
+# that stands for a release, the sync (through Sync itself, with the site at
+# 127.0.0.1 rather than https), and for a pack, Install from the site's bytes.
+function Invoke-Sync($rec, $v, [string]$base = $at) {
+    $a = New-Object 'object[]' 5
+    $a[0] = (Raw $cfg); $a[1] = [string]$base; $a[2] = (Raw $rec); $a[3] = (Raw $v); $a[4] = $log
+    return [bool]$mSync.Invoke($null, $a)
+}
+function Install-Pack($p) {
+    $sha = ([string]$p.sha256).ToLowerInvariant()
+    $a = New-Object 'object[]' 3
+    $a[0] = [string](Join-Path $feedDir "assets\$sha"); $a[1] = (Raw $p); $a[2] = $log
+    [void]$mInstall.Invoke($null, $a)
+}
+function Update-New([string]$root, [string]$base = $at) {
+    Use-Install $root
+    $script:said.Clear()
+    $v = Parse-Feed
+    $pending = (Pending-Of $v)
+    $n = 0
+    foreach ($p in $pending) {
+        if ($null -ne $p.Record) {
+            if (-not (Invoke-Sync $p.Record $p.Doc $base)) { foreach ($q in (Pending-Of $v)) { Install-Pack $q; $n++ } }
+        } else { Install-Pack $p }
+        $n++
+    }
+    return $n
+}
+# An old launcher: every pack id not in applied.txt, in order, and nothing else.
+function Update-Old([string]$root) {
+    Use-Install $root
+    $done = @()
+    $af = Join-Path $root 'Profile\applied.txt'
+    if (Test-Path -LiteralPath $af) { $done = @(Get-Content -LiteralPath $af | ForEach-Object { $_.Trim() }) }
+    $n = 0
+    foreach ($p in @((Parse-Feed).packs)) { if ($done -notcontains $p.id) { Install-Pack $p; $n++ } }
+    return $n
+}
+function Get-Game([string]$root) {
+    $game = Join-Path $root 'Game'
+    $m = @{}
+    foreach ($f in @(Get-ChildItem -LiteralPath $game -Recurse -File)) { $m[$f.FullName.Substring($game.Length + 1)] = Get-BaselineEntry $f.FullName }
+    return $m
+}
+# The game folder against a record: every file of ours at its bytes, nothing of
+# ours it does not list. $extra are files that are not ours and stay.
+function Test-Lands([string]$root, [hashtable]$want, [string[]]$extra = @()) {
+    $have = Get-Game $root
+    $bad = @()
+    foreach ($k in @($want.Keys)) {
+        if ($k.StartsWith(':')) { continue }
+        if (-not $have.ContainsKey($k)) { $bad += "missing $k" } elseif ($have[$k] -ne $want[$k]) { $bad += "wrong $k" }
+    }
+    foreach ($k in @($have.Keys)) { if (-not $want.ContainsKey($k) -and $extra -notcontains $k) { $bad += "extra $k" } }
+    if ($bad.Count) { Write-Host ('      ' + ($bad -join '; ')) }
+    return ($bad.Count -eq 0)
+}
+function Plugins-Match([string]$root, [hashtable]$want) {
+    $f = Join-Path $root 'Profile\Default\plugins.txt'
+    return ((Test-Path -LiteralPath $f) -and ('{0}' -f (Get-BaselineEntry $f)) -eq [string]$want[':golden:plugins.txt'])
+}
+function Synced([string]$root) { $f = Join-Path $root 'Profile\release.txt'; if (Test-Path -LiteralPath $f) { return [IO.File]::ReadAllText($f) } else { return '' } }
+function Said([string]$pattern) { return @($script:said | Where-Object { $_ -match $pattern }).Count -gt 0 }
+function Fetched { $m = @($script:said | ForEach-Object { [regex]::Match($_, '^Downloading (\d+) file') } | Where-Object { $_.Success }); if ($m.Count) { return [int]$m[0].Groups[1].Value } else { return 0 } }
+function Err($sb) { try { & $sb; return '' } catch { $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }; return $e.Message } }
+
+Write-Host ''; Write-Host 'a launcher that syncs to the record'
+$ids = @('20260101-0000')
+$fresh = New-Install 'fresh' $installerFiles $ids
+Use-Install $fresh
+$pend = @(Pending-Of (Parse-Feed))
+Yes 'a fresh install as the installer left it is offered the release as one update, not its three packs' ($pend.Count -eq 1 -and $null -ne $pend[0].Record -and $pend[0].Record.id -eq $R3)
+[void](Update-New $fresh)
+Yes '  it syncs straight to the third release, file for file' (Test-Lands $fresh $records[$R3])
+Yes ("  downloading only what differs from what it had: six game files and the plugin list's two ({0})" -f (Fetched)) ((Fetched) -eq 8)
+Yes '  with the plugin list the release shipped, in Profile\Default' (Plugins-Match $fresh $records[$R3])
+Yes '  it writes down which release it is on' ((Synced $fresh) -match ([regex]::Escape([string]$d3.baseline.sha256) + ' ' + $R3))
+Yes '  and every pack on the feed as behind it, so an old feed shape replays nothing' (@(Get-Content (Join-Path $fresh 'Profile\applied.txt')).Count -eq 4)
+Yes '  after which nothing is pending' ((Pending-Of (Parse-Feed)).Count -eq 0)
+$noApplied = New-Install 'no-applied' $installerFiles $null
+[void](Update-New $noApplied)
+Yes 'a fresh install with no applied.txt at all reaches the third release too' ((Test-Lands $noApplied $records[$R3]) -and @(Get-Content (Join-Path $noApplied 'Profile\applied.txt')).Count -eq 4)
+
+# One behind: an install on the second release.
+$one = New-Install 'one-behind' @{} $ids
+$saveFeed = [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))
+Use-Install $one
+$r2ptr = @($d3.releases | Where-Object { $_.id -eq $R2 })[0]
+$rec2 = [Activator]::CreateInstance($asm.GetType('Thornswood.RecordRef')); $rec2.id = $R2; $rec2.sha256 = [string]$r2ptr.sha256; $rec2.url = [string]$r2ptr.url
+$script:said.Clear()
+[void](Invoke-Sync $rec2 (Parse-Feed))
+Yes ("an empty install syncs to the second release by its record in the feed's list ({0} files)" -f (Fetched)) ((Test-Lands $one $records[$R2]) -and (Fetched) -eq (Get-RecordFileShas $records[$R2]).Count)
+[void](Update-New $one)
+Yes 'one release behind, it downloads only the two files the third release changed' ((Test-Lands $one $records[$R3]) -and (Fetched) -eq 2)
+
+# Several behind: as the installer left it, and it never took the old pack that
+# removed Data\ancient.esp.
+$several = @{}; foreach ($k in $installerFiles.Keys) { $several[$k] = $installerFiles[$k] }
+$several['Data\ancient.esp'] = 'an old plugin an old pack took out'
+$sev = New-Install 'several-behind' $several @()
+[void](Update-New $sev)
+Yes 'several releases behind, it lands on the third release' (Test-Lands $sev $records[$R3])
+Yes '  having taken out what the first release dropped and what the old pack took out' ((Said '^removed Data\\old\.esp') -and (Said '^removed Data\\ancient\.esp'))
+
+# A file Vortex deploys now is the collection's, not ours, whatever a record says.
+$vx = New-Install 'vortex' $installerFiles $ids
+Put (Join-Path $vx 'Game\Data\vortex.deployment.json') '{"files":[{"relPath":"old.esp","source":"a mod"}]}'
+[void](Update-New $vx)
+Yes 'a file of ours a release dropped stays when Vortex deploys that path now' (
+    (Test-Lands $vx $records[$R3] @('Data\old.esp', 'Data\vortex.deployment.json')) -and (Test-Path -LiteralPath (Join-Path $vx 'Game\Data\old.esp')) -and (Said 'collection''s now and stayed'))
+
+# ---- the old launcher beside it -----------------------------------------------
+Write-Host ''; Write-Host 'an old launcher on the same feed'
+$oldL = New-Install 'old-launcher' $installerFiles $ids
+Yes 'an old launcher replays the three packs' ((Update-Old $oldL) -eq 3)
+Yes '  and lands on the same files as the record' (Test-Lands $oldL $records[$R3])
+
+# ---- verified, resumed, finished ---------------------------------------------
+Write-Host ''; Write-Host 'every download is checked, and a cut off one carries on'
+$bigSha = ([string]$records[$R3]['Data\big.bsa']).Split(':')[1]
+$bigAsset = Join-Path $feedDir "assets\$bigSha"
+$half = [int]($big.Length / 2)
+$bad = New-Object byte[] $big.Length
+[Array]::Copy($big, $bad, $big.Length)
+for ($i = 0; $i -lt $half; $i++) { $bad[$i] = [byte](255 - $bad[$i]) }
+[IO.File]::WriteAllBytes($bigAsset, $bad)
+$chk = New-Install 'checked' $installerFiles $ids
+$before = Get-Game $chk
+Use-Install $chk
+$why = Err { [void](Update-New $chk) }
+Yes 'a download whose bytes are not its sha256 is refused' ($why -match 'Checksum did not match')
+Yes '  and nothing in the install moved, nor is it written down as synced' ((($before.Keys | Where-Object { (Get-Game $chk)[$_] -ne $before[$_] }).Count -eq 0) -and -not (Synced $chk))
+$cut = New-Install 'cut-off' $installerFiles $ids
+New-Item -ItemType Directory -Force -Path (Join-Path $cut 'Profile\Sync') | Out-Null
+$part = New-Object byte[] $half
+[Array]::Copy($big, $part, $half)
+[IO.File]::WriteAllBytes((Join-Path $cut "Profile\Sync\$bigSha.part"), $part)
+$why = Err { [void](Update-New $cut) }
+Yes 'a download cut off halfway carries on from where it stopped (only a Range request gets these bytes right)' ($why -eq '' -and (Test-Lands $cut $records[$R3]))
+[IO.File]::WriteAllBytes($bigAsset, $big)
+
+# Cut off after the downloads: one file could not be put in place.
+$stop = New-Install 'stopped' $installerFiles $ids
+New-Item -ItemType Directory -Force -Path (Join-Path $stop 'Game\Data\new3.esp') | Out-Null
+$why = Err { [void](Update-New $stop) }
+Yes 'a sync that stops after its downloads is not written down as done' ($why -ne '' -and -not (Synced $stop) -and (Test-Path -LiteralPath (Join-Path $stop "Profile\Sync\$bigSha")))
+Remove-Item -LiteralPath (Join-Path $stop 'Game\Data\new3.esp') -Recurse -Force
+$why = Err { [void](Update-New $stop "http://127.0.0.1:$dead/feed/assets/") }
+Yes '  and the next one finishes from what it had fetched, with the site out of reach' ($why -eq '' -and (Test-Lands $stop $records[$R3]))
+Yes '  then tidies what it fetched away' (-not (Test-Path -LiteralPath (Join-Path $stop 'Profile\Sync')))
+
+# A file changed by hand.
+$tamper = Join-Path $fresh 'Game\Data\ours.bsa'
+[IO.File]::WriteAllText($tamper, ('z' * 4096), $ascii)
+Use-Install $fresh
+Yes 'a file changed by hand is not a new release: nothing is offered' ((Pending-Of (Parse-Feed)).Count -eq 0)
+$script:said.Clear()
+$vv = Parse-Feed
+[void](Invoke-Sync $vv.record $vv)
+Yes '  but a sync to the release (Updater.Resync) finds it by its sha256 and puts only it right' ((Test-Lands $fresh $records[$R3]) -and (Fetched) -eq 1)
+
+# A record that does not say its files are up: the packs, and not again.
+$plain = @{}; foreach ($k in $records[$R3].Keys) { if ($k -ne ':record:files') { $plain[$k] = $records[$R3][$k] } }
+$plainFile = Join-Path $T 'plain.json'
+$plainSha = Write-BaselineFile $plain $plainFile
+Copy-Item -LiteralPath $plainFile -Destination (Join-Path $feedDir "assets\$plainSha")
+$doc = Feed
+$doc.baseline = [pscustomobject]@{ id = 'plain'; sha256 = $plainSha; url = "https://thornswood.net/feed/assets/$plainSha"; entries = $plain.Count }
+[IO.File]::WriteAllText((Join-Path $feedDir 'version.json'), ($doc | ConvertTo-Json -Depth 6), $utf8)
+$pl = New-Install 'plain' $installerFiles $ids
+[void](Update-New $pl)
+Yes 'a record without :record:files is taken as packs, pack by pack' ((Test-Lands $pl $records[$R3]) -and (Said 'pack by pack'))
+Use-Install $pl
+Yes '  and is not offered again' ((Pending-Of (Parse-Feed)).Count -eq 0 -and (Synced $pl) -match "packs $plainSha")
+[IO.File]::WriteAllBytes((Join-Path $feedDir 'version.json'), $saveFeed)
+
+# ---- a rollback, for both ---------------------------------------------------------
+Write-Host ''; Write-Host 'Rollback-Feed.ps1, for both kinds of launcher'
+$rbScript = Join-Path $fake 'scripts\release\Rollback-Feed.ps1'
+$work = Join-Path $T 'rb-work'; $rbRel = Join-Path $T 'rb-rel'
+function Rollback([string[]]$more) {
+    $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $rbScript, '-Channel', 'main', '-NoPause', '-SiteDir', $site, '-SiteUrl', $siteUrl,
+           '-ReleaseDir', $rbRel, '-WorkDir', $work) + $more
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $out = & $winps @a 2>&1 | ForEach-Object { "$_" }
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    if ($rc -ne 0) { Write-Host ((@($out) | Select-Object -Last 10) -join "`n") -ForegroundColor DarkGray }
+    return [pscustomobject]@{ Code = $rc; Out = ($out -join "`n") }
+}
+$RB = '20260930-0400'
+$r = Rollback @('-Back', '1', '-Id', $RB)
+$db = Feed; $mb = Record-Of $db
+Yes 'the feed goes back a release, as one more pack and a new record' ($r.Code -eq 0 -and [string]$db.baseline.id -eq $RB -and [string]@($db.packs)[-1].id -eq $RB)
+Yes '  the record says its files are up, and they are' ([string]$mb[':record:files'] -eq '1' -and
+    @((Get-RecordFileShas $mb).Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $feedDir "assets\$_")) }).Count -eq 0)
+Yes '  and says the file the third release added is gone' ([string]$mb[':gone:Data\new3.esp'] -eq 'removed')
+[void](Update-New $fresh)
+Yes 'a launcher that syncs lands on the second release''s files' ((Test-Lands $fresh $records[$R2]) -and (Plugins-Match $fresh $records[$R2]))
+Yes '  downloading only the file that went back' ((Fetched) -eq 1)
+Yes 'an old launcher takes the rollback pack and lands there too' ((Update-Old $oldL) -eq 1 -and (Test-Lands $oldL $records[$R2]))
+Yes 'an install that was several behind lands there as well' (((Update-New $sev) -ge 1) -and (Test-Lands $sev $records[$R2]))
+$RF = '20260930-0500'
+$r = Rollback @('-To', $R3, '-Id', $RF)
+Yes 'and forward again to the third' ($r.Code -eq 0 -and [string](Feed).baseline.id -eq $RF)
+[void](Update-New $fresh); [void](Update-Old $oldL)
+Yes '  both kinds of launcher follow it' ((Test-Lands $fresh $records[$R3]) -and (Test-Lands $oldL $records[$R3]))
+
+# ---- nothing here weakens the launcher's own update -------------------------------
+Write-Host ''; Write-Host 'the launcher itself'
+$src = [IO.File]::ReadAllText((Join-Path $app 'Sync.cs'))
+$upd = [IO.File]::ReadAllText((Join-Path $app 'Updater.cs'))
+Yes 'the sync never touches the launcher exe: it writes only under the game folder and Profile\Default' (
+    $src -notmatch 'SelfUpdate\(|Paths\.LauncherDir|\.exe\.new' -and $src -match 'Inside\(full, Paths\.Game\)')
+Yes 'SelfUpdate still checks the signer before the swap, and Signature.cs is what it asks' ($upd -match '(?s)public static void SelfUpdate.*?CheckSigner\(tmp, log\);\s*File\.Copy\(tmp, neu, true\)' -and $upd -match 'Signature\.Refusal\(')
+Yes 'the public sync checks the record''s address (https, the host list) before a byte is fetched' ($src -match '(?s)public static void SyncRecord.*?CheckUrl\(r\.url\);.*?AssetFolder\(r\)')
+
+Done

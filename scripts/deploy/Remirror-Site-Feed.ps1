@@ -102,6 +102,14 @@ param(
   # no feed is read and version.json is not sent. Publish-Update.ps1 calls it
   # before it writes the feed (#897).
   [string[]]$Send,
+  # Hands back, one per line, the sha256 of every asset already in
+  # /feed[-dev]/assets on the site, and sends nothing. Publish-Update.ps1 reads
+  # it to check every file of a release is up under the name its record gives
+  # it (#1050). Throws when the site could not be asked.
+  [switch]$Have,
+  # Where a bundle of assets is put together before it is sent. Left out, the
+  # temp folder.
+  [string]$WorkDir,
   # A folder on this machine standing in for the site's feed root (the folder
   # holding feed\ and feed-dev\). Nothing connects to the VPS. For the tests.
   [string]$SiteDir
@@ -190,6 +198,82 @@ Move-Item -LiteralPath `$p -Destination `$f -Force
   if ($said -notmatch 'in place') { throw "$sha did not land: $said" }
 }
 
+# MANY ASSETS AT ONCE (#1050). The first release after #1050 sends every file of
+# ours, about 2,500 of them, and one scp and one ssh each would be thousands of
+# connections. So more than a few go as one zip, each entry named by its sha256,
+# unpacked up there by the script below: each one is written to <sha>.part,
+# hashed, and renamed only when its bytes are its name, an asset already there
+# is left alone, and the zip is deleted. It lands in the channel's folder beside
+# the assets, which the site never serves (it answers only version.json and a
+# name of 64 hex characters under assets). -SiteDir runs the same script here.
+$BundleUnpack = @'
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zipFile = '@ZIP@'
+$assets = '@ASSETS@'
+if (-not (Test-Path -LiteralPath $assets)) { New-Item -ItemType Directory -Force -Path $assets | Out-Null }
+$z = [IO.Compression.ZipFile]::OpenRead($zipFile)
+$h = [Security.Cryptography.SHA256]::Create()
+try {
+  foreach ($e in $z.Entries) {
+    $name = $e.Name.ToLowerInvariant()
+    if ($name -notmatch '^[0-9a-f]{64}$') { 'SKIP ' + $e.FullName; continue }
+    $final = Join-Path $assets $name
+    if (Test-Path -LiteralPath $final) { 'THERE ' + $name; continue }
+    $part = $final + '.part'
+    [IO.Compression.ZipFileExtensions]::ExtractToFile($e, $part, $true)
+    $s = [IO.File]::OpenRead($part)
+    try { $got = -join ($h.ComputeHash($s) | ForEach-Object { $_.ToString('x2') }) } finally { $s.Dispose() }
+    if ($got -ne $name) { Remove-Item -LiteralPath $part -Force; 'BAD ' + $name; continue }
+    Move-Item -LiteralPath $part -Destination $final -Force
+    'PUT ' + $name
+  }
+} finally {
+  $z.Dispose(); $h.Dispose()
+  Remove-Item -LiteralPath $zipFile -Force -ErrorAction SilentlyContinue
+}
+'UNPACKED'
+'@
+
+# $items: sha256 to local file. Throws unless every one is up there afterwards.
+function Send-AssetBundle($items) {
+  Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
+  Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
+  $work = if ($WorkDir) { $WorkDir } else { [IO.Path]::GetTempPath() }
+  New-Item -ItemType Directory -Force -Path $work | Out-Null
+  $tag = [Guid]::NewGuid().ToString('N')
+  $zipPath = Join-Path $work ("assets-$tag.zip")
+  $z = [IO.Compression.ZipFile]::Open($zipPath, 'Create')
+  try {
+    foreach ($sha in @($items.Keys)) {
+      [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($z, $items[$sha], $sha, [IO.Compression.CompressionLevel]::Fastest)
+    }
+  } finally { $z.Dispose() }
+  Say ("  {0} asset(s) in one bundle, {1:N1} MB" -f $items.Count, ((Get-Item -LiteralPath $zipPath).Length / 1MB))
+  try {
+    if ($SiteDir) {
+      $assets = Join-Path (Join-Path $SiteDir $prefix) 'assets'
+      $there = Join-Path (Join-Path $SiteDir $prefix) ("incoming-$tag.zip")
+      Copy-Item -LiteralPath $zipPath -Destination $there -Force
+      $text = $BundleUnpack.Replace('@ZIP@', $there.Replace("'", "''")).Replace('@ASSETS@', $assets.Replace("'", "''"))
+      $said = @(& ([scriptblock]::Create($text)) | ForEach-Object { [string]$_ })
+    } else {
+      & scp @ssh $zipPath "$User@${Vps}:$Root/$prefix/incoming-$tag.zip"
+      if ($LASTEXITCODE -ne 0) { throw "scp failed: the bundle of $($items.Count) asset(s)" }
+      $text = $BundleUnpack.Replace('@ZIP@', "$rootWin\$prefix\incoming-$tag.zip").Replace('@ASSETS@', "$rootWin\$prefix\assets")
+      $said = @(RemoteLines $text)
+    }
+  } finally { Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue }
+  $bad = @($said | Where-Object { $_ -match '^BAD ' })
+  if (-not (@($said) -contains 'UNPACKED') -or $bad.Count) {
+    throw ("the bundle did not unpack cleanly up there: " + ((@($said) | Select-Object -Last 5) -join ' | '))
+  }
+  $done = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+  foreach ($l in @($said | Where-Object { $_ -match '^(PUT|THERE) ' })) { [void]$done.Add($l.Substring($l.IndexOf(' ') + 1)) }
+  $miss = @($items.Keys | Where-Object { -not $done.Contains($_) })
+  if ($miss.Count) { throw ("{0} asset(s) of the bundle are not up there: {1}" -f $miss.Count, (($miss | Select-Object -First 3) -join ', ')) }
+}
+
 # version.json through the feed store (#907): .part then renamed on the VPS,
 # the one it replaces kept in history, and only while the feed and baseline up
 # there are what this folder received. A folder that was never received (an
@@ -264,6 +348,19 @@ function PropList($obj, $name) {
 # Where the feed lives and how it is sent (#907).
 . (Join-Path $Here '..\release\Feed-Store.ps1')
 
+# ------------------------------------------------- -Have: what is up there --
+if ($Have) {
+  $asked = $false
+  foreach ($l in (Get-ThereLines $false)) {
+    $line = ([string]$l).Trim()
+    if ($line -eq 'NOTHING THERE YET' -or $line -eq 'ASKED') { $asked = $true; continue }
+    $m = [regex]::Match($line, '^([a-f0-9]{64})\|(\d+)\|')
+    if ($m.Success) { $m.Groups[1].Value }
+  }
+  if (-not $asked) { throw "$Vps did not say what is up there in /$prefix/assets." }
+  return
+}
+
 # ------------------------------------------------- -Send: these files only --
 if ($PSBoundParameters.ContainsKey('Send')) {
   $files = @($Send | Where-Object { $_ })
@@ -297,17 +394,27 @@ if ($PSBoundParameters.ContainsKey('Send')) {
   }
   [void](New-ThereFolders)
   $sentNow = 0
+  $toSend = [ordered]@{}
   foreach ($h in $byHash.Keys) {
     $local = $byHash[$h]
     $size = (Get-Item -LiteralPath $local).Length
     if ($upThere.ContainsKey($h) -and $upThere[$h] -eq $size) {
-      Say ("  already there  {0}  {1}" -f $h.Substring(0, 12), (Split-Path -Leaf $local)) 'DarkGray'
+      if ($byHash.Count -le 20) { Say ("  already there  {0}  {1}" -f $h.Substring(0, 12), (Split-Path -Leaf $local)) 'DarkGray' }
       continue
     }
-    Say ("  {0}  {1:N1} MB  {2}" -f $h.Substring(0, 12), ($size / 1MB), (Split-Path -Leaf $local))
-    try { Send-Asset $local $h }
+    $toSend[$h] = $local
+  }
+  if ($toSend.Count -gt 4) {
+    try { Send-AssetBundle $toSend; $sentNow = $toSend.Count }
     catch { Say "  $($_.Exception.Message)" 'Red'; exit 1 }
-    $sentNow++
+  } else {
+    foreach ($h in @($toSend.Keys)) {
+      $local = $toSend[$h]
+      Say ("  {0}  {1:N1} MB  {2}" -f $h.Substring(0, 12), ((Get-Item -LiteralPath $local).Length / 1MB), (Split-Path -Leaf $local))
+      try { Send-Asset $local $h }
+      catch { Say "  $($_.Exception.Message)" 'Red'; exit 1 }
+      $sentNow++
+    }
   }
   Say ("  {0} sent, {1} already there. version.json was not touched." -f $sentNow, ($byHash.Count - $sentNow)) 'Green'
   exit 0

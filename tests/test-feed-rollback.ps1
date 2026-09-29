@@ -300,6 +300,14 @@ function Update-Install([string]$root, [int]$only = -1) {
     Use-Install $root
     $v = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))))
     $pending = @($mPending.Invoke($null, @($v)))
+    # A launcher from #1050 on offers the record the feed names as one update.
+    # These records do not say their files are on the site (':record:files'),
+    # so it writes that down and takes the packs (Sync.cs), which is what this
+    # does. tests\test-record-sync.ps1 is the sync itself.
+    if ($pending.Count -eq 1 -and $null -ne $pending[0].Record) {
+        [IO.File]::WriteAllText((Join-Path $root 'Profile\release.txt'), ('packs ' + [string]$pending[0].Record.sha256))
+        $pending = @($mPending.Invoke($null, @($v)))
+    }
     $n = 0
     foreach ($p in $pending) {
         if ($only -ge 0 -and $n -ge $only) { break }
@@ -431,9 +439,17 @@ Yes '-To the third release puts the feed forward again' ($r.Code -eq 0 -and [str
 Yes '  every launcher lands on the third release''s files' (
     (Update-Install $A) -eq 1 -and (Test-Lands $A $records[$R3]) -and (Update-Install $B) -eq 1 -and (Test-Lands $B $records[$R3]) -and
     (Update-Install $C) -eq 2 -and (Test-Lands $C $records[$R3]))
-Yes '  the record it names is the third release''s, with the launcher''s own source' (
-    (Get-BaselineFileSha (Join-Path $feedDir 'published.json')) -eq [string]$d.baseline.sha256 -and
-    [string]$d.baseline.sha256 -eq [string]@($d.releases | Where-Object { $_.id -eq $R3 })[0].sha256)
+# Since #1050 the record a rollback names also lists what it takes out
+# (':gone:') and the plugin list as its pack carries it (':golden:'), for
+# launchers that sync to it, so it is the third release's
+# record plus those lines, not the same bytes.
+$fwd = Read-BaselineFile (Join-Path $feedDir ("assets\" + [string]$d.baseline.sha256))
+$same = $true
+foreach ($k in @($records[$R3].Keys)) { if ([string]$fwd[$k] -ne [string]$records[$R3][$k]) { $same = $false } }
+foreach ($k in @($fwd.Keys)) { if (-not $k.StartsWith(':gone:') -and -not $k.StartsWith(':golden:') -and $k -ne ':record:files' -and -not $records[$R3].ContainsKey($k)) { $same = $false } }
+Yes '  the record it names is the third release''s, with the launcher''s own source, and what it takes out' (
+    (Get-BaselineFileSha (Join-Path $feedDir 'published.json')) -eq [string]$d.baseline.sha256 -and $same -and
+    [string]$fwd[':gone:Data\new1.esp'] -eq 'removed' -and -not $fwd.ContainsKey(':record:files'))
 Yes 'the list names every step, newest first' ((@($d.releases | ForEach-Object { [string]$_.id }) -join ',') -eq "$RF,$RA,$RB,$R3,$R2,$R1")
 $r = Rollback @('-Back', '1', '-DryRun', '-Id', '20260904-1400-dev')
 Yes '-Back 1 from there is the release before it in the list' ($r.Code -eq 0 -and $r.Out -match ("going to " + [regex]::Escape($RA)))

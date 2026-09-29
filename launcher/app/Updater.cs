@@ -8,7 +8,7 @@ using System.Text;
 
 namespace Thornswood
 {
-    static class Updater
+    static partial class Updater
     {
         public const string Version = "1.1.102";
 
@@ -566,10 +566,18 @@ namespace Thornswood
             catch { return new HashSet<string>(StringComparer.OrdinalIgnoreCase); }
         }
 
+        /// <summary>
+        /// What this install still has to take from the feed. When the feed
+        /// names a release record this install has not synced to, that is one
+        /// entry standing for the whole release (Sync.cs, #1050), and no pack
+        /// is replayed. Otherwise every pack id not in applied.txt, in order.
+        /// </summary>
         public static List<Pack> Pending(VersionDoc v)
         {
-            var done = Applied();
             var list = new List<Pack>();
+            Pack release = RecordDue(v);
+            if (release != null) { list.Add(release); return list; }
+            var done = Applied();
             if (v == null || v.packs == null) return list;
             foreach (var p in v.packs)
                 if (p != null && !string.IsNullOrEmpty(p.id) && !done.Contains(p.id)) list.Add(p);
@@ -687,6 +695,8 @@ namespace Thornswood
         /// </summary>
         public static void ApplyPack(Config cfg, Pack p, Action<string> log)
         {
+            // A whole release, synced to its record rather than unpacked.
+            if (p != null && p.Record != null) { SyncRecord(cfg, p.Record, p.Doc, log); return; }
             // A retry runs the whole list again and everything before the pack
             // that broke is already in. A second helping means another line in
             // applied.txt and a file list written afresh in which every path

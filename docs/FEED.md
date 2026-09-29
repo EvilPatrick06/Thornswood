@@ -264,7 +264,7 @@ launcher.
 | `packs` | array | `Publish-Update.ps1:1210-1233` appends; `Repair-Manifest.ps1` removes | `Updater.Pending` (`Updater.cs:360-368`) | See below. |
 | `optional` | array | `Publish-Pack.ps1:197-213` | Add-ons tab (`Shell.cs:2310`) | Absent in both feeds today; `scripts/release/optional-packs.txt` lists none. |
 | `clientRuntime` | object | `Publish-Update.ps1:1236-1245`, only when the fork commit changed | `ClientRuntime.Heal` (`ClientRuntime.cs:261-269`) | Null or no `url`: a missing client file cannot be repaired from it. Same host and sha256 checks as a pack. |
-| `baseline` | object `{ id, sha256, url, entries }` | `Publish-Update.ps1` on every release that sends to the site (the release manifest block, #441); taken out by a `-NoUpload` run | No launcher. The next `Publish-Update.ps1`, through `Resolve-ReleaseBaseline` (`Release-Baseline.ps1`) | What that release left installed: every file of ours as `<bytes>:<sha256>`, at `/feed[-dev]/assets/<sha256>`, the same bytes as the store's `published.json`. The next release is diffed against it; a missing or stale store copy is replaced by it, checked by sha256. |
+| `baseline` | object `{ id, sha256, url, entries }` | `Publish-Update.ps1` on every release that sends to the site (the release manifest block, #441); taken out by a `-NoUpload` run | The launcher from #1050 on, which syncs the install to it (`Updater.SyncRecord`, `launcher\app\Sync.cs`; see "Syncing to the release record"). The next `Publish-Update.ps1`, through `Resolve-ReleaseBaseline` (`Release-Baseline.ps1`) | The release record: what that release left installed, every file of ours as `<bytes>:<sha256>`, at `/feed[-dev]/assets/<sha256>`, the same bytes as the store's `published.json`. The next release is diffed against it; a missing or stale store copy is replaced by it, checked by sha256. The launcher reads it apart from the rest of the feed (`RecordRef.FromFeed`), so a `baseline` of any other shape costs that one field and never the whole feed. |
 | `releases` | array, newest first, at most 30, of `{ id, sha256, url, entries, lastPack, to? }` | `Publish-Update.ps1` on every release that names a `baseline` (the release list block, #442); `Rollback-Feed.ps1` adds the one a rollback makes, with `to` naming the release it went back to | No launcher. `Rollback-Feed.ps1` (`Get-FeedReleases`, `Release-Baseline.ps1`) | The record each release published, the same shape as `baseline`, plus `lastPack`, the last pack on the feed once that release was out, whose plugin list is the one it shipped. What a channel can be put back to; a release older than the newest thirty cannot be. The first release after this change starts the list with the `baseline` the feed already named. |
 | `release` | object `{ id, channel, launcherVersion, packs, baseline, commit, branch, uncommitted, tag }` | `Publish-Update.ps1` on every release (the release record block, #444) | No launcher. Ship, which tags `commit` as `tag` once the feed is out (`Add-ReleaseTag`, `Release-Name.ps1`); the store's `releases.txt` | The release's one name is `id`, the id its packs and its `baseline` carry (`20260928-1630`, dev `20260928-2324-dev`). The rest is what else it is known by: the launcher the feed offers with it (the same across Ships that keep their launcher, #921), the packs it added, its baseline id (empty on a `-NoUpload` run), the commit it was built from and how many tracked files differed from it, and the tag `release/main/<id>` or `release/dev/<id>` (empty when it was not built from a git checkout). `Get-ReleaseDisagreements` says whether they agree, with each other and with `releases`, whose newest entry is the same id ending on its last pack. After a main Ship the dev feed carries main's, `channel` main. `Rollback-Feed.ps1` does not rewrite it yet, so after a rollback it still names the last Ship until the next. |
 | `news` | array, newest first, at most 40 | `Publish-Update.ps1:1507-1536`; `Publish-Server.ps1:415-520` | News tab (`Shell.cs:2965-3160`); `Publish-News.ps1` copies it to the site | Cosmetic. |
@@ -302,7 +302,11 @@ same title and body as the newest entry adds nothing (`Publish-Update.ps1:1517-1
 ## How a launcher decides what is new
 
 1. It reads the feed and saves the saved fields (`Shell.cs:4540-4592`).
-2. Pending packs are every `packs` entry whose `id` is not a line in
+2. From #1050 on: when the feed names a `baseline` this install has not synced
+   to (`Profile\release.txt`), that release is the one pending update, and no
+   pack is replayed (`Updater.Pending`, `Sync.cs RecordDue`). See "Syncing to
+   the release record". Otherwise, and in every launcher before #1050:
+   pending packs are every `packs` entry whose `id` is not a line in
    `Profile\applied.txt`, in feed order (`Updater.cs:219-225,360-368`). Order
    matters: part one before part two.
 3. The launcher is offered when `launcherVersion` is higher and `launcherUrl`
@@ -316,7 +320,132 @@ same title and body as the newest entry adds nothing (`Publish-Update.ps1:1517-1
    (`Package-Thornswood.ps1:731-742`). The dev build copies the main build's
    `applied.txt` when it is installed (`DevBuild.cs:92-96`).
 
-A machine that loses `applied.txt` asks for every pack on the feed again.
+A machine that loses `applied.txt` asks for every pack on the feed again. A
+launcher from #1050 on does not: it syncs to the record, which needs no
+history.
+
+## Syncing to the release record (#1050)
+
+Patrick, 29 Sep: the launcher fetches each file straight from the site by its
+fingerprint, syncing the install to the release record, instead of replaying
+the chain of packs.
+
+- **What the record is.** The `baseline` the feed names (#1011): one JSON
+  object, itself an asset named by its sha256. Every key is a path under the
+  game folder with the value `<bytes>:<sha256>` of a file of ours, plus:
+  `:golden:plugins.txt` and `:golden:loadorder.txt` (the reference plugin list
+  exactly as the pack carries it, into `Profile\Default`); `:gone:<path>` =
+  `removed` for a file of ours a release stopped shipping, or `always` for
+  Ship-Rules' delete list; and `:record:files` = `1`, written only once every
+  file above is on the site beside the record. The `:profile:`, `:order:` and
+  `:src:` keys are Publish-Update's own and no launcher reads them.
+  `Release-Baseline.ps1` has the list.
+- **What the launcher does** (`launcher\app\Sync.cs`). `Updater.Pending`
+  offers one update standing for the release when the feed names a record this
+  install has not synced to. Installing it reads the record (checked against
+  its sha256), compares every file of ours in the install with it, by size and
+  then sha256, and downloads only the ones that differ, from the folder the
+  record is in: its own url with its sha256 swapped for the file's
+  (`/feed[-dev]/assets/<sha256>`). The record's address is checked once
+  (https, the host list, stored under its own sha256), so no file can come
+  from anywhere else. Each download is checked against its sha256 (and size)
+  before anything is written into the game; then they are put in place (a
+  linked file is unshared first, as a pack does), the plugin list is settled,
+  every `:gone:` path is taken out (a `removed` one is left alone when Vortex
+  deploys that path now, the rule `RemovePack` keeps), the kept copies follow,
+  every pack on the feed is marked applied, and `Profile\release.txt` records
+  the release. A record without `:record:files` (every release before #1050)
+  is written down as `packs <sha256>` and the packs go in as before.
+- **Interrupted.** Downloads land in `Profile\Sync\<sha256>`: a cut off one is
+  carried on from where it stopped with a Range request (thrown away and
+  fetched whole once more if the joined file does not check out), a finished
+  one is not fetched again, and a sync that stopped after its downloads
+  finishes from them with the site out of reach. `release.txt` moves only once
+  every step is done, and `Profile\Sync` is cleared then.
+- **What it never touches.** The launcher exe: it updates only through
+  `SelfUpdate`, with every check Signature.cs makes (WinVerifyTrust, the
+  Artifact Signing root, the ThornswoodRelease durable identity,
+  `ExpectedSigner`). The six client runtime files: they stay with the
+  launcher, which puts back any that are not the build it records
+  (`ClientRuntime.Heal`). Anything outside the game folder and
+  `Profile\Default`.
+- **A file changed by hand** is not a new release, so it is not offered on
+  every check; the next release's sync, or `Updater.Resync`, finds it by its
+  sha256 and puts only it right.
+- **How every file gets on the site** (`Publish-Update.ps1`, the record files
+  block). Before `version.json` is touched: the plugin list the pack carried
+  goes in as `:golden:` (a release with no pack keeps the last one's); the
+  `:gone:` list carries forward from the last record, adds what this release
+  removed, and on the first record of a channel starts from every `delete.txt`
+  the packs on the feed carry (read off each pack's zip directory with a Range
+  request, not the whole pack); every file of ours is sent with
+  `Remirror-Site-Feed.ps1 -Send`, which skips what is already up and sends the
+  rest as one zip that the VPS unpacks, checking each file's bytes against its
+  name; `-Have` then lists the folder and every sha256 the record names must be
+  there, or the release stops with the feed untouched. The first record on a
+  channel also runs Check-Secrets over the files no pack carries. Only then
+  does the record get `:record:files`.
+- **How big that is on the site.** Measured on the dev record of 29 Sep: 2,515
+  files of ours, 463.5 MB, 449.0 MB once the files with the same bytes are
+  counted once, stored as they are (not zipped). Each channel has its own
+  folder, so the first release after this on each sends about that much; after
+  that a release adds only the files it changed, the same bytes a pack carries
+  unzipped. About 180 MB of that record is the Creation Kit and a backup of
+  SkyrimSE.exe, which are not ours and should not be in a release at all
+  (filed separately). Nothing deletes an old asset: a file every record in
+  `releases` has stopped naming can be cleared by hand.
+
+## When the packs can go
+
+Updating is the one place backwards compatibility matters, so the packs stay on
+the feed, and Publish-Update keeps appending them, for every launcher before
+#1050. They can go from a channel from the first Ship after both of these hold:
+
+1. the channel's `minLauncher` is at or above the first launcher that syncs to
+   the record, the first one built from a commit with `launcher\app\Sync.cs`:
+   on main, 1.1.103 if the next Bump-Version comes after this merges; on dev,
+   the first dev number Ship gives after this merges (the dev
+   feed is on 1.1.102.7 on 29 Sep, so 1.1.102.8 or above; read it off the dev
+   feed the day it goes out). Publish-Update sets `minLauncher` to the feed's
+   `launcherVersion` on every publish (#937), so this holds from the Ship that
+   first publishes such a launcher;
+2. the record the feed names carries `:record:files`, and its `:gone:` list was
+   started from the packs (that Ship printed "read what N pack(s) took out").
+
+From then an installed launcher of any age still updates: it finds no pack,
+is offered the launcher, takes it through the signed self-update (unchanged),
+and the new launcher syncs the install to the record, taking out every file of
+ours a release removed since, from `:gone:`. Nothing an old launcher needs in
+order to update comes from `packs`.
+
+What changes then: `packs` becomes `[]` rather than being left out, the shape
+every launcher ever published has read; Publish-Update stops
+appending; and `Rollback-Feed.ps1` stops building a pack, because a record
+whose files are up is the whole rollback. After it, version.json is:
+
+```json
+{
+  "launcherVersion": "1.1.103", "minLauncher": "1.1.103",
+  "launcherUrl": "https://thornswood.net/feed/assets/<sha256>", "launcherSha256": "<sha256>",
+  "launcherInputs": "<sha256>",
+  "serverAddress": "192.135.112.23", "serverPort": "7777", "voicePort": "7778",
+  "voiceUrl": "https://thornswood.net/voice", "updateFeedUrl": "https://thornswood.net/feed/version.json",
+  "collectionUrl": "...", "collectionRevision": 1, "maxOnline": 25,
+  "discordAppId": "...", "siteUrl": "https://thornswood.net", "presenceImage": "...",
+  "expectedExeBytes": "...", "newerExeBytes": "...", "depots": [ ... ],
+  "clientRuntime": { "url": "...", "sha256": "...", "bytes": 6356315, "forkCommit": "..." },
+  "packs": [],
+  "baseline": { "id": "20261001-1200", "sha256": "<sha256>", "url": "https://thornswood.net/feed/assets/<sha256>", "entries": 2583 },
+  "release": { ... }, "releases": [ ... ], "news": [ ... ]
+}
+```
+
+Measured on the main feed of 29 Sep (80,452 bytes): `packs` is 43,126 of it,
+`news` 27,862, and `releases` would be about 7,800 once it holds thirty. So
+dropping the packs takes it to about 37 KB; the few hundred bytes #1050 asks
+for also needs the news in a file of its own that the News tab reads and the
+releases list kept only in the VPS store, where Rollback-Feed is its only
+reader. That is the rest of #1050.
 
 ## Checks on every download
 
@@ -428,7 +557,16 @@ Now it is one command, and it goes the same way as every other update:
   then this, and lands on the same files; a fresh install seeded with every
   pack id applies only this. `tests\test-feed-rollback.ps1` proves all three
   with the launcher's own `Updater` compiled, back, further back and forward.
-- **Where the bytes come from.** The packs already on the site, found by size
+- **Launchers that sync to the record** (#1050) follow the new record rather
+  than the pack: it names what the release asked for installed, lists what the
+  later releases added under `:gone:`, and says `:record:files` once every file
+  it names is in the channel's folder on the site (the rollback sends any that
+  are not, from what it staged or from the folder of either record). When one
+  cannot be had it goes out without `:record:files` and those launchers take
+  the pack like the rest. `tests\test-record-sync.ps1` proves both kinds land
+  on the same files, back and forward.
+- **Where the bytes come from.** The site's copy of each file beside its record
+  (#1050), then the packs already on the site, found by size
   and sha256 and checked again as they are read. A file no pack ever carried
   (it came with the installer and nothing changed it before the release being
   undone) is not on the site; the rollback stops, names it, and sends nothing.
