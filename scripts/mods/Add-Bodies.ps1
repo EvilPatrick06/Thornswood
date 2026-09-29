@@ -1,6 +1,21 @@
 ﻿<#
   Add-Bodies.ps1
 
+  RETIRED. DO NOT RUN. Issue #405: every run poured the nude CBBE and 3BA
+  female body (femalebody_0.nif and _1.nif, shapes 3BA, 3BA_Vagina and
+  3BA_Anus, no Bra or Panty) back over Game\Data, whatever body had been
+  put there since. It is also from before the own game folder: those meshes
+  are Vortex hard links now (Profile\OwnGame\files.txt records them as L|V),
+  so a run wrote straight into Vortex's own staging copy, and
+  Publish-Update never packs a Vortex deployed file, so nothing it wrote
+  would ship anyway. The bodies come from the Nexus collection, and the
+  covered female body goes in there, as a collection revision, the way
+  every other mesh reaches everybody. It refuses to run, and the rest of
+  the file is kept for the history of how it was installed. Pattern from
+  #735 Add-TempleRespawn and #768 Add-JContainers.
+
+  What it used to do, and what is left of it:
+
   Bodies, genitals and physics. Skeleton, female body, male body, and the
   jiggle that hangs off both.
 
@@ -29,6 +44,16 @@ param(
     [switch]$NoShip,
     [switch]$NoPause
 )
+
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Add-Bodies.ps1 is retired and installs nothing (issue #405). ' +
+       'It pours the nude CBBE and 3BA female body back over Game\Data, which undoes a covered ' +
+       'body the moment it lands, and the meshes there are Vortex hard links, so it writes into ' +
+       "Vortex's own staging copy. Bodies come from the Nexus collection now: the covered female " +
+       'body goes into a collection revision, not this script. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'bodies are meant to be hand-installed again, and read the header first.')
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
