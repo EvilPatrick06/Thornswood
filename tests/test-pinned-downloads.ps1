@@ -26,15 +26,15 @@
   never writes outside its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$ToolsPath)
+param([string]$RepoPath)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsPath) { $ToolsPath = $Here }
-$RepoRoot = Split-Path -Parent $ToolsPath
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoPath) { $RepoPath = $Here }
+$RepoRoot = $RepoPath
 
 $script:pass = 0
 $script:fail = 0
@@ -108,7 +108,7 @@ function Start-Process {
 try {
 
 # ============================================================== caddy ======
-$sdPath = Join-Path $ToolsPath '..\scripts\deploy\Setup-Domain.ps1'
+$sdPath = Join-Path $RepoPath 'scripts\deploy\Setup-Domain.ps1'
 $sd = ParseOf $sdPath
 $sdText = Get-Content -LiteralPath $sdPath -Raw
 Yes 'Setup-Domain.ps1 parses' ($sd.Errors.Count -eq 0)
@@ -197,7 +197,7 @@ if ($caddyBlocks.Count -eq 1) {
 }
 
 # =============================================================== node ======
-$bvPath = Join-Path $ToolsPath '..\scripts\vps\Bootstrap-VPS.ps1'
+$bvPath = Join-Path $RepoPath 'scripts\vps\Bootstrap-VPS.ps1'
 $bv = ParseOf $bvPath
 $bvText = Get-Content -LiteralPath $bvPath -Raw
 Yes 'Bootstrap-VPS.ps1 parses' ($bv.Errors.Count -eq 0)
@@ -255,7 +255,7 @@ if ($fn.Count -eq 1) {
 }
 
 # ================================================================ bot ======
-$reqPath = Join-Path $ToolsPath '..\bot\requirements.txt'
+$reqPath = Join-Path $RepoPath 'bot\requirements.txt'
 Yes 'bot\requirements.txt exists' (Test-Path -LiteralPath $reqPath)
 $req = @()
 if (Test-Path -LiteralPath $reqPath) { $req = @(Get-Content -LiteralPath $reqPath | Where-Object { $_.Trim() }) }
@@ -267,7 +267,7 @@ foreach ($lib in 'discord.py', 'pillow', 'certifi') {
     Yes "  $lib is pinned" (@($req | Where-Object { $_ -like "$lib==*" }).Count -eq 1)
 }
 
-$ibPath = Join-Path $ToolsPath '..\scripts\deploy\Install-Bot.ps1'
+$ibPath = Join-Path $RepoPath 'scripts\deploy\Install-Bot.ps1'
 $ib = ParseOf $ibPath
 $ibText = Get-Content -LiteralPath $ibPath -Raw
 Yes 'Install-Bot.ps1 parses' ($ib.Errors.Count -eq 0)

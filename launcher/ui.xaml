@@ -761,7 +761,7 @@
 
                   <!-- This card told a new person to name the character after
                        themselves and to save before connecting, both left over
-                       from Skyrim Together. The name is what everybody sees over
+                       from the old multiplayer mod. The name is what everybody sees over
                        your head in a roleplay world, so a person who followed the
                        card walked into Whiterun under their own name. And there is
                        no saving: the server holds the character. Help.cs gives the
@@ -1383,7 +1383,8 @@
 
 
                 <TextBlock Text="Folders" Style="{StaticResource Eyebrow}"/>
-                <StackPanel x:Name="PathRows" Margin="0,0,0,16"/>
+                <StackPanel x:Name="PathRows" Margin="0,0,0,8"/>
+                <TextBlock x:Name="TxtInGameBrowser" Style="{StaticResource Small}" Margin="0,0,0,16"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,30">
                   <Button x:Name="BtnFolder"  Style="{StaticResource Ghost}" Content="Open install folder" Margin="0,0,8,0"/>
                   <Button x:Name="BtnOpenLog" Style="{StaticResource Ghost}" Content="Open log" Margin="0,0,8,0"/>
@@ -1395,7 +1396,7 @@
                   <StackPanel>
                     <StackPanel x:Name="PnlOwnGame">
                       <TextBlock Style="{StaticResource H2}" Text="Thornswood's own Skyrim folder"/>
-                      <TextBlock Style="{StaticResource Body}" Text="Runs Thornswood from a Skyrim folder of its own, made from what Vortex has deployed while the Thornswood profile is on. Any other Vortex profile can then use the Steam copy without reaching Thornswood, and switching profiles in Vortex no longer takes Thornswood's mods away. The big files are links to Vortex's copies, so the collection is not on the disk twice. When Vortex deploys a newer Thornswood collection, the launcher brings it in by itself the next time it starts. Windows asks for administrator once while this is set up, to write a firewall rule for the game's browser: Skyrim Platform draws the interface in a second program, and a rule is tied to a program's path, so moving the game into its own folder is what makes Windows ask about it. The rule is a block, because that program only ever talks to the game on this machine. Saying no is fine and only means Windows asks you about the browser on the first launch instead."/>
+                      <TextBlock Style="{StaticResource Body}" Text="Runs Thornswood from a Skyrim folder of its own, made from what Vortex has deployed while the Thornswood profile is on. Any other Vortex profile can then use the Steam copy without reaching Thornswood, and switching profiles in Vortex no longer takes Thornswood's mods away. The big files are links to Vortex's copies, so the collection is not on the disk twice. When Vortex deploys a newer Thornswood collection, the launcher brings it in by itself the next time it starts."/>
                       <TextBlock x:Name="TxtOwnGameState" Style="{StaticResource Small}" Margin="0,8,0,0"/>
                       <StackPanel Orientation="Horizontal" Margin="0,13,0,0">
                         <Button x:Name="BtnOwnGameMake" Style="{StaticResource Ghost}" Content="Make it"/>

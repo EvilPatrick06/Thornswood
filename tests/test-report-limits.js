@@ -21,7 +21,7 @@
 // Nothing here touches the repository's data folder or anything on the VPS.
 // server.js writes beside itself, and the copy it runs as is in a temp folder
 // that is deleted afterwards.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -30,9 +30,9 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const CR = String.fromCharCode(13);
-const SRC = path.join(TOOLS_DIR, '..', 'site', 'server.js');
+const SRC = path.join(REPO_DIR, 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const HOME = fs.readFileSync(path.join(TOOLS_DIR, '..', 'site', 'public', 'home.html'), 'utf8')
+const HOME = fs.readFileSync(path.join(REPO_DIR, 'site', 'public', 'home.html'), 'utf8')
   .split(CR).join('');
 
 let pass = 0, fail = 0;
@@ -196,7 +196,7 @@ yes('out of the tab order, so a keyboard never lands on it', /id="rHome"[^>]*tab
 yes('and hidden from a screen reader', /aria-hidden="true" style="position:absolute;left:-10000px/.test(HOME));
 yes('and the page sends it', /homepage: document\.getElementById\('rHome'\)\.value/.test(HOME));
 yes('the page shows the site\'s own sentence when a report is refused',
-    /said\.textContent = res\.j\.error \|\|/.test(HOME));
+    /(said\.textContent = |finish\()res\.j\.error \|\|/.test(HOME));
 
 // --------------------------------------------------- the real server --
 function freePort() {

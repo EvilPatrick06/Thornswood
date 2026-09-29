@@ -26,13 +26,13 @@
   name a different server.js and Door.cs, so it can be pointed at the
   versions from before the fix to watch it fail.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const SRC = process.argv[2] || path.join(TOOLS_DIR, '..', 'site', 'server.js');
+const SRC = process.argv[2] || path.join(REPO_DIR, 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8');
-const DOOR = fs.readFileSync(process.argv[3] || path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Door.cs'), 'utf8');
+const DOOR = fs.readFileSync(process.argv[3] || path.join(REPO_DIR, 'launcher', 'app', 'Door.cs'), 'utf8');
 
 function braced(at, what) {
   const b = src.indexOf('{', at);
@@ -83,12 +83,26 @@ const readTicket = (t) => (String(t || '').startsWith('tk:') ? { d: String(t).sl
 const body = async (req) => req.body;
 const sendJson = (res, code, obj) => { res.code = code; res.obj = obj; return res; };
 const slotsFor = () => 2;
+// The world is never full here (#481); test-seats.js runs that refusal.
+const gameStatus = { up: false, online: 0, max: 0 };
+const seatsFull = () => false;
+const worldFull = () => '';
+const mostOnlineFallback = () => 0;
 
 // standingCached, hasLeft and departed because the join route asks whether an
 // account holding the id has left the Discord before it reads the file it
 // writes back (entry 142).
 eval(grab('guildMembers') + '\n' + grab('memberOf') + '\n' + grab('roleNames') + '\n' + grab('standing') +
+     '\n' + route('function holdsStaffRole(') +
      '\n' + grab('standingCached') + '\n' + grab('hasLeft') + '\n' + grab('departed') +
+     '\n' + route('function notAcceptedYet(') +
+     // What a banned account is told at Play (#1010).
+     '\n' + route('function banUntilText(') + '\n' + route('function accountBanned(') +
+     // Play's doors answer inside PLAY_ANSWER_MS (#1094).
+     '\n' + src.slice(src.indexOf('const PLAY_ANSWER_MS'), src.indexOf('\n', src.indexOf('const PLAY_ANSWER_MS'))) +
+     '\n' + src.slice(src.indexOf('const PLAY_BODY_MS'), src.indexOf('\n', src.indexOf('const PLAY_BODY_MS'))) +
+     '\n' + route('class BodyFailed') + '\n' + route('function passBodyFailure(') +
+     '\n' + route('function within(') + '\n' + route('function standingLate(') +
      '\nasync function join(p, req, res) {\n' + JOIN + '\n}');
 
 function reset() {

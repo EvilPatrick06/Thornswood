@@ -1,8 +1,10 @@
 THORNSWOOD
 ==========
 
-Thornswood is a co-op Skyrim roleplay server, in closed playtest and for
-people eighteen and over. You apply in the Discord first:
+Thornswood is a co-op Skyrim roleplay server, in alpha and for people
+eighteen and over. Anyone can install it, and the world is open by
+application: you apply in the Discord, accept the rules, and the Playtester
+role lets you press Play:
 https://thornswood.net/discord
 
 The full guide is https://thornswood.net/join. It is kept up to date, so if

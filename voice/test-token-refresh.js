@@ -41,6 +41,10 @@ const sandbox = {
   // not about how long the backoff actually waits.
   setTimeout: (fn) => { fn(); return 0; },
   clearTimeout: () => {},
+  // The page's own keepalive (issue #519) ticks on this; nothing here waits
+  // long enough for it to matter.
+  setInterval: () => 0,
+  clearInterval: () => {},
 };
 vm.createContext(sandbox);
 vm.runInContext(SRC, sandbox);

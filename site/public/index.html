@@ -580,7 +580,7 @@ tr.adder .plus{color:var(--faint);font-size:16px;line-height:38px}
 var S = {
   me:{member:false,admin:false,dev:false,name:''}, titles:{}, level:{},
   docs:{}, boards:{}, results:{}, files:[], uploads:[], inbox:[], linked:[],
-  sessions:[],
+  sessions:[], records:{bans:{}, notes:{}, pk:{}, names:{}},
   news:{news:[]}, invite:'', at:'home', editing:false, discord:false
 };
 
@@ -596,7 +596,7 @@ var isBoard = function (k) { return BOARDKEYS.indexOf(k) >= 0; };
 
 var ABOUT = {
   uploads:     'Staff Accept waiting shots and Delete pending or live ones. Send and browse pictures on /gallery.',
-  inbox:       'Bugs and ideas sent in from the public report page.',
+  inbox:       'Bugs and ideas from the public report page, reports about people, and calls for help from the game.',
   linked:      'Everybody who has linked a Discord account to a copy of the game.',
   sessions:    'One card a person, newest first by when they last played. ' +
                'Open one for every session they have had, with its logs and ' +
@@ -730,6 +730,7 @@ function start() {
     S.uploads = d.uploads || []; S.inbox = d.inbox || [];
     S.linked = d.linked || []; S.invite = d.invite || '';
     S.sessions = d.sessions || [];
+    S.records = d.records || { bans: {}, notes: {} };
     S.news = d.news || { news: [] };
     el('gate').style.display = 'none';
     el('shell').style.display = 'grid';
@@ -744,6 +745,7 @@ function refresh() {
     S.results = d.results || {}; S.files = d.files || [];
     S.uploads = d.uploads || []; S.inbox = d.inbox || [];
     S.linked = d.linked || []; S.sessions = d.sessions || [];
+    S.records = d.records || { bans: {}, notes: {} };
   }).catch(function () { });
 }
 
@@ -833,15 +835,238 @@ function drawLinked() {
           (u.first ? new Date(u.first).toLocaleDateString() : '') + '</div></td>' +
         '<td data-label="Last played"><div class="cell">' +
           (u.played ? new Date(u.played).toLocaleString() : 'never') + '</div></td>' +
-      '</tr>';
+      '</tr>' +
+      '<tr class="notesrow"><td colspan="5" data-label="Notes"><div class="cell">' +
+        linkedNotes(u, S.records, Date.now()) + linkedControls(u, S.records, Date.now(), !!S.me.admin) +
+      '</div></td></tr>';
     });
     out += '</tbody></table></div>';
   }
-  out += '<p class="lede" style="margin-top:20px">Banning somebody is a Discord ' +
-    'job, not a job here. Give them the <b>Banned</b> role, or remove them from ' +
-    'the server, and the next time they press Play they are turned away. Nothing ' +
-    'on this page needs touching.</p>';
+  var loose = looseBans(S.records, Date.now(), S.linked);
+  if (loose) out += '<h3 style="margin-top:22px">Banned by profile</h3>' + loose;
+  var dead = deadList(S.records);
+  if (dead) out += '<h3 style="margin-top:22px">Dead for good</h3>' + dead;
+  out += '<p class="lede" style="margin-top:20px">Every staff role can do these, from here or in ' +
+    'the game. <b>Ban account</b> (/banaccount) keeps every character on that account out of both ' +
+    'worlds, and stops it making new ones, until it ends. <b>Ban character</b> (/ban) keeps that ' +
+    'one character out and leaves the rest. <b>PK</b> (/pk) kills a character for good: it can ' +
+    'never be played or picked again, it is kept here for staff, the account can make a new ' +
+    'character, and nobody but its owner is told. <b>Undo PK</b> (/unpk) is for a PK made by ' +
+    'mistake and only an admin can use it: the character comes back into a free slot on its ' +
+    'account, or stays dead while every slot is taken, and the PK stays on its record with the ' +
+    'undo beside it. Anybody banned or dead for good who is in the ' +
+    'world has their session ended. The <b>Banned</b> role in Discord still works too, for good. ' +
+    'Notes are for staff and nobody else sees them.</p>';
   el('page').innerHTML = out;
+  wireLinked();
+}
+
+/* When a ban ends, in words. */
+function banUntil(b) {
+  return Number(b && b.until) > 0 ? 'until ' + new Date(Number(b.until)).toLocaleString() : 'for good';
+}
+
+/* Who did it, from where and when, in brackets after a record. */
+function byLine(r) {
+  return ' (by ' + esc(r.by || 'staff') + (r.from ? ', from ' + esc(r.from) : '') +
+    (r.at ? ', ' + esc(new Date(Number(r.at)).toLocaleString()) : '') + ')';
+}
+
+/* A character's name, from the game server's roster or the record, or ''. */
+function charName(pid, rec) {
+  rec = rec || {};
+  var n = (rec.names || {})[String(pid)];
+  if (n) return n;
+  var pk = (rec.pk || {})[String(pid)];
+  if (pk && pk.name) return pk.name;
+  var b = (rec.bans || {})['p:' + pid];
+  return (b && b.name) || '';
+}
+
+/* One character under an account (#1010): its name and profile, and whether
+   it is dead for good or banned by itself, with why, who and when. */
+function charLine(pid, rec, now) {
+  rec = rec || {};
+  var name = charName(pid, rec);
+  var out = '<div class="char">' + (name ? esc(name) : 'Unnamed character') +
+    ' <span class="said">profile ' + esc(pid) + '</span> ';
+  var pk = (rec.pk || {})[String(pid)];
+  var b = (rec.bans || {})['p:' + pid];
+  // Every earlier PK an admin undid, oldest first, then the row itself (#1010).
+  var past = pk ? (pk.history || []).concat(pk.undone ? [pk] : []) : [];
+  var was = past.map(function (h) {
+    return '<div class="said">PK ' + esc(h.why || '') + byLine(h) + (h.undone
+      ? ', undone by an admin: ' + esc(h.undone.why || '') + byLine(h.undone) : '') + '</div>';
+  }).join('');
+  if (pk && !pk.undone) {
+    out += '<span class="pill fail">Dead for good (PK)</span> ' + esc(pk.why || '') + byLine(pk);
+  } else if (b && b.active) {
+    out += '<span class="pill fail">Character banned ' + esc(banUntil(b)) + '</span> ' +
+      esc(b.why || '') + byLine(b);
+  } else if (b) {
+    out += '<span class="said">A character ban ' + esc(banUntil(b)) + ' has ended: ' + esc(b.why || '') + '</span>';
+  }
+  return out + was + '</div>';
+}
+
+/* The Notes line under one account (#412, #1010): the account's ban if there
+   is one, each of its characters with a PK or a ban of its own, then every
+   staff note, newest first, each with who wrote it and when. */
+function linkedNotes(u, rec, now) {
+  rec = rec || { bans: {}, notes: {} };
+  var id = String(u && u.id || '');
+  var b = (rec.bans || {})[id];
+  var notes = (rec.notes || {})[id] || [];
+  var chars = (u && u.profiles) || [];
+  var out = '<div class="notes"><b>Notes</b>';
+  if (b && b.active) {
+    out += '<div class="ban pill fail">Account banned ' + esc(banUntil(b)) + ', every character on it: ' +
+      esc(b.why || '') + byLine(b) + '</div>';
+  } else if (b) {
+    out += '<div class="said">An account ban ' + esc(banUntil(b)) + ' has ended: ' + esc(b.why || '') +
+      ' (by ' + esc(b.by || 'staff') + ')</div>';
+  }
+  chars.forEach(function (pid) { out += charLine(pid, rec, now); });
+  if (!notes.length && !b) out += ' <span class="said">no notes yet</span>';
+  notes.forEach(function (n) {
+    out += '<div class="note">' + esc(n.text || '') + ' <span class="said">(' +
+      esc(n.by || 'staff') + ', ' + esc(new Date(Number(n.at) || 0).toLocaleString()) +
+      (n.from ? ', ' + esc(n.from) : '') + ')</span></div>';
+  });
+  return out + '</div>';
+}
+
+/* How long a ban lasts, staff's choice, for good included. */
+function lengthPick(key) {
+  var lengths = [['30', '30 minutes'], ['120', '2 hours'], ['1440', '1 day'], ['4320', '3 days'],
+                 ['10080', '1 week'], ['43200', '30 days'], ['0', 'for good']];
+  return '<select class="banlen" data-id="' + key + '">' +
+    lengths.map(function (l) { return '<option value="' + l[0] + '">' + l[1] + '</option>'; }).join('') +
+    '</select>';
+}
+
+/* A note and the account's ban for one account, then for each of its
+   characters a ban of its own and PK (#1010). A dead character offers Undo
+   PK to an admin and says so to the other staff roles (29 September). */
+function linkedControls(u, rec, now, admin) {
+  rec = rec || {};
+  var raw = String(u && u.id || '');
+  var id = esc(raw);
+  var b = (rec.bans || {})[raw];
+  var out = '<div class="bar notesbar">' +
+    '<input class="notetext" data-id="' + id + '" placeholder="A note for staff">' +
+    '<button class="btn small" data-act="note" data-id="' + id + '">Add note</button>' +
+    lengthPick(id) +
+    '<input class="banwhy" data-id="' + id + '" placeholder="Why the account is banned">' +
+    '<button class="btn small" data-act="ban" data-id="' + id + '">Ban account</button>' +
+    (b && b.active ? '<button class="btn small" data-act="unban" data-id="' + id + '">Lift account ban</button>' : '') +
+    '</div>';
+  ((u && u.profiles) || []).forEach(function (pid) {
+    var key = id + ':' + esc(pid);
+    var name = charName(pid, rec) || ('profile ' + pid);
+    var pk = (rec.pk || {})[String(pid)];
+    var cb = (rec.bans || {})['p:' + pid];
+    if (pk && !pk.undone) {
+      out += '<div class="bar notesbar charbar"><span class="said">' + esc(name) + ' is dead for good.</span>' +
+        (admin
+          ? '<input class="unpkwhy" data-id="' + key + '" placeholder="Why the PK is undone">' +
+            '<button class="btn small" data-act="unpk" data-id="' + id + '" data-pid="' + esc(pid) + '" data-name="' + esc(name) + '">Undo PK</button>'
+          : ' <span class="said">Only an admin can undo a PK.</span>') +
+        '</div>';
+      return;
+    }
+    out += '<div class="bar notesbar charbar"><span class="said">' + esc(name) + '</span>' +
+      lengthPick(key) +
+      '<input class="banwhy" data-id="' + key + '" placeholder="Why, for a ban or a PK">' +
+      '<button class="btn small" data-act="ban" data-id="' + id + '" data-pid="' + esc(pid) + '">Ban character</button>' +
+      (cb && cb.active ? '<button class="btn small" data-act="unban" data-id="' + id + '" data-pid="' + esc(pid) + '">Lift character ban</button>' : '') +
+      '<button class="btn small" data-act="pk" data-id="' + id + '" data-pid="' + esc(pid) + '" data-name="' + esc(name) + '">PK</button>' +
+      '</div>';
+  });
+  return out;
+}
+
+/* Bans held against a profile no linked account holds (made in the game). */
+function looseBans(rec, now, linked) {
+  var bans = (rec || {}).bans || {};
+  var held = {};
+  (linked || []).forEach(function (u) { ((u && u.profiles) || []).forEach(function (n) { held[String(n)] = true; }); });
+  var out = '';
+  Object.keys(bans).forEach(function (k) {
+    var b = bans[k];
+    if (k.indexOf('p:') !== 0 || !b || !b.active || held[k.slice(2)]) return;
+    out += '<div class="note">Profile ' + esc(k.slice(2)) + (b.name ? ' (' + esc(b.name) + ')' : '') +
+      ': banned ' + esc(banUntil(b)) + ': ' + esc(b.why || '') + ' <span class="said">(by ' +
+      esc(b.by || 'staff') + ')</span></div>';
+  });
+  return out;
+}
+
+/* Every character dead for good, newest first, so staff can find them for an event. */
+function deadList(rec) {
+  var pk = (rec || {}).pk || {};
+  var keys = Object.keys(pk).filter(function (k) { return pk[k] && !pk[k].undone; })
+    .sort(function (a, b) { return (Number(pk[b].at) || 0) - (Number(pk[a].at) || 0); });
+  var out = '';
+  keys.forEach(function (k) {
+    var r = pk[k] || {};
+    out += '<div class="note">' + esc(charName(k, rec) || 'Unnamed character') +
+      ' <span class="said">profile ' + esc(k) + (r.account ? ', Discord ' + esc(r.account) : '') + '</span>: ' +
+      esc(r.why || '') + ' <span class="said">' + byLine(r) + '</span></div>';
+  });
+  return out;
+}
+
+function wireLinked() {
+  var page = el('page');
+  if (!page || !page.querySelectorAll) return;
+  var pick = function (cls, id) {
+    var all = page.querySelectorAll('.' + cls);
+    for (var i = 0; i < all.length; i++) if (all[i].getAttribute('data-id') === id) return all[i];
+    return null;
+  };
+  var bs = page.querySelectorAll('button[data-act]');
+  for (var i = 0; i < bs.length; i++) {
+    bs[i].onclick = function () {
+      var act = this.getAttribute('data-act'), id = this.getAttribute('data-id');
+      var pid = this.getAttribute('data-pid') || '';
+      var key = pid ? id + ':' + pid : id;
+      var bodyOf = { id: id };
+      if (pid) bodyOf.profileId = Number(pid);
+      if (act === 'note') bodyOf.text = (pick('notetext', id) || {}).value || '';
+      if (act === 'ban') {
+        bodyOf.minutes = Number((pick('banlen', key) || {}).value || 0);
+        bodyOf.why = (pick('banwhy', key) || {}).value || '';
+        if (!bodyOf.why.trim()) { alert('Say why they are banned.'); return; }
+      }
+      if (act === 'pk') {
+        bodyOf.why = (pick('banwhy', key) || {}).value || '';
+        if (!bodyOf.why.trim()) { alert('Say why the character dies.'); return; }
+        if (!confirm('PK ' + (this.getAttribute('data-name') || 'this character') + '? It dies for good and ' +
+                     'can never be played again. It is kept for staff, and only an admin can undo it.')) return;
+      }
+      if (act === 'unpk') {
+        bodyOf.why = (pick('unpkwhy', key) || {}).value || '';
+        if (!bodyOf.why.trim()) { alert('Say why the PK is undone.'); return; }
+        if (!confirm('Undo the PK of ' + (this.getAttribute('data-name') || 'this character') + '? It can be ' +
+                     'played again from a free slot on its account. The PK stays on its record.')) return;
+      }
+      if (act === 'note' && !bodyOf.text.trim()) return;
+      // The site's own sentence when it has one: Undo PK says why it did not.
+      var said = '';
+      api('/api/staff/' + act, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify(bodyOf) })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            said = (j && j.message) || '';
+            if (!r.ok) throw 0;
+            return refresh();
+          });
+        })
+        .then(function () { drawLinked(); })
+        .catch(function () { alert(said || 'The site did not take that.'); });
+    };
+  }
 }
 
 /* ------------------------------------------------------- play sessions -- */
@@ -2194,7 +2419,7 @@ function loadGalleryStaff() {
       (waiting ? ' &middot; ' + waiting + ' waiting' : '') +
       (live.length ? (waiting ? ', ' : ' &middot; ') + live.length + ' live' : '') +
       '</div>';
-    out += '<p class="lede" style="margin:0 0 12px">Pending shots need Accept before they appear on /gallery or Play. Delete removes a pending or live shot. Players Report; only staff Accept or Delete.</p>';
+    out += '<p class="lede" style="margin:0 0 12px">Pending shots need Accept before they appear on /gallery or Play. Delete removes a pending or live shot. Anyone can Report; only staff Accept or Delete.</p>';
     if (!pending.length && !live.length) {
       out += '<div class="empty">Nothing in the gallery yet.</div>';
     } else {
@@ -2320,11 +2545,15 @@ function drawInbox() {
     out += '<div class="empty">Nothing sent in yet.</div>';
   }
   S.inbox.forEach(function (n) {
+    // A report about a person and a call for help from the game (#414) say
+    // what they are, rather than reading as a bug.
+    var label = (n.kind === 'idea' || n.kind === 'report' || n.kind === 'help' ||
+                 n.kind === 'ticket') ? n.kind : 'bug';
     out += '<div class="note' + (n.state !== 'new' ? ' done' : '') + '" data-i="' + n.id + '">' +
       '<span class="kind ' + (n.kind === 'idea' ? 'idea' : 'bug') + '">' +
-        (n.kind === 'idea' ? 'idea' : 'bug') + '</span>' +
+        label + '</span>' +
       '<div class="mid">' +
-        '<div class="t">' + esc(n.title) + '</div>' +
+        '<div class="t">' + (n.about ? 'About ' + esc(n.about) + ': ' : '') + esc(n.title) + '</div>' +
         (n.detail ? '<div class="d">' + esc(n.detail) + '</div>' : '') +
         '<div class="m">' + (n.by ? esc(n.by) + '  &middot;  ' : '') +
           new Date(n.at).toLocaleString() +

@@ -24,12 +24,12 @@
   on /sessions are dev ones. The last block checks the dev case, the call that
   passes the session's channel in, and the folders the defaults point at.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const SRC = path.join(TOOLS_DIR, '..', 'site', 'server.js');
+const SRC = path.join(REPO_DIR, 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8');
 
 function grab(name) {
@@ -178,9 +178,9 @@ yes('and reads the server log beside it by the same channel', /serverLogSlice\(\
 // THORNSWOOD_CHAT_DIR is set, nothing that installs it sets that, and the
 // folders are named in vps-dev-instance.ps1 and Get-Logs.ps1. If any of those
 // moves, the site's default has to move with it, and this is what says so.
-const readTool = (f) => { try { return fs.readFileSync(path.join(TOOLS_DIR, f), 'utf8'); } catch (e) { return ''; } };
-const vpsDev = readTool('../scripts/vps/vps-dev-instance.ps1');
-const getLogs = readTool('../scripts/vps/Get-Logs.ps1');
+const readTool = (f) => { try { return fs.readFileSync(path.join(REPO_DIR, f), 'utf8'); } catch (e) { return ''; } };
+const vpsDev = readTool('scripts/vps/vps-dev-instance.ps1');
+const getLogs = readTool('scripts/vps/Get-Logs.ps1');
 const liveRoot = (vpsDev.match(/\$liveVoice\s*=\s*'([^']+)'/) || [])[1] || '';
 const devRoot = (vpsDev.match(/\$devVoice\s*=\s*'([^']+)'/) || [])[1] || '';
 const dirsAt = src.indexOf('const CHAT_DIRS');
@@ -193,9 +193,9 @@ yes('the live default is the live voice service\'s chat folder', !!liveRoot && f
 yes('the dev default is the dev voice service\'s chat folder', !!devRoot && fallback('dev') === devRoot + '\\chat');
 yes('Get-Logs reads dev voice from the same folder', !!devRoot && getLogs.indexOf("if ($Dev) { '" + devRoot + "' }") >= 0);
 yes('the voice service writes chat into its own folder unless told otherwise',
-    /const CHAT_DIR = process\.env\.THORNSWOOD_CHAT_DIR \|\| path\.join\(HERE, 'chat'\)/.test(readTool(path.join('..', 'voice', 'voice-server.js'))));
+    /const CHAT_DIR = process\.env\.THORNSWOOD_CHAT_DIR \|\| path\.join\(HERE, 'chat'\)/.test(readTool(path.join('voice', 'voice-server.js'))));
 yes('and neither install script tells it otherwise',
-    readTool('../scripts/deploy/Install-Voice.ps1').indexOf('THORNSWOOD_CHAT_DIR') < 0 && vpsDev.indexOf('THORNSWOOD_CHAT_DIR') < 0);
+    readTool('scripts/deploy/Install-Voice.ps1').indexOf('THORNSWOOD_CHAT_DIR') < 0 && vpsDev.indexOf('THORNSWOOD_CHAT_DIR') < 0);
 
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { }
 console.log('');

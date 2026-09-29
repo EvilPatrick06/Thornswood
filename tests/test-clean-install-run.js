@@ -48,12 +48,12 @@
 
   Read only. Pass another path as the first argument to check a copy.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.join(TOOLS_DIR, '..');
-const DOC = process.argv[2] ? path.resolve(process.argv[2]) : path.join(TOOLS_DIR, '..', 'docs', 'CLEAN-INSTALL-RUN.md');
+const ROOT = REPO_DIR;
+const DOC = process.argv[2] ? path.resolve(process.argv[2]) : path.join(REPO_DIR, 'docs', 'CLEAN-INSTALL-RUN.md');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

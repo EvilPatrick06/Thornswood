@@ -20,6 +20,11 @@
     list every five minutes and keeps it in data\allowed.json. Its door reads
     that list and, when enforcing, turns away anybody not on it.
 
+  -Connect also copies the site's join pass key (passKey in the site's
+  config.json, which the site makes itself) into door.json, so the gamemode
+  can check the join pass a launcher hands the game (#937). The key is read and
+  written on the VPS and never crosses this machine or its screen.
+
   The safe order is -Connect, then leave it watching for a day, then read the
   log, then -Enforce. Turning it on before the list has filled up would turn
   away people who have simply not pressed Play since the launcher started
@@ -28,7 +33,7 @@
 [CmdletBinding()]
 param(
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Site = 'https://thornswood.net',
   [string]$DocsRoot = 'C:/Thornswood-Docs',
   # Which server. Empty finds the live one itself. Give it
@@ -46,9 +51,10 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $docsWin = $DocsRoot.Replace('/','\')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -119,6 +125,12 @@ foreach (`$d in (Get-ChildItem 'C:\' -Directory -EA SilentlyContinue)) {
 }
 if (-not $root) { Die 'No server-settings.json anywhere on C: of the VPS.' }
 Say "  $root"
+# The dev server's door asks the dev list, /dev/api/allowed, which is only the
+# people the dev build is for (docs\SYSTEM.md, "The door"). Without -Site this
+# wrote the live address into the dev door and it fetched the live list (#964).
+if ($root -match '-Dev$' -and -not $PSBoundParameters.ContainsKey('Site')) {
+  $Site = $Site.TrimEnd('/') + '/dev'
+}
 
 # ------------------------------------------------------------- connecting ---
 if ($Connect) {
@@ -137,16 +149,22 @@ try {
 `$priv = Join-Path `$root `$privDir
 
 `$key = ''
+`$pass = ''
 try {
   `$c = Get-Content '$docsWin\config.json' -Raw | ConvertFrom-Json
   `$key = [string]`$c.botKey
+  `$pass = [string]`$c.passKey
 } catch { }
 if (-not `$key) { 'NO BOT KEY in $docsWin\config.json. Run Install-Bot.ps1 first.'; exit }
 
-`$doc = @{ site = '$Site'; key = `$key } | ConvertTo-Json
+`$doc = @{ site = '$Site'; key = `$key }
+if (`$pass) { `$doc.passKey = `$pass }
+`$doc = `$doc | ConvertTo-Json
 if (-not (Test-Path `$priv)) { New-Item -ItemType Directory -Path `$priv -Force | Out-Null }
 [IO.File]::WriteAllText((Join-Path `$priv 'door.json'), `$doc, (New-Object Text.UTF8Encoding(`$false)))
 'door.json written, pointing at $Site'
+if (`$pass) { 'with the join pass key, so this server can check join passes' }
+else { 'WITHOUT a join pass key: the site has not made one yet. Deploy-Docs.ps1, then -Connect again.' }
 'The gamemode picks it up within five minutes, or restart the server to be sure.'
 "@
   $out | ForEach-Object { Say "  $_" }
@@ -207,6 +225,9 @@ if (-not (Test-Path `$f)) {
 }
 `$j = Join-Path `$priv 'door.json'
 'refreshing ' + `$(if (Test-Path `$j) { 'yes, from the site' } else { 'NO. Run -Connect, or the list never updates.' })
+`$pk = `$false
+try { `$pk = [bool]([string](Get-Content `$j -Raw | ConvertFrom-Json).passKey) } catch { }
+'join pass key ' + `$(if (`$pk) { 'yes' } else { 'NO. Run -Connect once the site has made one (#937).' })
 "@
 $out | ForEach-Object { Say "  $_" }
 

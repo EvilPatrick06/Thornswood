@@ -17,6 +17,10 @@
   20 September it was the second: another server's launcher had written its
   own client into the Steam copy and the folder build copied it across.
 
+  When the game folder already holds all six as recorded, nothing is copied
+  and the build is not read, so a checkout with no engine\skymp build still
+  answers 0 for a game folder that is right (issue #946).
+
   Nothing here talks to the VPS, starts anything, or touches the Steam copy.
 
 .PARAMETER Check
@@ -74,7 +78,6 @@ function Stop-Here($m) {
 function Sha256([string]$p) { (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant() }
 
 if (-not (Test-Path -LiteralPath $Record)) { Stop-Here "no record at $Record. Run .\scripts\release\New-ClientBuildRecord.ps1 after building the client." }
-if (-not (Test-Path -LiteralPath $Dist))   { Stop-Here "client build not found: $Dist" }
 if (-not (Test-Path -LiteralPath $Game))   { Stop-Here "game folder not found: $Game" }
 
 $rec = Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json
@@ -82,6 +85,28 @@ $files = @($rec.files.PSObject.Properties.Name)
 if (-not $files.Count) { Stop-Here 'the record names no files' }
 
 Say ("client build {0} on {1}, recorded {2}" -f $rec.forkCommit, $rec.forkBranch, $rec.recordedUtc) 'Cyan'
+
+# The game folder first. When it already holds every recorded file, byte for
+# byte, there is nothing to copy and the build is not needed at all: what a
+# Ship packs is the game folder, and it is the recorded client. Until 28 Sep
+# this stopped on "client build not found" before looking, so a fresh Ship
+# worktree with no engine\skymp could not Ship although the folder it packs was
+# right (issue #946).
+$already = 0
+foreach ($rel in $files) {
+  $dst = Join-Path $Game $rel
+  if ((Test-Path -LiteralPath $dst) -and ((Sha256 $dst) -eq $rec.files.$rel.sha256)) { $already++ }
+}
+if ($already -eq $files.Count) {
+  foreach ($rel in $files) { Say ("  {0,-9} {1,10:N0} b  {2}" -f 'in place', (Get-Item -LiteralPath (Join-Path $Game $rel)).Length, $rel) 'Green' }
+  if (-not (Test-Path -LiteralPath $Dist)) { Say "  no client build at $Dist, and none is needed" 'DarkGray' }
+  Say 'every recorded file is already in the game folder' 'Green'
+  exit 0
+}
+if (-not (Test-Path -LiteralPath $Dist)) {
+  Stop-Here (("client build not found: $Dist, and the game folder does not hold the recorded client ({0} of {1} in place). " -f $already, $files.Count) +
+             'Put a build that matches records\client-build.json there, or pass -Dist with one.')
+}
 
 # First pass: every file in the build must be the recorded one. Nothing is
 # copied until all six pass, so a half synced folder is not a state this can

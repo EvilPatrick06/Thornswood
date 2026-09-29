@@ -30,14 +30,11 @@ flowchart LR
     L -->|builds, patches, starts| G
   end
 
-  subgraph GH["GitHub"]
-    R["Thornswood-Releases<br/>version.json on main and dev"]
-    A["Release assets<br/>packs, launcher exe, client runtime"]
-  end
-
   subgraph VPS["VPS 192.135.112.23"]
     C["Caddy :80 :443<br/>thornswood.net"]
     W["Site node 127.0.0.1:3001"]
+    F["Feed and downloads<br/>/feed and /feed-dev<br/>version.json, assets by sha256<br/>baseline and history, not served"]
+    W --> F
     GS["Game server :7777<br/>resources :3000"]
     DS["Dev game server :7787<br/>resources :7788"]
     VO["Voice :7778"]
@@ -58,11 +55,10 @@ flowchart LR
   end
 
   P["Patrick's machine<br/>Ship.ps1, Deploy-*"]
-  P -->|Publish-Update: gh release, git push| R
-  P -->|uploads| A
+  P -->|scp: assets, then version.json and the baseline| F
   P -->|ssh: Deploy-*, Install-*| VPS
-  L -->|polls version.json| R
-  L -->|downloads, sha256 checked| A
+  L -->|polls version.json| C
+  L -->|downloads, host and sha256 checked| C
   L -->|Discord sign in, installer, news| C
   G -->|UDP 7777 or 7787| GS
   L -->|voice socket| C
@@ -100,15 +96,18 @@ packs and as its own asset named in the feed's `clientRuntime`
 ## Updates, the installer and the site
 
 - **The feed.** Every launcher reads `version.json` from
-  `EvilPatrick06/Thornswood-Releases` (public) through the GitHub contents API,
-  branch `main` or `dev` (`Updater.cs:157-164`). Packs, the launcher exe and the
-  client runtime are release assets in that same repository. FEED.md has every
-  field.
+  `https://thornswood.net/feed/version.json` (dev: `/feed-dev/`) since #649,
+  and since #907 nowhere else: a site feed that does not answer is asked again
+  on the next check (`Updater.Check`). Since #897 packs, the launcher exe and
+  the client runtime are served by the site too, at
+  `/feed[-dev]/assets/<sha256>`. FEED.md has every field.
 - **Who writes it.** `Ship.ps1` runs `Publish-Update.ps1`, which diffs the game
   folder against this channel's baseline
-  (`published.json` in the releases clone for that channel), zips the
-  difference, uploads it with `gh release`, rewrites
-  `version.json` and pushes it. Then `Publish-News.ps1` (main only), then
+  (`published.json`, received from the VPS store beside the channel's feed,
+  `Feed-Store.ps1`), zips the difference, sends it and the launcher to the
+  site's assets folder, rewrites `version.json` and sends it and the baseline
+  back to the store, which is when the site serves it; `Publish-PostShip.ps1`
+  then checks every asset the feed names is up with `Remirror-Site-Feed.ps1`. Then `Publish-News.ps1` (main only), then
   `Publish-Discord.ps1` (#news, or the dev updates channel), then
   `Request-Restart.ps1`, which warns the room for five minutes
   (`Ship.ps1:1033-1098`).
@@ -146,7 +145,7 @@ somebody away only when `allowed.json` says `"enforce": true`
 ## The VPS services
 
 Every service is a Windows scheduled task. The watchdog starts a task by name
-when its check fails, three times an hour at most (`Watch-Services.ps1:198-247`).
+when its check fails, three times an hour at most (`Watch-Services.ps1:631-671`).
 
 | Service | Folder on the VPS | Port(s) | Scheduled task | Deployed or set up by | From |
 | --- | --- | --- | --- | --- | --- |
@@ -156,24 +155,77 @@ when its check fails, three times an hour at most (`Watch-Services.ps1:198-247`)
 | Dev voice | `C:\Thornswood-Voice-Dev` | TCP 7789, and `/voice-dev` through Caddy | `Thornswood Dev Voice` | Made by `vps-dev-instance.ps1`; `Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'` | `vps-dev-instance.ps1:11-12,77-97`, `voice/README.md:57-64` |
 | Site | `C:\Thornswood-Docs` | 127.0.0.1:3001 | `Thornswood Docs` | `Deploy-Docs.ps1`, `-Site` for the public pages | `Deploy-Docs.ps1:43-45`, `server.js:34-38` |
 | Caddy | `C:\Thornswood-Caddy` | 80, 443 | `Thornswood Web` (at startup and every five minutes) | `Setup-Domain.ps1`; the Caddyfile itself is kept in step with `scripts\deploy\Caddyfile` by hand | `Setup-Domain.ps1:30,183,248-266`, `scripts/deploy/Caddyfile:4-7` |
-| Discord bot | `C:\Thornswood-Bot` | none | `Thornswood Bot` | `Install-Bot.ps1`, `-CodeOnly` for code and card art | `Install-Bot.ps1:28-30,496` |
+| Discord bot | `C:\Thornswood-Bot` | none | none: the Windows service `ThornswoodBot`, as `NT SERVICE\ThornswoodBot` (issue #465) | `Install-Bot.ps1`, `-CodeOnly` for code and card art | `Install-Bot.ps1`, `Bot-Service.ps1`, `BotService.cs` |
 | Watchdog | `C:\Thornswood-Watch` (`watch.ps1`, `watch.log`) | none | `Thornswood Watch`, every five minutes as SYSTEM | `Watch-Services.ps1 -Install` | `Watch-Services.ps1:65-66,361` |
-| Nightly backup | `C:\Thornswood-Backup` (passphrase in `key.txt`) | none | `Thornswood Backup`, daily at 03:15 | `Install-Backup.ps1`; `Fetch-Backups.ps1` brings them down | `Install-Backup.ps1:30-34,149-152`, `vps-nightly-backup.ps1:41-52` |
+| Nightly backup | `C:\Thornswood-Backup` (passphrase in `key.txt`) | none | `Thornswood Backup`, daily at 03:15 | `Install-Backup.ps1`; `Fetch-Backups.ps1` brings them down | `Install-Backup.ps1:30-34,149-152`, `vps-nightly-backup.ps1:53-72` |
 
 What the watchdog checks: `https://thornswood.net/` for Caddy, then TCP 3001,
 3000, 7778, 7788 and 7789, and a python process with `Thornswood-Bot` in its
-command line for the bot (`Watch-Services.ps1:165-209,250-310`). It also writes DISK LOW
-under 20 percent free on C: and DISK CRITICAL under 10. The bot reads
-`C:\Thornswood-Watch\watch.log` every minute and posts outages in the staff
-channel (`bot/bot.py:219`, `Watch-Services.ps1:20-29`).
+command line for the bot (`Watch-Services.ps1:595-679`). The bot writes
+`heartbeat.json` beside itself every minute, and a bot whose process runs but
+which is hung or off Discord for ten minutes is down too; that is told about
+and not restarted for (issue #449, `Watch-Services.ps1:217-300`,
+`bot/bot.py:2408-2510`). From outside the box, the bot also pings an uptime
+monitor every minute while it is on Discord, so a bot or a whole VPS that
+stops is noticed when One is off too: the address is `PING_URL` in
+`bot.env.json`, set by `Install-Bot.ps1 -SetPing`, and `bot/README.md` says
+how to make the check (issue #449, `bot/bot.py:2513-2618`). It also asks the site,
+both game servers and both voice servers over HTTP, which it tells about and
+never restarts for, and checks the `Thornswood Backup` task's last result with
+a backup under 26 hours old, the build runner's service, and writes DISK LOW
+under 20 percent free on C: and DISK CRITICAL under 10. It tells the staff
+channel once when any of these goes down and once when it is back (issue
+#447): each message goes into `C:\Thornswood-Watch\alerts.jsonl`, the bot
+posts it within a minute, and when the bot is down or silent the watchdog posts
+it through the webhook in `alerts-webhook.txt` beside it
+(`Watch-Services.ps1:22-47,302-573`, `bot/bot.py:1998-2098`).
 
 What the backup takes: the live server's `world`, `private`, `data`,
-`server-settings.json` and `gamemode.js`; the site's data; the bot's config
-and join record; the voice service's `choices.json`; the Caddyfile. Encrypted,
-seven daily and four weekly kept (`vps-nightly-backup.ps1:8-33`). It takes
-nothing from `C:\Thornswood-Server-Dev` or `C:\Thornswood-Voice-Dev`
-(`vps-nightly-backup.ps1:41-46`); the dev world is meant to be thrown away
-(`vps-dev-instance.ps1:14-15`).
+`server-settings.json` and `gamemode.js`, and the same five from
+`C:\Thornswood-Server-Dev` under `game-dev` (issue #401); the site's data,
+config, uploads and each feed's store but not its downloads (issue #454); the
+bot's config and join record; the voice service's `choices.json`; the
+Caddyfile. Encrypted, seven daily and four weekly kept
+(`vps-nightly-backup.ps1:8-55`). It takes nothing from
+`C:\Thornswood-Voice-Dev`. The copy off the box is pulled to Patrick's machine
+over ssh by the `Thornswood Fetch Backups` task there (`Fetch-Backups.ps1
+-Schedule`), never served over HTTPS; `Restore-Server.ps1` puts one back into
+a server folder, `Restore-Box.ps1` puts all of it onto a new box, and
+`tests\test-backup-restore.ps1` and `tests\test-new-box-runbook.ps1` prove the
+round trip.
+
+A deploy sends a commit or nothing (issue #1121): `Deploy-Docs.ps1`,
+`Install-Voice.ps1`, `Install-Bot.ps1`, `Deploy-DevGamemode.ps1`,
+`Deploy-Server.ps1` and `Publish-Server.ps1` refuse, before they talk to the
+box, when a file they would send out of the repository has uncommitted
+changes or is untracked, and name each one (`Assert-ThornswoodCommitted` in
+`scripts\deploy\Artifact.ps1`). There is no switch past it.
+
+How a deploy replaces what runs (issue #446): nothing is written over a
+running service any more. The new files go into `<folder>\.stage-<stamp>`
+while the old one runs, the box checks them there (each file by its hash, the
+program parsing, the load order resolving), and a refusal stops nothing. Only
+then is it stopped, the files renamed in, started and asked whether it
+answers; if it does not, the old files go back and it is started again, and
+the run says `SWAP ROLLED BACK` and fails. What a deploy replaced stays in
+`<folder>\.prev-<stamp>`, the newest two, and `-PutBack` puts the newest
+back the same way, keeping what it took out in `.undone-<stamp>`:
+`Deploy-Server.ps1`, `Deploy-DevGamemode.ps1`, `Deploy-Docs.ps1`,
+`Install-Voice.ps1` and `Install-Bot.ps1` all take it, and the blocks that do
+it on the box are `scripts\deploy\Swap.ps1`. The record of what a part runs (issue #459,
+`C:\Thornswood-Deploys`) is written only once the swap has answered; the one
+it had goes into `.prev` with the files it describes, and `-PutBack` brings it
+back and tells the store. A whole server install through
+`Publish-Server.ps1` does the same one level up: the payload is unpacked to
+`C:\Thornswood-Server.stage-<stamp>` beside the root, the old root becomes
+`C:\Thornswood-Server.prev-<stamp>` (the newest two kept, each a whole
+server folder, so they cost disk), the world, the roster, the runtime data and
+the logs are carried across, and a server that does not answer is swapped
+back and kept as `.failed-<stamp>` to read. `Publish-Server.ps1 -PutBack`
+puts the newest `.prev` back. The documents and public pages the site serves
+from `data` are content, not the app, and still go up in place with a `.bak`.
+The harnesses are `tests\test-deploy-swaps.ps1`,
+`tests\test-install-server.ps1` and `tests\test-deploy-server-swap.ps1`.
 
 ## How the pieces talk
 
@@ -196,9 +248,10 @@ nothing from `C:\Thornswood-Server-Dev` or `C:\Thornswood-Voice-Dev`
 `Ship.ps1`, `Publish-*`, `Repair-Manifest.ps1`, `Bump-Version.ps1`, every
 `Deploy-*` and `Install-*`, and `Request-Restart.ps1`. The engine build and the
 release output (`out`, ignored by git) are in the repo folder; `scripts\release\Where.ps1`
-says where (`Where.ps1:71-82`). The releases repo is cloned beside the source
-repo as `Thornswood-Releases`, its dev branch as the worktree
-`Thornswood-Releases-dev` (`Publish-Update.ps1:111-129`). Which command each
+says where (`Where.ps1:71-82`). The feed and its baseline are received from
+the VPS into `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev`, working copies
+with a backup of the last twenty of each, not git clones (`Feed-Store.ps1`,
+#907). Which command each
 change needs after a merge: CONTRIBUTING.md, "After a pull request is merged".
 
 ## Where the sources disagree

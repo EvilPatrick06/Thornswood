@@ -430,8 +430,9 @@ namespace Thornswood
         /// 2: Creation Club plugins the reference list does not name are left
         ///    out, and taken out of a folder that already has them. See
         ///    UnwantedCreation.
-        /// 3: Data\SkyrimTogetherReborn is another server's and is left out,
-        ///    all of it rather than the two subfolders Ship-Rules named.
+        /// 3: the old multiplayer mod's client folder under Data was left
+        ///    out. That rule went on 28 September (issue #497): nothing here
+        ///    names that mod any more.
         /// 4: the retired dresser, thornswood-chargen.js, is left out, so a
         ///    refresh cannot copy the Steam copy's old one back in after a
         ///    pack deletes it. See Foreign.
@@ -448,8 +449,17 @@ namespace Thornswood
         ///    .dll/.exe. A folder that still holds its own copy of each gets
         ///    the link instead, giving the disk the second copy back. See
         ///    MustCopy.
+        /// 7: Start On Save is left out, and taken out of a folder that
+        ///    already has it, its settings file included. See Retired.
+        /// 8: SkyUI 5.2's ten loose scripts (ski_main.pex and the rest) that the
+        ///    collection installer left in the Steam copy are left out, so a
+        ///    refresh cannot link them back after a pack deletes them. See
+        ///    Foreign, issue #960.
+        /// 9: body shape sliders and jiggle (CBPC's cbp.dll and the three
+        ///    RaceMenu body slider scripts) are left out, and taken out of a
+        ///    folder that already has them. See BodyShape, issue #993.
         /// </summary>
-        const int Rules = 6;
+        const int Rules = 9;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -692,6 +702,30 @@ namespace Thornswood
                     if (File.Exists(dest)) { DropName(dest); removed++; }
                 }
                 catch (Exception ex) { Swallow.Note("OwnGame.Refresh, drop removed", ex); }
+            }
+
+            // A retired mod goes whether the record lists it or not: the
+            // launcher wrote one of its files itself and never recorded it.
+            foreach (string r in RetiredFiles)
+            {
+                try
+                {
+                    string dest = Path.Combine(Folder, r);
+                    if (File.Exists(dest)) { DropName(dest); removed++; }
+                }
+                catch (Exception ex) { Swallow.Note("OwnGame.Refresh, drop retired", ex); }
+            }
+
+            // So do the body shape sliders and jiggle (#993). A link removed
+            // here is this folder's name for the file; Vortex's copy stays.
+            foreach (string r in BodyShapeFiles)
+            {
+                try
+                {
+                    string dest = Path.Combine(Folder, r);
+                    if (File.Exists(dest)) { DropName(dest); removed++; }
+                }
+                catch (Exception ex) { Swallow.Note("OwnGame.Refresh, drop body shape", ex); }
             }
 
             File.WriteAllLines(FilesList, lines.ToArray());
@@ -1083,7 +1117,87 @@ namespace Thornswood
             if (Foreign(rel)) return "not one of ours";
             if (UnwantedCreation(rel)) return "a Creation Club plugin the server does not load";
             if (CrashesUs(rel)) return "it crashes the quick favourites menu";
+            if (Retired(rel)) return "Start On Save is no longer part of Thornswood";
+            if (BodyShape(rel)) return "body shape sliders and jiggle are not part of Thornswood";
             return null;
+        }
+
+        /// <summary>
+        /// A mod Thornswood has taken out, kept out of this folder even while
+        /// the collection still deploys it into the Steam copy.
+        /// </summary>
+        /// <remarks>
+        /// Start On Save (po3, Nexus 50054), issue #394. It loads the newest
+        /// save at the main menu, or presses New Game when there is none, and
+        /// under SkyMP either one is a second load on top of the one the server
+        /// starts: the crashes of 12 and 13 Sep, about thirty seconds in, with
+        /// its DLL on the stack. The launcher used to hold it still by
+        /// rewriting its settings file on every Play. It does not any more, so
+        /// the mod must not be in the folder at all: an untouched copy of its
+        /// settings file would start those crashes again.
+        ///
+        /// Refresh also deletes both files from a folder that has them, whether
+        /// the folder's record lists them or not, because the settings file
+        /// was written by the launcher and never recorded. Rules 7 makes every
+        /// folder refresh once to do it.
+        ///
+        /// Ship-Rules.ps1 keeps the same two files out of every pack and the
+        /// installer ($ShipRetiredFiles); change the two together.
+        /// </remarks>
+        static readonly string[] RetiredFiles = {
+            "Data\\SKSE\\Plugins\\po3_StartOnSave.dll",
+            "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        };
+
+        static bool Retired(string rel)
+        {
+            foreach (string r in RetiredFiles)
+                if (rel.Equals(r, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Body shape sliders and jiggle, kept out of this folder even while
+        /// the collection still deploys them (#993).
+        /// </summary>
+        /// <remarks>
+        /// Patrick, 28 Sep: "I don't want jiggle physics or the ability to
+        /// change boob/pussy/dick/ass/nipple related stuff during creation."
+        /// For men and women alike; height and weight stay.
+        ///
+        /// cbp.dll is CBPC (Nexus 21224), the one thing that moves the breast,
+        /// belly and seat bones. Its config files do nothing without it, and
+        /// no body mesh here carries an SMP physics block, so this is all of
+        /// the jiggle, on people and NPCs alike. FSMP (hdtsmp64.dll) stays: it
+        /// moves hair and capes, not bodies.
+        ///
+        /// The three scripts are the slider pages RaceMenu shows for the body:
+        /// the women's body morphs (3BA's or CBBE's RaceMenuMorphsCBBE, breast,
+        /// nipple and genital shapes among them), the men's (HIMBO), and the
+        /// skeleton's genital sliders (XPMSE's RaceMenuPluginSoS). Each is the
+        /// script on a quest in a plugin that stays loaded and inert, the same
+        /// as I4IconAddon.esp beside CrashesUs, so the load order does not
+        /// move. RaceMenu's own breast and glute sliders sit in its archive
+        /// beside Height and cannot be left out; the front plugin undoes them
+        /// ("body shape" in thornswood-front.js).
+        ///
+        /// Refresh also deletes them from a folder that has them, as it does
+        /// RetiredFiles; Rules 9 makes every folder refresh once to do it.
+        /// Ship-Rules.ps1 keeps the same four out of every pack and the
+        /// installer ($ShipBodyShapeFiles); change the two together.
+        /// </remarks>
+        static readonly string[] BodyShapeFiles = {
+            "Data\\SKSE\\Plugins\\cbp.dll",
+            "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
+            "Data\\Scripts\\_RaceMenuMorphsHIMBO.pex",
+            "Data\\Scripts\\RaceMenuPluginSoS.pex",
+        };
+
+        static bool BodyShape(string rel)
+        {
+            foreach (string r in BodyShapeFiles)
+                if (rel.Equals(r, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
         }
 
         /// <summary>
@@ -1207,11 +1321,6 @@ namespace Thornswood
             // program Windows Firewall stops the game to ask about.
             if (rel.StartsWith("Data\\NirnLabUIPlatform\\", StringComparison.OrdinalIgnoreCase)) return true;
             if (leaf.Equals("NirnLabUIPlugin.dll", StringComparison.OrdinalIgnoreCase)) return true;
-            // Skyrim Together Reborn's folder. Nothing here supports another
-            // server's install, so its files are not taken into ours either.
-            // Ship-Rules.ps1 carries the same rule; change the two together.
-            if (rel.StartsWith("Data\\SkyrimTogetherReborn\\", StringComparison.OrdinalIgnoreCase)) return true;
-            if (rel.Equals("Data\\SkyrimTogetherReborn", StringComparison.OrdinalIgnoreCase)) return true;
             // The client's per machine sign in data. It holds an access token.
             if (rel.StartsWith("Data\\Platform\\PluginsNoLoad\\", StringComparison.OrdinalIgnoreCase)) return true;
 
@@ -1248,6 +1357,19 @@ namespace Thornswood
               change the two together.
             */
             if (rel.Equals("Data\\Interface\\map.swf", StringComparison.OrdinalIgnoreCase)) return true;
+
+            // SkyUI 5.2's own scripts, loose, issue #960: "SKYUI ERROR CODE 6,
+            // menu file version mismatch, required 5.2 SE, detected 6.11 SE".
+            // The collection's SkyUI keeps its scripts and its 6.11 menus in
+            // SkyUI_SE.bsa, and its ski_main no longer compares menu versions.
+            // These ten, compiled in 2017, were left in the Steam copy by the
+            // collection installer; loose beats an archive, so the old
+            // ski_main ran against the new menus. Packs delete them, and this
+            // keeps a refresh from linking them back in. SKI_ConfigBase and
+            // SKI_ConfigManager are MCM Recorder's and are not on the list.
+            // Ship-Rules.ps1 carries the same rule ($ShipOldSkyUIScripts);
+            // change the two together.
+            if (Regex.IsMatch(rel, @"^Data\\Scripts\\ski_(activeeffectswidget|configmenu|favoritesmanager|main|playerloadgamealias|qf_configmanagerinstance|questbase|settingsmanager|widgetbase|widgetmanager)\.pex$", I)) return true;
 
             if (!rel.StartsWith("Data\\Platform\\", StringComparison.OrdinalIgnoreCase)) return false;
             if (leaf.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)) return true;

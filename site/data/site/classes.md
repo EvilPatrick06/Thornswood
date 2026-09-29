@@ -5,8 +5,11 @@ skill and no perk menu opens when you sleep. What replaced it is three choices
 made once, in the game, that decide what you are for. A new character wakes
 in the creation hall, makes a face, and then the panel behind K opens on its
 own: your class, your profession and the half of it you will make your own,
-and the town you wake up in tomorrow. Take them in any order. The third one
-sends you to your inn. The same panel, on K, is where you spend skill points
+and the town you wake up in tomorrow. Only the town has to be chosen before
+you leave the hall, and choosing it sends you to your inn. Your class and your
+profession can wait: leave them for later and pick them in the world, from the
+same panel. What waiting means is further down. The same panel, on K, is where
+you spend skill points
 for the rest of your character's life, and where the recipe book tells you what
 your half can make at the rank you have reached. A new character gets forty gold once, and the clothes they stand in:
 what else you carry, you earn, buy or are given.
@@ -39,10 +42,10 @@ are able to make at all.
 | **Woodworker** | **Charburner**, firewood through to coke, or **Woodwright**, bows, arrows and instruments |
 
 You get the **novice** work of your sister half for nothing. An Edgewright
-knows how to beat out plain iron plate, because anybody who works a forge does.
-What they cannot do is go any further than novice with it, and a real cuirass
-is not novice work. For that you find a Platewright, and that is a conversation
-rather than a menu.
+knows how to beat out a plain iron cuirass, because anybody who works a forge
+does. What they cannot do is go any further than novice with it, and a steel
+cuirass is not novice work. For that you find a Platewright, and that is a
+conversation rather than a menu.
 
 Everything outside your own profession you cannot do at all, unless somebody
 teaches you. There is a way to learn a little of it and it is further down.
@@ -53,6 +56,16 @@ Your half decides what you are able to make, and the server holds you to it.
 Stand at any forge, oven, tanning rack or workbench in Skyrim and what you are
 about to make is either your half's work or it is not. If it is not, it does not
 get made and you keep your materials.
+
+Some of it is nobody's work. Smelting ore into ingots and tanning a hide into
+leather belong to no half, because every trade needs them, and anybody can do
+them.
+
+Until you pick a profession, you cannot make anything that is somebody's work.
+Every bench tells you so and to press K and choose one; only the smelting and
+tanning above stay open to you. Picking a profession is what gives you a half,
+a rank to climb in it and work that is yours, and from then on the three
+answers below are the rule.
 
 Three answers, and every one of them names somebody.
 
@@ -99,8 +112,8 @@ to hold you to. The bench is held instead.
 An **alchemy lab** works for an Alchemist, either a **Blightbrewer** or a
 **Physicker**. An **arcane enchanter** works for an Enchanter, either a
 **Bladebinder** or a **Wardweaver**. Anybody else is turned away at the bench.
-Somebody who has not chosen a profession yet can use both, so nobody is shut
-out on their first evening.
+Somebody who has not chosen a profession yet can use neither, and is told to
+press K and choose one.
 
 Tempering is the other gap worth knowing about. Improving a weapon or a piece of
 armour at a grindstone or an armour table never reaches the server at all, so
@@ -140,6 +153,48 @@ rather than turning into a mage with extra steps.
 
 That is a scene between two people, and the master gets to say no.
 
+### Spell tomes
+
+A spell tome teaches its spell only to somebody who could have picked that
+spell anyway, mage or not, Enchanter or not. Reading one asks three things:
+
+- **A spell point** to spend. A mage earns them by rank; anybody else has only
+  the places a Master mage's teaching gave them.
+- **The rank** the spell asks for in its school. Apprentice and Adept spells
+  are Advanced here, Expert spells Expert, Master spells Master.
+- **A spell from the rank below**, of the same school, already known. A
+  Novice spell needs none.
+
+If any of the three is missing, nothing is learned, you keep the tome, and the
+line in chat says which ones. What a staff binds is not learned this way: see
+Staff spells, below.
+
+### Staff spells
+
+A staff binds one spell, and a staff enchanter only makes the staff for
+somebody who has unlocked that spell for staves. Enchanters do it the way a
+mage learns spells, with points of their own and no tome:
+
+- **A staff spell point** to spend. An Enchanter starts with two, earns one
+  with every Bladebinder rank, and two more at Master.
+- **The rank.** Your Bladebinder rank decides how high you can go: a Novice
+  unlocks Novice staff spells, an Advanced one Advanced, and so on up to
+  Master. Bladebinders climb it as their own half; a Wardweaver holds it as
+  the sister half, at Novice until a Master Bladebinder takes them on.
+- **A staff spell from the rank below**, already unlocked. A Novice one needs
+  none.
+
+Press K and open **Staff spells**, mark the ones you want, and press Unlock.
+If one of the three is missing, nothing is spent and the line says which.
+
+Somebody who is not an Enchanter can only have staff spells the way a
+non-mage has magic. A Master Bladebinder has to teach them first, which is one
+of their two other trades. Then they learn a staff spell from its tome, it
+takes one of their places, they hold two at most, and only Novice ones.
+
+An unlocked staff spell is on your character as a spell too, because Skyrim's
+crafting menu lists a staff only for somebody who knows its spell.
+
 ## Classes
 
 This is the half of the world that produces rather than makes. Each one owns a
@@ -158,6 +213,10 @@ profession. Somebody who took Miner gets nothing off a dead elk whatever they
 do for a living, and a Hunter cannot pull a flower out of the ground. If you
 want leather you know a hunter, and if you do not know one yet, that is the
 game telling you to go and meet people.
+
+Waiting on a class is the other way round from waiting on a profession. Until
+you pick one, none of the five is yours: every seam, carcass, plant, fishing
+spot and crop turns you away and tells you to press K and choose.
 
 ## Roleplay only (not Class or Profession)
 
@@ -188,10 +247,11 @@ and one whole profession. In the pack is enough; nothing has to be equipped.
 | **Farmer** | A shovel |
 | **Woodworker** | A woodcutter's axe |
 
-You are handed yours the moment you pick, and if you ever end up with none, the
-seam, the plot or the kiln hands you another rather than leaving you standing
-there with a class you cannot use. It is not often and it is not much, the same
-as the seed.
+You are handed yours the moment you pick. After that it wears with the work: a
+tool has a hundred uses in it, you are told when it is worn thin, and when it
+breaks the next one comes from a smith. With no tool in your pack the seam, the
+plot, the chopping block and the kiln turn you away, and nothing hands you a
+free one.
 
 Any of them counts. The game has two shovels that look and read exactly alike,
 and six things it calls a pickaxe including the Notched Pickaxe and the ancient
@@ -200,9 +260,8 @@ war pick is a weapon and not a mining tool, so that one does not.
 
 **Skyrim has no hoe.** There is no such item in the game, and there is none in
 any of the mods we load on top of it either; every one of them was searched. So
-farming asks for a shovel, which is a real thing lying about on farms and at
-mills all over the province, and a shovel is what we mean whenever this page
-says farming needs a tool.
+farming asks for a shovel, which a smith forges, and a shovel is what we mean
+whenever this page says farming needs a tool.
 
 Nothing else asks for one. Gathering, hunting and fishing need your hands.
 
@@ -279,7 +338,7 @@ nothing to sow can never do the work that earns the next rank.
 
 How long a crop takes to come up, how much a harvest gives back, and how long a
 claim survives unworked are all set on the server rather than settled here.
-They will move during the playtest, because the only way to find out what a
+They will move during the alpha, because the only way to find out what a
 day's farming should be worth is to watch people farm.
 
 ## Getting better at it
@@ -296,7 +355,7 @@ long time.
 
 Each rank opens more of what you are able to make, inside your own half of your
 own profession and nowhere else. An Edgewright at Master still cannot make a
-cuirass.
+steel cuirass.
 
 ### What Master actually gets you
 

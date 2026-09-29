@@ -1,7 +1,7 @@
 <#
   test-package-release-dir.ps1
 
-  The installer has to find the releases feed on whichever machine builds it,
+  The installer has to find the live feed on whichever machine builds it,
   and has to stop rather than guess when the feed is not there.
 
   Entry 175 on the list. Package-Thornswood.ps1 read version.json from a path
@@ -25,9 +25,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Here0 = $PSScriptRoot
 if (-not $Here0) { $Here0 = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here0 = Join-Path (Split-Path -Parent $Here0) 'tools'
-if (-not $PackagePath) { $PackagePath = Join-Path $Here0 '..\scripts\release\Package-Thornswood.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here0 = Split-Path -Parent $Here0
+if (-not $PackagePath) { $PackagePath = Join-Path $Here0 'scripts\release\Package-Thornswood.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -118,61 +118,55 @@ $assigns = @($ast.FindAll({
 Yes '$vLive is set' ($assigns.Count -ge 1)
 Yes 'and only inside the lookup' (@($assigns | Where-Object { $_.Extent.StartOffset -lt $a -or $_.Extent.StartOffset -gt $b }).Count -eq 0)
 
-# Runs the lifted block the way the packager does: $Here is the tools folder
-# and $ReleaseDir is whatever was passed. Die is the packager's stop, so here
-# it throws and the message comes back.
-function Run-Lookup([string]$toolsDir, [string]$passed) {
-    $Here = $toolsDir
+# Runs the lifted block the way the packager does: $ReleaseDir is whatever was
+# passed, and LOCALAPPDATA is where this machine's working copy of the live
+# feed is (Feed-Store.ps1, #907). Die is the packager's stop, so here it throws
+# and the message comes back.
+function Run-Lookup([string]$appData, [string]$passed) {
     $ReleaseDir = $passed
     $vLive = ''
     function Die($m) { throw ('DIE: ' + $m) }
     $died = ''
+    $oldApp = $env:LOCALAPPDATA
+    $env:LOCALAPPDATA = $appData
     try { . ([scriptblock]::Create($block)) }
     catch { $died = [string]$_.Exception.Message }
+    finally { $env:LOCALAPPDATA = $oldApp }
     return [pscustomobject]@{ ReleaseDir = $ReleaseDir; vLive = $vLive; Died = $died }
 }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-releasedir-' + [Guid]::NewGuid().ToString('N'))
 try {
-    # One machine's layout: the repo and the feed side by side, and the repo
-    # carrying its own stale version.json, the way it does today.
+    # One machine: the working copy of the live feed under LOCALAPPDATA, and a
+    # repo carrying its own stale version.json, the way it does today.
+    $app   = Join-Path $work 'appdata'
+    $feed  = Join-Path $app 'Thornswood\feed\main'
     $repo  = Join-Path $work 'Thornswood-Repo'
-    # Package-Thornswood is in scripts\release since phase 8 of issue #440.
-    $tools = Join-Path (Join-Path $repo 'scripts') 'release'
-    $feed  = Join-Path $work 'Thornswood-Releases'
-    New-Item -ItemType Directory -Path $tools, $feed -Force | Out-Null
+    New-Item -ItemType Directory -Path $feed, $repo -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $repo 'version.json') -Value '{"packs":[{"id":"stale"}]}' -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $feed 'version.json') -Value '{"packs":[{"id":"live"}]}' -Encoding UTF8
 
-    # ---- nothing passed: the folder beside the repo
-    $r = Run-Lookup $tools ''
-    Yes 'nothing passed finds the feed beside the repo' ($r.ReleaseDir -eq $feed)
+    # ---- nothing passed: this machine's working copy of the live feed
+    $r = Run-Lookup $app ''
+    Yes 'nothing passed finds the live feed this machine last received' ($r.ReleaseDir -eq $feed)
     Yes 'and reads its version.json' ($r.vLive -eq (Join-Path $feed 'version.json'))
     Yes 'and does not stop' ($r.Died -eq '')
-
-    # ---- a different account, a different drive: no home folder in it
-    $other = Join-Path $work 'D\Somebody Else\Code'
-    $otherTools = Join-Path (Join-Path (Join-Path $other 'Thornswood-Repo') 'scripts') 'release'
-    $otherFeed = Join-Path $other 'Thornswood-Releases'
-    New-Item -ItemType Directory -Path $otherTools, $otherFeed -Force | Out-Null
-    Set-Content -LiteralPath (Join-Path $otherFeed 'version.json') -Value '{"packs":[]}' -Encoding UTF8
-    $r = Run-Lookup $otherTools ''
-    Yes 'a repo somewhere else finds the feed beside it' ($r.vLive -eq (Join-Path $otherFeed 'version.json'))
+    Yes 'it is not a clone of Thornswood-Releases beside the repo' ($r.ReleaseDir -notlike '*Thornswood-Releases*')
 
     # ---- passed explicitly
     $elsewhere = Join-Path $work 'elsewhere'
     New-Item -ItemType Directory -Path $elsewhere -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $elsewhere 'version.json') -Value '{"packs":[]}' -Encoding UTF8
-    $r = Run-Lookup $tools $elsewhere
+    $r = Run-Lookup $app $elsewhere
     Yes '-ReleaseDir is used as given' ($r.vLive -eq (Join-Path $elsewhere 'version.json'))
     Yes 'and does not stop' ($r.Died -eq '')
 
     # ---- the feed is missing: stop, and never the repo's own copy
     Remove-Item -LiteralPath (Join-Path $feed 'version.json') -Force
-    $r = Run-Lookup $tools ''
-    Yes 'no feed beside the repo stops the packager' ($r.Died -like 'DIE: *')
+    $r = Run-Lookup $app ''
+    Yes 'no feed received on this machine stops the packager' ($r.Died -like 'DIE: *')
     Yes 'and says where it looked' ($r.Died.Contains($feed))
-    Yes 'and says how to put it right' ($r.Died.Contains('-ReleaseDir') -and $r.Died.Contains('git clone'))
+    Yes 'and says how to put it right' ($r.Died.Contains('-ReleaseDir') -and $r.Died.Contains('thornswood.net/feed/version.json'))
     Yes 'the repo''s own version.json is never taken instead' ($r.vLive -ne (Join-Path $repo 'version.json'))
 
     # ---- an explicit folder with no feed in it stops too, rather than going
@@ -180,23 +174,12 @@ try {
     Set-Content -LiteralPath (Join-Path $feed 'version.json') -Value '{"packs":[]}' -Encoding UTF8
     $empty = Join-Path $work 'empty'
     New-Item -ItemType Directory -Path $empty -Force | Out-Null
-    $r = Run-Lookup $tools $empty
+    $r = Run-Lookup $app $empty
     Yes 'a -ReleaseDir with no version.json stops' ($r.Died -like 'DIE: *')
     Yes 'and names that folder' ($r.Died.Contains($empty))
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
-}
-
-# ---- this machine, when it is laid out like Patrick's ----------------------
-# The real answer for the real repo, measured rather than trusted. A worktree
-# or a build runner has no feed beside it, so that is a SKIP, not a failure.
-$realFeed = Join-Path (Split-Path -Parent (Split-Path -Parent $Here0)) 'Thornswood-Releases'
-if (Test-Path -LiteralPath (Join-Path $realFeed '.git')) {
-    $r = Run-Lookup (Join-Path (Split-Path -Parent $Here0) (Join-Path 'scripts' 'release')) ''
-    Yes ("on this machine it reads " + $r.vLive) ($r.Died -eq '' -and $r.vLive -eq (Join-Path $realFeed 'version.json'))
-} else {
-    Write-Host ("SKIP  no releases clone at {0}, so the real path is not checked here" -f $realFeed)
 }
 
 Done

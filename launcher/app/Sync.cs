@@ -1,0 +1,510 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Net;
+using System.Text;
+
+namespace Thornswood
+{
+    /// <summary>
+    /// SYNCING TO THE RELEASE RECORD (#1050). Patrick, 29 Sep: the launcher
+    /// fetches each file straight from the site by its fingerprint, syncing the
+    /// install to the release record, instead of replaying the chain of packs.
+    ///
+    /// Until this a launcher only ever replayed packs: every pack id not in
+    /// applied.txt, in feed order, each one a zip of what changed. It never
+    /// knew what a release was supposed to leave installed, so a file changed
+    /// by hand, a lost applied.txt or a pack that 404ed left an install that
+    /// no later update could put right, and the feed had to keep every pack
+    /// ever published (76 on main, 82 on dev, most of version.json).
+    ///
+    /// Now, when the feed names a record whose files are all on the site, the
+    /// launcher reads it and compares every file of ours in the install with
+    /// it, by size and then sha256. Only a file that differs is downloaded,
+    /// from /feed[-dev]/assets/&lt;sha256&gt; beside the record, checked against
+    /// that sha256, and put in place. Files of ours the record says are gone
+    /// are taken out. A download cut short carries on where it stopped, and a
+    /// file already fetched before an interruption is not fetched again.
+    ///
+    /// The launcher exe is not part of this: it still updates only through
+    /// SelfUpdate, with every check Signature.cs makes.
+    /// </summary>
+    static partial class Updater
+    {
+        /// <summary>
+        /// The key a record carries when every file it lists is on the site
+        /// beside it. Publish-Update.ps1 writes it only after sending them.
+        /// A record without it (every release before #1050) is not synced
+        /// to: the launcher takes the packs as it always did.
+        /// </summary>
+        public const string RecordFilesMark = ":record:files";
+        const string GoldenMark = ":golden:";
+        const string GoneMark = ":gone:";
+
+        internal static bool IsSha(string s) { return RecordRef.IsSha(s); }
+
+        // ---- what this install last synced to ---------------------------------
+        //
+        // Profile\release.txt: "synced <sha256> <id>" once a sync finishes, and
+        // "packs <sha256>" for a record that carries no RecordFilesMark, so it is
+        // not downloaded again on every check. Read on every check; a few bytes.
+
+        class SyncState
+        {
+            public string Synced = "";
+            public string SyncedId = "";
+            public string PacksOnly = "";
+        }
+
+        static string SyncStateFile { get { return Path.Combine(Paths.ProfileDir, "release.txt"); } }
+        static string SyncDir { get { return Path.Combine(Paths.ProfileDir, "Sync"); } }
+
+        static SyncState ReadSyncState()
+        {
+            var s = new SyncState();
+            try
+            {
+                if (!File.Exists(SyncStateFile)) return s;
+                foreach (string raw in File.ReadAllLines(SyncStateFile))
+                {
+                    string[] w = raw.Trim().Split(new[] { ' ' }, 3, StringSplitOptions.RemoveEmptyEntries);
+                    if (w.Length < 2) continue;
+                    if (w[0] == "synced") { s.Synced = w[1].ToLowerInvariant(); s.SyncedId = w.Length > 2 ? w[2] : ""; }
+                    else if (w[0] == "packs") s.PacksOnly = w[1].ToLowerInvariant();
+                }
+            }
+            catch (Exception ex) { Swallow.Note("Updater.ReadSyncState", ex); }
+            return s;
+        }
+
+        static void WriteSyncState(SyncState s)
+        {
+            var lines = new List<string>();
+            if (s.Synced.Length > 0) lines.Add("synced " + s.Synced + (s.SyncedId.Length > 0 ? " " + s.SyncedId : ""));
+            if (s.PacksOnly.Length > 0) lines.Add("packs " + s.PacksOnly);
+            Directory.CreateDirectory(Paths.ProfileDir);
+            string tmp = SyncStateFile + ".tmp";
+            File.WriteAllLines(tmp, lines.ToArray());
+            if (File.Exists(SyncStateFile)) File.Delete(SyncStateFile);
+            File.Move(tmp, SyncStateFile);
+        }
+
+        /// <summary>The release this install last synced to, or "" when it has
+        /// never synced to one (it is on packs, or has not updated yet).</summary>
+        public static string SyncedRelease()
+        {
+            SyncState s = ReadSyncState();
+            return s.SyncedId.Length > 0 ? s.SyncedId : s.Synced;
+        }
+
+        /// <summary>
+        /// The update Pending offers when the feed names a record this install
+        /// has not synced to: one entry standing for the whole release, so the
+        /// card, the in play clock and Install now need nothing new. Null when
+        /// the feed names none, this install is on it already, or it was found
+        /// to carry no RecordFilesMark.
+        /// </summary>
+        static Pack RecordDue(VersionDoc v)
+        {
+            RecordRef r = v == null ? null : v.record;
+            if (r == null) return null;
+            SyncState s = ReadSyncState();
+            if (s.Synced == r.sha256 || s.PacksOnly == r.sha256) return null;
+            var p = new Pack();
+            p.id = "release " + r.id;
+            p.url = r.url;
+            p.sha256 = r.sha256;
+            p.notes = LastNotes(v);
+            p.Record = r;
+            p.Doc = v;
+            return p;
+        }
+
+        static string LastNotes(VersionDoc v)
+        {
+            if (v == null || v.packs == null) return "";
+            for (int i = v.packs.Length - 1; i >= 0; i--)
+                if (v.packs[i] != null && !string.IsNullOrEmpty(v.packs[i].notes)) return v.packs[i].notes;
+            return "";
+        }
+
+        /// <summary>
+        /// The folder the record's files are in: its own url up to its name.
+        /// A record is named by its sha256 like every asset, and Publish-Update
+        /// puts every file it lists beside it, so a file's address is this
+        /// plus the file's sha256 and never anything the feed spells out.
+        /// </summary>
+        static string AssetFolder(RecordRef r)
+        {
+            string u = r.url;
+            int q = u.IndexOfAny(new[] { '?', '#' });
+            if (q >= 0) u = u.Substring(0, q);
+            if (!u.EndsWith("/" + r.sha256, StringComparison.OrdinalIgnoreCase))
+                throw new Exception("The update feed names a release record that is not stored under its own checksum. Nothing was downloaded.");
+            return u.Substring(0, u.Length - r.sha256.Length);
+        }
+
+        /// <summary>
+        /// Brings the install to the release the feed names. Falls back to the
+        /// packs, in feed order, when that release's record does not say its
+        /// files are on the site.
+        /// </summary>
+        public static void SyncRecord(Config cfg, RecordRef r, VersionDoc v, Action<string> log)
+        {
+            // Where every byte comes from is decided here, once: https, and a
+            // host on the allow list. Every file after this is this address
+            // plus 64 hex characters, so it cannot be anywhere else.
+            CheckUrl(r.url);
+            string at = AssetFolder(r);
+            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
+            if (Sync(cfg, at, r, v, log)) return;
+
+            foreach (Pack p in Pending(v))
+            {
+                if (p == null || p.Record != null) continue;
+                if (string.IsNullOrEmpty(p.url) || p.url.Trim().Length == 0)
+                {
+                    log("Skipping " + p.id + ": it was published without a download link, so there is nothing to fetch. It will not be offered again.");
+                    Skip(p.id);
+                    continue;
+                }
+                ApplyPack(cfg, p, log);
+            }
+        }
+
+        /// <summary>
+        /// Checks the install against the record the feed names now and puts
+        /// right anything that differs, whether or not it synced to it before.
+        /// For a repair. False when the feed names no record it can sync to.
+        /// </summary>
+        public static bool Resync(Config cfg, VersionDoc v, Action<string> log)
+        {
+            RecordRef r = v == null ? null : v.record;
+            if (r == null) return false;
+            CheckUrl(r.url);
+            string at = AssetFolder(r);
+            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+            return Sync(cfg, at, r, v, log);
+        }
+
+        class SyncItem
+        {
+            public string Rel;
+            public string Dest;
+            public long Bytes;
+            public string Sha;
+            public bool InGame;
+        }
+
+        /// <summary>
+        /// The sync itself. $at is the folder the record and its files are in
+        /// (checked by the caller). tests\test-record-sync.ps1 calls this with
+        /// a copy of the site on this machine.
+        /// </summary>
+        static bool Sync(Config cfg, string at, RecordRef r, VersionDoc v, Action<string> log)
+        {
+            string stage = SyncDir;
+            Directory.CreateDirectory(stage);
+
+            string recFile = Path.Combine(stage, "record-" + r.sha256 + ".json");
+            FetchInto(at + r.sha256, r.sha256, -1, recFile);
+            Dictionary<string, string> map = ReadRecord(recFile);
+
+            SyncState state = ReadSyncState();
+            if (!map.ContainsKey(RecordFilesMark))
+            {
+                state.PacksOnly = r.sha256;
+                WriteSyncState(state);
+                try { File.Delete(recFile); } catch (Exception ex) { Swallow.Note("Updater.Sync, record", ex); }
+                log("Release " + r.id + " does not have its files on the site one by one, so it goes in pack by pack.");
+                return false;
+            }
+
+            var items = new List<SyncItem>();
+            var gone = new List<KeyValuePair<string, string>>();
+            var listed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // The six client runtime files stay with the launcher, which
+            // carries the record of which build belongs beside it and puts
+            // back any other (ClientRuntime.Heal), the same rule a rollback
+            // keeps (Rollback-Feed.ps1). Never written or removed here.
+            var client = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (ClientRuntime.Entry ce in ClientRuntime.Recorded()) client.Add(ce.Rel);
+            foreach (KeyValuePair<string, string> e in map)
+            {
+                string k = e.Key;
+                if (k.StartsWith(GoneMark, StringComparison.Ordinal))
+                {
+                    string rel = k.Substring(GoneMark.Length).Replace('/', '\\');
+                    if (rel.Length > 0) gone.Add(new KeyValuePair<string, string>(rel, e.Value));
+                    continue;
+                }
+                bool golden = k.StartsWith(GoldenMark, StringComparison.Ordinal);
+                if (k.StartsWith(":", StringComparison.Ordinal) && !golden) continue;
+
+                long bytes; string sha;
+                if (!ReadEntry(e.Value, out bytes, out sha))
+                    throw new Exception("The record of release " + r.id + " has an entry that is not a size and a checksum (" + k + "). Nothing was changed.");
+
+                var it = new SyncItem();
+                it.Bytes = bytes;
+                it.Sha = sha;
+                string full;
+                if (golden)
+                {
+                    // Only the reference plugin list's own files, into
+                    // Profile\Default, the way a pack's profile/ tree goes.
+                    string leaf = k.Substring(GoldenMark.Length);
+                    if (leaf.Length == 0 || leaf.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || leaf.StartsWith(".")) continue;
+                    try { full = Path.GetFullPath(Path.Combine(Paths.Golden, leaf)); } catch { continue; }
+                    if (!Inside(full, Paths.Root)) continue;
+                    it.Rel = leaf;
+                }
+                else
+                {
+                    string rel = k.Replace('/', '\\');
+                    // Fenced after the path is resolved, as Install does.
+                    try { full = Path.GetFullPath(Path.Combine(Paths.Game, rel)); } catch { continue; }
+                    if (!Inside(full, Paths.Game)) continue;
+                    it.Rel = full.Substring(Paths.Game.TrimEnd('\\', '/').Length).TrimStart('\\', '/');
+                    it.InGame = true;
+                    listed.Add(it.Rel);
+                    if (client.Contains(it.Rel)) continue;
+                }
+                it.Dest = full;
+                items.Add(it);
+            }
+
+            // ---- compare: size first, then the sha256 ---------------------
+            log("Checking " + items.Count + " files against release " + r.id + "...");
+            var need = new List<SyncItem>();
+            foreach (SyncItem it in items)
+                if (!Matches(it.Dest, it.Bytes, it.Sha)) need.Add(it);
+
+            // ---- fetch what differs, each file once ------------------------
+            var fetch = new Dictionary<string, long>(StringComparer.Ordinal);
+            foreach (SyncItem it in need) fetch[it.Sha] = it.Bytes;
+            long total = 0;
+            foreach (long b in fetch.Values) total += b;
+            if (fetch.Count > 0)
+            {
+                log("Downloading " + fetch.Count + (fetch.Count == 1 ? " file, " : " files, ") + Mb(total) + " MB.");
+                long got = 0; int quarter = 0;
+                foreach (KeyValuePair<string, long> f in fetch)
+                {
+                    FetchInto(at + f.Key, f.Key, f.Value, Path.Combine(stage, f.Key));
+                    got += f.Value;
+                    int now = total > 0 ? (int)(got * 4 / total) : 4;
+                    if (now > quarter && now < 4 && total > 20L * 1048576) log("  " + Mb(got) + " of " + Mb(total) + " MB");
+                    quarter = now;
+                }
+                log("Every file checked against its checksum.");
+            }
+
+            // ---- put them in place ------------------------------------------
+            var newInGame = new List<string>();
+            var gameWritten = new List<string>();
+            bool carriedProfile = false;
+            foreach (SyncItem it in need)
+            {
+                string src = Path.Combine(stage, it.Sha);
+                Directory.CreateDirectory(Path.GetDirectoryName(it.Dest));
+                bool existed = File.Exists(it.Dest);
+                if (existed)
+                {
+                    // In a game folder made of links, writing over a linked
+                    // file would rewrite Vortex's copy with it (Install).
+                    if (it.InGame) OwnGame.Unshare(it.Dest);
+                    try { if (File.Exists(it.Dest)) File.SetAttributes(it.Dest, FileAttributes.Normal); }
+                    catch (Exception ex) { Swallow.Note("Updater.Sync, attributes", ex); }
+                }
+                File.Copy(src, it.Dest, true);
+                if (it.InGame)
+                {
+                    gameWritten.Add(it.Rel);
+                    if (!existed) newInGame.Add(it.Rel);
+                }
+                else if (it.Rel.Equals("plugins.txt", StringComparison.OrdinalIgnoreCase) ||
+                         it.Rel.Equals("loadorder.txt", StringComparison.OrdinalIgnoreCase))
+                    carriedProfile = true;
+            }
+
+            // ---- and what the release says is gone --------------------------
+            // "always" is a path taken out of every install whatever put it
+            // there (Ship-Rules' delete list), like a line in a pack's
+            // delete.txt. Any other is a file of ours a release stopped
+            // shipping: left alone when Vortex has deployed that path since,
+            // the same rule RemovePack keeps, because then it is the
+            // collection's file and not ours.
+            var removed = new List<string>();
+            HashSet<string> deployed = null;
+            int shared = 0;
+            foreach (KeyValuePair<string, string> g in gone)
+            {
+                string full;
+                try { full = Path.GetFullPath(Path.Combine(Paths.Game, g.Key)); } catch { continue; }
+                if (!Inside(full, Paths.Game)) continue;
+                string rel = full.Substring(Paths.Game.TrimEnd('\\', '/').Length).TrimStart('\\', '/');
+                if (listed.Contains(rel) || client.Contains(rel) || !File.Exists(full)) continue;
+                if (!string.Equals(g.Value, "always", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (deployed == null) deployed = DeployedNow(cfg);
+                    if (deployed.Contains(rel)) { shared++; continue; }
+                }
+                try
+                {
+                    File.SetAttributes(full, FileAttributes.Normal);
+                    File.Delete(full);
+                    removed.Add(rel);
+                    log("removed " + rel);
+                }
+                catch (Exception ex) { Swallow.Note("Updater.Sync, delete", ex); }
+            }
+
+            if (carriedProfile)
+            {
+                try
+                {
+                    if (Verify.SettleLoadOrder() > 0)
+                        log("The plugin list this update carried is in place, so the load order is right without pressing Fix.");
+                }
+                catch (Exception ex)
+                {
+                    log("Could not put this update's plugin list in place: " + ex.Message + ". Press Fix in the launcher.");
+                }
+            }
+            Swap.RepairConfigs();
+            NoteInstalledIntoGame(newInGame);
+            int kept = Keep.Remember(gameWritten);
+            if (kept > 0) log("Kept " + kept + " of " + Keep.Build() + "'s own game " + (kept == 1 ? "file" : "files") + " to put back if another server or build changes " + (kept == 1 ? "it." : "them."));
+            Keep.Forget(removed);
+
+            // Every pack on the feed now is behind this release, so a feed that
+            // later stops naming a record replays only packs published after.
+            var done = Applied();
+            if (v != null && v.packs != null)
+                foreach (Pack p in v.packs)
+                    if (p != null && !string.IsNullOrEmpty(p.id) && !done.Contains(p.id)) { MarkApplied(p.id); done.Add(p.id); }
+
+            state = ReadSyncState();
+            state.Synced = r.sha256;
+            state.SyncedId = r.id;
+            if (state.PacksOnly == r.sha256) state.PacksOnly = "";
+            WriteSyncState(state);
+            try { Directory.Delete(stage, true); } catch (Exception ex) { Swallow.Note("Updater.Sync, tidy", ex); }
+
+            string msg = "Release " + r.id + ": " + items.Count + " files checked, " + need.Count +
+                         (need.Count == 1 ? " file" : " files") + " put right";
+            if (fetch.Count > 0) msg += " (" + Mb(total) + " MB downloaded)";
+            if (removed.Count > 0) msg += ", " + removed.Count + " removed";
+            msg += ".";
+            if (shared > 0) msg += " " + shared + (shared == 1 ? " file this release no longer ships is" : " files this release no longer ships are") + " the collection's now and stayed.";
+            log(msg);
+            return true;
+        }
+
+        static string Mb(long b)
+        {
+            return (b / 1048576.0).ToString("0.0", CultureInfo.InvariantCulture);
+        }
+
+        static bool ReadEntry(string v, out long bytes, out string sha)
+        {
+            bytes = 0; sha = "";
+            if (v == null) return false;
+            int c = v.IndexOf(':');
+            if (c <= 0) return false;
+            if (!long.TryParse(v.Substring(0, c), NumberStyles.None, CultureInfo.InvariantCulture, out bytes)) return false;
+            sha = v.Substring(c + 1).ToLowerInvariant();
+            return IsSha(sha);
+        }
+
+        static bool Matches(string file, long bytes, string sha)
+        {
+            try
+            {
+                var fi = new FileInfo(file);
+                if (!fi.Exists) return false;
+                if (bytes >= 0 && fi.Length != bytes) return false;
+                return string.Equals(Sha256(file), sha, StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("Updater.Matches", ex);
+                return false;
+            }
+        }
+
+        static Dictionary<string, string> ReadRecord(string file)
+        {
+            string text = File.ReadAllText(file, Encoding.UTF8);
+            var o = Json.Parse(text) as Dictionary<string, object>;
+            if (o == null) throw new Exception("The release record is not a list of files. Nothing was changed.");
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, object> e in o)
+            {
+                var s = e.Value as string;
+                if (s == null) throw new Exception("The release record has an entry that is not text (" + e.Key + "). Nothing was changed.");
+                map[e.Key] = s;
+            }
+            return map;
+        }
+
+        /// <summary>
+        /// One asset into $dest, checked against its sha256 (and its size when
+        /// known). A $dest already there with the right bytes is kept, which
+        /// is what makes a sync that was cut off after its downloads cost
+        /// nothing the second time. A $dest.part left by a download that was
+        /// cut off carries on from where it stopped, with a Range request; if
+        /// the joined file does not check out, the part is thrown away and
+        /// the file fetched whole once more.
+        /// </summary>
+        static void FetchInto(string url, string sha, long bytes, string dest)
+        {
+            if (File.Exists(dest))
+            {
+                if (Matches(dest, bytes, sha)) return;
+                File.Delete(dest);
+            }
+            string part = dest + ".part";
+            for (int attempt = 0; attempt < 2; attempt++)
+            {
+                long have = File.Exists(part) ? new FileInfo(part).Length : 0;
+                if (bytes < 0 || have > bytes) { if (have > 0) File.Delete(part); have = 0; }
+                if (bytes < 0 || have < bytes) Transfer(url, part, have);
+                if (Matches(part, bytes, sha))
+                {
+                    File.Move(part, dest);
+                    return;
+                }
+                try { File.Delete(part); } catch (Exception ex) { Swallow.Note("Updater.FetchInto, delete", ex); }
+                if (have == 0) break;
+            }
+            throw new Exception("Checksum did not match. Download rejected.");
+        }
+
+        static void Transfer(string url, string part, long from)
+        {
+            var req = (HttpWebRequest)WebRequest.Create(url);
+            req.Timeout = 10000;
+            req.ReadWriteTimeout = 60000;
+            req.UserAgent = "ThornswoodLauncher/" + Version;
+            req.Accept = "application/octet-stream";
+            if (from > 0) req.AddRange(from);
+            using (var resp = (HttpWebResponse)req.GetResponse())
+            {
+                // A server that ignores the Range answers 200 with the whole
+                // file, and then the part starts again from nothing.
+                bool carryOn = from > 0 && resp.StatusCode == HttpStatusCode.PartialContent;
+                using (Stream s = resp.GetResponseStream())
+                using (var f = new FileStream(part, carryOn ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    byte[] buf = new byte[81920];
+                    int n;
+                    while ((n = s.Read(buf, 0, buf.Length)) > 0) f.Write(buf, 0, n);
+                }
+            }
+        }
+    }
+
+}

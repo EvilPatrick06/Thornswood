@@ -32,10 +32,10 @@
 // makes, and a bench nobody has classified are all still let through.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -52,6 +52,11 @@ const b = a < 0 ? -1 : src.indexOf(END, a);
 const block = (a >= 0 && b >= 0) ? src.slice(a, b + END.length) : null;
 
 yes('the recipeless gate is in the gamemode', block !== null);
+
+// The one sentence somebody with no profession hears at any bench (#1037).
+const noProfM = /^const NO_PROFESSION_AT_A_BENCH = '([^']*)';$/m.exec(src);
+const NO_PROF = noProfM ? noProfM[1] : null;
+yes('the no-profession sentence is in the gamemode and says to press K', !!NO_PROF && /Press K/.test(NO_PROF));
 
 /*
   THE REAL CRAFT GATE GOES BESIDE IT, NOT A STUB OF IT. The point of 347g is
@@ -162,7 +167,7 @@ function context(opts) {
   const told = opts.told || {};
   const fn = new Function(
     'globalThis', 'log', 'notify', 'say', 'mp', 'idOf', 'Number',
-    'RECIPES_BY_ID', 'BENCH_BY_BASE', 'RANK_LADDER', 'toldCraftingIsComing', 'raceOf',
+    'RECIPES_BY_ID', 'BENCH_BY_BASE', 'RANK_LADDER', 'NO_PROFESSION_AT_A_BENCH', 'raceOf',
     GATE + '\n' + block +
     '\nreturn { recipelessCraft: recipelessCraft, craftAnswer: craftAnswer };');
 
@@ -206,7 +211,7 @@ function context(opts) {
     opts.table || {},
     opts.benches || REAL_BENCHES,
     RANK_LADDER,
-    told,
+    NO_PROF,
     function () { return opts.race || ''; });
   return { api: api, said: said, spoken: spoken, logs: logs, credited: credited, told: told };
 }
@@ -285,11 +290,16 @@ if (block !== null) {
               state: { prof: 'smith', half: 'edgewright', taught: ['hearthcook'] } }).refused);
   }
 
-  // S6: nobody is stranded on their first evening.
+  // S6: NO PROFESSION, NO BREWING AND NO ENCHANTING (#1037). Patrick, 29
+  //     September: "There should be no grace at all".
   {
-    yes('S6 a character with no profession yet is let through',
-        !run({ made: BREWED, bench: 'AlchemyWorkbench',
-               state: { prof: null, taught: [] } }).refused);
+    const r = run({ made: BREWED, bench: 'AlchemyWorkbench', state: { prof: null, taught: [] } });
+    yes('S6 a character with no profession is refused at the alchemy lab', r.refused);
+    yes('S6 and told, once, to press K and choose one',
+        r.spoken.length === 1 && r.spoken[0] === NO_PROF);
+    yes('S6 and nothing is credited', r.credited.length === 0);
+    const e = run({ made: BREWED, bench: 'CraftingEnchantingTable', state: { prof: null, taught: [] } });
+    yes('S6 the same at the arcane enchanter', e.refused && e.spoken[0] === NO_PROF);
   }
 
   // S7: A BENCH NOBODY HAS CLASSIFIED IS NOT A REFUSAL. That is a hole in our
@@ -454,31 +464,19 @@ if (block !== null) {
         r.spoken[0].indexOf('Advanced') !== -1 && r.spoken[0].indexOf('Master') === -1);
   }
 
-  // S15: THE ONCE-ONLY NOTE. Asking several rows must not change who is told
-  //      that a profession will start deciding this, or how often.
+  // S15: NO PROFESSION, NOTHING MADE, below the line too (#1037). Every row
+  //      that makes the thing refuses them, and they hear one line.
   {
-    const told = {};
-    const o = atForge(nobodyYet, 'cloak:Test.esp', { told: told });
+    const o = atForge(nobodyYet, 'cloak:Test.esp');
     const r = run(o);
-    yes('S15 somebody with no profession yet is let through', !r.refused);
-    yes('S15 and told once, in the recipe gate\'s words, though a riekling row was asked first',
-        r.spoken.length === 1 && r.spoken[0] === expected(o, CLOAK_ANYBODY).note &&
-        told[ACTOR] === true);
-    const again = run(o);
-    yes('S15 and not told a second time', !again.refused && again.said.length === 0);
-    const toldD = {};
-    const d = run(atForge(nobodyYet, 'dumpling:Test.esp', { told: toldD }));
-    yes('S15 three rows that all allow still tell them exactly once, and the note is said, not swallowed',
-        !d.refused && d.spoken.length === 1 && toldD[ACTOR] === true);
-    const told2 = {};
-    const refused = run(atForge(nobodyYet, 'cloak:Test.esp',
-                                { told: told2, table: { 'c1:Test.esp': CLOAK_RIEKLING } }));
-    yes('S15 a race refusal does not use the note up, so they still hear it later',
-        refused.refused && !Object.prototype.hasOwnProperty.call(told2, ACTOR));
-    const told3 = {};
-    run(atForge(cook, 'dumpling:Test.esp', { told: told3 }));
-    yes('S15 and somebody with a profession is never marked as told',
-        Object.keys(told3).length === 0);
+    yes('S15 somebody with no profession is refused the cloak with no recipe matched', r.refused);
+    yes('S15 and hears one line, the one the recipe gate gives the row it names',
+        r.spoken.length === 1 && expected(o, CLOAK_ANYBODY).refusal === NO_PROF);
+    const d = run(atForge(nobodyYet, 'dumpling:Test.esp'));
+    yes('S15 three rows, every one refused, still one line, and it says to press K',
+        d.refused && d.spoken.length === 1 && d.spoken[0] === NO_PROF);
+    const c = run(atForge(cook, 'dumpling:Test.esp'));
+    yes('S15 and somebody with the profession still makes it', !c.refused);
   }
 
   // S16: EVERYTHING ELSE IS AS IT WAS. Tempering, an item no row makes, and a

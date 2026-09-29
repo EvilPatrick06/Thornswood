@@ -311,11 +311,21 @@
                : '#8d857a';                // cannot speak at all
     var word = usable ? modeOf(myMode).label.toUpperCase() : 'LISTENING ONLY';
 
-    b.className = live ? 'tw-live' : '';
-    b.style.opacity = live ? '1' : (usable ? '.72' : '.5');
-    b.innerHTML = micSvg(colour) +
-                  '<span class="tw-word" style="color:' + colour + '">' +
-                  word + '</span>';
+    /*
+      ONLY WHAT CHANGED IS WRITTEN (#963). draw() comes here every 300 ms while
+      anybody is connected and on every relay answer, and the microphone reads
+      the same for minutes at a time. Rewriting the svg each pass rebuilt it
+      and repainted the game's browser layer for nothing.
+    */
+    var cls = live ? 'tw-live' : '';
+    // Written as the browser reads them back, so the comparison holds.
+    var op = live ? '1' : (usable ? '0.72' : '0.5');
+    var html = micSvg(colour) +
+               '<span class="tw-word" style="color:' + colour + '">' +
+               word + '</span>';
+    if (b.className !== cls) { b.className = cls; }
+    if (b.style.opacity !== op) { b.style.opacity = op; }
+    if (b.__twHtml !== html) { b.__twHtml = html; b.innerHTML = html; }
   }
 
   function esc(s) {
@@ -346,7 +356,7 @@
       is what decides how loud they sound. Only the drawing is gone.
     */
     var b = overlay();
-    if (b) { b.style.display = 'none'; b.innerHTML = ''; }
+    if (b && (b.style.display !== 'none' || b.innerHTML !== '')) { b.style.display = 'none'; b.innerHTML = ''; }
   }
 
   // ------------------------------------------------------------- the mic ----
@@ -728,8 +738,29 @@
     onNet = function (m) {
       if (!m || !m.t) { return; }
       if (m.t === 'welcome') { myPeer = Number(m.peer) || 0; return; }
+      /*
+        The relay guard comes before the peer list, not after it.
+
+        It used to sit below this line, so in relay mode a peer list still
+        reached reconcile, and reconcile built a WebRTC connection to every
+        other person in the room before open threw on the audio context relay
+        mode never makes. Measured in cef_debug.log on 26 September: the
+        launcher had the microphone from 14:28:01, and at 14:29:03, when a
+        second person joined, the game's browser made a peer connection, the
+        network service in SkyrimPlatformCEF.exe.hidden started its mDNS
+        responder, and the chat logged "listener threw: TypeError: Cannot read
+        properties of null (reading 'createGain')". A WebRTC connection opens
+        UDP sockets on every network the machine has, which is what makes
+        Windows Firewall ask about the game's browser. The launcher's voice
+        page does all of this in WebView2, so this page has no reason to.
+      */
+      if (inRelay() && (m.t === 'sdp' || m.t === 'ice' || m.t === 'peers')) { return; }
       if (m.t === 'peers') { reconcile(m.peers); return; }
+      // The whole view on the first tick after a join, then only what moved
+      // and who left it (issue #482; the note over the tick in
+      // voice/voice-server.js). The party strip reads the same table.
       if (m.t === 'pos') { lastWho = m.who || {}; place(); return; }
+      if (m.t === 'moved') { applyMoved(lastWho, m); place(); return; }
       if (m.t === 'vmode') {
         var rec = conns.get(Number(m.from));
         if (rec) {
@@ -741,11 +772,11 @@
       }
       /*
         Once the launcher holds the audio, this page is a HUD and must not
-        answer for the connection. It used to, which is the other half of the
-        handoff defect below: relay mode dropped the connections and then
-        rebuilt them from the very next offer that arrived.
+        answer for the connection (the guard above). It used to, which is the
+        other half of the handoff defect below: relay mode dropped the
+        connections and then rebuilt them from the very next offer that
+        arrived.
       */
-      if (inRelay() && (m.t === 'sdp' || m.t === 'ice' || m.t === 'peers')) { return; }
       if (m.t === 'sdp') { onSdp(m); return; }
       if (m.t === 'ice') { onIce(m); return; }
       if (m.t === '__closed') {
@@ -781,6 +812,12 @@
   }
 
   function open(id, info, initiator) {
+    // No connection is built unless this page is the one playing the audio.
+    // In relay mode the launcher is, and with no audio context there is
+    // nowhere to play it. Checked before the RTCPeerConnection rather than
+    // after: making one is what opens the sockets Windows Firewall asks about,
+    // and the old order made it and then threw on ctx, leaving it open.
+    if (inRelay() || !ctx) { return; }
     var pc = new RTCPeerConnection({ iceServers: ICE });
     var gain = ctx.createGain();
     var panner = ctx.createPanner();
@@ -957,6 +994,18 @@
   // the front's widget, and it handles /roll. Nothing about chat is left here.
 
   // ---------------------------------------------------------- placement -----
+  /* A 'moved' tick on top of the table the last 'pos' gave: the rows that
+     changed replace theirs, and the ids in gone are nobody this person can
+     hear any more. */
+  function applyMoved(table, m) {
+    var who = m.who || {};
+    for (var k in who) {
+      if (Object.prototype.hasOwnProperty.call(who, k)) { table[k] = who[k]; }
+    }
+    var gone = m.gone || [];
+    for (var i = 0; i < gone.length; i++) { delete table[gone[i]]; }
+  }
+
   function place() {
     var me = lastWho[cfg.profileId];
     if (!me || !ctx) { draw(); return; }

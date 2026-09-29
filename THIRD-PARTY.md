@@ -28,7 +28,10 @@ or the build check goes red.
   installer. Build-Launcher.ps1 compiles everything it needs into the one file.
 - **The client runtime**, the six files in `records\client-build.json`. They go
   out as `client-runtime-<commit>.zip` on the feed (Publish-Update.ps1), and
-  in game packs and the installer.
+  in game packs and the installer. The zip carries a `README.txt` saying where
+  their source is, with `GPL-3.0.txt` and `AGPL-3.0.txt` beside it, and so
+  does every pack that carries a SkyMP file, as `SOURCE CODE.txt`
+  (Source-Notice.ps1). The launcher takes only the game files out of either.
 - **Game packs and the installer payload**: every file in the game folder that
   the collection did not provide and Ship-Rules.ps1 does not hold back.
 - **Nexus Mods**, through the collection
@@ -89,10 +92,11 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` are built from
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `ccf71644` (in full, `ccf71644d8f3f3fcd03f32ef1ebb696ede8630b1`). That
+commit `44366c7e` (in full, `44366c7ea849447d69ccc6160d4d14c66f4c20a2`). That
 is upstream skyrim-multiplayer/skymp at `f926944b` with Thornswood's changes on
-top. The copies in `C:\Thornswood\Game` matched the recorded sha256 of all six
-on 24 September.
+top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
+recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
+recorded build.
 
 | File | Built from, in the fork | Licence |
 |---|---|---|
@@ -345,14 +349,39 @@ them, names the SIL Open Font License, Version 1.1.
 - SKSE, which is in the collection, and Skyrim Special Edition, which each
   person owns.
 - The WebView2 Runtime, which comes from Microsoft.
+- texconv, the tool the main menu picture is built with (next section).
+
+## texconv, Microsoft's texture converter, used to build and not shipped
+
+`scripts\dev\Build-Backdrop.py` uses texconv to write the main menu picture,
+`game\menu\Mainmenuwallpaper.dds`, as BC7 (issue #994), because Pillow cannot
+write that format. The picture ships; texconv does not. It is not in the
+repository either: the script fetches this one file the first time it runs,
+into `local\texconv\may2026` (ignored by git), and refuses to run any copy
+whose sha256 is not the one below.
+
+| File | Release | Download | sha256 |
+|---|---|---|---|
+| `texconv.exe` | DirectXTex `may2026`, file version 2026.5.8.1, 966,480 bytes | https://github.com/microsoft/DirectXTex/releases/download/may2026/texconv.exe | `dcfdec10244e02cf5037fba089c55fb7e1326b1c8181742d77d15fa5cb5eef06` |
+
+The sha256 is the one GitHub publishes for that release asset, and the file
+downloaded on 28 September matched it. Its Authenticode signature is valid,
+signed by Microsoft Corporation ("Microsoft 3rd Party Application Component").
+Source: https://github.com/microsoft/DirectXTex, tag `may2026`.
+
+Licence: MIT, by the `LICENSE` file at that tag, "Copyright (c) Microsoft
+Corporation." Nobody is handed a copy, so its notice has nothing to travel
+with.
 
 ## On our servers
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`. That record names `skymp5-server` in the fork at
   `d00063515242e0ad1a9affb690c83194acf2c937`, an earlier commit on the same branch than the
-  `ccf71644` `records\client-build.json` names (what lies between them changes
-  only the client and a unit test), and it is AGPL-3.0. The binary running on
+  `44366c7e` `records\client-build.json` names (what lies between them changes
+  the client, the unit tests and one server function, `getNeighborsByPosition`
+  in `c5c1e99e`, which the server binary takes at its next build), and it is
+  AGPL-3.0. The binary running on
   the VPS is that build: the record hashes it as
   `e5d85ed8038b5bfc8e896ab6addc757709d5f272765fba7c418374ca2aedd53f`, built
   2026-09-27T05:19:54Z and recorded after the Deploy-Server that sent it, and
@@ -366,7 +395,7 @@ For the six client files and for the game server module running on the VPS, the
 Corresponding Source is the fork at the commit each record names. The six
 client files:
 
-https://github.com/EvilPatrick06/skymp/tree/ccf71644d8f3f3fcd03f32ef1ebb696ede8630b1
+https://github.com/EvilPatrick06/skymp/tree/44366c7ea849447d69ccc6160d4d14c66f4c20a2
 
 The game server module:
 
@@ -400,13 +429,18 @@ README still gives the source of CEF (https://github.com/chromiumembedded/cef),
 Chromium (https://chromium.googlesource.com/chromium/src) and Node
 (https://github.com/nodejs/node).
 
-The directions reach people in three places. The installer carries
+The directions reach people in four places. The installer carries
 `SOURCE CODE.txt`, which Package-Thornswood.ps1 writes from the two build
 records and Setup-Thornswood.ps1 copies into the install folder (entry 170).
 The public credits page has them under "Source code", at
 https://thornswood.net/credits#source, which the download page links beside
 the installer (entry 170). `tests\test-source-offer.ps1` holds both to the
-records. And the Thornswood Client Runtime's own README, installed as
+records. The update feed's own downloads carry them too: the client runtime
+zip has a `README.txt` and every pack that carries a SkyMP file has a
+`SOURCE CODE.txt`, each naming the recorded commit and the files it carries,
+with the GPL and AGPL texts beside it (Source-Notice.ps1, written by
+Publish-Update.ps1 from `records\client-build.json`). And the Thornswood
+Client Runtime's own README, installed as
 `Data\Docs\Thornswood Client Runtime\README.txt`, names the fork, its branch
 and upstream SkyMP, but no commit, and `___systemPolyfill.js` is not on that
 branch any more.
@@ -420,10 +454,12 @@ branch any more.
   installer also hands `GPL-3.0.txt`, `AGPL-3.0.txt` and `WebView2-LICENSE.txt`
   into the install folder beside `SOURCE CODE.txt` (Package-Thornswood.ps1
   stages them from `installer\licences`, Setup copies them, Uninstall removes
-  them). GitHub release pages for update packs now append a short source
-  footer (Publish-Update.ps1 `Get-ReleaseSourceFooter`, also Publish-Pack.ps1
-  and the launcher draft notes in `.github/workflows/release.yml`) naming the
-  recorded fork trees and https://thornswood.net/credits#source.
+  them). The update feed's client runtime zip and every pack that carries a
+  SkyMP file hand the GPL and AGPL texts with a note naming the recorded
+  commit (Source-Notice.ps1). Updates stopped going to GitHub release pages on
+  28 September (#907); the launcher's draft release notes in
+  `.github/workflows/release.yml` still point at
+  https://thornswood.net/credits#source.
 - The Client Runtime's README names the fork's branch and no commit, and
   `___systemPolyfill.js` is gone from that branch, so the README's directions
   do not lead to that file's source. The exact place is under "Where the

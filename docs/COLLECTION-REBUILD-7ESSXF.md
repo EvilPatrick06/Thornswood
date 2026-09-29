@@ -118,7 +118,7 @@ feed; the dev Ship is separate.
 
 ```
 # 1. Point config.json and the feed at 7essxf, then push the feed. This also
-#    updates and pushes Thornswood-Releases version.json's collectionUrl.
+#    updates the live feed's collectionUrl and sends it to the VPS (#907).
 .\scripts\ops\Set-Collection.ps1 -Url "https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf"
 
 # 2. Re-bake the server load order from the installed collection's plugin list.

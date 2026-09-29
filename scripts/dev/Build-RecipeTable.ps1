@@ -855,6 +855,23 @@ $GAMEMODE_JS = Join-Path $PSScriptRoot '..\..\game\gamemode.js'
 # worth doing once to see how far it pushes every half up.
 $PRODUCER_RANK_IS_LOWEST = $true
 
+# A CROP THAT ALSO GROWS WILD. Patrick, 28 September, issue #398: leave it as
+# it is. Since the food rule and #626 no crop is also picked wild, so turning
+# this on moves no recipe; ask again only if a crop is added back to the wild
+# plants.
+#
+# Lowest wins, above, means a crop that a gatherer can also pick in the wild
+# costs the gatherer's rank and never the farmer's: Tomato is gatherer novice,
+# not farmer advanced, and every overlapping crop is the same, so the farmer's
+# ladder decides nothing where it overlaps the gatherer's.
+#
+# $false  IN USE, and what the table has always done: the cheapest way wins,
+#         whichever class it is.
+# $true   anything the farmer produces costs the farmer's rank, even where a
+#         gatherer picks the same thing lower, so a Cook's rungs follow the
+#         farmer's. Everything the farmer does not produce is unchanged.
+$CROP_COSTS_THE_FARMERS_RANK = $false
+
 # WHETHER THE INPUT RULE RANKS AT ALL. Set to $false and every row falls back
 # to RANK_SHARE, which is what this script did before 21 September, including
 # the three empty rungs.
@@ -886,6 +903,13 @@ $INPUT_RANK_IS_THE_DEAREST = $true
 # fell two rungs or more, Wild Hunt Heavy Helm master to novice, 14 Hearthcook
 # stews expert to novice off a Salt Pile.
 #
+# DECIDED BY PATRICK ON 28 SEPTEMBER, issue #398: keep 'floor'. The things
+# nobody gathers (Dragon Bone, Dragon Scales, Linen Wrap, Dwarven metal, Daedra
+# Hearts) are loot or bought, and a recipe that wants one stays dear. The rows
+# this holds above their gatherable makings are kept on purpose, and each says
+# so in rankFrom with UNPLACED_INPUT_KEPT_BECAUSE below, which is what
+# Check-Balance.ps1 reads to count them as kept rather than waiting.
+#
 # 'floor'    IN USE. When every input is placed, the dearest one decides, which
 #            is the rule above unchanged. When any input is not placed, the
 #            dearest placed one can only RAISE the row above what its price
@@ -898,6 +922,7 @@ $INPUT_RANK_IS_THE_DEAREST = $true
 #            and keeps the price rank. Honest, and it throws away the one thing
 #            the index does know about 301 rows.
 $UNPLACED_INPUT_RULE = 'floor'
+$UNPLACED_INPUT_KEPT_BECAUSE = 'Patrick decided on 28 September (issue #398) that a recipe wanting something nobody gathers stays dear.'
 
 # THE HOP: AN INPUT THAT IS ITSELF MADE BY A RECIPE. INVENTED, in the sense that
 # classes.md sets no numbers for it, and measured in the sense that every number
@@ -1109,6 +1134,12 @@ $HOP_THROUGH_A_TEMPER = $false
 # and a half that fails it has to be named in the knob under it with the
 # measured reason or this build does not write a table.
 #
+# SETTLED ON 28 SEPTEMBER, issue #398: Patrick made Heart Stone deposits
+# advanced mining (RANK_BY_ORE in Build-OreTable.ps1). The staves' input cost is
+# advanced now, the one rung hole fill below spreads them over all four rungs,
+# and no half on this build reaches the second rule. It stays as the last resort
+# for a future half, and the build prints by name any half that uses it.
+#
 # 'total inputs'    how many things the recipe wants in all, counting three
 #                   firewood as three. This is the one in use: it is the
 #                   closest thing the records have to how much work went into
@@ -1116,6 +1147,34 @@ $HOP_THROUGH_A_TEMPER = $false
 # 'distinct inputs' how many different things it wants. Fewer distinct values
 #                   in every half measured, so it collapses sooner.
 $SECOND_RULE_KEY = 'total inputs'
+
+# BEFORE THE SECOND RULE, TRY MOVING A FEW ROWS ONE RUNG. INVENTED, and it is
+# here because the second rule turned out to be a much bigger hammer than the
+# holes it was being used on. Issue #398.
+#
+# The second rule was written for the Bladebinder, a half where price and input
+# cost both say one number for every row. It is applied to ANY half the first
+# two rules leave with a hole, and it throws the whole half's ranking away to
+# fill one rung. Measured on the build of 28 September, after Tundra Cotton moved
+# to the gatherer (#626): the Liverywright's input cost put its 102 rows at
+# novice 82, advanced 10, expert 0, master 10, a hole at expert and nothing
+# else wrong. The second rule re-ranked all 102 by shopping list length and put
+# 30 robes whose makings are novice work, four Thread and a Leather Strip, on
+# expert and master: 39 Liverywright rows sat two rungs or more above what they
+# cost, and the Confectioner lost five more the same way.
+#
+# $true   IN USE. A hole is filled first from the rung next to it, above and
+#         then below, and no row moves more than one rung from where the first
+#         two rules put it. How many move is the hole's share in RANK_SHARE
+#         against its neighbour's, so the ladder keeps the shape the shares ask
+#         for. Rows whose own input cost does not stand in the way move first,
+#         then the cheapest (moving down) or the dearest (moving up). The rung
+#         moved from always keeps a row, named ranks and the row moved to novice
+#         for a new character never move, and a row moved once is never moved
+#         again. Only a half this cannot close, the Bladebinder with all 161
+#         rows on master, goes on to the second rule, and every move is printed.
+# $false  every hole goes straight to the second rule, as it did before.
+$HOLE_FILL_MOVES_ONE_RUNG = $true
 
 # A RUNG YOU CAN REACH AND CANNOT GATHER FOR IS STILL AN EMPTY RUNG. INVENTED,
 # and it is the other half of the rule HoleIn already enforces.
@@ -1137,8 +1196,8 @@ $RUNGS_MUST_BE_STANDABLE = $true
 # a check quietly passing. Any half not named here that fails the check fails
 # the build, because a rung nobody can gather for is a rank that opens nothing.
 $HALVES_WITH_AN_UNSTANDABLE_RUNG = [ordered]@{
-    'Cook/Confectioner' = 'every one of its 28 rows wants a Sack of Flour and a pat of Butter, counted over the whole half on 21 September, and flour is made from Wheat, which harvests.json ranks advanced for a gatherer and for a farmer alike. So the cheapest thing a Confectioner can bake is advanced work to gather for and the novice rung cannot be stood on whatever rule ranks the half: by input cost the 22 rows the rule reaches land 14 advanced and 14 expert and none novice, and the second rule only relabels seven of them. This appeared the day the hop was followed and it was always true; before it, flour had no producer at all and every row read as costing nothing. It closes when somebody decides where a Confectioner''s flour comes from, which is the same decision HALVES_NOBODY_CAN_START is already waiting on for this half: all 28 rows are behind two vanilla perks nobody here will ever hold, so nothing is being opened to anybody at any rank yet.'
-    'Enchanter/Bladebinder' = 'its novice, advanced and expert rungs are the second rule''s, not the input rule''s. 160 of its 161 rows want a Heart Stone and ores.json ranks all four Heart Stone deposits master, so every rung below master holds rows nobody at that rank can gather for. The second rule is argued for at SECOND_RULE_KEY and this is the price of it, stated rather than passed over: the half is ranked by how long a recipe''s shopping list is and the shopping list starts with a master miner''s stone either way. It closes when somebody decides where an Enchanter''s Heart Stones come from, which is the same decision HALVES_NOBODY_CAN_START is waiting on for this half.'
+    'Cook/Confectioner' = 'every one of its 28 rows wants a Sack of Flour and a pat of Butter, counted over the whole half on 21 September, and flour is made from Wheat, which harvests.json ranks advanced for a gatherer and for a farmer alike. So the cheapest thing a Confectioner can bake is advanced work to gather for and the novice rung cannot be stood on whatever rule ranks the half: by input cost all 28 land 20 advanced and 8 expert and none novice (28 September), and filling the empty novice rung (HOLE_FILL_MOVES_ONE_RUNG) only relabels eight of the advanced ones. This appeared the day the hop was followed and it was always true; before it, flour had no producer at all and every row read as costing nothing. It closes when somebody decides where a Confectioner''s flour comes from, which is the same decision HALVES_NOBODY_CAN_START is already waiting on for this half: all 28 rows are behind two vanilla perks nobody here will ever hold, so nothing is being opened to anybody at any rank yet.'
+    'Enchanter/Bladebinder' = '160 of its 161 rows want a Heart Stone, which Patrick made advanced mining on 28 September (issue #398, RANK_BY_ORE in Build-OreTable.ps1), so by input cost 160 land on advanced and the hole fill (HOLE_FILL_MOVES_ONE_RUNG) moves some of them one rung either way: novice 66, advanced 55, expert 39, master 1, none more than a rung from its stone. The 66 on novice are one rung below the stone, so a novice Bladebinder buys stones from an advanced miner rather than digging them. That is the whole cost and it is one rung, not the three the second rule left before. Each staff also wants its spell, which an Enchanter learns by reading its tome (TOMES_TEACH_STAFF_SPELLS, issue #967).'
 }
 
 # WHERE THE GOLD VALUE SITS IN EACH KIND OF RECORD. The first five were proved
@@ -1191,9 +1250,32 @@ $NOVICE_MUST_BE_REACHABLE = $true
 # asked separately: a half can own hundreds of rows and still be empty in
 # practice, which is exactly what two of these are. The counts printed every
 # run now carry both numbers side by side for this reason.
+# A SPELL A TOME TEACHES IS A SPELL AN ENCHANTER CAN LEARN, and so a staff
+# recipe whose only condition is that spell is one somebody can reach.
+#
+# Patrick, 28 September, answering issue #967: "Enchanters learn staff spells
+# from spell tomes". 160 of the Bladebinder's 161 recipes carry a HasSpell
+# condition naming the staff's own spell, and the fork evaluates it (function
+# index 264 against MpActor::GetSpellList). Reading a tome teaches the spell in
+# the engine for anybody, and game\gamemode.js (THE STAFF SPELLS) records it for
+# somebody who can make staves, and a staff is refused until its spell is
+# recorded. So a HasSpell row counts as reachable here when some BOOK record
+# with the teaches spell flag names that spell, and the tomes are written into
+# the needs list (taughtBy) and into the STAFF_SPELLS block the gamemode reads.
+# A spell no tome teaches (the NPC copies some Apocalypse staves name) leaves
+# its row closed, and the run prints every one of them.
+#
+# Set this to $false and a HasSpell row is closed again whatever teaches it,
+# which puts the Bladebinder back in HALVES_NOBODY_CAN_START.
+$TOMES_TEACH_STAFF_SPELLS = $true
+# The BOOK DATA flag bit that says the tome teaches a spell: TeachesSpell = 0x04
+# in libespm/include/libespm/BOOK.h.
+$BOOK_TEACHES_SPELL = 0x04
+# The HasSpell condition function index, CONDITION_FUNCTIONS_THE_SERVER_HAS.
+$CONDITION_HAS_SPELL = 264
+
 $HALVES_NOBODY_CAN_START = [ordered]@{
     'Cook/Confectioner'     = 'every one of its 28 recipes carries two vanilla perk conditions, function index 448: MAG_FoodUpgradePerk03 out of Gourmet.esp on all 28, and a second perk named for the recipe itself, MAG_RecipePerkSnowberryDumpling and its like, on all 28 as well. classes.md says no perk menu opens and vanilla progression is off, so nobody here will ever hold either. The server would wave the condition through, because the fork has no function for that index, but Skyrim''s own crafting menu evaluates it first and never lists the recipe, so onCraft is not even reached. The dessert keyword split is right and the half is real; what is missing is somebody deciding what a new Confectioner starts able to bake. Four of the 28 want an item on top of the perks.'
-    'Enchanter/Bladebinder' = '160 of its 161 recipes are the Dragonborn staff enchanter''s, and every one of those 160 carries a HasSpell condition naming the staff''s own spell: Thunderbolt, Turn Undead, the Odin wall spells. That one the server really does evaluate, function index 264 against MpActor::GetSpellList in the fork, so it is refused twice over. A new Enchanter has no spells at all: classes.md gives starting spells to the Mage alone and says nothing is handed out at the start but the clothes you stand in. The 161st is DLC1LD_RecipeAetherialStaff, which wants the Aetherium Crest and is behind the Dawnguard chain that ends in one. So the half is 0 of 161 on the day somebody picks it and stays there until the apprenticeship system classes.md describes is built, or until somebody decides what spells an Enchanter starts holding.'
 }
 
 # WHEN A HALF IS THIN ENOUGH TO NAME OUT LOUD. A half with a handful of rows a
@@ -1955,6 +2037,11 @@ function RememberProducer([string]$desc, [string]$rank, [int]$at, [string]$who, 
     $take = $false
     if (-not $have) {
         $take = $true
+    } elseif ($CROP_COSTS_THE_FARMERS_RANK -and ($who -eq 'farmer' -or $have.Who -eq 'farmer')) {
+        # See CROP_COSTS_THE_FARMERS_RANK: the farmer's entry wins over any
+        # other class, and between two farmer entries the usual rule decides.
+        if ($who -eq 'farmer' -and $have.Who -ne 'farmer') { $take = $true }
+        elseif ($who -eq 'farmer' -and $have.Who -eq 'farmer' -and $at -lt $have.At) { $take = $true }
     } elseif ($PRODUCER_RANK_IS_LOWEST) {
         if ($at -lt $have.At) { $take = $true }
     } else {
@@ -1968,7 +2055,7 @@ function RememberProducer([string]$desc, [string]$rank, [int]$at, [string]$who, 
 }
 
 
-# THE STATIONS, READ OUT OF tools\gamemode.js. Argued for at STATION_VERBS: this
+# THE STATIONS, READ OUT OF game\gamemode.js. Argued for at STATION_VERBS: this
 # is a reader and not a copy, so the index cannot drift from what the server
 # actually hands over without the build saying so.
 #
@@ -2224,6 +2311,74 @@ function SecondRule([string]$key, $descs) {
     return (CountRungs $descs)
 }
 
+# The share RANK_SHARE gives one rung, 0.25 for novice and so on.
+function RungShare([int]$i) {
+    $lo = 0.0
+    if ($i -gt 0) { $lo = [double]$RANK_SHARE[$i - 1].Upto }
+    return ([double]$RANK_SHARE[$i].Upto - $lo)
+}
+
+# THE ONE RUNG HOLE FILL, argued for at HOLE_FILL_MOVES_ONE_RUNG. Moves rows
+# from the rung next to each hole into it, never a row more than one rung and
+# never a pinned row. Returns the list of moves when every hole is closed. When
+# it cannot close them all it puts every row back as it found it and returns
+# $null, and the caller goes on to the second rule.
+function FillHolesOneRung($descs) {
+    $saved = @{}
+    foreach ($d in $descs) { $saved[$d] = @($owned[$d].Rank, $owned[$d].RankFrom, $owned[$d].RankWhy) }
+    $moved = @{}
+    $moves = New-Object 'System.Collections.Generic.List[string]'
+    for ($round = 0; $round -lt ($RANKS.Count * 2); $round++) {
+        $counts = CountRungs $descs
+        $hole = HoleIn $counts
+        if ($hole -lt 0) { return ,($moves.ToArray()) }
+        $took = $false
+        foreach ($from in @(($hole + 1), ($hole - 1))) {
+            if ($from -lt 0 -or $from -ge $RANKS.Count) { continue }
+            $total = [int]$counts[$RANKS[$from]]
+            if ($total -lt 2) { continue }
+            $pool = @($descs | Where-Object {
+                [string]$owned[$_].Rank -eq $RANKS[$from] -and -not $owned[$_].Pinned -and -not $moved.ContainsKey($_)
+            })
+            if ($pool.Count -eq 0) { continue }
+            $take = [int][math]::Floor($total * (RungShare $hole) / ((RungShare $hole) + (RungShare $from)))
+            if ($take -lt 1) { $take = 1 }
+            if ($take -gt ($total - 1)) { $take = $total - 1 }
+            if ($take -gt $pool.Count) { $take = $pool.Count }
+            $down = ($from -gt $hole)
+            # A row whose input cost is already at or past the hole loses
+            # nothing by moving, so those go first. Then the cheapest when the
+            # move is down and the dearest when it is up, then the id so the
+            # order is total and the build is the same every run.
+            $order = @($pool | Sort-Object `
+                @{ Expression = {
+                    $ir = RankAt ([string]$owned[$_].InputRank)
+                    if ($ir -lt 0) { 0 } elseif ($down -and $ir -le $hole) { 0 } elseif ((-not $down) -and $ir -ge $hole) { 0 } else { 1 }
+                } }, `
+                @{ Expression = { if ($down) { [int64]$owned[$_].Value } else { -[int64]$owned[$_].Value } } }, `
+                @{ Expression = { [int](SecondRuleKey $owned[$_]) } }, `
+                @{ Expression = { [string]$_ } })
+            for ($t = 0; $t -lt $take; $t++) {
+                $d = $order[$t]
+                $owned[$d].Rank = $RANKS[$hole]
+                $owned[$d].RankFrom = ('moved one rung from ' + $RANKS[$from] + ' to fill an empty ' + $RANKS[$hole] + ' rung, after ' + $saved[$d][1])
+                $owned[$d].RankWhy = ($saved[$d][2] + '. Then moved one rung, ' + $RANKS[$from] + ' to ' + $RANKS[$hole] +
+                                      ', because the ' + $RANKS[$hole] + ' rung of this half was empty with work above it (HOLE_FILL_MOVES_ONE_RUNG)')
+                $moved[$d] = $true
+                $moves.Add(('{0} ({1}), {2} to {3}' -f $owned[$d].Edid, $owned[$d].OutName, $RANKS[$from], $RANKS[$hole]))
+            }
+            $took = $true
+            break
+        }
+        if (-not $took) { break }
+    }
+    if ((HoleIn (CountRungs $descs)) -lt 0) { return ,($moves.ToArray()) }
+    foreach ($d in $descs) {
+        $owned[$d].Rank = $saved[$d][0]; $owned[$d].RankFrom = $saved[$d][1]; $owned[$d].RankWhy = $saved[$d][2]
+    }
+    return $null
+}
+
 # The number the second rule sorts on, and the other one, so that changing
 # SECOND_RULE_KEY changes both in one place.
 function SecondRuleKey($row) {
@@ -2450,12 +2605,20 @@ $OUTPUT_TYPES = @('ARMO', 'WEAP', 'ALCH', 'MISC', 'INGR', 'AMMO', 'BOOK', 'SCRL'
 # of a number, which the flag bit 0x04 says. Everything else a condition can
 # name, a book or an ingot or a piece of armour, is already in $OUTPUT_TYPES.
 $CONDITION_TYPES = @('PERK', 'SPEL', 'GLOB')
-$SCAN_TYPES = @('KYWD', 'COBJ') + $OUTPUT_TYPES + $CONDITION_TYPES
+# MGEF is read for one thing: the school and rank of the spell a staff binds
+# (issue #1128, an Enchanter's staff spells unlock by rank). A SPEL record's
+# SPIT names its half cost perk, whose editor id says both (DestructionAdept50),
+# and failing that its effects say them: MGEF DATA int32 at offset 12 is the
+# magic skill and uint32 at offset 40 the minimum level. The same reading the
+# gamemode's spell tomes block does at runtime. Kept in $mgefs, not $items.
+$SCAN_TYPES = @('KYWD', 'COBJ') + $OUTPUT_TYPES + $CONDITION_TYPES + @('MGEF')
 
 # desc -> the record, last one in the load order wins, because that is the
 # record the game is using
 $items   = @{}
 $kwName  = @{}
+# MGEF desc -> { Skill, Level }, for the staff spells' school and rank (#1128).
+$mgefs   = @{}
 # item desc -> which class produces it, at the lowest rank any of them does.
 # Filled under 'what an input costs a producer', below, out of the five
 # producing tables and the server's own verbs. Declared here because InputsJson
@@ -2520,6 +2683,12 @@ foreach ($pl in $order) {
                     $alchFlags = 0
                     $hasEnit = $false
                     $weapAnim = -1
+                    $teaches = ''
+                    # SPEL: the half cost perk (SPIT at 32) and the effects
+                    # (EFID); MGEF: the skill and minimum level. #1128.
+                    $spit = 0
+                    $efids = New-Object 'System.Collections.Generic.List[uint32]'
+                    $mgefSkill = -1; $mgefLevel = -1
                     $cnam = 0; $hasCnam = $false
                     $bnam = 0; $hasBnam = $false
                     $nam1 = 1
@@ -2574,6 +2743,23 @@ foreach ($pl in $order) {
                             # the first byte of a WEAP DNAM is the animation
                             # type, which is what tells a bow from a sword
                             $weapAnim = [int]$rec[$k]
+                        } elseif ($sub -eq 'DATA' -and $label -eq 'BOOK' -and $sz -ge 8) {
+                            # BOOK DATA: the flag byte, then at offset 4 the
+                            # spell a tome teaches when flag 0x04 (TeachesSpell
+                            # in libespm's BOOK.h) is set. SpellTomeThunderbolt
+                            # reads 4 and 0x10f7ee, which is Thunderbolt. Read
+                            # for issue #967: an Enchanter learns a staff's
+                            # spell from the tome that teaches it.
+                            if (([int]$rec[$k] -band $BOOK_TEACHES_SPELL) -ne 0) {
+                                $teaches = DescOf ([BitConverter]::ToUInt32($rec, $k + 4)) $masters $pl
+                            }
+                        } elseif ($label -eq 'SPEL' -and $sub -eq 'SPIT' -and $sz -ge 36) {
+                            $spit = [BitConverter]::ToUInt32($rec, $k + 32)
+                        } elseif ($label -eq 'SPEL' -and $sub -eq 'EFID' -and $sz -ge 4) {
+                            $efids.Add([BitConverter]::ToUInt32($rec, $k))
+                        } elseif ($label -eq 'MGEF' -and $sub -eq 'DATA' -and $sz -ge 44) {
+                            $mgefSkill = [BitConverter]::ToInt32($rec, $k + 12)
+                            $mgefLevel = [int64][BitConverter]::ToUInt32($rec, $k + 40)
                         } elseif ($label -eq 'COBJ') {
                             if ($sub -eq 'CNAM' -and $sz -eq 4) { $cnam = [BitConverter]::ToUInt32($rec, $k); $hasCnam = $true }
                             elseif ($sub -eq 'BNAM' -and $sz -eq 4) { $bnam = [BitConverter]::ToUInt32($rec, $k); $hasBnam = $true }
@@ -2665,12 +2851,19 @@ foreach ($pl in $order) {
                         $here++
                         if (-not $perPluginRecipes.ContainsKey($pl)) { $perPluginRecipes[$pl] = 0 }
                         $perPluginRecipes[$pl] = $perPluginRecipes[$pl] + 1
+                    } elseif ($label -eq 'MGEF') {
+                        $mgefs[$desc] = [pscustomobject]@{ Skill = $mgefSkill; Level = $mgefLevel }
                     } else {
                         if (-not $full) { $full = $edid; $fullFrom = 'the editor id' }
+                        $spitDesc = ''
+                        if ($spit -ne 0) { $spitDesc = DescOf ([uint32]$spit) $masters $pl }
+                        $efidDescs = @()
+                        foreach ($e in $efids) { if ($e -ne 0) { $efidDescs += (DescOf ([uint32]$e) $masters $pl) } }
                         $items[$desc] = [pscustomobject]@{
                             Desc = $desc; Type = $label; Edid = $edid; Name = $full; NameFrom = $fullFrom
                             AlchFlags = $alchFlags; HasEnit = $hasEnit; WeapAnim = $weapAnim
                             Keywords = $kwds.ToArray(); SeenIn = $pl; Value = $value
+                            Teaches = $teaches; Spit = $spitDesc; Efids = $efidDescs
                         }
                         if ($label -eq 'KYWD') { $kwName[$desc] = $edid }
                     }
@@ -2686,6 +2879,20 @@ foreach ($pl in $order) {
 Ok ("{0} recipes after overrides, out of {1} COBJ records read" -f $recipes.Count, ($recipes.Count + $seenTwice.Count))
 Ok ("{0} item and keyword records to resolve against, {1} of them keywords" -f $items.Count, $kwName.Count)
 if ($recipes.Count -eq 0) { Bad 'no COBJ records found at all, which means the load order or the Data folder is not what this thinks it is' }
+
+# Spell desc -> every spell tome that teaches it, sorted so two runs agree.
+# Read out of the BOOK records the scan above kept, last one in the load order
+# winning as everywhere else. TOMES_TEACH_STAFF_SPELLS says why (#967).
+$tomesBySpell = @{}
+foreach ($d in @($items.Keys | Sort-Object)) {
+    $it = $items[$d]
+    if ($it.Type -ne 'BOOK' -or -not $it.Teaches) { continue }
+    if (-not $tomesBySpell.ContainsKey($it.Teaches)) { $tomesBySpell[$it.Teaches] = New-Object 'System.Collections.Generic.List[string]' }
+    $tomesBySpell[$it.Teaches].Add($d)
+}
+$tomeCount = 0
+foreach ($s in $tomesBySpell.Keys) { $tomeCount += $tomesBySpell[$s].Count }
+Ok ("{0} spell tome(s) teaching {1} spell(s)" -f $tomeCount, $tomesBySpell.Count)
 
 # --------------------------------------------------------------- the split --
 
@@ -2908,11 +3115,36 @@ function ConditionRead($cond, $masters, [string]$plugin) {
     $text = $name
     if ($what) { $text += '(' + $what + ')' }
     $text += ' ' + $op + ' ' + $val
+    # The tomes that teach the spell a HasSpell names, for TOMES_TEACH_STAFF_SPELLS.
+    $tomes = @()
+    if ($idx -eq $CONDITION_HAS_SPELL -and $whatDesc -and $tomesBySpell.ContainsKey($whatDesc)) {
+        $tomes = $tomesBySpell[$whatDesc].ToArray()
+    }
     return [pscustomobject]@{
         Func = $idx; Name = $name; Text = $text
         Param = $what; ParamType = $whatType; ParamDesc = $whatDesc
         ServerSees = $serverSees
+        Tomes = $tomes
     }
+}
+
+# Can a new character get past every condition on a row. No condition at all
+# is the plain yes. Under TOMES_TEACH_STAFF_SPELLS a HasSpell whose spell a
+# tome teaches is also a yes, because the tome is how the spell is learned.
+function NeedsAreReachable($needs) {
+    foreach ($n in $needs) {
+        if ($TOMES_TEACH_STAFF_SPELLS -and $n.Func -eq $CONDITION_HAS_SPELL -and @($n.Tomes).Count -gt 0) { continue }
+        return $false
+    }
+    return $true
+}
+
+# The spell a row's HasSpell names, or '' when it has none.
+function StaffSpellOf($row) {
+    foreach ($n in $row.Needs) {
+        if ($n.Func -eq $CONDITION_HAS_SPELL -and $n.ParamDesc) { return [string]$n.ParamDesc }
+    }
+    return ''
 }
 
 $owned    = New-Object System.Collections.Specialized.OrderedDictionary
@@ -3232,7 +3464,11 @@ foreach ($desc in $recipes.Keys) {
         NameFrom = $o.NameFrom
         Value = $o.Value
         Needs = $needs.ToArray()
-        DayOne = ($needs.Count -eq 0)
+        DayOne = (NeedsAreReachable $needs)
+        # No condition at all. NOVICE_MUST_BE_REACHABLE ranks by this rather than
+        # by DayOne, so a staff opened by its tome (TOMES_TEACH_STAFF_SPELLS) does
+        # not move the Bladebinder's ladder that #398 set.
+        Bare = ($needs.Count -eq 0)
         BehindVanillaPerk = $behindPerk
         ServerChecks = $serverChecks
         Rank = ''
@@ -3246,6 +3482,10 @@ foreach ($desc in $recipes.Keys) {
         # 'the dearest input is novice' means something different on a row where
         # that is the whole list and on a row with four unknowns beside it.
         InputsUnplaced = 0
+        # True for a row whose rank a rule set on purpose (the novice row a new
+        # character can reach, a rank named in RECIPE_RANK), which the one
+        # rung hole fill must never move. See HOLE_FILL_MOVES_ONE_RUNG.
+        Pinned = $false
     }
 }
 
@@ -4102,6 +4342,9 @@ $rankedByValue = @{}
 # totalled, because this number is the whole of the dragonbone defect.
 $heldByPrice = @{}
 $secondRuleUsed = [ordered]@{}
+# Per half: the rows HOLE_FILL_MOVES_ONE_RUNG moved, when it closed the half's
+# holes without the second rule. Written into the json beside secondRule.
+$oneRungFill = [ordered]@{}
 # Per half: the rungs that hold rows nobody at that rank can gather the makings
 # for. Written into the json so Check-Balance.ps1 reads the same finding off the
 # table rather than working it out a second way and disagreeing.
@@ -4197,7 +4440,8 @@ foreach ($p in $PROFESSIONS.Keys) {
             if (-not $inputDecides) {
                 $heldUpByPrice++
                 $owned[$d].RankFrom = ('what it sells for, held above what its placed inputs cost because ' + $unplaced +
-                                       ' of the things it asks for are produced by no class in this world and could cost anything')
+                                       ' of the things it asks for are produced by no class in this world and could cost anything. Kept on purpose: ' +
+                                       $UNPLACED_INPUT_KEPT_BECAUSE)
                 $owned[$d].RankWhy = ($owned[$d].RankWhy + '. The dearest input any class does produce is ' + $nameBest +
                                       ', ' + $RANKS[$best] + ' work for a ' + $whoBest + ', which is a floor and not the answer here')
                 continue
@@ -4223,13 +4467,14 @@ foreach ($p in $PROFESSIONS.Keys) {
         if ($NOVICE_MUST_BE_REACHABLE) {
             $firstOpen = ''
             foreach ($d in $sorted) {
-                if ($owned[$d].Fires -and $owned[$d].DayOne) { $firstOpen = $d; break }
+                if ($owned[$d].Fires -and $owned[$d].Bare) { $firstOpen = $d; break }
             }
             if ($firstOpen -and $owned[$firstOpen].Rank -ne 'novice') {
                 $promoted.Add(("{0}: {1} ({2}), worth {3}, was {4} and is the cheapest row of this half anybody can reach on the day they pick it" -f `
                                $key, $owned[$firstOpen].Edid, $owned[$firstOpen].OutName, $owned[$firstOpen].Value, $owned[$firstOpen].Rank))
                 $owned[$firstOpen].Rank = 'novice'
                 $owned[$firstOpen].RankWhy = 'the cheapest row of this half that a new character can reach, moved to novice so the half has a way in'
+                $owned[$firstOpen].Pinned = $true
             }
         }
 
@@ -4251,6 +4496,7 @@ foreach ($p in $PROFESSIONS.Keys) {
             $owned[$d].Rank = [string]$named.Rank
             $owned[$d].RankFrom = 'named outright in RECIPE_RANK'
             $owned[$d].RankWhy = [string]$named.Why
+            $owned[$d].Pinned = $true
             $namedRanks.Add(("{0}: {1} ({2}) is {3}. {4}" -f $key, $edid, $owned[$d].OutName, $named.Rank, $named.Why))
         }
 
@@ -4291,15 +4537,26 @@ foreach ($p in $PROFESSIONS.Keys) {
             $why = ('{0} row(s) ranked by what their inputs cost and {1} by what they sell for, and they land {2}. What is left to rank by is {3} distinct output price(s), {4} distinct input list length(s) and {5} distinct total input count(s)' -f `
                     $rankedByInputs[$key], $rankedByValue[$key], ($spreadTxt -join ', '), $vals.Keys.Count, $distinct.Keys.Count, $totals.Keys.Count)
             Loud ("{0}: the {1} rung is empty with rows above it. {2}" -f $key, $RANKS[$hole], $why)
-            $secondRuleUsed[$key] = ('the {0} rung came out empty with rows above it. {1}. Ranked by {2} for this half alone.' -f `
-                                     $RANKS[$hole], $why, $SECOND_RULE_KEY)
-            $counts = SecondRule $key $sorted
-            $hole = HoleIn $counts
-            if ($hole -ge 0) {
-                Bad ("{0}: the {1} rung is still empty after the {2} rule, so this half has no ladder and the table was not written" -f `
-                     $key, $RANKS[$hole], $SECOND_RULE_KEY)
+            $filled = $null
+            if ($HOLE_FILL_MOVES_ONE_RUNG) { $filled = FillHolesOneRung $sorted }
+            if ($null -ne $filled) {
+                $oneRungFill[$key] = @($filled)
+                $counts = CountRungs $sorted
+                $hole = HoleIn $counts
+                Loud ("  {0}: {1} row(s) moved one rung each and every rung now has work on it (HOLE_FILL_MOVES_ONE_RUNG)" -f $key, @($filled).Count)
+                foreach ($mv in @($filled | Select-Object -First 10)) { Loud ("    " + $mv) }
+                if (@($filled).Count -gt 10) { Loud ("    ... and {0} more, each one's rankFrom in the json says so" -f (@($filled).Count - 10)) }
             } else {
-                Loud ("  {0}: ranked by {1} instead, and every rung now has work on it" -f $key, $SECOND_RULE_KEY)
+                $secondRuleUsed[$key] = ('the {0} rung came out empty with rows above it. {1}. Ranked by {2} for this half alone.' -f `
+                                         $RANKS[$hole], $why, $SECOND_RULE_KEY)
+                $counts = SecondRule $key $sorted
+                $hole = HoleIn $counts
+                if ($hole -ge 0) {
+                    Bad ("{0}: the {1} rung is still empty after the {2} rule, so this half has no ladder and the table was not written" -f `
+                         $key, $RANKS[$hole], $SECOND_RULE_KEY)
+                } else {
+                    Loud ("  {0}: ranked by {1} instead, and every rung now has work on it" -f $key, $SECOND_RULE_KEY)
+                }
             }
         }
 
@@ -4743,7 +5000,7 @@ $doc.Add('  "readFrom": ' + (JsonStr 'BNAM is the workbench keyword, CNAM is the
 $doc.Add('  "event": ' + (JsonStr 'mp.onCraft(actorFormId, craftedItemBaseId, count, recipeId). All four arguments are numbers. The keys of this table are desc strings, so look a row up with RECIPES_BY_ID[mp.getDescFromId(recipeId)] and never with recipeId itself, which matches nothing. Returning false refuses the craft outright: CraftEvent::OnFireSuccess is what removes the inputs and adds the output, and GameModeEvent::Fire only calls it when nobody blocked.') + ',')
 $doc.Add('  "key": ' + (JsonStr 'the recipe''s form id in lower case hex, a colon, and the file it belongs to. mp.getDescFromId turns onCraft''s fourth argument into one.') + ',')
 $doc.Add('  "rank": ' + (JsonStr 'which of classes.md''s four ranks the row asks for: novice, advanced, expert or master. Ranked by WHAT ITS INPUTS COST A PRODUCER, taking the dearest thing it asks for, because that is the rung somebody has to have reached before they could gather the makings at all. Where part of the list is produced by nobody, that dearest placed input is a FLOOR and not the answer: it can raise the row above what the output sells for and never lower it, because an item nothing produces is an unknown cost rather than a free one. A row whose inputs no class produces at all falls back to what the output sells for, ranked inside its own half. rankFrom says which of the three answered. classes.md sets no numbers for any of this and nothing in the game records ranks a recipe, so every judgement is a knob at the top of the script: RANK_FROM_INPUT_COST, PRODUCER_TABLES, SERVER_PRODUCERS, PRODUCER_RANK_IS_LOWEST, INPUT_RANK_IS_THE_DEAREST, UNPLACED_INPUT_RULE, RANK_SHARE and SECOND_RULE_KEY.') + ',')
-$doc.Add('  "inputItems": ' + (JsonStr 'every CNTO the record carried: what the recipe wants, how many, and which class produces that item at which rank. producedBy is the class that gets it at the LOWEST rank, because that is what the thing costs to get hold of; alsoProducedBy, where it is present, is every OTHER class that produces the same item, at the rank that class produces it at, whether that is higher than producedAt or exactly level with it. A tied class was dropped from this field until 21 September, which made the farmer invisible for wheat in every consumer of this file. producedBy null means nothing in this repository hands that item over: no table in this folder and no verb in tools\gamemode.js. Read out of the recipe''s own CNTO subrecords, eight bytes each, a form id then a count.') + ',')
+$doc.Add('  "inputItems": ' + (JsonStr 'every CNTO the record carried: what the recipe wants, how many, and which class produces that item at which rank. producedBy is the class that gets it at the LOWEST rank, because that is what the thing costs to get hold of; alsoProducedBy, where it is present, is every OTHER class that produces the same item, at the rank that class produces it at, whether that is higher than producedAt or exactly level with it. A tied class was dropped from this field until 21 September, which made the farmer invisible for wheat in every consumer of this file. producedBy null means nothing in this repository hands that item over: no table in this folder and no verb in game\gamemode.js. Read out of the recipe''s own CNTO subrecords, eight bytes each, a form id then a count.') + ',')
 $doc.Add('  "suppliedBy": ' + (JsonStr 'on each input beside producedBy, and a different question: producedBy is the class that digs it out of the ground, and suppliedBy is the class the input rests on however many benches away it is. Steel Ingot reads producedBy null and suppliedBy miner, because a smelter row makes it out of ore. hops is how many recipes stand between the class and the input, 0 for handed straight over and 1 for a smelter or a tanning rack away, and suppliedVia names the recipe of the last of those steps. suppliedBy null means nothing in this world supplies it at all, directly or through any bench: it is bought, looted or dropped. What ranks a row is suppliedAt and not producedAt.') + ',')
 $doc.Add('  "theHop": ' + (JsonStr 'how suppliedBy is worked out. An input that is itself the output of a recipe costs what that recipe''s dearest input costs, taken over all 5116 recipes and not just the 3437 with an owner, because the smelter and the tanning rack are among the 1679 nobody owns. It is a fixpoint: every item starts unknown, every recipe is asked again each round, and a cost only ever moves from unknown to a rank or from a rank to a cheaper one, so it settles, and it settles in three rounds on this build. A recipe says nothing about its output while any part of its own list is unknown, for the reason written at UNPLACED_INPUT_RULE. A row that turns a finished good back into stock, a fur hood into a Steel Ingot, is a refund and not a source and sets nothing; 1072 rows have that shape.') + ',')
 $doc.Add('  "inputsWithNoProducer": ' + (JsonStr 'how many of the row''s inputs nothing in this repository produces. Read it with inputRank: "the dearest input is novice" means one thing on a row where that is the whole list and another on a row with four unknowns beside it, and not reading it is how a 3100 gold dragonbone plate went out at novice on 21 September off one novice hunter''s fox pelt.') + ',')
@@ -4862,6 +5119,9 @@ foreach ($k in $keys) {
             ', "craftsAtAll": ' + $craftsTxt +
             ', "offerInCharacterCreation": true'
     if ($secondRuleUsed.Contains($k)) { $line += ', "secondRule": ' + (JsonStr $secondRuleUsed[$k]) }
+    if ($oneRungFill.Contains($k)) {
+        $line += ', "movedOneRung": ' + (JsonStr (('{0} row(s) moved one rung each to fill an empty rung, HOLE_FILL_MOVES_ONE_RUNG: ' -f @($oneRungFill[$k]).Count) + (@($oneRungFill[$k]) -join '; ')))
+    }
     if ($unstandable.Contains($k)) {
         $line += ', "rungsNobodyCanGatherFor": ' + (JsonStr $unstandable[$k])
         if ($HALVES_WITH_AN_UNSTANDABLE_RUNG.Contains($k)) {
@@ -4893,9 +5153,17 @@ foreach ($desc in $owned.Keys) {
         foreach ($nd in $r.Needs) {
             $sees = 'false'
             if ($nd.ServerSees) { $sees = 'true' }
+            # A HasSpell also says which spell record it is and which tomes
+            # teach it (TOMES_TEACH_STAFF_SPELLS). Nothing else grows a field.
+            $spellTxt = ''
+            if ($nd.Func -eq $CONDITION_HAS_SPELL) {
+                $tomeBits = @()
+                foreach ($tm in @($nd.Tomes)) { $tomeBits += (JsonStr $tm) }
+                $spellTxt = ', "ofDesc": ' + (JsonStr $nd.ParamDesc) + ', "taughtBy": [' + ($tomeBits -join ', ') + ']'
+            }
             $bits += ('{ "asks": ' + (JsonStr $nd.Text) + ', "function": ' + $nd.Func +
                       ', "of": ' + (JsonStr $nd.Param) + ', "ofType": ' + (JsonStr $nd.ParamType) +
-                      ', "serverSees": ' + $sees + ' }')
+                      ', "serverSees": ' + $sees + $spellTxt + ' }')
         }
         $needsTxt = '[' + ($bits -join ', ') + ']'
     }
@@ -4973,13 +5241,112 @@ foreach ($desc in $owned.Keys) {
     $r = $owned[$desc]
     $dayOneTxt = 'false'
     if ($r.DayOne) { $dayOneTxt = 'true' }
+    # The spell a staff binds, on the rows that have one, for the gamemode's
+    # staff gate (STAFF_SPELLS below). Every other row is unchanged.
+    $spellTxt = ''
+    $rowSpell = StaffSpellOf $r
+    if ($rowSpell) { $spellTxt = ', "spell": ' + (JsonStr $rowSpell) }
     $blockRows.Add('    ' + (JsonStr $desc) + ': { "out": ' + (JsonStr $r.OutDesc) + ', "name": ' + (JsonStr $r.OutName) +
                    ', "type": ' + (JsonStr $r.OutType) + ', "makes": ' + $r.Count +
                    ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) +
                    ', "race": ' + (JsonStr $r.Race) +
                    ', "rank": ' + (JsonStr $r.Rank) + ', "family": ' + (JsonStr $r.Family) +
-                   ', "open": ' + $dayOneTxt + ' },')
+                   ', "open": ' + $dayOneTxt + $spellTxt + ' },')
 }
+
+# THE STAFF SPELLS, the second block this script owns in game\gamemode.js
+# (issue #967). Spell desc -> its name and every tome that teaches it, for each
+# spell a staff recipe the server is asked about names in a HasSpell. The
+# gamemode reads a tome off onReadBook against it and a staff off onCraft.
+$staffSpells = [ordered]@{}
+foreach ($desc in $owned.Keys) {
+    $r = $owned[$desc]
+    if (-not $r.Fires) { continue }
+    foreach ($n in $r.Needs) {
+        if ($n.Func -ne $CONDITION_HAS_SPELL -or -not $n.ParamDesc) { continue }
+        if ($staffSpells.Contains($n.ParamDesc)) { continue }
+        $sname = $n.Param
+        if ($items.ContainsKey($n.ParamDesc) -and $items[$n.ParamDesc].Name) { $sname = $items[$n.ParamDesc].Name }
+        $staffSpells[$n.ParamDesc] = [pscustomobject]@{ Name = $sname; Edid = $n.Param; Tomes = @($n.Tomes) }
+    }
+}
+# THE SCHOOL AND RANK OF A STAFF SPELL (#1128). An Enchanter unlocks staff
+# spells by rank, so each one needs its rank. Read the way the gamemode's spell
+# tomes block reads a tome's spell: the SPEL's half cost perk, whose editor id
+# names both (DestructionAdept50, AlterationNovice00), and failing that the
+# highest minimum level among its effects of the five schools. Skyrim's levels
+# to ranks as the rulebook sorts them: 0 Novice, 25 Apprentice and 50 Adept are
+# Advanced, 75 Expert, 100 Master. The gamemode still prefers the rulebook's own
+# rank for a spell its SPELLS lists.
+$SPELL_AV_SCHOOL = @{ 18 = 'alteration'; 19 = 'conjuration'; 20 = 'destruction'; 21 = 'illusion'; 22 = 'restoration' }
+$SPELL_PERK_WORD = @{ novice = 'novice'; apprentice = 'advanced'; adept = 'advanced'; expert = 'expert'; master = 'master' }
+function StaffSchoolRank([string]$spellDesc) {
+    if (-not $items.ContainsKey($spellDesc)) { return $null }
+    $sp = $items[$spellDesc]
+    if ($sp.Spit -and $items.ContainsKey($sp.Spit)) {
+        $m = [regex]::Match([string]$items[$sp.Spit].Edid, '(alteration|conjuration|destruction|illusion|restoration)(novice|apprentice|adept|expert|master)', 'IgnoreCase')
+        if ($m.Success) {
+            return [pscustomobject]@{ School = $m.Groups[1].Value.ToLower(); Rank = $SPELL_PERK_WORD[$m.Groups[2].Value.ToLower()] }
+        }
+    }
+    $best = $null
+    foreach ($e in @($sp.Efids)) {
+        if (-not $mgefs.ContainsKey($e)) { continue }
+        $mg = $mgefs[$e]
+        if (-not $SPELL_AV_SCHOOL.ContainsKey([int]$mg.Skill) -or $mg.Level -lt 0) { continue }
+        if (-not $best -or $mg.Level -gt $best.Level) { $best = [pscustomobject]@{ School = $SPELL_AV_SCHOOL[[int]$mg.Skill]; Level = $mg.Level } }
+    }
+    if (-not $best) { return $null }
+    $rk = 'novice'
+    if ($best.Level -ge 100) { $rk = 'master' } elseif ($best.Level -ge 75) { $rk = 'expert' } elseif ($best.Level -ge 25) { $rk = 'advanced' }
+    return [pscustomobject]@{ School = $best.School; Rank = $rk }
+}
+$staffTaught = 0
+$staffUntaught = New-Object 'System.Collections.Generic.List[string]'
+$staffUnranked = New-Object 'System.Collections.Generic.List[string]'
+$staffByRank = [ordered]@{ novice = 0; advanced = 0; expert = 0; master = 0 }
+foreach ($k in $staffSpells.Keys) {
+    if ($staffSpells[$k].Tomes.Count -gt 0) { $staffTaught++ }
+    else { $staffUntaught.Add(('{0} ({1}, {2})' -f $staffSpells[$k].Name, $staffSpells[$k].Edid, $k)) }
+    $sr = StaffSchoolRank $k
+    $staffSpells[$k] | Add-Member -NotePropertyName School -NotePropertyValue $(if ($sr) { $sr.School } else { $null }) -Force
+    $staffSpells[$k] | Add-Member -NotePropertyName Rank -NotePropertyValue $(if ($sr) { $sr.Rank } else { $null }) -Force
+    if ($sr) { $staffByRank[$sr.Rank] = $staffByRank[$sr.Rank] + 1 }
+    else { $staffUnranked.Add(('{0} ({1}, {2})' -f $staffSpells[$k].Name, $staffSpells[$k].Edid, $k)) }
+}
+Write-Host ''
+Write-Host 'the staff spells' -ForegroundColor Cyan
+Ok ("{0} spell(s) named by staff recipes, {1} of them taught by a tome" -f $staffSpells.Count, $staffTaught)
+Ok ("ranks read out of the records: novice {0}, advanced {1}, expert {2}, master {3}" -f $staffByRank['novice'], $staffByRank['advanced'], $staffByRank['expert'], $staffByRank['master'])
+if ($staffUntaught.Count -gt 0) {
+    Note ("{0} no tome teaches, so only an Enchanter can unlock them:" -f $staffUntaught.Count)
+    foreach ($u in $staffUntaught) { Note ('    ' + $u) }
+}
+if ($staffUnranked.Count -gt 0) {
+    Loud ("{0} have no school and rank the records say, so nobody can unlock them:" -f $staffUnranked.Count)
+    foreach ($u in $staffUnranked) { Note ('    ' + $u) }
+}
+$staffLines = New-Object 'System.Collections.Generic.List[string]'
+$staffLines.Add('  /* Built by scripts\dev\Build-RecipeTable.ps1 out of the game''s own records. Do not hand edit.')
+$staffLines.Add('     ' + $staffSpells.Count + ' spells a staff recipe binds, ' + $staffTaught + ' of them taught by a spell tome.')
+$staffLines.Add('     Spell desc -> its name, its school and rank read out of the records (#1128; null when they cannot be),')
+$staffLines.Add('     and every BOOK record whose teaches spell flag names it. */')
+$staffLines.Add('  var STAFF_SPELLS = {')
+$sn = 0
+foreach ($k in $staffSpells.Keys) {
+    $sn++
+    $comma = ','
+    if ($sn -eq $staffSpells.Count) { $comma = '' }
+    $tb = @()
+    foreach ($tm in $staffSpells[$k].Tomes) { $tb += (JsonStr $tm) }
+    $schTxt = 'null'
+    if ($staffSpells[$k].School) { $schTxt = JsonStr $staffSpells[$k].School }
+    $rkTxt = 'null'
+    if ($staffSpells[$k].Rank) { $rkTxt = JsonStr $staffSpells[$k].Rank }
+    $staffLines.Add('    ' + (JsonStr $k) + ': { "name": ' + (JsonStr $staffSpells[$k].Name) + ', "school": ' + $schTxt +
+                    ', "rank": ' + $rkTxt + ', "tomes": [' + ($tb -join ', ') + '] }' + $comma)
+}
+$staffLines.Add('  };')
 # And the refused rows, which carry a sentence instead of an owner. The gate
 # reads nobody before it reads anything else, so these never reach a question
 # about profession or rank: there is no rank at which a nail becomes useful.
@@ -5002,10 +5369,12 @@ if ($blockRows.Count -gt 0) {
 $ruleInput = 0
 $rulePrice = 0
 $ruleSecond = 0
+$ruleMoved = 0
 foreach ($desc in $owned.Keys) {
     if (-not $owned[$desc].Fires) { continue }
     $rf = [string]$owned[$desc].RankFrom
     if ($rf.StartsWith('the second rule')) { $ruleSecond++ }
+    elseif ($rf.StartsWith('moved one rung')) { $ruleMoved++ }
     elseif ($rf.StartsWith('what its inputs cost')) { $ruleInput++ }
     else { $rulePrice++ }
 }
@@ -5013,7 +5382,7 @@ $secondRuleHalves = @($secondRuleUsed.Keys)
 
 $lines = New-Object 'System.Collections.Generic.List[string]'
 $lines.Add('  /* Built by scripts\dev\Build-RecipeTable.ps1 out of the game''s own records. Do not hand edit.')
-$lines.Add('     ' + $blockRows.Count + ' crafting recipes, out of ' + ($owned.Count + $unowned.Count) + ' in tools\recipes.json.')
+$lines.Add('     ' + $blockRows.Count + ' crafting recipes, out of ' + ($owned.Count + $unowned.Count) + ' in game\data\recipes.json.')
 $lines.Add('')
 $lines.Add('     Recipe desc -> what it makes, what kind of record that is, how many it')
 $lines.Add('     makes, which profession and which half of it owns the recipe, and which')
@@ -5045,10 +5414,14 @@ $lines.Add('     the shopping list is. That last rule is used for a whole half a
 if ($secondRuleHalves.Count -gt 0) {
     $lines.Add('     and only where the first two leave a rung with nothing on it, which here')
     $lines.Add('     is ' + ($secondRuleHalves -join ', ') + '. A rank there means how long the list is and')
-    $lines.Add('     nothing else, and the half says so in tools\recipes.json.')
+    $lines.Add('     nothing else, and the half says so in game\data\recipes.json.')
 } else {
     $lines.Add('     and only where the first two leave a rung with nothing on it, which no')
     $lines.Add('     half in this build did.')
+}
+if ($ruleMoved -gt 0) {
+    $lines.Add('     ' + $ruleMoved + ' more row(s) were moved one rung, and no further, to fill an empty')
+    $lines.Add('     rung without the second rule: ' + (@($oneRungFill.Keys) -join ', ') + '.')
 }
 $lines.Add('     Every row carries rankFrom in game\data\recipes.json saying which of the')
 $lines.Add('     three answered for it. Nothing in here is the script''s opinion of what a')
@@ -5069,6 +5442,9 @@ $lines.Add('     open is true when the recipe carries no condition of its own. A
 $lines.Add('     with open false needs something first, an item, a spell or a vanilla')
 $lines.Add('     perk nobody here can hold, and Skyrim''s own crafting menu decides that')
 $lines.Add('     before the server is ever asked. game\data\recipes.json says which.')
+$lines.Add('     A staff whose one condition is a spell some tome teaches is open too:')
+$lines.Add('     the tome is how an Enchanter learns it, and spell names that spell''s')
+$lines.Add('     desc for the staff gate, which reads STAFF_SPELLS below.')
 $lines.Add('')
 $lines.Add('     A recipe id that is not in here is one nobody owns and anybody may')
 $lines.Add('     make. Tempering is not in here either: the server is never asked about')
@@ -5083,7 +5459,7 @@ $literal = $lines -join [Environment]::NewLine
 # ---------------------------------------------------------------- install --
 #
 # The gamemode carries the table, because the server is deployed as one file and
-# cannot read tools\recipes.json. Nothing hand edits that block: this writes it
+# cannot read game\data\recipes.json. Nothing hand edits that block: this writes it
 # between its own markers, the way the ore table does. -NoInstall prints it and
 # leaves the file alone, and so does a gamemode.js that has no markers yet: this
 # never invents a place to put it.
@@ -5123,6 +5499,22 @@ if (-not $NoInstall -and $fail -eq 0) {
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} recipes and the comment over them into the RECIPES_BY_ID block of {1}" -f $blockRows.Count, $gm)
         }
+        # The staff spells, between their own markers, the same way.
+        $text = [System.IO.File]::ReadAllText($gm)
+        $sOpen  = '  // ==== STAFF_SPELLS ===='
+        $sClose = '  // ==== end STAFF_SPELLS ===='
+        $a = $text.IndexOf($sOpen)
+        $b = $text.IndexOf($sClose)
+        if ($a -lt 0 -or $b -lt 0 -or $b -lt $a) {
+            Note ("there is no STAFF_SPELLS block in {0}, so the staff spells were not written into it." -f $gm)
+        } else {
+            $body = New-Object 'System.Collections.Generic.List[string]'
+            $body.Add($sOpen)
+            foreach ($l in $staffLines) { $body.Add($l) }
+            $new = $text.Substring(0, $a) + (($body -join "`r`n")) + "`r`n" + $text.Substring($b)
+            [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
+            Ok ("wrote {0} staff spells into the STAFF_SPELLS block of {1}" -f $staffSpells.Count, $gm)
+        }
     }
 }
 
@@ -5132,7 +5524,7 @@ $head = [Math]::Min($lines.Count, 24)
 for ($z = 0; $z -lt $head; $z++) { Write-Host $lines[$z] }
 if ($lines.Count -gt $head) { Note ("... and {0} more lines. -JsOut writes the whole block to a file." -f ($lines.Count - $head)) }
 if ($JsOut) {
-    [System.IO.File]::WriteAllText($JsOut, $literal, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($JsOut, $literal + [Environment]::NewLine + ($staffLines -join [Environment]::NewLine), (New-Object System.Text.UTF8Encoding($false)))
     Write-Host ''
     Ok "wrote $JsOut"
 }

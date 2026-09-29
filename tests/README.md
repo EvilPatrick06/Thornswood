@@ -6,7 +6,8 @@ Every `test-*.js` and `test-*.ps1` here checks one thing the scripts, the
 launcher, the plugins, the gamemode or the site promise, by reading the files
 or by running a piece of them against a scratch copy. None of them talks to
 the VPS or to GitHub unless it says so at the top (`test-branch-rules.js
---live` is the one that does). The nightly checks (`.github/workflows/nightly.yml`) run every one of them
+--live` is one that does; `test-collection-revision-2.ps1` reads both
+servers' manifests over plain HTTP unless given `-Offline`). The nightly checks (`.github/workflows/nightly.yml`) run every one of them
 on the VPS each night and open an issue when one fails; on a pull request,
 run the ones your change touches yourself.
 
@@ -21,11 +22,12 @@ The voice service's own harnesses stay beside it in `voice\`, and the bot's in
 
 ## Where they look
 
-They moved here from `tools\` on 25 September (issue #440, phase 5). What they
-test did not move, so each one finds `tools\` from here: a `.js` harness through
-`TOOLS_DIR`, declared at its top as `..\tools`, and a `.ps1` harness through the
-line after its `$Here = $PSScriptRoot` that points `$Here` at `..\tools`. A new
-harness does the same; copying the top of an existing one is the easy way.
+They moved here from `tools\` on 25 September (issue #440, phase 5), and
+`tools\` itself went on 29 September (phase 10). Each one finds the repository
+folder from here, one folder up: a `.js` harness through `REPO_DIR`, declared at
+its top as `path.join(__dirname, '..')`, and a `.ps1` harness through the line
+after its `$Here = $PSScriptRoot` that points `$Here` at the repository folder.
+A new harness does the same; copying the top of an existing one is the easy way.
 
 ## Running them
 

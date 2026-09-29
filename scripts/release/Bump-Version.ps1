@@ -64,14 +64,17 @@ if ($To) {
 
 # ==== thornswood live version ====
 # THE NUMBER LIVE LAUNCHERS ALREADY HAVE, from the feed Ship publishes to:
-# version.json in Thornswood-Releases beside this repo, the place Ship reads it.
+# https://thornswood.net/feed/version.json, the feed every live launcher reads
+# (until #907 it was read from the Thornswood-Releases clone beside this repo).
 # A hotfix moves that number on its own branch and main never hears of it. On
 # 25 September main said 1.1.92 while 1.1.94 was live, so the plain bump here
 # would have made 1.1.93. The updater takes a launcher only when its number is
 # higher, so nobody on 1.1.94 would ever have been given it, and nobody on dev
 # either, because a main release resets dev to match main. So the next number
 # is one above whichever is higher, and a -To at or below the live one is
-# refused. With no releases clone beside the repo it says so and goes on.
+# refused. When the live feed cannot be read it says so and goes on.
+# $env:THORNSWOOD_TEST_SITE_DIR names a folder standing in for the site's root
+# (Feed-Store.ps1); the tests use it, so nothing is fetched.
 function Compare-Ver([string]$a, [string]$b) {
   $x = @($a -split '\.' | ForEach-Object { [int]$_ })
   $y = @($b -split '\.' | ForEach-Object { [int]$_ })
@@ -83,12 +86,23 @@ function Compare-Ver([string]$a, [string]$b) {
   return 0
 }
 function Get-LiveLauncher([string]$repoDir) {
-  $f = Join-Path (Split-Path -Parent $repoDir) 'Thornswood-Releases\version.json'
-  if (-not (Test-Path -LiteralPath $f)) { return $null }
   $v = ''
-  try { $v = [string]((Get-Content -LiteralPath $f -Raw | ConvertFrom-Json).launcherVersion) } catch { }
+  $from = 'https://thornswood.net/feed/version.json'
+  try {
+    if ($env:THORNSWOOD_TEST_SITE_DIR) {
+      $from = Join-Path $env:THORNSWOOD_TEST_SITE_DIR 'feed\version.json'
+      if (-not (Test-Path -LiteralPath $from)) { return $null }
+      $json = [IO.File]::ReadAllText($from)
+    } else {
+      [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+      $wc = New-Object Net.WebClient
+      $wc.Headers['User-Agent'] = 'Thornswood-Bump'
+      try { $json = [Text.Encoding]::UTF8.GetString($wc.DownloadData($from)) } finally { $wc.Dispose() }
+    }
+    $v = [string]((($json -replace '^\uFEFF', '') | ConvertFrom-Json).launcherVersion)
+  } catch { return $null }
   if ($v -notmatch '^(\d+\.\d+\.\d+)') { return $null }
-  return @{ Version = $Matches[1]; From = $f }
+  return @{ Version = $Matches[1]; From = $from }
 }
 $live = Get-LiveLauncher $RepoDir
 if ($live) {
@@ -103,13 +117,12 @@ if ($live) {
     Write-Host ''
     Say ("  Updater.cs says $current, so the next would be $was, but live launchers already have " +
          $live.Version + ", and a launcher only takes a higher number. So it is $target.") 'Yellow'
-    Say ("  Read from " + $live.From + " as this machine has it; pull that clone first if a") 'DarkGray'
-    Say '  release went out from somewhere else.' 'DarkGray'
+    Say ("  Read from " + $live.From + ", the feed live launchers read.") 'DarkGray'
   }
 } else {
   Write-Host ''
-  Say ('  No Thornswood-Releases\version.json beside this repo, so this number is not checked against ' +
-       'what live launchers have. Ship reads the same file.') 'Yellow'
+  Say ('  The live feed could not be read, so this number is not checked against ' +
+       'what live launchers have. Ship reads the same feed.') 'Yellow'
 }
 # ==== end thornswood live version ====
 

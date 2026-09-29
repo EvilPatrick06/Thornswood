@@ -18,6 +18,8 @@
       .\Install-Voice.ps1              install and start it
       .\Install-Voice.ps1 -Restart     just restart it
       .\Install-Voice.ps1 -Remove      take it off again
+      .\Install-Voice.ps1 -PutBack     the files the last install replaced go
+                                       back in, checked; the task is left as is
       .\Install-Voice.ps1 -Auth on     require a join to prove itself
       .\Install-Voice.ps1 -ChatRange on   typed chat reaches only the people near
       .\Install-Voice.ps1 -TurnUrl turn:host:3478
@@ -30,7 +32,7 @@ param(
   # turns that check off, which is how this behaved before it existed.
   [string]$Site = 'https://thornswood.net',
     [string]$VpsHost  = '',
-    [string]$VpsUser  = 'Administrator',
+    [string]$VpsUser  = '',
     [string]$Root     = 'C:\Thornswood-Voice',
     [int]$Port        = 7778,
     # Which addresses the service answers on. Every interface is how this
@@ -66,20 +68,30 @@ param(
     [string]$TaskName = 'Thornswood Voice',
     [switch]$Restart,
     [switch]$Remove,
-    [switch]$NoPause
+    [switch]$NoPause,
+    # How long the new service has to answer with the build that was sent
+    # before the old files and the old task go back.
+    [int]$Wait = 30,
+    # Put the files the last install replaced back in, and send nothing.
+    [switch]$PutBack
 )
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
+. (Join-Path $Here 'Swap.ps1')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
 $target = "$VpsUser@$VpsHost"
+# Host key checking on (issue #450): ssh talks only to the box whose key
+# Setup-SshKey.ps1 wrote into known_hosts, checked against vps.json.
+$ssh = @('-o', 'StrictHostKeyChecking=yes')
 foreach ($t in 'ssh', 'scp') {
     if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
         Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client."
@@ -88,15 +100,28 @@ foreach ($t in 'ssh', 'scp') {
 
 if ($Remove) {
     Head 'Removing'
-    & ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue; Remove-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContinue; Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue; 'removed'`""
+    & ssh @ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue; Remove-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContinue; Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue; 'removed'`""
     Say 'Gone. The game server is untouched.' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
 }
 
+# What goes up is the voice artifact (issue #459, Artifact.ps1): the service
+# and its page as the commit holds them, in one zip named by commit and hash.
+# Built here, before anything asks the box what it runs, because a service,
+# page or log roller with uncommitted changes is refused with the box
+# untouched (#1121). Sent under "files" below.
+. (Join-Path $Here 'Artifact.ps1')
+$artifact = $null
+if (-not $PutBack -and -not $Remove -and -not $Restart) {
+    $artifact = New-ThornswoodArtifact -Component voice -RepoDir (Join-Path $Here '..\..') -Paths 'voice/voice-server.js', 'voice/public' `
+        -AlsoSends 'scripts/vps/Roll-Log.ps1'
+    Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
+}
+
 if ($Restart) {
     Head 'Restarting'
-    & ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Start-Sleep -Seconds 1; Start-ScheduledTask -TaskName '$TaskName'; 'restarted'`""
+    & ssh @ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Start-Sleep -Seconds 1; Start-ScheduledTask -TaskName '$TaskName'; 'restarted'`""
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
 }
@@ -154,52 +179,116 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
 }
 
 # ---------------------------------------------------------------- files -----
+# The voice artifact built above goes to the box's store first. The copies
+# below are from its folder. -PutBack builds and sends nothing.
 $src = Join-Path $Here '..\..\voice'
+if (-not $PutBack) {
+Send-ThornswoodArtifact -Artifact $artifact -Target $target -SshArgs $ssh
+$src = Join-Path $artifact.Folder 'voice'
+}
 foreach ($f in 'voice-server.js', 'public\index.html', 'public\voice.js') {
     if (-not (Test-Path -LiteralPath (Join-Path $src $f))) { Die "not found: $(Join-Path $src $f)" }
 }
 
-Head 'Copying'
-& ssh $target "powershell -NoProfile -Command `"New-Item -ItemType Directory -Force -Path '$Root\public' | Out-Null; 'ready'`""
-if ($LASTEXITCODE -ne 0) { Die "ssh exited with $LASTEXITCODE" }
+<#
+  STAGED, CHECKED, THEN SWAPPED, issue #446.
 
-& scp (Join-Path $src 'voice-server.js') "${target}:$($Root -replace '\\','/')/voice-server.js"
-if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
+  This used to copy voice-server.js and the page straight over the running
+  service, then stop it, re-register it and start it, and say "voice did not
+  come up" with nothing put back and an exit code of 0. The page changed under
+  everybody the moment it was copied, whatever the service did next.
 
-# The roller the task runs in front of the service. See Roll-Log.ps1 for why a
-# log cmd holds open can only be rolled at start.
-& scp (Join-Path $Here '..\vps\Roll-Log.ps1') "${target}:$($Root -replace '\\','/')/roll-log.ps1"
-if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
+  Now the four files go into $Root\.stage-<stamp> while the service runs, the
+  box checks them there (each by its hash, voice-server.js through
+  node --check), and nothing is stopped if that fails. Then Swap.ps1's service
+  swap stops it, renames them in (what they replace goes to
+  $Root\.prev-<stamp>), registers the task with this install's settings and
+  starts it, and asks /health for the build that was sent. If that is not what
+  answers, the old files go back, the task goes back exactly as it was
+  (exported before anything changed), and it is started again. -PutBack puts
+  the newest .prev folder back and leaves the task as it is.
+#>
+function Remote($script) {
+    $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+    $cmd = "powershell -NoProfile -EncodedCommand $e"
+    # Under the limit it goes on the command line, one round trip. Over it,
+    # the script goes as a file and is run from there: sshd on Windows hands
+    # the command to cmd.exe, which stops at 8,191 characters, and the install
+    # below has never fitted (measured 23 September, 24,350 on the wire). The
+    # path goes across bare, the form that runs under cmd.exe and Windows
+    # PowerShell alike, measured on 24 September.
+    if ($cmd.Length -le 6000) {
+        return & ssh @ssh $target $cmd 2>&1
+    }
+    $far = 'C:/Windows/Temp/thornswood-install-voice.ps1'
+    $tmp = [IO.Path]::GetTempFileName()
+    try {
+        Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
+        & scp @ssh $tmp "${target}:$far" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "could not send a script to $VpsHost" }
+        & ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
+        & ssh @ssh $target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
+    }
+    finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
+}
 
-# THE CHARACTER REGISTER IS GONE, 23 September, and so is the secret it used.
-#
-# The three routes it guarded, /whoami, /claim and /owners, refused every real
-# caller with 403, because each one required a password the launcher
-# deliberately never sent: Account.cs and CharSync.cs were written that way and
-# were themselves deleted on 20 September. They are out of voice-server.js now
-# along with owners.json, and tools\Characters.ps1, which existed only to read
-# them, went with them.
-#
-# Sending a secret that nothing reads is worse than sending nothing, so this
-# step is gone too. The service's own join tokens are signed with a key it
-# makes for itself in token-key.txt and have nothing to do with this.
-
-& scp (Join-Path $src 'public\index.html') "${target}:$($Root -replace '\\','/')/public/index.html"
-& scp (Join-Path $src 'public\voice.js') "${target}:$($Root -replace '\\','/')/public/voice.js"
-Say 'copied' 'Green'
+$rootFar   = $Root -replace '\\', '/'
+$stamp     = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stageName = '.stage-' + $stamp
+$prevName  = '.prev-' + $stamp
+$hashes    = [ordered]@{}
 
 <#
-  The build string out of the file we just copied.
+  The build string out of the file being sent.
 
-  Checked on the far end after the restart, because "the port answers" turned
-  out to prove nothing at all. See the kill below for why.
+  Checked on the far end after the start, because "the port answers" turned
+  out to prove nothing at all: an old process still holding the port answers
+  too. See StopIt below.
 #>
 $expectBuild = ''
-try {
-    $m = [regex]::Match((Get-Content -LiteralPath (Join-Path $src 'voice-server.js') -Raw),
-                        "const\s+BUILD\s*=\s*'([^']+)'")
-    if ($m.Success) { $expectBuild = $m.Groups[1].Value }
-} catch { }
+if (-not $PutBack) {
+    try {
+        $m = [regex]::Match((Get-Content -LiteralPath (Join-Path $src 'voice-server.js') -Raw),
+                            "const\s+BUILD\s*=\s*'([^']+)'")
+        if ($m.Success) { $expectBuild = $m.Groups[1].Value }
+    } catch { }
+}
+
+# THE CHARACTER REGISTER IS GONE, 23 September, and so is the secret it used.
+# The three routes it guarded refused every real caller, and they are out of
+# voice-server.js along with owners.json. Sending a secret that nothing reads
+# is worse than sending nothing, so nothing here sends one. The service's own
+# join tokens are signed with a key it makes for itself in token-key.txt.
+
+if (-not $PutBack) {
+    Head 'Staging'
+    $send = [ordered]@{}
+    $send['voice-server.js'] = Join-Path $src 'voice-server.js'
+    # The roller the task runs in front of the service. See Roll-Log.ps1 for
+    # why a log cmd holds open can only be rolled at start.
+    $send['roll-log.ps1'] = Join-Path $Here '..\vps\Roll-Log.ps1'
+    $send['public/index.html'] = Join-Path $src 'public\index.html'
+    $send['public/voice.js'] = Join-Path $src 'public\voice.js'
+    # A stage a run that died part way left behind was never swapped in.
+    $made = @(Remote @"
+New-Item -ItemType Directory -Force -Path '$Root\public' | Out-Null
+Get-ChildItem -LiteralPath '$Root' -Directory -Force -EA SilentlyContinue |
+  Where-Object { `$_.Name -like '.stage-*' } |
+  ForEach-Object { Remove-Item -LiteralPath `$_.FullName -Recurse -Force -EA SilentlyContinue }
+New-Item -ItemType Directory -Force -Path '$Root\$stageName\public' | Out-Null
+'ready'
+"@ | ForEach-Object { "$_".Trim() })
+    if ($made -notcontains 'ready') { Die "could not make $Root\$stageName up there. Voice was not touched." }
+    foreach ($rel in $send.Keys) {
+        & scp @ssh $send[$rel] "${target}:$rootFar/$stageName/$rel"
+        if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE for $rel. Voice was not touched." }
+    }
+    Say 'staged' 'Green'
+    $hashes = Get-SwapHashes $send
+    $checkOut = @(Remote ((ServiceSwapVars $Root $stageName $prevName $Wait $hashes @('voice-server.js')) + $serviceCheckBlock) |
+                  ForEach-Object { Say "  $_"; "$_".Trim() })
+    if ($checkOut -notcontains 'STAGE OK') { Die 'the stage did not check out, so voice was not stopped or changed. The lines above say why.' }
+}
 
 # ---------------------------------------------------------------- install ---
 Head 'Installing'
@@ -216,7 +305,7 @@ if (-not `$node) {
     `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
     `$node = Get-Command node -EA SilentlyContinue
 }
-if (-not `$node) { throw 'node is not installed on this machine' }
+if (-not `$node) { 'node is not installed on this machine'; 'SWAP REFUSED'; exit 1 }
 
 # The port everyone's browser connects to. The position feed is loopback only
 # and needs nothing opened.
@@ -249,58 +338,14 @@ if (-not (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue)) {
 `$psExe = Join-Path `$env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 `$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=$Auth&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $turnSet"{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log, `$psExe, `$roll)
 
-<#
-  Stop the old service, and mean it.
+# The task as it is now, for the way back: a new install that does not answer
+# gets its old files AND its old settings back.
+`$oldXml = `$null
+if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) { `$oldXml = (Export-ScheduledTask -TaskName '$TaskName' | Out-String) }
 
-  This used to be a bare Unregister-ScheduledTask. Unregistering removes the
-  task definition and leaves the process it started running, so the old node
-  kept the port. The new one then died on the bind, instantly, and every check
-  that followed connected to the orphan and called it success: the copy said
-  17 KB, the install said 'voice is up', the launcher said nothing was wrong,
-  and the code running up here was still whatever was current the day the VPS
-  last rebooted. Days of voice-server changes went to disk and never ran.
-
-  So: stop the task, then kill anything still holding voice-server.js open,
-  then wait for the port to actually let go before starting anything.
-#>
-Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue
-if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) { Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false }
-
-# Ours, and only ours.
-#
-# This used to kill every node running voice-server.js, whatever folder it
-# ran from. There are two of these services, live and dev, so installing
-# either one killed the other. On 18 September installing dev stopped live
-# and the dev copy then took 7778 with dev's data on it.
-#
-# Two ways a process counts as ours, and it needs one of them: it was
-# started from this root, which the log path in its command line shows, or
-# it is sitting on the port we are about to bind, which makes it an orphan
-# in our way whoever started it.
-`$mine = @()
-foreach (`$p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
-    if (-not `$p.CommandLine) { continue }
-    if (`$p.CommandLine -notlike '*voice-server.js*') { continue }
-    # NOTE the backtick. $log belongs to the remote script (it is set at the
-    # top of this here-string), not to this one. Written as '$log' the outer
-    # PowerShell expands it, finds nothing, and the test becomes '**', which
-    # matches every voice process there is. That is how this killed live
-    # twice on 18 September while reporting it had stopped one 'for this root'.
-    # The log path is NOT on node's own command line. The task runs
-    # cmd.exe /c "set ... && node voice-server.js >> <log>", so cmd owns the
-    # redirect and node's command line is bare: node.exe voice-server.js.
-    # Measured on the box 18 September, where a check that read node's line
-    # could not tell live from dev and answered '?'. The parent shell is what
-    # carries the folder.
-    if (`$p.CommandLine -like ('*' + `$log + '*')) { `$mine += `$p.ProcessId; continue }
-    `$parent = Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$p.ParentProcessId) -EA SilentlyContinue
-    if (`$parent -and `$parent.CommandLine -like ('*' + `$log + '*')) { `$mine += `$p.ProcessId; continue }
-    `$onPort = Get-NetTCPConnection -State Listen -LocalPort $Port -EA SilentlyContinue |
-              Where-Object { `$_.OwningProcess -eq `$p.ProcessId }
-    if (`$onPort) { `$mine += `$p.ProcessId }
-}
 # Going to loopback with somebody still on the raw port cuts them off in
 # the middle of a word, and nothing on this box can reach them to say so.
+# Refused here, before anything has been stopped.
 if ('$Bind' -eq '127.0.0.1') {
     `$direct = @(Get-NetTCPConnection -LocalPort $Port -State Established -EA SilentlyContinue |
                 Where-Object { `$_.RemoteAddress -notin '127.0.0.1', '::1' })
@@ -308,132 +353,143 @@ if ('$Bind' -eq '127.0.0.1') {
         'REFUSING to bind to loopback: ' + `$direct.Count + ' connection(s) are still on the raw port:'
         foreach (`$d in `$direct) { '   ' + `$d.RemoteAddress + ' since ' + `$d.CreationTime }
         'Those are launchers that have not moved to the proxy. Leave the port open.'
-        exit 9
+        if (`$Stage -like '.stage-*') { Remove-Item -LiteralPath (Join-Path '$Root' `$Stage) -Recurse -Force -EA SilentlyContinue }
+        'SWAP REFUSED'
+        exit 1
     }
     'nothing is on the raw port directly, so loopback is safe'
 }
 
-`$killed = 0
-foreach (`$id in (`$mine | Select-Object -Unique)) {
-    # The parent shell first, so it cannot outlive the node it started.
-    `$par = (Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$id) -EA SilentlyContinue).ParentProcessId
-    Stop-Process -Id `$id -Force -EA SilentlyContinue
-    if (`$par) {
-        `$pp = Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$par) -EA SilentlyContinue
-        if (`$pp -and `$pp.Name -eq 'cmd.exe') { Stop-Process -Id `$par -Force -EA SilentlyContinue }
+# From here the swap runs, and one error must not end it half way.
+`$ErrorActionPreference = 'Continue'
+# Not `$want: names ignore case here, and `$Want is the swap's list of files.
+`$wantBuild = '$expectBuild'
+
+<#
+  Stop the old service, and mean it.
+
+  A bare Unregister-ScheduledTask leaves the process it started running, so
+  the old node kept the port, the new one died on the bind, and every check
+  connected to the orphan and called it success: days of voice-server changes
+  went to disk and never ran. So: stop the task, then kill anything of ours
+  still running, then wait for the port to actually let go.
+
+  Ours, and only ours. This used to kill every node running voice-server.js,
+  whatever folder it ran from, and there are two of these services, live and
+  dev: on 18 September installing dev stopped live. A process is ours if it
+  was started from this root, which the log path in its parent cmd's command
+  line shows (node's own line is bare, node.exe voice-server.js, measured on
+  the box 18 September), or if it sits on the port we are about to bind.
+  NOTE the backtick on the log: it belongs to the far side, and written bare
+  the outer PowerShell expands it to nothing and the test matches every voice
+  process there is, which is how this killed live twice on 18 September.
+#>
+function StopIt {
+    Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue
+    `$mine = @()
+    foreach (`$p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
+        if (-not `$p.CommandLine) { continue }
+        if (`$p.CommandLine -notlike '*voice-server.js*') { continue }
+        if (`$p.CommandLine -like ('*' + `$log + '*')) { `$mine += `$p.ProcessId; continue }
+        `$parent = Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$p.ParentProcessId) -EA SilentlyContinue
+        if (`$parent -and `$parent.CommandLine -like ('*' + `$log + '*')) { `$mine += `$p.ProcessId; continue }
+        `$onPort = Get-NetTCPConnection -State Listen -LocalPort $Port -EA SilentlyContinue |
+                  Where-Object { `$_.OwningProcess -eq `$p.ProcessId }
+        if (`$onPort) { `$mine += `$p.ProcessId }
     }
-    `$killed++
-}
-if (`$killed) { "stopped `$killed old voice process(es) for this root" }
-`$others = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue |
-            Where-Object { `$_.CommandLine -like '*voice-server.js*' })
-if (`$others.Count) { "left " + `$others.Count + " other voice process(es) alone" }
-
-`$free = `$false
-for (`$i = 0; `$i -lt 30; `$i++) {
-    `$busy = `$false
-    try {
-        `$c = New-Object Net.Sockets.TcpClient
-        `$null = `$c.BeginConnect('127.0.0.1', $Port, `$null, `$null).AsyncWaitHandle.WaitOne(300)
-        `$busy = `$c.Connected; `$c.Close()
-    } catch { }
-    if (-not `$busy) { `$free = `$true; break }
-    Start-Sleep -Milliseconds 500
-}
-if (-not `$free) { throw 'something is still holding port $Port up here and would not let go' }
-`$action = New-ScheduledTaskAction -Execute "`$env:SystemRoot\System32\cmd.exe" -Argument `$cmd -WorkingDirectory '$Root'
-`$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
-`$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-Register-ScheduledTask -TaskName '$TaskName' -Action `$action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings `$settings -Principal `$principal | Out-Null
-
-# Rolled whatever its size rather than deleted, so the run before this install
-# is voice.log.1 and the tails below read only this one. Deleting it is how
-# the evidence for the last crash disappeared.
-try { & `$roll -Path `$log -Force } catch { 'could not roll voice.log: ' + `$_.Exception.Message }
-Start-ScheduledTask -TaskName '$TaskName'
-
-`$up = `$false
-for (`$i = 0; `$i -lt 20; `$i++) {
-    try {
-        `$c = New-Object Net.Sockets.TcpClient
-        `$null = `$c.BeginConnect('127.0.0.1', $Port, `$null, `$null).AsyncWaitHandle.WaitOne(500)
-        `$up = `$c.Connected; `$c.Close()
-    } catch { }
-    if (`$up) { break }
-    Start-Sleep -Seconds 1
-}
-if (-not `$up) {
-    'voice did not come up. Its log says:'
-    if (Test-Path -LiteralPath `$log) { Get-Content -LiteralPath `$log -Tail 20 } else { 'nothing was written' }
-} else {
-    # The port answering is not the test. Which build answers is the test.
-    `$seen = ''
-    for (`$i = 0; `$i -lt 20; `$i++) {
+    `$killed = 0
+    foreach (`$id in (`$mine | Select-Object -Unique)) {
+        # The parent shell first, so it cannot outlive the node it started.
+        `$par = (Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$id) -EA SilentlyContinue).ParentProcessId
+        Stop-Process -Id `$id -Force -EA SilentlyContinue
+        if (`$par) {
+            `$pp = Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$par) -EA SilentlyContinue
+            if (`$pp -and `$pp.Name -eq 'cmd.exe') { Stop-Process -Id `$par -Force -EA SilentlyContinue }
+        }
+        `$killed++
+    }
+    if (`$killed) { "stopped `$killed old voice process(es) for this root" }
+    `$others = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue |
+                Where-Object { `$_.CommandLine -like '*voice-server.js*' })
+    if (`$others.Count) { "left " + `$others.Count + " other voice process(es) alone" }
+    `$free = `$false
+    for (`$i = 0; `$i -lt 30; `$i++) {
+        `$busy = `$false
         try {
-            `$h = Invoke-RestMethod -Uri 'http://127.0.0.1:$Port/health' -TimeoutSec 2
-            `$seen = [string]`$h.build
-        } catch { `$seen = '' }
-        if (`$seen) { break }
-        Start-Sleep -Seconds 1
+            `$c = New-Object Net.Sockets.TcpClient
+            `$null = `$c.BeginConnect('127.0.0.1', $Port, `$null, `$null).AsyncWaitHandle.WaitOne(300)
+            `$busy = `$c.Connected; `$c.Close()
+        } catch { }
+        if (-not `$busy) { `$free = `$true; break }
+        Start-Sleep -Milliseconds 500
     }
-    `$want = '$expectBuild'
-    if (-not `$want) { "voice is up on $Port" }
-    elseif (`$seen -eq `$want) { "voice is up on $Port running `$seen" }
-    else {
-        "WRONG BUILD on $Port. sent `$want, running '`$seen'."
-        'That means an old process is still answering. Its log says:'
-        if (Test-Path -LiteralPath `$log) { Get-Content -LiteralPath `$log -Tail 20 } else { 'nothing was written' }
-    }
+    if (-not `$free) { 'something is still holding port $Port up here and would not let go' }
 }
-"@
 
-# THIS BLOCK HAS NEVER ARRIVED WHOLE, measured 23 September.
-#
-# sshd on Windows hands the command to cmd.exe, which stops at 8,191
-# characters. Base64 of UTF-16 is about 2.7 times the script, and $remote is
-# 9,117 characters, so what went up the wire was 24,350 characters and the far
-# end saw roughly the first third of it. PowerShell then complains about a
-# brace or a token in a script nobody can see, fifteen lines above the line
-# that was actually cut.
-#
-# Deploy-Docs.ps1 found this on 17 September and sixteen scripts were given the
-# fix on 20 September. This one was not among them and is the worst case in the
-# repo: it is the whole install of the voice service.
-#
-# Under the limit it goes on the command line as before, because that is one
-# round trip. Over it, the script is sent as a file and run from there, which
-# has no length to run into. The exit code is kept across the tidy up, because
-# the Remove-Item afterwards would otherwise be the code this reads, which is
-# the fault entry 118 is about.
-$b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-$cmd = "powershell -NoProfile -EncodedCommand $b64"
-if ($cmd.Length -le 6000) {
-    & ssh $target $cmd
-}
-else {
-    $far = 'C:/Windows/Temp/thornswood-install-voice.ps1'
-    $tmp = [IO.Path]::GetTempFileName()
-    try {
-        Set-Content -LiteralPath $tmp -Value $remote -Encoding UTF8
-        & scp $tmp "${target}:$far"
-        if ($LASTEXITCODE -ne 0) { Die "could not send the install script to $VpsHost" }
-        # The path goes across as it is: Windows PowerShell takes forward
-        # slashes, and converting them is how a sister script once shipped
-        # with the slashes stripped out entirely. And bare, with no quotes
-        # round it; the path above is ours and has no spaces. Measured on this
-        # machine on 24 September, not on the VPS: bare runs whether cmd.exe
-        # or Windows PowerShell hands the line on, and the old form, the path
-        # in single quotes, fails under cmd.exe. The old form did run on the
-        # VPS on 20 and 21 September, so which shell sshd uses there is not
-        # known, and bare is the form that works under either.
-        & ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File $far"
-        $rc = $LASTEXITCODE
-        & ssh $target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" | Out-Null
-        $global:LASTEXITCODE = $rc
+# This install's task, or on the way back the one there was before it.
+# -PutBack leaves the task as it is and only starts it.
+function StartIt {
+    if (-not `$KeepTask) {
+        if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) { Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false }
+        if (`$Rolling) {
+            if (-not `$oldXml) { 'there was no task before this install, so nothing is started'; return }
+            Register-ScheduledTask -TaskName '$TaskName' -Xml `$oldXml | Out-Null
+            'the task is back as it was before this install'
+        } else {
+            `$action = New-ScheduledTaskAction -Execute "`$env:SystemRoot\System32\cmd.exe" -Argument `$cmd -WorkingDirectory '$Root'
+            `$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
+            `$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+            Register-ScheduledTask -TaskName '$TaskName' -Action `$action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings `$settings -Principal `$principal | Out-Null
+        }
     }
-    finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
+    # Rolled whatever its size rather than deleted, so the run before this
+    # install is voice.log.1 and the tails below read only this one.
+    try { & `$roll -Path `$log -Force } catch { 'could not roll voice.log: ' + `$_.Exception.Message }
+    Start-ScheduledTask -TaskName '$TaskName'
 }
-if ($LASTEXITCODE -ne 0) { Die "the install on the VPS exited with $LASTEXITCODE" }
+
+function Build {
+    try { return [string](Invoke-RestMethod -Uri 'http://127.0.0.1:$Port/health' -TimeoutSec 2).build } catch { return '' }
+}
+
+# The port answering is not the test. Which build answers is the test.
+function Healthy {
+    `$until = (Get-Date).AddSeconds(`$Wait)
+    while (`$true) {
+        `$up = `$false
+        try {
+            `$c = New-Object Net.Sockets.TcpClient
+            `$null = `$c.BeginConnect('127.0.0.1', $Port, `$null, `$null).AsyncWaitHandle.WaitOne(500)
+            `$up = `$c.Connected; `$c.Close()
+        } catch { }
+        if (`$up) {
+            if (`$Rolling -or -not `$wantBuild) { return `$true }
+            if ((Build) -eq `$wantBuild) { return `$true }
+        }
+        if ((Get-Date) -gt `$until) { return `$false }
+        Start-Sleep -Milliseconds 700
+    }
+}
+
+function Answer { "voice is up on $Port running " + (Build) }
+
+function Why {
+    `$seen = Build
+    if (`$wantBuild -and `$seen -and `$seen -ne `$wantBuild) {
+        "WRONG BUILD on $Port. sent `$wantBuild, running '" + `$seen + "'. That means an old process is still answering."
+    }
+    'voice.log says:'
+    if (Test-Path -LiteralPath `$log) { Get-Content -LiteralPath `$log -Tail 20 } else { 'nothing was written' }
+}
+
+"@ + $serviceSwapBlock
+
+$keepTask = '$KeepTask = $false'
+$pick = ''
+if ($PutBack) { $keepTask = '$KeepTask = $true'; $pick = $putBackPick }
+$vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + $keepTask + "`r`n" + $pick
+$swapOut = @(Remote ($vars + $remote) | ForEach-Object { Say "  $_"; "$_".Trim() })
+if (-not (Show-SwapResult $swapOut "$Root\.prev-<stamp>")) { Die 'voice was not swapped in. The lines above say what is running.' }
 
 # ---------------------------------------------------------------- verify ----
 Head 'Checking from here'
@@ -493,6 +549,16 @@ if ($Bind -eq '127.0.0.1') {
 } else {
     Say "Installed, but nothing is answering on ${VpsHost}:$Port." 'Red'
     Say "  ssh $target `"powershell -NoProfile -Command Get-Content '$Root\voice.log' -Tail 20`"" 'DarkGray'
+}
+# The service's files are in place: the box records that it runs this
+# artifact, and /health says so from then on (Artifact.ps1).
+# Only now, with the new build answering: the record it had goes into .prev
+# with the files it describes (Swap.ps1). After -PutBack, the record that came
+# back with the files is the one recorded.
+if ($PutBack) { Restore-SwapRecord $target $ssh $Root $swapOut '' 'voice' }
+else {
+    Save-SwapPreviousRecord $target $ssh $Root $prevName
+    $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target $target -SshArgs $ssh -Root $Root
 }
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

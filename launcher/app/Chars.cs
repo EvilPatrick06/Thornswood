@@ -40,7 +40,8 @@ namespace Thornswood
 
         // One saves folder for the whole install, where a folder per slot was
         // until 20 September. Nothing on this disk decides who the character
-        // is (see WriteStartIni), so there is nothing to keep apart.
+        // is (SkyMP loads the character the server holds), so there is
+        // nothing to keep apart.
         static string SavesDir { get { return Path.Combine(Home, "saves"); } }
 
         // One line per character, and one for the spare:
@@ -70,10 +71,6 @@ namespace Thornswood
         // reads the first six fields and writes the seventh back as nothing,
         // which this one takes as not known and mints a fresh spare for.
         static string ProfileFile { get { return Path.Combine(Home, "profiles.txt"); } }
-        static string StartIni
-        {
-            get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\po3_StartOnSave.ini"); }
-        }
 
         // The two files the plugin and the launcher pass between them at the
         // main menu. Both in Data\Platform, the one folder each end finds
@@ -237,6 +234,73 @@ namespace Thornswood
             Save(rows);
             return "Slots tidied for an allowance of " + allowance + ": " +
                    string.Join(", ", moved.ToArray()) + ".";
+        }
+
+        /// <summary>
+        /// The slot number of a character staff have killed for good (#1010).
+        /// Patrick, 28 September: the character "can never be played or
+        /// selected again" and the account can make a new one. So its row
+        /// leaves the numbered slots, which frees its number for New
+        /// character, and is kept (never minted again, shown on the menu as
+        /// dead, forgettable with the bin) rather than deleted.
+        /// </summary>
+        const int DeadSlot = -1;
+
+        /// <summary>
+        /// Every row the site says is dead for good moves to DeadSlot, and the
+        /// file is saved when any did. Returns a line for the log naming them,
+        /// or null. Roster.Refresh has run first.
+        /// </summary>
+        static string BuryDead(List<Row> rows)
+        {
+            var moved = new List<string>();
+            foreach (Row r in rows)
+            {
+                if (r.Slot <= 0 || r.Id <= 0) continue;
+                bool isDead = false;
+                try { isDead = Roster.Dead(r.Id); } catch { isDead = false; }
+                if (!isDead) continue;
+                moved.Add("profile " + r.Id + " from slot " + r.Slot);
+                r.Slot = DeadSlot;
+            }
+            if (moved.Count == 0) return null;
+            Save(rows);
+            return "Staff have killed " + (moved.Count == 1 ? "a character" : moved.Count + " characters") +
+                   " for good, so the slot is free for a new one: " + string.Join(", ", moved.ToArray()) + ".";
+        }
+
+        /// <summary>
+        /// Every row in DeadSlot whose PK an admin undid (#1010, Patrick,
+        /// 29 September) goes back into the lowest free slot, and the file is
+        /// saved when any did. The site undoes a PK only while the account has
+        /// a free slot, and TidySlots brings the row under the allowance after
+        /// this. Only ids the site names as revived move, so a site that did
+        /// not answer brings nobody back. Returns a line for the log, or null.
+        /// </summary>
+        static string RaiseRevived(List<Row> rows)
+        {
+            var moved = new List<string>();
+            foreach (Row r in rows)
+            {
+                if (r.Slot != DeadSlot || r.Id <= 0) continue;
+                bool back = false;
+                try { back = Roster.Revived(r.Id); } catch { back = false; }
+                if (!back) continue;
+                r.Slot = NextSlot(rows);
+                moved.Add("profile " + r.Id + " to slot " + r.Slot);
+            }
+            if (moved.Count == 0) return null;
+            Save(rows);
+            return "An admin undid the PK of " + (moved.Count == 1 ? "a character" : moved.Count + " characters") +
+                   ", so it can be played again: " + string.Join(", ", moved.ToArray()) + ".";
+        }
+
+        /// <summary>The rows staff have killed for good that were played here.</summary>
+        static List<Row> DeadRows(List<Row> rows)
+        {
+            var l = new List<Row>();
+            foreach (Row r in rows) if (r.Slot == DeadSlot && r.Id > 0) l.Add(r);
+            return l;
         }
 
         /// <summary>
@@ -424,7 +488,8 @@ namespace Thornswood
             if (profileId <= 0) return;
             List<Row> rows = Rows();
             Row r = FindId(rows, profileId);
-            if (r == null || r.Slot <= 0) return;
+            // A dead character (DeadSlot) can be forgotten too; the spare never.
+            if (r == null || (r.Slot <= 0 && r.Slot != DeadSlot)) return;
             rows.Remove(r);
             Save(rows);
             Retire(profileId);
@@ -554,6 +619,8 @@ namespace Thornswood
             if (profileId <= 0) return;
             List<Row> rows = Rows();
             Row r = FindId(rows, profileId);
+            // A character staff killed for good is never picked again (#1010).
+            if (r != null && r.Slot == DeadSlot) return;
             if (r == null)
             {
                 r = new Row();
@@ -590,25 +657,27 @@ namespace Thornswood
         /// </summary>
         static void WriteCharacters(Config cfg, List<Row> rows, int last, int spare, int slots)
         {
-            // The roster first, so the names are as fresh as the server can
-            // make them. Its own two and a half second timeout, and a server
-            // that does not answer costs the names and nothing else.
-            try { Roster.Refresh(cfg); } catch (Exception ex) { Swallow.Note("Chars.WriteCharacters, roster", ex); }
-
+            // The roster was refreshed by Prepare, before the dead were moved
+            // out of their slots (BuryDead), so the names are as fresh as the
+            // server can make them.
             var sb = new StringBuilder();
             sb.Append("{\"v\":1,\"last\":").Append(last)
               .Append(",\"spare\":").Append(spare)
               .Append(",\"slots\":").Append(slots)
               .Append(",\"characters\":[");
             bool first = true;
-            foreach (Row r in Characters(rows))
+            // The characters in slot order, then the dead, in no slot (#1010).
+            var all = Characters(rows);
+            all.AddRange(DeadRows(rows));
+            foreach (Row r in all)
             {
                 Roster.Row who = null;
                 try { who = Roster.For(r.Id); } catch { who = null; }
+                bool isDead = r.Slot == DeadSlot;
                 if (!first) sb.Append(',');
                 first = false;
                 sb.Append("{\"profileId\":").Append(r.Id)
-                  .Append(",\"slot\":").Append(r.Slot)
+                  .Append(",\"slot\":").Append(isDead ? 0 : r.Slot)
                   .Append(",\"seconds\":").Append(r.Seconds)
                   .Append(",\"name\":\"").Append(Json(who == null ? "" : who.Name))
                   .Append("\",\"race\":\"").Append(Json(who == null ? "" : who.Race))
@@ -617,7 +686,19 @@ namespace Thornswood
                   .Append("\",\"where\":\"").Append(Json(who == null ? "" : who.Where))
                   .Append("\",\"played\":\"").Append(Json(PlayedText(r.Seconds)))
                   .Append("\",\"lastPlayed\":\"").Append(Iso(r.Played))
-                  .Append("\"}");
+                  .Append("\"");
+                // The server said it has no character under this id (#955):
+                // the menu marks the card, since picking it makes a new one.
+                bool isGone = false;
+                try { isGone = !isDead && Roster.Gone(r.Id, r.Played); } catch { isGone = false; }
+                if (isGone) sb.Append(",\"gone\":true");
+                // Staff killed it for good, or banned it by itself (#1010):
+                // the menu shows it and will not play it.
+                if (isDead) sb.Append(",\"pk\":true");
+                bool isBarred = false;
+                try { isBarred = !isDead && Roster.Barred(r.Id); } catch { isBarred = false; }
+                if (isBarred) sb.Append(",\"banned\":true");
+                sb.Append("}");
             }
             sb.Append("]}");
 
@@ -743,7 +824,7 @@ namespace Thornswood
         /// The save folder half used to throw too, and Play stopped, with one
         /// line in the log and no reason (a tester on 1.1.36: "Could not point
         /// the save folder at character 1."). Under SkyMP nothing on this disk
-        /// decides who the character is (see WriteStartIni), so a save folder
+        /// decides who the character is (the server does), so a save folder
         /// that cannot be redirected is not a reason to keep anybody out.
         /// </summary>
         public static string Prepare(Config cfg)
@@ -818,6 +899,20 @@ namespace Thornswood
             // offer first. SetChooseAtMenu reads the file back and throws when
             // it does not say what was written, which is what stops Play.
             List<Row> rows = Rows();
+
+            // The roster first, so the names are as fresh as the server can
+            // make them and a character staff killed for good (#1010) leaves
+            // its slot before the id played last is chosen or the slots are
+            // tidied. Its own two and a half second timeout, and a server that
+            // does not answer costs the names and nothing else.
+            try { Roster.Refresh(cfg); } catch (Exception ex) { Swallow.Note("Chars.Prepare, roster", ex); }
+            string buried = null;
+            try { buried = BuryDead(rows); } catch (Exception ex) { Swallow.Note("Chars.Prepare, dead", ex); }
+            // And one an admin brought back from a PK made by mistake goes back
+            // into a free slot, before the slots are tidied (#1010).
+            string raised = null;
+            try { raised = RaiseRevived(rows); } catch (Exception ex) { Swallow.Note("Chars.Prepare, revived", ex); }
+
             Row oldSpare = Find(rows, 0);
             int spareBefore = oldSpare != null ? oldSpare.Id : 0;
             string ownerBefore = oldSpare != null ? oldSpare.Owner : "";
@@ -840,9 +935,9 @@ namespace Thornswood
             int point = last > 0 ? last : spare;
             AutoJoin.SetChooseAtMenu(point);
 
-            WriteStartIni();
-            WriteBrowserBackend();
-            KeepPlatformLogReadable();
+            BrowserBackend = WriteBrowserBackend();
+            // The log level and the text window are Enforce's now (#963):
+            // normal logging and no window, every Play, for everybody.
 
             // Voice read the old id out of the settings file at startup and has
             // been using it ever since. The write above just changed it, and
@@ -882,6 +977,8 @@ namespace Thornswood
             // Shell logs the note; its Log is its own, so the tidy's line
             // rides along here rather than being written from this class.
             if (tidied != null) note = (note == null ? "" : note + " ") + tidied;
+            if (buried != null) note = (note == null ? "" : note + " ") + buried;
+            if (raised != null) note = (note == null ? "" : note + " ") + raised;
             if (reminted != null) note = (note == null ? "" : note + " ") + reminted;
             return note;
         }
@@ -900,7 +997,7 @@ namespace Thornswood
         /// save: it is a shell with no world behind it. Loading one gets you a
         /// black screen if you are lucky and a null pointer thirty seconds into
         /// startup if you are not, which is the crash sitting in
-        /// crash-2026-09-13-17-45-02.log with po3_StartOnSave's hook on the
+        /// crash-2026-09-13-17-45-02.log with an auto load mod's hook on the
         /// stack and rcx at zero.
         ///
         /// This machine's save folder had nothing else left in it. Two
@@ -927,90 +1024,6 @@ namespace Thornswood
                 }
             }
             catch (Exception ex) { Swallow.Note("Chars.Scrub, delete", ex); }
-        }
-
-        // Written fresh every launch, and what it writes is "do nothing".
-        //
-        // Start On Save used to be how the launcher reached past the main menu:
-        // point the save folder at one character, set bStartNewGame, and let it
-        // load the newest save or start a new game when there was none.
-        //
-        // Under SkyMP that job is already taken. When the server sends
-        // CreateActor for your own character the client calls
-        //
-        //     loadGameService.loadGame(pos, rot, worldOrCell, appearance, loadOrder)
-        //
-        // which walks you from the main menu to wherever the server says you
-        // are, with the body and the face the server holds. Nothing here has to
-        // press anything, and a character that lives on the server has nothing
-        // on this disk worth loading anyway.
-        //
-        // Leaving bStartNewGame true meant Start On Save pressed New Game at the
-        // main menu, Skyrim Unbound's alternate start began, and SkyMP's own
-        // load landed on top of a game that was still loading. Two loads through
-        // one BGSSaveLoadManager, about thirty seconds in, every single launch:
-        //
-        //   crash-2026-09-13-01-20-50   uptime 33s   po3_StartOnSave.dll frame 4
-        //   crash-2026-09-13-01-14-07   uptime 30s   po3_StartOnSave.dll frame 11
-        //   crash-2026-09-12-18-53-41   uptime 42s   inside the allocator's free
-        //
-        // It is also why creation flashed up for a moment and then teleported
-        // somebody who had not finished making a face: Unbound's start was being
-        // interrupted part way through.
-        //
-        // The mod stays installed, because the build ships it and Verify checks
-        // the file list. It is simply told to stand still.
-        //
-        // Standing still takes more than bStartNewGame false. Read from the
-        // mod's own source (powerof3/Start-On-Save, Hooks.cpp): when the load
-        // spinner first opens it builds the save list, and if that list is
-        // not empty and sSaveFile names nothing, it loads the newest save in
-        // it, full stop. bStartNewGame only decides what happens when the
-        // list is EMPTY. The list is empty on a machine whose slot folder
-        // holds nothing, which is most of them. It is not empty on a fresh
-        // install where Skyrim had been played before: Adopt moves that
-        // person's own saves into character one, the junction points Saves
-        // at that folder, and the newest of those saves was loaded at the
-        // main menu while SkyMP was loading its own. That is the install on
-        // 17 Sep whose slot showed a level 21 from single player and whose
-        // game closed after 0 minutes, and it is the thirty second crashes
-        // above with a different lever.
-        //
-        // The one filter the mod applies before loading is sCharacterName:
-        // the save's character has to carry that exact name. No save does
-        // carry the one below, so nothing qualifies and nothing is loaded,
-        // whatever is in the folder.
-        //
-        // The bool it took until 20 September said whether the slot was fresh
-        // and had not been read since the day this stopped starting new games.
-        static void WriteStartIni()
-        {
-            try
-            {
-                string dir = Path.GetDirectoryName(StartIni);
-                Directory.CreateDirectory(dir);
-                var sb = new StringBuilder();
-                sb.AppendLine("; Written by the Thornswood launcher every time you press Play.");
-                sb.AppendLine("; Editing it by hand will not stick.");
-                sb.AppendLine(";");
-                sb.AppendLine("; This file tells Start On Save to load nothing. SkyMP loads you into");
-                sb.AppendLine("; the world itself once the server has made your character, and a second");
-                sb.AppendLine("; load running at the same time crashes the game about thirty seconds in.");
-                sb.AppendLine(";");
-                sb.AppendLine("; bStartNewGame false is not enough for that: with sSaveFile blank the mod");
-                sb.AppendLine("; loads the newest save in the Saves folder whenever there is one. The");
-                sb.AppendLine("; character name below is the one filter it applies first. No save");
-                sb.AppendLine("; carries that name, so nothing qualifies.");
-                sb.AppendLine("[Settings]");
-                sb.AppendLine("sSaveFile =");
-                sb.AppendLine("sCharacterName = Thornswood-Nobody");
-                sb.AppendLine("iSaveType = 0");
-                sb.AppendLine("bStartNewGame = false");
-                sb.AppendLine("iSkipAutoLoadHotkey = 16");
-                sb.AppendLine("bDisableMissingContentWarning = true");
-                File.WriteAllText(StartIni, sb.ToString());
-            }
-            catch (Exception ex) { Swallow.Note("Chars.WriteStartIni, write", ex); }
         }
 
         static string PlatformIni
@@ -1054,17 +1067,26 @@ namespace Thornswood
         /// installer. On 17 Sep a search for *.exe missed it, because of the
         /// .hidden on the end, and this comment said tilted spawned nothing.
         /// Taking NirnLab out changes which program Windows asks about and
-        /// nothing else. The answer is a firewall rule; see Firewall.cs.
+        /// nothing else. What Windows asked about was the WebRTC connections
+        /// the in-game voice page made after the launcher had taken the
+        /// audio; it makes none now (#911), so no firewall rule is needed.
         ///
         /// The file is edited, never rewritten. It also carries the log level,
         /// the console window geometry and the plugin folder list, none of
         /// which are ours to invent.
+        ///
+        /// Returns the backend the ini names once this is done, "nirnlab" or
+        /// "tilted", and null when there is no ini or it could not be read or
+        /// written. Every way out returns, the steady state included: on a
+        /// healthy install the ini already says the right thing and the
+        /// early return below is the one that runs, every Play. Until 27 Sep
+        /// this was void and nothing afterwards knew what it had decided.
         /// </summary>
-        static void WriteBrowserBackend()
+        static string WriteBrowserBackend()
         {
             try
             {
-                if (!File.Exists(PlatformIni)) return;
+                if (!File.Exists(PlatformIni)) return null;
 
                 // One file, and it is not in SKSE\Plugins.
                 //
@@ -1093,9 +1115,10 @@ namespace Thornswood
                 // produced exactly that box.
                 //
                 // Choosing a backend here is also not a way to get rid of the
-                // firewall prompt. Whichever one runs starts a second program
-                // that binds a socket, so the prompt follows the backend
-                // rather than going away. Firewall.cs is what settles it.
+                // firewall prompt. Whichever one runs starts a second program,
+                // so the prompt follows the backend rather than going away.
+                // What settles it is the voice page making no WebRTC
+                // connection in the game's browser (#911).
                 string want = nirnlab ? "nirnlab" : "tilted";
 
                 string text = File.ReadAllText(PlatformIni);
@@ -1116,59 +1139,26 @@ namespace Thornswood
                            "BackendName = " + want + Environment.NewLine;
                 }
 
-                if (next == text) return;
+                if (next == text) return want;
 
                 // The file arrives with a byte order mark and SkyrimPlatform
                 // reads it happily, so keep one rather than quietly changing
                 // the encoding of a file this launcher does not own.
                 File.WriteAllText(PlatformIni, next, new UTF8Encoding(true));
+                return want;
             }
             catch (Exception ex) { Swallow.Note("Chars.WriteBrowserBackend, write", ex); }
+            // The read or the write threw, so what the ini names is not known.
+            return null;
         }
 
         /// <summary>
-        /// Stop the client's log being switched off, and nothing more.
-        ///
-        /// The comment above says the log level is not ours to invent, and that
-        /// was true while nothing depended on it. It is not any more: everything
-        /// skymp5-client says goes through printConsole, and printConsole now
-        /// writes to skyrim-platform.log. Above info that file holds nothing a
-        /// person can use, and on 21 September an evening went into a fault
-        /// whose answer was four lines the client had already written and
-        /// nobody could read.
-        ///
-        /// So this only ever lowers, and only from a level that is silent.
-        /// 0 trace, 1 debug and 2 info are all left exactly as found, because
-        /// somebody sitting at trace chose trace. 3 warn through 6 none become
-        /// 2. Choosing how much to log stays theirs; switching it off entirely
-        /// does not, because the first thing anybody is asked for when they
-        /// cannot play is that file.
+        /// What WriteBrowserBackend left the ini naming at the last Play:
+        /// "nirnlab", "tilted", or null when it could not say (no
+        /// SkyrimPlatform.ini, or reading or writing it failed). Null too
+        /// until the first Play of this session. StartPlay puts it in
+        /// launcher.log and config.json, and the Settings page shows it.
         /// </summary>
-        static void KeepPlatformLogReadable()
-        {
-            try
-            {
-                if (!File.Exists(PlatformIni)) return;
-
-                string text = File.ReadAllText(PlatformIni);
-                var rx = new System.Text.RegularExpressions.Regex(
-                    @"(?im)^[ \t]*LogLevel[ \t]*=[ \t]*(\d+)[ \t]*$");
-                System.Text.RegularExpressions.Match m = rx.Match(text);
-
-                // No LogLevel line at all means the default, which InitLog
-                // takes as info. That is already readable, so leave it.
-                if (!m.Success) return;
-
-                int level;
-                if (!int.TryParse(m.Groups[1].Value, out level)) return;
-                if (level <= 2) return;
-
-                string next = rx.Replace(text, "LogLevel = 2");
-                if (next == text) return;
-
-                File.WriteAllText(PlatformIni, next, new UTF8Encoding(true));
-            }
-            catch (Exception ex) { Swallow.Note("Chars.KeepPlatformLogReadable, write", ex); }
-        }
+        public static string BrowserBackend { get; private set; }
     }
 }

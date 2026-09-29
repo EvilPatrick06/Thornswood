@@ -31,18 +31,104 @@
     2. Bot in the sidebar. Add a bot, then Reset Token and copy it.
     3. Under Bot, turn ON "Server Members Intent". Leave the other two OFF.
     4. OAuth2 then URL Generator: tick "bot", then "Administrator", open the
-       URL it makes and add it to the Thornswood server.
+       URL it makes and add it to the Thornswood server. Administrator is for
+       the build only. It makes the Owner and Dev roles, which carry
+       Administrator, and Discord refuses that from a bot without it.
     5. Server Settings, Enable Community. Without it there are no forum
        channels, no announcement channels and no rules screen, and this falls
        back to plain text channels for those.
 
   The bot needs to be ABOVE the roles it creates, so drag its own role to the
   top of the role list once it has joined.
+
+  TWO PERMISSION SETS. Administrator for a build, and the smaller set below
+  for the rest of the time, which is all bot.py needs to run. A build that
+  finishes with nothing failed prints the invite link with that smaller set
+  and a line saying to untick Administrator on the bot's role. Tick it again
+  before the next build. To see that link without building anything, and
+  without a token:
+
+      python Build-Discord.py --invite <application id>
+
+  The application id is on the developer portal's General Information page.
 """
 
 import asyncio
 import os
 import sys
+
+# ----------------------------------------------------- the running set --
+# What bot.py does once the build is over, and nothing more. Each one is
+# Discord's own bit number from its permissions page,
+# https://docs.discord.com/developers/topics/permissions, not a discord.py
+# name, so the integer can be checked against the page by hand. It is read
+# off what bot.py calls:
+#
+#   Manage Channels           log_channel makes the staff only #tickets when
+#                             there is none
+#   View Channel              every channel it reads or posts in
+#   Send Messages             join cards, panels, alerts, closed tickets
+#   Attach Files              the join card is a picture
+#   Read Message History      finds its own panels to edit in place
+#   Manage Roles              the hold and ping buttons give and take roles,
+#                             and the two ping roles are made when missing
+#   Manage Threads            a ticket thread is private and not invitable, so
+#                             only a moderator can add people to it, and Close
+#                             locks it
+#   Create Private Threads    one per ticket
+#   Send Messages in Threads  writes the ticket into its thread
+#
+# Left out on purpose: Administrator, Manage Server, Manage Webhooks, Manage
+# Messages, Pin Messages and Embed Links, which only the build uses or
+# nothing uses. Interaction replies and direct messages need no permission.
+RUN_BITS = (
+    ('Manage Channels',           4),
+    ('View Channel',             10),
+    ('Send Messages',            11),
+    ('Attach Files',             15),
+    ('Read Message History',     16),
+    ('Manage Roles',             28),
+    ('Manage Threads',           34),
+    ('Create Private Threads',   36),
+    ('Send Messages in Threads', 38),
+)
+RUN_PERMISSIONS = sum(1 << bit for _, bit in RUN_BITS)
+
+
+def invite_url(app_id, permissions=RUN_PERMISSIONS):
+    """The bot invite, as https://docs.discord.com/developers/topics/oauth2
+       describes it: the application id, scope bot, and the permissions
+       integer. Opened for a bot already in the server, it sets these on the
+       bot's own role."""
+    return ('https://discord.com/oauth2/authorize?client_id=%s&scope=bot'
+            '&permissions=%d' % (app_id, permissions))
+
+
+def say_invite(app_id, role_name=None):
+    """What a finished build ends on, and all --invite prints."""
+    print('  Running, the bot needs these and not Administrator:')
+    print('    ' + ', '.join(n for n, _ in RUN_BITS))
+    print('')
+    print('  Open this to give the bot\'s role exactly those, permissions %d:'
+          % RUN_PERMISSIONS)
+    print('    ' + invite_url(app_id))
+    print('')
+    print('  Then untick Administrator on the bot\'s role now the build is done:')
+    print('  Server Settings, Roles, %s, Permissions. Tick it again before the '
+          'next build.' % (role_name or 'the bot\'s own role'))
+
+
+# THE DRY PATH. Before discord.py is imported and before any token is read,
+# so it runs anywhere, connects to nothing and changes nothing.
+if __name__ == '__main__' and '--invite' in sys.argv:
+    _rest = sys.argv[sys.argv.index('--invite') + 1:]
+    _app = (_rest[0] if _rest else os.environ.get('DISCORD_CLIENT_ID', '')).strip()
+    if not _app.isdigit():
+        sys.exit('Say which application: python Build-Discord.py --invite '
+                 '<application id>. It is on the developer portal\'s General '
+                 'Information page.')
+    say_invite(_app)
+    sys.exit(0)
 
 try:
     import discord
@@ -231,7 +317,7 @@ PLAN = [
  ]),
  ('In Character', [
    dict(kind='text',  name='game-rules',  key='GAMERULES', mode='membersread',
-        topic='How roleplay works here. Ten rules, and what we let slide.',
+        topic='How roleplay works here. Nine rules, and what we let slide.',
         post=C.GAME_RULES),
    dict(kind='text',  name='lore',        key='LORE',     mode='membersread',
         topic='4E 252. What happened and who you can be.',
@@ -328,17 +414,30 @@ def say(mark, what):
 # which does not hold it.
 BOT_NEEDS = ('view_channel', 'send_messages', 'read_message_history')
 
+# And two more in the channel bot.py opens its ticket threads in. The read
+# mode that channel has in PLAN denies @everyone Send Messages in Threads, and
+# the live one was gated by hand, so without Administrator the bot could open
+# a private thread there and then not write the ticket into it. A thread takes
+# its permissions from the channel it is in, so the bot's role having them
+# server wide is not enough once the channel's @everyone deny lands on it.
+TICKET_BOT_NEEDS = BOT_NEEDS + ('create_private_threads',
+                                'send_messages_in_threads')
 
-def with_bot(guild, out):
+
+def bot_needs(spec):
+    return TICKET_BOT_NEEDS if spec.get('key') == 'TICKETS' else BOT_NEEDS
+
+
+def with_bot(guild, out, needs=BOT_NEEDS):
     me = getattr(guild, 'me', None)
     if me is not None:
-        out[me] = discord.PermissionOverwrite(**dict((n, True) for n in BOT_NEEDS))
+        out[me] = discord.PermissionOverwrite(**dict((n, True) for n in needs))
     return out
 
 
-def shuts_out(ch):
+def shuts_out(ch, needs=BOT_NEEDS):
     """Whether @everyone's overwrite on this channel takes away one of the
-       three the bot needs.
+       ones the bot needs there.
 
        Read off the channel as it stands rather than off its mode in PLAN.
        The gate on the live server was set by hand, and the modes only say
@@ -350,27 +449,27 @@ def shuts_out(ch):
     if ev is None:
         return False
     have = ch.overwrites_for(ev)
-    return any(getattr(have, n) is False for n in BOT_NEEDS)
+    return any(getattr(have, n) is False for n in needs)
 
 
-async def keep_bot(ch):
+async def keep_bot(ch, needs=BOT_NEEDS):
     """Give the bot its own overwrite in a channel that is already there.
 
        overwrites() only reaches a channel when it is made, and every channel
        on the live server was made, or gated by hand, before this existed, so
        without this a re-run would let the bot into nothing. Only a channel
        that shuts @everyone out is touched, and only the bot's own overwrite
-       on it. Only the three it needs are set, anything else already on it
-       stays as it is, and a channel that already has all three is not written
+       on it. Only the ones it needs are set, anything else already on it
+       stays as it is, and a channel that already has all of them is not written
        to at all, so running this again after Administrator is gone changes
        nothing and asks Discord for nothing."""
-    if ch is None or not shuts_out(ch):
+    if ch is None or not shuts_out(ch, needs):
         return
     me = getattr(getattr(ch, 'guild', None), 'me', None)
     if me is None:
         return
     have = ch.overwrites_for(me)
-    need = dict((n, True) for n in BOT_NEEDS if getattr(have, n) is not True)
+    need = dict((n, True) for n in needs if getattr(have, n) is not True)
     if not need:
         return
     what = '#' + ch.name + ' lets the bot in without Administrator'
@@ -398,7 +497,7 @@ def _named(guild, roles, name):
     return roles.get(name) or discord.utils.get(guild.roles, name=name)
 
 
-def overwrites(guild, mode, roles, hold=None):
+def overwrites(guild, mode, roles, hold=None, needs=BOT_NEEDS):
     ev = guild.default_role
     deny_all  = discord.PermissionOverwrite(view_channel=False)
     read_only = discord.PermissionOverwrite(send_messages=False,
@@ -421,7 +520,7 @@ def overwrites(guild, mode, roles, hold=None):
         for r in STAFF:
             if roles.get(r):
                 out[roles[r]] = talk
-        return with_bot(guild, out)
+        return with_bot(guild, out, needs)
     if mode == 'hold':
         out = {ev: deny_all}
         names = list(HOLD_STAFF)
@@ -431,26 +530,26 @@ def overwrites(guild, mode, roles, hold=None):
             r = _named(guild, roles, n)
             if r is not None:
                 out[r] = talk
-        return with_bot(guild, out)
+        return with_bot(guild, out, needs)
     if mode == 'read':
         out = {ev: read_only}
         for r in STAFF:
             if roles.get(r):
                 out[roles[r]] = discord.PermissionOverwrite(send_messages=True,
                                                             manage_messages=True)
-        return with_bot(guild, out)
+        return with_bot(guild, out, needs)
     if mode == 'staff':
         out = {ev: deny_all}
         for r in STAFF:
             if roles.get(r):
                 out[roles[r]] = talk
-        return with_bot(guild, out)
+        return with_bot(guild, out, needs)
     if mode == 'pathfind':
         out = {ev: deny_all}
         for r in list(STAFF) + ['Playtester']:
             if roles.get(r):
                 out[roles[r]] = talk
-        return with_bot(guild, out)
+        return with_bot(guild, out, needs)
     return {}
 
 
@@ -498,7 +597,8 @@ async def ensure_channel(guild, cat, spec, roles, found):
         if ch.name == want and getattr(ch, 'category', None) == cat:
             existing = ch
             break
-    ow = overwrites(guild, spec.get('mode', 'open'), roles, spec.get('hold'))
+    ow = overwrites(guild, spec.get('mode', 'open'), roles, spec.get('hold'),
+                    bot_needs(spec))
 
     if existing is None and CHECK:
         say('would make', ('voice ' if kind == 'voice' else '#') + want)
@@ -559,7 +659,7 @@ async def ensure_channel(guild, cat, spec, roles, found):
                     await existing.edit(topic=spec['topic'])
         except Exception:
             pass
-        await keep_bot(existing)
+        await keep_bot(existing, bot_needs(spec))
 
     if kind == 'announce' and isinstance(existing, discord.TextChannel):
         try:
@@ -826,6 +926,17 @@ async def on_ready():
                 print('  Nothing was deleted. Run with -Prune to clear out')
                 print('  anything this no longer wants.')
         print('')
+        # Only after a real build that did all it set out to. After -Check
+        # nothing was built, and after a failure the run that fixes it still
+        # wants Administrator.
+        if not CHECK and not failed:
+            app = (getattr(client, 'application_id', None) or
+                   getattr(getattr(client, 'user', None), 'id', None))
+            if app:
+                role = (getattr(guild, 'self_role', None) or
+                        getattr(getattr(guild, 'me', None), 'top_role', None))
+                say_invite(app, getattr(role, 'name', None))
+                print('')
     except Exception as e:
         print('\n  stopped: %r' % (e,))
     finally:

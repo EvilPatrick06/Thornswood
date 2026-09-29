@@ -1,5 +1,21 @@
 # Help
 
+## Getting in
+
+<!-- alpha -->
+Thornswood is in alpha and is eighteen and over, and the world is open by
+application. Anyone can install it. Come into the Discord, open a ticket and
+pick **Apply to be an alpha playtester**. It asks whether you are eighteen or
+over and whether you accept the [rules](/rules). When you are accepted you are
+given the Playtester role, and that role is what unlocks Play. The
+[join](/join) page says more.
+<!-- /alpha -->
+<!-- open -->
+Thornswood is open and is eighteen and over. Anyone can install it, and
+anyone in the Discord can play. Being there means accepting the
+[rules](/rules). The [join](/join) page has the whole of it.
+<!-- /open -->
+
 ## Installing it the first time
 
 You need **Skyrim Special Edition** on Steam, on build **1.6.1170**, and
@@ -26,6 +42,11 @@ Skyrim the way it was.
    and no mods, and the server turns you away when you press Play.
 4. Press **Connect Discord** on the launcher's front page. Your browser opens,
    you say yes, and it closes itself. You never do this again.
+<!-- alpha -->
+   It works once your application has been accepted; before that it says
+   your account has not been accepted into the alpha yet, and applying is the
+   fix.
+<!-- /alpha -->
 
 <a id='defender'></a>
 
@@ -54,8 +75,7 @@ If an update is waiting, the launcher takes it before it lets you play. That is
 on purpose: everybody has to be running the same files or nobody can connect.
 
 The launcher also compares every plugin with the server's copy, byte for byte,
-when it starts. If one differs it says so, and **Fix** downloads the server's
-copy of that plugin. See LOAD ORDER ERROR below.
+when it starts. If one differs it says so. See LOAD ORDER ERROR below.
 
 ## Your first character
 
@@ -78,16 +98,50 @@ Nothing else is handed out at the start, except a tool to the three picks whose
 work needs one: a Miner is handed a pickaxe, a Woodworker a woodcutter's axe
 and a Farmer a shovel and seed to sow, at the moment each one is picked.
 
+## Keys
+
+These are the keys a fresh install has. The launcher's **Controls** page lists
+every key and changes them: press Change, then the key you want, with Skyrim
+closed.
+
+- **Enter** opens the chat, and **/** opens it with the slash already typed.
+- **K** your character panel, **P** your friends and party, **J** your journals.
+- Looking at somebody: **Y** asks them to be friends, **H** offers a trade, **L**
+  stops you hearing them.
+- **V** held to talk, **O** keeps the microphone open until you press it again,
+  **B** steps between a whisper, your normal voice and a yell.
+- **G** opens the emote wheel, and **N** stands you up out of an emote.
+- **U** presses a blank key mold into the lock of the door you are looking at.
+- **F1** turns the names over heads off and on, and **F2** hides and shows the
+  overlay.
+
 ## Voice
 
 Voice runs in the launcher, not in the game. Leave the launcher open while you
 play.
 
-Push to talk is the default. The indicator in the launcher says whether you are
-being heard. Whisper and yell change how far your voice carries in the world.
+Hold **V** to talk, or press **O** to keep the microphone open for a song or a
+long speech. **B** steps between a whisper, about 7 metres, your normal voice,
+about 30, and a yell, about 85. The voice card on the launcher's Play page
+says whether it is working.
 
 If nobody can hear you, check that the launcher is still open and that Windows
 has not handed your microphone to something else.
+
+## Getting staff in game
+
+Type **/helpme** and a few words about what is wrong. Anybody from staff in the
+world is told at once, with where you are, and it goes to the staff channel in
+the Discord. **/report**, the person's name and what they did, reaches staff and
+nobody else. The game tells you whether it got through; if it did not, open a
+ticket in the Discord.
+
+Wedged in a wall or a rock and cannot walk out? Type **/stuck**. It takes you
+back a few steps to where you were last standing safely, or to the nearest
+temple when there is no such spot. It works once every 5 minutes, not while you
+are dead, and in a fight it waits 15 seconds first, which moving or being hit
+cancels. It is only for being truly stuck: every use is logged for staff, and
+using it to get out of a fight or to travel can mean a warning or a ban.
 
 ## When something goes wrong
 
@@ -96,8 +150,8 @@ has not handed your microphone to something else.
    reason.
 2. If it is not there, [report it](/report). One line about what happened is
    enough to start with.
-3. If you have a screenshot or a crash log, drag it into the Discord channel
-   with the report, or say in the report that you have one.
+3. If you have a screenshot or a crash log, drag it into your ticket in the
+   Discord, or say in the report that you have one. Where the logs are is below.
 
 ## LOAD ORDER ERROR
 
@@ -105,9 +159,14 @@ The game compares every plugin with the server's at login: the same names, in
 the same order, with the same bytes. If one differs you are turned away with
 that message.
 
-Close the game, and in the launcher press **Scan**. It names the plugin that
-differs. Press **Fix** and the launcher downloads the server's copy and puts
-it in place. Then press Play again. Nothing in Vortex has to change.
+Close the game, open **Diagnostics** in the launcher and press **Scan**. It
+names the plugin that differs. Then press **Fix**, and press Play again.
+Nothing in Vortex has to change.
+
+What Fix does: it puts your plugin list in the server's order, puts back
+plugins Vortex has that the game folder lost, downloads the server's copy of
+any plugin whose bytes differ, and moves another server's files and stray
+Creation Club plugins aside, never deleting them.
 
 If Scan says a plugin is missing rather than different, the collection is not
 fully installed or the wrong Vortex profile is active. The launcher says which.
@@ -127,18 +186,22 @@ folder:
 C:\Thornswood\Profile\MyGames\SKSE\
 ```
 
-The launcher's Logs page lists both and opens them. They are plain text and
-they are usually the difference between a fix and a guess.
+The easy way to send them: in the launcher open **Diagnostics** and press
+**Build the report**. It makes one zip with the newest crash log, the script
+extender log, your plugin list and the launcher log, and opens the folder it
+is in. Drag that zip into your ticket in the Discord. **Settings**, **Open log**
+opens the launcher log on its own.
 
 ## Things that are normal here
 
 - No saving. The server holds your character. Quitting is safe.
-- Mod settings menus forget themselves every session, because there is no save
-  to write them to.
+- Most mod settings menus keep your choices: MCM Helper menus in a file on
+  your machine, and Apocalypse, moreHUD, Atlas Map Markers, Skyrim Unbound and
+  chfshVariousActions on the server, with your character. QuickLoot, the
+  instrument menu, MCM Recorder and SkyUI's favourite group and unequip options
+  still forget themselves every session, because there is no save to write
+  them to.
 - No levelling, no fast travel, and the difficulty is fixed at Expert.
-- Start On Save is in the mod list but never loads a save. The launcher points
-  it at a character that does not exist, on purpose: an ordinary Skyrim save
-  cannot be loaded under Thornswood.
 - The creation hall is a bare room. Your face is made there, and everything
   else is chosen on the panel that opens by itself once it is done.
 
@@ -148,7 +211,8 @@ change.
 
 ## Restart warnings
 
-When an update is going out, a warning appears in the game before anything
-happens. A notice means the server might stutter for a moment and you can keep
-playing. An update or a restart counts down and then puts you back to the
-launcher, where the Play button will pick the new version up.
+A countdown in the chat comes first. A notice means the world freezes for a few
+seconds and your game does not close. For an update, your launcher closes the
+game when the count runs out, installs it and puts you back in, unless it
+already has it. A restart means the server is going down: get somewhere safe
+and log out before then.

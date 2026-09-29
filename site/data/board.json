@@ -324,8 +324,8 @@
             "id": "r40",
             "done": false,
             "cells": {
-              "c35": "Mod settings menus reset every session",
-              "c36": "Follows from no saves. There is no co-save to write to"
+              "c35": "A few mod settings menus still reset every session",
+              "c36": "No co-save to write to. MCM Helper menus keep a file on your machine, and the server keeps Apocalypse, moreHUD, Atlas Map Markers, Skyrim Unbound and chfshVariousActions per character. QuickLoot, the instrument menu, MCM Recorder and three SkyUI options still reset"
             },
             "at": 0,
             "by": ""
@@ -666,7 +666,7 @@
             "by": "",
             "cells": {
               "s2a": "**Anyone with the address can walk in**",
-              "s2b": "There is no `sPassword` in server-settings.json, nothing in gamemode.js reads a password, and SkyMP has no join screen. The field only ever existed because Skyrim Together had one. So `192.135.112.23:7777` is open to any SkyMP client.\n\nThe launcher asking Discord does not fix this. That only stops people using your launcher. A stranger with a stock client goes straight past it.",
+              "s2b": "There is no `sPassword` in server-settings.json, nothing in gamemode.js reads a password, and SkyMP has no join screen. The field only ever existed because the old multiplayer mod had one. So `192.135.112.23:7777` is open to any SkyMP client.\n\nThe launcher asking Discord does not fix this. That only stops people using your launcher. A stranger with a stock client goes straight past it.",
               "s2c": "**Today.** Firewall 7777 and 3000 to the addresses that should reach them. I can write it.\n\n**Properly.** A check in gamemode.js on connect against the same ticket the site issues. That is the one that makes a ban bite."
             }
           },
@@ -1078,8 +1078,8 @@
             "by": "",
             "cells": {
               "c21n": "**Default channels**",
-              "c22n": "Discord needs 7, and 5 that everybody can post in. These are nine, six writable.",
-              "c23n": "Tick these nine:\n\n`#welcome` `#rules` `#start-here` `#news`\n\n`#general` `#media` `#character-introductions` `#tales` `#rp-appreciation`\n\nThat is nine total and five writable. The first four are read-only."
+              "c22n": "Discord needs 7, and 5 that everybody can post in. These are nine, five writable, which is exactly the minimum.",
+              "c23n": "Tick these nine:\n\n`#welcome` `#rules` `#start-here` `#news`\n\n`#general` `#media` `#character-introductions` `#tales` `#rp-appreciation`\n\nThat is nine total and five writable. The first four are read-only. All nine have to be channels everybody can see, so check first: `.\\scripts\\deploy\\Set-DiscordOnboarding.ps1 -Check` reads the server and says which of these Discord would refuse, and changes nothing."
             }
           },
           {
@@ -1286,7 +1286,7 @@
             "cells": {
               "c1pt": "**The page blurb**",
               "c2pt": "Settings, then the page editor. Tagline first, then the long one.",
-              "c3pt": "Tagline:\n\n```\nA modded Skyrim roleplay server. Fewer NPCs, more people who matter.\n```\n\nAbout:\n\n```\nThornswood is a modded Skyrim co-op roleplay server set in 4E 252, fifty years after the civil war. The Stormcloaks won. Skyrim has a High King and no Emperor above him. The Thalmor are a criminal remnant, hunted rather than feared.\n\nThe world runs with fewer NPCs than vanilla, not none. Enough that a hold still feels lived in at three in the morning, few enough that the person standing next to you is actually a person.\n\nThe server is free and always will be. Patreon pays for the machine it runs on, the domain, and the time that goes into building it.\n\nNothing here affects what happens in the world. No gold, no gear, no skills, no land, no favours.\n\nThornswood is in closed playtesting. Access is by application at thornswood.net.\n```"
+              "c3pt": "Tagline:\n\n```\nA modded Skyrim roleplay server. Fewer NPCs, more people who matter.\n```\n\nAbout:\n\n```\nThornswood is a modded Skyrim co-op roleplay server set in 4E 252, fifty years after the civil war. The Stormcloaks won. Skyrim has a High King and no Emperor above him. The Thalmor are a criminal remnant, hunted rather than feared.\n\nThe world runs with fewer NPCs than vanilla, not none. Enough that a hold still feels lived in at three in the morning, few enough that the person standing next to you is actually a person.\n\nThe server is free and always will be. Patreon pays for the machine it runs on, the domain, and the time that goes into building it.\n\nNothing here affects what happens in the world. No gold, no gear, no skills, no land, no favours.\n\nThornswood is in alpha, and the world is open by application in the Discord. Anyone can download it at thornswood.net.\n```"
             }
           },
           {

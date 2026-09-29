@@ -5,9 +5,9 @@
 
   The launcher's updater, asked its own questions.
 
-  WHY THIS EXISTS. Seven functions in launcher\app\Updater.cs decide what counts
+  WHY THIS EXISTS. Six functions in launcher\app\Updater.cs decide what counts
   as an update, where one may come from, and which files a pack may write or
-  delete: IsNewer, Parts, RepoCandidates, Inside, ClaimedElsewhere, Pending and
+  delete: IsNewer, Parts, Inside, ClaimedElsewhere, Pending and
   CheckUrl. Each has the incident that shaped it written above it, and until
   this nothing ran any of them outside a live launcher. The To Do List entry
   put it as "the easiest thing in the codebase to test and the most expensive
@@ -51,9 +51,9 @@ param([string]$Src)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $Src) { $Src = Join-Path $Here '..\launcher\app' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $Src) { $Src = Join-Path $Here 'launcher\app' }
 
 # ---- the launcher's runtime, not pwsh's --------------------------------------
 if ($PSVersionTable.PSEdition -eq 'Core') {
@@ -116,7 +116,7 @@ function Find-Ref([string]$name) {
 
 # The names are read off the build script rather than copied, so a reference
 # the launcher gains there is one this compile gains too.
-$builder = Join-Path $Here '..\scripts\release\Build-Launcher.ps1'
+$builder = Join-Path $Here 'scripts\release\Build-Launcher.ps1'
 $tokens = $null; $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($builder, [ref]$tokens, [ref]$errors)
 $assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
@@ -144,7 +144,9 @@ function Run {
         if ($p) { $refs += $p } else { $missing += $n }
     }
     foreach ($n in $wv2) {
-        $p = Join-Path $Here ('lib\webview2\' + $n)
+        # Where Build-Launcher.ps1 reads them, launcher\lib\webview2, since the
+        # launcher moved out of tools\.
+        $p = Join-Path $Here ('launcher\lib\webview2\' + $n)
         if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n }
     }
     Yes ('every one of them is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) (
@@ -183,11 +185,11 @@ function Run {
     $flags = [Reflection.BindingFlags]'Static, Public, NonPublic'
     $script:m = @{}
     $gone = @()
-    foreach ($n in 'IsNewer', 'Parts', 'RepoCandidates', 'Inside', 'ClaimedElsewhere', 'Pending', 'CheckUrl') {
+    foreach ($n in 'IsNewer', 'Parts', 'Inside', 'ClaimedElsewhere', 'Pending', 'CheckUrl') {
         $script:m[$n] = $U.GetMethod($n, $flags)
         if ($null -eq $script:m[$n]) { $gone += $n }
     }
-    Yes ('the seven functions under test are all there' + $(if ($gone.Count) { ', missing ' + ($gone -join ', ') } else { '' })) (
+    Yes ('the six functions under test are all there' + $(if ($gone.Count) { ', missing ' + ($gone -join ', ') } else { '' })) (
         $gone.Count -eq 0)
     if ($gone.Count) { return }
 
@@ -233,24 +235,71 @@ function Run {
         Yes "Parts: nothing for $shown, which is not all numbers" ((PartsText $bad) -eq 'null')
     }
 
-    # ---- RepoCandidates: both sides of the rename ----------------------------
+    # ---- no GitHub fallback (#907) --------------------------------------------
     #
-    # A config.json written either side of skyrim-together becoming Thornswood
-    # is still on somebody's machine, and rewriting it on load renamed
-    # everybody's before the repository itself was renamed. So both are tried,
-    # the one in the config first.
-    Yes 'RepoCandidates: skyrim-together tries Thornswood next' (
-        (Repos 'EvilPatrick06/skyrim-together') -eq 'EvilPatrick06/skyrim-together then EvilPatrick06/Thornswood')
-    Yes 'RepoCandidates: Thornswood tries skyrim-together next' (
-        (Repos 'EvilPatrick06/Thornswood') -eq 'EvilPatrick06/Thornswood then EvilPatrick06/skyrim-together')
-    Yes 'RepoCandidates: whatever case the config wrote it in' (
-        (Repos 'EvilPatrick06/THORNSWOOD') -eq 'EvilPatrick06/THORNSWOOD then EvilPatrick06/skyrim-together')
-    # The default a fresh install writes (Config.cs). It was never renamed, so
-    # a second name would only be a second request.
-    Yes 'RepoCandidates: Thornswood-Releases is asked on its own' (
-        (Repos 'EvilPatrick06/Thornswood-Releases') -eq 'EvilPatrick06/Thornswood-Releases')
-    Yes 'RepoCandidates: nothing set gives nothing to try' ((Repos $null) -eq '' -and (Repos '') -eq '')
-    Yes 'RepoCandidates: a name with no owner is tried as it is and nothing more' ((Repos 'Thornswood') -eq 'Thornswood')
+    # RepoCandidates tried both sides of the repository rename on the
+    # GitHub Contents API fallback. The fallback went with Thornswood-Releases,
+    # so the site feed is the only place updates are read from: a config with a
+    # repository and no feed url has no update source at all.
+    Yes 'RepoCandidates is gone with the GitHub fallback' ($null -eq $U.GetMethod('RepoCandidates', $flags))
+    $upSrc = [IO.File]::ReadAllText((Join-Path $Src 'Updater.cs'))
+    Yes 'Updater.cs builds no GitHub contents API address' ($upSrc -notmatch '/contents/version\.json')
+
+    # ---- FeedUrl: config.json cannot switch the update check off (#937) -----
+    #
+    # Blanking UpdateFeedUrl in config.json used to turn the check off, and a
+    # launcher with no update source let Play through on its own say. Now a
+    # feed address config.json names is kept only on thornswood.net over https,
+    # the way a feed announces a move; anything else is the built-in address
+    # for the channel. A repository with no feed url is no update source any
+    # more, and neither is anything else: there is always one.
+    $C = $asm.GetType('Thornswood.Config')
+    $fu = $U.GetMethod('FeedUrl', $flags)
+    Yes 'Updater.Enabled is gone: nothing can say updates are off' ($null -eq $U.GetMethod('Enabled', $flags))
+    if ($null -ne $C -and $null -ne $fu) {
+        $main = 'https://thornswood.net/feed/version.json'
+        $devFeed = 'https://thornswood.net/feed-dev/version.json'
+        function FeedFor([string]$url, [string]$channel, [string]$branch) {
+            $cfg = [Activator]::CreateInstance($C)
+            $C.GetField('UpdateFeedUrl').SetValue($cfg, $url)
+            $C.GetField('Channel').SetValue($cfg, $channel)
+            $C.GetField('UpdateBranch').SetValue($cfg, $branch)
+            return [string]$fu.Invoke($null, @($cfg))
+        }
+        Yes 'FeedUrl: an empty UpdateFeedUrl is the built-in main feed' ((FeedFor '' '' 'main') -eq $main)
+        Yes 'FeedUrl: a missing one too' ((FeedFor $null '' 'main') -eq $main)
+        Yes 'FeedUrl: an empty one on the dev build is the built-in dev feed' ((FeedFor '' 'dev' 'dev') -eq $devFeed)
+        Yes 'FeedUrl: UpdateBranch dev alone is the dev feed too' ((FeedFor '   ' '' 'dev') -eq $devFeed)
+        foreach ($bent in @('https://evil.example/version.json', 'http://thornswood.net/feed/version.json',
+                            'https://thornswood.net.evil.example/feed/version.json',
+                            'https://evilthornswood.net/feed/version.json',
+                            'https://someone@thornswood.net/feed/version.json',
+                            'https://thornswood.net:8443/feed/version.json',
+                            'file:///C:/Thornswood/version.json', 'not an address', 'off')) {
+            Yes "FeedUrl: '$bent' in config.json falls back to the built-in feed" ((FeedFor $bent '' 'main') -eq $main)
+        }
+        Yes 'FeedUrl: and on the dev build to the dev feed' ((FeedFor 'https://evil.example/v.json' 'dev' 'dev') -eq $devFeed)
+        Yes 'FeedUrl: the site feed is kept' ((FeedFor $main '' 'main') -eq $main)
+        Yes 'FeedUrl: a move the feed announced within thornswood.net is kept' (
+            (FeedFor 'https://thornswood.net/feed-next/version.json' '' 'main') -eq 'https://thornswood.net/feed-next/version.json')
+        Yes 'FeedUrl: and on a thornswood.net host of its own' (
+            (FeedFor 'https://cdn.thornswood.net/feed/version.json' '' 'main') -eq 'https://cdn.thornswood.net/feed/version.json')
+    } else {
+        Yes 'Config and Updater.FeedUrl are in the build' $false
+    }
+    $checkAt = $upSrc.IndexOf('public static VersionDoc Check(Config cfg)')
+    $checkBody = if ($checkAt -ge 0) { $upSrc.Substring($checkAt, $upSrc.IndexOf('static VersionDoc FromSite(', $checkAt) - $checkAt) } else { '' }
+    Yes 'Updater.Check reads FeedUrl and never UpdateFeedUrl itself' (
+        $checkBody -match 'string feedUrl = FeedUrl\(cfg\);' -and $checkBody -notmatch 'UpdateFeedUrl' -and $checkBody -notmatch 'return null;')
+    $shellAll = ''
+    foreach ($f in (Get-ChildItem -LiteralPath $Src -Filter 'Shell*.cs')) { $shellAll += [IO.File]::ReadAllText($f.FullName) }
+    Yes 'the Shell no longer lets Play through with no update source (Unblock is gone)' ($shellAll -notmatch '\bUnblock\s*\(')
+    $opened = @([regex]::Matches($shellAll, 'updatePending = false')).Count
+    $upd = [IO.File]::ReadAllText((Join-Path $Src 'ShellUpdate.cs'))
+    $inDoc = $upd.Substring($upd.IndexOf('static void OnVersionDoc('), $upd.IndexOf('static void CheckUpdatesInPlay(') - $upd.IndexOf('static void OnVersionDoc('))
+    $installed = @([regex]::Matches($upd, 'updatePending = false;\s*DrawStatus\(\); BuildModList\(\);\s*Log\("Update finished\."\);')).Count
+    Yes 'Play is let through only by a feed that was read: every updatePending = false is in OnVersionDoc or after its packs went in' (
+        $opened -gt 0 -and $opened -eq (@([regex]::Matches($inDoc, 'updatePending = false')).Count + $installed))
 
     # ---- Inside: the fence round every write and delete ----------------------
     #
@@ -389,11 +438,6 @@ function PartsText($v) {
     $r = Ask 'Parts' $v
     if ($null -eq $r) { return 'null' }
     return ($r -join '.')
-}
-function Repos($repo) {
-    $l = Ask 'RepoCandidates' $repo
-    if ($null -eq $l) { return 'null' }
-    return (@($l) -join ' then ')
 }
 function Fenced([string]$fence, [string]$line) {
     $full = [IO.Path]::GetFullPath([IO.Path]::Combine($fence, $line))

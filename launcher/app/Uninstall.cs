@@ -362,11 +362,8 @@ namespace Thornswood
             foreach (string spot in spots)
             {
                 if (string.IsNullOrEmpty(spot) || !Directory.Exists(spot)) continue;
-                foreach (string name in new[] { "Thornswood.lnk", "Skyrim Together.lnk" })
-                {
-                    string p = Path.Combine(spot, name);
-                    try { if (File.Exists(p)) File.Delete(p); } catch (Exception ex) { Swallow.Note("Uninstall.DropShortcuts, delete", ex); }
-                }
+                string p = Path.Combine(spot, "Thornswood.lnk");
+                try { if (File.Exists(p)) File.Delete(p); } catch (Exception ex) { Swallow.Note("Uninstall.DropShortcuts, delete", ex); }
             }
         }
 

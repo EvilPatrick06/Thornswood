@@ -26,7 +26,7 @@
 [CmdletBinding()]
 param(
   [string]$VpsHost  = '',
-  [string]$VpsUser  = 'Administrator',
+  [string]$VpsUser  = '',
   [string]$Root     = 'C:\Thornswood-Backup',
   [string]$TaskName = 'Thornswood Backup',
   # Quarter past three in the morning, well clear of when anybody is playing.
@@ -45,6 +45,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -52,7 +53,7 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
 $target = "$VpsUser@$VpsHost"
-$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 foreach ($t in 'ssh', 'scp') {
   if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
     Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client."
@@ -121,6 +122,17 @@ if ($LASTEXITCODE -ne 0) { Die 'scp failed.' }
 Say "  $runner" 'Green'
 
 Head 'The passphrase'
+# A new box, and this machine already has the passphrase every backup so far
+# was made with: that one goes up, rather than the box making its own. A new
+# one there would leave this machine's copy unable to open anything the new
+# box takes, and the "already a copy here" below would keep it that way
+# without a word (issue #454). Sent as a file, never on a command line.
+$there = Remote "if (Test-Path '$keyFile') { 'KEY THERE' } else { 'KEY NONE' }"
+if ("$there" -match 'KEY NONE' -and (Test-Path -LiteralPath $KeyOut)) {
+  & scp @ssh $KeyOut "${target}:$($keyFile.Replace('\','/'))"
+  if ($LASTEXITCODE -ne 0) { Die 'could not send the passphrase up. Nothing was registered.' }
+  Say "  sent this machine's copy up from $KeyOut, so every backup opens with the same file" 'Green'
+}
 $made = Remote @"
 if (Test-Path '$keyFile') {
   'already there, left alone'
@@ -168,8 +180,8 @@ Get-Content '$Root\backup.log' -Tail 20 -EA SilentlyContinue
 Head 'What is left to do'
 Say '  1. Put the passphrase where you keep the server password. It is at' 'DarkGray'
 Say "     $KeyOut on this machine. Losing it makes every backup noise." 'DarkGray'
-Say '  2. Run .\scripts\vps\Fetch-Backups.ps1 to bring them off the box. A backup' 'DarkGray'
-Say '     that only exists on the server is not a backup.' 'DarkGray'
+Say '  2. Run .\scripts\vps\Fetch-Backups.ps1 -Schedule once, so this machine pulls' 'DarkGray'
+Say '     them off the box every day. A backup only on the server is not a backup.' 'DarkGray'
 Say '  3. Restore one, once, following docs\RESTORING.md, and write the date' 'DarkGray'
 Say '     in it. Until that has been done none of this is known to work.' 'DarkGray'
 Write-Host ''

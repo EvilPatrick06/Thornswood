@@ -20,7 +20,7 @@
 // about the game folder is that it only reads it.
 //
 // Read only apart from its own temp folder, which it removes.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -38,7 +38,7 @@ function done() {
   process.exit(fail ? 1 : 0);
 }
 
-const SCRIPT = path.join(TOOLS_DIR, '..', 'scripts', 'mods', 'Audit-ModMenus.js');
+const SCRIPT = path.join(REPO_DIR, 'scripts', 'mods', 'Audit-ModMenus.js');
 let A = null;
 try { A = require(SCRIPT); } catch (e) { console.log('      ' + e.message); }
 yes('scripts\\mods\\Audit-ModMenus.js is there and loads', !!A);

@@ -113,7 +113,45 @@ function grab(name) {
   }
   return '';
 }
-const HELPERS = grab('hasLeft') + '\n' + grab('departed') + '\n';
+// What a banned account is told at Play (#1010), lifted the same way.
+function grabPlain(name) {
+  const at = src.indexOf('\nfunction ' + name + '(');
+  if (at < 0) return '';
+  const b = src.indexOf('{', at);
+  let depth = 0;
+  for (let i = b; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(at + 1, i + 1); }
+  }
+  return '';
+}
+// Play's doors answer inside PLAY_ANSWER_MS, and departed() takes that
+// deadline (#1094): the constants, within, standingLate and the body
+// failure pass-through come along.
+const lineOf = (head) => { const at = src.indexOf(head); return at < 0 ? '' : src.slice(at, src.indexOf('\n', at)); };
+const classOf = (head) => {
+  const at = src.indexOf(head);
+  if (at < 0) return '';
+  let depth = 0;
+  for (let i = src.indexOf('{', at); i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(at, i + 1); }
+  }
+  return '';
+};
+const HELPERS = grab('hasLeft') + '\n' + grab('departed') + '\n' +
+                grabPlain('banUntilText') + '\n' + grabPlain('accountBanned') + '\n' +
+                lineOf('const PLAY_ANSWER_MS') + '\n' + lineOf('const PLAY_BODY_MS') + '\n' +
+                classOf('class BodyFailed') + '\n' + grabPlain('passBodyFailure') + '\n' +
+                grabPlain('within') + '\n' + grabPlain('standingLate') + '\n';
+// /api/allowed asks standingsForDoor for everybody at once since issue #415;
+// lifted with the two constants above it and run over the same stand-in.
+const FOR_DOOR = src.slice(src.indexOf('const DOOR_BUDGET_MS'), src.indexOf('async function standingsForDoor(')) +
+                 grab('standingsForDoor');
+function forDoor(standingCached) {
+  return new Function('standingCached', 'discordQuietMs', FOR_DOOR + '\nreturn standingsForDoor;')(
+    standingCached, function () { return 0; });
+}
 yes('hasLeft and departed are in server.js', HELPERS.length > 10 &&
     HELPERS.indexOf('async function hasLeft(') === 0 && HELPERS.indexOf('async function departed(') > 0);
 
@@ -191,6 +229,11 @@ async function roster(table, store, discordId) {
       return fallback;
     },
     LINKED: 'linked.json', ROSTER: 'roster.json',
+    // Nobody killed for good or banned by character here (#1010);
+    // test-bans-pk.js runs those.
+    characterBar: function () { return null; },
+    // Nor any PK an admin undid; jsonFile hands pk.json back empty.
+    PK: 'pk.json', pkActive: function (r) { return !!r && !r.undone; },
     sendJson: null
   });
 }
@@ -206,8 +249,12 @@ async function allowed(table, over) {
     keyInAddress: new Set(),
     sameSecret: function (a, b) { return a === b; },
     standingCached: standingFrom(over),
+    standingsForDoor: forDoor(standingFrom(over)),
     jsonFile: function (f, fallback) { return f === 'linked.json' ? clone(table) : fallback; },
     LINKED: 'linked.json',
+    // Staff bans kept on the site (#412); none here. test-staff-bans.js runs them.
+    activeBans: function () { return []; },
+    pkProfiles: function () { return []; },
     sendJson: null
   });
 }
@@ -248,6 +295,11 @@ async function checkIn(table, discordId, profileId, standingOver, world) {
     putJson: function (f, obj) { state.writes++; state.table = clone(obj); },
     sendJson: function (r, code, obj) { state.sent = { code: code, obj: obj }; return state.sent; },
     slotsFor: function () { return 2; },
+    // The world is never full here (#481); test-seats.js runs that refusal.
+    gameStatus: { up: false, online: 0, max: 0 },
+    seatsFull: function () { return false; },
+    worldFull: function () { return ''; },
+    mostOnlineFallback: function () { return 0; },
     console: {
       log: function (s) { state.logged.push(String(s)); },
       error: function (s) { state.logged.push(String(s)); }

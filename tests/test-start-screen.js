@@ -32,13 +32,13 @@
 //
 // Read only.
 'use strict';
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 
-const FRONT = process.env.FRONT || path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
-const SELECT = process.env.SELECT || path.join(TOOLS_DIR, '..', 'game', 'ui', 'thornswood-select.js');
+const FRONT = process.env.FRONT || path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js');
+const SELECT = process.env.SELECT || path.join(REPO_DIR, 'game', 'ui', 'thornswood-select.js');
 const front = fs.readFileSync(FRONT, 'utf8').split(CR).join('');
 const page = fs.readFileSync(SELECT, 'utf8').split(CR).join('');
 
@@ -158,8 +158,10 @@ yes('the front hears Continue and remembers it for its own repeats',
 
 yes('with the scroll on the page tells the client to wait',
     /if \(LIST\.intro !== false && beats % 5 === 0\) \{\s*try \{ window\.skyrimPlatform\.sendMessage\('thornswood', 'stay'\); \}/.test(page));
-yes('every ten seconds, on a two second beat, until a character is picked',
-    /\}, 2000\);/.test(page) && /if \(sent \|\| root\.className === 'gone'\) \{ clearInterval\(beat\); return; \}/.test(page));
+// Until the pick is taken rather than made (#481): somebody waiting in line
+// at the menu sits on the page, and its beat is what keeps it from reloading.
+yes('every ten seconds, on a two second beat, until the pick is taken',
+    /\}, 2000\);/.test(page) && /if \(acked \|\| root\.className === 'gone'\) \{ clearInterval\(beat\); return; \}/.test(page));
 yes('with the scroll off it says nothing, so the three minutes work as before',
     page.indexOf('LIST.intro !== false && beats % 5 === 0') >= 0);
 yes('the front says the same two words from its own tick, so the wait outlives the page',

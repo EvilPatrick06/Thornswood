@@ -8,7 +8,7 @@ namespace Thornswood
     /// <summary>
     /// Points the game at the server before it starts.
     ///
-    /// Under Skyrim Together this was a real piece of work: its join menu was a
+    /// Under the old multiplayer mod this was a real piece of work: its join menu was a
     /// Chromium page, so connecting for someone meant injecting a script beside
     /// it, wrapping the bridge object the game put on the window, fanning out
     /// listeners because the bridge allowed only one per event, and retrying.
@@ -304,6 +304,11 @@ namespace Thornswood
             after = SetEveryNumber(after, "profileId", lastProfileId);
             after = EnsureInGameData(after, "chooseAtMenu", "true");
             after = SetEveryBool(after, "chooseAtMenu", true);
+            // SkyMP's skipUpdates draws everybody else's movement at half
+            // rate (worldView.ts skips every other update when it is true).
+            // Patrick, 28 September (#963): it stays off. Absent is off, so
+            // nothing is added; one that says true is put back to false.
+            after = SetEveryBool(after, "skipUpdates", false);
 
             if (!string.Equals(before, after, StringComparison.Ordinal))
             {

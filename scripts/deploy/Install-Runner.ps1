@@ -46,7 +46,7 @@
 [CmdletBinding()]
 param(
   [string]$VpsHost    = '',
-  [string]$VpsUser    = 'Administrator',
+  [string]$VpsUser    = '',
   [string]$Repo       = 'EvilPatrick06/Thornswood',
   [string]$Root       = 'C:\Thornswood-Runner',
   [string]$Account    = 'thornswood-runner',
@@ -63,6 +63,8 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Secret.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -71,7 +73,7 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if
 function Done() { Write-Host ''; if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 0 }
 
 $target = "$VpsUser@$VpsHost"
-$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 foreach ($t in 'ssh', 'scp', 'gh') {
   if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
     if ($t -ne 'gh') { Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client." }
@@ -81,8 +83,8 @@ foreach ($t in 'ssh', 'scp', 'gh') {
 
 # Short scripts go on the command line; the install is longer than cmd.exe's
 # 8,191 characters once encoded, so it goes as a file and is deleted after,
-# the same way Setup-Domain.ps1 does it. The file carries the registration
-# token for the few seconds it exists; the account's password is never in it.
+# the same way Setup-Domain.ps1 does it. The registration token is never in
+# the file: it goes on ssh's standard input (Send-Secret.ps1, issue #451).
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
   $cmd = "powershell -NoProfile -EncodedCommand $e"
@@ -140,11 +142,16 @@ if ($Remove) {
   Head 'Removing the runner'
   $tok = $null
   try { $tok = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/remove-token" --jq .token | Out-String).Trim() } catch { Say '  could not get a removal token; the box is cleaned and GitHub is left to forget it' 'Yellow' }
-  Remote @"
+  # The removal token goes on ssh's standard input and reaches config.cmd in
+  # its environment, never on a command line (Send-Secret.ps1, issue #451).
+  Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret ([string]$tok) -Script @"
 `$ErrorActionPreference = 'Continue'
-if ((Test-Path '$Root\config.cmd') -and '$tok') {
+`$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+if ((Test-Path '$Root\config.cmd') -and `$t) {
   Push-Location '$Root'
-  & .\config.cmd remove --token '$tok' 2>&1 | Select-Object -Last 3
+  `$env:ACTIONS_RUNNER_INPUT_TOKEN = `$t; `$t = `$null
+  & .\config.cmd remove 2>&1 | Select-Object -Last 3
+  Remove-Item Env:\ACTIONS_RUNNER_INPUT_TOKEN -EA SilentlyContinue
   Pop-Location
 }
 Stop-Service -Name '$service' -Force -EA SilentlyContinue
@@ -199,8 +206,14 @@ if (-not $token) { Die "GitHub gave no registration token. gh has to be signed i
 Say '  got one, good for an hour, not shown' 'Green'
 
 Head 'Installing it on the VPS'
-$out = Remote @"
+# The token goes on ssh's standard input (Send-Secret.ps1, issue #451): on no
+# command line and in no file on either machine. Until then it was written
+# into this script, which is long enough to go up as a file, so it sat in
+# C:\Windows\Temp on the VPS while the install ran.
+$out = Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret $token -Script @"
 `$ErrorActionPreference = 'Stop'
+`$regToken = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+if (-not `$regToken) { throw 'NOTHING ARRIVED on standard input, so there is no registration token. Nothing was installed.' }
 `$root = '$Root'
 `$acct = '$Account'
 
@@ -276,11 +289,21 @@ try { Add-MpPreference -ExclusionPath `$root -EA Stop; 'Defender skips ' + `$roo
 # Its own folder is the one place it may write.
 & icacls.exe `$root /grant (`$acct + ':(OI)(CI)M') /T /C /Q 2>&1 | Out-Null
 
+# The token and the account's password reach config.cmd in its environment,
+# not its arguments, so neither is in the box's process list (issue #451).
+# The runner reads ACTIONS_RUNNER_INPUT_<argument> for any argument not given
+# and clears it once read (actions/runner, CommandSettings.cs).
 Push-Location `$root
-`$cfg = & .\config.cmd --unattended --url 'https://github.com/$Repo' --token '$token' --name '$RunnerName' --labels '$Label' --work '_work' --replace --runasservice --windowslogonaccount (".\" + `$acct) --windowslogonpassword `$pw 2>&1
-`$code = `$LASTEXITCODE
+`$env:ACTIONS_RUNNER_INPUT_TOKEN = `$regToken
+`$env:ACTIONS_RUNNER_INPUT_WINDOWSLOGONPASSWORD = `$pw
+try {
+  `$cfg = & .\config.cmd --unattended --url 'https://github.com/$Repo' --name '$RunnerName' --labels '$Label' --work '_work' --replace --runasservice --windowslogonaccount (".\" + `$acct) 2>&1
+  `$code = `$LASTEXITCODE
+} finally {
+  Remove-Item Env:\ACTIONS_RUNNER_INPUT_TOKEN, Env:\ACTIONS_RUNNER_INPUT_WINDOWSLOGONPASSWORD -EA SilentlyContinue
+}
 Pop-Location
-`$pw = `$null; `$sec = `$null
+`$pw = `$null; `$sec = `$null; `$regToken = `$null
 `$cfg | Where-Object { "`$_" -match 'Runner successfully|Settings Saved|Service .* started|error|Error|failed' } | ForEach-Object { '  config: ' + "`$_".Trim() }
 if (`$code -ne 0) { throw ('config.cmd stopped with ' + `$code) }
 

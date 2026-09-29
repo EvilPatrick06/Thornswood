@@ -25,7 +25,7 @@ param(
   [string]$Domain = 'thornswood.net',
   [string]$Email,
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Root = 'C:/Thornswood-Docs',
   [string]$CaddyDir = 'C:/Thornswood-Caddy',
   # One Caddy release, and the SHA-512 Caddy publishes for its Windows zip in
@@ -52,7 +52,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
@@ -141,6 +141,7 @@ Write-Host 'Setting up Caddy on the VPS...'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $tracked = Join-Path $Here 'Caddyfile'
 if (-not (Test-Path -LiteralPath $tracked)) { throw "not found: $tracked. The site's Caddyfile is kept in the repository, and nothing is sent without it." }

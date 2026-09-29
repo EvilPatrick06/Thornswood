@@ -44,7 +44,7 @@
 // two days is caught as different text and answers differently.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
@@ -54,8 +54,8 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const TOOLS = TOOLS_DIR;
-const PLUGINS = path.join(TOOLS, '..', 'game', 'plugins');
+const REPO = REPO_DIR;
+const PLUGINS = path.join(REPO, 'game', 'plugins');
 const REFERENCE = 'thornswood-front.js';
 const GUARD = 'if (!thornswoodGame()) { return; }';
 const HEAD = 'function thornswoodGame() {';
@@ -167,8 +167,8 @@ function settings(ip, bom) {
 function note(ms) { return ms + ' Thornswood Dev'; }
 
 // ------------------------------------------------ the address Set-Vps moves
-const configCs = fs.readFileSync(path.join(TOOLS, '..', 'launcher', 'app', 'Config.cs'), 'utf8');
-const setVps = fs.readFileSync(path.join(TOOLS, '..', 'scripts', 'vps', 'Set-Vps.ps1'), 'utf8');
+const configCs = fs.readFileSync(path.join(REPO, 'launcher', 'app', 'Config.cs'), 'utf8');
+const setVps = fs.readFileSync(path.join(REPO, 'scripts', 'vps', 'Set-Vps.ps1'), 'utf8');
 const OLD_RX = 'public\\s+string\\s+ServerAddress\\s*=\\s*"([^"]+)"';
 
 yes('Set-Vps.ps1 still takes the address it moves from the ServerAddress default in app\\Config.cs',

@@ -7,27 +7,48 @@
       .\Install-Bot.ps1               all of it, asks for the token
       .\Install-Bot.ps1 -CodeOnly    just the code, then restart
       .\Install-Bot.ps1 -NoToken     everything except asking for it
+      .\Install-Bot.ps1 -PutBack     the code the last run replaced goes back
+                                     in, checked the same way
+      .\Install-Bot.ps1 -SetPing     asks for the outside monitor's ping
+                                     address, puts it in bot.env.json and
+                                     restarts the bot; nothing else is sent
 
   What it does:
 
     1. Checks Python is on the VPS, and says how to get it if not.
-    2. Copies bot.py, card.py and the card artwork up.
+    2. Stages bot.py, card.py and the card artwork beside the running bot and
+       checks them there, before anything is stopped (issue #446, FILES below).
     3. Installs discord.py and Pillow there.
-    4. Asks for the bot token at a prompt, never on a command line.
+    4. Asks for the bot token at a prompt, never on a command line, and puts
+       it in the bot's bot.env.json and the site's config.json together
+       (scripts\vps\Write-BotToken.ps1, the one writer of it).
     5. Makes a shared key, gives it to both the bot and the site, so the site
-       knows a ticket really came from the bot.
-    6. Registers a scheduled task that starts it at boot and restarts it if it
-       falls over, then starts it now.
+       knows a ticket really came from the bot. The site is restarted when the
+       key or the token changed, since it reads its config only on starting.
+    6. Runs it as the Windows service ThornswoodBot, under its own account,
+       NT SERVICE\ThornswoodBot, rather than as SYSTEM, and starts it by that
+       name (issue #465, scripts\vps\Bot-Service.ps1 and BotService.cs). The
+       service starts it at boot, starts python again when it exits, and
+       rolls bot.log by size while it runs. The first full run takes the old
+       scheduled task and its run.ps1 loop off the box.
 
-  Run it again any time to push a change. It stops the old one first.
+  Run it again any time to push a change. It stops the old one by the
+  service's name only once the new code has checked out, and puts the old
+  code back if the new one does not come up.
 #>
 [CmdletBinding()]
 param(
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Root = 'C:/Thornswood-Bot',
   [string]$DocsRoot = 'C:/Thornswood-Docs',
+  # The service the bot runs as, stopped and started by this name.
+  [string]$Service = 'ThornswoodBot',
+  # The scheduled task the bot ran under before the service. A full run
+  # removes it.
   [string]$Task = 'Thornswood Bot',
+  # The site's task, restarted when the key or the token it reads changed.
+  [string]$SiteTask = 'Thornswood Docs',
   # The channel the ticket panel lives in. More than one name is allowed and
   # the first that exists wins, so renaming the channel in Discord stops being
   # able to take tickets down with it.
@@ -55,15 +76,27 @@ param(
   # so it runs unattended.
   [switch]$CodeOnly,
   [switch]$NoToken,
-  [switch]$NoPause
+  [switch]$NoPause,
+  # How long the new bot has to say it is watching its server before the old
+  # code goes back. Connecting to Discord and reading the roles takes a while.
+  [int]$Wait = 90,
+  # Put the code the last run replaced back in, and send nothing.
+  [switch]$PutBack,
+  # The outside monitor's ping address (issue #449), asked for hidden, into
+  # bot.env.json as PING_URL on ssh's standard input, then the bot restarted
+  # by name so it reads it. Typing off takes it out. Nothing else is sent.
+  [switch]$SetPing
 )
 
 $ErrorActionPreference = 'Stop'
-$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Secret.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
+. (Join-Path $Here 'Swap.ps1')
 # The bot sources live at the repo root, in bot\. This script sits two levels
 # down, in scripts\deploy, since #440 sorted the scripts into scripts\<area> on
 # 25 September, so the repo root is two up from here. The copy loop below kept
@@ -74,6 +107,20 @@ if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $Repo = Split-Path -Parent (Split-Path -Parent $Here)
 $rootWin = $Root.Replace('/','\')
 $docsWin = $DocsRoot.Replace('/','\')
+
+# What goes up is the bot artifact (issue #459, Artifact.ps1): the bot's files
+# as the commit holds them, in one zip named by commit and hash, sent to the
+# box's store first. From here $Repo is the artifact's folder, which is laid
+# out like the repository, so every copy below sends exactly what the zip holds.
+# -PutBack and -SetPing build and send nothing.
+. (Join-Path $Here 'Artifact.ps1')
+$artifact = $null
+if (-not $PutBack -and -not $SetPing) {
+$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
+Write-Host ('artifact ' + (Format-ThornswoodArtifact $artifact)) -ForegroundColor DarkGray
+Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
+$Repo = $artifact.Folder
+}
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -124,6 +171,99 @@ function Remote($script) {
 
 Write-Host ''
 Write-Host '  THORNSWOOD  -  the bot' -ForegroundColor White
+
+# ------------------------------------------------------------ ping url ---
+# The outside monitor's ping address (issue #449, bot.py uptime_ping). The
+# bot sends it one GET a minute while it is on Discord, and the monitor
+# alerts when that stops, whether or not One is on. The address is a secret
+# (whoever has it can keep the monitor quiet): asked for hidden, never
+# printed, sent on ssh's standard input (Send-Secret.ps1, issue #451), kept
+# only in bot.env.json on the VPS, never in the repository. The full run
+# keeps it, since it keeps every setting it does not write.
+if ($SetPing) {
+  Head 'The outside monitor''s ping address'
+  Say '  From the monitor''s page for the bot check. Hidden while you paste it, never shown.' 'DarkGray'
+  Say '  Type off instead to take it out, so the bot stops pinging.' 'DarkGray'
+  $ss = Read-Host '  Paste it' -AsSecureString
+  if (-not $ss -or $ss.Length -eq 0) { Die 'Nothing pasted, nothing sent.' }
+  $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($ss)
+  try { $pingUrl = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr).Trim() }
+  finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+  $ss = $null
+  if ($pingUrl -ne 'off') {
+    $shape = $pingUrl -match '^https://[^\s/]+\.[^\s/]+/\S+$' -and $pingUrl.Length -le 400
+    if (-not $shape) {
+      $pingUrl = $null
+      Die 'That is not a ping address: it starts with https:// and has no spaces. Nothing was sent.'
+    }
+    Say ('  a ping address on ' + ([Uri]$pingUrl).Host) 'Green'
+  } else { Say '  taking the ping address out' 'Yellow' }
+
+  $writer = Join-Path $Here '..\vps\Write-BotToken.ps1'
+  if (-not (Test-Path -LiteralPath $writer)) { Die "missing: $writer" }
+  Head 'Into bot.env.json, then the bot restarted by name'
+  $out = Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $pingUrl -Script ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
+`$ErrorActionPreference = 'Continue'
+`$u = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+`$f = '$rootWin\bot.env.json'
+if (-not `$u) { 'NOT WRITTEN: nothing arrived on standard input. Nothing changed.'; return }
+`$h = `$null
+try { `$h = Read-ThornswoodJsonFile `$f }
+catch { 'NOT WRITTEN: ' + `$_.Exception.Message + '. Run Install-Bot.ps1 once first. Nothing changed.'; return }
+`$off = (`$u -eq 'off')
+if (`$off) {
+  if (-not `$h.Contains('PING_URL')) { 'PING UNCHANGED: bot.env.json holds no ping address. Nothing changed.'; return }
+  `$h.Remove('PING_URL')
+} else {
+  if ([string]`$h['PING_URL'] -ceq `$u) { 'PING UNCHANGED: bot.env.json already holds that ping address. Nothing changed.'; return }
+  `$h['PING_URL'] = `$u
+}
+try { Write-ThornswoodJsonFile `$f `$h }
+catch { 'NOT WRITTEN: ' + `$f + ' could not be written. Nothing else changed.'; return }
+`$back = `$null
+try { `$back = Read-ThornswoodJsonFile `$f } catch { }
+if (-not `$back) { 'NOT WRITTEN: ' + `$f + ' does not read back. Put it right before the bot restarts.'; return }
+if (`$off) {
+  if (`$back.Contains('PING_URL')) { 'NOT WRITTEN: the ping address is still in ' + `$f; return }
+  'ping address taken out of ' + `$f + ' and read back'
+} else {
+  if (-not ([string]`$back['PING_URL'] -ceq `$u)) { 'NOT WRITTEN: ' + `$f + ' reads back a different ping address'; return }
+  'ping address written to ' + `$f + ' and read back'
+}
+`$u = `$null; `$h = `$null; `$back = `$null
+# The service hands bot.env.json to python only when it starts it.
+`$log = '$rootWin\bot.log'
+`$before = Get-ThornswoodLogLength `$log
+`$r = @(Restart-ThornswoodBot -Root '$rootWin' -Service '$Service')
+`$r
+if (`$r -contains 'bot reconnected') {
+  # uptime_ping says once how its first ping went, within seconds of connecting.
+  `$seen = @()
+  for (`$i = 0; `$i -lt 30 -and -not `$seen.Count; `$i += 2) {
+    `$seen = @(Read-ThornswoodLogTail `$log `$before | Where-Object { `$_ -match 'uptime ping' })
+    if (-not `$seen.Count) { Start-Sleep -Seconds 2 }
+  }
+  if (`$seen.Count) { `$seen | ForEach-Object { 'bot: ' + (`$_ -replace '^\s*\[thornswood-bot\]\s*', '') } }
+  else { 'THE BOT HAS NOT SAID how its first ping went. Show-BotLog.ps1 shows its log.' }
+}
+"@)
+  $pingUrl = $null
+  foreach ($l in @($out)) {
+    $s = "$l"
+    $c = 'Gray'
+    if ($s -match 'NOT WRITTEN|NOT RESTARTED|HAS NOT SAID|FAILED') { $c = 'Red' }
+    elseif ($s -match 'read back|reconnected|reached the outside monitor|hears from this bot again') { $c = 'Green' }
+    Say "  $s" $c
+  }
+  Write-Host ''
+  if ("$out" -match 'NOT WRITTEN') { Die 'The ping address was not changed.' }
+  if ("$out" -match 'PING UNCHANGED') { Say '  Nothing to do: the bot already has that.' 'DarkGray' }
+  elseif ("$out" -match 'reached the outside monitor') { Say '  The monitor hears from the bot. Its page shows the first ping.' 'Green' }
+  elseif ("$out" -match 'taken out') { Say '  The bot no longer pings anything. Pause or delete the check on the monitor''s page, or it alerts.' 'Yellow' }
+  else { Say '  Check the monitor''s page: it shows each ping it gets.' 'Yellow' }
+  if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  exit 0
+}
 
 # ------------------------------------------------------------- python ---
 Head 'Python on the VPS'
@@ -178,8 +318,27 @@ if (`$p) { 'FOUND ' + (& `$p.Source --version 2>&1) } else { 'MISSING' }
 }
 
 # --------------------------------------------------------------- files ---
-Head 'Copying it up'
-$null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin','$rootWin\assets' | Out-Null; 'ready'"
+<#
+  STAGED, CHECKED, THEN SWAPPED, issue #446.
+
+  This used to copy every file straight over the running bot, without looking
+  at a single scp exit code, and then restart it, so a copy that failed half
+  way was loaded half new at the next start. Now the files go into
+  $Root\.stage-<stamp> while the bot runs, every copy is checked, and the box
+  checks the stage (each file by its hash, bot.py and card.py through Python's
+  own parser). Nothing is stopped if that fails. The swap then stops the
+  service by name, renames the files in (what they replace goes to
+  $Root\.prev-<stamp>, the newest two kept), starts it by name, and waits
+  for this start to say it is watching its server. If it does not, the old
+  files go back and the service is started again on them. -PutBack puts the
+  newest .prev folder back the same way.
+#>
+$stamp     = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stageName = '.stage-' + $stamp
+$prevName  = '.prev-' + $stamp
+$hashes    = [ordered]@{}
+if (-not $PutBack) {
+Head 'Staging it'
 # dev-channel.txt goes up with the code, and it is not an afterthought.
 #
 # The site watcher reads the staff channel's id out of it, beside bot.py. It
@@ -190,18 +349,14 @@ $null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin','$rootWin\a
 # be added here.
 #
 # requirements.txt too, because the full run installs the libraries from it.
+$send = [ordered]@{}
 foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') {
   $src = Join-Path $Repo "bot\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
-  & scp @ssh $src "${User}@${Vps}:$Root/$f" | Out-Null
-  Say "  $f" 'Green'
+  $send[$f] = $src
 }
-# The roller run.ps1 calls before each start of the bot. See Roll-Log.ps1 for
-# why a log cmd holds open can only be rolled then.
-$roll = Join-Path $Here '..\vps\Roll-Log.ps1'
-if (-not (Test-Path $roll)) { Die "missing: $roll" }
-& scp @ssh $roll "${User}@${Vps}:$Root/roll-log.ps1" | Out-Null
-Say '  roll-log.ps1' 'Green'
+# No roll-log.ps1 any more: the service rolls bot.log itself, by size, while
+# the bot runs (BotService.cs).
 
 # staff-channel.txt the same way, when there is one. It holds the id of the
 # channel a session that went wrong is announced in. Unlike the file above it
@@ -210,69 +365,153 @@ Say '  roll-log.ps1' 'Green'
 # working bot rather than a silent one. Put an id in it the moment two
 # channels ever share that name, which has already happened here with news.
 $staff = Join-Path $Repo 'bot\staff-channel.txt'
-if (Test-Path $staff) {
-  & scp @ssh $staff "${User}@${Vps}:$Root/staff-channel.txt" | Out-Null
-  Say '  staff-channel.txt' 'Green'
-} else {
-  Say '  no staff-channel.txt, so the bot resolves staff-general by name' 'DarkGray'
-}
+if (Test-Path $staff) { $send['staff-channel.txt'] = $staff }
+else { Say '  no staff-channel.txt, so the bot resolves staff-general by name' 'DarkGray' }
 $art = Join-Path $Repo 'bot\assets\join-card.png'
-if (Test-Path $art) {
-  & scp @ssh $art "${User}@${Vps}:$Root/assets/join-card.png" | Out-Null
-  Say '  assets\join-card.png' 'Green'
-} else {
-  Say '  no join-card.png, cards will fall back to a plain background' 'Yellow'
+if (Test-Path $art) { $send['assets/join-card.png'] = $art }
+else { Say '  no join-card.png, cards will fall back to a plain background' 'Yellow' }
+
+# A stage a run that died part way left behind was never swapped in.
+$made = @(Remote @"
+New-Item -ItemType Directory -Force -Path '$rootWin','$rootWin\assets' | Out-Null
+Get-ChildItem -LiteralPath '$rootWin' -Directory -Force -EA SilentlyContinue |
+  Where-Object { `$_.Name -like '.stage-*' } |
+  ForEach-Object { Remove-Item -LiteralPath `$_.FullName -Recurse -Force -EA SilentlyContinue }
+New-Item -ItemType Directory -Force -Path '$rootWin\$stageName\assets' | Out-Null
+'ready'
+"@ | ForEach-Object { "$_".Trim() })
+if ($made -notcontains 'ready') { Die "could not make $rootWin\$stageName on the VPS. The bot was not touched." }
+foreach ($rel in $send.Keys) {
+  & scp @ssh $send[$rel] "${User}@${Vps}:$Root/$stageName/$rel" | Out-Null
+  if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE for $rel. The bot was not touched." }
+  Say "  $rel" 'Green'
+}
+$hashes = Get-SwapHashes $send
+$checkOut = @(Remote ((ServiceSwapVars $Root $stageName $prevName $Wait $hashes @('bot.py', 'card.py')) + $serviceCheckBlock) |
+              ForEach-Object { Say "  $_"; "$_".Trim() })
+if ($checkOut -notcontains 'STAGE OK') { Die 'the stage did not check out, so the bot was not stopped or changed. The lines above say why.' }
+}
+
+# ==== thornswood bot hooks ====
+# What is particular to the bot, for Swap.ps1's service swap, in front of
+# which Bot-Service.ps1 goes: stopped by the service's name, with one sweep
+# for a copy somebody started by hand, which is still a bot holding the token
+# (issue #465); started by name. Healthy when this start has written 'watching
+# N server' to bot.log, which bot.py says once it is connected and has read
+# the roles, and not merely when the service says Running: a bot.py that fails
+# on import is running for a second at a time. A box with no service yet, on a
+# full run that is about to install it, has nothing to start or check here.
+$botHooks = @"
+`$log = '$rootWin\bot.log'
+`$before = 0
+`$hasService = [bool](Get-Service -Name '$Service' -EA SilentlyContinue)
+if (-not `$hasService -and -not `$NoServiceOk) {
+  'THE BOT SERVICE IS NOT INSTALLED HERE. Run Install-Bot.ps1 once without -CodeOnly: it puts the service in place of the old loop.'
+  'SWAP REFUSED'
+  exit 1
+}
+function StopIt {
+  if (`$hasService) {
+    try { Stop-Service -Name '$Service' -Force -ErrorAction Stop; 'stopped the service $Service' }
+    catch { 'COULD NOT STOP the service $Service' + ': ' + `$_.Exception.Message }
+  }
+  Stop-ThornswoodBotStrays '$rootWin'
+}
+function StartIt {
+  `$script:before = 0
+  if (Test-Path -LiteralPath `$log) { `$script:before = (Get-Item -LiteralPath `$log).Length }
+  if (`$hasService) { Restart-ThornswoodBotService -Name '$Service' -Root '$rootWin' }
+}
+# Only what this start wrote. The file is held open by the service, so it is
+# read with FileShare ReadWrite or not at all. Shorter than before means it
+# rolled, so all of it is this start.
+function Fresh {
+  `$out = @()
+  `$fs = `$null
+  try {
+    `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
+    `$from = `$before
+    if (`$fs.Length -lt `$from) { `$from = 0 }
+    if (`$fs.Length -gt `$from) {
+      [void]`$fs.Seek(`$from, 'Begin')
+      `$sr = New-Object IO.StreamReader(`$fs, [Text.Encoding]::UTF8)
+      `$out = @((`$sr.ReadToEnd()) -split "\r?\n")
+      `$sr.Close()
+    }
+  } catch { }
+  if (`$fs) { `$fs.Dispose() }
+  return `$out
+}
+function Healthy {
+  if (-not `$hasService) { return `$true }
+  `$until = (Get-Date).AddSeconds(`$Wait)
+  while (`$true) {
+    `$said = @(Fresh)
+    if (@(`$said -match 'watching \d+ server').Count -and (Get-Service -Name '$Service').Status -eq 'Running') { return `$true }
+    if (@(`$said -match 'stopped within').Count) { return `$false }
+    if ((Get-Date) -gt `$until) { return `$false }
+    Start-Sleep -Seconds 2
+  }
+}
+function Answer {
+  if (-not `$hasService) { return 'the files are in; the service is installed below' }
+  'service $Service is ' + (Get-Service -Name '$Service').Status + ', and the bot says it is watching its server'
+}
+function Why {
+  '--- what the bot said this time ---'
+  `$said = @(Fresh | Where-Object { `$_ -match '^\s*\[(thornswood-bot|run|service)\]' -or `$_ -match 'Error|Traceback' })
+  if (`$said.Count) { `$said | Select-Object -Last 25 } else { 'nothing yet' }
+}
+
+"@
+# ==== end thornswood bot hooks ====
+
+# The swap itself, for -CodeOnly, -PutBack and a full run. Hands back what the
+# box said. A full run may meet a box with no service yet, which the service
+# install below then puts in.
+function Invoke-BotSwap([bool]$noServiceOk) {
+  $pick = ''
+  if ($PutBack) { $pick = $putBackPick }
+  $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
+  if (-not (Test-Path -LiteralPath $svcLib)) { Die "missing: $svcLib" }
+  $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + ('$NoServiceOk = $' + $noServiceOk + "`r`n")
+  $out = @(Remote ($vars + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $botHooks + $pick + $serviceSwapBlock) |
+           ForEach-Object { Say "  $_"; "$_".Trim() })
+  if (-not (Show-SwapResult $out "$rootWin\.prev-<stamp>")) { Die 'the bot was not swapped in. The lines above say what is running.' }
+  return $out
+}
+
+# The box records that the bot runs this artifact (Artifact.ps1), and only
+# once the service is running on it (issue #465) and the swap has answered
+# (issue #446): -CodeOnly after the swap, a full run after the service
+# install. The record it had goes into .prev with the files it describes, so
+# -PutBack brings it back (Swap.ps1). A run that ends with the bot stopped
+# records nothing, so the record never names code that is not up.
+function Save-BotRecord {
+  Save-SwapPreviousRecord "$User@$Vps" $ssh $Root $prevName
+  $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root
 }
 
 # ----------------------------------------------------------- code only ---
 # A change to bot.py and nothing else, which is most of them.
 #
 # The full run checks Python, reinstalls three libraries over the network,
-# rewrites bot.env.json and re-registers the scheduled task, and none of that
-# has anything to do with the code having changed. This sends the files and
-# restarts, which is the whole job, and it never asks for the token, so it
-# runs unattended.
-if ($CodeOnly) {
-    Head 'Restarting it'
-    Remote @"
-`$ErrorActionPreference = 'Continue'
-`$log = '$rootWin\bot.log'
-`$before = 0
-if (Test-Path `$log) { `$before = (Get-Item `$log).Length }
-
-# By command line rather than by task, because a bot started by hand once is
-# still a bot holding the token and answering tickets.
-Get-CimInstance Win32_Process |
-  Where-Object { `$_.Name -like 'python*' -and `$_.CommandLine -like '*Thornswood-Bot*' } |
-  ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue; 'stopped pid ' + `$_.ProcessId }
-Start-Sleep -Seconds 2
-Stop-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
-Start-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
-Start-Sleep -Seconds 12
-
-`$p = Get-CimInstance Win32_Process |
-      Where-Object { `$_.Name -like 'python*' -and `$_.CommandLine -like '*Thornswood-Bot*' }
-if (`$p) { 'bot up, pid ' + (`$p | Select-Object -First 1).ProcessId } else { 'BOT DID NOT START' }
-
-# Only what this start wrote. The file is held open by the bot, so it is read
-# with FileShare ReadWrite or not at all. Shorter than before means run.ps1
-# rolled it on the way up, so all of it is this start.
-`$fs = `$null
-try {
-  `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
-  `$from = `$before
-  if (`$fs.Length -lt `$from) { `$from = 0 }
-  if (`$fs.Length -gt `$from) {
-    [void]`$fs.Seek(`$from, 'Begin')
-    `$sr = New-Object IO.StreamReader(`$fs, [Text.Encoding]::UTF8)
-    (`$sr.ReadToEnd()) -split "\r?\n" | Where-Object { `$_ } | Select-Object -Last 12
-    `$sr.Close()
-  } else { 'nothing new in the log yet' }
-} catch { 'could not read the log: ' + `$_.Exception.Message } finally { if (`$fs) { `$fs.Dispose() } }
-"@ | ForEach-Object { Say "  $_" }
+# rewrites bot.env.json and re-installs the service, and none of that has
+# anything to do with the code having changed. This swaps the staged files in
+# and restarts the service by name, which is the whole job, and it never asks
+# for the token, so it runs unattended. -PutBack is the same swap with the
+# newest .prev folder in place of the stage.
+if ($CodeOnly -or $PutBack) {
+    if ($PutBack) { Head 'Putting the last files back' } else { Head 'Swapping it in' }
+    $restart = Invoke-BotSwap $false
+    if ($PutBack) { Restore-SwapRecord "$User@$Vps" $ssh $Root $restart '' 'bot' }
+    elseif ($restart -contains 'SWAP OK') {
+        if ("$restart" -match ('service ' + $Service + ' is Running')) { Save-BotRecord }
+        else { Say '  The service is not running, so the box does not record this code as the bot''s.' 'Yellow' }
+    }
 
     Write-Host ''
-    Say '  Code only. Python, the libraries, the token and the task were left alone.' 'DarkGray'
+    Say '  Code only. Python, the libraries, the token and the service were left alone.' 'DarkGray'
     Say '  The ticket panel updates itself on startup, so a changed panel is already up.' 'DarkGray'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -295,7 +534,7 @@ Set-Location '$rootWin'
 # box would have taken the next major of any of the three, untried. The
 # build check installs the same file before it runs the bot harnesses, so the
 # versions tested are the versions run. Bump them there, on purpose.
-& python -m pip install --quiet --disable-pip-version-check -r '$rootWin\requirements.txt' 2>&1 | Out-Null
+& python -m pip install --quiet --disable-pip-version-check -r '$rootWin\$stageName\requirements.txt' 2>&1 | Out-Null
 if (`$LASTEXITCODE -eq 0) { 'discord.py, pillow and certifi ready, at the versions in requirements.txt' } else { 'PIP FAILED with ' + `$LASTEXITCODE }
 `$ca = (& python -c "import certifi; print(certifi.where())" 2>&1 | Select-Object -Last 1)
 if (`$ca -and (Test-Path `$ca)) { 'root certificates at ' + `$ca } else { 'COULD NOT FIND certifi, TLS will fail' }
@@ -326,15 +565,25 @@ function NewKey([int]$n) {
 $botKey = NewKey 32
 $KeyMode = if ($RotateKey) { 'new' } else { 'keep' }
 
+# The token and the key go on ssh's standard input, never in the script or on
+# a command line on either machine (Send-Secret.ps1, issue #451).
 $payload = @{ token = $token; key = $botKey } | ConvertTo-Json -Compress
-$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
-$token = $null; $payload = $null
+$token = $null
+
+# The one writer of the token, which puts it in bot.env.json and the site's
+# config.json together or in neither (issue #466). It goes up in front of the
+# settings script, so both run in the same session on the VPS.
+$writer = Join-Path $Here '..\vps\Write-BotToken.ps1'
+if (-not (Test-Path -LiteralPath $writer)) { Die "missing: $writer" }
 
 Head 'Settings, and the key the site will check'
-$settings = Remote @"
+$settings = Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $payload -Script ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Stop'
 `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')
-`$p = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64')) | ConvertFrom-Json
+`$p = `$null
+try { `$p = `$ThornswoodSecret | ConvertFrom-Json } catch { }
+`$ThornswoodSecret = `$null
+if (-not `$p) { 'NOTHING ARRIVED on standard input. Nothing written.'; return }
 
 # The bot's own env file. Kept out of the repo and readable by this account only.
 `$f = '$rootWin\bot.env.json'
@@ -343,7 +592,8 @@ if (Test-Path `$f) {
   try { (Get-Content `$f -Raw | ConvertFrom-Json).PSObject.Properties |
         ForEach-Object { `$env2[`$_.Name] = `$_.Value } } catch { }
 }
-if (`$p.token) { `$env2['DISCORD_TOKEN'] = `$p.token }
+# The token is not written here. Write-ThornswoodBotToken writes it below,
+# into this file and the site's config.json together, once both exist.
 `$env2['THORNSWOOD_SITE'] = 'https://thornswood.net'
 `$changed = `$false
 if ('$KeyMode' -eq 'new' -or -not `$env2['THORNSWOOD_KEY']) {
@@ -358,7 +608,7 @@ if ('$KeyMode' -eq 'new' -or -not `$env2['THORNSWOOD_KEY']) {
 # Piped, Python writes in the machine's ANSI codepage and PowerShell reads the
 # pipe as OEM. Anything outside plain ASCII, a role name or a channel name with
 # an accent in it, came out of that as a screenful of question marks. Both ends
-# are told UTF-8 instead, here and at the top of run.ps1.
+# are told UTF-8 instead, here and by the service (BotService.cs).
 `$env2['PYTHONIOENCODING'] = 'utf-8'
 
 # Where Python looks for root certificates. ssl.set_default_verify_paths reads
@@ -372,9 +622,12 @@ try {
   }
 } catch { }
 [IO.File]::WriteAllText(`$f, (`$env2 | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding(`$false)))
-# Locked down, but not so far that the thing meant to read it cannot. The
-# scheduled task runs as SYSTEM, so SYSTEM has to stay on the file. Taking it
-# off is how the bot ended up starting with no token and exiting immediately.
+# Locked down, but not so far that the thing meant to read it cannot. The bot
+# runs as NT SERVICE\ThornswoodBot now, and Bot-Service.ps1 grants that
+# account read on this file below, after this rewrites the rules, every full
+# run. SYSTEM stays for the nightly backup, which runs as SYSTEM and copies
+# this folder. A file its reader cannot open is how the bot once started with
+# no token and exited immediately.
 try {
   `$acl = Get-Acl `$f
   `$acl.SetAccessRuleProtection(`$true, `$false)
@@ -388,7 +641,6 @@ try {
     [Security.Principal.WindowsIdentity]::GetCurrent().Name, 'FullControl', 'Allow')))
   Set-Acl `$f `$acl
 } catch { 'could not tighten bot.env.json: ' + `$_.Exception.Message }
-if (`$env2['DISCORD_TOKEN']) { 'token held' } else { 'NO TOKEN, the bot will not start' }
 'panel channel: #' + (`$env2['TICKET_CHANNEL'] -replace ',', ' or #')
 'closed tickets: #' + (`$env2['TICKET_LOG'] -replace ',', ' or #') + '  (staff only)'
 'join cards:    #' + `$env2['JOIN_CHANNEL']
@@ -396,115 +648,73 @@ if (`$env2['DISCORD_TOKEN']) { 'token held' } else { 'NO TOKEN, the bot will not
 'creator only:  ' + `$env2['CREATOR_ROLES']
 
 # The same key into the site's config, so it accepts the bot and nobody else.
+# Never over a config.json that is there and does not parse: it is not empty,
+# it is unreadable, and writing a fresh one over it is how the whole Discord
+# setup, client secret and token included, went once already.
 `$c = '$docsWin\config.json'
 `$cfg = @{}
+`$cfgOk = `$true
 if (Test-Path `$c) {
   try { (Get-Content `$c -Raw | ConvertFrom-Json).PSObject.Properties |
-        ForEach-Object { `$cfg[`$_.Name] = `$_.Value } } catch { }
+        ForEach-Object { `$cfg[`$_.Name] = `$_.Value } } catch { `$cfgOk = `$false }
 }
-`$cfg['botKey'] = `$env2['THORNSWOOD_KEY']
-[IO.File]::WriteAllText(`$c, (`$cfg | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
-if (`$changed) { 'site told about a NEW key, so the site needs restarting' }
-else { 'key unchanged, the site does not need restarting' }
-"@
+if (`$cfgOk) {
+  `$cfg['botKey'] = `$env2['THORNSWOOD_KEY']
+  [IO.File]::WriteAllText(`$c, (`$cfg | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
+} else {
+  `$changed = `$false
+  'SITE CONFIG DOES NOT PARSE: ' + `$c + ' was left as it is, and neither the key nor the token went into it'
+}
+
+# The token, into both files or neither. Blank at the prompt keeps what is there.
+`$tokenChanged = `$false
+if (`$p.token) {
+  `$r = Write-ThornswoodBotToken -Token `$p.token -BotEnv `$f -SiteConfig `$c
+  `$r.Lines
+  `$tokenChanged = [bool]`$r.Changed
+}
+Get-ThornswoodBotTokenState -BotEnv `$f -SiteConfig `$c
+
+# The site reads config.json once, when it starts, so a new key or token means
+# nothing to it until it restarts.
+if (`$changed -or `$tokenChanged) {
+  if (`$changed) { 'site told about a NEW key' }
+  Restart-ThornswoodSite -Root '$docsWin' -Task '$SiteTask'
+} else { 'key and token unchanged, the site does not need restarting' }
+"@)
+$payload = $null; $botKey = $null
 $settings | ForEach-Object { Say "  $_" }
 
+# ---------------------------------------------------------------- swap ---
+# The staged code in, with the old service stopped and started again by name,
+# and the old code back if it does not come up (issue #446). A box with no
+# service yet gets the files, and the install below starts them.
+Head 'Swapping it in'
+$null = Invoke-BotSwap $true
+
 # -------------------------------------------------------------- runner ---
+# The bot as the Windows service ThornswoodBot, under its own account (issue
+# #465). BotService.cs is the program the service runs: python bot.py with
+# bot.env.json as its environment, bot.log written and rolled by size, python
+# started again when it exits, three quick exits and it stops. It is built on
+# the box by Bot-Service.ps1, which also takes off the old way: the scheduled
+# task that ran run.ps1 as SYSTEM, and run.ps1 and roll-log.ps1 with it.
+#
+# Nothing on the box is stopped until python has been checked and the program
+# has built beside the old one, so a failure there leaves the running bot as
+# it is.
 Head 'Keeping it running'
-Remote @"
-`$ErrorActionPreference = 'Stop'
-
-# A wrapper, because the scheduled task cannot set environment variables and
-# the bot wants six of them. It also restarts the bot if it exits, which is
-# what a rate limit or a dropped websocket looks like from out here.
-`$run = @'
+$svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
+# From the artifact, like the bot's own files: the program is part of what
+# the box records as running.
+$svcSrc = Join-Path $Repo 'scripts\vps\BotService.cs'
+foreach ($f in $svcLib, $svcSrc) { if (-not (Test-Path -LiteralPath $f)) { Die "missing: $f" } }
+$null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin\service' | Out-Null; 'ready'"
+& scp @ssh $svcSrc "${User}@${Vps}:$Root/service/BotService.cs" | Out-Null
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE for BotService.cs. The bot was not touched." }
+Say '  service\BotService.cs' 'Green'
+$running = @(Remote ((Get-Content -LiteralPath $svcLib -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Continue'
-Set-Location '$rootWin'
-
-[Console]::OutputEncoding = [Text.Encoding]::UTF8
-`$OutputEncoding = [Text.Encoding]::UTF8
-
-# Say so in the log rather than starting the bot with nothing and letting it
-# exit with a message that looks like the token was never set.
-`$envFile = '$rootWin\bot.env.json'
-try {
-  `$e = Get-Content `$envFile -Raw -ErrorAction Stop | ConvertFrom-Json
-} catch {
-  ('[run] cannot read ' + `$envFile + ': ' + `$_.Exception.Message) | Out-File '$rootWin\bot.log' -Append -Encoding utf8
-  ('[run] running as ' + [Security.Principal.WindowsIdentity]::GetCurrent().Name) | Out-File '$rootWin\bot.log' -Append -Encoding utf8
-  exit 1
-}
-foreach (`$p in `$e.PSObject.Properties) { [Environment]::SetEnvironmentVariable(`$p.Name, `$p.Value, 'Process') }
-if (-not `$env:DISCORD_TOKEN) {
-  '[run] bot.env.json has no DISCORD_TOKEN in it' | Out-File '$rootWin\bot.log' -Append -Encoding utf8
-  exit 1
-}
-
-# PATH came from before Python was installed on a fresh box.
-`$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')
-
-if (-not `$env:PYTHONIOENCODING) { `$env:PYTHONIOENCODING = 'utf-8' }
-
-# Three quick exits in a row and it stops trying.
-#
-# This loop used to start the bot again fifteen seconds after every exit, for
-# ever. That is right for a dropped connection. It is wrong for a rejected
-# token, Server Members Intent switched off, or a bot.py that fails on import:
-# each of those is in bot.log within seconds and the process exits, and the
-# loop tried again about four times a minute, the same way every time, until
-# somebody happened to open bot.log. A run that lasts
-# thirty seconds got far enough to be worth another go, so a long run starts
-# the count again, and only three short ones in a row give up.
-#
-# It exits 0 when it gives up. The task has RestartCount 999, and whether Task
-# Scheduler repeats a task that exits non-zero has not been measured on this
-# box; a clean exit is not a failure either way. What starts it again is the
-# watchdog, Watch-Services.ps1, which tries at most three times an hour and
-# then writes that the bot needs a look. That rule is entry 99 and stays as it
-# is. Install-Bot.ps1 starts the task again too, which is how a fix goes up.
-`$fastSeconds = 30
-`$fastRuns = 0
-while (`$true) {
-  # Rolled here, between runs, because this is the one moment nothing holds
-  # bot.log: cmd opens it for the >> below and keeps it until python exits.
-  # At 4 MB, five kept, and it never stops the bot starting. Roll-Log.ps1.
-  try { & '$rootWin\roll-log.ps1' -Path '$rootWin\bot.log' | Out-Null } catch { }
-  # Python writes the log itself, through cmd's redirection, the same way the
-  # game server and the voice server are run. Piping every line through
-  # PowerShell and Out-File, which this did until 2026-09-16, re-encoded the
-  # text and left the file unreadable past a point, and a slow pipeline could
-  # hold the bot's own print() calls, which run on its event loop.
-  `$clock = [Diagnostics.Stopwatch]::StartNew()
-  & cmd /c "python ""$rootWin\bot.py"" >> ""$rootWin\bot.log"" 2>&1"
-  `$code = `$LASTEXITCODE
-  if (`$clock.Elapsed.TotalSeconds -lt `$fastSeconds) { `$fastRuns++ } else { `$fastRuns = 0 }
-  if (`$fastRuns -ge 3) {
-    # Python has exited, so bot.log is free to append to.
-    ('[run] the bot stopped within ' + `$fastSeconds + ' seconds three times running, the last time with exit code ' + `$code + '. Not starting it again. The reason is in the lines above.') | Out-File '$rootWin\bot.log' -Append -Encoding utf8
-    exit 0
-  }
-  Start-Sleep -Seconds 15
-}
-'@
-[IO.File]::WriteAllText('$rootWin\run.ps1', `$run, (New-Object Text.UTF8Encoding(`$false)))
-
-Get-CimInstance Win32_Process |
-  Where-Object { `$_.Name -eq 'python.exe' -and `$_.CommandLine -like '*Thornswood-Bot*' } |
-  ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue }
-Get-CimInstance Win32_Process |
-  Where-Object { `$_.Name -eq 'powershell.exe' -and `$_.CommandLine -like '*Thornswood-Bot\run.ps1*' } |
-  ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue }
-Start-Sleep -Seconds 1
-
-Unregister-ScheduledTask -TaskName '$Task' -Confirm:`$false -EA SilentlyContinue
-`$a = New-ScheduledTaskAction -Execute 'powershell.exe' ``
-     -Argument '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "$rootWin\run.ps1"'
-`$t = New-ScheduledTaskTrigger -AtStartup
-`$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries ``
-     -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) ``
-     -ExecutionTimeLimit ([TimeSpan]::Zero)
-Register-ScheduledTask -TaskName '$Task' -Action `$a -Trigger `$t -Settings `$s ``
-  -User 'SYSTEM' -RunLevel Highest | Out-Null
 # Remember how long the log is, and read back only what is written past that.
 # Waiting for the words 'watching 1 server' to appear is no good on its own:
 # every previous start left that line behind, so the wait was satisfied by a
@@ -516,16 +726,13 @@ Register-ScheduledTask -TaskName '$Task' -Action `$a -Trigger `$t -Settings `$s 
 `$before = 0
 if (Test-Path `$log) { `$before = (Get-Item `$log).Length }
 
-Start-ScheduledTask -TaskName '$Task'
-Start-Sleep -Seconds 5
+`$r = Install-ThornswoodBotService -Name '$Service' -Root '$rootWin' -Source '$rootWin\service\BotService.cs' -Task '$Task'
+`$r.Lines
+if (-not `$r.Ok) { 'BOT SERVICE NOT INSTALLED'; return }
 
-`$p = Get-CimInstance Win32_Process |
-      Where-Object { `$_.Name -eq 'python.exe' -and `$_.CommandLine -like '*Thornswood-Bot*' }
-if (`$p) { 'bot up, pid ' + `$p.ProcessId } else { 'BOT DID NOT START' }
-
-# Opened with FileShare ReadWrite, because the bot has it open for writing and
-# anything less strict than that is denied while it does. Shorter than before
-# means run.ps1 rolled it on the way up, so all of it is this start.
+# Opened with FileShare ReadWrite, because the service has it open for
+# writing and anything less strict than that is denied while it does. Shorter
+# than before means it rolled, so all of it is this start.
 function Fresh {
   `$out = @()
   `$fs = `$null
@@ -558,15 +765,32 @@ if (-not `$ready) {
 '--- what the bot said this time ---'
 `$said = @(Fresh) | Where-Object { `$_ -match '^\s*\[(thornswood-bot|run)\]' }
 if (`$said) { `$said | Select-Object -Last 25 } else { 'nothing yet' }
-"@ | ForEach-Object { Say "  $_" }
+"@))
+$running | ForEach-Object { Say "  $_" }
+if ("$running" -notmatch 'BOT SERVICE NOT INSTALLED' -and "$running" -match ('service ' + $Service + ': Running')) { Save-BotRecord }
+if ("$running" -match 'BOT SERVICE NOT INSTALLED') {
+  Write-Host ''
+  if ("$running" -match 'Nothing was stopped or changed') {
+    Say 'The bot was left running the way it was. Fix what the lines above say, then run this again.' 'Yellow'
+  } else {
+    Say 'The bot is NOT running. Fix what the lines above say, then run this again.' 'Red'
+  }
+}
 
 Write-Host ''
-if ("$settings" -match 'NEW key') {
-  Say 'The site is still running with the old key, so tickets will not reach' 'Yellow'
-  Say 'its inbox until it restarts:' 'Yellow'
+if ("$settings" -match 'SITE DID NOT COME BACK|SITE CONFIG DOES NOT PARSE') {
+  Say 'The site is not running with the new key or token, so tickets and role' 'Yellow'
+  Say 'lookups fail until it is. Start it again with:' 'Yellow'
   Say '    .\scripts\deploy\Deploy-Docs.ps1' 'Green'
+} elseif ("$settings" -match 'site restarted') {
+  Say 'The site was restarted, so it has the key and the token the bot has.' 'DarkGray'
 } else {
-  Say 'The key did not change, so the site needs nothing.' 'DarkGray'
+  Say 'The key and the token did not change, so the site needs nothing.' 'DarkGray'
+}
+if ("$settings" -match 'NEW key') {
+  Say 'A NEW key: the doors need it too, or both are refused on their next fetch:' 'Yellow'
+  Say '    .\scripts\ops\Set-Door.ps1 -Connect' 'Green'
+  Say '    .\scripts\ops\Set-Door.ps1 -Connect -Root C:\Thornswood-Server-Dev -Site https://thornswood.net/dev' 'Green'
 }
 Write-Host ''
 Say 'Then check the panel channel above, and try joining with another account.' 'DarkGray'

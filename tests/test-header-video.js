@@ -24,11 +24,11 @@
 
   Read only. It reads launcher\app\*.cs and nothing else.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const APP = path.join(TOOLS_DIR, '..', 'launcher', 'app');
+const APP = path.join(REPO_DIR, 'launcher', 'app');
 const CR = String.fromCharCode(13);
 function read(f) { return fs.readFileSync(path.join(APP, f), 'utf8').split(CR).join(''); }
 const SHELL = read('Shell.cs');

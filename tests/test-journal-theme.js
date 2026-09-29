@@ -27,15 +27,15 @@
 // them to it.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 function read(...bits) {
-  return fs.readFileSync(path.join(TOOLS_DIR, ...bits), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join(REPO_DIR, ...bits), 'utf8').split(CR).join('');
 }
-const journalSrc = read('..', 'game', 'ui', 'thornswood-journal.js');
-const skillsSrc = read('..', 'game', 'ui', 'thornswood-skills.js');
+const journalSrc = read('game', 'ui', 'thornswood-journal.js');
+const skillsSrc = read('game', 'ui', 'thornswood-skills.js');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -125,7 +125,10 @@ const doc = {
 };
 const win = {
   skyrimPlatform: { sendMessage(to, what) { told.push(to + ' ' + what); } },
-  thornswoodNet: { say(line) { sent.push(line); return true; } }
+  thornswoodNet: { say(line) { sent.push(line); return true; } },
+  // The panel is scaled to the screen (test-journal-scale.js holds that).
+  innerWidth: 1920, innerHeight: 1080,
+  addEventListener() { }
 };
 new Function('window', 'document', journalSrc)(win, doc);
 const J = win.thornswoodJournal;

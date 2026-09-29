@@ -52,7 +52,7 @@ param(
   # mode that kicks is refused outright.
   [switch]$RestartFollows,
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Data = 'C:/Thornswood-Server/data'
 )
 
@@ -60,9 +60,10 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 
 if ($ThenRestart -and $Cancel) { throw 'Use one or the other: -Cancel calls it off, -ThenRestart sees it through.' }
 if ($ThenRestart -and $Mode -ne 'restart') {

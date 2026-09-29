@@ -33,17 +33,17 @@
 // number anything else of ours or vanilla Skyrim already answers to.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 const read = function (p) { return fs.readFileSync(p, 'utf8').split(CR).join(''); };
 
-const FRONT_PATH = process.env.FRONT || path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
-const GM_PATH = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const FRONT_PATH = process.env.FRONT || path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js');
+const GM_PATH = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const front = read(FRONT_PATH);
 const gm = read(GM_PATH);
-const ini = read(path.join(TOOLS_DIR, '..', 'launcher', 'Thornswood.ini'));
+const ini = read(path.join(REPO_DIR, 'launcher', 'Thornswood.ini'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -100,20 +100,20 @@ yes('the shipped Thornswood.ini carries MoldKey = 22', !!iniM && Number(iniM[1])
   while ((m = rxFront.exec(front)) !== null) {
     if (m[1] !== 'MoldKey' && m[1] !== 'VoicePort') { take(Number(m[2]), 'front ' + m[1]); }
   }
-  const emotes = read(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-emotes.js'));
+  const emotes = read(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-emotes.js'));
   const rxEm = /key\('(\w+)', (\d+)\)/g;
   while ((m = rxEm.exec(emotes)) !== null) { take(Number(m[2]), 'emotes ' + m[1]); }
-  const voice = read(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-voice.js'));
+  const voice = read(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-voice.js'));
   const rxVo = /^let (\w+_KEY) = (\d+);/gm;
   while ((m = rxVo.exec(voice)) !== null) { take(Number(m[2]), 'voice ' + m[1]); }
-  const mark = read(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-mark.js'));
+  const mark = read(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-mark.js'));
   const rxMk = /^let (\w+Key) = (\d+);/gm;
   while ((m = rxMk.exec(mark)) !== null) { take(Number(m[2]), 'mark ' + m[1]); }
   const rxIni = /^\s*(\w+)\s*=\s*(\d+)\s*$/gm;
   while ((m = rxIni.exec(ini)) !== null) {
     if (['MoldKey', 'VoicePort', 'Microphone'].indexOf(m[1]) === -1) { take(Number(m[2]), 'ini ' + m[1]); }
   }
-  const keys = read(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Keys.cs'));
+  const keys = read(path.join(REPO_DIR, 'launcher', 'app', 'Keys.cs'));
   const rxCs = /ThornIni, "(\w+)", (-?\d+)\)/g;
   let rows = 0;
   while ((m = rxCs.exec(keys)) !== null) { rows++; if (m[1] !== 'MoldKey') { take(Number(m[2]), 'Controls ' + m[1]); } }
@@ -133,7 +133,7 @@ const PIECES_FRONT = {
   keyName: liftFrom(front, 'function keyName(code) {', '  '),
   anyClaim: liftFrom(front, 'function anyClaim() {', '  '),
   gameMenuOpen: liftFrom(front, 'function gameMenuOpen() {', '  '),
-  busyMenuOpenNow: liftFrom(front, 'function busyMenuOpenNow() {', '  '),
+  busyMenuOpenNow: liftFrom(front, 'function busyMenuOpenNow(except) {', '  '),
   menus: (function () {
     const a = front.indexOf('  const KEYBOARD_MENUS = [');
     const b = a < 0 ? -1 : front.indexOf('\n  ];\n', a);
@@ -251,7 +251,10 @@ function client(opt) {
     'const MOLD_NAME = keyName(MOLD_KEY);',
     'const FRIEND_KEY = 21, TRADE_KEY = 35, MUTE_KEY = 38, PARTY_KEY = 25, JOURNAL_KEY = 36;',
     'const SKILLS_KEY = 37, CHAT_KEY = 28, ESC = 1;',
-    'const COMMAND_KEY = 53; let statsPressAt = 0; function commandKeyPressed() { }',
+    'const COMMAND_KEY = 53; function commandKeyPressed() { }',
+    // The / and P watchers on the game's own menus (test-slash-key.js).
+    'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };',
+    'const statsOnSlash = OFF_MENU, magicOnP = OFF_MENU;',
     'let keysSeen = 0, stuckKeys = 0, stuckMoveKeys = 0, sawAnyKey = true;',
     'function busyMenuOpen() { return busyMenuOpenNow(); }',
     'function rememberKey() {}',

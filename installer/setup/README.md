@@ -2,25 +2,42 @@
 
 ## What it is
 
-This folder holds one file, `Bootstrap.cs`, the source of the small program a
-new person runs first, `Thornswood-Setup.exe`. It is not the launcher's source;
+This folder holds two files. `Bootstrap.cs` is the source of the small program
+a new person runs first, `Thornswood-Setup.exe`. `Setup.manifest` is that
+program's application manifest (issue #463): sharp at any display scale and on
+every monitor (per-monitor DPI), never asking for administrator (asInvoker),
+and named `Thornswood.Installer.Setup` at the launcher's version, which
+`Build-Launcher.ps1` writes into the copy it embeds. The window also keeps
+inside the screen at any scale with the launcher's `WindowFit.cs`, which the
+build compiles in beside it. `tests\test-app-manifest.ps1` reads the manifest
+back out of the built exe. It is not the launcher's source;
 that is `launcher\app`. It is a WPF window in C# 5, like the launcher, because the
 same .NET Framework 4 csc compiles both and understands nothing newer. It asks
 which drive to install to, reads the
 payload attached to its own end, or downloads it from the site
 (`https://thornswood.net/api/payload`), carrying on from where a dropped
 download stopped and checking it against the SHA-256 the site gives, then
-unpacks it and starts the `Setup.bat` inside with the chosen folder.
+unpacks it and runs the install script inside, the one `Setup.bat` runs, with
+the chosen folder.
+
+Since issue #889 that script runs inside this window, not in a console of its
+own. It is started the way `Setup.bat` starts it (the same PowerShell, the same
+`-MovePayload -Root`), hidden, with `-NonInteractive`; every line it prints
+shows in the window and in `setup-log.txt` beside the unpacked payload, its
+exit code decides whether the window closes or says what stopped it, and its
+one question, the Steam depot downloads on a standalone install, comes up as a
+box in this window. The window will not close while the script is moving
+files. `tests\test-setup-in-window.ps1` holds all of that.
 
 It never uses a zip it finds on the disk. Until 25 September it took an old
-`SkyrimTogether-Setup.zip` or `Thornswood-Setup*.zip` from beside itself or the
+setup zip from beside itself or the
 Downloads folder ahead of everything else, unchecked, and a tester got an old
 install that way. `tests\test-installer-own-payload.ps1` holds it to that.
 
 ## On your machine
 
 `scripts\release\Build-Launcher.ps1` compiles it after the launcher, into
-`tools\setup-stub.exe`, which git ignores like every other `.exe`. A failed
+`out\setup-stub.exe`, which git ignores like every other `.exe`. A failed
 compile keeps the last working stub and says so. Build into a scratch root, as
 for the launcher:
 
@@ -30,7 +47,7 @@ for the launcher:
 
 `scripts\release\Package-Thornswood.ps1` copies the stub to `Thornswood-Setup.exe`
 beside `Thornswood-Setup.zip`, the payload, and `Sign-Artifact.ps1` signs the
-exe when the machine has `tools\signing.json`. Running the stub installs for
+exe when the machine has `records\signing\signing.json`. Running the stub installs for
 real into the folder picked, and asks Skyrim to close first if it is running.
 
 ## Where it runs
@@ -63,7 +80,7 @@ manual script.
 
 ### What Windows shows, for the Downloads page and the FAQ to match
 
-`Thornswood-Setup.exe` is signed when the build machine has `tools\signing.json`
+`Thornswood-Setup.exe` is signed when the build machine has `records\signing\signing.json`
 (#390 done). The UAC publisher line then shows the signed publisher rather than
 `Unknown`. The product NAME strings the prompt and the file's Properties show
 come from a version resource `Bootstrap.cs` carries itself, and those names are
@@ -88,7 +105,7 @@ Build-Launcher version-stamping wiring to what is here.
 
 ### Version resource after signing
 
-`Build-Launcher.ps1` leaves `tools\setup-stub.exe` unsigned. `Package-Thornswood.ps1`
+`Build-Launcher.ps1` leaves `out\setup-stub.exe` unsigned. `Package-Thornswood.ps1`
 copies it to `Thornswood-Setup.exe`, for a one-file build appends the payload and
 a trailer, then signs the final Setup (a pre-signed stub cannot be signed again
 after attach). `Publish-Installer.ps1` only uploads it. Neither rewrites the exe or
@@ -119,3 +136,46 @@ refuse: whether the launcher may fall back to copies instead, at about 26 to 41
 GB, is the team's call in #staff-general (issue #473).
 `tests\test-setup-skyrim-drive.ps1` holds all of that to what is here.
 
+## Thornswood's own Skyrim folder
+
+Issue #906, 28 September: "let's offer the own folder during install as
+well". Under the drive card is a card with the words of the
+launcher's Settings, Maintenance panel (`launcher\ui.xaml`, `PnlOwnGame`), a
+tick box, "Give Thornswood a Skyrim folder of its own", and Choose Vortex's
+folder.
+
+The installer does not make the folder. The launcher does (`OwnGame.Make`),
+out of what Vortex has deployed, and nothing is deployed while this window is
+up. So the tick answers the launcher's own question in advance: it goes to the
+script as `-MakeOwnGame`, into `config.json` as `MakeOwnGame`, and the launcher
+then makes the folder without asking once Vortex has deployed. Nothing asks
+for administrator: the firewall rule it used to ask for is gone (#911). Left unticked,
+which is the default, nothing changes: no argument, no field, and the launcher
+asks as it did before. A chosen Vortex folder is checked the way
+`OwnGame.PointAt` checks it (SkyrimSE.exe and `Data\vortex.deployment.json`)
+and saved as `VortexGame`, the field the Settings button writes. A standalone
+install has its Game folder already and writes neither.
+`tests\test-setup-own-folder.ps1` holds all of that to what is here.
+
+
+## What a person agrees to before Install
+
+Issue #1009, asked for on 28 September: "check boxes that lock the install for
+reading and accepting terms and conditions, privacy policy, and agreeing to
+the rules", "and links to all 3". Beside Install are four boxes, all unticked:
+the age box, then "I have read and accept the Terms and Conditions", "I have
+read and accept the Privacy Policy" and "I have read and agree to the Rules".
+Install stays greyed out until all four are ticked. Each of the three has a
+link beside it that opens the page on the site in the browser
+(`https://thornswood.net/terms`, `/privacy`, `/rules`), so what a person
+reads is the current text, never a copy inside the installer.
+
+When Install is pressed, the setup program writes `Profile\accepted.json` in
+the install: the time in UTC, and for each page its address and the SHA-256
+of its text as `https://thornswood.net/api/page/<name>` serves it at that
+moment, which is the version accepted. The site can hash its own page the same
+way to say which version somebody agreed to. A page the site did not answer
+for is recorded with an empty hash, and the install carries on: the boxes
+were ticked either way. Nothing about the person or the machine goes in it.
+`tests\test-setup-agreements.ps1` holds all of that, and with `-Live` also
+checks the three links answer and the hashes match the pages served now.

@@ -6,15 +6,25 @@
 
 
   What it does, in order:
+    0. refuses, naming each file, when anything it would send out of this
+       repository has uncommitted changes (#1121)
     1. builds the payload zip from your local dist\server
-    2. stops the scheduled task on the VPS so files are not in use
-    3. copies the zip across
-    4. unpacks it there, checks every plugin in the load order is on disk,
-       registers the boot task and starts it
+    2. copies the zip across, with the server still running
+    3. the installer unpacks it BESIDE the running server, checks it there
+       (the zip's hash, every plugin in the load order, gamemode.js parsing,
+       the binary against its record) and stops nothing if any of it fails
+    4. only then stops the server, swaps the new folder in, registers the
+       boot task and starts it; if it does not answer on its ports, the
+       previous folder goes back and is started again (issue #446)
     5. waits for the resources port to answer, from here
 
-  The world folder on the VPS is preserved across reinstalls by the installer,
-  so characters made on the server survive an update. -FreshWorld throws it away.
+  The world folder on the VPS is carried across reinstalls by the installer,
+  so characters made on the server survive an update. -FreshWorld starts the
+  server with none, and leaves the old one in the previous folder.
+
+  The previous folder is kept beside the root, the newest two, and
+      .\scripts\release\Publish-Server.ps1 -PutBack
+  puts the newest back the same checked way (-Channel dev for the dev server).
 
   It also writes a line into the launcher's News page and pushes it.
 
@@ -30,10 +40,9 @@
 param(
     [Parameter(Position = 0)][string]$Notes = '',
     [string]$RepoDir,
-    # The public releases clone, which is the feed every launcher reads.
-    # Same shape as Set-Server.ps1, and for the same reason: releases moved
-    # into their own repository and the version.json still sitting in this one
-    # stopped being the live feed that day. See the News section below.
+    # A folder holding the version.json to add the News entry to. Left out,
+    # the live feed is received from the VPS store and sent back (#907), the
+    # same shape as Set-Server.ps1. See the News section below.
     [string]$ReleaseDir,
     <#
       Which server this goes to. 'main' is the one everybody plays on.
@@ -56,14 +65,20 @@ param(
     [switch]$NoNews,
     [switch]$NoPush,
     [string]$VpsHost  = '',
-    [string]$VpsUser  = 'Administrator',
+    [string]$VpsUser  = '',
     [string]$Dist     = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
     [string]$Zip      = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerZip),
     [string]$VpsRoot,
     [string]$TaskName,
     [switch]$FreshWorld,
     [switch]$SkipBuild,
-    [switch]$NoPause
+    [switch]$NoPause,
+    # Put the previous server folder back instead of publishing. Builds and
+    # sends nothing but the installer, and writes no news.
+    [switch]$PutBack,
+    # How long the new server has to answer on the box before the previous one
+    # goes back.
+    [int]$Wait = 60
 )
 
 # The two that the channel decides, unless they were given outright. An
@@ -86,6 +101,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -93,6 +109,9 @@ function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
 $target = "$VpsUser@$VpsHost"
+# Host key checking on (issue #450): ssh talks only to the box whose key
+# Setup-SshKey.ps1 wrote into known_hosts, checked against vps.json.
+$ssh = @('-o', 'StrictHostKeyChecking=yes')
 
 # ---------------------------------------------------------------- tools ------
 foreach ($t in 'ssh', 'scp') {
@@ -101,8 +120,62 @@ foreach ($t in 'ssh', 'scp') {
     }
 }
 
+# -------------------------------------------------------- committed only ----
+# A publish sends a commit or nothing (Patrick, 29 Sep, #1121). The files it
+# takes out of this repository are the installer and the log roller, sent
+# every time, and for a publish the gamemode it copies into the build and the
+# number of people records\most-online.json puts in the settings. Any of them
+# with uncommitted changes, or untracked, refuses it here, naming each, before
+# anything is built or the box is asked anything. There is no switch past it.
+. (Join-Path $Here '..\deploy\Artifact.ps1')
+$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/vps/Roll-Log.ps1')
+if (-not $PutBack) { $committedOnly += 'game/gamemode.js', 'records/most-online.json' }
+try { Assert-ThornswoodCommitted -RepoDir (Join-Path $Here '..\..') -Paths $committedOnly -What 'this publish' }
+catch { Die $_.Exception.Message }
+
+# ------------------------------------------------------------- installer ----
+# Sent every time rather than trusting whatever copy is up there, so the VPS
+# never runs a version of the installer older than the payload it is unpacking.
+$installer = Join-Path $Here '..\deploy\Install-ThornswoodServer.ps1'
+if (-not (Test-Path -LiteralPath $installer)) { Die "not found: $installer" }
+# Beside the installer, which puts it in the server's folder for the task to
+# run in front of the server. See Roll-Log.ps1 for why a log can only be
+# rolled at start.
+$rollLog = Join-Path $Here '..\vps\Roll-Log.ps1'
+if (-not (Test-Path -LiteralPath $rollLog)) { Die "not found: $rollLog" }
+
+# What the installer said, printed as it comes, and its last line read: it
+# ends with INSTALL OK, INSTALL REFUSED, INSTALL ROLLED BACK or INSTALL FAILED.
+function Invoke-Installer([string]$instArgs) {
+    $lines = @(& ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 $instArgs" |
+               ForEach-Object { Say "  $_"; "$_".Trim() })
+    $code = $LASTEXITCODE
+    if ($lines -contains 'INSTALL OK' -and $code -eq 0) { return }
+    if ($lines -contains 'INSTALL REFUSED') {
+        Die "the installer refused, so the server up there was not stopped or changed. The lines above say why."
+    }
+    if ($lines -contains 'INSTALL ROLLED BACK') {
+        Die "the new server did not answer, so the installer put the previous one back and started it again. The lines above say whether it answers, and why the new one did not."
+    }
+    Die "the installer on the VPS exited with $code and did not say it finished. THE SERVER MAY BE DOWN: look at $VpsRoot and the folders beside it before anything else."
+}
+
+# ------------------------------------------------------------- -PutBack -----
+if ($PutBack) {
+    Head 'Putting the previous server back'
+    & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1"
+    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
+    & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1"
+    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
+    Invoke-Installer "-Root '$VpsRoot' -TaskName '$TaskName' -StartNow -PutBack -Wait $Wait"
+    Say 'the previous server is back and answering up there' 'Green'
+    Write-Host ''
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
+}
+
 # ------------------------------------------------------------- gamemode ------
-# The gamemode is edited in tools\ and packaged from dist\server. Those are two
+# The gamemode is edited in game\ and packaged from dist\server. Those are two
 # different files, and for a whole evening every change went into the first one
 # while every publish shipped the second: the race menu fix, the launcher
 # choices, the removal of the books, none of it ever reached the server, and
@@ -180,6 +253,27 @@ if ($IsDev -and (Test-Path -LiteralPath $settingsPath)) {
         throw "Could not set the dev ports in $settingsPath : $_"
     }
 }
+<#
+  AND HOW MANY IT HOLDS AT ONCE, #481, whichever channel it goes to:
+  thornswoodMostOnline for the gamemode and maxPlayers, with the staff seats
+  on top, for the engine, from records\most-online.json by way of
+  MaxOnline.ps1. Into the DIST copy like the ports above, so what is packed
+  carries the one number, and only written when it moved.
+#>
+if (Test-Path -LiteralPath $settingsPath) {
+    . (Join-Path $PSScriptRoot '..\deploy\MaxOnline.ps1')
+    $mostOnline = Get-MostOnline
+    try {
+        $capJson = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $capWas = [string]$capJson.thornswoodMostOnline + '/' + [string]$capJson.maxPlayers
+        Set-MaxPlayers $capJson $mostOnline
+        if (([string]$capJson.thornswoodMostOnline + '/' + [string]$capJson.maxPlayers) -ne $capWas) {
+            [IO.File]::WriteAllText($settingsPath, ($capJson | ConvertTo-Json -Depth 20), (New-Object Text.UTF8Encoding($false)))
+        }
+    } catch {
+        throw "Could not set how many the server holds in $settingsPath : $_"
+    }
+}
 if (Test-Path -LiteralPath $settingsPath) {
     Head 'Where new characters start'
     $hallPlugin = 'Skyrim Unbound.esp'
@@ -244,73 +338,33 @@ if (-not $SkipBuild) {
 if (-not (Test-Path -LiteralPath $Zip)) { Die "not found: $Zip. Run without -SkipBuild." }
 Say ("payload {0:N1} MB" -f ((Get-Item -LiteralPath $Zip).Length / 1MB)) 'Green'
 
-# ---------------------------------------------------------------- installer --
-# Sent every time rather than trusting whatever copy is up there, so the VPS
-# never runs a version of the installer older than the payload it is unpacking.
-$installer = Join-Path $Here '..\deploy\Install-ThornswoodServer.ps1'
-if (-not (Test-Path -LiteralPath $installer)) { Die "not found: $installer" }
-# Beside the installer, which puts it in the server's folder for the task to
-# run in front of the server. See Roll-Log.ps1 for why a log can only be
-# rolled at start.
-$rollLog = Join-Path $Here '..\vps\Roll-Log.ps1'
-if (-not (Test-Path -LiteralPath $rollLog)) { Die "not found: $rollLog" }
-
-Head 'Stopping the server up there'
-# Not fatal: on a first install there is no task to stop.
-#
-# Sent base64 encoded rather than as a quoted string. The previous version wrote
-# \$_.Name, escaping with a backslash, which PowerShell does not use: the escape
-# character is a backtick. So the backslash stayed literal, $_ expanded to
-# nothing outside a pipeline, and the remote shell was asked to run a command
-# called \.Name, once per process on the box. A hundred red errors every publish,
-# none of them real, and real ones buried in the middle of them.
-#
-# EncodedCommand takes the script as one blob and nothing has to survive two
-# layers of quoting.
-$stopRemote = @'
-$ProgressPreference = 'SilentlyContinue'
-Stop-ScheduledTask -TaskName '@@TASK@@' -ErrorAction SilentlyContinue
-<#
-  BY THE FOLDER, NOT BY THE WORD skymp5-server.
-
-  This used to match every node process carrying 'skymp5-server' on its
-  command line. On the live server that is the live server and nothing else,
-  so it was right for years. The moment this script gained a dev channel it
-  was the thing that took the LIVE server down while publishing to dev, on
-  21 September, exactly as Deploy-DevGamemode.ps1's header warns it would.
-
-  The trailing backslash is the whole of the fix and it is not decoration:
-  'C:\Thornswood-Server' is a prefix of 'C:\Thornswood-Server-Dev', so
-  matching without it means a live publish also kills the dev server, and the
-  bug simply changes direction.
-#>
-Get-CimInstance Win32_Process -EA SilentlyContinue |
-  Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*@@ROOT@@\*' } |
-  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }
-'stopped'
-'@ -replace '@@TASK@@', $TaskName -replace '@@ROOT@@', $VpsRoot.TrimEnd('\')
-
-$stopEnc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($stopRemote))
-& ssh $target "powershell -NoProfile -EncodedCommand $stopEnc"
+# ------------------------------------------------------------ no stop here ---
+# This used to stop the server here, before anything was copied, so a copy
+# that failed or a payload the installer refused left it down. Issue #446.
+# The installer stops it now, by its own folder and port, and only once the
+# new folder has checked out beside the old one.
 
 Head 'Copying'
-Say 'this is the slow part, a few minutes on a first run' 'DarkGray'
-& scp $Zip "${target}:C:/thornswood-server.zip"
-if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
-& scp $installer "${target}:C:/Install-ThornswoodServer.ps1"
-if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
-& scp $rollLog "${target}:C:/Roll-Log.ps1"
-if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
+Say 'this is the slow part, a few minutes on a first run; the server keeps running' 'DarkGray'
+& scp @ssh $Zip "${target}:C:/thornswood-server.zip"
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
+& scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1"
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
+& scp @ssh $rollLog "${target}:C:/Roll-Log.ps1"
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Say 'copied' 'Green'
 
 Head 'Installing'
-$instArgs = "-Zip C:\thornswood-server.zip -Root '$VpsRoot' -TaskName '$TaskName' -StartNow"
+# The zip's hash as it left here, for the installer to hold the copy up there to.
+$zipSum = (Get-FileHash -LiteralPath $Zip -Algorithm SHA256).Hash
+$instArgs = "-Zip C:\thornswood-server.zip -Root '$VpsRoot' -TaskName '$TaskName' -StartNow -ZipSha256 $zipSum -Wait $Wait"
 if ($FreshWorld) {
-    Say 'throwing away the world on the VPS as asked' 'Yellow'
-    & ssh $target "powershell -NoProfile -Command `"Remove-Item -LiteralPath '$VpsRoot\world' -Recurse -Force -ErrorAction SilentlyContinue; 'world cleared'`""
+    # Not deleted any more: the installer starts the new server with no world
+    # and leaves the old one in the previous folder beside the root.
+    Say 'starting with no world, as asked; the old one stays in the previous folder' 'Yellow'
+    $instArgs += ' -FreshWorld'
 }
-& ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 $instArgs"
-if ($LASTEXITCODE -ne 0) { Die "the installer on the VPS exited with $LASTEXITCODE. Nothing local was changed." }
+Invoke-Installer $instArgs
 
 <#
   DEV CARRIES MAIN'S ROSTER.
@@ -337,6 +391,23 @@ if ($LASTEXITCODE -ne 0) { Die "the installer on the VPS exited with $LASTEXITCO
   Install-ThornswoodServer.ps1 now sets the folder aside and restores it, so
   after the first seeding this is keeping the two in step rather than repairing
   a wipe.
+
+  ONLY THE DOOR, AND ASKING FOR THE DEV LIST (#964). This was
+  Copy-Item -LiteralPath (Join-Path $live '*'), and -LiteralPath reads the *
+  as a file name, so it never copied anything: the count it printed was what
+  dev already held. Copying the whole folder would have been wrong anyway. It
+  holds the dev server's own door.log, characters.json, property.json,
+  farm-claims.json, take-limit.json, mod-settings.json and online-names.json,
+  which belong to the dev world, and a door.json with the live address, which
+  gives the dev door the live list. The dev door asks
+  https://thornswood.net/dev, whose list is only the people the dev build is
+  for (docs\SYSTEM.md, "The door"); on 28 Sep that took the dev list from 46
+  to 28, which is right.
+
+  So now: door.json is live's key and join pass key with the address ending
+  in /dev, so a rotated key still reaches dev and the list stays the dev one.
+  allowed.json is copied only when dev has none, so the Owner has commands
+  on a fresh dev root until its door fetches its own. Nothing else is touched.
 #>
 if ($IsDev) {
     Head 'The roster'
@@ -351,14 +422,32 @@ if (-not (Test-Path -LiteralPath $live)) {
     'the live server has no private folder, so there is no roster to copy'
 } else {
     New-Item -ItemType Directory -Path $dev -Force | Out-Null
-    Copy-Item -LiteralPath (Join-Path $live '*') -Destination $dev -Recurse -Force
-    $n = @(Get-ChildItem -LiteralPath $dev -File -Force -EA SilentlyContinue).Count
-    "dev now has the same roster as main, $n file(s)"
+    $liveDoor = Join-Path $live 'door.json'
+    if (Test-Path -LiteralPath $liveDoor) {
+        try {
+            $d = Get-Content -LiteralPath $liveDoor -Raw | ConvertFrom-Json
+            $site = ([string]$d.site).TrimEnd('/')
+            if ($site -and $site -notmatch '/dev$') { $site = $site + '/dev' }
+            $d | Add-Member -NotePropertyName site -NotePropertyValue $site -Force
+            [IO.File]::WriteAllText((Join-Path $dev 'door.json'), ($d | ConvertTo-Json),
+                (New-Object Text.UTF8Encoding($false)))
+            "dev door.json has the live key and asks $site/api/allowed"
+        } catch {
+            'the live door.json could not be read, so the dev one was left as it was'
+        }
+    } else {
+        'the live server has no door.json, so the dev one was left as it was'
+    }
+    $devList = Join-Path $dev 'allowed.json'
+    if (-not (Test-Path -LiteralPath $devList) -and (Test-Path -LiteralPath (Join-Path $live 'allowed.json'))) {
+        Copy-Item -LiteralPath (Join-Path $live 'allowed.json') -Destination $devList -Force
+        'dev had no allowed.json, so it starts from the live one until its door fetches the dev list'
+    }
 }
 '@
     $seed = $seed.Replace('@@DEVROOT@@', $VpsRoot.TrimEnd('\'))
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($seed))
-    $out = & ssh $target "powershell -NoProfile -EncodedCommand $enc"
+    $out = & ssh @ssh $target "powershell -NoProfile -EncodedCommand $enc"
     foreach ($line in @($out)) { Say "  $line" 'Green' }
 }
 
@@ -406,12 +495,17 @@ if ($up) {
     # Rather than list what it might be, fetch what it actually said. The task
     # redirects everything the server prints into this file for exactly this.
     Head 'What the server printed up there'
-    & ssh $target "powershell -NoProfile -Command `"if (Test-Path '$VpsRoot\server.log') { Get-Content '$VpsRoot\server.log' -Tail 40 } else { 'server.log is not there, so node never started. Check that node is on the machine PATH up there.' }`""
+    & ssh @ssh $target "powershell -NoProfile -Command `"if (Test-Path '$VpsRoot\server.log') { Get-Content '$VpsRoot\server.log' -Tail 40 } else { 'server.log is not there, so node never started. Check that node is on the machine PATH up there.' }`""
 
     Write-Host ''
     Say 'If that log is empty or says nothing useful, the other candidate is the' 'Yellow'
     Say 'firewall. The server can be up and still unreachable from here:' 'Yellow'
     Say "    ssh $target `"powershell -NoProfile -Command Get-NetFirewallRule -DisplayName '*Thornswood*' ^| Format-Table DisplayName,Enabled,Direction`"" 'DarkGray'
+    # The box said it answers on its own ports, so the new server stays: this
+    # is the network or the firewall, and the previous folder would not change it.
+    Write-Host ''
+    if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
+    exit 1
 }
 
 # ------------------------------------------------------------------ news ----
@@ -430,9 +524,17 @@ if (-not $NoNews -and $up) {
     # launcher reads the copy in the public releases clone. So a server change
     # was written down in a file nobody reads, which is the same as not being
     # announced at all, and the whole reason this News section exists.
-    if (-not $ReleaseDir) {
-        $guess = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
-        $ReleaseDir = if (Test-Path (Join-Path $guess '.git')) { $guess } else { $RepoDir }
+    #
+    # Since #907 the live feed is on the VPS store (Feed-Store.ps1): received
+    # into this machine's working folder for main, the entry added, and sent
+    # back. Until then it was the Thornswood-Releases clone, pushed. -ReleaseDir
+    # works on a folder instead and receives nothing.
+    . (Join-Path $Here 'Feed-Store.ps1')
+    $receive = -not $ReleaseDir
+    if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir 'main' }
+    if ($receive -and -not $NoPush) {
+        try { [void](Receive-FeedStore 'main' $ReleaseDir) }
+        catch { Say "  could not receive the live feed from the VPS: $($_.Exception.Message)" 'Yellow' }
     }
     $VersionFile = Join-Path $ReleaseDir 'version.json'
 
@@ -543,34 +645,22 @@ if (-not $NoNews -and $up) {
                 Say ("  added: {0}" -f $entry.title) 'Green'
 
                 if (-not $NoPush) {
-                    # THE RELEASES CLONE, BY -C, AND NEVER THE SOURCE REPO.
+                    # THE LIVE FEED ON THE VPS, NEVER THE SOURCE REPO.
                     #
                     # This used to Push-Location into the source repo and run a
-                    # bare git push there. Two things wrong with that, and the
-                    # second is the dangerous one. It pushed the file nobody
-                    # reads, so the news still did not reach anybody. And a
-                    # bare push takes whatever branch the source repo happens
-                    # to have checked out, which on the machine that ships is
-                    # usually main: a deploy script quietly pushing main is how
-                    # the rule that main is only ever what shipped gets broken
-                    # by accident.
-                    #
-                    # -C keeps it in the releases clone whatever this shell is
-                    # standing in, which is the shape Set-Server.ps1 uses for
-                    # the same file.
-                    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+                    # bare git push there, which pushed a file nobody reads and
+                    # whatever branch the source repo had checked out, usually
+                    # main. Then it pushed the Thornswood-Releases clone by -C.
+                    # Since #907 the entry goes to the VPS store, where the
+                    # site serves it at once; a feed that changed up there
+                    # since it was received is refused, not overwritten.
                     try {
-                        # git writes progress to stderr, and Out-Host renders
-                        # anything on stderr as a red error even on success.
-                        function Relay { process { Write-Host ('  ' + $_.ToString()) -ForegroundColor DarkGray } }
-                        & git -C $ReleaseDir add version.json 2>&1 | Relay
-                        & git -C $ReleaseDir commit -m "Server: $($entry.title)" 2>&1 | Relay
-                        & git -C $ReleaseDir push 2>&1 | Relay
-                        if ($LASTEXITCODE -ne 0) {
-                            Say '  the feed did not push, so nobody has the News entry yet' 'Yellow'
-                            Say ("  git -C $ReleaseDir push   sends it") 'Yellow'
-                        }
-                    } finally { $ErrorActionPreference = $old }
+                        [void](Send-FeedStore 'main' $ReleaseDir @('version.json'))
+                        Say '  sent; the News entry is on the live feed' 'DarkGray'
+                    } catch {
+                        Say "  the feed was not sent, so nobody has the News entry yet: $($_.Exception.Message)" 'Yellow'
+                        Say '  Run this again to add it.' 'Yellow'
+                    }
                 }
             }
         } catch {

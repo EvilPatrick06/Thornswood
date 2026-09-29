@@ -24,7 +24,8 @@
   removed. The rest of those scripts builds and uploads releases, so it never
   runs here.
 
-  -Tools <folder> runs it against another copy of the three scripts. Pointed
+  -Tools <folder> runs it against another copy of the three scripts, flat in
+  that folder or under its scripts\release (a repository). Pointed
   at c32b820, main just before the lists became one, it fails 29 of its checks.
   Entry 128 added three client runtime checks that fail there as well, because
   that code called any file at those paths ours. Run on the machine that ships
@@ -44,7 +45,7 @@
        and every file whose fate changed is listed by name.
 
   Read only. The game folder, the launcher's record and the baselines under
-  Thornswood-Releases (and legacy LOCALAPPDATA copies) are read and never written. -Before writes the old scripts and
+  this machine's working copies of the VPS store (%LOCALAPPDATA%\Thornswood\feed, #907) and legacy LOCALAPPDATA copies are read and never written. -Before writes the old scripts and
   client-build.json into a temp folder of its own and removes it.
 
   About a minute on the machine that ships, nearly all of it the installer's
@@ -61,10 +62,12 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if (-not $Tools) { $Tools = $PSScriptRoot }
-if (-not $Tools) { $Tools = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\. Only when -Tools was not given.
-if (-not $PSBoundParameters.ContainsKey('Tools')) { $Tools = Join-Path (Split-Path -Parent $Tools) 'tools' }
+if (-not $Tools) {
+    # The tests are in tests\, the repository is one folder up.
+    $Tools = $PSScriptRoot
+    if (-not $Tools) { $Tools = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+    $Tools = Split-Path -Parent $Tools
+}
 
 $pass = 0; $fail = 0
 function Yes($what, $cond) {
@@ -116,7 +119,7 @@ function Quote([string]$s) { return "'" + $s.Replace("'", "''") + "'" }
 function Find-In([string]$toolsDir, [string]$name) {
     $flat = Join-Path $toolsDir $name
     if (Test-Path -LiteralPath $flat) { return $flat }
-    return (Join-Path $toolsDir ('..\scripts\release\' + $name))
+    return (Join-Path $toolsDir ('scripts\release\' + $name))
 }
 function New-Decider([string]$toolsDir, [string]$which) {
     $rules = Find-In $toolsDir 'Ship-Rules.ps1'
@@ -429,8 +432,8 @@ if ($Before) {
         if ($LASTEXITCODE -ne 0) { throw "git archive of $Before failed" }
         Expand-Archive -LiteralPath $zip -DestinationPath $oldDir
         $old = [pscustomobject]@{
-            Pack = New-Decider (Join-Path $oldDir 'tools') 'pack'
-            Inst = New-Decider (Join-Path $oldDir 'tools') 'installer'
+            Pack = New-Decider $oldDir 'pack'
+            Inst = New-Decider $oldDir 'installer'
         }
         Write-Host ''
         Write-Host ("The fixed paths against {0}" -f $Before) -ForegroundColor Cyan
@@ -480,11 +483,11 @@ if (-not (Test-Path -LiteralPath (Join-Path $Game 'SkyrimSE.exe')) -or -not (Tes
     # filter. Anything that comes out the other side would be deleted from
     # every tester by the next release.
     $instVanilla = $inst.Module
-    $repoRoot = Split-Path -Parent $Tools
+    $repoRoot = $Tools
     $relSibling = Split-Path -Parent $repoRoot
     $baselinePaths = @(
-        @{ Name = 'main Releases'; Path = (Join-Path $relSibling 'Thornswood-Releases\published.json') },
-        @{ Name = 'dev Releases';  Path = (Join-Path $relSibling 'Thornswood-Releases-dev\published.json') },
+        @{ Name = 'main store';    Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main\published.json') },
+        @{ Name = 'dev store';     Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev\published.json') },
         @{ Name = 'legacy main';   Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\published.json') },
         @{ Name = 'legacy dev';    Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\published-dev.json') }
     )

@@ -9,9 +9,9 @@
 // and when it did you had to use youyr cursor and a bunch of other bs I just
 // want to press a key while looking at them."
 //
-// THE TRADE MENU HE REMEMBERS WAS TradeTogether, a Skyrim Together mod that is
-// not in this build: the launcher still carries six key bindings for it and
-// writes them into a file that does not exist. So all of this is new, and the
+// THE TRADE MENU HE REMEMBERS WAS AN ADD-ON OF THE OLD MULTIPLAYER MOD, not in
+// this build: the launcher carried six key bindings for it and wrote them
+// into a file that does not exist. So all of this is new, and the
 // first thing checked here is the loop everything else rides on - the server
 // publishing who is near you, the client matching the crosshair against it.
 //
@@ -19,13 +19,13 @@
 // and a fake clock, the way test-needs.js does.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const FRONT = fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js'), 'utf8');
+const FRONT = fs.readFileSync(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js'), 'utf8');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -220,7 +220,7 @@ if (social && trade) {
     yes('pressing again turns it off', w.soc.toggleMute(A, 102, 'Sera') === false);
 
     // The page is where the silence actually happens.
-    const voice = fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'ui', 'thornswood-voice.js'), 'utf8');
+    const voice = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-voice.js'), 'utf8');
     yes('the voice page takes a mute list', /setMuted: function/.test(voice));
     /*
       Matched on the mute and not on what the other branch happens to be. The

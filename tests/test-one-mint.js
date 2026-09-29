@@ -40,11 +40,11 @@
 // runs again.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
-const RECIPES = process.env.RECIPES || path.join(TOOLS_DIR, '..', 'game', 'data', 'recipes.json');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
+const RECIPES = process.env.RECIPES || path.join(REPO_DIR, 'game', 'data', 'recipes.json');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -325,6 +325,7 @@ const WRITERS = {
   'outer/takeItemById': [1, 'only takes things away'],
   'outer/giveShift': [1, 'the shift, out of CHARGEN.shift'],
   'outer/giveItems': [1, 'descriptor pairs, and nothing calls it (checked below)'],
+  'outer/packAsServerHasIt': [1, 'the take limit sends back the pack the server already holds, so it adds nothing'],
   'property/giveDeed': [1, 'one deed, DEED'],
   'property/giveNamed': [1, 'one named key or mold, KEY or MOLD'],
   'property/takeBlankMold': [1, 'only takes a mold away'],
@@ -536,6 +537,7 @@ function goldDescriptors(text) {
     'ITEMS.firewood': 'firewood, ITEMS',
     'ITEMS[grade]': 'charcoal, ITEMS',
     'ITEMS.butter': 'butter off the churn, ITEMS',
+    'ITEMS.milk': 'milk off a living cow, ITEMS (#396)',
     'plant.produce': 'a plant, HARVESTS_BY_BASE',
     'caught.produce': 'a fish, FISH_BY_BASE',
     'hung.produce': 'game, GAME_BY_BASE',

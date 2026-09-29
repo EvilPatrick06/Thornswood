@@ -29,7 +29,7 @@ namespace Thornswood
     /// log and clears the .bad.
     ///
     /// Kept apart from Updater, with nothing in it but the framework, so that
-    /// tools\test-self-update.ps1 can compile it on its own and drive the
+    /// tests\test-self-update.ps1 can compile it on its own and drive the
     /// real script against stub launchers in a scratch folder, broken ones
     /// included.
     /// </summary>

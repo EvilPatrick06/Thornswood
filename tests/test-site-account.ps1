@@ -70,14 +70,14 @@
   removed before this ends. Never connects to anything.
 #>
 [CmdletBinding()]
-param([string]$ToolsPath)
+param([string]$RepoPath)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsPath) { $ToolsPath = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoPath) { $RepoPath = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -92,7 +92,7 @@ function Done {
     exit 0
 }
 
-$deploy = Join-Path $ToolsPath '..\scripts\deploy\Deploy-Docs.ps1'
+$deploy = Join-Path $RepoPath 'scripts\deploy\Deploy-Docs.ps1'
 $errs = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($deploy, [ref]$null, [ref]$errs)
 Yes 'Deploy-Docs.ps1 parses' ($errs.Count -eq 0)
@@ -194,9 +194,11 @@ foreach ($account in @('', 'SYSTEM', 'LOCAL SERVICE')) {
 
     $block = BlockOf $text
     Yes "$label`: it carries the account block between its markers" ($null -ne $block)
+    # Since issue #446 this block stops nothing: it ends with SETUP DONE, and
+    # only then does Deploy-Docs send the swap that stops the old site.
     $firstStop = $text.IndexOf('Stop-Process')
-    Yes "$label`: the account is worked out before anything is stopped" (
-        $null -ne $block -and $firstStop -gt 0 -and $text.IndexOf($open) -lt $firstStop)
+    Yes "$label`: the account is worked out, and the block stops nothing" (
+        $null -ne $block -and $firstStop -lt 0 -and $text.IndexOf($open) -lt $text.IndexOf("'SETUP DONE'"))
 
     $reg = @(CallsOf $sent 'Register-ScheduledTask')
     $upd = @(CallsOf $sent 'Set-ScheduledTask')
@@ -255,7 +257,7 @@ foreach ($account in @('', 'SYSTEM', 'LOCAL SERVICE')) {
 # the day the site stops being SYSTEM, with nothing in any log to say why.
 $real = BlockOf (Build 'LOCAL SERVICE' 'C:\Thornswood-Docs')
 Yes 'LOCAL SERVICE: its own folder gets Modify' ($real -and $real.Contains("@('C:\Thornswood-Docs', '(OI)(CI)M')"))
-$serverJs = Get-Content -LiteralPath (Join-Path $ToolsPath '..\site\server.js') -Raw
+$serverJs = Get-Content -LiteralPath (Join-Path $RepoPath 'site\server.js') -Raw
 $outside = @()
 foreach ($m in [regex]::Matches($serverJs, "'([A-Za-z]:(?:\\\\|/)[^']*)'")) {
     $p = $m.Groups[1].Value.Replace('\\', '\').Replace('/', '\')
@@ -362,6 +364,8 @@ try {
     $dev    = Join-Path $tmp 'Thornswood-Server-Dev'
     $voice  = Join-Path $tmp 'Thornswood-Voice\chat'
     $voiceDev = Join-Path $tmp 'Thornswood-Voice-Dev\chat'
+    # The deploy records /api/deploys lists (#459).
+    $deploys = Join-Path $tmp 'Thornswood-Deploys\current'
     Put (Join-Path $docs 'config.json') '{}'
     Put (Join-Path $docs 'data\board.json') '{}'
     Put (Join-Path $server 'server.log') 'before'
@@ -369,6 +373,19 @@ try {
     Put (Join-Path $server 'world\changeForms.json') '{}'
     Put (Join-Path $voice '2026-09-24.jsonl') '{}'
     Put (Join-Path $voiceDev '2026-09-24.jsonl') '{}'
+    Put (Join-Path $deploys 'thornswood-docs.json') '{}'
+    # The update feed the site serves and must not write (#913).
+    Put (Join-Path $docs 'feed\version.json') '{}'
+    Put (Join-Path $docs 'feed\assets\0000000000000000000000000000000000000000000000000000000000000000') 'x'
+    Put (Join-Path $docs 'feed-dev\version.json') '{}'
+    # BUILTIN\Users reaches the real site folder by inheriting from C:\. The
+    # scratch one gets the same, from the scratch folder above it.
+    $usersSid = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
+    $top = Get-Acl -LiteralPath $tmp
+    $top.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($usersSid, 'ReadAndExecute',
+        [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
+        [Security.AccessControl.PropagationFlags]::None, 'Allow')))
+    Set-Acl -LiteralPath $tmp -AclObject $top
     # $dev is left out on purpose: a box with no dev server has no folder.
     $map = @{
         'C:\Thornswood-Server\data'    = (Join-Path $server 'data')
@@ -376,6 +393,7 @@ try {
         'C:\Thornswood-Server-Dev'     = $dev
         'C:\Thornswood-Voice\chat'     = $voice
         'C:\Thornswood-Voice-Dev\chat' = $voiceDev
+        'C:\Thornswood-Deploys\current' = $deploys
     }
 
     # -- SYSTEM: the principal it always had, and not one grant -----------------
@@ -429,6 +447,7 @@ try {
     # to survive that, which a grant on the file would not.
     Remove-Item -LiteralPath (Join-Path $server 'server.log') -Force
     Put (Join-Path $server 'server.log') 'after a restart'
+    Yes 'the deploy records: LOCAL SERVICE reads them and changes nothing (#459)' (ReadsOnly (RulesFor (Join-Path $deploys 'thornswood-docs.json') $ls))
     Yes 'server.log made again after the grant can still be read' (ReadsOnly (RulesFor (Join-Path $server 'server.log') $ls))
     Yes 'online.json can be read' (ReadsOnly (RulesFor (Join-Path $server 'data\online.json') $ls))
     Yes 'the chat can be read' (ReadsOnly (RulesFor (Join-Path $voice '2026-09-24.jsonl') $ls))
@@ -444,6 +463,48 @@ try {
         (RulesFor (Join-Path $server 'world\changeForms.json') $ls).Count -eq 0 -and
         (RulesFor (Join-Path $server 'world') $ls).Count -eq 0)
 
+    # -- #913: the feed is read, never written, by the site account ---------------
+    # A deny that carries SYNCHRONIZE stops node opening the file at all, which
+    # is what icacls' W did to both feeds on 28 Sep.
+    $noWrite = $fsr::WriteData -bor $fsr::AppendData -bor $fsr::WriteExtendedAttributes -bor
+               $fsr::WriteAttributes -bor $fsr::Delete -bor $fsr::DeleteSubdirectoriesAndFiles
+    function DeniesOf($rules) { return @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Deny' }) }
+    foreach ($f in @('feed', 'feed-dev')) {
+        $d = DeniesOf (RulesFor (Join-Path $docs $f) $ls)
+        Yes "$f`: the site account is denied writing and deleting there" (
+            $d.Count -eq 1 -and ($d[0].FileSystemRights -band $noWrite) -eq $noWrite)
+        Yes "$f`: and the deny leaves out SYNCHRONIZE and every read right, so the site still serves it" (
+            $d.Count -eq 1 -and ($d[0].FileSystemRights -band ($fsr::Synchronize -bor $fsr::ReadData -bor $fsr::ReadAttributes)) -eq 0)
+        Yes "$f`: and reaches what is inside it" ($d.Count -eq 1 -and "$($d[0].InheritanceFlags)" -eq 'ContainerInherit, ObjectInherit')
+        Yes "$f`: it says so" ($said -match [regex]::Escape("denied LOCAL SERVICE writing and deleting in " + (Join-Path $docs $f)))
+    }
+    $vj = RulesFor (Join-Path $docs 'feed\version.json') $ls
+    Yes 'feed\version.json inherits the deny and still the read under it' (
+        (DeniesOf $vj).Count -eq 1 -and (Modifies @($vj | Where-Object { "$($_.AccessControlType)" -eq 'Allow' })))
+    Yes 'feed\assets inherits the deny too' (
+        (DeniesOf (RulesFor (Join-Path $docs 'feed\assets\0000000000000000000000000000000000000000000000000000000000000000') $ls)).Count -eq 1)
+    Yes 'the rest of its folder is not denied anything' (
+        (DeniesOf (RulesFor (Join-Path $docs 'data\board.json') $ls)).Count -eq 0 -and
+        (DeniesOf (RulesFor (Join-Path $docs 'config.json') $ls)).Count -eq 0)
+    Yes 'the deploy script never denies with icacls, whose W carries SYNCHRONIZE' (
+        (Get-Content -LiteralPath $deploy -Raw) -notmatch 'icacls[^\r\n]*/deny')
+
+    # -- #913: BUILTIN\Users no longer reaches the site folder ---------------------
+    $u = 'S-1-5-32-545'
+    Yes 'the scratch folder above gave BUILTIN\Users read, as C:\ does on the box' ((RulesFor $tmp $u).Count -ge 1)
+    Yes 'BUILTIN\Users has nothing on the site folder' ((RulesFor $docs $u).Count -eq 0)
+    Yes 'nor on config.json, data or the feed' (
+        (RulesFor (Join-Path $docs 'config.json') $u).Count -eq 0 -and
+        (RulesFor (Join-Path $docs 'data\board.json') $u).Count -eq 0 -and
+        (RulesFor (Join-Path $docs 'feed\version.json') $u).Count -eq 0)
+    Yes 'the site folder stopped inheriting, so a rule put back on the folder above does not come back' (
+        (Get-Acl -LiteralPath $docs).AreAccessRulesProtected)
+    $meSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    Yes 'whoever ran it keeps what they had there (Administrators on the box)' (
+        (Modifies (RulesFor $docs $meSid)) -or (Modifies (RulesFor $docs 'S-1-5-32-544')))
+    Yes 'and the site account keeps Modify on its folder' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
+    Yes 'it says Users was taken off' ($said -match 'BUILTIN\\Users no longer reaches')
+
     # The grants are given again at every deploy while the site is not SYSTEM,
     # so a second run has to leave the same rules, not a second copy of each.
     $before = @($docs, $server, (Join-Path $server 'data'), $voice, $voiceDev | ForEach-Object { (RulesFor $_ $ls).Count })
@@ -451,6 +512,11 @@ try {
     $after = @($docs, $server, (Join-Path $server 'data'), $voice, $voiceDev | ForEach-Object { (RulesFor $_ $ls).Count })
     Yes ('a second run grants again without doubling a rule (' + ($before -join ',') + ' then ' + ($after -join ',') + ')') (
         ($before -join ',') -eq ($after -join ',') -and @($after | Where-Object { $_ -ne 1 }).Count -eq 0)
+    Yes 'a second run leaves one deny on each feed folder, not two' (
+        (DeniesOf (RulesFor (Join-Path $docs 'feed') $ls)).Count -eq 1 -and
+        (DeniesOf (RulesFor (Join-Path $docs 'feed-dev') $ls)).Count -eq 1)
+    Yes 'and BUILTIN\Users is still off, with nothing refused' (
+        (RulesFor $docs $u).Count -eq 0 -and ($r.said -join "`n") -notmatch 'COULD NOT (DENY|TAKE)')
     Yes 'and the second run still says what it granted, with nothing refused' (
         ($r.said -join "`n") -match [regex]::Escape("granted LOCAL SERVICE (OI)(CI)M on $docs") -and
         ($r.said -join "`n") -notmatch 'COULD NOT GRANT')
@@ -465,7 +531,7 @@ try {
     $refused = @([regex]::Matches($said, 'COULD NOT GRANT')).Count
     Yes 'a grant that fails does not throw' (-not $threw)
     Yes 'each one that fails is said, with what icacls said, and the rest are still tried' (
-        $refused -eq 5 -and $said -match 'Access is denied')
+        $refused -eq 6 -and $said -match 'Access is denied')
 
     # -- an account this box does not have: nothing is stopped ------------------
     $script:icaclsCalls = 0
@@ -475,9 +541,12 @@ try {
     Yes 'an account that does not resolve is said' (($r.said -join "`n") -match 'NO SUCH ACCOUNT HERE: NOBODY AT ALL')
     Yes 'and nothing is granted and no principal is made' ($script:icaclsCalls -eq 0 -and $null -eq $r.principal)
     $whole = Build 'NOBODY AT ALL' 'C:\Thornswood-Docs'
-    Yes 'and it returns from the block before the old site is stopped' (
+    $deployText = Get-Content -LiteralPath $deploy -Raw
+    $gate = $deployText.IndexOf("if (`$setup -notcontains 'SETUP DONE')")
+    Yes 'and it returns from the block before SETUP DONE, and Deploy-Docs swaps nothing without it' (
         $whole.IndexOf('Nothing was stopped or changed.''; return') -gt 0 -and
-        $whole.IndexOf('Nothing was stopped or changed.''; return') -lt $whole.IndexOf('Stop-Process'))
+        $whole.IndexOf('Nothing was stopped or changed.''; return') -lt $whole.IndexOf("'SETUP DONE'") -and
+        $gate -gt 0 -and $gate -lt $deployText.IndexOf('$serviceSwapBlock)'))
 
     # -- no -RunAs keeps the account the task already has -----------------------
     #

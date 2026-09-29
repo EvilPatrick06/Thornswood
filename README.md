@@ -1,6 +1,7 @@
 # Thornswood
 
-A modded co-op Skyrim roleplay server on SkyMP, in closed playtest. This
+A modded co-op Skyrim roleplay server on SkyMP, in alpha and open by
+application. This
 repository is everything behind it. It is not where the game is downloaded:
 people who want to join apply in the [Discord](https://thornswood.net/discord)
 and follow [thornswood.net/join](https://thornswood.net/join).
@@ -21,7 +22,7 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 - `bot`: the Discord bot, in Python.
 - `records`: the client and server build records, and code signing.
 - `scripts`: what builds, ships and deploys it all, listed in
-  `scripts/README.md`; `tools` forwards the common commands there for now.
+  `scripts/README.md`.
 - `tests`: the test harnesses; all of them run every night on the VPS.
 - `engine/skymp`: the SkyMP fork our engine changes live in, a git submodule.
   `scripts/release/Build-Engine.ps1` fetches and builds it (engine/README.md).

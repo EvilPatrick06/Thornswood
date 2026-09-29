@@ -29,20 +29,20 @@ param(
 
     This defaulted to C:\Thornswood\_dist, which stopped existing when
     releases were moved out of the folder Patrick plays from. Package builds
-    into C:\Thornswood-Dev\dist\Thornswood\_dist and has done
-    since; running this on its own, which is what Package's own recovery line
+    into out\dist\Thornswood\_dist in the repository (Where.ps1 Package) and
+    has done since; running this on its own, which is what Package's own recovery line
     tells you to do when publishing fails, threw "not built" and named a folder
     nobody has.
 
     Found 23 September, and it is the same shape as the eleven scripts that
-    were still reading C:\SkyrimTogether: a default that points at a machine
+    were still reading the old build folder: a default that points at a machine
     nobody has any more, waiting for the one day somebody needs it.
   #>
   [string]$OutDir = (& (Join-Path $PSScriptRoot 'Where.ps1') Package),
   [string]$Version,
   [string]$Note,
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Root = 'C:/Thornswood-Docs',
   [switch]$KeepOld,
   # The payload is inside the exe, so there is one file to publish and the
@@ -52,10 +52,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $rootWin = $Root.Replace('/','\')
 

@@ -35,19 +35,19 @@
 // and the plugin has no key, no line and no 'skills:quit', so those fail.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 const read = function (p) { return fs.readFileSync(p, 'utf8').split(CR).join(''); };
 
-const SKILLS_PATH = process.env.SKILLS || path.join(TOOLS_DIR, '..', 'game', 'ui', 'thornswood-skills.js');
-const FRONT_PATH = process.env.FRONT || path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
-const INI_PATH = process.env.INI || path.join(TOOLS_DIR, '..', 'launcher', 'Thornswood.ini');
+const SKILLS_PATH = process.env.SKILLS || path.join(REPO_DIR, 'game', 'ui', 'thornswood-skills.js');
+const FRONT_PATH = process.env.FRONT || path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js');
+const INI_PATH = process.env.INI || path.join(REPO_DIR, 'launcher', 'Thornswood.ini');
 const page = read(SKILLS_PATH);
 const front = read(FRONT_PATH);
 const ini = read(INI_PATH);
-const gm = read(path.join(TOOLS_DIR, '..', 'game', 'gamemode.js'));
+const gm = read(path.join(REPO_DIR, 'game', 'gamemode.js'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -504,13 +504,13 @@ yes('the shipped Thornswood.ini carries CloseGameKey = 68', !!iniM && Number(ini
   while ((m = rxFront.exec(front)) !== null) {
     if (m[1] !== 'CloseGameKey' && m[1] !== 'VoicePort') { take(Number(m[2]), 'front ' + m[1]); }
   }
-  const emotes = read(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-emotes.js'));
+  const emotes = read(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-emotes.js'));
   const rxEm = /key\('(\w+)', (\d+)\)/g;
   while ((m = rxEm.exec(emotes)) !== null) { take(Number(m[2]), 'emotes ' + m[1]); }
-  const voice = read(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-voice.js'));
+  const voice = read(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-voice.js'));
   const rxVo = /^let (\w+_KEY) = (\d+);/gm;
   while ((m = rxVo.exec(voice)) !== null) { take(Number(m[2]), 'voice ' + m[1]); }
-  const mark = read(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-mark.js'));
+  const mark = read(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-mark.js'));
   const rxMk = /^let (\w+Key) = (\d+);/gm;
   while ((m = rxMk.exec(mark)) !== null) { take(Number(m[2]), 'mark ' + m[1]); }
   const rxIni = /^\s*(\w+)\s*=\s*(\d+)\s*$/gm;
@@ -518,7 +518,7 @@ yes('the shipped Thornswood.ini carries CloseGameKey = 68', !!iniM && Number(ini
     if (['CloseGameKey', 'VoicePort', 'Microphone'].indexOf(m[1]) === -1) { take(Number(m[2]), 'ini ' + m[1]); }
   }
   // Every row on the launcher's Controls page, ours and the mods'.
-  const keys = read(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Keys.cs'));
+  const keys = read(path.join(REPO_DIR, 'launcher', 'app', 'Keys.cs'));
   const rxCs = /Dxd?\("(\w+)",[\s\S]*?, "(\w+)", (?:"\w+", )?(-?\d+)\)\);/g;
   let rows = 0;
   while ((m = rxCs.exec(keys)) !== null) { rows++; take(Number(m[3]), 'Controls ' + m[1]); }

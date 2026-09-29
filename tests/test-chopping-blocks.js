@@ -37,11 +37,11 @@
 // pretend and says so below.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const SRC = process.env.FRONT ||
-            path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
+            path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -52,7 +52,7 @@ function yes(what, cond) {
 }
 
 // From `from` to the end of the named function, the way test-fire-walk.js
-// lifts refsInCell: the first closing brace at the plugin's own indent.
+// lifts walkCellSlice: the first closing brace at the plugin's own indent.
 function liftFn(from, fnName) {
   const a = src.indexOf(from);
   if (a < 0) { return null; }
@@ -75,7 +75,7 @@ function liftHandler(from) {
   return b < 0 ? null : src.slice(a, b + END.length);
 }
 
-const walk = liftFn('  const CELL_TYPES = [', 'refsInCell');
+const walk = liftFn('  const CELL_TYPES = [', 'walkCellSlice');
 const blocks = liftHandler('  const BLOCK_BASES = [');
 yes('the blocksgone handler is in the plugin', blocks !== null);
 

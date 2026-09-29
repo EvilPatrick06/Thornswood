@@ -3,7 +3,8 @@
 
   Run this ON THE VPS, after Bootstrap-VPS.ps1, as Administrator.
 
-  Unpacks the payload, checks the load order actually resolves, and registers a
+  Unpacks the payload beside the running server, checks it there, and only
+  then stops the server, swaps the new folder in and starts it. Registers a
   scheduled task so the server comes back after a reboot.
 
   Why a scheduled task rather than a real service: node.exe is not a service
@@ -11,6 +12,32 @@
   an "at startup" trigger and "run whether logged on or not" is built into
   Windows and does the same job. The cost is that it does not restart on crash
   by itself, which is what -RestartOnFailure adds via a second repeating trigger.
+
+  STAGED, CHECKED, THEN SWAPPED, issue #446: "A failed publish deletes the live
+  server before checking the new one". Until 28 September this stopped the
+  server, deleted the whole root, unpacked the payload into the empty folder,
+  and only then checked the load order, so a payload naming a plugin it did
+  not carry left no server at all, and Publish-Server said "Nothing local was
+  changed". Now, in this order:
+
+    1. The zip is held to the hash it left the laptop with (-ZipSha256) and
+       unpacked into <root>.stage-<stamp>, beside the root. The load order is
+       resolved there, with the root's own prefix mapped onto the stage,
+       gamemode.js is parsed, and the binary is held to server-build.json.
+       Anything wrong clears the stage, says INSTALL REFUSED and exits 1,
+       with nothing stopped.
+    2. The server is stopped, the root is renamed to <root>.prev-<stamp> and
+       the stage to the root, and the world, the roster, the runtime data and
+       the logs are carried across (below).
+    3. It is started, and has -Wait seconds to answer on its game port and its
+       resources port. If it does not, it is stopped, what was carried goes
+       back, the new folder is renamed <root>.failed-<stamp>, the previous one
+       comes back as the root and is started again: INSTALL ROLLED BACK, exit 1.
+
+  The newest two .prev folders are kept, and the last .failed one to read.
+  -PutBack puts the newest .prev folder back the same way, keeping what it
+  took out as <root>.undone-<stamp>. The renames keep every path the task and
+  server-settings.json name the same, so nothing has to be rewritten.
 #>
 [CmdletBinding()]
 param(
@@ -18,15 +45,30 @@ param(
     [string]$Root     = 'C:\Thornswood-Server',
     [string]$TaskName = 'Thornswood Server',
     [switch]$NoTask,          # unpack only, start it by hand
-    [switch]$StartNow
+    [switch]$StartNow,
+    # The SHA-256 of the zip as it left the laptop. Publish-Server passes it;
+    # an exit code from scp says a copy ended, not what arrived.
+    [string]$ZipSha256 = '',
+    # Start with no world. The old one is not deleted: it stays in the .prev
+    # folder the old root becomes, for as long as that is kept.
+    [switch]$FreshWorld,
+    # Put the newest <root>.prev-<stamp> back as the root, checked the same way.
+    [switch]$PutBack,
+    # How long a started server has to answer before the previous one goes back.
+    [int]$Wait = 60,
+    # How many <root>.prev-<stamp> folders to keep.
+    [int]$Keep = 2,
+    # Lets tests\test-install-server.ps1 run this on a machine with the game on
+    # it, against a scratch root. Nothing else passes it.
+    [switch]$AllowGamingPc
 )
 
 $ErrorActionPreference = 'Stop'
 
-if (Test-Path 'C:\Thornswood\Game\SkyrimSE.exe') {
+if (-not $AllowGamingPc -and (Test-Path 'C:\Thornswood\Game\SkyrimSE.exe')) {
     throw "SkyrimSE.exe is present, so this looks like the gaming PC, not the VPS. Nothing was changed."
 }
-if (-not (Test-Path -LiteralPath $Zip)) { throw "not found: $Zip" }
+if (-not $PutBack -and -not (Test-Path -LiteralPath $Zip)) { throw "not found: $Zip" }
 
 # A shell started before the bootstrap installed Node carries the old PATH, and
 # every SSH and RDP session inherits it, so "open a new window" is advice that
@@ -44,215 +86,343 @@ if (-not $node) {
 }
 Write-Host ("node {0}  at {1}" -f (& node --version), $node.Source) -ForegroundColor DarkGray
 
-# ---- unpack ----------------------------------------------------------------
-<#
-  Two things survive a reinstall, not one.
+$Root     = $Root.TrimEnd('\')
+$parent   = Split-Path -Parent $Root
+$leaf     = Split-Path -Leaf $Root
+$stamp    = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stageDir = "$Root.stage-$stamp"
 
-  world is the obvious one: it holds every character on the server.
+function Say([string]$m, [string]$c = 'Gray') { Write-Host $m -ForegroundColor $c }
+function Finish([string]$marker, [int]$code) { Write-Host ''; Write-Host $marker; exit $code }
 
-  data is the one that was being quietly thrown away. The gamemode writes
-  private\characters.json while people are online, and that file is where the
-  launcher gets the race, the sex and the name to put on a character card. It
-  is written by playing, not by building, so nothing in the payload can put it
-  back. Every publish was wiping it and taking the details off everybody's
-  cards until each person next logged in.
-
-  The two are restored differently and the difference matters. world is copied
-  back over the top, because the payload has no world and whatever was here is
-  the truth. data does have shipped contents, so only files the fresh unpack
-  did NOT provide are put back: runtime state returns, and anything that came
-  with the build stays at the version that was just installed.
-#>
-$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-
-$world = Join-Path $Root 'world'
-$worldBak = $null
-if (Test-Path -LiteralPath $world) {
-    $worldBak = Join-Path $env:TEMP ("world-" + $stamp)
-    Copy-Item -LiteralPath $world -Destination $worldBak -Recurse -Force
-    Write-Host "existing world set aside at $worldBak" -ForegroundColor Yellow
+# The game port a root's settings name, and the resources port that follows
+# from it: skymp5-server/ts/ui.ts gives 3000 for 7777 and the game port plus
+# one otherwise. Publish-Server and Deploy-Server use the same rule.
+function GamePortOf([string]$dir) {
+    try {
+        $cfg = [IO.File]::ReadAllText((Join-Path $dir 'server-settings.json')) | ConvertFrom-Json
+        if ($cfg.port) { return [int]$cfg.port }
+    } catch { }
+    return 7777
 }
 
-$dataDir = Join-Path $Root 'data'
-$dataBak = $null
-if (Test-Path -LiteralPath $dataDir) {
-    $dataBak = Join-Path $env:TEMP ("serverdata-" + $stamp)
-    Copy-Item -LiteralPath $dataDir -Destination $dataBak -Recurse -Force
-    Write-Host "existing data set aside at $dataBak" -ForegroundColor Yellow
-}
-
-<#
-  AND THE PRIVATE FOLDER, WHICH IS WHERE THE ROSTER LIVES.
-
-  This set aside the world and the data folder and not this one, so every
-  install since there has been a private folder has deleted it: door.json,
-  allowed.json and characters.json, gone, on a script that reports nothing but
-  success.
-
-  gamemode.js already wrote down what that costs, on 20 September, when the
-  whole folder went: "the character register silently stops being saved, the
-  door silently never fetches a roster, and /tp silently refuses everybody
-  because the list it reads was never written. That is three separate reports
-  with one cause and no log line between them." It was read as a one off. It
-  is this script, every time.
-
-  Patrick, 21 September, from the dev server: "Dev has no playtetser list so I
-  can't tp like I can on main."
-
-  Restored whole rather than file by file, unlike data. Nothing in a build
-  ships into private, so there is no shipped file here for a new build to be
-  entitled to replace, and merging would only risk half a roster.
-#>
-$privDir = Join-Path $Root 'private'
-$privBak = $null
-if (Test-Path -LiteralPath $privDir) {
-    $privBak = Join-Path $env:TEMP ("serverprivate-" + $stamp)
-    Copy-Item -LiteralPath $privDir -Destination $privBak -Recurse -Force
-    Write-Host "existing roster set aside at $privBak" -ForegroundColor Yellow
+# A folder rename on one volume, retried, because a process that has just been
+# told to stop does not always let go of its files the same instant.
+function MoveDir([string]$from, [string]$to) {
+    for ($i = 0; $i -lt 10; $i++) {
+        try { [IO.Directory]::Move($from, $to); return $true } catch { Start-Sleep -Milliseconds 700 }
+    }
+    return $false
 }
 
 <#
   THE OLD SERVER LETTING GO, WHICH IT DOES NOT ALWAYS DO ON ITS OWN.
 
-  21 September, on a dev publish that had just said "stopped":
-
-    Remove-Item : Cannot remove item
-    C:\Thornswood-Server-Dev\data\api\servers\thornswood\plugins\10.bin:
-    Access to the path '10.bin' is denied.
-    STOP. the installer on the VPS exited with 1.
-
   Stopping a scheduled task asks the process to end. It does not wait for it,
   and node does not drop its file handles the instant it is asked: the
-  resources server under data\api holds the plugin files it is serving. So the
-  delete raced the process, hit one locked file, and took the whole install
-  down after the payload had already been copied up.
+  resources server under data\api holds the plugin files it is serving. A
+  folder cannot be renamed while anything in it is open, so what is still
+  running under this root is stopped outright and the handles are waited for.
 
-  Three things, in the order that costs least.
-
-  ONE, ask anything still running under this root to stop, by command line
-  rather than by name, because the live server and the dev server are both node
-  and killing by name would take the other one down. That is the same rule
-  Publish-Server settled on 21 September after a dev publish stopped live.
-
-  TWO, wait for the handles. A few short goes rather than one long sleep, so
-  the ordinary case where it is already gone costs nothing.
-
-  THREE, say which file it was if it still will not go, because "access to the
-  path is denied" without a process name is the start of a long evening.
-
-  AND THE LOGS GO ASIDE FIRST, entry 220. server.log and thornswood.log sat in
-  this folder and went with it, so every publish deleted the evidence for
-  whatever the server did before it. They are moved out ahead of the delete,
-  on each try, and the folder is not deleted while one of them is still held,
-  because it would go with the folder. roll-log.ps1 keeps them from growing
-  now, so there is nothing left to gain by throwing them away.
+  By this root and nothing else, because the live and the dev server are both
+  node. The task runs cmd.exe, which holds server.log open, and node under it
+  with a relative path on its command line, so cmd is found by the log path on
+  its line and node as cmd's child. The trailing backslash matters: C:\Thornswood-Server
+  is a prefix of C:\Thornswood-Server-Dev.
 #>
-$logBak = $null
-if (Test-Path -LiteralPath $Root) {
-    $rootMatch = $Root.TrimEnd('\') + '\*'
-    try {
-        foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
-            if ($p.CommandLine -and $p.CommandLine -like $rootMatch) {
-                Write-Host ("asking node {0} under this root to stop" -f $p.ProcessId) -ForegroundColor Yellow
-                Stop-Process -Id $p.ProcessId -Force -EA SilentlyContinue
-            }
-        }
-    } catch { }
-
-    $logBak = Join-Path $env:TEMP ("serverlogs-" + $stamp)
-    $gone = $false
-    for ($i = 1; $i -le 10; $i++) {
-        $held = 0
-        foreach ($f in @(Get-ChildItem -LiteralPath $Root -File -Force -EA SilentlyContinue |
-                         Where-Object { $_.Name -match '\.log(\.\d+)?$' })) {
-            try {
-                New-Item -ItemType Directory -Path $logBak -Force | Out-Null
-                Move-Item -LiteralPath $f.FullName -Destination (Join-Path $logBak $f.Name) -Force -EA Stop
-            } catch { $held++ }
-        }
-        try {
-            if ($held -gt 0) { throw 'a log is still held' }
-            Remove-Item -LiteralPath $Root -Recurse -Force -EA Stop
-            $gone = $true
-            break
-        } catch {
-            if ($i -eq 1) {
-                Write-Host 'the old server is still holding a file, waiting for it' -ForegroundColor Yellow
-            }
-            Start-Sleep -Milliseconds 700
-        }
+function StopServer([string]$dir) {
+    # Ours only, found before the task is stopped: cmd.exe with this root's
+    # log on its line, the node it started (whose own line is relative), and
+    # any node with the root on its line. The game port alone is not proof: a
+    # scratch root holding a copy of the live settings names 7777, and the
+    # process there is the live server (docs\RESTORING.md installs into one).
+    $mark = $dir + '\'
+    $all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine })
+    $ids = @()
+    foreach ($p in $all) {
+        if (($p.Name -eq 'node.exe' -or $p.Name -eq 'cmd.exe') -and
+            $p.CommandLine.IndexOf($mark, [StringComparison]::OrdinalIgnoreCase) -ge 0) { $ids += [int]$p.ProcessId }
     }
+    foreach ($p in $all) {
+        if ($p.Name -eq 'node.exe' -and $ids -contains [int]$p.ParentProcessId) { $ids += [int]$p.ProcessId }
+    }
+    if (-not $NoTask) { try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction Stop } catch { } }
+    $port = GamePortOf $dir
+    foreach ($id in @($ids | Where-Object { $_ -gt 0 -and $_ -ne $PID } | Sort-Object -Unique)) {
+        Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+        Say ("stopped pid {0}" -f $id) 'Yellow'
+    }
+    # The port let go, when it was ours that held it.
+    for ($i = 0; $i -lt 20; $i++) {
+        $held = @()
+        try { $held = @(Get-NetUDPEndpoint -LocalPort $port -ErrorAction Stop | Where-Object { $ids -contains [int]$_.OwningProcess }) } catch { }
+        if (-not $held.Count) { break }
+        Start-Sleep -Milliseconds 500
+    }
+}
 
-    if (-not $gone) {
-        # Name what is still open, then stop rather than half installing.
-        $stuck = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -EA SilentlyContinue |
+# Both of its ports, from the box itself, for up to -Wait seconds. UDP alone is
+# not enough: the resources port is what the launcher and the client fetch
+# from, and it only opens once the native server has been built without throwing.
+function Answers([string]$dir) {
+    $port = GamePortOf $dir
+    $res = if ($port -eq 7777) { 3000 } else { $port + 1 }
+    $until = (Get-Date).AddSeconds($Wait)
+    while ($true) {
+        $udp = $false
+        try { $udp = @(Get-NetUDPEndpoint -LocalPort $port -ErrorAction Stop).Count -gt 0 } catch { }
+        $tcp = $false
+        if ($udp) {
+            try {
+                $c = New-Object Net.Sockets.TcpClient
+                $null = $c.BeginConnect('127.0.0.1', $res, $null, $null).AsyncWaitHandle.WaitOne(500)
+                $tcp = $c.Connected
+                $c.Close()
+            } catch { }
+        }
+        if ($tcp) { return $true }
+        if ((Get-Date) -gt $until) { return $false }
+        Start-Sleep -Milliseconds 700
+    }
+}
+
+function TailLog([string]$dir) {
+    $log = Join-Path $dir 'server.log'
+    if (Test-Path -LiteralPath $log) {
+        Get-Content -LiteralPath $log -Tail 30 | ForEach-Object { Say "    $_" 'Yellow' }
+    } else {
+        Say '    nothing was written, so node never started. Check that node is on the machine PATH.' 'Yellow'
+    }
+}
+
+<#
+  WHAT SURVIVES A REINSTALL, carried from the folder going out to the one
+  coming in. Moved rather than copied, so nothing is set aside in %TEMP% any
+  more and never cleaned up, and so the folder going out keeps what it
+  shipped with and nothing it did not.
+
+  world holds every character on the server. private holds the roster:
+  door.json, allowed.json and characters.json; gamemode.js wrote down on
+  20 September what losing it costs ("the character register silently stops
+  being saved, the door silently never fetches a roster, and /tp silently
+  refuses everybody"), and Patrick hit it on 21 September on the dev server.
+  Neither has anything a build ships, so each moves whole, and only into a
+  folder that has none: -FreshWorld leaves the world where it was, and a
+  put-back keeps the world the folder it brings back already has.
+
+  data does have shipped contents. The gamemode writes runtime state into it
+  while people are online, so every file in it that the incoming folder's
+  payload did not bring is copied across: runtime state comes along, and
+  anything the build ships stays at the version being installed. What a
+  payload brought is listed in .payload-data.txt as it is unpacked; a folder
+  from before that list existed falls back to the old rule, only what it does
+  not have.
+
+  And the logs, entry 220: server.log and thornswood.log sat in the root and
+  went with every install, taking the evidence for whatever the server did
+  before it. They move across and are rolled, never deleted.
+#>
+function Carry([string]$from, [string]$to, [bool]$skipWorld) {
+    foreach ($name in 'world', 'private') {
+        if ($name -eq 'world' -and $skipWorld) { Say "the world is left in $from, as -FreshWorld asked" 'Yellow'; continue }
+        $a = Join-Path $from $name
+        $b = Join-Path $to $name
+        if (-not (Test-Path -LiteralPath $a)) { continue }
+        if (Test-Path -LiteralPath $b) { Say "$b is already there, so the $name in $from is left where it is" 'Yellow'; continue }
+        if (MoveDir $a $b) { Say "$name carried across" 'Cyan' }
+        else { Say "COULD NOT MOVE $a TO $b" 'Red'; $script:carryFailed = $true }
+    }
+    $a = Join-Path $from 'data'
+    $b = Join-Path $to 'data'
+    if (Test-Path -LiteralPath $a) {
+        $list = Join-Path $to '.payload-data.txt'
+        $shipped = $null
+        if (Test-Path -LiteralPath $list) {
+            $shipped = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+            foreach ($l in [IO.File]::ReadAllLines($list)) { if ($l) { [void]$shipped.Add($l) } }
+        }
+        $kept = 0
+        foreach ($f in @(Get-ChildItem -LiteralPath $a -Recurse -File -Force -ErrorAction SilentlyContinue)) {
+            $rel = $f.FullName.Substring($a.Length).TrimStart('\')
+            $dest = Join-Path $b $rel
+            if ($shipped) { if ($shipped.Contains($rel)) { continue } }
+            elseif (Test-Path -LiteralPath $dest) { continue }
+            New-Item -ItemType Directory -Path (Split-Path -Parent $dest) -Force | Out-Null
+            Copy-Item -LiteralPath $f.FullName -Destination $dest -Force
+            $kept++
+        }
+        if ($kept -gt 0) { Say ("kept $kept runtime file" + $(if ($kept -eq 1) { '' } else { 's' }) + ' in data, including the character book') 'Cyan' }
+    }
+    $moved = 0
+    foreach ($f in @(Get-ChildItem -LiteralPath $from -File -Force -ErrorAction SilentlyContinue |
+                     Where-Object { $_.Name -match '\.log(\.\d+)?$' })) {
+        $dest = Join-Path $to $f.Name
+        if (Test-Path -LiteralPath $dest) { continue }
+        try { Move-Item -LiteralPath $f.FullName -Destination $dest -Force -ErrorAction Stop; $moved++ } catch { }
+    }
+    if ($moved -gt 0) { Say 'logs carried across, to be rolled rather than deleted' 'Cyan' }
+}
+
+# The newest few of each kind of folder beside the root.
+function Prune([string]$kind, [int]$n) {
+    Get-ChildItem -LiteralPath $parent -Directory -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like ($leaf + $kind) } | Sort-Object Name -Descending | Select-Object -Skip $n |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+# ---- the stage: nothing running is touched -----------------------------------
+if (-not $PutBack) {
+    $bad = @()
+    function Refuse([string[]]$why) {
+        Write-Host ''
+        foreach ($w in $why) { Say "REFUSED: $w" 'Red' }
+        Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue
+        Say 'the stage is cleared, and the server was not stopped or changed' 'Red'
+        Finish 'INSTALL REFUSED' 1
+    }
+    if ($ZipSha256) {
+        $have = (Get-FileHash -LiteralPath $Zip -Algorithm SHA256).Hash
+        if ($have -ne $ZipSha256.ToUpperInvariant()) { Refuse @("$Zip arrived different from what was sent") }
+        Say 'the zip is what was sent' 'DarkGray'
+    }
+    # A stage a run that died part way left behind was never swapped in.
+    Prune '.stage-*' 0
+    New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
+    Expand-Archive -LiteralPath $Zip -DestinationPath $stageDir -Force
+    Say "unpacked to $stageDir" 'Cyan'
+    # What this payload brought into data, for Carry to leave alone.
+    $sd = Join-Path $stageDir 'data'
+    $shippedData = @()
+    if (Test-Path -LiteralPath $sd) {
+        $shippedData = @(Get-ChildItem -LiteralPath $sd -Recurse -File -Force | ForEach-Object { $_.FullName.Substring($sd.Length).TrimStart('\') })
+    }
+    [IO.File]::WriteAllLines((Join-Path $stageDir '.payload-data.txt'), [string[]]$shippedData)
+
+    # ---- check the stage before trusting it ----------------------------------
+    # A byte order mark on this file is fatal and says nothing useful when it
+    # happens: node stops on the first character with "Unexpected token" and the
+    # stack points into skymp's settings loader, not at whatever wrote the file.
+    # PowerShell 5.1 puts one there when 7 does not, so a payload built on one
+    # machine can start fine and the same payload built on another cannot. Taken
+    # off here as well as fixed at the source, because payloads built before that
+    # fix are still sitting in people's folders.
+    $settingsPath = Join-Path $stageDir 'server-settings.json'
+    $s = $null
+    if (-not (Test-Path -LiteralPath $settingsPath)) { Refuse @('the payload has no server-settings.json') }
+    $bytes = [IO.File]::ReadAllBytes($settingsPath)
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        [IO.File]::WriteAllBytes($settingsPath, $bytes[3..($bytes.Length - 1)])
+        Say 'took a byte order mark off server-settings.json, node cannot parse one' 'Yellow'
+    }
+    try { $s = [IO.File]::ReadAllText($settingsPath) | ConvertFrom-Json } catch { Refuse @("server-settings.json does not parse: $($_.Exception.Message)") }
+
+    # The load order resolves, against the stage. The paths in it are written
+    # out in full under the root (Export-ServerPayload writes them for the root
+    # it is told), so the root's prefix is read as the stage's: the files are
+    # in the stage now and will be at those paths once it is the root. A
+    # shortened load order shifts every index after the gap, so a plugin that
+    # is nowhere is a refusal, not a warning.
+    $order = @($s.loadOrder)
+    if (-not $order.Count) { $bad += 'server-settings.json has no loadOrder' }
+    $missing = @()
+    foreach ($p in $order) {
+        $at = ([string]$p) -replace '/', '\'
+        if ($at.StartsWith($Root + '\', [StringComparison]::OrdinalIgnoreCase)) { $at = $stageDir + $at.Substring($Root.Length) }
+        if (-not (Test-Path -LiteralPath $at)) { $missing += $p }
+    }
+    if ($missing.Count) {
+        Say ("{0} plugin(s) in the load order are not in the payload or on disk:" -f $missing.Count) 'Red'
+        foreach ($m in $missing) { Say "    $m" 'Red' }
+        $bad += 'load order does not resolve. The server would refuse to start, and a shortened load order would shift every index after the gap.'
+    }
+    # What the task starts.
+    if (-not $NoTask -and -not (Test-Path -LiteralPath (Join-Path $stageDir 'dist_back\skymp5-server.js'))) {
+        $bad += 'the payload has no dist_back\skymp5-server.js, which is what the task starts'
+    }
+    # The gamemode parses, here, before anything is stopped.
+    $gm = Join-Path $stageDir 'gamemode.js'
+    if (Test-Path -LiteralPath $gm) {
+        # Continue for the call: under Stop, Windows PowerShell turns the first
+        # line node writes to stderr into an error that ends this script.
+        $eap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try { $said = @(& $node.Source --check $gm 2>&1) } finally { $ErrorActionPreference = $eap }
+        if ($LASTEXITCODE -ne 0) { $bad += ('gamemode.js does not parse: ' + ((@($said | ForEach-Object { "$_".Trim() } | Where-Object { $_ }) | Select-Object -First 6) -join ' | ')) }
+    }
+    # The binary is the build the payload's own record names.
+    $bin = Join-Path $stageDir 'scam_native.node'
+    $rec = Join-Path $stageDir 'server-build.json'
+    if ((Test-Path -LiteralPath $bin) -and (Test-Path -LiteralPath $rec)) {
+        try {
+            $want = ([string]([IO.File]::ReadAllText($rec) | ConvertFrom-Json).sha256).ToLowerInvariant()
+            if ($want -and $want -ne (Get-FileHash -LiteralPath $bin -Algorithm SHA256).Hash.ToLowerInvariant()) {
+                $bad += 'scam_native.node is not the build server-build.json records'
+            }
+        } catch { $bad += "server-build.json does not parse: $($_.Exception.Message)" }
+    }
+    if ($bad.Count) { Refuse $bad }
+    Say ("load order: all {0} plugins present" -f $order.Count) 'Green'
+
+    $candidate = $stageDir
+    $aside     = "$Root.prev-$stamp"
+    $failedAs  = "$Root.failed-$stamp"
+} else {
+    $last = @(Get-ChildItem -LiteralPath $parent -Directory -Force -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -like ($leaf + '.prev-*') } | Sort-Object Name -Descending | Select-Object -First 1)
+    if (-not $last.Count) {
+        Say "there is no $leaf.prev-<stamp> beside $Root, so there is nothing to put back" 'Red'
+        Finish 'INSTALL REFUSED' 1
+    }
+    $candidate = $last[0].FullName
+    $aside     = "$Root.undone-$stamp"
+    # A put-back that does not answer goes back to being the .prev it was.
+    $failedAs  = $candidate
+    Say "putting back $candidate" 'Cyan'
+}
+
+# ---- the swap ------------------------------------------------------------------
+$hadRoot = Test-Path -LiteralPath $Root
+$script:carryFailed = $false
+if ($hadRoot) {
+    Say 'stopping the server' 'Cyan'
+    StopServer $Root
+    if (-not (MoveDir $Root $aside)) {
+        # Name what is still open, start the old one again, and stop rather than
+        # half installing. The old folder is exactly as it was.
+        $stuck = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -ErrorAction SilentlyContinue |
                    Where-Object {
                        try { $h = [IO.File]::Open($_.FullName, 'Open', 'ReadWrite', 'None'); $h.Close(); $false }
                        catch { $true }
                    } | Select-Object -First 5)
-        foreach ($f in $stuck) { Write-Host ("still open: {0}" -f $f.FullName) -ForegroundColor Red }
-        throw ("could not clear $Root after ten tries. Something outside this " +
-               "script is holding those files; the world, the data folder, " +
-               "the roster and the logs are all still set aside in $env:TEMP.")
+        foreach ($f in $stuck) { Say ("still open: {0}" -f $f.FullName) 'Red' }
+        Say "could not move $Root aside after ten tries. Something outside this script is holding those files." 'Red'
+        if (-not $PutBack) { Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue }
+        if ($StartNow -and -not $NoTask) { Start-ScheduledTask -TaskName $TaskName; Say 'the old server was started again, as it was' 'Yellow' }
+        Finish 'INSTALL REFUSED' 1
     }
 }
-New-Item -ItemType Directory -Path $Root -Force | Out-Null
-Expand-Archive -LiteralPath $Zip -DestinationPath $Root -Force
-Write-Host "unpacked to $Root" -ForegroundColor Cyan
-
-if ($worldBak) {
-    Copy-Item -LiteralPath $worldBak -Destination $world -Recurse -Force
-    Write-Host 'world restored' -ForegroundColor Cyan
+if (-not (MoveDir $candidate $Root)) {
+    Say "COULD NOT MOVE $candidate TO $Root" 'Red'
+    if ($hadRoot -and (MoveDir $aside $Root)) {
+        if ($StartNow -and -not $NoTask) { Start-ScheduledTask -TaskName $TaskName }
+        Say 'the old server is back where it was' 'Yellow'
+        Finish 'INSTALL REFUSED' 1
+    }
+    Finish 'INSTALL FAILED' 1
 }
+Say "swapped in; what it replaced is $aside" 'Cyan'
+if ($hadRoot) { Carry $aside $Root ([bool]$FreshWorld) }
 
-# See the note above. Whole, because nothing in a build ships into private.
-if ($privBak) {
-    Copy-Item -LiteralPath $privBak -Destination $privDir -Recurse -Force
-    $n = @(Get-ChildItem -LiteralPath $privDir -Recurse -File -Force -EA SilentlyContinue).Count
-    Write-Host "roster restored, $n file(s) including door.json and allowed.json" -ForegroundColor Cyan
-} elseif (-not (Test-Path -LiteralPath $privDir)) {
-    <#
-      A root that has never had one. The door writes allowed.json itself once
-      it has fetched, and the register writes characters.json, but neither can
-      write into a folder that is not there: gamemode.js does one mkdir at load
-      for exactly that reason. Saying so here is the difference between "this
-      server has no roster yet" and the silence that cost three reports.
-    #>
+# See Carry. A root that has never had a private folder gets an empty one:
+# the door writes allowed.json itself once it has fetched, and the register
+# writes characters.json, but neither can write into a folder that is not
+# there. Saying so here is the difference between "this server has no roster
+# yet" and the silence that cost three reports.
+$privDir = Join-Path $Root 'private'
+if (-not (Test-Path -LiteralPath $privDir)) {
     New-Item -ItemType Directory -Path $privDir -Force | Out-Null
-    Write-Host 'no roster to restore: this root has never had a private folder.' -ForegroundColor Yellow
-    Write-Host '  /tp will refuse everybody until door.json is put there.' -ForegroundColor Yellow
-}
-
-if ($dataBak) {
-    $kept = 0
-    New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
-    foreach ($f in @(Get-ChildItem -LiteralPath $dataBak -Recurse -File -Force -EA SilentlyContinue)) {
-        $rel = $f.FullName.Substring($dataBak.Length).TrimStart('\')
-        $to = Join-Path $dataDir $rel
-        # Only what the build did not bring. A shipped file that also exists in
-        # the backup is a file the new build is entitled to replace.
-        if (Test-Path -LiteralPath $to) { continue }
-        New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
-        Copy-Item -LiteralPath $f.FullName -Destination $to -Force
-        $kept++
-    }
-    if ($kept -gt 0) {
-        Write-Host "kept $kept runtime file$(if ($kept -eq 1) { '' } else { 's' }) in data, including the character book" -ForegroundColor Cyan
-    }
-}
-
-# The logs, back where the task writes them. Only what the build did not
-# bring, the same rule as data, and the folder is left behind rather than
-# deleted if anything in it could not go back.
-if ($logBak -and (Test-Path -LiteralPath $logBak)) {
-    foreach ($f in @(Get-ChildItem -LiteralPath $logBak -File -Force -EA SilentlyContinue)) {
-        $to = Join-Path $Root $f.Name
-        if (-not (Test-Path -LiteralPath $to)) { Move-Item -LiteralPath $f.FullName -Destination $to -Force }
-    }
-    if (@(Get-ChildItem -LiteralPath $logBak -Force -EA SilentlyContinue).Count -eq 0) {
-        Remove-Item -LiteralPath $logBak -Force -EA SilentlyContinue
-    }
-    Write-Host 'logs kept, to be rolled rather than deleted' -ForegroundColor Cyan
+    Say 'no roster to restore: this root has never had a private folder.' 'Yellow'
+    Say '  /tp will refuse everybody until door.json is put there.' 'Yellow'
 }
 
 # The roller the task runs in front of the server, from beside this script:
@@ -276,34 +446,7 @@ if ($rollSrc) {
 } else {
     Write-Host "Roll-Log.ps1 is not beside this installer, so server.log will not be rolled at start." -ForegroundColor Yellow
 }
-
-# ---- check the load order resolves before trusting it ----------------------
-# A byte order mark on this file is fatal and says nothing useful when it
-# happens: node stops on the first character with "Unexpected token" and the
-# stack points into skymp's settings loader, not at whatever wrote the file.
-# PowerShell 5.1 puts one there when 7 does not, so a payload built on one
-# machine can start fine and the same payload built on another cannot. Taken
-# off here as well as fixed at the source, because payloads built before that
-# fix are still sitting in people's folders.
-$settingsPath = Join-Path $Root 'server-settings.json'
-$bytes = [IO.File]::ReadAllBytes($settingsPath)
-if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
-    [IO.File]::WriteAllBytes($settingsPath, $bytes[3..($bytes.Length - 1)])
-    Write-Host 'took a byte order mark off server-settings.json, node cannot parse one' -ForegroundColor Yellow
-}
-
-$s = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
-$bad = @()
-foreach ($p in $s.loadOrder) {
-    if (-not (Test-Path -LiteralPath ($p -replace '/', '\'))) { $bad += $p }
-}
-if ($bad) {
-    Write-Host ''
-    Write-Host ("{0} plugin(s) in the load order are not on disk:" -f $bad.Count) -ForegroundColor Red
-    foreach ($b in $bad) { Write-Host "    $b" -ForegroundColor Red }
-    throw 'load order does not resolve. The server would refuse to start, and a shortened load order would shift every index after the gap.'
-}
-Write-Host ("load order: all {0} plugins present" -f $s.loadOrder.Count) -ForegroundColor Green
+# ---- end of the roller copy
 
 # ---- scheduled task --------------------------------------------------------
 if (-not $NoTask) {
@@ -341,75 +484,71 @@ if (-not $NoTask) {
     Write-Host "scheduled task '$TaskName' registered, starts at boot, restarts every minute if it stops" -ForegroundColor Cyan
 }
 
-if ($StartNow -and -not $NoTask) {
-    # Rolled whatever its size rather than deleted, so the run before this
-    # install is server.log.1 and the tail below reads only this one.
-    # Deleting it is how the evidence for the last crash disappeared.
-    $log = Join-Path $Root 'server.log'
-    if (Test-Path -LiteralPath $roller) {
-        try { & $roller -Path $log -Force | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray } }
-        catch { Write-Host ("could not roll server.log: {0}" -f $_.Exception.Message) -ForegroundColor Yellow }
-    }
+function Tidy {
+    Prune '.prev-*' $Keep
+    Prune '.undone-*' 2
+    Prune '.failed-*' 1
+}
 
-    Start-ScheduledTask -TaskName $TaskName
+if (-not ($StartNow -and -not $NoTask)) {
+    Tidy
+    Say 'not started, so not checked. Start it and watch the resources port answer.' 'Yellow'
+    Finish 'INSTALL OK' 0
+}
 
-    <#
-      THE PORT OF THE SERVER THIS SCRIPT JUST INSTALLED, NOT 3000.
+# Rolled whatever its size rather than deleted, so the run before this
+# install is server.log.1 and the tail below reads only this one.
+# Deleting it is how the evidence for the last crash disappeared.
+$log = Join-Path $Root 'server.log'
+if (Test-Path -LiteralPath $roller) {
+    try { & $roller -Path $log -Force | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray } }
+    catch { Write-Host ("could not roll server.log: {0}" -f $_.Exception.Message) -ForegroundColor Yellow }
+}
 
-      This probed 127.0.0.1:3000 whatever it had installed. 3000 is the LIVE
-      server's resources port, and the live server is up, so a DEV install
-      asked the live server whether dev had started and was told yes. It would
-      have printed "the server is answering" with the dev server face down in
-      its own log, which is the one case this loop exists for.
+Start-ScheduledTask -TaskName $TaskName
 
-      Publish-Server had the identical fault in its own verify block and it was
-      fixed there on 21 September. This is the second copy of it. The rule is
-      written down in one more place now: skymp5-server/ts/ui.ts derives the
-      resources port as 3000 when the game port is 7777 and game port plus one
-      otherwise, so dev on 7787 serves on 7788.
+<#
+  THE PORT OF THE SERVER THIS SCRIPT JUST INSTALLED, NOT 3000.
 
-      Read out of the settings that were just unpacked, so it is right for any
-      root without anybody passing a number.
-    #>
-    $gamePort = 7777
-    try {
-        $cfg = Get-Content -LiteralPath (Join-Path $Root 'server-settings.json') -Raw | ConvertFrom-Json
-        if ($cfg.port) { $gamePort = [int]$cfg.port }
-    } catch { }
-    $resPort = if ($gamePort -eq 7777) { 3000 } else { $gamePort + 1 }
-
-    # Wait for the resources port rather than a fixed few seconds, and when it
-    # never opens, print the log instead of leaving the caller to guess.
-    $up = $false
-    for ($i = 0; $i -lt 30; $i++) {
-        try {
-            $c = New-Object Net.Sockets.TcpClient
-            $null = $c.BeginConnect('127.0.0.1', $resPort, $null, $null).AsyncWaitHandle.WaitOne(500)
-            $up = $c.Connected
-            $c.Close()
-        } catch { }
-        if ($up) { break }
-        Start-Sleep -Seconds 1
-    }
-
-    $t = Get-ScheduledTask -TaskName $TaskName
-    Write-Host ("task state: {0}" -f $t.State) -ForegroundColor DarkGray
-
-    if ($up) {
-        Write-Host ("the server is answering on {0}, game port {1}" -f $resPort, $gamePort) -ForegroundColor Green
-    }
-    else {
-        Write-Host ''
-        Write-Host 'the server did not come up. Its log says:' -ForegroundColor Red
-        if (Test-Path -LiteralPath $log) {
-            Get-Content -LiteralPath $log -Tail 30 | ForEach-Object { Write-Host "    $_" -ForegroundColor Yellow }
-        }
-        else {
-            Write-Host '    nothing was written, so node never started. Check that node is on the machine PATH.' -ForegroundColor Yellow
-        }
-    }
+  This probed 127.0.0.1:3000 whatever it had installed. 3000 is the LIVE
+  server's resources port, and the live server is up, so a DEV install
+  asked the live server whether dev had started and was told yes. Read out
+  of the settings that were just swapped in, so it is right for any root
+  without anybody passing a number.
+#>
+$gamePort = GamePortOf $Root
+$resPort = if ($gamePort -eq 7777) { 3000 } else { $gamePort + 1 }
+Say ("started, giving it {0} seconds to answer on UDP {1} and on {2}" -f $Wait, $gamePort, $resPort) 'DarkGray'
+if (Answers $Root) {
+    Say ("the server is answering on {0}, game port {1}" -f $resPort, $gamePort) 'Green'
+    Tidy
+    Say ("the task appends everything it prints to {0}\server.log, rolled at 4 MB before each start, five kept" -f $Root) 'DarkGray'
+    Finish 'INSTALL OK' 0
 }
 
 Write-Host ''
-Write-Host ''
-Write-Host ("the task appends everything it prints to {0}\server.log, rolled at 4 MB before each start, five kept" -f $Root) -ForegroundColor DarkGray
+Say 'the server did not come up. Its log says:' 'Red'
+TailLog $Root
+if (-not $hadRoot) {
+    Say 'there was no server here before this one, so there is nothing to go back to.' 'Red'
+    Finish 'INSTALL FAILED' 1
+}
+
+# ---- the way back ----------------------------------------------------------------
+Say 'putting the previous server back' 'Yellow'
+StopServer $Root
+Carry $Root $aside ([bool]$FreshWorld)
+if (-not (MoveDir $Root $failedAs)) {
+    Say "COULD NOT MOVE $Root ASIDE, so the previous server is still in $aside. Look at the box." 'Red'
+    Finish 'INSTALL FAILED' 1
+}
+if (-not (MoveDir $aside $Root)) {
+    Say "COULD NOT MOVE $aside BACK TO $Root. The new one is in $failedAs. Look at the box." 'Red'
+    Finish 'INSTALL FAILED' 1
+}
+Start-ScheduledTask -TaskName $TaskName
+if (Answers $Root) { Say ("the previous server is back and answering on {0}" -f $resPort) 'Yellow' }
+else { Say "THE PREVIOUS SERVER IS BACK AND IT STILL IS NOT ANSWERING on $resPort" 'Red'; TailLog $Root }
+if (-not $PutBack) { Say "what did not start is kept as $failedAs to read" 'DarkGray' }
+if ($script:carryFailed) { Finish 'INSTALL FAILED' 1 }
+Finish 'INSTALL ROLLED BACK' 1

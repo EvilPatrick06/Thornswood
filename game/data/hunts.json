@@ -12,7 +12,7 @@
     "expert": "a body whose best part is worth up to 75 gold",
     "master": "anything above the band before it"
   },
-  "count": 362,
+  "count": 361,
   "hunts": {
     "eb3:Skyrim.esm": { "name": "Rabbit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "count": 1 }] },
     "eb2:Skyrim.esm": { "name": "Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 1 }] },
@@ -237,7 +237,6 @@
     "1e7a4:Skyrim.esm": { "name": "Cave Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
     "1e7a1:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
     "1e7a0:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
-    "3025:Update.esm": { "name": "Rabbit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "count": 1 }] },
     "804:Update.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
     "138b8:Dawnguard.esm": { "name": "Giant Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 2 }] },
     "113c1:Dawnguard.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
@@ -378,6 +377,7 @@
     "d64:FishingInSkyrim.esp": { "name": "FishingNetSlaughterfish", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad70:Skyrim.esm", "name": "Slaughterfish Scales", "count": 1 }, { "item": "8ae:Gourmet.esp", "name": "Slaughterfish Meat", "count": 1 }] }
   },
   "skipped": [
+    { "desc": "3025:Update.esm", "editorId": "ccBGSSSE003_LvlBoneWolfZombie", "why": "a Creation Club creature: every Special Edition has the record, but its art comes with the Creation Club files Thornswood leaves out" },
     { "desc": "d3ada:Skyrim.esm", "editorId": "AudioTemplateWisp", "why": "nothing in its traits chain names a death item, so its body gives nothing" },
     { "desc": "9a744:Skyrim.esm", "editorId": "E3demoFox", "why": "nothing in its traits chain names a death item, so its body gives nothing" },
     { "desc": "90ce8:Skyrim.esm", "editorId": "DA05QuestingBeastGhost", "why": "nothing in its traits chain names a death item, so its body gives nothing" },
@@ -3593,20 +3593,6 @@
       "bestValue": 3,
       "rank": "novice",
       "couldAlsoBe": "DeathItemBear, DeathItemBearCave, DeathItemFrostbiteSpider, DeathItemTroll, DeathItemWolf",
-      "readFrom": "the race at the end of the traits chain, and the INAM that came with it"
-    },
-    "3025:Update.esm": {
-      "editorId": "ccBGSSSE003_LvlBoneWolfZombie",
-      "name": "Rabbit",
-      "nameFrom": "the record its Use Base Data bit points at, which is where the game reads this one",
-      "plugin": "Update.esm",
-      "definedIn": "Update.esm",
-      "race": "HareRace",
-      "deathItem": "9a772:Skyrim.esm",
-      "deathEdid": "DeathItemHare",
-      "bestValue": 2,
-      "rank": "novice",
-      "couldAlsoBe": "",
       "readFrom": "the race at the end of the traits chain, and the INAM that came with it"
     },
     "804:Update.esm": {

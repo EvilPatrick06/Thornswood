@@ -20,8 +20,9 @@
       foreign host is compiled in (the two http:// left are XAML namespaces,
       which are names and not places);
     - what it downloads is a zip it checks against a SHA-256 before anything in
-      it runs, and the only thing it starts is Setup.bat, so no second unsigned
-      program is fetched and run;
+      it runs, and the only thing it starts is PowerShell on the payload's
+      Setup-Thornswood.ps1 (Setup.bat until issue #889), so no second
+      unsigned program is fetched and run;
     - the age gate's else-branch, which enables Install when the checkbox is
       missing, is left exactly as it is (locked for #429).
 
@@ -36,8 +37,6 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # This test lives in tests\; repo root is one level up.
 $repoRoot = Split-Path -Parent $Here
-# Legacy: some older checks still resolve Bootstrap via tools\.
-$toolsDir = Join-Path $repoRoot 'tools'
 if (-not $BootstrapPath) { $BootstrapPath = Join-Path $repoRoot 'installer\setup\Bootstrap.cs' }
 
 $script:pass = 0
@@ -86,10 +85,20 @@ Yes 'and a mismatch is deleted and stops the install' (
 $iCheck = $bs.IndexOf('CheckPayload(target, sha);')
 $iReturn = if ($iCheck -ge 0) { $bs.IndexOf('return target;', $iCheck) } else { -1 }
 Yes 'the SHA is checked before the download is handed back' ($iCheck -ge 0 -and $iReturn -gt $iCheck)
-$iStart = $bs.IndexOf('Process.Start(psi);')
-Yes 'the only program it starts is the payload''s Setup.bat, not a downloaded exe' (
-    $bs.Contains('string bat = Path.Combine(temp, "Setup.bat");') -and
-    $bs.Contains('new ProcessStartInfo(bat)') -and $iStart -gt 0)
+# Since issue #889 that is PowerShell on the payload's Setup-Thornswood.ps1,
+# started hidden, the same thing Setup.bat runs (test-setup-in-window.ps1).
+$iStart = $bs.IndexOf('p.Start();')
+Yes 'the only program it starts is PowerShell on the payload''s script, not a downloaded exe' (
+    $bs.Contains('string script = Path.Combine(temp, "Setup-Thornswood.ps1");') -and
+    $bs.Contains('SetupStartInfo(PowerShellExe(), script, installRoot, makeOwnGame, vortexGame)') -and
+    $bs.Contains('var psi = new ProcessStartInfo(ps);') -and $iStart -gt 0)
+# The one Process.Start is the browser on the terms, privacy or rules page
+# (issue #1009), and OpenPage refuses any address that is not the site's.
+$openAt = $bs.IndexOf('static void OpenPage(Uri uri)')
+$psAt = @([regex]::Matches($bs, 'Process\.Start\('))
+$guard = if ($openAt -gt 0) { $bs.IndexOf('if (!url.StartsWith(Site + "/", StringComparison.OrdinalIgnoreCase)) return;', $openAt) } else { -1 }
+Yes 'the one Process.Start opens only a page on the site, in the browser' (
+    $psAt.Count -eq 1 -and $openAt -gt 0 -and $guard -gt $openAt -and $psAt[0].Index -gt $guard)
 
 # ---- 4. the #429 age lock, left alone --------------------------------------
 # Install starts disabled and the checkbox is the only thing that enables it,
@@ -103,7 +112,7 @@ Yes 'and the else-branch that enables it when the control is missing is intact' 
 # ---- 5. the build wiring: shipped name, icon, version stamp from Updater ------
 # OriginalFilename and InternalName come off the /out leaf, and the shipped exe
 # is Thornswood-Setup.exe, so the stub is compiled under that name and then
-# moved onto tools\setup-stub.exe, which packaging copies without recompiling.
+# moved onto out\setup-stub.exe, which packaging copies without recompiling.
 # A file icon (/win32icon) keeps the download from arriving as a blank mark.
 # FileVersion/ProductVersion come from a generated ThornswoodSetupVersion.cs
 # stamped from Updater.cs ($ver / $verFour), not from hardcoded Bootstrap attrs.

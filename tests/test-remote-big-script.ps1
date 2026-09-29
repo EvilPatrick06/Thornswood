@@ -51,14 +51,14 @@
   would reach nothing.
 #>
 [CmdletBinding()]
-param([string]$ToolsPath)
+param([string]$RepoPath)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsPath) { $ToolsPath = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoPath) { $RepoPath = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -133,10 +133,13 @@ function global:Invoke-TsFarEnd([string]$command, [string]$shell) {
     # copied up.
     $ok = $false
     $at = [regex]::Escape($far.Temp) + '[A-Za-z0-9._-]+'
-    $m = [regex]::Match($command, '^powershell -NoProfile -EncodedCommand ([A-Za-z0-9+/=]+)$')
+    # -ExecutionPolicy Bypass as well since Rotate-BotToken.ps1 (#902): its
+    # inline script dot-sources a writer it copied up, and a file is what an
+    # execution policy looks at.
+    $m = [regex]::Match($command, '^powershell -NoProfile (-ExecutionPolicy Bypass )?-EncodedCommand ([A-Za-z0-9+/=]+)$')
     if ($m.Success) {
         $text = ''
-        try { $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value)) } catch { }
+        try { $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[2].Value)) } catch { }
         foreach ($s in $far.Scripts) { if ($text.EndsWith($s)) { $ok = $true } }
     }
     else {
@@ -328,7 +331,7 @@ function Test-Sends([string]$name, [scriptblock]$sendBig, [scriptblock]$sendShor
 }
 
 # ---- Remote.ps1, which takes any script --------------------------------------
-$remotePs1 = Join-Path $ToolsPath '..\scripts\vps\Remote.ps1'
+$remotePs1 = Join-Path $RepoPath 'scripts\vps\Remote.ps1'
 Yes 'Remote.ps1 is there' (Test-Path -LiteralPath $remotePs1)
 if (Test-Path -LiteralPath $remotePs1) {
     Test-Sends 'Remote.ps1 -Script' {
@@ -366,7 +369,7 @@ function Get-FunctionText([string]$path, [string]$name) {
 }
 
 $helpers = 0
-foreach ($f in (Get-ChildItem -Path (Join-Path $ToolsPath '..\scripts') -Filter *.ps1 -File -Recurse | Where-Object { $_.Name -notlike 'test-*' -and $_.FullName -notmatch '[\\/]oneoff[\\/]' } | Sort-Object Name)) {
+foreach ($f in (Get-ChildItem -Path (Join-Path $RepoPath 'scripts') -Filter *.ps1 -File -Recurse | Where-Object { $_.Name -notlike 'test-*' -and $_.FullName -notmatch '[\\/]oneoff[\\/]' } | Sort-Object Name)) {
     $fn = Get-FunctionText $f.FullName 'Remote'
     if (-not $fn) { continue }
     if ($fn -notmatch '\$cmd\.Length -(le|gt) \d+') {
@@ -375,6 +378,23 @@ foreach ($f in (Get-ChildItem -Path (Join-Path $ToolsPath '..\scripts') -Filter 
     }
     $helpers++
     try { Invoke-Expression $fn } catch { Yes ("the Remote in {0} can be lifted" -f $f.Name) $false; continue }
+    # A guard that refuses instead of sending a file. Rotate-BotToken.ps1
+    # (#902) does that on purpose: what it sends carries the bot token, and a
+    # script sent as a temp file would put the token on the disk at both
+    # ends, so its remote scripts are kept short and a long one is an error.
+    # Held to that instead: a 10 KB script stops before anything is sent, and
+    # a short one goes inline, whole, and runs.
+    if ($fn -match '\$cmd\.Length -gt \d+\)\s*\{\s*throw\b') {
+        $r = Measure-Send { Remote $big }
+        Yes ("{0} refuses a 10 KB script rather than send it, since its scripts carry the token" -f $f.Name) ($r.Stopped -ne '')
+        Yes '  and nothing went to the far end, by ssh or scp' ($r.Ssh.Count -eq 0 -and $r.Scp.Count -eq 0)
+        $r = Measure-Send { Remote $short }
+        Yes '  and a short one goes inline, in one call' ($r.Scp.Count -eq 0 -and $r.Ssh.Count -eq 1)
+        Yes '  whole' ($r.Ssh.Count -eq 1 -and (Get-Encoded $r.Ssh[0].Command).Contains($short))
+        Yes '  and runs' ($r.Out.Contains('short and sent inline'))
+        if (-not $r.Out.Contains('short and sent inline')) { Show-Why $r }
+        continue
+    }
     Test-Sends $f.Name { Remote $big } { Remote $short } $false
 }
 Yes 'the guarded helpers were found and sent to' ($helpers -ge 10)
@@ -388,7 +408,7 @@ Yes 'the guarded helpers were found and sent to' ($helpers -ge 10)
 # claim about the VPS. It keeps every helper on the form that runs under
 # either shell while which one the VPS uses is not known.
 $quoted = @()
-foreach ($f in (Get-ChildItem -Path (Join-Path $ToolsPath '..\scripts') -Filter *.ps1 -File -Recurse | Where-Object { $_.Name -notlike 'test-*' -and $_.FullName -notmatch '[\\/]oneoff[\\/]' } | Sort-Object Name)) {
+foreach ($f in (Get-ChildItem -Path (Join-Path $RepoPath 'scripts') -Filter *.ps1 -File -Recurse | Where-Object { $_.Name -notlike 'test-*' -and $_.FullName -notmatch '[\\/]oneoff[\\/]' } | Sort-Object Name)) {
     $i = 0
     foreach ($line in [IO.File]::ReadAllLines($f.FullName)) {
         $i++

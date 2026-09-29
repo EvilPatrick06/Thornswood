@@ -1,4 +1,4 @@
-﻿<#
+<#
   test-deploy-server-online.ps1
 
   Deploy-Server.ps1 treats a server with nothing listening as nobody online,
@@ -23,9 +23,8 @@ $ErrorActionPreference = 'Stop'
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-$tools = Join-Path (Split-Path -Parent $Here) 'tools'
-$deployPath = Join-Path $tools '..\scripts\deploy\Deploy-Server.ps1'
-$shimPath   = Join-Path $tools 'Deploy-Server.ps1'
+$tools = Split-Path -Parent $Here
+$deployPath = Join-Path $tools 'scripts\deploy\Deploy-Server.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -41,6 +40,8 @@ function Done {
 }
 
 $src = Get-Content -LiteralPath $deployPath -Raw
+# The stage check and the swap moved into Swap.ps1 beside it for issue #446.
+$lib = Get-Content -LiteralPath (Join-Path (Split-Path -Parent $deployPath) 'Swap.ps1') -Raw
 
 Yes 'OnlineNow asks whether anything is on the game port' (
     $src -match 'function OnlineNow' -and $src -match 'Get-NetUDPEndpoint -EA Stop')
@@ -49,10 +50,7 @@ Yes 'OnlineNow zeroes the count when nothing is listening' (
     $src -match "if \(-not ``\$up\) \{ 'ONLINE 0' \}" -or
     ($src -match "if \(-not ``\`$up\)" -and $src -match "'ONLINE 0'"))
 Yes 'StopOurs removes a leftover restart.json' (
-    $src -match "removed a restart\.json the old process never read")
-Yes 'tools\Deploy-Server.ps1 still forwards to scripts\deploy' (
-    (Test-Path -LiteralPath $shimPath) -and
-    ((Get-Content -LiteralPath $shimPath -Raw) -match 'scripts\\deploy\\Deploy-Server\.ps1'))
+    $lib -match "removed a restart\.json the old process never read")
 
 $open  = '# ==== thornswood live deploy warning ===='
 $close = '# ==== end thornswood live deploy warning ===='
@@ -111,6 +109,18 @@ try {
         $room = Get-LiveOnline
         Yes 'Get-LiveOnline names the data folder the gamemode uses' (
             $room.Data -replace '\\','/' -match '/data$')
+        Yes 'a gamemode older than the names file gives no names' (@($room.Names).Count -eq 0)
+
+        # Issue #520: who, from the private folder, never the served one.
+        $priv = Join-Path $box 'private'
+        New-Item -ItemType Directory -Path $priv -Force | Out-Null
+        [IO.File]::WriteAllText((Join-Path $priv 'online-names.json'),
+            '{"at":1790000000000,"names":["Ahlam","Brynjolf","Camilla"]}')
+        $room = Get-LiveOnline
+        Yes "the private online-names.json gives who is on (got $(@($room.Names) -join ', '))" (
+            (@($room.Names) -join ',') -eq 'Ahlam,Brynjolf,Camilla')
+        Yes 'and the warning line carries them' ((Format-Names $room.Names) -eq ': Ahlam, Brynjolf, Camilla')
+        Yes 'and no names adds nothing to it' ((Format-Names @()) -eq '')
 
         Remove-Item -LiteralPath $online -Force
         $n = OnlineNow
@@ -124,6 +134,7 @@ try {
         [IO.File]::WriteAllText($settings, ('{"port":' + $downPort + ',"dataDir":"data"}'))
         $n = OnlineNow
         Yes "nothing on the port is nobody, whatever online.json says (got $n)" ($n -eq 0)
+        Yes 'and whatever names it left behind' (@((Get-LiveOnline).Names).Count -eq 0)
 
         $elsewhere = Join-Path $work 'elsewhere'
         New-Item -ItemType Directory -Path $elsewhere -Force | Out-Null
@@ -136,13 +147,13 @@ try {
             ($room.Data -replace '\\','/') -eq ($elsewhere -replace '\\','/'))
     }
 
-    $a2 = $src.IndexOf('# ==== deploy-server remote blocks ====')
-    $b2 = $src.IndexOf('# ==== end deploy-server remote blocks ====')
+    $a2 = $lib.IndexOf('# ==== deploy-server remote blocks ====')
+    $b2 = $lib.IndexOf('# ==== end deploy-server remote blocks ====')
     Yes 'the remote blocks are still between their markers' ($a2 -ge 0 -and $b2 -gt $a2)
     if ($a2 -ge 0 -and $b2 -gt $a2) {
         $checkBlock = $null
         $swapBlock = $null
-        Invoke-Expression $src.Substring($a2, $b2 - $a2)
+        Invoke-Expression $lib.Substring($a2, $b2 - $a2)
         Yes 'the swap block defines StopOurs' ($swapBlock -match 'function StopOurs')
 
         $standIns = "function Stop-ScheduledTask { }`r`n" +

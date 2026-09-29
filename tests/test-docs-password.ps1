@@ -30,9 +30,9 @@ param([string]$DeployPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $DeployPath) { $DeployPath = Join-Path $Here '..\scripts\deploy\Deploy-Docs.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $DeployPath) { $DeployPath = Join-Path $Here 'scripts\deploy\Deploy-Docs.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -77,10 +77,20 @@ if (-not $ps51 -or -not $node) {
     Done
 }
 
-# The same command line Remote builds, run here instead of over ssh.
-function Remote($script) {
-    $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-    return & $ps51.Source -NoProfile -NonInteractive -EncodedCommand $e 2>&1
+# The password goes through the real Send-Secret.ps1 (issue #451): on ssh's
+# standard input, the script alone on the command line. ssh is swapped for
+# one that runs that command line in Windows PowerShell 5.1 here, with the
+# same standard input, and keeps every command line it was handed so the
+# password can be looked for in them afterwards.
+. (Join-Path $Here 'scripts\vps\Send-Secret.ps1')
+$script:lines = New-Object System.Collections.ArrayList
+function ssh {
+    $a = @($args | ForEach-Object { [string]$_ })
+    [void]$script:lines.Add(($a -join ' '))
+    $m = [regex]::Match($a[-1], '-EncodedCommand (\S+)$')
+    if (-not $m.Success) { throw 'the fake ssh was handed no encoded command' }
+    [void]$script:lines.Add([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value)))
+    @($input) | & $ps51.Source -NoProfile -NonInteractive -EncodedCommand $m.Groups[1].Value
 }
 
 # Runs the branch with the two things it takes from the rest of Deploy-Docs:
@@ -194,6 +204,11 @@ try {
     }
     Yes 'a whole config: no byte order mark on it' ((First3 $f) -ne '239 187 191')
     Yes 'a whole config: it says it kept the rest' (($said -join ' ') -match 'set, 13 other setting')
+    $wire = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($newPw))
+    $sent = $script:lines -join "`n"
+    Yes 'the password went to ssh at all' ($script:lines.Count -ge 2)
+    Yes 'the password is on no command line handed to ssh, nor in the script, plain or base64 (#451)' (
+        -not $sent.Contains($newPw) -and -not $sent.Contains($wire))
 
     # ---- a config that already has a byte order mark, as anything written
     # with Set-Content -Encoding UTF8 in Windows PowerShell does

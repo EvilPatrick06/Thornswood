@@ -56,9 +56,9 @@ param([string]$AppPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppPath) { $AppPath = Join-Path $Here '..\launcher\app' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $AppPath) { $AppPath = Join-Path $Here 'launcher\app' }
 
 $script:pass = 0
 $script:fail = 0
@@ -115,11 +115,20 @@ namespace Thornswood
     {
         public const string OffSuffix = ".thornswood-off";
         public static string[] ForeignClients() { return new string[0]; }
+        // The light flag list: the hand list, and the overloads Verify calls
+        // with the list it works out from the manifest.
+        public static readonly string[] MustBeLight = { };
         public static List<string> NotLight() { return new List<string>(); }
+        public static List<string> NotLight(IEnumerable<string> mustBeLight) { return new List<string>(); }
         public static List<string> StrayCreations(ICollection<string> wanted) { return new List<string>(); }
         public static bool TakesNoPlace(string name) { return false; }
         public static int IsolateForeign(Action<string> say) { return 0; }
         public static int FlagLight(Action<string> say) { return 0; }
+        public static int FlagLight(IEnumerable<string> mustBeLight, Action<string> say) { return 0; }
+        // The real one reads the Vortex state under this account's AppData.
+        // No profile found is what OwnGame already handles: it leaves the
+        // plugin list alone.
+        public static string VortexProfileDir(string name) { return null; }
         public static int IsolateCreations(ICollection<string> wanted, Action<string> say) { return 0; }
     }
     static class Keep { public static List<string> Held() { return new List<string>(); } }

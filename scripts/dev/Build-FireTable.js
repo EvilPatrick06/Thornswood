@@ -48,7 +48,7 @@
 //      ends in Off or Out is dropped, and the count of what was dropped is
 //      printed so the rule can be seen working.
 //
-// Read only. It opens the plugins of the build and writes tools\fires.json.
+// Read only. It opens the plugins of the build and writes game\data\fires.json.
 // It touches nothing in the game folder and nothing on the VPS.
 //
 // Usage:

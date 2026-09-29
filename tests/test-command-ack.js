@@ -34,7 +34,7 @@
   shown to fail on the code before the change. Read only apart from its own
   temp folder and two loopback ports.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -42,8 +42,8 @@ const http = require('http');
 const { spawn } = require('child_process');
 
 const CR = String.fromCharCode(13);
-const GM = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
-const VOICE = process.env.VOICE || path.join(TOOLS_DIR, '..', 'voice', 'voice-server.js');
+const GM = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
+const VOICE = process.env.VOICE || path.join(REPO_DIR, 'voice', 'voice-server.js');
 const gm = fs.readFileSync(GM, 'utf8').split(CR).join('');
 const voiceSrc = fs.readFileSync(VOICE, 'utf8').split(CR).join('');
 

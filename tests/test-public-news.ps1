@@ -28,20 +28,20 @@
   -Vps is a name that cannot resolve, so if -OutFile ever stopped working
   this would fail to send rather than put a test page on the site.
 
-  -Tools runs it against another copy of the scripts, which is how it was
+  -Repo runs it against another copy of the scripts, which is how it was
   shown to fail on the code before the fix.
 
   Read only apart from files under its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$Tools)
+param([string]$Repo)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $Tools) { $Tools = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $Repo) { $Repo = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -50,7 +50,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$newsScript = Join-Path $Tools '..\scripts\ops\Publish-News.ps1'
+$newsScript = Join-Path $Repo 'scripts\ops\Publish-News.ps1'
 $ip = '\b\d{1,3}(\.\d{1,3}){3}\b'
 
 # Runs Publish-News over one feed and hands back what it would have published,
@@ -152,12 +152,12 @@ try {
     }
 
     # ---- the live feed, read as a stranger would -----------------------------
-    # From the Thornswood-Releases clone beside this repository, where the
-    # scripts that publish look for it. This repository's own version.json,
-    # which this read until 25 September, was a stale copy and is gone.
-    $repoV = Join-Path (Join-Path (Split-Path -Parent (Split-Path -Parent $Tools)) 'Thornswood-Releases') 'version.json'
+    # From this machine's working copy of the live feed (Feed-Store.ps1, #907),
+    # where the scripts that publish look for it. This repository's own
+    # version.json, which this read until 25 September, was a stale copy and is gone.
+    $repoV = Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main\version.json'
     if (-not (Test-Path -LiteralPath $repoV)) {
-        Write-Host "SKIP  no Thornswood-Releases clone beside this repository to read the feed from"
+        Write-Host "SKIP  no live feed received on this machine to read"
     } else {
         $copy = Join-Path $tmp 'copy'
         New-Item -ItemType Directory -Path $copy -Force | Out-Null
@@ -191,7 +191,7 @@ try {
 # ---- Publish-Server no longer writes them ------------------------------------
 # It needs the VPS to run, so its source is read instead: every place it adds
 # to the details, and every place it sets the body.
-$psPath = Join-Path $Tools '..\scripts\release\Publish-Server.ps1'
+$psPath = Join-Path $Repo 'scripts\release\Publish-Server.ps1'
 $tk = $null; $er = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($psPath, [ref]$tk, [ref]$er)
 Yes 'Publish-Server.ps1 parses' (@($er).Count -eq 0)
@@ -214,7 +214,7 @@ function Noise-List($path) {
     return @($as.Right.FindAll({ param($x) $x -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
 }
 $newsNoise = @(Noise-List $newsScript)
-$discordNoise = @(Noise-List (Join-Path $Tools '..\scripts\ops\Publish-Discord.ps1'))
+$discordNoise = @(Noise-List (Join-Path $Repo 'scripts\ops\Publish-Discord.ps1'))
 Yes ("Publish-News strips {0} kinds of line, the load order and the gamemode among them" -f $newsNoise.Count) (($newsNoise -contains '^\s*Load order\s*:') -and ($newsNoise -contains '^\s*The gamemode was rebuilt\b'))
 $missing = @($newsNoise | Where-Object { $discordNoise -notcontains $_ })
 foreach ($m in $missing) { Write-Host ('      Publish-Discord does not strip: ' + $m) }

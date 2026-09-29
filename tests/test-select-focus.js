@@ -42,11 +42,11 @@
 // nothing for a party, journal or trade window and three windows for skills.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const SRC = process.env.FRONT ||
-            path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
+            path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -223,6 +223,8 @@ function rig(opts) {
     'let menuStayAt = 0;\n' +
     'let menuFgAt = 0;\n' +
     'let menuFgWas = null;\n' +
+    // Back at the choice after being idle (#1142); never, here.
+    'let menuAgain = null;\n' +
     "const UI_URL = '" + PAGE + "';\n" +
     'let PROFILE = ' + (opts.fallback || 0) + ';\n' +
     'let menuChosenId = 0, menuChosenAt = 0, menuSaidAt = 0, menuSaidTimes = 0;\n' +

@@ -598,7 +598,7 @@ let portCheckedAt = 0;
 /*
   Our half: written the instant a key moves rather than on the next poll, so
   the only delay push to talk picks up is the launcher noticing, which it does
-  every 100ms.
+  as soon as Windows says the file changed (it looked every 100ms until #977).
 */
 let myMode = 'local';
 let pttHeld = false;

@@ -11,6 +11,7 @@
   "gamePort": 7777,
   "gameCheckPort": 3000,
   "onlineFile": "C:/Thornswood-Server/data/online.json",
+  "open": false,
   "access": {
     "admin": [
       "Owner",
@@ -47,5 +48,6 @@
   },
   "botKey": "",
   "admins": [],
-  "secret": ""
+  "secret": "",
+  "passKey": ""
 }

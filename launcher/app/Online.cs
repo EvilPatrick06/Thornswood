@@ -8,7 +8,7 @@ namespace Thornswood
     ///
     /// There is no way to ask a SkyMP server directly: its networking carries
     /// no status packet, and the first thing it will discuss is a connection.
-    /// This used to read Skyrim Together's public server list, which is the
+    /// This used to read the old multiplayer mod's public server list, which is the
     /// right answer for a build that is not this one: SkyMP never reports to
     /// it, so the count sat at nothing forever and the Play page said so.
     ///
@@ -82,6 +82,11 @@ namespace Thornswood
                                 got.Known = true;
                                 got.Now = int.Parse(m.Groups[1].Value);
                             }
+                            // The most the server holds at once, in its own
+                            // words (#481), over the feed's copy of it.
+                            var mx = System.Text.RegularExpressions.Regex.Match(text, "\"max\"\\s*:\\s*(\\d+)");
+                            int most;
+                            if (mx.Success && int.TryParse(mx.Groups[1].Value, out most) && most > 0) got.Max = most;
                         }
                     }
                 }

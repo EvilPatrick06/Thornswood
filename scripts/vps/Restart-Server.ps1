@@ -33,7 +33,7 @@ param(
   [ValidateSet('game', 'dev', 'docs', 'voice', 'bot')]
   [string]$Service = 'game',
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [switch]$Now,
   [switch]$NoPause
 )
@@ -42,9 +42,10 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) {
@@ -72,13 +73,14 @@ $map = @{
   dev   = @{ Task = 'Thornswood Dev Server'; Root = 'C:\Thornswood-Server-Dev'; Port = 7788 }
   docs  = @{ Task = 'Thornswood Docs';       Root = 'C:\Thornswood-Docs';       Port = 0 }
   voice = @{ Task = 'Thornswood Voice';      Root = 'C:\Thornswood-Voice';      Port = 0 }
-  bot   = @{ Task = 'Thornswood Bot';        Root = 'C:\Thornswood-Bot';        Port = 0 }
+  # A Windows service since issue #465, restarted by its name.
+  bot   = @{ Svc  = 'ThornswoodBot';         Root = 'C:\Thornswood-Bot';        Port = 0 }
 }
 $it = $map[$Service]
 
 Write-Host ''
 Write-Host "  THORNSWOOD  -  restarting $Service" -ForegroundColor White
-Say "  task $($it.Task)" 'DarkGray'
+if ($it.Svc) { Say "  service $($it.Svc)" 'DarkGray' } else { Say "  task $($it.Task)" 'DarkGray' }
 
 # ------------------------------------------------------------- who is on ----
 if (-not $Now -and $it.Port -gt 0) {
@@ -100,7 +102,17 @@ if (-not $Now -and $it.Port -gt 0) {
 
 # ------------------------------------------------------------- the bounce ---
 Head 'Restarting'
-$out = Remote @"
+if ($it.Svc) {
+  $out = Remote @"
+if (-not (Get-Service -Name '$($it.Svc)' -EA SilentlyContinue)) { 'NO SUCH SERVICE: $($it.Svc)'; return }
+try { Restart-Service -Name '$($it.Svc)' -Force -ErrorAction Stop } catch { 'COULD NOT RESTART: ' + `$_.Exception.Message }
+Start-Sleep -Seconds 12
+'state ' + (Get-Service -Name '$($it.Svc)').Status
+"@
+  $out | ForEach-Object { Say "  $_" }
+  if ("$out" -match 'NO SUCH SERVICE') { Die "There is no service called $($it.Svc) on the VPS. Install-Bot.ps1 puts it there." }
+} else {
+  $out = Remote @"
 Stop-ScheduledTask -TaskName '$($it.Task)' -EA SilentlyContinue
 Start-Sleep -Seconds 4
 Start-ScheduledTask -TaskName '$($it.Task)' -EA SilentlyContinue
@@ -108,8 +120,9 @@ Start-Sleep -Seconds 12
 `$t = Get-ScheduledTask -TaskName '$($it.Task)' -EA SilentlyContinue
 if (`$t) { 'state ' + `$t.State } else { 'NO SUCH TASK: $($it.Task)' }
 "@
-$out | ForEach-Object { Say "  $_" }
-if ("$out" -match 'NO SUCH TASK') { Die "There is no scheduled task called $($it.Task) on the VPS." }
+  $out | ForEach-Object { Say "  $_" }
+  if ("$out" -match 'NO SUCH TASK') { Die "There is no scheduled task called $($it.Task) on the VPS." }
+}
 
 # ------------------------------------------------------------- did it come back
 Head 'What it said on the way up'

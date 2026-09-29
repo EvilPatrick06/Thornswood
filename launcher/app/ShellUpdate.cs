@@ -63,20 +63,6 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Let Play through when nothing is able to say whether it should.
-        /// Never called on a check that answered; only when there was no
-        /// answer to be had.
-        /// </summary>
-        static void Unblock(string why)
-        {
-            if (updateAnswered) return;
-            updateAnswered = true;
-            updatePending = false;
-            Log("Playing on launcher " + Updater.Version + ", " + why + ".");
-            DrawStatus();
-        }
-
-        /// <summary>
         /// The feed's message in the bar above Play, and the hold on Play when
         /// the feed asks for one. Entry 262: until this the message was one
         /// Log line that scrolled away, so there was no way to say anything to
@@ -114,10 +100,10 @@ namespace Thornswood
             pendingDoc = v;
 
             // Where the answer came from, once, and again if it ever changes.
-            // A line in launcher.log naming thornswood.net is what says the
-            // checks are off the GitHub Contents API and its sixty anonymous
-            // requests an hour, and a line naming api.github.com is what says
-            // the site feed is missing and the fallback is carrying it (#445).
+            // A line in launcher.log naming thornswood.net is what says where
+            // the checks go. Until #907 a line naming api.github.com said the
+            // site feed was missing and the GitHub fallback was carrying it;
+            // that fallback went with Thornswood-Releases.
             if (feedSaid != Updater.LastFeedUrl)
             {
                 feedSaid = Updater.LastFeedUrl;
@@ -153,12 +139,9 @@ namespace Thornswood
             {
                 cfg.VoicePort = v.voicePort; quiet = true;
             }
-            if (!string.IsNullOrEmpty(v.updateRepo) && v.updateRepo != cfg.UpdateRepo)
-            {
-                cfg.UpdateRepo = v.updateRepo; quiet = true;
-            }
-            // Same announce-a-rename pattern as updateRepo (#649): a feed can
-            // ship the new site URL under the old one, then move.
+            // updateRepo is no longer read: it named the GitHub fallback, which
+            // went with Thornswood-Releases (#907). A feed can still announce a
+            // move of the site feed by shipping the new URL under the old one.
             if (!string.IsNullOrEmpty(v.updateFeedUrl) && v.updateFeedUrl != cfg.UpdateFeedUrl)
             {
                 cfg.UpdateFeedUrl = v.updateFeedUrl; quiet = true;
@@ -173,10 +156,13 @@ namespace Thornswood
             // pointed at Caddy. Null means the feed did not mention it.
             if (v.voiceUrl != null && v.voiceUrl != cfg.VoiceUrl) { cfg.VoiceUrl = v.voiceUrl; quiet = true; }
             if (!string.IsNullOrEmpty(v.presenceImage) && v.presenceImage != cfg.PresenceImage) { cfg.PresenceImage = v.presenceImage; quiet = true; }
+            // The Skyrim build the checks and the Downgrade button look for
+            // (#471). A feed without it leaves what the launcher was built with.
+            if (Downgrade.AdoptPin(cfg, v)) { LogOnly("Took the Skyrim build from the update feed: SkyrimSE.exe of " + cfg.ExpectedExeBytes + " bytes, and the depots the Downgrade button asks Steam for."); quiet = true; }
             if (quiet)
             {
                 cfg.Save(Paths.CfgFile);
-                if (txtUpdateSource != null) txtUpdateSource.Text = Updater.WhyDisabled(cfg);
+                if (txtUpdateSource != null) txtUpdateSource.Text = Updater.FeedUrl(cfg);
                 DrawVoiceState();
             }
             ShowNotice(v);
@@ -282,7 +268,7 @@ namespace Thornswood
         /// </summary>
         static void CheckUpdatesInPlay()
         {
-            if (checkingInPlay || !Updater.Enabled(cfg)) return;
+            if (checkingInPlay) return;
             checkingInPlay = true;
             ThreadPool.QueueUserWorkItem(delegate
             {

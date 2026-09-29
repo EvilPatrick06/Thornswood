@@ -191,6 +191,13 @@ namespace Thornswood
         [STAThread]
         static void Main(string[] args)
         {
+            // PerMonitorV2 is in the application manifest (#463). Framework WPF
+            // only rescales on WM_DPICHANGED when this switch is false; its
+            // default depends on a TargetFrameworkAttribute we do not emit.
+            // WPF reads it once and keeps the answer, so it is set here, before
+            // any window, message box or XAML exists.
+            AppContext.SetSwitch("Switch.System.Windows.DoNotScaleForDpiChanges", false);
+
             bool fresh;
             using (var mutex = new Mutex(true, MutexName(args), out fresh))
             {
@@ -476,10 +483,9 @@ namespace Thornswood
             AutoDisplayOnce();
             StartPing();
             StartGallery();
-            if (Updater.Enabled(cfg))
-                ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
-            else
-                Unblock("there is no update source configured");
+            // Always: config.json cannot switch the check off (#937), and Play
+            // stays shut until it has answered (Updater.FeedUrl).
+            ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
 
             /*
               Voice comes up with the launcher, not with the game.
@@ -536,6 +542,8 @@ namespace Thornswood
                 });
             };
 
+            // Inside the screen at any display scale, before it is centred (#463).
+            try { WindowFit.Keep(win); } catch (Exception ex) { Swallow.Note("Shell.Run, fitting the window to the screen", ex); }
             CentreOnMainScreen();
 
             /*
@@ -552,12 +560,6 @@ namespace Thornswood
               OnMainWindowClose ties the app's life to this window, which is
               what anyone closing it means.
             */
-            // PerMonitorV2 is in the application manifest (#463). Framework WPF
-            // only rescales on WM_DPICHANGED when this switch is false; its
-            // default depends on a TargetFrameworkAttribute we do not emit, so
-            // set it here before Application is created.
-            AppContext.SetSwitch("Switch.System.Windows.DoNotScaleForDpiChanges", false);
-
             var app = new Application();
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
             app.Exit += delegate { Voice.Stop(); try { Presence.Stop(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } try { Hold.Release(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } };
@@ -632,16 +634,9 @@ namespace Thornswood
 
         static T F<T>(string name) where T : class { return win.FindName(name) as T; }
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        static extern int GetSystemMetrics(int index);
-
         /// <summary>How far a maximized window hangs past the screen: the sizing frame plus its padding, in WPF units.</summary>
         static Thickness MaximizedInset()
         {
-            double px = 0;
-            try { px = GetSystemMetrics(32) + GetSystemMetrics(92); }   // SM_CXSIZEFRAME + SM_CXPADDEDBORDER
-            catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, asking Windows for the frame size", ex); }
-            if (px <= 0) px = 8;
             double scale = 1;
             try
             {
@@ -650,6 +645,12 @@ namespace Thornswood
             }
             catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, reading the screen scale", ex); }
             if (scale <= 0) scale = 1;
+            // At the scale of the monitor the window is on, not the one
+            // Windows started with: they differ on a second monitor (#463).
+            double px = 0;
+            try { px = WindowFit.FramePixels(scale); }   // SM_CXSIZEFRAME + SM_CXPADDEDBORDER
+            catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, asking Windows for the frame size", ex); }
+            if (px <= 0) px = 8;
             return new Thickness(px / scale);
         }
 
@@ -888,12 +889,11 @@ namespace Thornswood
 
         static bool linkingDiscord = false;
 
-        /// <summary>Both buttons that can start a link, moved together.</summary>
+        /// <summary>The button that starts a link. The collection bar used to be
+        /// a second one; since #428 it only ever opens the collection.</summary>
         static void SetLinkButtons(bool on)
         {
             if (buttonDiscord != null) buttonDiscord.IsEnabled = on;
-            if (btnInstallNow != null && collectionBarUp && !Discord.Linked)
-                btnInstallNow.IsEnabled = on;
         }
 
         /// <summary>The Discord account block above Settings. Called whenever it changes.</summary>
@@ -1269,6 +1269,9 @@ namespace Thornswood
         /// </summary>
         static void MusicDecide()
         {
+            // While the game runs the browser behind the theme is closed, not
+            // paused (#963). The first call after the game closes makes it again.
+            if (playing) { try { MenuMusic.Close(); } catch (Exception ex) { Swallow.Note("Shell.MusicDecide, close", ex); } return; }
             bool want = cfg != null && cfg.MusicOn && cfg.MusicVolume > 0 && !playing
                 && win != null && win.WindowState != WindowState.Minimized;
             double vol = cfg == null ? 0 : Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
@@ -2129,6 +2132,8 @@ namespace Thornswood
             {
                 Action fit = delegate { frame.Margin = win.WindowState == WindowState.Maximized ? MaximizedInset() : new Thickness(0); };
                 win.StateChanged += delegate { fit(); };
+                // Maximized onto a monitor with another scale: that monitor's frame.
+                win.DpiChanged += delegate { fit(); };
                 fit();
             }
 
@@ -2160,7 +2165,6 @@ namespace Thornswood
             {
                 if (collectionBarUp)
                 {
-                    if (!Discord.Linked) { ConnectDiscord(); return; }
                     try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
                     catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
                     return;
@@ -2348,7 +2352,6 @@ namespace Thornswood
             };
             btnCheckNow.Click += delegate
             {
-                if (!Updater.Enabled(cfg)) { Log("No update source is configured in config.json."); return; }
                 Log("Checking for updates...");
                 ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(true); });
             };
@@ -2513,7 +2516,10 @@ namespace Thornswood
                 if (++pingTicks >= 15) { pingTicks = 0; StartPing(); }
 
                 if (!playing) return;
-                if (Checks.GameRunning())
+                // Asks the game processes the last look found whether they are
+                // still up, and lists the machine's processes only when none is
+                // (#978). Same answer as GameRunning, on the same tick.
+                if (Checks.GameStillRunning())
                 {
                     // Who was picked at the game's menu, every tick. One file
                     // read, and nothing when the file says what it said last.
@@ -3071,7 +3077,7 @@ namespace Thornswood
                 "Downgrade Skyrim to 1.6.1170?\n\n" +
                 "Steam only hands over an older build through its own console, so the launcher works that console for you. " +
                 "Steam's window comes to the front, the launcher clicks the console's command line and types these three lines into it, one at a time, each after the one before has finished downloading:\n\n" +
-                string.Join("\n", Downgrade.Commands()) + "\n\n" +
+                string.Join("\n", Downgrade.Commands(cfg)) + "\n\n" +
                 "Steam downloads about 11 GB under your own account, and the launcher then copies the files over the Steam copy of Skyrim. " +
                 "Do not type or click while Steam's window is in front, or the keys go to the wrong place.",
                 "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
@@ -3916,6 +3922,7 @@ namespace Thornswood
             AddPathRow("Game", Paths.Game);
             AddPathRow("Saves", Path.Combine(Paths.LiveMyGames, "Saves"));
             AddPathRow("Settings", Paths.LiveMyGames);
+            DrawInGameBrowser();
         }
 
         static void AddPathRow(string label, string value)
@@ -4004,7 +4011,7 @@ namespace Thornswood
             quickKeys.Children.Clear();
 
             // Read out of the real files rather than typed here. A hardcoded
-            // list went stale the moment the build moved off Skyrim Together:
+            // list went stale the moment the build moved to SkyMP:
             // it was still offering an F2 party menu that no longer exists and
             // a trade key belonging to a mod that had been removed. A row now
             // appears only if its binding is really there, and it shows the key
@@ -4098,9 +4105,7 @@ namespace Thornswood
             if (items.Length == 0)
             {
                 var empty = new TextBlock();
-                empty.Text = Updater.Enabled(cfg)
-                    ? "Nothing posted yet. Anything Patrick writes to the update feed turns up here."
-                    : "Updates are not set up on this copy, so there is no news feed to read.";
+                empty.Text = "Nothing posted yet. Anything Patrick writes to the update feed turns up here.";
                 empty.Foreground = Res("Faint"); empty.FontSize = 12.5;
                 empty.TextWrapping = TextWrapping.Wrap;
                 newsList.Children.Add(empty);
@@ -5338,8 +5343,8 @@ namespace Thornswood
                 // appropriate address library" when it is wrong, even though
                 // the file is sitting right there.
                 //
-                // No --exePath any more. That existed because Skyrim Together's
-                // own client looked Skyrim up through Steam's registry key and
+                // No --exePath any more. That existed because the old
+                // multiplayer mod's own client looked Skyrim up through Steam's registry key and
                 // would start the wrong copy. skse64_loader starts the exe
                 // beside it, so the build it is sitting in is the one that runs.
                 var psi = new ProcessStartInfo(Paths.Loader);
@@ -5616,13 +5621,13 @@ namespace Thornswood
 
                 // THE REVISION, NOT A NAMED FILE.
                 //
-                // This used to ask whether po3_StartOnSave.dll was present and
+                // This used to ask whether one mod's file was present and
                 // call the collection stale when it was not. That was wrong in
                 // both directions, and on 22 September it was wrong on
                 // Patrick's own machine in the quietest possible way.
                 //
-                // The file is not in the collection and never has been:
-                // Add-Characters.ps1 puts it into a build by hand. So anybody
+                // The file was not in the collection then: a script put it
+                // into a build by hand. So anybody
                 // who installed the collection correctly and never ran that
                 // script read as behind, and Patrick, who had run it, read as
                 // fine while sitting two revisions behind the collection he
@@ -5701,27 +5706,15 @@ namespace Thornswood
             btnInstallNow.Visibility = Visibility.Visible;
             collectionBarUp = true;
 
-            if (Discord.Linked)
-            {
-                btnInstallNow.Content = "Open the collection";
-                btnInstallNow.IsEnabled = true;
-            }
-            else
-            {
-                // It used to read "Apply first" and be dead. That is a card
-                // telling somebody to do a thing, with the button that does the
-                // thing switched off, and the only other way to it greyed out
-                // underneath by a bug. Somebody who has been accepted and has
-                // simply not linked yet had nowhere to go from this screen.
-                //
-                // The gate has not moved: the collection still only opens once
-                // Discord is linked and the site says yes. The button is just
-                // the next step now instead of a wall.
-                btnInstallNow.Content = "Connect Discord";
-                btnInstallNow.IsEnabled = !linkingDiscord;
-                txtUpdateNote.Text = txtUpdateNote.Text +
-                    "  Connect Discord first and this opens the collection.";
-            }
+            // Open to everybody (#428). Patrick, 28 Sep: "we are in alpha so the
+            // world is open by application". Anyone can download, and the
+            // collection's link is on the public Downloads page, so holding it
+            // back here until Discord was linked kept nothing from anybody and
+            // left somebody still waiting on their application with a button
+            // that only said Connect Discord, which the site refuses until they
+            // are accepted. The application is what unlocks Play, not the mods.
+            btnInstallNow.Content = "Open the collection";
+            btnInstallNow.IsEnabled = true;
         }
 
 

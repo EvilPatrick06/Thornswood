@@ -8,7 +8,7 @@ channel to post it in (#general had been renamed, so on_member_join logged
     python backfill.py          list who would get a card, post nothing
     python backfill.py --go     post them, oldest join first
 
-Reads the same bot.env.json as the bot (run.ps1 puts it in the environment).
+Reads the same bot.env.json as the bot (its service puts it in the environment).
 Who already has a card is worked out from the channels themselves: every card
 message is the bot's, says "came up the road." and mentions the person, so the
 mentioned ids across #welcome-travelers and #general-chat are the people done.
@@ -43,7 +43,7 @@ WELCOME = os.environ.get('JOIN_CHANNEL', 'welcome-travelers').strip()
 GO = '--go' in sys.argv
 
 if not TOKEN:
-    raise SystemExit('No DISCORD_TOKEN in the environment. Run through run.ps1 or set it.')
+    raise SystemExit('No DISCORD_TOKEN in the environment. Set it from bot.env.json first.')
 
 intents = discord.Intents(guilds=True, members=True)
 client = discord.Client(intents=intents)

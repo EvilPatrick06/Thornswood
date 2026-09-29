@@ -25,14 +25,14 @@
 
   Read only. It reads launcher\app\*.cs and launcher\ui.xaml and nothing else.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const APP = path.join(TOOLS_DIR, '..', 'launcher', 'app');
+const APP = path.join(REPO_DIR, 'launcher', 'app');
 const SHELL = fs.readFileSync(path.join(APP, 'Shell.cs'), 'utf8');
 const DOWN = fs.readFileSync(path.join(APP, 'Downgrade.cs'), 'utf8');
-const XAML = fs.readFileSync(path.join(TOOLS_DIR, '..', 'launcher', 'ui.xaml'), 'utf8');
+const XAML = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'ui.xaml'), 'utf8');
 
 let pass = 0, fail = 0;
 const yes = (w, c) => {
@@ -96,12 +96,17 @@ yes('saying No leaves a line in the log', /MessageBoxResult\.Yes\) \{ Log\("[^"]
 yes('only one question stands in front of the start', (run.match(/MessageBox\.Show\(/g) || []).length === 1);
 
 // ---- what it shows is what is typed ----------------------------------------
-yes('the question lists the lines from Downgrade.Commands()', /Downgrade\.Commands\(\)/.test(ask));
+yes('the question lists the lines from Downgrade.Commands(cfg)', /Downgrade\.Commands\(cfg\)/.test(ask));
 yes('Downgrade.Commands is public so the button can read it',
-    /public static string\[\] Commands\(\)/.test(DOWN));
-const commandsBody = body(DOWN, 'public static string[] Commands()');
-yes('Commands builds every line through Command', /all\[i\] = Command\(Depots\[i\]\);/.test(commandsBody));
+    /public static string\[\] Commands\(Config cfg\)/.test(DOWN));
+const commandsBody = body(DOWN, 'public static string[] Commands(Config cfg)');
+// Since #471 the depots come from the feed when it has sent them, so the
+// question and the run both take them from PinnedDepots(cfg).
+yes('Commands builds every line through Command, from the pinned depots',
+    /string\[\]\[\] depots = PinnedDepots\(cfg\);/.test(commandsBody) && /all\[i\] = Command\(depots\[i\]\);/.test(commandsBody));
 const runBody = body(DOWN, 'static bool Run(Config cfg');
+yes('Run takes the same pinned depots the question showed',
+    /Depots = PinnedDepots\(cfg\);/.test(runBody) && runBody.indexOf('Depots = PinnedDepots(cfg);') < runBody.indexOf('for (int i = 0; i < Depots.Length; i++)'));
 yes('Run types the line Command builds, the same one the question showed',
     /string cmd = Command\(Depots\[i\]\);/.test(runBody) && /TypeIntoConsole\(cmd, log\)/.test(runBody));
 yes('Run no longer builds the line by hand anywhere else',
@@ -111,7 +116,7 @@ yes('Run no longer builds the line by hand anywhere else',
 // they are the three lines a person would expect to see.
 const appId = (DOWN.match(/const int AppId = (\d+);/) || [])[1];
 const depots = [];
-const depotBlock = (DOWN.match(/static readonly string\[\]\[\] Depots = \{([\s\S]*?)\};/) || [])[1] || '';
+const depotBlock = (DOWN.match(/static readonly string\[\]\[\] FallbackDepots = \{([\s\S]*?)\};/) || [])[1] || '';
 depotBlock.replace(/new\[\] \{ "(\d+)", "(\d+)" \}/g, (_, d, m) => { depots.push([d, m]); return ''; });
 const commandShape = /return "download_depot " \+ AppId \+ " " \+ depot\[0\] \+ " " \+ depot\[1\];/.test(DOWN);
 yes('Command writes download_depot, the app, the depot and the manifest in that order', commandShape);
@@ -141,7 +146,7 @@ const noLine = (afterAsk.match(/Log\("([^"]+)"\)/) || [])[1] || '';
 yes('the log line for No is plain words too', noLine.length > 0 && !/player/i.test(noLine) && !/[–—]/.test(noLine));
 
 // ---- C# 5 --------------------------------------------------------------------
-for (const [name, src] of [['RunDowngrade', run], ['Downgrade.Commands', commandsBody], ['Downgrade.Command', body(DOWN, 'static string Command(string[] depot)')]]) {
+for (const [name, src] of [['RunDowngrade', run], ['Downgrade.Commands', commandsBody], ['Downgrade.PinnedDepots', body(DOWN, 'static string[][] PinnedDepots(Config cfg)')], ['Downgrade.AdoptPin', body(DOWN, 'public static bool AdoptPin(Config cfg, VersionDoc v)')], ['Downgrade.Command', body(DOWN, 'static string Command(string[] depot)')]]) {
   yes(name + ' is C# 5: no interpolated strings', !/\$"/.test(src));
   yes(name + ' is C# 5: no ?.', !/\?\./.test(src));
   yes(name + ' is C# 5: no nameof, no out var', !/\bnameof\s*\(/.test(src) && !/\bout var\b/.test(src));

@@ -23,9 +23,15 @@ this is how the server knows who you are and whether you are allowed in. It is
 the only identity Thornswood has: there are no passwords here and no email
 addresses.
 
+**Your application.** Applying in the Discord keeps what you wrote in a
+private ticket only you and staff can read, and on the site for staff. Your
+answer to whether you accept the rules is also kept on the site against your
+Discord id, with the time you gave it, so there is a record that you agreed to
+them.
+
 **When you played.** Each session records who, when it started and when it
-ended, so a closed playtest has a record of what was tested and by whom
-instead of somebody's memory.
+ended, so an alpha has a record of what was tested and by whom instead of
+somebody's memory.
 
 **Your character.** Name, appearance, what you carry, where you are standing,
 what you have built and claimed, and the ranks you have earned. That is the
@@ -34,6 +40,26 @@ character, and without it there is nothing to log back into.
 **What you say in chat.** Kept so that a report of something that happened has
 something behind it other than one person's word. If you would not want a
 moderator to read it, do not type it in a shared channel.
+
+**Reports and calls for help.** /helpme and /report in the game, and a report
+about a person on the site's report page, keep who sent it, who it is about,
+what they wrote and where they were standing, so staff can act on it. Only
+staff read them, the person reported is not told, and nothing else from
+the chat is copied into them.
+
+**Using /stuck.** Each use keeps your character, your profile, your Discord
+account, where you were and where it sent you, and when, so staff can see it
+was used for being stuck. The game server also keeps the last few places each
+character stood, for as long as they are online, so /stuck has somewhere to
+send them back to; that list is gone when they leave or the server restarts.
+Only staff read these.
+
+**Staff records.** When staff ban a character or a whole account, kill a
+character for good, or write a note about somebody, the site keeps it against
+the Discord account or the character, with who did it, when and why, and the
+staff channel is told. A character killed for good is kept, not deleted. Only
+staff read these: somebody who is not staff never sees a note, even one
+about them.
 
 **The launcher's own log.** Sent to the site when a session ends. It is about
 the game: which mods are installed, what failed to start, which version you

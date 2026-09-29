@@ -39,7 +39,7 @@
 [CmdletBinding()]
 param(
     [string]$Vps  = '',
-    [string]$User = 'Administrator',
+    [string]$User = '',
     # Both by default, because the interesting answer is usually the
     # difference between them.
     [string[]]$Root = @('C:\Thornswood-Server', 'C:\Thornswood-Server-Dev')
@@ -49,9 +49,10 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 
 # The three the server actually uses. Anything else in there is listed too, so
 # a file nobody expected is visible rather than hidden by the filter.

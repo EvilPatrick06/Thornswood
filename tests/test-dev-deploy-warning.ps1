@@ -47,8 +47,8 @@ $ErrorActionPreference = 'Stop'
 
 $tools = $PSScriptRoot
 if (-not $tools) { $tools = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$tools = Join-Path (Split-Path -Parent $tools) 'tools'
+# The tests are in tests\, the repository is one folder up.
+$tools = Split-Path -Parent $tools
 
 $script:pass = 0
 $script:fail = 0
@@ -63,8 +63,8 @@ function Done {
     exit 0
 }
 
-$deployPath = Join-Path $tools '..\scripts\deploy\Deploy-DevGamemode.ps1'
-$askPath    = Join-Path $tools '..\scripts\vps\Request-Restart.ps1'
+$deployPath = Join-Path $tools 'scripts\deploy\Deploy-DevGamemode.ps1'
+$askPath    = Join-Path $tools 'scripts\vps\Request-Restart.ps1'
 $src = Get-Content -LiteralPath $deployPath -Raw
 
 # ---- the block is there to test -------------------------------------------
@@ -117,8 +117,9 @@ for ($i = 0; $i -lt $top.Count; $i++) {
         $s.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst] -and
         $s.PipelineElements[0].GetCommandName() -eq 'Warn-DevRoom') { $iWarn = $i }
     if ($iStop -lt 0 -and $text -match "^Write-Host 'Stopping the dev server\.\.\.'") { $iStop = $i }
+    # The stop is Swap.ps1's swap block since issue #446, sent as $swapBlock.
     if ($iFirstStopTask -lt 0 -and $s -isnot [System.Management.Automation.Language.FunctionDefinitionAst] -and
-        $text -match 'Stop-ScheduledTask') { $iFirstStopTask = $i }
+        $text -match 'Stop-ScheduledTask|\$swapBlock') { $iFirstStopTask = $i }
 }
 Yes 'the deploy calls the warning' ($iWarn -ge 0)
 Yes 'after the load order is worked out, so a missing plugin still stops it before anybody is told' (
@@ -278,6 +279,24 @@ try {
     Yes "and the data folder the gamemode writes online.json to (got $($r.Data))" ($r.Data -eq $wantData)
     Yes "and online.json gives the head count (got $($r.Online))" ($r.Online -eq 3)
     Yes 'and it sees the server on its port' ($r['Up'] -eq $true)
+    Yes 'a gamemode older than the names file gives no names, and the count stands alone' (
+        @($r.Names).Count -eq 0 -and $r.Online -eq 3)
+
+    # Issue #520: who, not just how many. The names live in the private
+    # folder, never beside online.json, which is served to anybody who asks.
+    $boxPriv = Join-Path $box 'private'
+    New-Item -ItemType Directory -Path $boxPriv -Force | Out-Null
+    $namesFile = Join-Path $boxPriv 'online-names.json'
+    [IO.File]::WriteAllText($namesFile, '{"at":1790000000000,"names":["Ahlam","Brynjolf","Camilla"]}')
+    $r = Get-DevRoom
+    Yes "the private online-names.json gives who is on (got $(@($r.Names) -join ', '))" (
+        (@($r.Names) -join ',') -eq 'Ahlam,Brynjolf,Camilla')
+    Yes 'and the names do not stand in for the count' ($r.Online -eq 3)
+    [IO.File]::WriteAllText($namesFile, '{"at":17')
+    $r = Get-DevRoom
+    Yes 'a half written names file is no names, and the count still reads' (
+        @($r.Names).Count -eq 0 -and $r.Online -eq 3)
+    [IO.File]::WriteAllText($namesFile, '{"at":1790000000000,"names":["Ahlam","Brynjolf","Camilla"]}')
 
     Remove-Item -LiteralPath $online -Force
     $r = Get-DevRoom
@@ -314,25 +333,34 @@ try {
     Yes "nothing on the port is read as nothing there (port $downPort)" ($r['Up'] -eq $false)
     Yes 'so a count left in online.json by a server that is gone is nobody on' ($r.Online -eq 0)
     Yes 'and the count it left is kept to say so' ($r['Stale'] -eq 1)
+    Yes 'and the names it left are dropped with it' (@($r.Names).Count -eq 0)
 
     # And the stop, run here. The things that would stop a task or a process
     # are functions in front of the cmdlets, which PowerShell prefers, so
     # nothing on this machine is touched whatever is on that port.
-    $stopAst = @($ast.EndBlock.Statements | Where-Object {
-        $_ -is [System.Management.Automation.Language.PipelineAst] -and
-        $_.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst] -and
-        $_.PipelineElements[0].GetCommandName() -eq 'Remote' -and
-        $_.Extent.Text -match 'Stop-ScheduledTask' })
-    Yes 'the deploy has one stop block to run' ($stopAst.Count -eq 1)
-    if ($stopAst.Count -eq 1) {
-        $Task = 'thornswood-test-no-such-task'
-        $stopText = Invoke-Expression $stopAst[0].PipelineElements[0].CommandElements[1].Extent.Text
+    #
+    # Since issue #446 the stop is StopOurs in Swap.ps1's swap block, the one
+    # Deploy-Server sends to live, and the deploy sends that block rather than
+    # a stop of its own. So the stop run here is that one, against the dev box.
+    $lib = Get-Content -LiteralPath (Join-Path (Split-Path -Parent $deployPath) 'Swap.ps1') -Raw
+    $la = $lib.IndexOf('# ==== deploy-server remote blocks ====')
+    $lb = $lib.IndexOf('# ==== end deploy-server remote blocks ====')
+    $swapBlock = ''
+    if ($la -ge 0 -and $lb -gt $la) { $checkBlock = $null; Invoke-Expression $lib.Substring($la, $lb - $la) }
+    $stopMatch = [regex]::Match($swapBlock, '(?ms)^function StopOurs \{.*?^\}\r?$')
+    Yes 'the deploy sends Swap.ps1''s swap block, which carries the stop' (
+        $src -match '\. \(Join-Path \$Here ''Swap\.ps1''\)' -and $src -match '\+ \$swapBlock\)')
+    Yes 'the deploy has one stop block to run' ($stopMatch.Success)
+    if ($stopMatch.Success) {
+        $stopText = "`$Task = 'thornswood-test-no-such-task'`r`n`$Root = '" + $box.Replace("'", "''") + "'`r`n`$port = " + $upPort + "`r`n" +
+                    $stopMatch.Value + "`r`nStopOurs`r`n'stopped'`r`n"
         $standIns = @'
 function Stop-ScheduledTask { }
 function Stop-Process { 'stand-in asked to stop ' + ($args -join ' ') }
 function Get-NetUDPEndpoint { }
 function Get-NetTCPConnection { }
 function Start-Sleep { }
+function Held { $false }
 
 '@
         $request = Join-Path $boxData 'restart.json'
@@ -393,6 +421,10 @@ function Start-Sleep { }
     Drive "$dev|$devDat|ONLINE 3"
     $asked = @(Asked)
     Yes 'three on: it says how many before anything stops' (Said '^\s*3 on the dev server')
+
+    Drive "$dev|$devDat|ONLINE 2|NAME Ahlam|NAME Brynjolf"
+    Yes 'and with the names file there, it says who' (Said '^\s*2 \(Ahlam, Brynjolf\) on the dev server')
+    Drive "$dev|$devDat|ONLINE 3"
     Yes 'Request-Restart is asked once' ($asked.Count -eq 1)
     if ($asked.Count -eq 1) {
         $q = $asked[0]

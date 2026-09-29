@@ -37,11 +37,11 @@
 param([string]$ShipPath)
 
 $ErrorActionPreference = 'Stop'
-$ToolsHere = $PSScriptRoot
-if (-not $ToolsHere) { $ToolsHere = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$ToolsHere = Join-Path (Split-Path -Parent $ToolsHere) 'tools'
-if (-not $ShipPath) { $ShipPath = Join-Path $ToolsHere '..\scripts\release\Ship.ps1' }
+$RepoHere = $PSScriptRoot
+if (-not $RepoHere) { $RepoHere = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# The tests are in tests\, the repository is one folder up.
+$RepoHere = Split-Path -Parent $RepoHere
+if (-not $ShipPath) { $ShipPath = Join-Path $RepoHere 'scripts\release\Ship.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -114,11 +114,12 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ship-guards-' + [Guid]
 $oldAppData = $env:LOCALAPPDATA
 try {
     New-Item -ItemType Directory -Path $work -Force | Out-Null
-    $script:rel = Join-Path $work 'Thornswood-Releases'
-    $script:relDev = Join-Path $work 'Thornswood-Releases-dev'
+    # This machine's working copies of the feeds (Feed-Store.ps1, #907).
+    $script:rel = Join-Path $work 'appdata\Thornswood\feed\main'
+    $script:relDev = Join-Path $work 'appdata\Thornswood\feed\dev'
     $state = Join-Path $work 'appdata\Thornswood'
     New-Item -ItemType Directory -Path $script:rel, $script:relDev, $state -Force | Out-Null
-    # Pending notes still use LOCALAPPDATA; the baseline is in the releases clone.
+    # Pending notes and the working copies of the feed and baseline are all under LOCALAPPDATA.
     $env:LOCALAPPDATA = Join-Path $work 'appdata'
     [IO.File]::WriteAllText((Join-Path $script:relDev 'version.json'), '{"launcherVersion":"1.1.67","packs":[]}')
 
@@ -130,7 +131,7 @@ try {
     $target = '1.1.68'
 
     # What the publisher does under -NoUpload -NoPush: it writes version.json
-    # in the release clone and records the release in its baseline.
+    # in the working folder and records the release in its baseline.
     $publish = {
         param([string]$name)
         $rd = if ($name -eq 'published-dev.json') { $script:relDev } else { $script:rel }

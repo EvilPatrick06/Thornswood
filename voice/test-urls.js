@@ -28,9 +28,9 @@ function check(what, got, want) {
 }
 
 console.log('the launcher page:');
-let f = pageFns({ host: '192.135.112.23', port: '7778' });
-check('nothing set, as today', f.socket(), 'ws://192.135.112.23:7778/');
-check('nothing set, base', f.base(), 'http://192.135.112.23:7778');
+let f = pageFns({ host: '203.0.113.7', port: '7778' });
+check('nothing set, as today', f.socket(), 'ws://203.0.113.7:7778/');
+check('nothing set, base', f.base(), 'http://203.0.113.7:7778');
 f = pageFns({ host: 'x', port: '1', base: 'https://thornswood.net/voice', socket: 'wss://thornswood.net/voice/' });
 check('launcher sent both', f.socket(), 'wss://thornswood.net/voice/');
 f = pageFns({ host: 'x', port: '1', base: 'https://thornswood.net/voice' });
@@ -41,7 +41,7 @@ f = pageFns({ host: 'x', port: '1', base: 'http://box/voice' });
 check('plain http gives ws', f.socket(), 'ws://box/voice/');
 
 console.log('\nthe chat socket in the game:');
-check('no base, as today', chatUrl({}, '192.135.112.23', 7778)(), 'ws://192.135.112.23:7778/');
+check('no base, as today', chatUrl({}, '203.0.113.7', 7778)(), 'ws://203.0.113.7:7778/');
 check('base set', chatUrl({ base: 'https://thornswood.net/voice' }, 'x', 1)(), 'wss://thornswood.net/voice/');
 check('base with trailing slash', chatUrl({ base: 'https://thornswood.net/voice/' }, 'x', 1)(), 'wss://thornswood.net/voice/');
 check('dev base', chatUrl({ base: 'https://thornswood.net/voice-dev' }, 'x', 1)(), 'wss://thornswood.net/voice-dev/');

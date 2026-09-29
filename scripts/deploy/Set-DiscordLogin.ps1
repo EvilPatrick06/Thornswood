@@ -33,6 +33,11 @@
   It asks for the client secret and the bot token at a prompt rather than
   taking them on the command line, so neither ends up in your history.
 
+  A bot token given here goes into the bot's C:\Thornswood-Bot\bot.env.json as
+  well as the site's config.json, through scripts\vps\Write-BotToken.ps1, the
+  one writer of it, and the bot is restarted. To change only the token,
+  Rotate-BotToken.ps1 is the shorter way.
+
   Later, to change one thing, pass just that thing. Anything you leave out is
   left as it is:
 
@@ -68,19 +73,28 @@ param(
   [switch]$NewPatreon,
   [switch]$NoSecrets,
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Root = 'C:/Thornswood-Docs',
-  [string]$Task = 'Thornswood Docs'
+  [string]$Task = 'Thornswood Docs',
+  # The bot's folder and service. A bot token goes into its bot.env.json as well
+  # as the site's config.json, through the one writer both use, and the bot is
+  # restarted when it changed.
+  [string]$BotRoot = 'C:/Thornswood-Bot',
+  [string]$BotService = 'ThornswoodBot'
 )
 
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Secret.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $rootWin = $Root.Replace('/','\')
+$botWin  = $BotRoot.Replace('/','\')
+$writer  = Join-Path $Here '..\vps\Write-BotToken.ps1'
 
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
@@ -286,31 +300,44 @@ if ($Patreon -and $Patreon -ne 'none') {
 $d = @{}
 if ($ClientId)     { $d.clientId = $ClientId }
 if ($clientSecret) { $d.clientSecret = $clientSecret }
-if ($botToken)     { $d.botToken = $botToken }
 if ($GuildId)      { $d.guildId = $GuildId }
 if ($Invite)       { $d.invite = $Invite }
 
+# The bot token is not part of the discord block this merges. It goes to
+# Write-ThornswoodBotToken on the VPS, which puts it into the site's
+# config.json and the bot's bot.env.json together or into neither (#466).
 $payload = @{
   discord = $d
+  token   = "$botToken"
   patreon = "$Patreon"
   admins  = @(if ($Admin) { $Admin | ForEach-Object { "$_" } })
 } | ConvertTo-Json -Depth 4 -Compress
+# A client id given with the token says which application this is on purpose,
+# and the token was checked against it above.
+$any = ''
+if ($ClientId) { $any = ' -AnyApplication' }
 
-# Base64 so neither secret is ever a word on a command line on either machine.
-$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
-$clientSecret = $null; $botToken = $null; $payload = $null
+# Both secrets go on ssh's standard input (Send-Secret.ps1, issue #451), so
+# neither is on a command line or in a file on either machine. A comment here
+# used to say base64 kept them off the command line; it did not, the base64
+# went inside it.
+$clientSecret = $null; $botToken = $null
 
 Write-Host ''
 Write-Host 'Writing it to the VPS...'
-Remote @"
+if (-not (Test-Path -LiteralPath $writer)) { Write-Host "  missing: $writer" -ForegroundColor Red; exit 1 }
+Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $payload -Script ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Stop'
+`$patch = `$null
+try { `$patch = `$ThornswoodSecret | ConvertFrom-Json } catch { }
+`$ThornswoodSecret = `$null
+if (-not `$patch) { 'NOTHING ARRIVED on standard input. Nothing written.'; return }
 `$f = '$rootWin\config.json'
 `$cfg = @{}
 if (Test-Path `$f) {
   try { (Get-Content `$f -Raw | ConvertFrom-Json).PSObject.Properties |
         ForEach-Object { `$cfg[`$_.Name] = `$_.Value } } catch { }
 }
-`$patch = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64')) | ConvertFrom-Json
 
 `$d = @{}
 if (`$cfg.discord) { `$cfg.discord.PSObject.Properties | ForEach-Object { `$d[`$_.Name] = `$_.Value } }
@@ -333,6 +360,15 @@ if (-not `$cfg['access']) {
 # the whole file is silently ignored while every check here still says 'set'.
 # So write the bytes ourselves, with no mark on the front.
 [IO.File]::WriteAllText(`$f, (`$cfg | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
+
+# The bot token, into this file and the bot's bot.env.json together, or into
+# neither. Blank at the prompt keeps what is there.
+`$tokenChanged = `$false
+if (`$patch.token) {
+  `$r = Write-ThornswoodBotToken -Token `$patch.token -BotEnv '$botWin\bot.env.json' -SiteConfig `$f$any
+  `$r.Lines
+  `$tokenChanged = [bool]`$r.Changed
+}
 
 # Read it back off the disk. What was in memory a second ago proves nothing.
 `$bytes = [IO.File]::ReadAllBytes(`$f)
@@ -374,15 +410,10 @@ function TokenLooks(`$v, `$cid) {
 '  patreon       ' + `$(if (`$back.patreon) { `$back.patreon } else { 'not set' })
 '  lets into the game: ' + (@(`$back.access.play) -join ', ')
 
-Get-CimInstance Win32_Process |
-  Where-Object { `$_.Name -eq 'node.exe' -and `$_.CommandLine -like '*Thornswood-Docs*' } |
-  ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue }
-Start-Sleep -Seconds 1
-Start-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
-Start-Sleep -Seconds 3
-if (Get-NetTCPConnection -LocalPort 3001 -State Listen -EA SilentlyContinue) { 'site restarted' }
-else { 'SITE DID NOT COME BACK' }
-"@ | ForEach-Object { "  $_" }
+Restart-ThornswoodSite -Root '$rootWin' -Task '$Task'
+if (`$tokenChanged) { Restart-ThornswoodBot -Root '$botWin' -Service '$BotService' }
+"@) | ForEach-Object { "  $_" }
+$payload = $null
 
 Write-Host ''
 Write-Host '  The redirect in the Discord application must be exactly this:' -ForegroundColor DarkGray

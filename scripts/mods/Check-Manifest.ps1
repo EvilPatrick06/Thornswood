@@ -26,7 +26,7 @@
 [CmdletBinding()]
 param(
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Client = '',
   [switch]$Dev,
   [switch]$Full,
@@ -37,6 +37,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 # The dev server is a second install beside the live one, and the dev build is
 # a second launcher beside the main one. Asking about one against the other is
@@ -44,7 +45,7 @@ if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $Client) { $Client = if ($Dev) { 'C:\Thornswood-DevBuild' } else { 'C:\Thornswood' } }
 
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 
 # The one rule for what the game loads and in what order, shared with the
 # launcher's LoadOrder.cs and with Publish-Update.ps1. This script used to

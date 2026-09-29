@@ -8,9 +8,9 @@ using System.Text;
 
 namespace Thornswood
 {
-    static class Updater
+    static partial class Updater
     {
-        public const string Version = "1.1.101";
+        public const string Version = "1.1.102";
 
         /// <summary>
         /// The collection revision the last feed named, or 0 when it named
@@ -26,9 +26,7 @@ namespace Thornswood
         /// <summary>
         /// The address the last check actually read version.json from, so
         /// launcher.log can be read back afterwards and say where the checks
-        /// went. The site feed on thornswood.net costs nothing; the GitHub
-        /// Contents API fallback spends one of the sixty anonymous requests an
-        /// hour that every launcher on the address shares (#445).
+        /// went: the site feed on thornswood.net, the only source since #907.
         /// </summary>
         public static string LastFeedUrl = "";
 
@@ -53,6 +51,7 @@ namespace Thornswood
         {
             public string Url;
             public string Etag;
+            public string LastModified;
             public VersionDoc Doc;
         }
 
@@ -65,23 +64,16 @@ namespace Thornswood
         // ten megabytes an hour per launcher to be told the same thing. With
         // the tag on the next request the site answers 304 and no body.
         //
-        // In memory and not in config.json on purpose: the tag is worth
-        // nothing without the document it belongs to, and a config that kept
-        // the tag alone would start up, ask with it, be told nothing had
-        // changed, and have nothing to read.
+        // Not in config.json on purpose: the tag is worth nothing without the
+        // document it belongs to, and a config that kept the tag alone would
+        // start up, ask with it, be told nothing had changed, and have nothing
+        // to read. So the tag and the document are kept together, in memory
+        // and in one file in Profile (CacheFile, #443), and the file is only
+        // believed when the document in it still reads. Before the file, every
+        // start of the launcher downloaded the whole feed again.
         static Cached cached;
-
-        // How long the GitHub Contents API fallback is left alone after a try.
-        //
-        // The site feed is asked every thirty seconds in play, and before this
-        // every one of those checks fell through to GitHub the moment the site
-        // missed: a hundred and twenty Contents API calls an hour against an
-        // allowance of sixty per address, so one site hiccup spent the hour's
-        // allowance in half an hour, for everybody on the connection at once.
-        // The site is still asked every thirty seconds, which is what the
-        // countdown needs. Only the fallback waits.
-        static readonly TimeSpan GithubRest = TimeSpan.FromMinutes(5);
-        static DateTime githubTried = DateTime.MinValue;
+        static bool cacheRead;
+        const string CacheMagic = "Thornswood feed cache 1";
 
         // WebClient has no timeout worth the name, and the default is long
         // enough that a GitHub which accepts the connection and then says
@@ -91,10 +83,21 @@ namespace Thornswood
         class Quick : WebClient
         {
             public int Ms = 10000;
+            // For the feed only (#443): If-Modified-Since has to go through
+            // the request's own property, because WebClient refuses it as a
+            // plain header, and a compressed feed is a quarter of the size.
+            public DateTime Since = DateTime.MinValue;
+            public bool Gzip;
             protected override WebRequest GetWebRequest(Uri address)
             {
                 var r = base.GetWebRequest(address);
                 if (r != null) { r.Timeout = Ms; }
+                var h = r as HttpWebRequest;
+                if (h != null)
+                {
+                    if (Since != DateTime.MinValue) h.IfModifiedSince = Since;
+                    if (Gzip) h.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+                }
                 return r;
             }
         }
@@ -121,35 +124,38 @@ namespace Thornswood
             return wc;
         }
 
-        public static bool Enabled(Config cfg)
-        {
-            // No token needed. The site feed (UpdateFeedUrl) is the primary
-            // source after the #649 cutover; Thornswood-Releases via UpdateRepo
-            // stays as the GitHub Contents API fallback. UpdateToken is still
-            // honoured if somebody sets one, which is what keeps a private
-            // source working for whoever is developing against it.
-            if (!string.IsNullOrEmpty(cfg.UpdateFeedUrl))
-            {
-                Uri feed;
-                if (Uri.TryCreate(cfg.UpdateFeedUrl.Trim(), UriKind.Absolute, out feed)
-                    && feed.Scheme == Uri.UriSchemeHttps)
-                    return true;
-            }
-            return !string.IsNullOrEmpty(cfg.UpdateRepo)
-                   && cfg.UpdateRepo.Contains("/");
-        }
+        /// <summary>The feed this build reads when config.json names none of Thornswood's.</summary>
+        public const string MainFeed = "https://thornswood.net/feed/version.json";
+        public const string DevFeed = "https://thornswood.net/feed-dev/version.json";
 
-        public static string WhyDisabled(Config cfg)
+        /// <summary>
+        /// Where version.json is read from. Always somewhere: the update check
+        /// cannot be switched off (#937).
+        ///
+        /// Until #937 an UpdateFeedUrl blanked or bent in config.json turned
+        /// the check off, and a launcher with no update source let Play through
+        /// on its own say (Unblock, gone with this). So an out of date
+        /// launcher was one edit away from playing. Now config.json may only
+        /// move the feed within thornswood.net, over https, the way a feed
+        /// announces a move (updateFeedUrl); anything else, empty included, is
+        /// the built-in address for this build's channel. A feed address that
+        /// then does not answer keeps Play shut like any other failed check,
+        /// and a dev build pointed at the main feed gets no join pass from the
+        /// site, which checks the launcher against its own channel's feed.
+        /// </summary>
+        public static string FeedUrl(Config cfg)
         {
-            if (!string.IsNullOrEmpty(cfg.UpdateFeedUrl))
-            {
-                Uri feed;
-                if (Uri.TryCreate(cfg.UpdateFeedUrl.Trim(), UriKind.Absolute, out feed)
-                    && feed.Scheme == Uri.UriSchemeHttps)
-                    return cfg.UpdateFeedUrl.Trim();
-            }
-            if (string.IsNullOrEmpty(cfg.UpdateRepo) || !cfg.UpdateRepo.Contains("/")) return "no update source set";
-            return cfg.UpdateRepo;
+            bool dev = cfg != null &&
+                       (string.Equals(cfg.Channel, "dev", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(cfg.UpdateBranch, "dev", StringComparison.OrdinalIgnoreCase));
+            string builtIn = dev ? DevFeed : MainFeed;
+            string said = (cfg == null || cfg.UpdateFeedUrl == null) ? "" : cfg.UpdateFeedUrl.Trim();
+            Uri u;
+            if (said.Length == 0 || !Uri.TryCreate(said, UriKind.Absolute, out u)) return builtIn;
+            if (u.Scheme != Uri.UriSchemeHttps || !u.IsDefaultPort || u.UserInfo.Length > 0) return builtIn;
+            string host = u.Host.ToLowerInvariant();
+            if (host != "thornswood.net" && !host.EndsWith(".thornswood.net", StringComparison.Ordinal)) return builtIn;
+            return said;
         }
 
         /// <summary>
@@ -202,146 +208,27 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The repository names worth trying, in order. The project was renamed
-        /// from skyrim-together to Thornswood, and a config.json written either
-        /// side of that rename is still out there on somebody's machine.
-        ///
-        /// Rewriting the name in the config on load was the obvious fix and the
-        /// wrong one: it renamed everybody's config before the repository
-        /// itself was renamed, so every launcher started asking GitHub for
-        /// something that did not exist yet. Trying is the only thing that
-        /// works whichever side of the rename a machine is on.
-        /// </summary>
-        static List<string> RepoCandidates(string repo)
-        {
-            var l = new List<string>();
-            if (string.IsNullOrEmpty(repo)) return l;
-            l.Add(repo);
-
-            int slash = repo.LastIndexOf('/');
-            if (slash <= 0) return l;
-            string owner = repo.Substring(0, slash + 1);
-            string name = repo.Substring(slash + 1);
-
-            if (string.Equals(name, "skyrim-together", StringComparison.OrdinalIgnoreCase)) l.Add(owner + "Thornswood");
-            else if (string.Equals(name, "Thornswood", StringComparison.OrdinalIgnoreCase)) l.Add(owner + "skyrim-together");
-            return l;
-        }
-
-        /// <summary>
-        /// Reads version.json. Prefers UpdateFeedUrl (direct https on the
-        /// site, #649), with the ETag of the last copy so an unchanged feed is
-        /// answered 304 and not downloaded again. If that fails or is unset,
-        /// falls back to the GitHub Contents API on UpdateRepo/UpdateBranch so
-        /// Thornswood-Releases stays a hot rollback, at most once every
-        /// GithubRest because that is the request with a quota on it (#445).
-        /// Returns null if updates are off.
+        /// Reads version.json from FeedUrl (direct https on the site, #649),
+        /// with the ETag of the last copy so an unchanged feed is answered 304
+        /// and not downloaded again. Until #907 a miss fell back to the GitHub
+        /// Contents API on UpdateRepo (Thornswood-Releases); that repository is
+        /// gone, so a miss throws and the next check tries the site again.
+        /// Never null: updates cannot be off (#937).
         /// </summary>
         public static VersionDoc Check(Config cfg)
         {
-            if (!Enabled(cfg)) return null;
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
             LastNotModified = false;
 
-            Exception hostFail = null;
-            if (!string.IsNullOrEmpty(cfg.UpdateFeedUrl))
-            {
-                string feedUrl = cfg.UpdateFeedUrl.Trim();
-                LastFeedUrl = feedUrl;
-                try { return FromSite(cfg, feedUrl); }
-                catch (Exception ex)
-                {
-                    // Site feed missed; try GitHub so a site outage does not
-                    // leave every launcher without updates.
-                    hostFail = ex;
-                }
-            }
-
-            if (string.IsNullOrEmpty(cfg.UpdateRepo) || !cfg.UpdateRepo.Contains("/"))
-            {
-                if (hostFail != null) throw WrapFeedFail(hostFail, true);
-                return null;
-            }
-
-            // The fallback is the one that costs quota, so it is not taken on
-            // every thirty second check while the site is down. Until its rest
-            // is up, the site's failure is what the caller gets, which reads as
-            // no answer rather than as no update and so leaves the in play
-            // clock where it is (Shell.CheckUpdatesInPlay).
-            if (hostFail != null && (DateTime.Now - githubTried) < GithubRest)
-                throw WrapFeedFail(hostFail, true);
-            githubTried = DateTime.Now;
-
-            string branch = string.IsNullOrEmpty(cfg.UpdateBranch) ? "main" : cfg.UpdateBranch;
-            List<string> tries = RepoCandidates(cfg.UpdateRepo);
-            Exception last = null;
-
-            foreach (string repo in tries)
-            {
-                string url = "https://api.github.com/repos/" + repo +
-                             "/contents/version.json?ref=" + branch;
-                LastFeedUrl = url;
-                try
-                {
-                    VersionDoc doc;
-                    using (var wc = Client(cfg, false, url))
-                        doc = VersionDoc.Parse(wc.DownloadData(url));
-
-                    // Settle on whichever one answered, so the next check is one
-                    // request rather than two.
-                    if (!string.Equals(repo, cfg.UpdateRepo, StringComparison.Ordinal))
-                    {
-                        cfg.UpdateRepo = repo;
-                        try { cfg.Save(Paths.CfgFile); } catch (Exception ex) { Swallow.Note("Updater.Check, cfg save", ex); }
-                    }
-                    return doc;
-                }
-                catch (WebException wex)
-                {
-                    var r = wex.Response as HttpWebResponse;
-                    if (r != null)
-                    {
-                        int code = (int)r.StatusCode;
-                        // Only a missing repo is worth trying the other name for.
-                        // A refused token would fail identically on both and the
-                        // second attempt would only hide what is actually wrong.
-                        if (code == 404)
-                        {
-                            last = new Exception("the repo or the branch could not be read, check UpdateRepo and that the token still has access");
-                            continue;
-                        }
-                        if (code == 401) throw new Exception("the access token was refused, it may have expired");
-                        if (code == 403 || code == 429)
-                        {
-                            // GitHub answers a rate limit with 403 as well as
-                            // with 429, and an install with no token of its own
-                            // shares sixty calls an hour with everybody on its
-                            // address. Calling that a refused token sent people
-                            // looking for a credential they never set, on an
-                            // install that is meant to need none.
-                            string left = null;
-                            try { left = r.Headers["X-RateLimit-Remaining"]; } catch (Exception ex) { Swallow.Note("Updater.Check, header", ex); }
-                            if (code == 429 || string.Equals(left, "0", StringComparison.Ordinal) ||
-                                string.IsNullOrEmpty(cfg.UpdateToken))
-                                throw new Exception("GitHub answered " + code + ": too many update checks have come from this connection for now. Nothing is wrong with your install and it clears by itself, usually within the hour.");
-                            throw new Exception("the access token was refused, it may have expired");
-                        }
-                    }
-                    if (wex.Status == WebExceptionStatus.Timeout)
-                        throw new Exception("GitHub did not answer in time. The check runs again by itself.");
-                    last = new Exception("could not reach GitHub");
-                }
-                catch (Exception ex)
-                {
-                    last = ex;
-                }
-            }
-
-            // Both the site feed and GitHub missed. Prefer the GitHub reason
-            // when we got one; otherwise surface the site failure.
-            if (last != null) throw WrapFeedFail(last, false);
-            if (hostFail != null) throw WrapFeedFail(hostFail, true);
-            throw new Exception("could not reach the update feed");
+            string feedUrl = FeedUrl(cfg);
+            LastFeedUrl = feedUrl;
+            // No GitHub fallback any more (#907): Thornswood-Releases is gone.
+            // A site feed that misses is what the caller gets, which reads as
+            // no answer rather than as no update, so the in play clock is left
+            // where it is (Shell.CheckUpdatesInPlay) and the next check, thirty
+            // seconds on, asks the site again.
+            try { return FromSite(cfg, feedUrl); }
+            catch (Exception ex) { throw WrapFeedFail(ex, true); }
         }
 
         /// <summary>
@@ -353,17 +240,46 @@ namespace Thornswood
         static VersionDoc FromSite(Config cfg, string feedUrl)
         {
             CheckUrl(feedUrl);
+            return Conditional(cfg, feedUrl);
+        }
+
+        /// <summary>
+        /// The conditional request itself, apart from CheckUrl so a test can
+        /// point it at a server of its own (tests\test-feed-conditional.ps1).
+        /// Asks with the ETag, and with Last-Modified when the server gave one,
+        /// of the copy in memory, or on the first check of a session the copy
+        /// in Profile (#443), so a restart is a 304 too.
+        /// </summary>
+        static VersionDoc Conditional(Config cfg, string feedUrl)
+        {
             // Read once. Anything that replaces it while this check is out
             // replaces the whole object, so what is used below cannot change
             // underneath it.
             Cached have = cached;
+            if (have == null && !cacheRead)
+            {
+                cacheRead = true;
+                have = ReadCache();
+                if (have != null) cached = have;
+            }
+            DateTime since = DateTime.MinValue;
+            if (have != null && !string.IsNullOrEmpty(have.LastModified))
+            {
+                DateTime t;
+                if (DateTime.TryParseExact(have.LastModified.Trim(), "r", System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out t))
+                    since = t;
+            }
             bool asked = have != null
                          && have.Doc != null
-                         && !string.IsNullOrEmpty(have.Etag)
+                         && (!string.IsNullOrEmpty(have.Etag) || since != DateTime.MinValue)
                          && string.Equals(have.Url, feedUrl, StringComparison.Ordinal);
             using (var wc = Client(cfg, false, feedUrl))
             {
-                if (asked) wc.Headers["If-None-Match"] = have.Etag;
+                var q = wc as Quick;
+                if (q != null) q.Gzip = true;
+                if (asked && !string.IsNullOrEmpty(have.Etag)) wc.Headers["If-None-Match"] = have.Etag;
+                if (asked && q != null) q.Since = since;
                 byte[] body;
                 try { body = wc.DownloadData(feedUrl); }
                 catch (WebException wex)
@@ -389,14 +305,103 @@ namespace Thornswood
                 VersionDoc doc = VersionDoc.Parse(body);
                 // Kept only once the document parsed, so a tag is never held
                 // beside something the launcher could not read.
-                string tag = null;
-                if (wc.ResponseHeaders != null) tag = wc.ResponseHeaders["ETag"];
+                string tag = null, mod = null;
+                if (wc.ResponseHeaders != null)
+                {
+                    tag = wc.ResponseHeaders["ETag"];
+                    mod = wc.ResponseHeaders["Last-Modified"];
+                }
                 var fresh = new Cached();
                 fresh.Url = feedUrl;
                 fresh.Etag = tag == null ? "" : tag.Trim();
+                fresh.LastModified = mod == null ? "" : mod.Trim();
                 fresh.Doc = doc;
                 cached = fresh;
+                if (fresh.Etag.Length > 0 || fresh.LastModified.Length > 0) WriteCache(fresh, body);
                 return doc;
+            }
+        }
+
+        /// <summary>
+        /// Profile\feed-cache.txt: four lines (what the file is, the feed
+        /// address, the ETag, the Last-Modified) and then the document exactly
+        /// as it arrived. One file, so the tag can never be read beside some
+        /// other copy's document. Null when Profile is not known.
+        /// </summary>
+        static string CacheFile
+        {
+            get { return string.IsNullOrEmpty(Paths.ProfileDir) ? null : Path.Combine(Paths.ProfileDir, "feed-cache.txt"); }
+        }
+
+        static void WriteCache(Cached c, byte[] body)
+        {
+            string file = CacheFile;
+            if (file == null || body == null) return;
+            string tmp = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                byte[] head = new UTF8Encoding(false).GetBytes(
+                    CacheMagic + "\n" + OneLine(c.Url) + "\n" + OneLine(c.Etag) + "\n" + OneLine(c.LastModified) + "\n");
+                using (var f = File.Create(tmp))
+                {
+                    f.Write(head, 0, head.Length);
+                    f.Write(body, 0, body.Length);
+                }
+                // Written aside and copied over, so a check that reads while
+                // another writes finds the old copy or the new one, and a
+                // copy cut short does not parse and is not believed.
+                File.Copy(tmp, file, true);
+            }
+            catch (Exception ex) { Swallow.Note("Updater.WriteCache", ex); }
+            finally
+            {
+                try { if (File.Exists(tmp)) File.Delete(tmp); } catch (Exception ex) { Swallow.Note("Updater.WriteCache, tidy", ex); }
+            }
+        }
+
+        static string OneLine(string s)
+        {
+            return s == null ? "" : s.Replace("\r", "").Replace("\n", "");
+        }
+
+        /// <summary>
+        /// The copy in Profile, or null when there is none, it is from an older
+        /// shape, or its document does not read. Null only ever costs one full
+        /// download, which is what every start of the launcher did before.
+        /// </summary>
+        static Cached ReadCache()
+        {
+            string file = CacheFile;
+            try
+            {
+                if (file == null || !File.Exists(file)) return null;
+                byte[] raw = File.ReadAllBytes(file);
+                var lines = new string[4];
+                int at = 0;
+                for (int i = 0; i < 4; i++)
+                {
+                    int nl = Array.IndexOf(raw, (byte)'\n', at);
+                    if (nl < 0) return null;
+                    lines[i] = Encoding.UTF8.GetString(raw, at, nl - at).TrimEnd('\r');
+                    at = nl + 1;
+                }
+                if (!string.Equals(lines[0], CacheMagic, StringComparison.Ordinal)) return null;
+                if (at >= raw.Length) return null;
+                byte[] body = new byte[raw.Length - at];
+                Buffer.BlockCopy(raw, at, body, 0, body.Length);
+                VersionDoc doc = VersionDoc.Parse(body);
+                if (doc == null) return null;
+                var c = new Cached();
+                c.Url = lines[1];
+                c.Etag = lines[2];
+                c.LastModified = lines[3];
+                c.Doc = doc;
+                return c;
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("Updater.ReadCache", ex);
+                return null;
             }
         }
 
@@ -561,10 +566,18 @@ namespace Thornswood
             catch { return new HashSet<string>(StringComparer.OrdinalIgnoreCase); }
         }
 
+        /// <summary>
+        /// What this install still has to take from the feed. When the feed
+        /// names a release record this install has not synced to, that is one
+        /// entry standing for the whole release (Sync.cs, #1050), and no pack
+        /// is replayed. Otherwise every pack id not in applied.txt, in order.
+        /// </summary>
         public static List<Pack> Pending(VersionDoc v)
         {
-            var done = Applied();
             var list = new List<Pack>();
+            Pack release = RecordDue(v);
+            if (release != null) { list.Add(release); return list; }
+            var done = Applied();
             if (v == null || v.packs == null) return list;
             foreach (var p in v.packs)
                 if (p != null && !string.IsNullOrEmpty(p.id) && !done.Contains(p.id)) list.Add(p);
@@ -641,7 +654,7 @@ namespace Thornswood
                 throw new Exception("That update arrived without a checksum, so it has not been downloaded. This is a publishing mistake, not something wrong with your install.");
 
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
-            string tmp = Path.Combine(Path.GetTempPath(), "st-" + Guid.NewGuid().ToString("N") + ".bin");
+            string tmp = Path.Combine(Path.GetTempPath(), "thornswood-" + Guid.NewGuid().ToString("N") + ".bin");
             using (var wc = Client(cfg, true, url)) wc.DownloadFile(url, tmp);
 
             string got = Sha256(tmp);
@@ -682,6 +695,8 @@ namespace Thornswood
         /// </summary>
         public static void ApplyPack(Config cfg, Pack p, Action<string> log)
         {
+            // A whole release, synced to its record rather than unpacked.
+            if (p != null && p.Record != null) { SyncRecord(cfg, p.Record, p.Doc, log); return; }
             // A retry runs the whole list again and everything before the pack
             // that broke is already in. A second helping means another line in
             // applied.txt and a file list written afresh in which every path
@@ -1096,6 +1111,11 @@ namespace Thornswood
         /// an exact-match check would refuse a perfectly good update the day
         /// the certificate is renewed.
         ///
+        /// Since #912 this is the last of five checks, not the only one:
+        /// Signature.cs first has Windows verify the signature and pins
+        /// Microsoft's Artifact Signing and Thornswood's durable identity.
+        /// scripts\release\Assert-PublishSigned.ps1 reads this line.
+        ///
         /// This is a third layer, not the only one. The host allow list at
         /// AllowedHosts decides where a byte may come from, the SHA-256 in
         /// version.json decides the bytes are the ones published, and this
@@ -1105,44 +1125,30 @@ namespace Thornswood
         public const string ExpectedSigner = "Gavin Knotts";
 
         /// <summary>
-        /// The Subject of whoever signed a file, or an empty string when it is
-        /// not signed. CreateFromSignedFile throws on an unsigned file rather
-        /// than returning null, so the throw is what "unsigned" looks like.
-        /// </summary>
-        static string SignerOf(string path)
-        {
-            try
-            {
-                var c = System.Security.Cryptography.X509Certificates.X509Certificate
-                            .CreateFromSignedFile(path);
-                if (c == null) return "";
-                return c.Subject;
-            }
-            catch { return ""; }
-        }
-
-        /// <summary>
-        /// Refuses a launcher that is not signed by us. Says which of the two
-        /// things went wrong, because "it would not update" with no reason is
-        /// the report nobody can act on.
+        /// Refuses a launcher that is not signed by us, and says which check it
+        /// failed, because "it would not update" with no reason is the report
+        /// nobody can act on.
+        ///
+        /// Until #912 this read the Subject of the embedded certificate and
+        /// nothing else, so a certificate anybody can make with this name on
+        /// it passed. Signature.Refusal now has Windows verify the signature
+        /// and its chain, then pins Microsoft's Artifact Signing root and
+        /// Thornswood's durable identity in the certificate, and only then
+        /// looks for ExpectedSigner in the Subject. Signature.cs says why each.
         /// </summary>
         static void CheckSigner(string path, Action<string> log)
         {
             if (String.IsNullOrEmpty(ExpectedSigner)) return;
-            string who = SignerOf(path);
-            if (who.Length == 0)
+            string said;
+            string why = Signature.Refusal(path, ExpectedSigner, out said);
+            if (why.Length > 0)
             {
                 throw new Exception(
-                    "The launcher that was downloaded is not signed. " +
-                    "Nothing has been replaced and the one you are running is untouched.");
+                    "The launcher that was downloaded " + why + " " +
+                    "Nothing has been replaced and the one you are running is untouched. " +
+                    "Tell Patrick before running anything.");
             }
-            if (who.IndexOf(ExpectedSigner, StringComparison.OrdinalIgnoreCase) < 0)
-            {
-                throw new Exception(
-                    "The launcher that was downloaded was signed by somebody else. " +
-                    "Nothing has been replaced. Tell Patrick before running anything.");
-            }
-            log("Signed by the expected publisher.");
+            log(said);
         }
 
         /// <summary>Replaces the running exe and restarts, via a short detached script.</summary>
@@ -1165,7 +1171,7 @@ namespace Thornswood
             // minutes now, watching the new launcher start, and with one fixed
             // name the dev build updating in that time would write over a
             // script cmd is still reading.
-            string bat = Path.Combine(Path.GetTempPath(), "st-update-" + me + ".cmd");
+            string bat = Path.Combine(Path.GetTempPath(), "thornswood-update-" + me + ".cmd");
 
             // Waits for this launcher to be gone, keeps it as Thornswood.exe.old,
             // puts the new one in, and puts the old one back if the new one

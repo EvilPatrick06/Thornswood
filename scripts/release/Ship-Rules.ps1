@@ -23,6 +23,7 @@
       Test-ShipForeignFramework $rel
                                    somebody else's framework or modding tool under Data; never shipped, never removed
       Test-ShipBethesdaLeftAlone   Bethesda's, and a pack once carried it; never shipped, never removed
+      Test-ShipRetired $rel        a mod Thornswood took out; never shipped, never removed (the launcher drops it)
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
       Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
@@ -47,14 +48,10 @@ $ShipRuntimeDirs = @(
     '_to_delete\',
     # RaceMenu writes a face export here when somebody saves one in game.
     'Data\SKSE\Plugins\CharGen\Exported\',
-    # Data\SkyrimTogetherReborn\ WAS HERE, cache and logs, until 23
-    # September. It is another server's folder and it belongs in
-    # Test-ShipOtherServer below, by prefix, which is where it is now.
-    # The difference is not cosmetic: a runtime path has its files listed
-    # as removed and swept off every install that has them, and this is
-    # somebody else's install being swept. Two named subfolders were
-    # listed and the rest of the folder was in no list at all, so a pack
-    # could carry the parts that were not named.
+    # Another server's folder must never be listed here: a runtime path has
+    # its files listed as removed and swept off every install that has them,
+    # which is somebody else's install being swept. Those go in
+    # Test-ShipOtherServer below.
     '.sentry-native\'
 )
 
@@ -237,6 +234,39 @@ function Test-ShipClientRecorded([string]$rel, [string]$full = '') {
     return ($have -eq $ShipClientHashes[$rel])
 }
 
+# SKYUI 5.2'S OWN SCRIPTS, LOOSE IN Data\Scripts. Issue #960, 28 September: on
+# dev, "SKYUI ERROR CODE 6", menu file version mismatch for magicmenu.swf,
+# skyui/itemcard.swf, skyui/bottombar.swf, map.swf and more, "required 5.2 SE,
+# detected 6.11 SE".
+#
+# MEASURED on the shipping machine. The collection's SkyUI (Nexus 12604, in
+# Vortex as SkyUI-12604-6-8) is one archive, SkyUI_SE.bsa: its menus say 6.11
+# SE, and its own ski_main.pex (compiled 6 April 2026) no longer compares menu
+# versions at all. But the ten names below sit loose in the Steam copy's
+# Data\Scripts: SkyUI 5.2 SE's scripts, compiled 3 October 2017, whose
+# ski_main.pex checks every menu for 5.2 SE. Loose beats an archive, so the old
+# script runs against the new menus and puts up the error box. Vortex's record
+# does not list them and no mod in its mods folder has them; the collection
+# installer put them there (Profile\installed-into-game.txt lists all ten), the
+# launcher linked them into Thornswood's folder, and the dev feed's baseline
+# lists all ten, so dev packs have been handing them to everybody.
+#
+# Only these ten. SKI_ConfigBase.pex and SKI_ConfigManager.pex are loose too,
+# but they are MCM Recorder's, deployed by Vortex, and stay.
+# scripts\mods\Check-SkyUIMenus.js is the check Ship runs against this.
+$ShipOldSkyUIScripts = @(
+    'Data\Scripts\ski_activeeffectswidget.pex',
+    'Data\Scripts\ski_configmenu.pex',
+    'Data\Scripts\ski_favoritesmanager.pex',
+    'Data\Scripts\ski_main.pex',
+    'Data\Scripts\ski_playerloadgamealias.pex',
+    'Data\Scripts\ski_qf_configmanagerinstance.pex',
+    'Data\Scripts\ski_questbase.pex',
+    'Data\Scripts\ski_settingsmanager.pex',
+    'Data\Scripts\ski_widgetbase.pex',
+    'Data\Scripts\ski_widgetmanager.pex'
+)
+
 function Test-ShipOtherServer([string]$rel) {
     # The client runtime, before anything else is asked: ours when it is the
     # recorded build, and not ours when it is anything else or is not there.
@@ -247,15 +277,6 @@ function Test-ShipOtherServer([string]$rel) {
     # kept it out of the installer all along; nothing kept it out of a pack.
     if ($rel -match '^Data\\NirnLabUIPlatform($|\\)') { return $true }
     if ((Split-Path $rel -Leaf) -ieq 'NirnLabUIPlugin.dll') { return $true }
-    # Skyrim Together Reborn's whole folder, wherever it came from. Its
-    # cache and its logs used to be in the runtime list above, which meant
-    # a release listed them as removed and every launcher took them off
-    # somebody's other install. Nothing here supports another server any
-    # more, so the rule is the one this list exists for: never shipped,
-    # never removed. Anchored and with a boundary, so a sibling folder
-    # whose name merely starts the same way is not matched.
-    # OwnGame.Foreign carries the same rule; change the two together.
-    if ($rel -match '^Data\\SkyrimTogetherReborn($|\\)') { return $true }
     # Other launchers' parking folders inside our own game folder, Djinn, 25
     # September. Keizaal's launcher moves the Creation Club archives it turns
     # off into Data\_disabledByKzl and keeps its own backup and plugin list
@@ -274,6 +295,9 @@ function Test-ShipOtherServer([string]$rel) {
     # collection wants it and taking it out keeps the good map.
     # OwnGame.Foreign carries the same rule; change the two together.
     if ($rel -ieq 'Data\Interface\map.swf') { return $true }
+    # SkyUI 5.2's own scripts, loose, issue #960. See $ShipOldSkyUIScripts.
+    # OwnGame.Foreign carries the same rule; change the two together.
+    if ($ShipOldSkyUIScripts -contains $rel) { return $true }
     if (-not $rel.StartsWith('Data\Platform\', 'OrdinalIgnoreCase')) { return $false }
     $leaf = Split-Path $rel -Leaf
     if ($rel.StartsWith('Data\Platform\PluginsNoLoad\', 'OrdinalIgnoreCase')) { return $true }
@@ -368,8 +392,8 @@ $ShipVanillaDataDirs     = @('Video', 'Strings')
 # NirnLab is still an open question for Patrick and Djinn, and merging the
 # lists does not answer it. The note over Checks.ForeignNames in the launcher
 # says NirnLabUIPlugin.dll is this build's own browser and must never be
-# treated as foreign. This file, the installer, OwnGame.Foreign and
-# Firewall.cs all treat it as foreign. What this machine runs on, read
+# treated as foreign. This file, the installer and OwnGame.Foreign
+# all treat it as foreign. What this machine runs on, read
 # 24 September: SkyrimPlatform.ini says BackendName = tilted, the plugin log of
 # the 10:20 session on 23 September says "browser backend: tilted", and there
 # is no Data\NirnLabUIPlatform in C:\Thornswood\Game.
@@ -484,11 +508,56 @@ function Test-ShipBethesdaLeftAlone([string]$rel) {
     return $false
 }
 
+# A mod Thornswood has taken out. Never shipped, and never listed as removed:
+# the launcher takes these out of its own game folder itself (OwnGame.Retired,
+# rules 7), so a pack has nothing to delete and no Vortex file in the Steam
+# copy is touched. Change the two lists together.
+#
+# Start On Save (po3, Nexus 50054), issue #394. Under SkyMP it only ever
+# started a second load on top of the server's, which crashed the game about
+# thirty seconds in, and the launcher held it still by rewriting its settings
+# file on every Play. That rewrite is gone, so neither file may reach a build:
+# the DLL with an untouched settings file is the crash again.
+$ShipRetiredFiles = @(
+    'Data\SKSE\Plugins\po3_StartOnSave.dll',
+    'Data\SKSE\Plugins\po3_StartOnSave.ini'
+)
+
+function Test-ShipRetired([string]$rel) {
+    foreach ($f in $ShipRetiredFiles) {
+        if ($rel -ieq $f) { return $true }
+    }
+    return $false
+}
+
+# Body shape sliders and jiggle, issue #993. Patrick, 28 September: no jiggle
+# physics and nothing in creation that changes breasts, seat, genitals or
+# nipples, for men and women alike; height and weight stay. CBPC's cbp.dll is
+# all of the jiggle, and the three scripts are RaceMenu's body slider pages.
+# The launcher leaves them out of its own game folder (OwnGame.BodyShape,
+# rules 9), so, like the retired files above, a pack never carries them and
+# never lists them as removed. Change the two lists together.
+$ShipBodyShapeFiles = @(
+    'Data\SKSE\Plugins\cbp.dll',
+    'Data\Scripts\RaceMenuMorphsCBBE.pex',
+    'Data\Scripts\_RaceMenuMorphsHIMBO.pex',
+    'Data\Scripts\RaceMenuPluginSoS.pex'
+)
+
+function Test-ShipBodyShape([string]$rel) {
+    foreach ($f in $ShipBodyShapeFiles) {
+        if ($rel -ieq $f) { return $true }
+    }
+    return $false
+}
+
 # One machine's own, never shipped and never listed as removed. Other servers'
 # files count as the machine's here, so a release never strips another
 # server's install off a tester.
 function Test-ShipMachine([string]$rel) {
     if (Test-ShipOtherServer $rel) { return $true }
+    if (Test-ShipRetired $rel) { return $true }
+    if (Test-ShipBodyShape $rel) { return $true }
     # So do Bethesda's files and other people's frameworks and tools, for the
     # same reason. See the note over $ShipVanillaDataFiles for the 90 files
     # that needed it on 24 September, and the one over $ShipBethesdaLeftAlone
@@ -689,8 +758,52 @@ $ShipDeleteAlways = @(
     # stick. The name is never used again, so nothing legitimate is lost.
     'Data\Platform\Plugins\thornswood-chargen.js'
 )
+# SkyUI 5.2's loose scripts, issue #960: dev packs carried them, so leaving
+# them out of new packs would do nothing for the machines showing the SkyUI
+# error box. The collection's SkyUI keeps its scripts inside SkyUI_SE.bsa, so
+# nothing it installs is lost. See $ShipOldSkyUIScripts above.
+$ShipDeleteAlways += $ShipOldSkyUIScripts
 
 function Get-ShipDeleteAlways { return $ShipDeleteAlways }
+
+# FILES THAT TRAVEL WITH A PAGE, issue #883.
+#
+# A pack is a diff against the baseline, so a file the baseline already lists
+# is never packed again, whether or not any launcher ever received it. The
+# sealed scroll's two pictures were written into this machine's game folder on
+# 25 September (17:54 UTC) and recorded by Main update 20260925-1654, which was
+# pulled from version.json four minutes later. The baseline kept them. Not one
+# of the 75 packs on the Main feed carries either picture (every zip listed,
+# 28 September), so an install that has only ever taken packs has the page
+# and not its art, and thornswood-select.js answers a missing picture with
+# "a scroll picture is missing, straight to the slots". That is the start
+# screen that skipped the scroll after the update, on the Main launcher.
+#
+# So when a pack carries the key, it carries these beside it, changed or not:
+# 47 KB, only in a pack that already changes the page. The next pack with the
+# page in it puts the pictures on every install that is missing them.
+# tests\test-start-screen-art.ps1 holds this list to the pictures the page names.
+$ShipTravelsWith = @{
+    'Data\Platform\UI\thornswood-select.js' = @(
+        'Data\Platform\UI\thornswood-scroll.webp',
+        'Data\Platform\UI\thornswood-scroll-open.webp'
+    )
+}
+
+# The companions of every changed path that are not already in the list.
+function Get-ShipTravelsWith([string[]]$changed) {
+    $out = @()
+    foreach ($c in @($changed)) {
+        foreach ($k in $ShipTravelsWith.Keys) {
+            if ($c -ieq $k) {
+                foreach ($w in $ShipTravelsWith[$k]) {
+                    if (@($changed) -notcontains $w -and $out -notcontains $w) { $out += $w }
+                }
+            }
+        }
+    }
+    return $out
+}
 
 # REQUIRED DATA THE COLLECTION DOES NOT YET DEPLOY UNDER THE LOAD ORDER NAME.
 #

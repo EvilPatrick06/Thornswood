@@ -16,7 +16,7 @@ Report one of these only if it does something this table does not describe.
 
 | Behaviour | Reason |
 |---|---|
-| Mod settings menus reset every session | Your character lives on the server rather than in a save file, so there is no co-save for a mod to write its settings into |
+| A few mod settings menus still reset every session | Your character lives on the server rather than in a save file, so there is no co-save for a mod to write its settings into. Menus built on MCM Helper, such as TrueHUD and Precision, keep theirs in a file on your machine. The server keeps the settings of Apocalypse, moreHUD, Atlas Map Markers, Skyrim Unbound and chfshVariousActions for each character and puts them back when you come in. QuickLoot, the instrument menu, MCM Recorder and SkyUI's favourite group and unequip options still start from their defaults |
 | Most mod scripts never fire | All Papyrus events except OnUpdate are blocked. Records still work, scripted behaviour does not |
 | Killmoves and stagger do not show on other people | Those animation events are blanked |
 | Fishing in Skyrim's rods, nets and fishing powers do nothing | They run on mod scripts, which never fire here. Fishing is the Fisher's trade instead: press E at salmon, clams, pearl oysters, horker meat and slaughterfish egg nests in the water, no rod needed. See the Classes page |
@@ -68,8 +68,8 @@ Position and cell. Health, magicka and stamina. Death and respawn, including whe
 | Behaviour | Reason |
 |---|---|
 | The creation hall is a bare stone room | Nothing in the room itself does anything. Every choice about a new character is on the panel behind K, which opens by itself once your face is made and keeps coming back until you have picked a town |
-| Start On Save is in the mod list but never loads a save | The launcher points it at a character that does not exist. An ordinary Skyrim save cannot be loaded under Thornswood, and loading one crashed the game on a fresh install |
 | You can leave the hall with no class or profession | Only the town you wake up in has to be chosen before you leave. Your class, your profession and the half of it can wait, and are picked later in the world from the same panel on K |
+| A launcher last opened before 26 September says it cannot read the update source, or never offers an update | Updates come only from thornswood.net now. A launcher that old still looks for them in the place they used to come from, which has closed, so it cannot find its way to the new one by itself. Take the installer again from the [Downloads](/downloads) page and run it over your install. Your characters live on the server and nothing is lost |
 
 ## The load order rule
 

@@ -50,7 +50,7 @@ $ErrorActionPreference = 'Stop'
 # --- refuse to run anywhere that is not the VPS -----------------------------
 #
 # THE GUARD USED TO TEST A FOLDER THAT NO LONGER EXISTS. It looked for
-# C:\SkyrimTogether\Game\SkyrimSE.exe, which was the install path before the
+# SkyrimSE.exe in the old build folder, which was the install path before the
 # rename, so on either machine as they are today the guard cannot fire and this
 # script goes on to install Node and Python as though it were the VPS.
 #
@@ -69,8 +69,7 @@ if ($productType -eq 1) {
 }
 
 foreach ($sign in @('C:\Thornswood\Game\SkyrimSE.exe',
-                    'C:\Thornswood-DevBuild\Game\SkyrimSE.exe',
-                    'C:\SkyrimTogether\Game\SkyrimSE.exe')) {
+                    'C:\Thornswood-DevBuild\Game\SkyrimSE.exe')) {
     if (Test-Path -LiteralPath $sign) {
         throw "$sign is present, so this looks like a gaming PC, not the VPS. Nothing was changed."
     }

@@ -132,12 +132,21 @@ namespace Thornswood
         public static void SetChooseAtMenu(int id) { Point = id; }
     }
     public static class Voice { public static void Reconfigure(int id) { } }
+    // Stands in for launcher\app\Swallow.cs, which Chars.cs calls from its
+    // catch blocks since the silent catches were given a log line (#461).
+    public static class Swallow { public static void Note(string where, Exception e) { } }
     public static class Door { public static Standing Last; }
     public static class Roster
     {
         public class Row { public string Name = ""; public string Race = ""; public string Trade = ""; public string Town = ""; public string Where = ""; }
         public static void Refresh(Config c) { }
         public static Row For(int id) { return null; }
+        // What the site says about this account's characters (#955, #1010):
+        // nothing here, so none is gone, dead, banned by itself or brought back.
+        public static bool Gone(int id, DateTime played) { return false; }
+        public static bool Dead(int id) { return false; }
+        public static bool Barred(int id) { return false; }
+        public static bool Revived(int id) { return false; }
     }
 
     public static class Discord

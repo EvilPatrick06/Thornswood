@@ -19,6 +19,14 @@
   Each gap prints the exact command that closes it. It does not ship, publish,
   deploy, push or write anything outside its own output.
 
+  NOT READY means something that would stop a Ship, and nothing else. A Ship
+  never builds the engine, so the fork in engine\skymp is a note, not a check:
+  what it needs is the game folder holding the recorded client, or a build
+  that matches records\client-build.json for it to copy in (issue #946). What
+  only a main release asks for, the setup stub -Package attaches to and the
+  server build the live deploys send (issue #932), prints as WARN on main and
+  leaves the verdict alone.
+
   It is deliberately not part of Ship. Ship's refusals stay where they are:
   they are the gate, and a gate that can be satisfied by a different script is
   not a gate. This is the map, not the key.
@@ -39,22 +47,164 @@ $script:VpsAddress = Get-ThornswoodVpsAddress
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 $Dev = ($Channel -eq 'dev')
 
-$script:gaps = New-Object Collections.Generic.List[object]
-$script:ok = 0
+$script:rows = New-Object Collections.Generic.List[object]
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 
-# $fix is the command that closes the gap, or $null when it is somebody's
-# decision rather than a command. $who is who runs it.
+# One answer. $fix is the command that closes the gap, or $null when it is
+# somebody's decision rather than a command. $who is who runs it. $level is
+# 'need' for what would stop a Ship, and 'warn' for what does not stop one but
+# gets in the way of something around it (-Package, the live deploys); a warn
+# never changes the verdict. tests\test-ship-ready.ps1 lifts this and the
+# functions below out of the script and runs them.
+function New-Row([string]$what, [bool]$ok, [string]$detail, [string]$fix, [string]$who = 'either', [string]$level = 'need') {
+  return [pscustomobject]@{ What = $what; Ok = $ok; Detail = $detail; Fix = $fix; Who = $who; Level = $level }
+}
+
+function Show-Row($r) {
+  $script:rows.Add($r)
+  $tail = $(if ($r.Detail) { '  (' + $r.Detail + ')' } else { '' })
+  if ($r.Ok) { Say ('  yes   ' + $r.What + $tail) 'Green' }
+  elseif ($r.Level -eq 'warn') { Say ('  WARN  ' + $r.What + $tail) 'Yellow' }
+  else { Say ('  NO    ' + $r.What + $tail) 'Red' }
+}
+
 function Ready([string]$what, [bool]$cond, [string]$detail, [string]$fix, [string]$who = 'either') {
-  if ($cond) {
-    $script:ok++
-    Say ("  yes   " + $what + $(if ($detail) { "  ($detail)" } else { '' })) 'Green'
-  } else {
-    Say ("  NO    " + $what + $(if ($detail) { "  ($detail)" } else { '' })) 'Red'
-    $script:gaps.Add([pscustomobject]@{ What = $what; Fix = $fix; Who = $who })
+  Show-Row (New-Row $what $cond $detail $fix $who 'need')
+}
+
+# NOT READY only for a 'need' that failed.
+function Get-ShipVerdict($rows) {
+  # A loop, not @($rows): on the List this script keeps, @() throws
+  # "Argument types do not match" in PowerShell 7.
+  $all = @(foreach ($r in $rows) { $r })
+  $gaps = @($all | Where-Object { -not $_.Ok -and $_.Level -ne 'warn' })
+  $warns = @($all | Where-Object { -not $_.Ok -and $_.Level -eq 'warn' })
+  return [pscustomobject]@{
+    Ready  = ($gaps.Count -eq 0)
+    Passed = @($all | Where-Object { $_.Ok }).Count
+    Gaps   = $gaps
+    Warns  = $warns
   }
+}
+
+# WHAT A SHIP NEEDS OF THE CLIENT, and it is not the fork (issue #946). Ship
+# never builds the engine. It runs Go.ps1, which runs Sync-Client.ps1 to copy
+# the recorded client from the build output into the game folder, and then
+# Sync-Client.ps1 -Check, which refuses unless the game folder holds all six
+# recorded files. So the question is only whether the game folder holds the
+# recorded client already (exit 0), or a build that matches the record is here
+# for Go.ps1 to copy in (exit 2). Until 28 Sep this asked whether
+# engine\skymp was a clone of the fork, and said NOT READY on two fresh Ship
+# worktrees whose Ships then ran to the end and published.
+function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [string]$ClientDist) {
+  $rows = @()
+  $hasRec = Test-Path -LiteralPath $Record
+  $rows += New-Row 'the client build record is in the repo' $hasRec 'records\client-build.json' 'It is tracked in git, so git pull brings it'
+  if (-not $hasRec -or -not $Game -or -not (Test-Path -LiteralPath $Game)) { return $rows }
+
+  # global:, never a bare assignment, and 6>&1 as well as 2>&1: Sync-Client
+  # reports with Write-Host, which is the information stream, so without it
+  # its whole listing lands in the middle of this report. The same
+  # LASTEXITCODE trap Ship.ps1 records applies here: a child script's exit
+  # lands in the global one.
+  $global:LASTEXITCODE = 0
+  $said = & $SyncClient -Check -NoPause -Game $Game -Dist $ClientDist -Record $Record 6>&1 2>&1 | Out-String
+  $code = $global:LASTEXITCODE
+  $stop = [regex]::Match($said, '(?m)^STOP\. (.+)$')
+  $detail = switch ($code) {
+    0       { 'the game folder holds it' }
+    2       { 'a build that matches is at ' + $ClientDist + ', and Ship copies it in' }
+    default { $(if ($stop.Success) { $stop.Groups[1].Value.Trim() } else { "Sync-Client -Check exit $code" }) }
+  }
+  $fix = 'Copy a client build that matches records\client-build.json to ' + $ClientDist +
+         ' (another checkout''s engine\skymp\build\dist\client will do; .\scripts\release\Sync-Client.ps1 -Check -Dist <that folder> says whether it matches),' +
+         ' or build the fork with .\scripts\release\Build-Engine.ps1'
+  $rows += New-Row 'the recorded client is in the game folder, or here to copy in' (($code -eq 0) -or ($code -eq 2)) $detail $fix
+  return $rows
+}
+
+# WHAT ONLY A MAIN RELEASE ASKS FOR (issue #932), as warnings: neither stops
+# Ship.ps1 itself.
+#   The setup stub. A main Ship takes the launcher CI built and never runs
+#   Build-Launcher, which is what compiles out\setup-stub.exe. So -Package,
+#   which a main Ship needs whenever the installer is behind, stops on
+#   "setup-stub.exe is missing" after the release is already published.
+#   Package-Thornswood also refuses a stub older than installer\setup\Bootstrap.cs.
+#   The server binary. Deploy-Gamemode and Deploy-Server follow a main Ship,
+#   and Deploy-Server refuses a scam_native.node that is not the one
+#   records\server-build.json names. They read the fork's build\dist\server
+#   unless given -Dist; out\_payload holds the one the last release sent.
+function Get-MainOnlyRows([string]$Channel, [string[]]$StubPlaces, [string]$Bootstrap, [string]$ServerRecord, [string[]]$ServerDists) {
+  if ($Channel -ne 'main') { return @() }
+  $rows = @()
+
+  $stub = @($StubPlaces | Where-Object { $_ -and (Test-Path -LiteralPath $_) }) | Select-Object -First 1
+  $stubOk = $false
+  if (-not $stub) { $stubDetail = 'no setup-stub.exe in ' + ($StubPlaces -join ' or ') }
+  elseif ($Bootstrap -and (Test-Path -LiteralPath $Bootstrap) -and
+          ((Get-Item -LiteralPath $stub).LastWriteTimeUtc -lt (Get-Item -LiteralPath $Bootstrap).LastWriteTimeUtc)) {
+    $stubDetail = $stub + ' is older than installer\setup\Bootstrap.cs'
+  }
+  else { $stubOk = $true; $stubDetail = $stub }
+  $rows += New-Row 'the setup stub is built, which Ship -Package needs' $stubOk $stubDetail `
+    '.\scripts\release\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause     compiles it into out\ and leaves the launcher you play with alone' 'either' 'warn'
+
+  if (-not (Test-Path -LiteralPath $ServerRecord)) {
+    $rows += New-Row 'the server build record is in the repo' $false 'records\server-build.json' 'git pull brings it' 'either' 'warn'
+    return $rows
+  }
+  $want = ([string](Get-Content -LiteralPath $ServerRecord -Raw | ConvertFrom-Json).sha256).ToLowerInvariant()
+  $first = $ServerDists[0]
+  $match = $null
+  foreach ($d in $ServerDists) {
+    $bin = Join-Path $d 'scam_native.node'
+    if ((Test-Path -LiteralPath $bin) -and ((Get-FileHash -LiteralPath $bin -Algorithm SHA256).Hash.ToLowerInvariant() -eq $want)) { $match = $d; break }
+  }
+  $what = 'a server build that matches records\server-build.json, for Deploy-Gamemode and Deploy-Server after the Ship'
+  if ($match -eq $first) {
+    $rows += New-Row $what $true $first $null 'either' 'warn'
+  } elseif ($match) {
+    $rows += New-Row $what $false ($first + ' does not match; ' + $match + ' does') `
+      ('Copy ' + $match + ' to a scratch folder and pass it as -Dist to Deploy-Gamemode.ps1 and Deploy-Server.ps1 (Deploy-Gamemode writes into the folder it is given)') 'either' 'warn'
+  } else {
+    $rows += New-Row $what $false ('none in ' + ($ServerDists -join ' or ')) `
+      'Build the fork with .\scripts\release\Build-Engine.ps1, or pass Deploy-Gamemode.ps1 and Deploy-Server.ps1 -Dist with a server build whose scam_native.node matches' 'either' 'warn'
+  }
+  return $rows
+}
+
+# WHETHER THIS MACHINE SIGNS (issue #458). Ship refuses every release, dev and
+# mods only included, when records\signing\signing.json is missing, disabled or names a
+# profile that is not filled in (Get-SigningConfigRefusal, Assert-PublishSigned.ps1),
+# and a launcher build stops at Sign-Artifact.ps1 when the dlib or metadata it
+# names is not there or signtool is not installed. This map asked none of it,
+# so a second machine found out at the end of a Ship. $Refuse is what
+# Get-SigningConfigRefusal said ('' when it accepts), so this stays testable
+# without dot-sourcing anything.
+function Get-SigningRows([string]$ConfigPath, [string]$RepoRoot, [string]$Refuse, [string]$Signtool) {
+  $setup = '.\scripts\release\Setup-ShipMachine.ps1     fetches the signing client and writes records\signing\signing.json from records\signing\signing.template.json'
+  $rows = @()
+  if (-not (Test-Path -LiteralPath $ConfigPath)) {
+    $rows += New-Row 'this machine signs (records\signing\signing.json)' $false 'there is none' $setup
+    return $rows
+  }
+  $rows += New-Row 'this machine signs (records\signing\signing.json)' (-not $Refuse) $Refuse $setup
+  $missing = @()
+  try {
+    $cfg = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+    foreach ($k in 'dlib', 'metadata') {
+      $v = ''
+      if ($cfg.PSObject.Properties[$k]) { $v = [string]$cfg.$k }
+      if ($v -and -not [IO.Path]::IsPathRooted($v)) { $v = Join-Path $RepoRoot $v }
+      if (-not $v -or -not (Test-Path -LiteralPath $v)) { $missing += $k }
+    }
+  } catch { $missing += 'the file itself, which is not valid JSON' }
+  $rows += New-Row 'the signing client and metadata it names are here' ($missing.Count -eq 0) $(if ($missing.Count) { 'missing: ' + ($missing -join ', ') } else { '' }) `
+    'Move records\signing\signing.json aside and run .\scripts\release\Setup-ShipMachine.ps1, which writes one naming what this machine has'
+  $rows += New-Row 'signtool, from the Windows SDK' ([bool]$Signtool) $Signtool 'winget install --id Microsoft.WindowsSDK.10.0.26100 -e'
+  return $rows
 }
 
 Write-Host ''
@@ -74,7 +224,6 @@ if ($isClone) {
 
   if ($Dev) {
     Say ("  note  a dev release may ship from any branch. This is " + $branch + ".") 'DarkGray'
-    $script:ok++
   } else {
     Ready 'on main' ($branch -eq 'main') ("on " + $branch) 'git checkout main' 'either'
     Ready 'not behind origin/main' ($behind -eq 0) ("$behind behind") 'git pull' 'either'
@@ -84,22 +233,11 @@ if ($isClone) {
   }
 }
 
-# ------------------------------------------------------------ the releases --
-Head 'The releases repository'
-$ReleaseDir = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
-$hasRel = Test-Path (Join-Path $ReleaseDir 'version.json')
-Ready 'Thornswood-Releases is cloned beside this repo' $hasRel $ReleaseDir `
-  ("git clone https://github.com/EvilPatrick06/Thornswood-Releases.git " + $ReleaseDir)
-
-if ($Dev) {
-  $devRel = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases-dev'
-  $hasDev = Test-Path (Join-Path $devRel 'version.json')
-  Ready 'the dev release worktree exists' $hasDev $devRel `
-    'Ship.ps1 -Channel dev makes it on first use; nothing to do by hand'
-}
-
-# GitHub itself, because a release is pushed there and a clone proves nothing
-# about whether this account may push.
+# ------------------------------------------------------------ GitHub --
+# No releases clone any more: the feed and its baseline are on the VPS (#907),
+# checked under The VPS below. GitHub is still where the source is, and where a
+# main Ship downloads the launcher CI built for its tag.
+Head 'GitHub'
 $ghOk = $false
 $ghWho = ''
 try {
@@ -109,16 +247,6 @@ try {
   if ($m.Success) { $ghWho = $m.Groups[1].Value }
 } catch { $ghOk = $false }
 Ready 'signed in to GitHub' $ghOk $ghWho 'gh auth login'
-
-if ($ghOk) {
-  $canPush = $false
-  try {
-    $p = & gh api repos/EvilPatrick06/Thornswood-Releases --jq '.permissions.push' 2>$null
-    $canPush = ("$p".Trim() -eq 'true')
-  } catch { $canPush = $false }
-  Ready 'this account may push to Thornswood-Releases' $canPush $ghWho `
-    'Patrick adds the account under Settings, Collaborators on the Thornswood-Releases repository' 'patrick'
-}
 
 # --------------------------------------------------------- the install root --
 Head 'The launcher install'
@@ -158,6 +286,12 @@ try {
         Say '  note  could not read the collection revision from Vortex, so it was not checked' 'DarkGray'
     }
 } catch { Say '  note  the collection revision check did not run' 'DarkGray' }
+# Ship stops on this too (Assert-VortexProfile, #557): it reads the load order
+# from the Vortex profile named Thornswood and no other.
+$vpDir = $null
+try { $vpDir = Get-VortexProfileDir 'Thornswood' } catch { $vpDir = $null }
+Ready 'Vortex has a profile named Thornswood' ([bool]$vpDir) $(if ($vpDir) { $vpDir } else { '' }) `
+  'In Vortex: Profiles, add one named Thornswood, switch to it, install the Thornswood collection and let it deploy'
 Ready 'it has its own game folder' $hasGame $GameDir `
   'Open the launcher and press Play once; it builds the folder from what Vortex has deployed'
 
@@ -183,6 +317,22 @@ try { $node = (Get-Command node -EA Stop).Source } catch { }
 Ready 'node is on the path' ($null -ne $node) $(if ($node) { (& node --version 2>$null) } else { '' }) `
   'Install Node from nodejs.org; the gamemode and the site are checked with it'
 
+# ------------------------------------------------------------- the signing --
+Head 'Signing'
+. (Join-Path $Here 'Assert-PublishSigned.ps1')
+$signCfg = Join-Path $RepoDir 'records\signing\signing.json'
+$signRefuse = ''
+if (Test-Path -LiteralPath $signCfg) { $signRefuse = Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir }
+$signtool = ''
+foreach ($sr in @("${env:ProgramFiles(x86)}\Windows Kits\10\bin", "$env:ProgramFiles\Windows Kits\10\bin")) {
+  if ($signtool -or -not (Test-Path -LiteralPath $sr)) { continue }
+  $st = Get-ChildItem -LiteralPath $sr -Recurse -Filter 'signtool.exe' -EA SilentlyContinue |
+        Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+  if ($st) { $signtool = $st.FullName }
+}
+foreach ($r in @(Get-SigningRows $signCfg $RepoDir $signRefuse $signtool)) { Show-Row $r }
+Say '  note  the Azure sign in behind it is asked by .\scripts\release\Setup-ShipMachine.ps1 -Check' 'DarkGray'
+
 # ------------------------------------------------------------- the plugins --
 Head 'The game plugins'
 if ($hasGame) {
@@ -198,8 +348,13 @@ if ($hasGame) {
     if ($a -ne $b) { $stale += ($f.Name + ' in the game folder is not this source') }
   }
   Ready 'game\plugins has plugins to ship' ($seen -gt 0) "$seen file(s)" 'Nothing to do; the repo is missing its plugins'
-  Ready 'the game folder holds this source' ($stale.Count -eq 0) $(if ($stale.Count) { $stale[0] } else { "$seen match" }) `
-    '.\scripts\release\Go.ps1     copies the repo''s plugins into the game folder'
+  # A note, not a gap (issue #946): Ship runs Go.ps1, which copies the plugins
+  # in, before it checks them, so a stale copy here does not stop a Ship.
+  if ($stale.Count) {
+    Say ('  note  ' + $stale[0] + $(if ($stale.Count -gt 1) { ' (and ' + ($stale.Count - 1) + ' more)' } else { '' }) + '. Ship copies the plugins in first (Go.ps1).') 'DarkGray'
+  } else {
+    Say ("  note  the game folder holds this source ($seen match)") 'DarkGray'
+  }
 } else {
   Say '  skip  no own game folder, so there is nothing to compare the plugins against' 'DarkGray'
 }
@@ -222,56 +377,45 @@ if ($hasGame -and $reqFiles.Count -gt 0) {
     $b = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
     if ($a -ne $b) { $stale += ($f.Name + ' in the game folder is not this source') }
   }
-  Ready 'the game folder holds required-data' ($stale.Count -eq 0) $(if ($stale.Count) { $stale[0] } else { "$($reqFiles.Count) match" }) `
-    '.\scripts\release\Go.ps1 -SkipServer     copies game\required-data into Data\'
+  # A note for the same reason as the plugins: Go.ps1 copies these in first.
+  if ($stale.Count) {
+    Say ('  note  ' + $stale[0] + '. Ship copies game\required-data in first (Go.ps1).') 'DarkGray'
+  } else {
+    Say ("  note  the game folder holds required-data ($($reqFiles.Count) match)") 'DarkGray'
+  }
 } elseif (-not $hasGame) {
   Say '  skip  no own game folder, so there is nothing to compare required-data against' 'DarkGray'
 }
 
 # -------------------------------------------------------- the client build --
 Head 'The client runtime'
-$rec = Join-Path $Here '..\..\records\client-build.json'
-Ready 'the client build record is in the repo' (Test-Path $rec) 'records\client-build.json' `
-  'It is tracked in git, so git pull brings it'
-
-$fork = (& (Join-Path $PSScriptRoot 'Where.ps1') Engine)
-$hasFork = Test-Path (Join-Path $fork '.git')
-$forkBranch = ''
-if ($hasFork) { $forkBranch = (& git -C $fork rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim() }
-Ready 'the skymp fork is cloned' $hasFork $fork `
-  ('git clone -b thornswood/engine-changes https://github.com/EvilPatrick06/skymp.git ' + $fork)
-if ($hasFork) {
-  Ready 'the fork is on thornswood/engine-changes' ($forkBranch -eq 'thornswood/engine-changes') $forkBranch `
-    ('git -C ' + $fork + ' checkout thornswood/engine-changes')
+$where = Join-Path $Here 'Where.ps1'
+$clientDist = (& $where ClientDist)
+foreach ($r in @(Get-ClientRows (Join-Path $Here 'Sync-Client.ps1') (Join-Path $Here '..\..\records\client-build.json') `
+                   $(if ($hasGame) { $GameDir } else { '' }) $clientDist)) { Show-Row $r }
+if (-not $hasGame) {
+  Say '  skip  no own game folder, so the client in it was not checked' 'DarkGray'
 }
 
-if ($hasGame -and (Test-Path $rec)) {
-  # global:, never a bare assignment, and 6>&1 as well as 2>&1: Sync-Client
-  # reports with Write-Host, which is the information stream, so a plain
-  # 2>&1 | Out-Null leaves its whole six line listing in the middle of this
-  # report. The same LASTEXITCODE trap Ship.ps1 records applies here: a child
-  # script's exit lands in the global one.
-  $global:LASTEXITCODE = 0
-  & (Join-Path $Here 'Sync-Client.ps1') -Check -NoPause -Game $GameDir 6>&1 2>&1 | Out-Null
-  $code = $LASTEXITCODE
-  Ready 'the game folder holds the recorded client' ($code -eq 0) ("Sync-Client -Check exit $code") `
-    $(if ($code -eq 2) { '.\scripts\release\Sync-Client.ps1' } else { 'Rebuild the client, then .\scripts\release\New-ClientBuildRecord.ps1' })
+# The fork itself is a note, never a gap: a Ship does not build the engine.
+$fork = (& $where Engine)
+if (Test-Path -LiteralPath (Join-Path $fork '.git')) {
+  $forkBranch = (& git -C $fork rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim()
+  Say ('  note  the skymp fork is at ' + $fork + ', on ' + $forkBranch + '. A Ship does not build it.') 'DarkGray'
+} else {
+  Say '  note  no clone of the skymp fork here. A Ship does not build the engine, so it is not needed;' 'DarkGray'
+  Say '        only rebuilding the client or the server is (.\scripts\release\Build-Engine.ps1).' 'DarkGray'
 }
 
-# -------------------------------------------------------- the server build --
-Head 'The server binary'
-$srec = Join-Path $Here '..\..\records\server-build.json'
-Ready 'the server build record is in the repo' (Test-Path $srec) 'records\server-build.json' 'git pull brings it'
-if ((Test-Path $srec) -and $hasFork) {
-  $bin = Join-Path $fork 'build\dist\server\scam_native.node'
-  if (Test-Path -LiteralPath $bin) {
-    $want = (Get-Content $srec -Raw | ConvertFrom-Json).sha256
-    $got = (Get-FileHash -LiteralPath $bin -Algorithm SHA256).Hash.ToLowerInvariant()
-    Ready 'the built binary matches the record' ($got -eq $want) $got '.\scripts\release\New-ClientBuildRecord.ps1 after a rebuild'
-  } else {
-    Ready 'the server binary is built' $false $bin `
-      'Build the fork. Deploy-Server needs it; a Ship does not.'
-  }
+# ------------------------------------------------ what only main asks for --
+if (-not $Dev) {
+  Head 'For -Package and the live deploys'
+  $pkgOut = Join-Path (Join-Path (& $where Dist) (Split-Path -Leaf $Root.TrimEnd('\'))) '_dist'
+  foreach ($r in @(Get-MainOnlyRows $Channel `
+                     @((Join-Path (& $where Out) 'setup-stub.exe'), (Join-Path $pkgOut 'setup-stub.exe')) `
+                     (Join-Path $RepoDir 'installer\setup\Bootstrap.cs') `
+                     (Join-Path $RepoDir 'records\server-build.json') `
+                     @((& $where ServerDist), (& $where Payload)))) { Show-Row $r }
 }
 
 # ---------------------------------------------------------------- the VPS ---
@@ -281,19 +425,33 @@ if ($NoVps) {
 } else {
   $sshOk = $false
   try {
-    $out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 "Administrator@$($script:VpsAddress)" 'echo THORNSWOOD_OK' 2>&1 | Out-String
+    $out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 "$(Get-ThornswoodVpsUser)@$($script:VpsAddress)" 'echo THORNSWOOD_OK' 2>&1 | Out-String
     $sshOk = ($out -match 'THORNSWOOD_OK')
   } catch { $sshOk = $false }
   Ready 'ssh to the VPS works without a password' $sshOk $script:VpsAddress `
     '.\scripts\vps\Setup-SshKey.ps1        then Patrick runs .\scripts\vps\Add-VpsKey.ps1 to put the public half on the box' 'either'
-  Say '  note  ssh is needed by Deploy-*, Publish-Server and the Check scripts that ask the box. A Ship itself does not use it.' 'DarkGray'
+  Say '  note  a Ship needs ssh: the feed, its baseline and every download go to the VPS (#897, #907).' 'DarkGray'
+  # The feed store beside the feed the site serves (Feed-Store.ps1, #907).
+  # Read only: asks what is there, sends nothing.
+  if ($sshOk) {
+    $storeOk = $false; $storeSaid = ''
+    try {
+      . (Join-Path $PSScriptRoot 'Feed-Store.ps1')
+      $there = Get-FeedStoreThere $Channel
+      $storeOk = [bool]$there['version.json'] -and [bool]$there['published.json']
+      $storeSaid = $(if ($storeOk) { 'version.json and published.json' } else { 'missing ' + ((@('version.json', 'published.json') | Where-Object { -not $there[$_] }) -join ' and ') })
+    } catch { $storeSaid = $_.Exception.Message }
+    Ready ("the $Channel feed and its baseline are on the VPS") $storeOk $storeSaid `
+      'scripts\oneoff\Move-FeedStore-ToVps.ps1 put them there once; if one is gone, Patrick looks at C:\Thornswood-Docs\feed on the VPS' 'patrick'
+  }
 }
 
 # --------------------------------------------------------------- the verdict --
 Write-Host ''
 Write-Host ('  ' + ('=' * 68)) -ForegroundColor DarkGray
-if ($script:gaps.Count -eq 0) {
-  Say ("  READY. {0} checks passed. This machine can run a {1} release." -f $script:ok, $Channel) 'Green'
+$verdict = Get-ShipVerdict $script:rows
+if ($verdict.Ready) {
+  Say ("  READY. {0} checks passed. This machine can run a {1} release." -f $verdict.Passed, $Channel) 'Green'
   Write-Host ''
   if ($Dev) {
     Say '      .\scripts\release\Ship.ps1 -Channel dev "what changed"' 'White'
@@ -303,10 +461,10 @@ if ($script:gaps.Count -eq 0) {
     Say '  That publishes to everybody. Only run it from main, with the pull done.' 'DarkGray'
   }
 } else {
-  Say ("  NOT READY. {0} passed, {1} in the way." -f $script:ok, $script:gaps.Count) 'Red'
+  Say ("  NOT READY. {0} passed, {1} in the way." -f $verdict.Passed, $verdict.Gaps.Count) 'Red'
   Write-Host ''
   $i = 0
-  foreach ($g in $script:gaps) {
+  foreach ($g in $verdict.Gaps) {
     $i++
     Say ("  {0}. {1}" -f $i, $g.What) 'Yellow'
     if ($g.Fix) {
@@ -315,6 +473,14 @@ if ($script:gaps.Count -eq 0) {
     }
   }
 }
+if ($verdict.Warns.Count) {
+  Write-Host ''
+  Say '  Not in the way of the Ship itself, but worth putting right first:' 'Yellow'
+  foreach ($w in $verdict.Warns) {
+    Say ('  -  ' + $w.What) 'Yellow'
+    if ($w.Fix) { Say ('       ' + $w.Fix) 'White' }
+  }
+}
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-if ($script:gaps.Count) { exit 1 }
+if (-not $verdict.Ready) { exit 1 }

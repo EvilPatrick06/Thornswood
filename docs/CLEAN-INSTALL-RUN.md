@@ -61,8 +61,7 @@ describes something that download does not do.
 - **Nobody fixes anything during the run.** Do only what the site, the installer
   or the launcher tells a person to do. When none of them says what to do next,
   that is the finding: write it down and stop the run there. The Address Library
-  and Start On Save are the two most likely to be missing. Record them, and do
-  not add them by hand.
+  is the most likely to be missing. Record it, and do not add it by hand.
 
 ## Before the run
 
@@ -201,8 +200,10 @@ Start menu.
 ### Discord in the launcher
 
 The join page puts this after the collection. The launcher's collection card
-asks for it first and keeps the collection shut until it is done, so the list
-takes it here, and row 30 records which order the tester really took.
+used to ask for it first and keep the collection shut until it was done; since
+#428 the collection opens without it, because anyone can download in the alpha.
+The list still takes it here, and row 30 records which order the tester really
+took.
 
 | # | Step | Clock | Seen, word for word | A stranger would instead |
 | --- | --- | --- | --- | --- |
@@ -218,7 +219,7 @@ takes it here, and row 30 records which order the tester really took.
 | 33 | Write down how many mods asked for a click on the Nexus site, and when the last one finished downloading. | | | |
 | 34 | Write down the name of the Vortex profile the collection made, and whether Vortex switched to it by itself. | | | |
 | 35 | Write down every dialog at deployment: external changes, file conflicts, sorting, missing masters. | | | |
-| 36 | Measure whether the Address Library and Start On Save arrived in the Steam copy (M4). Do not add either by hand. | | | |
+| 36 | Measure whether the Address Library arrived in the Steam copy, and whether Start On Save did too (M4). Do not add or remove either by hand. | | | |
 
 ### Thornswood's own folder
 
@@ -226,9 +227,9 @@ takes it here, and row 30 records which order the tester really took.
 | --- | --- | --- | --- | --- |
 | 37 | Go back to the launcher. Write down the words on the Play button and any question it asks, and press the button if it asks nothing. | | | |
 | 38 | Answer yes to the question about a Skyrim folder of its own. Copy the whole question word for word, then the percentages the log shows, and how long it took. | | | |
-| 39 | Write down the administrator prompt for the firewall rule, and what the tester chose. | | | |
+| 39 | Write down any Windows prompt while the folder is made. There should be none: the launcher no longer asks for administrator for a firewall rule. | | | |
 | 40 | Write down the restart, and copy the log line that starts "Thornswood's own Skyrim folder is ready at" (M5). | | | |
-| 41 | Measure whether the Address Library and Start On Save are in the own folder (M4 again). | | | |
+| 41 | Measure whether the Address Library is in the own folder and Start On Save is not (M4 again). | | | |
 | 42 | Write down the Client row on the Play page, and any log lines about putting the client runtime back (M5). | | | |
 
 ### The Play page
@@ -289,7 +290,11 @@ Select-String -Path C:\Thornswood\Profile\launcher.log -Pattern 'the installer l
 
 **M4, the Address Library and Start On Save.** Four lines, True or False: the
 Steam copy first, then the own folder. Until row 38 the own folder does not
-exist, so its two lines read False.
+exist, so its two lines read False. Once it does, its Address Library line
+should read True and its Start On Save line False: Start On Save left
+Thornswood in issue #394 and the launcher keeps it out of the own folder, even
+while a collection revision older than the one that dropped it still deploys it
+into the Steam copy.
 
 ```powershell
 foreach ($d in 'C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data\SKSE\Plugins', 'C:\Thornswood\Game\Data\SKSE\Plugins') {
@@ -405,7 +410,7 @@ tester confused by a list that no longer matches.
 | 28 | `Exit Steam from its own menu (Steam, Exit), then press Yes.` | `launcher\app\ShellSteamUpdates.cs` |
 | 28 | `Wait until I launch the game` | `launcher\app\SteamUpdates.cs` |
 | 29 | `Your mods are not installed yet` | `launcher\app\Shell.cs` |
-| 29 | `Connect Discord first and this opens the collection.` | `launcher\app\Shell.cs` |
+| 29 | `Open the collection` | `launcher\app\Shell.cs` |
 | 29 | `INSTALL THE MODS FIRST` | `launcher\app\Shell.cs` |
 | 31 | `https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf` | `launcher\app\Config.cs` |
 | 37 | `MAKE THORNSWOOD'S OWN FOLDER` | `launcher\app\Shell.cs` |
@@ -475,11 +480,11 @@ right or wrong. To Do entries are named by title, because their numbers move.
   to be, and since 24 Sep the launcher's First time card asks for a name that
   belongs in Skyrim and not your own, and says nothing about saving. So the
   console now disagrees with the launcher it opens. No entry.
-- **The Address Library and Start On Save (rows 36 and 41).** Expected missing
-  unless the collection delivers them. Owned by "The launcher never checks the
-  Address Library, so a whole class of failure reads as green" and by "Start On
-  Save is in the mod list and never loads a save, and pointing it at a character
-  that does not exist crashed a fresh install".
+- **The Address Library and Start On Save (rows 36 and 41).** The Address
+  Library is expected missing unless the collection delivers it, owned by "The
+  launcher never checks the Address Library, so a whole class of failure reads
+  as green". Start On Save in the own folder is a finding against issue #394,
+  which took it out.
 - **SmartScreen (row 16).** Owned by "Nothing is code signed: SmartScreen warns
   forever, and one GitHub login is all that stands between a stranger and every
   installed machine".
@@ -504,11 +509,11 @@ right or wrong. To Do entries are named by title, because their numbers move.
   Nexus collection carries the plugin order from revision 5, and what is left is
   proving a clean install matches the server".
 - **An old README in the scratch folder (row 25).** The installer unpacks into
-  `C:\Thornswood-setup` with a READ ME FIRST.txt that still describes the Skyrim
-  Together installer and says no Nexus account or Vortex is needed. The launcher
+  `C:\Thornswood-setup` with a READ ME FIRST.txt that still describes the old
+  multiplayer mod's installer and says no Nexus account or Vortex is needed. The launcher
   clears the folder on its first start (`launcher\app\Shell.cs`), so a stranger only
   meets it if they look before then. Owned by "The repository's own docs still
-  describe the Skyrim Together product".
+  describe the old product".
 
 ## After the run
 

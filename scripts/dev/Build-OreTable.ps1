@@ -99,9 +99,9 @@ $VEIN_TYPES    = @('ACTI', 'FURN')
 #   advanced   up to 29   orichalcum 20, corundum 20, shellbug chitin 25,
 #                         quicksilver 25, silver 25
 #   expert     up to 59   malachite 30, moonstone 30, gold 50
-#   master     over that  ebony 60, heart stone 100, stalhrim 200, and the
-#                         gem seams: amethyst 120, ruby 200, sapphire 400,
-#                         emerald 600
+#   master     over that  ebony 60, heart stone 100 (but see RANK_BY_ORE),
+#                         stalhrim 200, and the gem seams: amethyst 120,
+#                         ruby 200, sapphire 400, emerald 600
 #
 # Iron at the bottom and ebony near the top, which is the shape to expect.
 # What was not expected, and is measured rather than arranged: a handful of
@@ -117,6 +117,21 @@ $RANK_BANDS = @(
     @{ Rank = 'expert';   UpTo = 59 },
     @{ Rank = 'master';   UpTo = [int]::MaxValue }
 )
+#
+# AN ORE WHOSE RANK IS DECIDED RATHER THAN READ OFF ITS VALUE. Keyed by the
+# ore's editor id, each with the rank and the reason, and every one is printed
+# by name when the table is built. An ore named here that the load order does
+# not carry fails the build, so an entry cannot outlive its ore quietly.
+#
+# DLC2HeartStone: Patrick, 28 September, issue #398. Worth 100 gold, so master
+# by value, and 160 of the Bladebinder's 161 staves want one, which put the
+# whole half's cost on master while its rungs spread over all four ranks. At
+# advanced the staves line up with what they cost (measured: novice 66,
+# advanced 55, expert 39, master 1, none more than a rung out) and the miner
+# keeps 20 of his 24 master deposits.
+$RANK_BY_ORE = [ordered]@{
+    'DLC2HeartStone' = @{ Rank = 'advanced'; Why = 'decided by Patrick on 28 September (issue #398) so the Bladebinder''s staves line up with what their stone costs; by value it would be master' }
+}
 #
 # WHAT A VEIN GIVES. The salt quarry is the shape already in the game:
 # mineSalt hands out randInt(1, 1 + tier) with tier 1 at novice through 4 at
@@ -644,6 +659,11 @@ $table   = New-Object System.Collections.Specialized.OrderedDictionary
 $detail  = New-Object System.Collections.Specialized.OrderedDictionary
 $skipped = New-Object 'System.Collections.Generic.List[object]'
 $byOre   = @{}
+$namedSeen = @{}
+
+foreach ($r in $RANK_BY_ORE.Values) {
+    if ($RANK_ORDER -notcontains $r.Rank) { Bad ("RANK_BY_ORE names a rank that is not one of the four: {0}" -f $r.Rank) }
+}
 
 foreach ($desc in $veins.Keys) {
     $v = $veins[$desc]
@@ -662,6 +682,10 @@ foreach ($desc in $veins.Keys) {
     }
     if ($ore.NameFrom -eq 'the editor id') { $oreNameFromEdid++ }
     $rank = RankOf $ore.Value
+    if ($RANK_BY_ORE.Contains([string]$ore.Edid)) {
+        $rank = $RANK_BY_ORE[[string]$ore.Edid].Rank
+        $namedSeen[[string]$ore.Edid] = $true
+    }
     $table[$desc] = [pscustomobject]@{
         Ore = $ore.Desc; Name = $ore.Name; Rank = $rank; Yield = (YieldFor $rank)
     }
@@ -695,6 +719,13 @@ if ($skipped.Count -gt 0) {
     # and it is listed rather than quietly dropped.
     Note ("{0} vein(s) name no ore and are left out of the table:" -f $skipped.Count)
     foreach ($s in $skipped) { Note ("  {0}  {1}" -f $s.Desc, $s.Edid) }
+}
+foreach ($e in $RANK_BY_ORE.Keys) {
+    if ($namedSeen.ContainsKey($e)) {
+        Note ("{0} is ranked {1} by RANK_BY_ORE rather than by its value: {2}" -f $e, $RANK_BY_ORE[$e].Rank, $RANK_BY_ORE[$e].Why)
+    } else {
+        Bad ("RANK_BY_ORE names {0} and no vein in this load order gives it, so the entry is out of date" -f $e)
+    }
 }
 if ($oreNameFromEdid -gt 0) {
     Bad ("{0} vein(s) would carry an editor id where the ore's name goes" -f $oreNameFromEdid)
@@ -798,6 +829,17 @@ foreach ($band in $RANK_BANDS) {
     else { $docLines.Add('    ' + (JsonStr $band.Rank) + ': ' + (JsonStr ('an ore worth up to ' + $upTo + ' gold')) + $comma) }
 }
 $docLines.Add('  },')
+# The ores ranked by RANK_BY_ORE rather than by the bands above, with the
+# reason, so a row whose rank does not match its oreValue says why.
+$docLines.Add('  "rankNamedOutright": {')
+$rn = 0
+foreach ($e in $RANK_BY_ORE.Keys) {
+    $rn++
+    $comma = ','
+    if ($rn -eq $RANK_BY_ORE.Count) { $comma = '' }
+    $docLines.Add('    ' + (JsonStr $e) + ': ' + (JsonStr ($RANK_BY_ORE[$e].Rank + ': ' + $RANK_BY_ORE[$e].Why)) + $comma)
+}
+$docLines.Add('  },')
 $docLines.Add('  "ores": {')
 $n = 0
 foreach ($desc in $table.Keys) {
@@ -858,7 +900,8 @@ $lines.Add('     Vein base -> the ore it gives, that ore''s name, the rank it ta
 $lines.Add('     work it, and what it gives at novice, advanced, expert and master.')
 $lines.Add('     A pair of zeroes is a rank that cannot work that seam at all. The')
 $lines.Add('     ore is the Ore property of the vein''s MineOreScript, read out of the')
-$lines.Add('     record, and the rank is the ore''s value in gold. */')
+$lines.Add('     record, and the rank is the ore''s value in gold unless RANK_BY_ORE')
+$lines.Add('     in the build script names it. */')
 $lines.Add('  var ORES_BY_BASE = {')
 $n = 0
 foreach ($desc in $table.Keys) {

@@ -107,7 +107,9 @@ namespace Thornswood
                 try
                 {
                     if (active) refresh = OwnGame.NeedsRefresh(c);
-                    else if (collection && !OwnGame.Declined)
+                    // A yes given in the setup window (MakeOwnGame) is newer
+                    // than a no left in the profile by an earlier install.
+                    else if (collection && (!OwnGame.Declined || c.MakeOwnGame))
                     {
                         string src = OwnGame.DeploysInto(c);
                         // Offered whenever it is possible. It used to be offered
@@ -212,6 +214,17 @@ namespace Thornswood
             {
                 Log(why);
                 if (!atStart) MessageBox.Show(why, "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Already answered in the setup window (issue #906): its card
+            // carries this panel's words and a tick box, and a tick is the
+            // same yes as the one below, given before the launcher was open.
+            if (cfg.MakeOwnGame)
+            {
+                Log("Making Thornswood's own Skyrim folder, as chosen when Thornswood was installed. " +
+                    "It is made from what Vortex has deployed in " + src + ".");
+                StartOwnGame(true, true);
                 return;
             }
 
@@ -324,51 +337,13 @@ namespace Thornswood
                     }
                 }
 
-                // The firewall rule for the game's browser, written here
-                // because here is where the reason for it happens.
-                //
-                // Skyrim Platform draws the interface in a second program, and
-                // a firewall rule is tied to a program's full path. Every other
-                // server runs from the Steam copy, so that path was decided
-                // once, long ago, and nobody is asked again. Giving Thornswood
-                // a folder of its own makes the same file a new program as far
-                // as Windows is concerned, and that is the entire reason anyone
-                // here sees the prompt. This folder is what moved it, so this
-                // is what should settle it.
-                //
-                // It asks for administrator, which is unavoidable: only
-                // administrators may write firewall rules. It is also why this
-                // is not a button of its own. A prompt inside a folder build
-                // somebody started, which already says it is setting the folder
-                // up, is a prompt with a reason attached. A lone button
-                // offering to quieten a security warning is not, however true
-                // the words beside it are.
-                //
-                // Saying no costs nothing. The rule is a block, this never
-                // needed the network, and the only consequence of refusing is
-                // that Windows asks once on the first launch instead.
-                // Only when a person started this.
-                //
-                // Firewall.Ensure elevates (runas) to write the browser-helper
-                // block rule. That is only needed when Make creates a new own
-                // folder: Windows ties rules to the program's full path, and
-                // that path just changed. Bring it up to date and the silent
-                // startup refresh leave the path alone, so elevation would
-                // only flash UAC / a console for no reason. Existing rules
-                // stay; Make still settles them for a brand-new folder.
-                if (fail == null && loud && make)
-                {
-                    try
-                    {
-                        if (Firewall.Present().Count > 0)
-                        {
-                            say("Asking Windows to stop querying the game's browser. It will ask for administrator.");
-                            string fw = Firewall.Ensure(say);
-                            if (!string.IsNullOrEmpty(fw)) say(fw);
-                        }
-                    }
-                    catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, Firewall.Ensure", ex); }
-                }
+                // No firewall rule is written here any more, and nothing asks
+                // for administrator (#911). Windows only asked about the game's
+                // browser because the in-game voice page kept making WebRTC
+                // connections after the launcher had taken the audio, and a
+                // WebRTC connection opens UDP sockets on every network the
+                // machine has. thornswood-voice.js makes none in relay mode now,
+                // so the browser has nothing for Windows to ask about.
 
                 try
                 {

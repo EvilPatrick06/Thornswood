@@ -28,7 +28,7 @@
 // same split as the warmth table.
 //
 // Read only. It opens the plugins of the build and writes game\data\weather.json,
-// and installs the compact table into tools\gamemode.js.
+// and installs the compact table into game\gamemode.js.
 //
 // Usage:
 //   node scripts\dev\Build-WeatherTable.js

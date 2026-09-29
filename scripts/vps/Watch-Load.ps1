@@ -31,7 +31,7 @@
 [CmdletBinding()]
 param(
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Root = 'C:\Thornswood-Watch',
   [string]$Task = 'Thornswood Load',
   [string]$Out  = '',
@@ -41,11 +41,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $Out) { $Out = Join-Path (Split-Path -Parent (Split-Path -Parent $Here)) 'logs' }
 

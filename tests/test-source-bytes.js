@@ -22,12 +22,12 @@
 // repository needs one on purpose.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const ROOT = path.join(TOOLS_DIR, '..');
+const ROOT = REPO_DIR;
 const TEXT = /\.(js|mjs|cjs|ps1|psm1|psd1|py|cs|xaml|md|json|html|htm|css|txt|yml|yaml|toml|cmd|bat|sh|ini|xml)$/i;
 
 let pass = 0, fail = 0;

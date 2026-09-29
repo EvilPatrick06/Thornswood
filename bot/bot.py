@@ -10,15 +10,17 @@ What it does:
            or not anybody was looking at Discord. #tickets is the staff only
            channel closed tickets are written down in, and where a ticket
            goes when its thread will not open
-  Watch    asks the site every five minutes over its public name, and says so
-           in #dev when it stops answering and when it comes back
-  Services reads the VPS watchdog's watch.log every minute and says in the
-           same channel when a service needs a look, could not be started,
-           or did not come back after a restart
+  Services posts in the staff channel what the VPS watchdog says has died
+           and when it is back, from its outbox, once each (issue #447)
   Reports  says each thing sent in on the site's public report page in the
            staff channel, the day it arrives
   Holds    a panel in #choose-your-hold where a Member picks their hold
            and which announcements ping them
+  Heartbeat writes heartbeat.json beside this file every minute, so the
+           watchdog can tell a bot that is running from one that is on
+           Discord (issue #449)
+  Uptime   pings an outside monitor every minute while it is on Discord, so
+           a bot or a VPS that stops is noticed from outside the box (#449)
 
 Everything it needs is in env:
 
@@ -33,15 +35,21 @@ Everything it needs is in env:
   STAFF_ROLES      comma separated, who gets pulled into every ticket thread
   CREATOR_ROLES    comma separated, added to Apply: Content Creator only
   TICKET_COOLDOWN  seconds between one person's tickets, default 300
-  WATCH_CHANNEL_ID id of the staff channel the site watcher speaks in,
+  WATCH_CHANNEL_ID id of the staff channel the watchdog's messages go in,
                    default whatever dev-channel.txt beside this file holds
-  WATCH_EVERY      seconds between checks, default 300
-  WATCH_MISSES     how many in a row before it says so, default 2
-  WATCH_LOG        the watchdog's log, default the one Watch-Services.ps1
-                   writes on the VPS
-  WATCH_LOG_EVERY  seconds between reads of it, default 60
+  WATCH_DIR        the watchdog's folder, default the one Watch-Services.ps1
+                   makes on the VPS
+  WATCH_READ_EVERY seconds between reads of its outbox, default 60
   HOLD_CHANNEL     channel the hold panel lives in, default choose-your-hold
   MEMBER_ROLE      role that may pick a hold, default Member
+  HEARTBEAT_FILE   where the heartbeat goes, default heartbeat.json beside this
+                   file, which is where the watchdog reads it
+  HEARTBEAT_EVERY  seconds between heartbeats, default 60
+  PING_URL         the outside monitor's ping address. A secret, set only by
+                   Install-Bot.ps1 -SetPing and never written to the log. Not
+                   set means no ping
+  PING_EVERY       seconds between pings, default 60
+  PING_TIMEOUT     seconds one ping may take, default 10
 
 It is written to keep going when a piece of it fails. A card that will not
 draw still gets a greeting, a site that is down still gets a thread, and a
@@ -207,19 +215,13 @@ REPORTS_EVERY = _int_env('REPORTS_EVERY', 120)
 REPORTS_AT_ONCE = 5
 
 
-WATCH_EVERY = _int_env('WATCH_EVERY', 300)
-# Two in a row rather than one. A single timeout is a moment of packet loss and
-# nobody wants to read about it. Two, five minutes apart, is the site being
-# down. Caddy's own repeating trigger is five minutes as well, so anything that
-# clears by itself has had a go at clearing before this says a word.
-WATCH_MISSES = _int_env('WATCH_MISSES', 2)
-
-# What the watchdog Watch-Services.ps1 puts on the VPS writes down. The bot
-# runs on the same box as the same SYSTEM account, so it can read it.
-WATCH_LOG = os.environ.get('WATCH_LOG', r'C:\Thornswood-Watch\watch.log')
-# Once a minute. The watchdog itself runs every five, so this is never more
-# than a minute behind it, and the file is two thousand short lines at most.
-WATCH_LOG_EVERY = _int_env('WATCH_LOG_EVERY', 60)
+# The folder the watchdog Watch-Services.ps1 puts on the VPS. The bot runs on
+# the same box, as its own service account, which Install-Bot.ps1 grants read
+# on this folder and write on alerts-sent-bot.txt (Bot-Service.ps1).
+WATCH_DIR = os.environ.get('WATCH_DIR', r'C:\Thornswood-Watch')
+# Once a minute. The watchdog itself runs every five and gives this two and a
+# half minutes to post a message before it posts it through its webhook.
+WATCH_READ_EVERY = _int_env('WATCH_READ_EVERY', 60)
 
 if not TOKEN:
     raise SystemExit('No DISCORD_TOKEN. Install-Bot.ps1 sets it.')
@@ -243,6 +245,12 @@ class Thornswood(discord.Client):
         a second time is not free and is not meaningful, and the two lines
         were sitting in on_ready where every reconnect did it again.
         """
+        # First, so a site that is slow to answer below cannot delay it.
+        asyncio.create_task(heartbeat())      # for the watchdog, #449
+        asyncio.create_task(uptime_ping())    # for the outside monitor, #449
+        # The one switch (#428), before the panel is built from KINDS.
+        set_open(await asyncio.get_running_loop().run_in_executor(None, site_open))
+        log('the world is %s' % ('open to everybody' if OPEN else 'in alpha, open by application'))
         self.add_view(TicketPanel())          # so it keeps working after a restart
         self.add_view(TicketTools())          # and so does Close on every old ticket
         self.add_view(HoldPanel())            # and the hold and ping buttons
@@ -257,10 +265,16 @@ def log(*a):
 
 
 # ------------------------------------------------------------------ site --
-def push(kind, title, detail, by, discord_id):
+def push(kind, title, detail, by, discord_id, rules=None):
     """Send a ticket to the site. Runs off the event loop, and a failure here
        is never allowed to lose the ticket: the thread in Discord is the
-       record, this is the convenience."""
+       record, this is the convenience.
+
+       rules is the application's answer to the rules question, as
+       {'said': their words, 'yes': whether it read as a yes}, or None on a
+       ticket that does not ask it. The site keeps the latest one against the
+       Discord id (#428), because the inbox is trimmed and the record of who
+       accepted the rules should not be."""
     if not KEY:
         # Silent for as long as this has existed, which means a bot with no key
         # set looked exactly like a working one: the thread appeared, the site
@@ -269,10 +283,13 @@ def push(kind, title, detail, by, discord_id):
             'inbox. The thread in Discord is the only copy. Install-Bot.ps1 '
             'sets the key in bot.env.json on the VPS.')
         return
-    body = json.dumps({
+    sent = {
         'key': KEY, 'kind': kind, 'title': title,
         'detail': detail, 'by': by, 'discordId': str(discord_id)
-    }).encode()
+    }
+    if rules is not None:
+        sent['rules'] = rules
+    body = json.dumps(sent).encode()
     req = urllib.request.Request(
         SITE + '/api/ticket', data=body,
         headers={'Content-Type': 'application/json'}, method='POST')
@@ -629,12 +646,15 @@ async def on_member_join(member):
 
 
 # --------------------------------------------------------------- tickets --
-# 'Apply to play' is not here on purpose. Everybody in the world right now is
-# a playtester, so that is the one application to be in it, and when the doors
-# open there will be no application to play at all. Leaving both up asked
-# people to guess which one they wanted and half of them guessed wrong.
+# 'Apply to play' is not here on purpose. Patrick, 28 Sep: "we are in alpha so
+# the world is open by application". Anyone can download it, and the one way
+# into the world is this application, which gives the Playtester role when it
+# is accepted. A second 'Apply to play' asked people to guess which one they
+# wanted and half of them guessed wrong. The key stays 'playtest' because the
+# site inbox and ROLE_FOR file it under that name.
 KINDS = [
-    ('playtest',    'Apply to playtest',    'How you get in. Break it on purpose and write down how.'),
+    ('playtest',    'Apply to be an alpha playtester',
+                    'How you get into the world. Anyone can apply. Break it and write down how.'),
     ('jarl',        'Apply: Jarl',          'A seat in a hold. In character, and the first ones come out of these.'),
     ('gamemaster',  'Apply: Gamemaster',    'Run events, settle disputes, hold the line in character.'),
     ('loremaster',  'Apply: Loremaster',    'Keep the history straight and write the rest of it.'),
@@ -679,6 +699,39 @@ def _job(what, examples):
 # Discord id, at a time, kept in the thread and in the site inbox.
 AGE_Q = ('Are you 18 or over?', 'Thornswood is an adult server. Yes or no.', False)
 AGE_KINDS = ('playtest',)
+
+# #428: before this, nobody ever accepted the rules. Somebody could join for the
+# invite, be let in, press Play and have agreed to nothing. Asked on the same
+# tickets as the age question, for the same reason and in the same way: their
+# own words against their Discord id, at a time, in the thread, the site inbox
+# and the site's record of who accepted (push, then /api/ticket on the site).
+# Anything that does not read as a yes goes at the top of the thread for staff,
+# and nobody is given the role without somebody reading it.
+RULES_Q = ('Do you accept the rules in #rules?',
+           'Read #rules and thornswood.net/rules first. Yes or no.', False)
+RULES_KINDS = AGE_KINDS
+
+_ACCEPT = ('yes', 'yep', 'yeah', 'yup', 'y ', 'ye', 'i do', 'i accept', 'accept',
+           'i agree', 'agree', 'i have', "i've", 'sure', 'of course', 'ok',
+           'okay', 'absolutely', 'definitely', 'read and', 'correct', 'affirmative')
+
+
+def accepted_rules(text):
+    """
+    Whether an answer to the rules question reads as a yes.
+
+    Generous, like said_yes, and it never refuses anybody by itself: a no only
+    puts a line at the top of the thread for a person to read. A no word
+    anywhere at the start wins, so "no, not yet" is never taken for a yes.
+    """
+    t = (text or '').strip().lower()
+    if not t:
+        return False
+    if t == 'n' or t.startswith(_NO) or t.startswith(("don't", 'dont', 'do not',
+                                                     'i do not', "i don't", 'i dont',
+                                                     'haven', 'have not', 'not yet')):
+        return False
+    return t == 'y' or t.startswith(_ACCEPT)
 
 _NO  = ('no', 'nope', 'nah', 'not ', 'under', 'minor')
 _YES = ('yes', 'yep', 'yeah', 'yup', 'y ', 'ye', 'i am', 'im ', "i'm ", 'sure',
@@ -746,10 +799,15 @@ QUESTIONS = {
     # because that is what somebody is here for, and about testing, because
     # that is what being in it means today. It does not ask who they are
     # outside the game: that is answered by them being in the Discord.
+    #
+    # Discord takes five questions on a form and no more, so the rules
+    # question (#428) took the place of "Have you roleplayed before", which
+    # now rides along in the character question's hint.
     'playtest': [
         AGE_Q,
-        ('Have you roleplayed before, and where?', 'No is a perfectly good answer.', True),
-        ('Who do you want to play?', 'A sentence about the character, not a biography.', True),
+        RULES_Q,
+        ('Who do you want to play?',
+         'A sentence about the character, and where you have roleplayed before, if anywhere.', True),
         ('How much time can you give it?', 'Hours a week, and which days.', True),
         ('Describe a bug you have run into', 'What you did, what happened, what should have happened. Short.', True),
     ],
@@ -847,7 +905,21 @@ class TicketModal(discord.ui.Modal):
                 detail = ('**CHECK THIS ONE.** Asked if they are 18 or over they '
                           'said "%s".\n\n' % (gave or 'nothing')) + detail
 
-        title = ('%s, %s' % (self.label_text, who.display_name))[:96]
+        # The rules answer, flagged the same way, and kept for the site's
+        # record of who accepted them.
+        rules = None
+        if self.kind in RULES_KINDS:
+            said = ''
+            for item, (q, _, _) in zip(self.fields, QUESTIONS[self.kind]):
+                if q == RULES_Q[0]:
+                    said = (item.value or '').strip()
+                    break
+            rules = {'said': said[:200], 'yes': accepted_rules(said)}
+            if not rules['yes']:
+                detail = ('**CHECK THIS ONE.** Asked if they accept the rules they '
+                          'said "%s".\n\n' % (said or 'nothing')) + detail
+
+        title =('%s, %s' % (self.label_text, who.display_name))[:96]
 
         # Mentioning a role does not put anybody in a private thread. Only
         # people who have been added to one can see it, so a ticket opened
@@ -993,7 +1065,7 @@ class TicketModal(discord.ui.Modal):
         # push_async logs its own failure, so nothing is lost by not awaiting.
         task = asyncio.create_task(push_async(
             self.kind, '%s: %s' % (self.label_text, who.display_name),
-            detail, str(who), who.id))
+            detail, str(who), who.id, rules))
         _pushes.add(task)
         task.add_done_callback(_pushes.discard)
 
@@ -1261,18 +1333,70 @@ class TicketPicker(discord.ui.Select):
         await interaction.response.send_modal(TicketModal(k, lab))
 
 
-PANEL = ('**Open a ticket**\n\n'
-         'Pick the one that fits. It asks a few questions, then opens a thread '
-         'only you and staff can see. Nothing here is public and nobody else in '
-         'the server can read it.\n\n'
-         '**Apply to playtest** is the one everybody starts with, and it is how '
-         'you get into the world. **Apply: Jarl** is '
-         'answered in character: the seats are empty, and the first people to '
-         'hold them are picked out of what is written there.\n\n'
-         'The jobs below that are open to anybody already in, and they are jobs '
-         'rather than titles: each one is work somebody is currently doing '
-         'instead of you.\n\n'
-         'Applying for one does not give you it. Somebody reads it and answers.')
+_PANEL_TOP = ('**Open a ticket**\n\n'
+              'Pick the one that fits. It asks a few questions, then opens a thread '
+              'only you and staff can see. Nothing here is public and nobody else in '
+              'the server can read it.\n\n')
+_PANEL_JOBS = ('**Apply: Jarl** is '
+               'answered in character: the seats are empty, and the first people to '
+               'hold them are picked out of what is written there.\n\n'
+               'The jobs below that are open to anybody already in, and they are jobs '
+               'rather than titles: each one is work somebody is currently doing '
+               'instead of you.\n\n'
+               'Applying for one does not give you it. Somebody reads it and answers.')
+PANEL_ALPHA = (_PANEL_TOP +
+               'Thornswood is in alpha, and the world is open by application. Anyone '
+               'can download it. **Apply to be an alpha playtester** is the one '
+               'everybody starts with: once it is accepted you get the Playtester '
+               'role, and that is what lets you press Play. It asks whether you are '
+               '18 or over and whether you accept the rules, so read #rules first. '
+               'Your answers are kept against your Discord account.\n\n' +
+               _PANEL_JOBS)
+PANEL_OPEN = (_PANEL_TOP +
+              'Thornswood is open: anyone in the Discord can play, so there is '
+              'nothing to apply for to get in. Read #rules, because being here '
+              'and in the world means accepting them.\n\n' +
+              _PANEL_JOBS)
+PANEL = PANEL_ALPHA
+
+# THE ONE SWITCH (#428), read off the site so there is one copy of it: the
+# site's config.json "open", which /api/public hands out. Off, which is today,
+# the panel is the alpha one above and the application asks the age and rules
+# questions. On, anybody in the Discord can play, so the application goes from
+# the panel, and with it the age and rules questions, which were only ever
+# asked on the way in. THORNSWOOD_OPEN in bot.env.json overrides the site, for
+# a dev bot or a site that is down. Read once, in setup_hook, before the panel
+# view is registered; flipping it means restarting the bot.
+KINDS_ALPHA = list(KINDS)
+OPEN = False
+
+
+def site_open():
+    """Whether the world is open to everybody, from THORNSWOOD_OPEN when it is
+       set and otherwise from the site. Anything that goes wrong answers no,
+       the alpha, which is what is true until somebody flips the switch."""
+    env = os.environ.get('THORNSWOOD_OPEN', '').strip().lower()
+    if env in ('1', 'true', 'yes', 'open'):
+        return True
+    if env in ('0', 'false', 'no', 'alpha', 'closed'):
+        return False
+    try:
+        with urllib.request.urlopen(SITE + '/api/public', timeout=8) as r:
+            return json.loads(r.read().decode('utf-8')).get('open') is True
+    except Exception as e:
+        log('could not ask the site whether the world is open, so the panel is '
+            'the alpha one:', e)
+        return False
+
+
+def set_open(on):
+    """Point the panel, its kinds and the age and rules questions at one mode."""
+    global OPEN, KINDS, AGE_KINDS, RULES_KINDS, PANEL
+    OPEN = on is True
+    KINDS = [k for k in KINDS_ALPHA if not (OPEN and k[0] == 'playtest')]
+    AGE_KINDS = () if OPEN else ('playtest',)
+    RULES_KINDS = AGE_KINDS
+    PANEL = PANEL_OPEN if OPEN else PANEL_ALPHA
 
 
 def _panel_options(msg):
@@ -1634,62 +1758,18 @@ async def ensure_hold_panel(guild):
         log('hold panel failed:\n' + traceback.format_exc())
 
 
-# ----------------------------------------------------------- the watcher --
+# ----------------------------------------------------- the staff channel --
 #
-# WHY THE BOT DOES THIS AND NOT THE BOX.
-#
-# On 21 September thornswood.net was down and stayed down. Caddy, which holds
-# 443, had stopped, and the task that runs it had one startup trigger, so
-# nothing restarted it and nothing ever looked again. It surfaced hours later
-# as two testers reporting launcher faults, because the launcher checks people
-# in through the site and voice runs on the same hostname. A site that is down
-# looks to everybody like the launcher being broken, which is the worst kind of
-# outage: the reports point at the wrong thing.
-#
-# Caddy restarts itself now. This is the other half, which is somebody being
-# told.
-#
-# It lives in the bot because the bot is already running on that box, already
-# authenticated, and already written to keep going when a piece of it fails. A
-# watcher anywhere else needs a webhook put somewhere new, and the webhook
-# files are kept out of git deliberately.
-#
-# WHAT IT CANNOT CATCH is the box itself going down, which takes this with it.
-# That needs something off the machine and is not this.
-
-
-def site_answers():
-    """
-    Ask the site the way somebody's browser would.
-
-    Over the public name and the certificate, deliberately, so this fails when
-    Caddy is down and not only when node is. Asking 127.0.0.1:3001 would have
-    said the site was perfectly fine all through the outage this was written
-    for.
-
-    HEAD rather than GET: the answer is the status code, and there is no reason
-    to pull the front page down every five minutes forever.
-
-    Blocking, so it is called through an executor. Never raises.
-    """
-    req = urllib.request.Request(
-        SITE + '/', method='HEAD',
-        headers={'User-Agent': 'thornswood-watch'})
-    try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            code = r.getcode()
-            if 200 <= code < 400:
-                return True, 'HTTP %d' % code
-            return False, 'HTTP %d' % code
-    except Exception as ex:
-        # The class name matters when the message is empty, which is what a
-        # bare socket timeout gives you.
-        return False, str(ex) or ex.__class__.__name__
+# Where the watchdog's messages are said. There used to be a site watcher here
+# as well, asking https://thornswood.net every five minutes since the Caddy
+# outage of 21 September. The watchdog on the VPS asks the same address (its
+# caddy check), so one outage was two messages from two watchers; since #447
+# the watchdog decides and this only delivers (watch_services, below).
 
 
 async def watch_say(text):
     """
-    Say it once, in the staff channel, found by id.
+    Say it once, in the staff channel, found by id. True when it was said.
 
     Nothing is guessed and nothing falls back to another channel. If that id is
     not a channel this bot can see, it says so in the bot log and stays quiet in
@@ -1700,68 +1780,19 @@ async def watch_say(text):
         log('watch: no channel id, so nothing was said. dev-channel.txt is '
             'missing or unreadable, or set WATCH_CHANNEL_ID in bot.env.json '
             'on the VPS.')
-        return
+        return False
     ch = client.get_channel(WATCH_ID)
     if ch is None:
         log('watch: channel %d is not one this bot can see, so nothing was '
             'said.' % WATCH_ID)
-        return
+        return False
     try:
         await ch.send(text)
+        return True
     except Exception:
         log('watch: could not post in #%s:\n' % getattr(ch, 'name', WATCH_ID)
             + traceback.format_exc())
-
-
-async def watch_site():
-    """
-    Ask every WATCH_EVERY seconds, and speak only when the answer changes.
-
-    SILENCE IS THE POINT. A line every five minutes saying the site is up is a
-    channel nobody reads, and a channel nobody reads is the same as no watcher
-    at all. So it says the site went down, once, and says it came back, once.
-
-    Nothing in here is allowed to end the loop. A watcher that dies quietly is
-    worse than no watcher, because from the outside it looks exactly like
-    everything being fine.
-    """
-    await client.wait_until_ready()
-    misses = 0
-    said_down = False
-    log('watch: asking %s every %ds, speaking up after %d miss(es), in channel '
-        '%d' % (SITE, WATCH_EVERY, WATCH_MISSES, WATCH_ID))
-
-    while not client.is_closed():
-        try:
-            ok, what = await asyncio.get_running_loop().run_in_executor(
-                None, site_answers)
-            if ok:
-                if said_down:
-                    said_down = False
-                    await watch_say('The site is answering again. %s' % what)
-                    log('watch: back up, %s' % what)
-                elif misses:
-                    log('watch: answered after %d miss(es), %s' % (misses, what))
-                misses = 0
-            else:
-                misses += 1
-                log('watch: no answer from %s, %d in a row: %s'
-                    % (SITE, misses, what))
-                if misses >= WATCH_MISSES and not said_down:
-                    said_down = True
-                    await watch_say(
-                        'The site is not answering. %d checks in a row, %d '
-                        'seconds apart, and the last one said: %s\n'
-                        'Caddy holds 443 and now restarts itself every five '
-                        'minutes, so if this does not clear on its own then it '
-                        'is the box, the certificate, or something in front of '
-                        'both. People will be told they could not be checked '
-                        'in, and voice will sit on connecting, until it does.'
-                        % (misses, WATCH_EVERY, what))
-        except Exception:
-            log('watch: the check itself failed, carrying on:\n'
-                + traceback.format_exc())
-        await asyncio.sleep(WATCH_EVERY)
+        return False
 
 
 def _clock(ms):
@@ -1952,247 +1983,131 @@ async def trouble_say(text):
 # ------------------------------------------------------ the box's watchdog --
 #
 # Watch-Services.ps1 puts a watchdog on the VPS that restarts whatever stops
-# answering, three times an hour at most, and then stops and writes that the
-# service needs a look. That sentence went to watch.log on the box and nowhere
-# else. From the To Do List: "the sentence it writes when it gives up
-# currently goes to a file on the box that may itself be the thing that is
-# gone". Nobody reads a log on the VPS until they already know something is
-# wrong, so the one line written for a person was the one line no person saw.
+# answering, and since issue #447 it also decides what is down: one message
+# when a thing dies and one when it is back, however long it stays down and
+# however often it flaps. It writes them to alerts.jsonl in its folder, one
+# JSON line each (id, at, service, kind, text). This says each one in the
+# staff channel, by id through watch_say, which has no public fallback, and
+# writes its id to alerts-sent-bot.txt, so it is said once across restarts of
+# the bot too.
 #
-# This reads that file and says the three lines that need a person, in the
-# staff channel the site watcher uses, found by id through watch_say. Never a
-# public channel: watch_say has no fallback to one.
+# When this bot is down, or up and not posting, the watchdog posts the message
+# itself through a webhook kept on the box and writes its id to
+# alerts-sent-webhook.txt. This reads that list too, so what the webhook said
+# is not said again when the bot comes back.
 #
-#   needs a look          restarted three times this hour and still down
-#   could not be started  Windows would not run the service's task
-#   did not come back     restarted, and still not answering afterwards
+# The watchdog decides and this only delivers, so there is no counting here.
+# It replaced a reader of watch.log that tried to work out outages from the
+# watchdog's sentences, and repeated "needs a look" every hour.
+# tests\test-watch-alerts.ps1 drives the watchdog, and test-watch-services.py
+# drives this against an outbox the real watchdog wrote.
 #
-# A file and not a webhook, for the same reason as watch_trouble: both run on
-# this box, so there is no new secret to make, place or keep out of git.
-#
-# WHAT IT CANNOT CATCH is the box going down, or the bot being the thing that
-# is down. Both take this with them. That needs something off the machine.
-
-# How long with no line about a service before its next line is a new outage
-# rather than more of the same one. The watchdog writes at least one line
-# about every service that is down on every run, five minutes apart, give or
-# take the minute or so a run spends restarting whatever it checks first. It
-# writes nothing about a service that is up, so a gap of ten minutes is one run
-# that found it answering, and seven and a half sits between the two.
-#
-# ONE CLEAN RUN IS ENOUGH, and it was twenty minutes until 24 September. A
-# reviewer traced a fix made by hand that held for one run and then fell over
-# again: the watchdog wrote "needs a look" ten minutes after its last line, the
-# outage had never ended, and nobody was told for as long as it stayed down.
-# The person who fixed it believed it was fixed. A fix by hand is the one way a
-# service comes back with nothing written, so one run finding it up is all the
-# evidence there will ever be.
-WATCH_LOG_QUIET = int(7.5 * 60)
-
-# How long "needs a look" stays said while the lines keep coming. A fix that
-# falls over again inside five minutes leaves no gap at all, and without this
-# it would be silent for as long as the service stayed down. Once an hour is a
-# reminder, where every five minutes was the noise this whole thing avoids.
-WATCH_LOG_REMIND = 60 * 60
-
-# The watchdog's own words, from its Note() lines in Watch-Services.ps1, tried
-# in this order. test-watch-services.py renders those lines out of that script
-# and checks each one lands here, so changing the wording there fails a
-# harness instead of quietly silencing this.
-_WATCH_LINE = re.compile(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(\S.*?)\s*$')
-_WATCH_KINDS = [
-    ('look',    re.compile(r'^(.+?) is still down after (\d+) restarts this hour\..*needs a look')),
-    ('refused', re.compile(r'^(.+?) could not be started\.')),
-    ('stuck',   re.compile(r'^(.+?) did not come back in time')),
-    ('trying',  re.compile(r'^(.+?) is not answering\. Starting ')),
-    ('back',    re.compile(r'^(.+?) is back$')),
-]
+# WHAT IT CANNOT CATCH is the whole box going down, which takes the watchdog
+# with it. That needs something off the machine (issue #448).
+WATCH_ALERTS = os.path.join(WATCH_DIR, 'alerts.jsonl')
+WATCH_SENT_BOT = os.path.join(WATCH_DIR, 'alerts-sent-bot.txt')
+WATCH_SENT_HOOK = os.path.join(WATCH_DIR, 'alerts-sent-webhook.txt')
+# The watchdog's $alertMaxAge: a message a day late is noise, not news.
+WATCH_ALERT_MAX_AGE = 24 * 3600
 
 
-def _watch_log_message(kind, name, hit, line, since=None):
+def watch_alerts_due(lines, sent, now):
     """
-    What is said for one watchdog line, with the line itself under it.
+    The (id, text) of each message in the outbox still to be said, in order.
 
-    since is how many minutes ago "needs a look" was last said for this
-    service, when this is the hourly reminder of it, and None otherwise.
+    lines are the outbox's lines, sent every id already said by the bot or the
+    webhook, now the time in unix seconds. A line that is not a message is
+    skipped rather than stopping the rest, and so is one older than
+    WATCH_ALERT_MAX_AGE. An id twice in the outbox is said once.
     """
-    who = name[:1].upper() + name[1:]
-    if kind == 'look' and since is not None:
-        head = ('**%s still needs a look.** That was said here %d minutes ago, '
-                'and the watchdog has found it down on every run since and is '
-                'still leaving it. If somebody worked on it in that time, it '
-                'did not stay up. This is said again every hour it stays down.'
-                % (who, since))
-    elif kind == 'look':
-        head = ('**%s is down and the watchdog has stopped restarting it.** It '
-                'was restarted %s times this hour and would not stay up, so it '
-                'needs a person. The watchdog writes this to watch.log every '
-                'five minutes while it stays down, and it is said here again '
-                'every hour.'
-                % (who, hit.group(2)))
-    elif kind == 'refused':
-        head = ('**%s could not be started.** The watchdog on the VPS found it '
-                'not answering and Windows would not run its task, which '
-                'usually means the task is missing or was renamed.' % who)
-    else:
-        head = ('**%s did not come back after a restart.** The watchdog on the '
-                'VPS found it not answering, started it, and it was still not '
-                'answering when it looked again. It tries every five minutes, '
-                'three times an hour at most, and says so here if it gives up.'
-                % who)
-    return ('%s\n```\n%s\n```' % (head, line[:400]))[:1900]
-
-
-def watch_log_news(lines, state):
-    """
-    The messages to send for these new watch.log lines, in order.
-
-    state carries what has been said about each service from one call to the
-    next. Pass the same dict every time, starting from an empty one.
-
-    ONCE PER OUTAGE, per service and per kind of line. A service that will not
-    stay up gets "did not come back" on each of its three restarts an hour and
-    "needs a look" on every run after that, every five minutes. Said every
-    time, one broken service is twelve messages an hour and the channel stops
-    being read, which is the same as nobody being told. So each kind is said
-    the first time in an outage and not again until the outage ends. It ends
-    when the watchdog writes that the service is back, or when WATCH_LOG_QUIET
-    passes with no line about it at all, because the watchdog writes about a
-    service that is down on every run and writes nothing about one that is up.
-
-    AND "NEEDS A LOOK" AGAIN EVERY WATCH_LOG_REMIND while the lines keep
-    coming. A fix made by hand that falls over before the watchdog's next run
-    leaves no gap to end the outage on, so this is what stops that being
-    silence for as long as the service is down.
-
-    No file, no Discord, and no clock but the times in the log itself, so the
-    harness can drive it one line at a time.
-    """
-    last = state.setdefault('last', {})
-    # Per service, each kind already said in this outage and the log time it
-    # was said at.
-    said = state.setdefault('said', {})
     out = []
+    seen = set(sent)
     for raw in lines:
-        m = _WATCH_LINE.match(raw or '')
-        if not m:
-            continue
         try:
-            when = datetime.datetime.strptime(m.group(1), '%Y-%m-%d %H:%M:%S')
-        except ValueError:
+            a = json.loads(raw)
+            aid = str(a['id']).strip()
+            text = str(a['text'])
+            at = int(a['at'])
+        except Exception:
             continue
-        for kind, rx in _WATCH_KINDS:
-            hit = rx.match(m.group(2))
-            if hit:
-                break
-        else:
+        if not aid or not text.strip() or aid in seen:
             continue
-        name = hit.group(1)
-        before = last.get(name)
-        last[name] = when
-        # abs, because the only way a line is older than the one before it is
-        # the box's clock going back, and that is better said again than taken
-        # for the same outage with the reminder an hour further off.
-        if (kind == 'back' or before is None
-                or abs((when - before).total_seconds()) > WATCH_LOG_QUIET):
-            said[name] = {}
-        if kind not in ('look', 'refused', 'stuck'):
+        if now - at > WATCH_ALERT_MAX_AGE:
             continue
-        done = said.setdefault(name, {})
-        since = None
-        if kind in done:
-            if kind != 'look':
-                continue
-            gone = (when - done[kind]).total_seconds()
-            if gone < WATCH_LOG_REMIND:
-                continue
-            since = int(gone // 60)
-        done[kind] = when
-        out.append(_watch_log_message(kind, name, hit, raw.strip(), since))
+        seen.add(aid)
+        out.append((aid, text[:1900]))
     return out
 
 
-def _watch_log_lines():
+def _watch_lines(path):
     """
-    Every whole line in watch.log, or None when it could not be read.
+    Every whole, non-empty line of path, [] when there is no such file, and
+    None when it is there and cannot be read, so an unreadable outbox is never
+    taken for an empty one.
 
-    No file is an empty list, because that is the normal state of a quiet box:
-    the watchdog writes nothing until something goes down. Any other failure
-    is None, and the loop skips that round rather than reading an unreadable
-    file as an empty one.
-
-    A last line with no line ending is left for the next read. Add-Content may
-    be halfway through it, and half a line said now is the whole line said
-    again a minute later.
+    A last line with no line ending is left for the next read: the watchdog
+    may be halfway through writing it.
     """
     try:
-        with open(WATCH_LOG, 'rb') as f:
+        with open(path, 'rb') as f:
             data = f.read()
     except FileNotFoundError:
         return []
     except Exception:
         return None
-    # utf-8-sig because the watchdog trims the file with Set-Content -Encoding
-    # UTF8, which on Windows PowerShell puts a byte order mark first.
     parts = data.decode('utf-8-sig', errors='replace').split('\n')
-    return [p.rstrip('\r') for p in parts[:-1] if p.strip()]
+    return [p.strip() for p in parts[:-1] if p.strip()]
+
+
+def _watch_mark(aid):
+    """Write down that the bot said it. Blocking, so run through an executor."""
+    with open(WATCH_SENT_BOT, 'a', encoding='ascii', errors='replace') as f:
+        f.write(aid + '\r\n')
 
 
 async def watch_services():
     """
-    Read the watchdog's log every WATCH_LOG_EVERY seconds and say what needs a
-    person.
+    Every WATCH_READ_EVERY seconds, say what the watchdog's outbox holds that
+    nobody has said yet.
 
-    WHAT IT REMEMBERS AND WHY. The lines already in the file when this starts
-    are treated as said, the same as watch_trouble, or every restart of the
-    bot would say the last thousand again. They still go through
-    watch_log_news, so an outage that was already under way is known to be one
-    and its repeats stay quiet.
+    A message that could not be said is left unmarked and the rest of that
+    round waits, so they stay in order; the watchdog posts it through its
+    webhook once it has waited long enough.
 
-    Lines are remembered by their text, time and all, and not by where they
-    sit in the file, because the watchdog cuts the file to its last thousand
-    lines when it passes two thousand and every position moves.
-
-    Nothing in here may end the loop, for the same reason as the site watcher:
-    a watcher that dies quietly looks exactly like everything being fine.
+    Nothing in here may end the loop: a watcher that dies quietly looks
+    exactly like everything being fine.
     """
     await client.wait_until_ready()
     loop = asyncio.get_running_loop()
-    state = {}
-    seen = None
+    said = set()
     unreadable = False
-    log('services: reading %s every %ds, speaking in channel %d'
-        % (WATCH_LOG, WATCH_LOG_EVERY, WATCH_ID))
+    log('services: saying what %s holds, every %ds, in channel %d'
+        % (WATCH_ALERTS, WATCH_READ_EVERY, WATCH_ID))
 
     while not client.is_closed():
         try:
-            lines = await loop.run_in_executor(None, _watch_log_lines)
-            if lines is None:
+            lines = await loop.run_in_executor(None, _watch_lines, WATCH_ALERTS)
+            mine = await loop.run_in_executor(None, _watch_lines, WATCH_SENT_BOT)
+            hook = await loop.run_in_executor(None, _watch_lines, WATCH_SENT_HOOK)
+            if lines is None or mine is None or hook is None:
                 if not unreadable:
-                    log('services: could not read %s, trying again every %ds'
-                        % (WATCH_LOG, WATCH_LOG_EVERY))
+                    log('services: could not read the watchdog\'s files in %s, '
+                        'trying again every %ds' % (WATCH_DIR, WATCH_READ_EVERY))
                 unreadable = True
-            elif seen is None:
-                unreadable = False
-                seen = set(lines)
-                watch_log_news(lines, state)
-                log('services: %d line(s) already in the log, treated as said'
-                    % len(lines))
             else:
                 unreadable = False
-                new = [l for l in lines if l not in seen]
-                seen.update(new)
-                # The file never holds more than two thousand lines, so this
-                # only has to remember what could still be in it.
-                if len(seen) > 10000:
-                    seen = set(lines)
-                for text in watch_log_news(new, state):
-                    log('services: saying ' + text.split('\n', 1)[0])
-                    await watch_say(text)
+                due = watch_alerts_due(lines, said | set(mine) | set(hook),
+                                       int(time.time()))
+                for aid, text in due:
+                    if not await watch_say(text):
+                        break
+                    said.add(aid)
+                    log('services: said ' + aid)
+                    await loop.run_in_executor(None, _watch_mark, aid)
         except Exception:
             log('services: the check itself failed, carrying on:\n'
                 + traceback.format_exc())
-        await asyncio.sleep(WATCH_LOG_EVERY)
+        await asyncio.sleep(WATCH_READ_EVERY)
 
 
 def report_text(row):
@@ -2207,9 +2122,35 @@ def report_text(row):
         v = str(v or '').strip()[:n]
         return discord.utils.escape_mentions(discord.utils.escape_markdown(v))
 
-    kind = 'An idea' if row.get('kind') == 'idea' else 'A problem'
     by = clean(row.get('by'), 40)
     detail = clean(row.get('detail'), 400)
+    kind = row.get('kind')
+
+    # From inside the game (#414): /helpme and /report. The profile ids in
+    # the detail are the client's claim, and the detail says so. A report
+    # about somebody never pings: the send switches every mention off.
+    if str(row.get('from') or '').startswith('in game'):
+        where = ' on the dev server' if 'dev' in str(row.get('from')) else ''
+        if kind == 'help':
+            head = '**%s asked for help in game%s**' % (by or 'Somebody', where)
+        else:
+            head = ('**%s reported %s in game%s**'
+                    % (by or 'Somebody', clean(row.get('about'), 60) or 'somebody',
+                       where))
+        return '%s\n%s%s' % (head, clean(row.get('title'), 300) or '(nothing said)',
+                             ('\n' + detail) if detail else '')
+
+    # A report about a person from the site, which the site only takes from
+    # somebody signed in with Discord, so it always has a name and an account.
+    if kind == 'report':
+        acct = str(row.get('discordId') or '')
+        return ('**%s reported %s on the site**%s.\n%s%s'
+                % (by or 'Somebody', clean(row.get('about'), 60) or 'somebody',
+                   (' (Discord <@%s>)' % acct) if acct.isdigit() else '',
+                   clean(row.get('title'), 200) or '(no title)',
+                   ('\n' + detail) if detail else ''))
+
+    kind = 'An idea' if kind == 'idea' else 'A problem'
     return ('**%s sent in on the public report page**, %s.\n%s%s'
             % (kind,
                ('from ' + by) if by else 'with no name left',
@@ -2287,7 +2228,7 @@ async def watch_reports():
                 said.add(r['id'])
             if len(fresh) > REPORTS_AT_ONCE:
                 await report_say(
-                    '**%d reports came in on the public report page** since the '
+                    '**%d reports came in, from the site and the game,** since the '
                     'last look, which is more than people send and more than '
                     'this channel should carry one at a time. They are in the '
                     'inbox on the site.' % len(fresh))
@@ -2299,6 +2240,393 @@ async def watch_reports():
             log('reports: the check itself failed, carrying on:\n'
                 + traceback.format_exc())
         await asyncio.sleep(REPORTS_EVERY)
+
+
+# ------------------------------------------------------ staff in the world --
+#
+# What a moderator did in the game (#412): /kick, /freeze, /silence, /warn and
+# the rest. The gamemode appends one JSON line per action to
+# private\moderation.log beside each game server, on this same box, and this
+# says each new line once in the staff channel, so the record is outside the
+# game and in front of the rest of staff. A file rather than a request, for the
+# same reason as watch_trouble: no new secret, port or ticket.
+MODERATION_LOGS = [
+    ('live', os.environ.get('MODERATION_LOG',
+                            r'C:\Thornswood-Server\private\moderation.log')),
+    ('dev', os.environ.get('MODERATION_LOG_DEV',
+                           r'C:\Thornswood-Server-Dev\private\moderation.log')),
+    # Bans and notes made on the hub, which the site writes beside
+    # trouble.json. The game's own /ban and /note are in the two above.
+    ('site', os.environ.get('MODERATION_LOG_SITE',
+                            os.path.join(os.path.dirname(TROUBLE_FILE), 'moderation.log'))),
+]
+MODERATION_EVERY = _int_env('MODERATION_EVERY', 30)
+# More than this in one look from one server is said as a count, not a wall.
+MODERATION_AT_ONCE = 10
+
+_MOD_DID = {
+    'kick': 'removed %s from the world',
+    'freeze': 'froze %s in place',
+    'unfreeze': 'let %s move again',
+    'bring': 'brought %s to them',
+    'goto': 'went to %s',
+    'silence': 'silenced %s',
+    'unsilence': 'let %s speak again',
+    'warn': 'warned %s',
+    'give': 'gave %s',
+    'spawn': 'spawned beside %s',
+    'tp': 'sent %s',
+    # One character, or the whole account, and a character killed for good (#1010).
+    'ban': 'banned the character %s',
+    'unban': 'lifted the ban on the character %s',
+    'banaccount': 'banned the whole account of %s, every character on it',
+    'unbanaccount': 'lifted the ban on the account of %s',
+    'pk': 'killed %s for good (PK), quietly',
+    # An admin undoing a PK made by mistake (#1010, 29 September).
+    'unpk': 'undid the PK of %s, so the character can be played again',
+    'note': 'wrote a note on %s',
+    # Not staff: somebody's own /stuck (#414), said as its why reads.
+    'stuck': 'used /stuck',
+    # Not staff either: the server took somebody idle out of the world (#1142).
+    'idle': 'was moved out for being idle',
+}
+
+
+def moderation_text(where, row):
+    """
+    One line of moderation.log as the staff channel reads it, or None for a
+    line that is not one. Names and reasons were typed in the game, so they
+    are escaped: nothing in them can ping anybody or dress itself up.
+    """
+    if not isinstance(row, dict) or row.get('did') not in _MOD_DID:
+        return None
+
+    def clean(v, n):
+        v = str(v or '').strip()[:n]
+        return discord.utils.escape_mentions(discord.utils.escape_markdown(v))
+
+    def person(name, pid):
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            pid = 0
+        # The hub knows a person by account, not by profile.
+        if pid <= 0:
+            return clean(name, 40) or 'somebody'
+        return '%s (profile %d)' % (clean(name, 40) or 'somebody', pid)
+
+    # /stuck is not a staff action: the person did it to themselves, and the
+    # gamemode writes the whole sentence (from where, to where, the account).
+    if row['did'] == 'stuck':
+        why = clean(row.get('why'), 600) or 'used /stuck.'
+        return ('**/stuck on the %s server:** %s %s'
+                % (where, person(row.get('byName'), row.get('by')), why))[:1900]
+
+    # Moved out of the world for being idle (#1142): nobody did it to them, so
+    # it reads as what happened and why, which the gamemode writes.
+    if row['did'] == 'idle':
+        why = clean(row.get('why'), 600) or 'nothing from their game for too long'
+        return ('**Idle on the %s server:** %s was taken back to the character choice and put in line: %s'
+                % (where, person(row.get('whoName'), row.get('who')), why))[:1900]
+
+    did = _MOD_DID[row['did']] % person(row.get('whoName'), row.get('who'))
+    try:
+        minutes = int(row.get('minutes') or 0)
+    except (TypeError, ValueError):
+        minutes = 0
+    if row['did'] == 'silence' and minutes > 0:
+        did += ' for %d minute%s' % (minutes, '' if minutes == 1 else 's')
+    why = clean(row.get('why'), 300)
+    head = ('**Staff on the site:**' if where == 'site'
+            else '**Staff on the %s server:**' % where)
+    return ('%s %s %s%s'
+            % (head, person(row.get('byName'), row.get('by')), did,
+               (': ' + why) if why else '.'))[:1900]
+
+
+def _moderation_lines(path):
+    """
+    Every whole line in one moderation.log, [] when there is no file yet (no
+    staff action on that server so far), None when it could not be read. A
+    last line with no line ending is left for the next look, the same as
+    _watch_log_lines.
+    """
+    try:
+        with open(path, 'rb') as f:
+            data = f.read()
+    except FileNotFoundError:
+        return []
+    except Exception:
+        return None
+    parts = data.decode('utf-8-sig', errors='replace').split('\n')
+    return [p.rstrip('\r') for p in parts[:-1] if p.strip()]
+
+
+async def watch_moderation():
+    """
+    Say each new staff action from the game in the staff channel, once.
+
+    The lines already in each file when this starts are treated as said, as in
+    watch_trouble, or every restart of the bot would repeat the history. A
+    file that cannot be read is skipped for that look rather than read as
+    empty. Nothing in here may end the loop.
+    """
+    await client.wait_until_ready()
+    loop = asyncio.get_running_loop()
+    seen = {}
+    for where, path in MODERATION_LOGS:
+        lines = await loop.run_in_executor(None, _moderation_lines, path)
+        seen[where] = set(lines) if lines is not None else None
+    log('moderation: reading %s every %ds'
+        % (', '.join(p for _, p in MODERATION_LOGS), MODERATION_EVERY))
+
+    while not client.is_closed():
+        try:
+            for where, path in MODERATION_LOGS:
+                lines = await loop.run_in_executor(None, _moderation_lines, path)
+                if lines is None:
+                    continue
+                if seen.get(where) is None:
+                    seen[where] = set(lines)
+                    continue
+                new = [l for l in lines if l not in seen[where]]
+                seen[where].update(new)
+                texts = []
+                for l in new:
+                    try:
+                        text = moderation_text(where, json.loads(l))
+                    except ValueError:
+                        text = None
+                    if text:
+                        texts.append(text)
+                if len(texts) > MODERATION_AT_ONCE:
+                    await report_say(
+                        '**%d staff actions on %s** since the last look, more '
+                        'than this channel should carry one at a time. They '
+                        'are in %s on the VPS.'
+                        % (len(texts),
+                           'the site' if where == 'site' else 'the %s server' % where,
+                           path))
+                else:
+                    for text in texts:
+                        await report_say(text)
+        except Exception:
+            log('moderation: the check itself failed, carrying on:\n'
+                + traceback.format_exc())
+        await asyncio.sleep(MODERATION_EVERY)
+
+
+# ------------------------------------------------------------- heartbeat --
+# How the watchdog tells a running bot from a working one (issue #449).
+#
+# The watchdog on the VPS used to know one thing about the bot: whether a
+# python process with Thornswood-Bot in its command line was alive. A bot
+# stuck logging in, hung, or cut off from Discord and never getting back is
+# still that process, so the one outage the bot exists to tell staff about,
+# itself, looked fine. So this writes heartbeat.json beside this file every
+# HEARTBEAT_EVERY seconds: its pid, when it started, when it wrote it,
+# whether it is connected to Discord, when it last was, and when it last
+# handled something Discord sent it and what. The watchdog reads it
+# (BeatProblem in scripts\vps\Watch-Services.ps1) and treats ten quiet
+# minutes of any of those as the bot being down while its process runs.
+#
+# It is written from its own loop, so a hung event loop stops it, which is
+# the point. Written to a temporary file and renamed over the old one, so
+# the watchdog never reads half of one.
+HEARTBEAT_FILE = os.environ.get(
+    'HEARTBEAT_FILE',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'heartbeat.json'))
+HEARTBEAT_EVERY = _int_env('HEARTBEAT_EVERY', 60)
+
+# The fields the watchdog reads. test-heartbeat.py checks the two agree.
+_beat = {
+    'pid': os.getpid(),
+    'started': int(time.time()),
+    'connected': False,
+    'connected_at': 0,
+    'last_event': 0,
+    'last_event_type': '',
+}
+_beat_failed = False
+
+
+def beat_record(now, closed=False):
+    """What heartbeat.json says at unix time now. closed is the client having
+       been closed, which no event says."""
+    if closed:
+        _beat['connected'] = False
+    if _beat['connected']:
+        _beat['connected_at'] = int(now)
+    rec = dict(_beat)
+    rec['written'] = int(now)
+    return rec
+
+
+def beat_write(rec, path=None):
+    """Put rec in heartbeat.json. True when it is there. A failure is said in
+       bot.log once, not every minute, and never stops the bot."""
+    global _beat_failed
+    path = path or HEARTBEAT_FILE
+    tmp = path + '.tmp'
+    try:
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(rec, f)
+        os.replace(tmp, path)
+        _beat_failed = False
+        return True
+    except Exception:
+        if not _beat_failed:
+            log('could not write ' + path + ', so the watchdog cannot tell '
+                'whether this bot is on Discord:\n' + traceback.format_exc())
+        _beat_failed = True
+        return False
+
+
+def beat_now():
+    return beat_write(beat_record(time.time(), client.is_closed()))
+
+
+async def heartbeat():
+    """Started once, in setup_hook. Runs until the process ends."""
+    while True:
+        beat_now()
+        await asyncio.sleep(HEARTBEAT_EVERY)
+
+
+def beat_connected(on):
+    _beat['connected'] = bool(on)
+    beat_now()
+
+
+@client.event
+async def on_connect():
+    beat_connected(True)
+
+
+@client.event
+async def on_resumed():
+    beat_connected(True)
+
+
+@client.event
+async def on_disconnect():
+    beat_connected(False)
+
+
+@client.event
+async def on_socket_event_type(event_type):
+    # Every event Discord sends, whether or not anything here handles it.
+    # Kept in memory only; the loop above writes it.
+    _beat['last_event'] = int(time.time())
+    _beat['last_event_type'] = str(event_type)
+
+
+# ----------------------------------------------------------- uptime ping --
+# The heartbeat above is read on the box, by the watchdog, and a box that is
+# off, frozen or cut off reads nothing and says nothing. So the bot also pings
+# an outside monitor (Patrick, 29 Sep: "I want the bot too as well"): one GET
+# to PING_URL every PING_EVERY seconds while it is on Discord. When the pings
+# stop for longer than the monitor's grace, the monitor sends its alert,
+# whether the bot hung, lost Discord or stopped, or the whole VPS went down,
+# and whether or not One is on.
+#
+# PING_URL lives only in bot.env.json on the VPS, put there by
+# .\scripts\deploy\Install-Bot.ps1 -SetPing on ssh's standard input. Whoever
+# has it can keep the monitor quiet, so it is never logged, not even in an
+# error. Each ping runs on a worker thread with its own timeout, so a slow or
+# dead monitor never holds up anything Discord sends, and a ping still in
+# flight is never doubled. It is sent from the event loop, so a hung bot stops
+# pinging, which is the point. A failure is said once per outage and once
+# when it works again; nothing here can stop the bot.
+PING_URL = os.environ.get('PING_URL', '').strip()
+PING_EVERY = _int_env('PING_EVERY', 60)
+PING_TIMEOUT = _int_env('PING_TIMEOUT', 10)
+# How often the loop looks, so the first ping follows connecting by seconds.
+PING_LOOK = 5
+
+_ping = {'down': False, 'ok_once': False}
+
+
+def ping_shape_ok(url):
+    """A web address, and nothing that could be a file or a command."""
+    return (url.lower().startswith(('https://', 'http://'))
+            and not any(c.isspace() for c in url))
+
+
+def _ping_scrub(text, url):
+    """text with the address, and its path, taken out."""
+    text = str(text)
+    for part in (url, url.split('://', 1)[-1]):
+        if part:
+            text = text.replace(part, 'the ping address')
+    tail = url.split('://', 1)[-1].split('/', 1)
+    if len(tail) == 2 and len(tail[1]) > 3:
+        text = text.replace(tail[1], 'the ping address')
+    return text
+
+
+def ping_once(url, timeout=None):
+    """One ping. True when the monitor answered 2xx. Never raises."""
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'thornswood-bot'})
+        with urllib.request.urlopen(req, timeout=timeout or PING_TIMEOUT) as r:
+            r.read(256)
+            code = r.status
+        ok = 200 <= code < 300
+        why = 'it answered %d' % code
+    except Exception as e:
+        ok = False
+        code = getattr(e, 'code', None)
+        if isinstance(code, int):
+            why = 'it answered %d' % code
+        else:
+            why = '%s: %s' % (type(e).__name__, getattr(e, 'reason', None) or e)
+    try:
+        if ok:
+            if _ping['down']:
+                log('uptime ping: the outside monitor hears from this bot again')
+            elif not _ping['ok_once']:
+                log('uptime ping: reached the outside monitor, and pings it every '
+                    '%ds while on Discord' % PING_EVERY)
+            _ping['down'] = False
+            _ping['ok_once'] = True
+        else:
+            if not _ping['down']:
+                log('uptime ping FAILED (%s). The outside monitor alerts if it '
+                    'hears nothing past its grace. Said once until it works '
+                    'again.' % _ping_scrub(why, url))
+            _ping['down'] = True
+    except Exception:
+        pass
+    return ok
+
+
+async def uptime_ping():
+    """Started once, in setup_hook. Runs until the process ends, or returns
+       at once when there is nothing to ping."""
+    if not PING_URL:
+        log('uptime ping: PING_URL is not set in bot.env.json, so no outside '
+            'monitor hears from this bot. Install-Bot.ps1 -SetPing sets it.')
+        return
+    if not ping_shape_ok(PING_URL):
+        log('uptime ping: PING_URL in bot.env.json is not a web address, so '
+            'nothing is sent. Install-Bot.ps1 -SetPing sets it again.')
+        return
+    loop = asyncio.get_running_loop()
+    inflight = None
+    last = None
+    while True:
+        try:
+            now = time.monotonic()
+            if (_beat['connected'] and not client.is_closed()
+                    and (inflight is None or inflight.done())
+                    and (last is None or now - last >= PING_EVERY)):
+                last = now
+                inflight = loop.run_in_executor(None, ping_once, PING_URL)
+        except Exception:
+            log('uptime ping: could not start one, carrying on:\n'
+                + _ping_scrub(traceback.format_exc(), PING_URL))
+        await asyncio.sleep(PING_LOOK)
 
 
 # on_ready fires again on every reconnect, and a second loop would double every
@@ -2399,10 +2727,10 @@ async def on_ready():
     global _watching
     if not _watching:
         _watching = True
-        asyncio.create_task(watch_site())
         asyncio.create_task(watch_trouble())
         asyncio.create_task(watch_services())
         asyncio.create_task(watch_reports())
+        asyncio.create_task(watch_moderation())
 
     log('up as %s' % client.user)
 
@@ -2456,6 +2784,9 @@ async def on_ready():
 # `python bot.py`, where __name__ is __main__, so this changes nothing about
 # how it runs on the VPS.
 if __name__ == '__main__':
+    # One heartbeat before anything can hang, so a bot stuck logging in has
+    # this run's pid in the file and the watchdog can say how long it has sat.
+    beat_now()
     try:
         client.run(TOKEN)
     except discord.PrivilegedIntentsRequired:

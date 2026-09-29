@@ -24,10 +24,10 @@
 // the failure being guarded against is a door that quietly never locks.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -83,7 +83,9 @@ if (builder && everyM) {
         from: function (f) {
           if (!f) { return null; }
           return {
-            lock: function (on) { lockCalls++; locks[f.id] = !!on; }
+            lock: function (on) { lockCalls++; locks[f.id] = !!on; },
+            // A door nobody has touched reads unlocked, as vanilla ships most.
+            isLocked: function () { return !!locks[f.id]; }
           };
         }
       }
@@ -159,7 +161,7 @@ if (builder && everyM) {
     const w = world();
     w.loaded[A] = true;
     w.frame({ shut: [], open: [A], at: 1 });
-    yes('starting unlocked', w.locks[A] === false);
+    yes('starting unlocked', !w.locks[A]);
 
     // Somebody locks it. The server pushes a new list, a moment later.
     w.clock.now += 50;
@@ -171,6 +173,37 @@ if (builder && everyM) {
     w.clock.now += 50;
     w.frame({ shut: [], open: [A], at: 3 });
     yes('and so does unlocking it', w.locks[A] === false);
+  }
+
+  /*
+    ----------------------------- THE HEARTBEAT LEAVES A RIGHT DOOR ALONE (#963)
+
+    lock() fires the game's lockChanged event even when the door is already
+    that way, and the front plugin answers each one with a log line and a
+    blockActivation. The dev log of 28 September has the same open door
+    "opened" twice every four seconds, 408 ms of the frame in 30 s, worst
+    229 ms. So a heartbeat over doors already right calls lock() not at all,
+    and a door that went wrong in between (a lock picked open) is still fixed.
+  */
+  {
+    const w = world();
+    w.loaded[A] = true; w.loaded[B] = true;
+    w.frame({ shut: [A], open: [B], at: 1 });
+    yes('the first pass locks the shut door and leaves the open one, already open, alone',
+        w.locks[A] === true && w.locks[B] === undefined && w.counts().lockCalls === 1);
+    w.reset();
+    for (let beat = 0; beat < 15; beat++) {         // a minute of heartbeats
+      w.clock.now += EVERY;
+      w.frame({ shut: [A], open: [B], at: 1 });
+    }
+    yes('a minute of heartbeats over doors already right calls lock() no times (' +
+        w.counts().lockCalls + ')', w.counts().lockCalls === 0);
+    w.locks[A] = false;                              // picked open
+    w.locks[B] = true;                               // somebody else's script locked it
+    w.clock.now += EVERY;
+    w.frame({ shut: [A], open: [B], at: 1 });
+    yes('and a door that went wrong between beats is put right on the next one',
+        w.locks[A] === true && w.locks[B] === false && w.counts().lockCalls === 2);
   }
 
   /*
@@ -359,7 +392,7 @@ function liftFn(name) {
       !!wayM && src.indexOf('// ==== WAY_OUT, generated ====') >= 0 &&
       src.indexOf('// ==== end WAY_OUT ====') >= 0);
   let doorsJson = null;
-  try { doorsJson = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'data', 'doors.json'), 'utf8')); }
+  try { doorsJson = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'game', 'data', 'doors.json'), 'utf8')); }
   catch (e) { doorsJson = null; }
   yes('doors.json is readable', !!doorsJson);
   if (wayM && byM && nameM && doorsJson) {

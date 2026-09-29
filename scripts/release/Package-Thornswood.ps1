@@ -45,25 +45,21 @@ param(
     # payload was 14 GB, because Windows would not load an executable that big.
     # It is under a gigabyte now that the mods come from the collection.
     [switch]$OneFile,
-    # The public releases clone. Its version.json is how this build knows which
-    # packs it already has (applied.txt, further down). Left empty it is the
-    # Thornswood-Releases folder beside this repo, where Ship, Publish-Update
-    # and Check-ShipReady already look. It was a path into one home folder, so
-    # only one machine could build an installer that knew its own packs.
+    # The folder holding the live feed. Its version.json is how this build
+    # knows which packs it already has (applied.txt, further down). Left empty
+    # it is this machine's working copy of the live feed,
+    # %LOCALAPPDATA%\Thornswood\feed\main, which every Ship and feed edit
+    # receives from the VPS (Feed-Store.ps1, #907); until #907 it was the
+    # Thornswood-Releases clone beside this repo. It was once a path into one
+    # home folder, so only one machine could build an installer that knew its
+    # own packs.
     # Last in the list so no existing positional argument moves.
     [string]$ReleaseDir = ''
 )
 
 
-# The launcher was SkyrimTogether.exe and is Thornswood.exe now. It replaces
-# itself in place when it updates rather than being reinstalled, so an install
-# made before the rename still carries the old name and both have to be looked
-# for, newest first.
+# The launcher, Thornswood.exe in the launcher folder.
 function Get-LauncherExe([string]$dir) {
-    foreach ($n in 'Thornswood.exe', 'SkyrimTogether.exe') {
-        $p = Join-Path $dir $n
-        if (Test-Path -LiteralPath $p) { return $p }
-    }
     return (Join-Path $dir 'Thornswood.exe')
 }
 
@@ -148,18 +144,18 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # them all again. With neither file there it shipped no applied.txt at all:
 # every one of the 227 packs pending on first launch, and 164 of them point at
 # the private repository. So it stops and says where it looked.
-if (-not $ReleaseDir) { $ReleaseDir = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $Here))) 'Thornswood-Releases' }
+if (-not $ReleaseDir) { $ReleaseDir = Join-Path (Join-Path (Join-Path $env:LOCALAPPDATA 'Thornswood') 'feed') 'main' }
 $vLive = Join-Path $ReleaseDir 'version.json'
 if (-not (Test-Path -LiteralPath $vLive)) {
     Die ("No version.json in $ReleaseDir, so this installer cannot say which packs it already has, " +
          "and everybody who installs from it would be offered every pack ever published. " +
-         "Clone the feed there (git clone https://github.com/EvilPatrick06/Thornswood-Releases.git $ReleaseDir) " +
-         "or pass -ReleaseDir with the folder it is in.")
+         "Any Ship or feed edit on this machine receives the live feed there; or save " +
+         "https://thornswood.net/feed/version.json into a folder and pass -ReleaseDir with it.")
 }
 # ==== end thornswood release feed ====
 
 # ==== thornswood setup stub ====
-# The setup program is compiled by Build-Launcher.ps1 into tools\setup-stub.exe,
+# The setup program is compiled by Build-Launcher.ps1 into out\setup-stub.exe,
 # which git ignores, and this only copies it (Building the installer, below).
 # So it is as new as the last Build-Launcher on this machine, whatever
 # setup\Bootstrap.cs now says. On 25 September the installer went on the site
@@ -181,7 +177,7 @@ function Get-StubRefusal([string]$stub, [string]$src) {
             'with is left alone. From PowerShell 7 in the repo folder, the way Ship runs it: ' +
             '.\scripts\release\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause and then run this again.')
 }
-$stubNow = @((Join-Path $Here '..\..\tools\setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
+$stubNow = @((Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
            Where-Object { Test-Path $_ } | Select-Object -First 1
 $stubWhy = Get-StubRefusal $stubNow (Join-Path $Here '..\..\installer\setup\Bootstrap.cs')
 if ($stubWhy) { Die $stubWhy }
@@ -588,7 +584,7 @@ if (Test-Path $lexe) {
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRST.txt') {
-    # In installer\ beside tools\ since the reorganisation's phase 7 (issue #440).
+    # In installer\ since the reorganisation's phase 7 (issue #440).
     $s = Join-Path (Join-Path $here '..\..\installer') $f
     # All four are in the repository, so a missing one is a wrong path, and an
     # installer without it is broken for everybody (issue #440, phase 0).
@@ -1005,7 +1001,7 @@ $zip = Join-Path $OutDir 'Thornswood-Setup.zip'
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Move-Item $blob $zip
 
-$stub = @((Join-Path $here '..\..\tools\setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
+$stub = @((Join-Path (& (Join-Path $here 'Where.ps1') Out) 'setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
         Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $stub) {
     Head 'Done, but incomplete'
@@ -1026,7 +1022,7 @@ Say "  stub: $stub" 'DarkGray'
 
 # A signed stub cannot take the OneFile payload. Build-Launcher leaves the stub
 # unsigned for that reason; strip here anyway so a hand-signed stub or an older
-# tools\setup-stub.exe does not break Package the way Main did on 27 September
+# out\setup-stub.exe does not break Package the way Main did on 27 September
 # (signtool 0x800700C1 after attach). Sign-Artifact below signs the final Setup.
 $preSig = Get-AuthenticodeSignature -LiteralPath $exe
 if ($preSig -and $preSig.Status -ne 'NotSigned' -and $preSig.SignerCertificate) {
@@ -1052,7 +1048,7 @@ if ($preSig -and $preSig.Status -ne 'NotSigned' -and $preSig.SignerCertificate) 
 }
 
 # ---- one file, payload attached -------------------------------------------
-# STSFX001, then the offset the payload starts at, then its length. Both are
+# TWSFX001, then the offset the payload starts at, then its length. Both are
 # 64 bit and little endian, which is what BinaryReader.ReadInt64 wants on the
 # other side. Written after the copy so a failure here leaves a plain stub
 # rather than a half attached one.
@@ -1065,7 +1061,7 @@ if ($OneFile) {
         try { $fsIn.CopyTo($fsOut, 4MB) } finally { $fsIn.Dispose() }
         $len = (Get-Item $zip).Length
         $bw = New-Object IO.BinaryWriter($fsOut)
-        $bw.Write([Text.Encoding]::ASCII.GetBytes('STSFX001'))
+        $bw.Write([Text.Encoding]::ASCII.GetBytes('TWSFX001'))
         $bw.Write([long]$off)
         $bw.Write([long]$len)
         $bw.Flush()
@@ -1077,10 +1073,10 @@ if ($OneFile) {
 #
 # After the payload is attached, not before. Bootstrap.cs:625-636 already
 # expects this: the certificate lands on the end after the trailer, which is
-# exactly why its loader scans backwards for STSFX001 rather than reading a
+# exactly why its loader scans backwards for TWSFX001 rather than reading a
 # fixed offset from the end.
 #
-# Does nothing without tools\signing.json, so a machine with no certificate
+# Does nothing without records\signing\signing.json, so a machine with no certificate
 # still produces a working, unsigned installer.
 $signer = Join-Path $here 'Sign-Artifact.ps1'
 if (Test-Path -LiteralPath $signer) {
@@ -1128,13 +1124,13 @@ $listing = & $7z l $zip 2>&1
 $ErrorActionPreference = $old
 # Four names, and they are the names this build actually uses.
 #
-# These were still looking for Install-SkyrimTogether.ps1 and
-# SkyrimTogether.exe, from before the rename. The first of those has not
+# These were still looking for the installer script and the launcher exe
+# under their names from before the rename. The first of those had not
 # existed for a long time, so the check failed on every run and reported a
 # missing installer script while the installer itself was fine.
 #
 # The launcher check was worse, because it passed. Somewhere in 22 GB of
-# game build there is a leftover SkyrimTogether.exe, and a bare substring
+# game build there was a leftover exe of the old name, and a bare substring
 # match found it and called it the launcher. A check that answers yes
 # whatever happens is not a check.
 #

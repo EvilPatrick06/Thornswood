@@ -5,7 +5,7 @@
       .\scripts\mods\Clean-Everything.ps1 -Delete      delete it, after you type DELETE
 
   Finds the old installers, build leftovers, temp files, stale backups and old
-  GitHub release assets across this machine, the server and both repositories,
+  GitHub release assets across this machine, the server and the source repository,
   adds up what they are costing, and prints it.
 
   It deletes NOTHING unless you pass -Delete, and even then it asks you to type
@@ -28,9 +28,11 @@
 [CmdletBinding()]
 param(
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Root = 'C:\Thornswood',
-  [string]$Repo = 'EvilPatrick06/Thornswood-Releases',
+  # Another repository whose release assets to look at. Thornswood-Releases
+  # was the default until #907 deleted it.
+  [string]$Repo = '',
   [string]$SourceRepo = 'EvilPatrick06/Thornswood',
   [string]$BackupDir,
   # How many of the newest to keep in each group that has a series.
@@ -53,9 +55,10 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -259,7 +262,7 @@ if ($Github) {
     Say '  winget install --id GitHub.cli' 'DarkGray'
   }
   else {
-    foreach ($r in @($Repo, $SourceRepo)) {
+    foreach ($r in @(@($Repo, $SourceRepo) | Where-Object { $_ })) {
       Say "  $r" 'White'
       $json = & gh api "repos/$r/releases?per_page=100" 2>$null
       if ($LASTEXITCODE -ne 0 -or -not $json) { Say '    could not read it, skipping' 'Yellow'; continue }

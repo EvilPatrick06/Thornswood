@@ -55,16 +55,24 @@ param(
     [string]$Arguments = '',
 
     [string]$VpsHost = '',
-    [string]$VpsUser = 'Administrator',
+    [string]$VpsUser = '',
 
     # Show the script before sending it. Worth doing for anything that writes.
-    [switch]$Show
+    [switch]$Show,
+
+    # A value the script needs and nobody may see: a webhook, a password. It
+    # goes on ssh's standard input, never on a command line, and the script
+    # finds it in $ThornswoodSecret (Send-Secret.ps1, issue #451). Only from
+    # another script (& Remote.ps1 ... -Secret $v), never typed: a value typed
+    # after -Secret is in this shell's history.
+    [string]$Secret
 )
 
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 
@@ -97,6 +105,16 @@ if ($Show) {
     Write-Host '--- sending ---' -ForegroundColor Cyan
     $body -split "`r?`n" | ForEach-Object { Write-Host ("  " + $_) -ForegroundColor DarkGray }
     Write-Host ''
+}
+
+# With a secret, Send-Secret.ps1 sends it: the value on standard input, the
+# script on the command line or, when long, by file, the same as below.
+if ($PSBoundParameters.ContainsKey('Secret')) {
+    . (Join-Path $Here 'Send-Secret.ps1')
+    $sshArgs = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
+    Invoke-ThornswoodSecretRemote -Target "$VpsUser@$VpsHost" -SshArgs $sshArgs -Script $full -Secret $Secret
+    $Secret = $null
+    exit $LASTEXITCODE
 }
 
 $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($full))
@@ -137,15 +155,15 @@ if ($cmd.Length -gt 6000) {
     $rc = 1
     try {
         [IO.File]::WriteAllText($tmp, $full, (New-Object Text.UTF8Encoding($true)))
-        & scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new $tmp "${VpsUser}@${VpsHost}:$far" 2>&1 | Out-Null
+        & scp -o BatchMode=yes -o StrictHostKeyChecking=yes $tmp "${VpsUser}@${VpsHost}:$far" 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "Could not copy the script to $VpsHost. Nothing was run." }
-        & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$VpsUser@$VpsHost" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
+        & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$VpsUser@$VpsHost" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
         $rc = $LASTEXITCODE
-        & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$VpsUser@$VpsHost" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
+        & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$VpsUser@$VpsHost" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
     }
     finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
     exit $rc
 }
 
-& ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$VpsUser@$VpsHost" "powershell -NoProfile -EncodedCommand $encoded" 2>&1
+& ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$VpsUser@$VpsHost" "powershell -NoProfile -EncodedCommand $encoded" 2>&1
 exit $LASTEXITCODE

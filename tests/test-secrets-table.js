@@ -26,12 +26,12 @@
 // row, this fails and says which row to rewrite.
 //
 // Read only. It reads the doc and the source, never a secret file.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const ROOT = path.join(TOOLS_DIR, '..');
+const ROOT = REPO_DIR;
 const CR = String.fromCharCode(13);
 const BS = String.fromCharCode(92);
 
@@ -175,7 +175,7 @@ yes('Install-Bot.ps1 still has -RotateKey and still writes the key into the site
 yes('Set-Door.ps1 still copies the site botKey into door.json',
     /\$c\.botKey/.test(setDoor) && /'door\.json'/.test(setDoor));
 yes('the site still checks botKey on /api/ticket, /api/roster and /api/allowed',
-    /route === '\/api\/ticket'/.test(site) && /p === '\/api\/roster'/.test(site) && /route === '\/api\/allowed'/.test(site) &&
+    /route === '\/api\/ticket'/.test(site) && /(p|route) === '\/api\/roster'/.test(site) && /route === '\/api\/allowed'/.test(site) &&
     site.split('\n').filter(function (l) { return /sameSecret\(.*String\(cfg\.botKey\)\)/.test(l); }).length >= 3);
 
 // Who actually gets in, said once under the table.
@@ -194,11 +194,20 @@ yes('the site still makes secret on first start and signs tickets with it',
 
 // ---------------------------------------------------------------- the bot token ---
 const tok = row(/bot token/i) || ['', '', '', ''];
-yes('the bot token row names both files it lives in and both scripts that write it',
+// Since issue #466 one writer, scripts\vps\Write-BotToken.ps1, puts the token
+// in both files or neither, and every script that takes a token goes through it.
+yes('the bot token row names both files it lives in, the one command and the one writer',
     /config\.json/.test(tok[1]) && /bot\.env\.json/.test(tok[1]) &&
+    /Rotate-BotToken\.ps1/.test(tok[3]) && /Write-BotToken\.ps1/.test(tok[3]) &&
     /Set-DiscordLogin\.ps1/.test(tok[3]) && /Install-Bot\.ps1/.test(tok[3]));
-yes('Set-DiscordLogin.ps1 and Install-Bot.ps1 still each write the token',
-    /\$d\.botToken = \$botToken/.test(read('scripts/deploy/Set-DiscordLogin.ps1')) && /DISCORD_TOKEN'\] = /.test(installBot));
+const tokenWriter = read('scripts/vps/Write-BotToken.ps1');
+yes('Write-BotToken.ps1 still writes DISCORD_TOKEN and discord.botToken together',
+    /\$env2\['DISCORD_TOKEN'\] = \$Token/.test(tokenWriter) && /\$d\['botToken'\] = \$Token/.test(tokenWriter));
+yes('Rotate-BotToken.ps1, Set-DiscordLogin.ps1 and Install-Bot.ps1 all hand the token to it',
+    ['scripts/deploy/Rotate-BotToken.ps1', 'scripts/deploy/Set-DiscordLogin.ps1', 'scripts/deploy/Install-Bot.ps1']
+      .every(function (f) { return /Write-ThornswoodBotToken -Token/.test(read(f)); }) &&
+    !/\$d\.botToken = \$botToken/.test(read('scripts/deploy/Set-DiscordLogin.ps1')) &&
+    !/DISCORD_TOKEN'\] = /.test(installBot));
 
 // ------------------------------------------------------------------- the voice ---
 const vk = row(/voice/i) || ['', '', '', ''];
@@ -249,7 +258,7 @@ const scripts = {};
 const missing = Object.keys(scripts).filter(function (s) {
   return !['release', 'deploy', 'vps', 'ops', 'mods', 'dev'].some(function (a) { return exists('scripts/' + a + '/' + s); }) && !exists('bot/' + s);
 });
-missing.forEach(function (s) { console.log('      named but not in tools: ' + s); });
+missing.forEach(function (s) { console.log('      named but not in scripts: ' + s); });
 yes('every script the section names is in scripts, ' + Object.keys(scripts).length + ' of them',
     Object.keys(scripts).length >= 10 && missing.length === 0);
 
@@ -260,7 +269,7 @@ function ticks(text) {
 const local = [];
 rows.forEach(function (r) {
   ticks(r[1]).forEach(function (t) {
-    if (t.indexOf('tools' + BS) === 0 || t.indexOf('bot' + BS) === 0 || t === 'server-secret.txt') local.push(t);
+    if (t.indexOf('local' + BS) === 0 || t.indexOf('bot' + BS) === 0 || t === 'records' + BS + 'signing' + BS + 'signing.json' || t === 'server-secret.txt') local.push(t);
   });
 });
 let gitOk = true;
@@ -302,7 +311,7 @@ const unknown = [];
 let placed = 0;
 rows.forEach(function (r) {
   ticks(r[1]).forEach(function (t) {
-    if (t.indexOf(BS) < 0 || t.indexOf('tools' + BS) === 0) return;
+    if (t.indexOf(BS) < 0 || t.indexOf('local' + BS) === 0 || t.indexOf('records' + BS) === 0) return;
     const parts = t.split(BS);
     placed++;
     if (/^[A-Za-z]:$/.test(parts[0])) {

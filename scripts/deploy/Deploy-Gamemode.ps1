@@ -74,8 +74,8 @@ param(
         -Npcs interior   only inside, so towns are alive and the roads are not.
         -Npcs all        the default, everything.
 
-      Off is not a downgrade to the Skyrim Together behaviour: that was
-      everybody getting their own private copy. Off is nobody getting one.
+      Off is not a downgrade to the old multiplayer mod's behaviour: that
+      was everybody getting their own private copy. Off is nobody getting one.
     #>
     [ValidateSet('all', 'interior', 'off')][string]$Npcs = 'all',
 
@@ -133,10 +133,12 @@ param(
     #>
     [long[]]$Devs        = @(),
     [long[]]$Playtesters = @(),
-    # The launcher whose config.json holds MaxOnline, the number the live feed
-    # announces and this writes as maxPlayers. Empty means the one
-    # Publish-Update.ps1 would find. See MaxOnline.ps1.
-    [string]$LauncherRoot = '',
+    # thornswoodRequirePass for the live server (#937): on ends a session that
+    # shows no join pass from an up to date launcher, off only logs WOULD
+    # REFUSE. Left off, the built settings keep what they have. Live goes on
+    # only when Patrick says Main.
+    [ValidateSet('', 'on', 'off')]
+    [string]$RequirePass = '',
     # Deploy even though the collection installed here is behind the one
     # Vortex knows is out. For the case where that is deliberate; it is a
     # refusal rather than a warning because a warning in a long run is a line
@@ -246,12 +248,11 @@ if (-not (Test-Path -LiteralPath $Dist)) {
     )
 }
 
-# How many the server seats, read before anything is written, so a number the
-# engine would refuse stops this with the build untouched. MaxOnline.ps1 says
-# where the number lives and why there.
+# How many the server holds at once, read before anything is written, so a
+# number the engine would refuse stops this with the build untouched.
+# MaxOnline.ps1 says where the number lives (records\most-online.json) and why.
 . (Join-Path $Here 'MaxOnline.ps1')
-if (-not $LauncherRoot) { $LauncherRoot = Find-LauncherRoot }
-$maxOnline = Get-MaxOnline $LauncherRoot
+$maxOnline = Get-MostOnline
 
 # Syntax first, as Deploy-DevGamemode.ps1 does. A gamemode that does not parse
 # stops the live server at start, and a live deploy is not always preceded by a
@@ -528,8 +529,9 @@ $s | Add-Member -NotePropertyName name        -NotePropertyValue $ServerName -Fo
 $s | Add-Member -NotePropertyName port        -NotePropertyValue $Port       -Force
 $s | Add-Member -NotePropertyName offlineMode -NotePropertyValue $true       -Force
 $s | Add-Member -NotePropertyName dataDir     -NotePropertyValue 'data'      -Force
-# How many it seats: the engine's slot count, set from the MaxOnline the feed
-# announces rather than left at whatever the build put there (100).
+# How many it holds at once (#481): thornswoodMostOnline for the gamemode and
+# the engine's slot count a few seats above it for staff, from
+# records\most-online.json rather than whatever the build put there (100).
 Set-MaxPlayers $s $maxOnline
 
 <#
@@ -569,11 +571,28 @@ if ($s.PSObject.Properties.Name -contains 'thornswoodVoicePort' -and
     Write-Host '  A value that is not ours here means a dev deploy was pointed at this folder.' -ForegroundColor DarkGray
 }
 $s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
-# Server-simulated NPCs. Off is SkyMP's default and it is the Skyrim Together
-# behaviour we are leaving behind: everyone gets their own private copy of every
+# Which server a join pass must name (#937). Asserted for the same reason as
+# the voice port: a dev deploy pointed at this folder writes dev here, and the
+# live server would then refuse every pass the site issues for it.
+$s | Add-Member -NotePropertyName thornswoodServer -NotePropertyValue 'main' -Force
+if ($RequirePass) {
+    $s | Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue ($RequirePass -eq 'on') -Force
+}
+Write-Host ("  join pass: {0}" -f $(if ($s.thornswoodRequirePass -eq $true) { 'required' } else { 'watched only, nobody refused' })) -ForegroundColor DarkGray
+# Server-simulated NPCs. Off is SkyMP's default and it is the old multiplayer
+# mod's behaviour we are leaving behind: everyone gets their own private copy of every
 # bandit. On means one shared world. npcSettings stays empty, which is "no
 # per-NPC overrides", not "no NPCs".
 $s | Add-Member -NotePropertyName npcEnabled  -NotePropertyValue ($Npcs -ne 'off') -Force
+# The people, not only the animals (#956). The engine refuses anyone in a
+# hold's crime faction (every guard, nearly every townsperson) and anyone
+# essential, protected or unique (every named shopkeeper and resident) unless
+# these two say otherwise, and nothing wrote them, so the world had its animals
+# and few of its people. Over the dev load order the server binary loads 1406
+# of 4942 Skyrim.esm people with both off and 3274 with both on.
+# Deploy-DevGamemode.ps1 sets the same two on the dev box.
+$s | Add-Member -NotePropertyName npcAllowCrimeFaction -NotePropertyValue $true -Force
+$s | Add-Member -NotePropertyName npcAllowEssential -NotePropertyValue $true -Force
 
 # WHAT YOU ARE WEARING STAYS ON. Measured 20 September, after Patrick rejoined
 # an existing character and arrived with nothing on.
@@ -663,20 +682,35 @@ $s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue 
 # Off, the unknown item is dropped and the rest of the update is kept.
 $s | Add-Member -NotePropertyName equipmentInventoryCheckEnabled -NotePropertyValue $false -Force
 <#
-  npcSettings.default is where the two spawn flags actually live.
+  NO "default" KEY INSIDE npcSettings, EVER. It emptied both worlds.
 
-  ScampServer reads them from INSIDE npcSettings (it used to read them from the
-  root, which is a Thornswood fix already in the fork). An empty object leaves
-  both true, which is every NPC everywhere.
+  ScampServer.cpp reads npcSettings.default for the two flags, and then ALSO
+  puts every key of npcSettings, "default" included, into the per-plugin map.
+  WorldState::IsNpcAllowed walks that map looking for each key among the
+  loaded plugin file names, and returns false the moment a key is not one. No
+  plugin is called "default", so every NPC in every plugin was refused before
+  its flags were ever read. Measured 28 September with the server binary
+  itself (scam_native.node) over the Skyrim.esm and Update.esm form range:
+  npcSettings {} loads 6015 actors, {"default": {both true}} loads 0,
+  {"default": {interior only}} loads 0. Patrick, 28 September: "NPCs are
+  actually not working right now for some reason and they should be".
+
+  So the shape written here is one the engine reads the way it is meant:
+    -Npcs all       {}, no overrides, which is every NPC everywhere
+    -Npcs interior  one entry per plugin in this load order, inside only
+                    (the same measurement: 2498 actors, all of them indoors)
+    -Npcs off       {}, and npcEnabled false above does the work
+  Every key has to be a file name exactly as the load order spells it,
+  because one key that is not a loaded plugin refuses everything again.
 #>
-$npcDefault = [pscustomobject]@{
-    spawnInInterior = ($Npcs -ne 'off')
-    spawnInExterior = ($Npcs -eq 'all')
+$npcTable = [ordered]@{}
+if ($Npcs -eq 'interior') {
+    foreach ($p in $paths) {
+        $npcTable[[IO.Path]::GetFileName($p)] = [pscustomobject]@{ spawnInInterior = $true; spawnInExterior = $false }
+    }
 }
-$s | Add-Member -NotePropertyName npcSettings -NotePropertyValue ([pscustomobject]@{
-    default = $npcDefault
-}) -Force
-Write-Host "  NPCs: $Npcs (interior $($npcDefault.spawnInInterior), exterior $($npcDefault.spawnInExterior))" -ForegroundColor DarkGray
+$s | Add-Member -NotePropertyName npcSettings -NotePropertyValue ([pscustomobject]$npcTable) -Force
+Write-Host ("  NPCs: $Npcs (npcEnabled $($Npcs -ne 'off'), {0} per-plugin entries, no default key)" -f $npcTable.Count) -ForegroundColor DarkGray
 
 <#
   What a blow is worth. See -HitsOnPeople and -HitsOnNpcs above.

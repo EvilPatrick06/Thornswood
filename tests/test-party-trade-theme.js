@@ -33,19 +33,19 @@
 // pass on the old files and the new ones alike.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 function read(...bits) {
-  return fs.readFileSync(path.join(TOOLS_DIR, ...bits), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join(REPO_DIR, ...bits), 'utf8').split(CR).join('');
 }
 const SRC = {
-  party: read('..', 'game', 'ui', 'thornswood-party.js'),
-  trade: read('..', 'game', 'ui', 'thornswood-trade.js'),
-  journal: read('..', 'game', 'ui', 'thornswood-journal.js')
+  party: read('game', 'ui', 'thornswood-party.js'),
+  trade: read('game', 'ui', 'thornswood-trade.js'),
+  journal: read('game', 'ui', 'thornswood-journal.js')
 };
-const skillsSrc = read('..', 'game', 'ui', 'thornswood-skills.js');
+const skillsSrc = read('game', 'ui', 'thornswood-skills.js');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -137,7 +137,10 @@ function load(name) {
   };
   const win = {
     skyrimPlatform: { sendMessage(to, what) { page.told.push(to + ' ' + what); } },
-    thornswoodNet: { say(line) { page.sent.push(line); return true; } }
+    thornswoodNet: { say(line) { page.sent.push(line); return true; } },
+    // The journal is scaled to the screen (test-journal-scale.js holds that).
+    innerWidth: 1920, innerHeight: 1080,
+    addEventListener() { }
   };
   new Function('window', 'document', SRC[name])(win, doc);
   page.win = win;

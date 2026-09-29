@@ -50,9 +50,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $RulesPath) { $RulesPath = Join-Path $Here '..\scripts\release\Ship-Rules.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RulesPath) { $RulesPath = Join-Path $Here 'scripts\release\Ship-Rules.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -165,15 +165,6 @@ foreach ($rel in @(
 Yes 'a folder whose name only ends the same way is not taken for it' (-not (Test-ShipRuntime 'Data\NotClaude outputs\x.txt'))
 
 # ---- another server's folders ------------------------------------------------
-#
-# Skyrim Together Reborn's folder moved out of the runtime list on 23
-# September. A runtime path is swept off every install that has it, and this
-# is somebody else's install; the rule is never shipped, never removed.
-$str = 'Data\SkyrimTogetherReborn\logs\client.log'
-Yes "$str is another server's" (Test-ShipOtherServer $str)
-Yes '  and is not swept off anybody as a runtime file' (-not (Test-ShipRuntime $str))
-Yes '  and the folder itself counts' (Test-ShipOtherServer 'Data\SkyrimTogetherReborn')
-Yes 'a sibling folder whose name only starts the same way is not caught' (-not (Test-ShipOtherServer 'Data\SkyrimTogetherRebornExtras\x.esp'))
 Yes 'NirnLab UI Platform is kept out' (Test-ShipOtherServer 'Data\NirnLabUIPlatform\CEFSubprocess.exe')
 Yes '  and its plugin' (Test-ShipOtherServer 'Data\SKSE\Plugins\NirnLabUIPlugin.dll')
 Yes "Keizaal's parked Creation Club archives are kept out" (Test-ShipOtherServer 'Data\_disabledByKzl\ccBGSSSE001-Fish.bsa')
@@ -190,6 +181,17 @@ Yes "$map is never shipped" (Test-ShipOtherServer $map)
 Yes '  whatever case it is written in' (Test-ShipOtherServer 'Data\Interface\MAP.SWF')
 Yes '  and every pack deletes it from every install' ($always -contains $map)
 Yes 'the other Interface files still ship' (-not (Test-ShipOtherServer 'Data\Interface\quest_journal.swf'))
+
+# ---- SkyUI 5.2's loose scripts and SkyUI's ERROR CODE 6, issue #960 ------------
+#
+# Dev packs carried them, so every pack deletes them as well as leaving them out.
+foreach ($s in @('Data\Scripts\ski_main.pex', 'Data\Scripts\ski_widgetmanager.pex', 'Data\Scripts\ski_configmenu.pex')) {
+    Yes "$s is never shipped" (Test-ShipOtherServer $s)
+    Yes '  and every pack deletes it from every install' ($always -contains $s)
+}
+Yes 'SkyUI 5.2''s scripts match in any case' (Test-ShipOtherServer 'Data\Scripts\SKI_Main.pex')
+Yes 'MCM Recorder''s SKI_ConfigBase.pex still ships as the collection''s' (-not (Test-ShipOtherServer 'Data\Scripts\SKI_ConfigBase.pex') -and $always -notcontains 'Data\Scripts\SKI_ConfigBase.pex')
+Yes '  and so does its SKI_ConfigManager.pex' (-not (Test-ShipOtherServer 'Data\Scripts\SKI_ConfigManager.pex'))
 
 # ---- Data\Platform: ours is what we name --------------------------------------
 Yes 'our overlays in Plugins ship' (-not (Test-ShipOtherServer 'Data\Platform\Plugins\thornswood-chat.js'))
@@ -319,7 +321,7 @@ Yes 'and so does our own plugin' (-not (Test-ShipMachine 'Data\Thornswood-Conten
 # From the line that starts the two lists to the line that filters removals by
 # Test-Machine, plus Test-Machine itself. If either is renamed this fails
 # rather than quietly testing nothing.
-$pubPath = Join-Path $Here '..\scripts\release\Publish-Update.ps1'
+$pubPath = Join-Path $Here 'scripts\release\Publish-Update.ps1'
 $pub = Get-Content -LiteralPath $pubPath -Raw
 $tm = [regex]::Match($pub, '(?m)^function Test-Machine\(.*$')
 $diff = [regex]::Match($pub, '(?ms)^\$changed = @\(\); \$removed = @\(\)\r?$.*?^\$removed\s+= @\(\$removed \| Where-Object \{[^\r\n]*Test-Machine[^\r\n]*\r?$')
@@ -351,7 +353,7 @@ Yes 'the lifted diff is live: a mesh that really went is still removed' ($remove
 Yes 'and our overlay is neither changed nor removed' (($changed -notcontains 'Data\Platform\Plugins\thornswood-hud.js') -and ($removed -notcontains 'Data\Platform\Plugins\thornswood-hud.js'))
 
 # ---- the installer asks the same question ----------------------------------------
-$pkg = Get-Content -LiteralPath (Join-Path $Here '..\scripts\release\Package-Thornswood.ps1') -Raw
+$pkg = Get-Content -LiteralPath (Join-Path $Here 'scripts\release\Package-Thornswood.ps1') -Raw
 Yes 'Package-Thornswood.ps1 dot-sources Ship-Rules.ps1' ($pkg -match '\. \(Join-Path \$Here ''Ship-Rules\.ps1''\)')
 Yes 'and its filter loop leaves out what Test-ShipMachine claims' ($pkg -match 'if \(Test-ShipMachine \$rel\) \{')
 Yes 'and it reports the loose art it is about to ship' ($pkg -match '\$loose = Get-ShipLooseArt \$ship')
@@ -389,12 +391,12 @@ $none = Get-ShipLooseArt @((Row 'Data\meshes\interface\logo\logo.nif' 1), (Row '
 Yes 'nothing to report is an empty list, not nothing' (($null -ne $none) -and $none.Count -eq 0)
 $one = Get-ShipLooseArt @((Row 'Data\meshes\MCE\robe.nif' 29))
 Yes 'one folder is still a list of one' ($one.Count -eq 1 -and $one[0].Folder -eq 'Data\meshes\MCE' -and $one[0].Bytes -eq 29)
-Yes 'the three files Go.ps1 writes are the three called ours' ((@($ShipOwnArt) | Where-Object { (Get-Content -LiteralPath (Join-Path $Here '..\scripts\release\Go.ps1') -Raw).Contains("'" + $_ + "'") }).Count -eq 3)
+Yes 'the three files Go.ps1 writes are the three called ours' ((@($ShipOwnArt) | Where-Object { (Get-Content -LiteralPath (Join-Path $Here 'scripts\release\Go.ps1') -Raw).Contains("'" + $_ + "'") }).Count -eq 3)
 
 # ---- measured on this machine, where it can be ------------------------------------
 $baseline = $null
 foreach ($cand in @(
-    (Join-Path (Split-Path -Parent (Split-Path -Parent $Here)) 'Thornswood-Releases\published.json'),
+    (Join-Path (Split-Path -Parent ($Here)) 'Thornswood-Releases\published.json'),
     (Join-Path $env:LOCALAPPDATA 'Thornswood\published.json')
 )) {
     if ($cand -and (Test-Path -LiteralPath $cand)) { $baseline = $cand; break }

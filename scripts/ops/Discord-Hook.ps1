@@ -43,11 +43,22 @@ function OnVps([string]$body) {
     return @{ Code = $LASTEXITCODE; Out = $out }
 }
 
+# The webhook goes on ssh's standard input and the script finds it in
+# $ThornswoodSecret (Remote.ps1 -Secret, issue #451). It used to be written
+# into the script, which put it on the command line of ssh here and of
+# powershell on the VPS.
+function OnVpsWith([string]$body, [string]$value) {
+    $ErrorActionPreference = 'Continue'
+    $out = @(& $RemoteScript $body -Secret $value 2>&1 | ForEach-Object { "$_" })
+    return @{ Code = $LASTEXITCODE; Out = $out }
+}
+
 if ($Save) {
     $url = $Save.Trim()
     if ($url -notmatch $shape) { Write-Host 'STOP. That is not a Discord webhook address. Nothing was saved.' -ForegroundColor Red; exit 1 }
-    $r = OnVps ("`$d = 'C:\Thornswood-Bot\webhooks'; New-Item -ItemType Directory -Force -Path `$d | Out-Null; " +
-                "[IO.File]::WriteAllText('$far', '$url', (New-Object Text.UTF8Encoding(`$false))); 'SAVED'")
+    $r = OnVpsWith ("`$u = `$ThornswoodSecret; `$ThornswoodSecret = `$null; if (-not `$u) { 'NOTHING ARRIVED'; return }; " +
+                    "`$d = 'C:\Thornswood-Bot\webhooks'; New-Item -ItemType Directory -Force -Path `$d | Out-Null; " +
+                    "[IO.File]::WriteAllText('$far', `$u, (New-Object Text.UTF8Encoding(`$false))); `$u = `$null; 'SAVED'") $url
     $url = $null; $Save = $null
     if ($r.Code -ne 0 -or -not ($r.Out -contains 'SAVED')) { Write-Host 'STOP. The VPS did not take it; nothing was saved there. Is this machine''s ssh key on it (.\scripts\vps\Setup-SshKey.ps1 -Test)?' -ForegroundColor Red; exit 1 }
     if (Test-Path -LiteralPath $local) { Remove-Item -LiteralPath $local -Force }

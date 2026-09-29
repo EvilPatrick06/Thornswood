@@ -266,14 +266,116 @@ function voicePort() {
 /** Run fn, swallow and report anything it throws. Handlers must never escape. */
 function guard(name, fn) {
   return function () {
+    let began = null;
+    try { began = process.hrtime(); } catch (e) { began = null; }
     try {
       return fn.apply(null, arguments);
     } catch (e) {
       console.error('[thornswood] ' + name + ' threw: ' + (e && e.stack ? e.stack : e));
       return undefined;
+    } finally {
+      // Counted for the minute line below. Never allowed to throw: a finally
+      // that throws would replace what the handler returned.
+      try {
+        if (began) {
+          const d = process.hrtime(began);
+          const ms = d[0] * 1000 + d[1] / 1e6;
+          const row = gmSpent[name] || (gmSpent[name] = { ms: 0, runs: 0, worst: 0 });
+          row.ms += ms; row.runs++;
+          if (ms > row.worst) { row.worst = ms; }
+        }
+      } catch (e) { }
     }
   };
 }
+
+/*
+  WHERE THE SERVER'S TIME GOES, one line a minute in thornswood.log. Issue #385.
+
+  "Dev is laggy" had two suspects, the NPCs the server keeps alive and what it
+  sends about every actor, and no number from the server for either: the
+  engine times its own tick, but only behind /metrics, which answers 401 on
+  both servers. So the gamemode reports it, because it runs in the same
+  process as the engine:
+
+    process   the whole server's CPU as a share of one core: the engine's tick,
+              its NPCs and networking, and this file, all together
+    gamemode  the part of that spent inside guard(), which wraps every event
+              handler and most of the timers here
+    loop      how late the event loop ran, p50, p99 and worst. The engine's
+              tick runs on this loop, so a slow tick shows up here as delay
+    and the five costliest handlers, with their worst single call.
+
+  READ IT AS a before and after in one place: stand in the same spot with the
+  NPCs on and off, and the process and loop figures say whether the server
+  side moved. Process high with gamemode low is the engine. Loop worst high is
+  a tick that stalls, which people feel as others jumping about. Every minute
+  while somebody is on, every ten when nobody is, so an idle server still
+  leaves a baseline. Reads only; it changes nothing the server does.
+*/
+const gmSpent = {};
+try { (function () {
+  const EVERY_MS = 60000;
+  const IDLE_EVERY = 10;
+  let loop = null;
+  try {
+    loop = require('perf_hooks').monitorEventLoopDelay({ resolution: 5 });
+    loop.enable();
+  } catch (e) { loop = null; }
+
+  const g = globalThis;
+  if (g.__thornswoodServerBeat) {
+    try { clearInterval(g.__thornswoodServerBeat.timer); } catch (e) { }
+    try { if (g.__thornswoodServerBeat.loop) { g.__thornswoodServerBeat.loop.disable(); } } catch (e) { }
+  }
+  let cpuWas = process.cpuUsage();
+  let wasAt = Date.now();
+  let quiet = 0;
+
+  function beat() {
+    let on = 0;
+    try { on = (mp.get(0, 'onlinePlayers') || []).length; } catch (e) { on = 0; }
+    if (!on && ++quiet < IDLE_EVERY) { return; }
+    quiet = 0;
+    const now = Date.now();
+    const secs = Math.max(1, (now - wasAt) / 1000);
+    const cpu = process.cpuUsage(cpuWas);
+    cpuWas = process.cpuUsage();
+    wasAt = now;
+
+    const rows = [];
+    let gm = 0;
+    for (const k in gmSpent) {
+      if (!Object.prototype.hasOwnProperty.call(gmSpent, k)) { continue; }
+      const r = gmSpent[k];
+      if (r.runs) { rows.push({ k: k, ms: r.ms, runs: r.runs, worst: r.worst }); gm += r.ms; }
+      r.ms = 0; r.runs = 0; r.worst = 0;
+    }
+    rows.sort(function (a, b) { return b.ms - a.ms; });
+
+    const pct = function (ms) { return (ms / secs / 10).toFixed(1) + '%'; };
+    let lag = 'loop not measured';
+    if (loop) {
+      const q = function (p) { return (loop.percentile(p) / 1e6).toFixed(1); };
+      lag = 'loop late p50 ' + q(50) + 'ms p99 ' + q(99) + 'ms worst ' +
+            (loop.max / 1e6).toFixed(0) + 'ms';
+      loop.reset();
+    }
+    let rss = 0;
+    try { rss = Math.round(process.memoryUsage().rss / 1048576); } catch (e) { rss = 0; }
+
+    log('server: ' + Math.round(secs) + 's, ' + on + ' on, process ' +
+        pct((cpu.user + cpu.system) / 1000) + ' of one core, gamemode ' + pct(gm) +
+        ', ' + lag + ', ' + rss + ' MB; costliest: ' +
+        (rows.slice(0, 5).map(function (r) {
+          return r.k + ' ' + r.ms.toFixed(0) + 'ms/' + r.runs + ' worst ' + r.worst.toFixed(1) + 'ms';
+        }).join('; ') || 'nothing ran'));
+  }
+
+  g.__thornswoodServerBeat = { timer: setInterval(function () {
+    try { beat(); } catch (e) { }
+  }, EVERY_MS), loop: loop, beat: beat };
+})(); } catch (e) { log('the minute line is off: ' + e); }
 
 /** Runtime form id for a descriptor, or 0 if the plugin is not loaded. */
 function idOf(descriptor) {
@@ -467,8 +569,12 @@ function resolveArrival(site) {
 
 function ensureProperties() {
   try {
+    // Seen by its owner, the same as the character property the K panel
+    // reads: an old trade left here by migrate() is still on their screen
+    // (issue #509). Neighbours see nothing. makeProperty cannot change a
+    // property already made, so this takes a real restart, not a hot reload.
     mp.makeProperty(CHARGEN_PROPERTY, {
-      isVisibleByOwner: false,
+      isVisibleByOwner: true,
       isVisibleByNeighbors: false,
       updateOwner: '',
       updateNeighbor: '',
@@ -1249,11 +1355,11 @@ function ensureProperties() {
     "a511:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
     "310b:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
     "306b:HearthFires.esm": { "ore": "306c:HearthFires.esm", "name": "Quarried Stone", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "3863e:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "3863d:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "3863e:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
+    "3863d:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
     "377ee:Dragonborn.esm": { "ore": "2b06b:Dragonborn.esm", "name": "Stalhrim", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
     "32cd6:Dragonborn.esm": { "ore": "2b06b:Dragonborn.esm", "name": "Stalhrim", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "295cb:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
+    "295cb:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
     "28ea2:Dragonborn.esm": { "ore": "63b42:Skyrim.esm", "name": "Ruby", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
     "28ea1:Dragonborn.esm": { "ore": "63b42:Skyrim.esm", "name": "Ruby", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
     "28ea0:Dragonborn.esm": { "ore": "63b42:Skyrim.esm", "name": "Ruby", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
@@ -1266,7 +1372,7 @@ function ensureProperties() {
     "28e92:Dragonborn.esm": { "ore": "63b44:Skyrim.esm", "name": "Sapphire", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
     "28e90:Dragonborn.esm": { "ore": "63b44:Skyrim.esm", "name": "Sapphire", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
     "28e8e:Dragonborn.esm": { "ore": "63b44:Skyrim.esm", "name": "Sapphire", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "1b659:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] }
+    "1b659:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] }
   };
 
   // ==== end ORES_BY_BASE ====
@@ -1446,6 +1552,51 @@ function addItem(actorId, itemDesc, count) {
   if (!found) entries.push({ baseId: baseId, count: count });
   mp.set(actorId, 'inventory', { entries: entries });
   return true;
+}
+
+/*
+  Puts count new actors of the NPC record baseId away units out from where
+  ({ desc, pos, rot }): one straight ahead of the way they face (rot[2], in
+  degrees), several spread round them. Returns { made, why }. Shared by /spawn
+  and the staff block's /spawnat (#959).
+
+  mp.place and not mp.createActor. createActor's first argument is the form
+  id the NEW actor gets, not the record to build it from (PartOne::CreateActor),
+  so it made a bare actor with no base under the troll record's own id, and
+  nothing appeared. mp.place builds an actor from the record, at the middle of
+  Tamriel, and the locationalData set moves it here, the way PlaceAtMe does.
+  Anything that is not an NPC record is refused before it is placed, since a
+  placed object cannot be moved and would stay at the middle of Tamriel.
+*/
+function placeActors(baseId, where, count, away) {
+  let rec = null;
+  try { rec = (mp.lookupEspmRecordById(baseId) || {}).record || null; } catch (e) { rec = null; }
+  if (rec && rec.type && rec.type !== 'NPC_') {
+    return { made: 0, why: 'that record is a ' + rec.type + ', not a creature or a person' };
+  }
+  const facing = Number(where.rot && where.rot[2]) || 0;
+  let made = 0, why = '';
+  for (let s = 0; s < count; s++) {
+    // Skyrim's heading: 0 is north (+y), 90 is east (+x).
+    const ang = (facing / 180) * Math.PI + (s / Math.max(1, count)) * Math.PI * 2;
+    let ref = 0;
+    try {
+      ref = mp.place(baseId);
+      mp.set(ref, 'locationalData', {
+        cellOrWorldDesc: where.desc,
+        pos: [where.pos[0] + Math.sin(ang) * away, where.pos[1] + Math.cos(ang) * away, where.pos[2]],
+        // Turned to face the person who asked for it.
+        rot: [0, 0, (facing + 180) % 360]
+      });
+      made++;
+    } catch (e) {
+      why = String(e && e.message ? e.message : e);
+      // Placed but not moved: it would stand at the middle of Tamriel.
+      if (ref) { try { mp.destroyActor(ref); } catch (e2) { } }
+      break;
+    }
+  }
+  return { made: made, why: why };
 }
 
 function takeItem(actorId, itemDesc, count) {
@@ -4070,7 +4221,7 @@ function beginChoosing(actorId, state, why) {
   closeRaceMenu(actorId);
   const opened = openCreation(actorId);
   /*
-    THE LINE IS FOR THE PANEL THAT DID NOT OPEN, AND FOR NOBODY ELSE.
+    THE PRESS K LINE IS FOR THE PANEL THAT DID NOT OPEN, AND FOR NOBODY ELSE.
 
     Patrick, 21 September: "during creation it shouldnt put in chat to press k
     to begin blah blah because it brings the menu up automically and that is
@@ -4084,11 +4235,17 @@ function beginChoosing(actorId, state, why) {
     then, and it says what has actually happened rather than pretending this is
     the normal greeting.
   */
-  if (!opened) {
-    say(actorId, 'Welcome to Thornswood. The starting panel did not open by ' +
-                 'itself. Press K to choose where you will start. Your class ' +
-                 'and profession can be chosen there too, or later in the world.');
-  }
+  /*
+    AND ONE LINE EITHER WAY, issue #416, once (tellOnce). The pack has just
+    changed under them (giveShift) and the next pick moves them to a town,
+    and neither is on the screen. The welcome is beginAppearance's.
+  */
+  tellOnce(actorId, 'choosing', opened
+    ? 'You have been given plain clothes. Choose a home town, and you will ' +
+      'wake up at its inn.'
+    : 'You have been given plain clothes. The starting panel did not open by ' +
+      'itself. Press K to choose where you will start. Your class and ' +
+      'profession can be chosen there too, or later in the world.');
   log('chargen', actorId.toString(16), '-> choosing (' + why + ')' +
       (opened ? ', panel opened' : ', panel NOT opened'));
 }
@@ -4146,8 +4303,8 @@ function arriveAt(actorId, townKey) {
     spam and is unnescery". That line described what was already on the
     screen. This one is said once, after the one pick that ends creation, and
     it says where the server has just moved them, which nothing else does.
-    Lines for the other steps of creation are his to decide, and none are
-    added here.
+    The other steps have one line each since issue #416, through tellOnce,
+    each saying what changed and not what is already on the screen.
 
     say() and not notify(), whose own comment says it may well do nothing
     from here.
@@ -4336,6 +4493,36 @@ function setChargen(actorId, state) {
   mp.set(actorId, CHARGEN_PROPERTY, state);
 }
 
+/*
+  ONE LINE PER STEP OF CREATION, ONCE PER CHARACTER, issue #416.
+
+  Patrick, 28 September, on these lines: "Yes I want it, the problem was it
+  kept spamming the same message every like 5 seconds". The old creation line
+  was said from the choosing reminder, which runs on a timer and runs again
+  straight away every time the tick sees somebody afresh (a reconnect, a drop
+  out of onlinePlayers, a hot reload emptying firstSeen). A line that rides a
+  timer or a first sighting repeats; a line that rides a stage change should
+  not, but only while the stage write sticks, and chargenTick re-reads the
+  record every 500 ms.
+
+  So the step is written on the record (told) BEFORE the line goes, and the
+  line goes only when the record read back says so. A step already told is
+  never told again, whatever calls this; a write that did not stick says
+  nothing rather than saying it on every tick. A new character is a new actor
+  with no record, so they are told again.
+*/
+function tellOnce(actorId, step, text) {
+  const st = chargenOf(actorId);
+  if (!st || (st.told && st.told[step])) { return false; }
+  st.told = Object.assign({}, st.told);
+  st.told[step] = Date.now();
+  setChargen(actorId, st);
+  const back = chargenOf(actorId);
+  if (!back || !back.told || !back.told[step]) { return false; }
+  say(actorId, text);
+  return true;
+}
+
 /** Add or remove a set of [descriptor, count] pairs in one inventory write. */
 function giveItems(actorId, pairs, sign) {
   const inv = mp.get(actorId, 'inventory') || { entries: [] };
@@ -4427,6 +4614,11 @@ function beginAppearance(actorId) {
   setChargen(actorId, state);
   log('chargen', actorId.toString(16), '-> appearance',
       state.moved ? '(moving to the hall, menu to follow)' : '(already in the hall)');
+  // Issue #416, once (tellOnce): the stone room, and the teleport into it. The
+  // race menu is not described: it is on their screen.
+  tellOnce(actorId, 'hall', state.moved
+    ? 'Welcome to Thornswood. You are going to the creation hall to make your character.'
+    : 'Welcome to Thornswood. This is the creation hall, where you make your character.');
 }
 
 /**
@@ -4557,6 +4749,22 @@ function chargenTick() {
         if (c && c.grantKnown) { c.grantKnown(actorId); }
       } catch (e) {
         log('login', actorId.toString(16), 'could not put the known spells back:', e);
+      }
+
+      // Their own profession, said back to them as they arrive, which proves
+      // the route from the server to the person's own screen (issue #509).
+      try {
+        const c = globalThis.__thornswoodCharacter;
+        const P = globalThis.__thornswoodProgression;
+        const s = c && c.stateOf ? c.stateOf(actorId) : null;
+        const prof = s && s.prof && P && P.has(P.TABLE.professions, s.prof)
+          ? P.TABLE.professions[s.prof] : null;
+        if (prof) {
+          notify(actorId, 'Your profession: ' + prof.name +
+                 (s.half && c.nameOf ? ', ' + c.nameOf(s.half) : '') + '.');
+        }
+      } catch (e) {
+        log('login', actorId.toString(16), 'could not say the profession:', e);
       }
 
       /*
@@ -4712,6 +4920,8 @@ function chargenTick() {
             ', so creation is skipped for them');
         setChargen(actorId, { stage: 'done', at: now, legacy: true });
         closeRaceMenu(actorId);
+        // Issue #416, once (tellOnce): why the race menu shut, if it was up.
+        tellOnce(actorId, 'back', 'Welcome back to Thornswood. This character is already made.');
         continue;
       }
 
@@ -4767,10 +4977,14 @@ function chargenTick() {
         for the case it was written for: the push failed, so there is nothing
         on their screen and a key press is the only way on.
       */
+      //
+      // And said once (tellOnce, issue #416): this is the timer that repeated
+      // the old line, and beginChoosing has already said it on the same step,
+      // so a reminder, a reconnect or a hot reload after that says nothing.
       if (!openCreation(actorId)) {
-        say(actorId, 'The starting panel did not open. Press K to choose where ' +
-                     'you will start. Your class and profession can wait until ' +
-                     'you are there.');
+        tellOnce(actorId, 'choosing', 'The starting panel did not open. Press K ' +
+                     'to choose where you will start. Your class and profession ' +
+                     'can wait until you are there.');
       }
       continue;
     }
@@ -5290,8 +5504,11 @@ mp.onRespawn = guard('onRespawn', function (actorId) {
 });
 
 // No book moves anybody's rank. Patrick, 21 September: rank comes from working
-// the trade and from nothing else. There is no book event here any more and the
-// manuals are gone from the plugin. A book in this world is a book.
+// the trade and from nothing else. The manuals are gone from the plugin and a
+// book in this world is a book. The one book event here, mp.onReadBook at the
+// end of THE STAFF SPELLS, holds a spell tome to the Mage rules (#1026) and
+// records a staff's spell when somebody who makes staves reads its
+// tome (#967), and never touches a rank.
 
 
 // ---------------------------------------------------------------------------
@@ -5429,9 +5646,6 @@ var HARVESTS_BY_BASE = {
   "23cff:Skyrim.esm": { "produce": "23d6f:Skyrim.esm", "name": "Pine Thrush Egg", "rank": "advanced" },
   "2a76:Dawnguard.esm": { "produce": "2a78:Dawnguard.esm", "name": "Yellow Mountain Flower", "rank": "advanced" },
   "2a77:Dawnguard.esm": { "produce": "2a78:Dawnguard.esm", "name": "Yellow Mountain Flower", "rank": "advanced" },
-  "306a:Update.esm": { "produce": "306e:Update.esm", "name": "Screaming Maw", "rank": "master" },
-  "306b:Update.esm": { "produce": "306d:Update.esm", "name": "Rot Scale", "rank": "master" },
-  "306c:Update.esm": { "produce": "306f:Update.esm", "name": "Thorn Hook", "rank": "master" },
   "34d2c:Skyrim.esm": { "produce": "34d32:Skyrim.esm", "name": "Frost Mirriam", "rank": "novice" },
   "34d2d:Skyrim.esm": { "produce": "34d31:Skyrim.esm", "name": "Elves Ear", "rank": "expert" },
   "34d30:Skyrim.esm": { "produce": "34d22:Skyrim.esm", "name": "Garlic", "rank": "novice" },
@@ -6985,7 +7199,6 @@ var HUNTS_BY_BASE = {
   "1e7a4:Skyrim.esm": { "name": "Cave Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
   "1e7a1:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
   "1e7a0:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
-  "3025:Update.esm": { "name": "Rabbit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "count": 1 }] },
   "804:Update.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
   "138b8:Dawnguard.esm": { "name": "Giant Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 2 }] },
   "113c1:Dawnguard.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
@@ -7880,8 +8093,8 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   closing one is generated, so nothing hand written belongs below it.
 */
   // ==== RECIPES_BY_ID ====
-  /* Built by tools\Build-RecipeTable.ps1 out of the game's own records. Do not hand edit.
-     1888 crafting recipes, out of 4525 in tools\recipes.json.
+  /* Built by scripts\dev\Build-RecipeTable.ps1 out of the game's own records. Do not hand edit.
+     1888 crafting recipes, out of 4525 in game\data\recipes.json.
 
      Recipe desc -> what it makes, what kind of record that is, how many it
      makes, which profession and which half of it owns the recipe, and which
@@ -7908,12 +8121,13 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
      reached. Where part of the list is produced by nobody, that is a floor
      and what the output sells for can hold the row higher; where none of it
      is, the price ranks it inside its own half. On this build that is
-     1417 row(s) by what their inputs cost, 176 by price and 291 by how long
+     1578 row(s) by what their inputs cost, 187 by price and 0 by how long
      the shopping list is. That last rule is used for a whole half at a time
-     and only where the first two leave a rung with nothing on it, which here
-     is Cook/Confectioner, Enchanter/Bladebinder, Tailor/Liverywright. A rank there means how long the list is and
-     nothing else, and the half says so in tools\recipes.json.
-     Every row carries rankFrom in tools\recipes.json saying which of the
+     and only where the first two leave a rung with nothing on it, which no
+     half in this build did.
+     119 more row(s) were moved one rung, and no further, to fill an empty
+     rung without the second rule: Cook/Confectioner, Enchanter/Bladebinder, Tailor/Liverywright.
+     Every row carries rankFrom in game\data\recipes.json saying which of the
      three answered for it. Nothing in here is the script's opinion of what a
      thing is worth: classes.md sets no numbers for any of it, and every
      judgement is a named knob at the top of the script that wrote this.
@@ -7924,19 +8138,22 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
      garments. It is read off the output record: a weapon type keyword, one
      of the five armour slot keywords, a clothing slot keyword or a Gourmet
      food type keyword. An output naming two kinds names none and falls to
-     its record type with the ones naming none at all. tools\recipes.json
+     its record type with the ones naming none at all. game\data\recipes.json
      carries familyFrom on every row saying which reading answered, and
      this build has 35 families across the whole table.
 
      open is true when the recipe carries no condition of its own. A row
      with open false needs something first, an item, a spell or a vanilla
      perk nobody here can hold, and Skyrim's own crafting menu decides that
-     before the server is ever asked. tools\recipes.json says which.
+     before the server is ever asked. game\data\recipes.json says which.
+     A staff whose one condition is a spell some tome teaches is open too:
+     the tome is how an Enchanter learns it, and spell names that spell's
+     desc for the staff gate, which reads STAFF_SPELLS below.
 
      A recipe id that is not in here is one nobody owns and anybody may
      make. Tempering is not in here either: the server is never asked about
      it, because CraftService throws the armour table and the sharpening
-     wheel out before it looks at a recipe. tools\recipes.json carries
+     wheel out before it looks at a recipe. game\data\recipes.json carries
      every row, owned and unowned, with the reason for each. */
   var RECIPES_BY_ID = {
     "108cfd:Skyrim.esm": { "out": "68c57:Skyrim.esm", "name": "Nord Hero Bow", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "advanced", "family": "Bows", "open": false },
@@ -8151,15 +8368,15 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "11802:HearthFires.esm": { "out": "11801:HearthFires.esm", "name": "Snowberry Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "novice", "family": "Desserts", "open": false },
     "11800:HearthFires.esm": { "out": "117ff:HearthFires.esm", "name": "Jazbay Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "novice", "family": "Desserts", "open": false },
     "117fe:HearthFires.esm": { "out": "64b43:Skyrim.esm", "name": "Apple Pie", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
-    "117fd:HearthFires.esm": { "out": "353b:HearthFires.esm", "name": "Snowberry Crostata", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
-    "117fc:HearthFires.esm": { "out": "3539:HearthFires.esm", "name": "Juniper Berry Crostata", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
+    "117fd:HearthFires.esm": { "out": "353b:HearthFires.esm", "name": "Snowberry Crostata", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
+    "117fc:HearthFires.esm": { "out": "3539:HearthFires.esm", "name": "Juniper Berry Crostata", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
     "117fb:HearthFires.esm": { "out": "64b3d:Skyrim.esm", "name": "Sweet Roll", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "novice", "family": "Desserts", "open": false },
-    "117fa:HearthFires.esm": { "out": "353a:HearthFires.esm", "name": "Jazbay Crostata", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
-    "117f9:HearthFires.esm": { "out": "3533:HearthFires.esm", "name": "Apple Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "novice", "family": "Desserts", "open": false },
+    "117fa:HearthFires.esm": { "out": "353a:HearthFires.esm", "name": "Jazbay Crostata", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
+    "117f9:HearthFires.esm": { "out": "3533:HearthFires.esm", "name": "Apple Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
     "117f8:HearthFires.esm": { "out": "3537:HearthFires.esm", "name": "Potato Bread", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Bread", "open": false },
     "117f6:HearthFires.esm": { "out": "65c97:Skyrim.esm", "name": "Bread Loaf", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Bread", "open": false },
     "3544:HearthFires.esm": { "out": "353f:HearthFires.esm", "name": "Steamed Mudcrab Legs", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Crab dishes", "open": false },
-    "3543:HearthFires.esm": { "out": "353e:HearthFires.esm", "name": "Clam Chowder", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Chowders", "open": false },
+    "3543:HearthFires.esm": { "out": "353e:HearthFires.esm", "name": "Clam Chowder", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Chowders", "open": false },
     "3542:HearthFires.esm": { "out": "353d:HearthFires.esm", "name": "Potato Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
     "3d581:Dragonborn.esm": { "out": "37564:Dragonborn.esm", "name": "Bonemold Guard Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "expert", "family": "Body armour", "open": false },
     "3d2dd:Dragonborn.esm": { "out": "1cd93:Dragonborn.esm", "name": "Bonemold Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "expert", "family": "Body armour", "open": false },
@@ -8216,203 +8433,100 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "2b051:Dragonborn.esm": { "out": "1cd88:Dragonborn.esm", "name": "Chitin Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Gauntlets", "open": false },
     "2b050:Dragonborn.esm": { "out": "1cd87:Dragonborn.esm", "name": "Chitin Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Body armour", "open": false },
     "2b04f:Dragonborn.esm": { "out": "1cd86:Dragonborn.esm", "name": "Chitin Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Armoured boots", "open": false },
-    "17773:Dragonborn.esm": { "out": "10fcf4:Skyrim.esm", "name": "Staff of Thunderbolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17772:Dragonborn.esm": { "out": "29b87:Skyrim.esm", "name": "Staff of the Storm Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17771:Dragonborn.esm": { "out": "29b86:Skyrim.esm", "name": "Staff of the Frost Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17770:Dragonborn.esm": { "out": "29b85:Skyrim.esm", "name": "Staff of the Flame Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "1776f:Dragonborn.esm": { "out": "29b94:Skyrim.esm", "name": "Minor Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1776e:Dragonborn.esm": { "out": "29b95:Skyrim.esm", "name": "Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "1776d:Dragonborn.esm": { "out": "29b97:Skyrim.esm", "name": "Grand Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "1776c:Dragonborn.esm": { "out": "4dee2:Skyrim.esm", "name": "Staff of Sparks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1776b:Dragonborn.esm": { "out": "be122:Skyrim.esm", "name": "Staff of Soul Trapping", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1776a:Dragonborn.esm": { "out": "29b92:Skyrim.esm", "name": "Staff of Vanquishment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17769:Dragonborn.esm": { "out": "29b7a:Skyrim.esm", "name": "Staff of Greater Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17768:Dragonborn.esm": { "out": "29b9b:Skyrim.esm", "name": "Grand Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17767:Dragonborn.esm": { "out": "29b9a:Skyrim.esm", "name": "Greater Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17766:Dragonborn.esm": { "out": "29b76:Skyrim.esm", "name": "Staff of Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17765:Dragonborn.esm": { "out": "29b8e:Skyrim.esm", "name": "Staff of Inspiration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17764:Dragonborn.esm": { "out": "29b74:Skyrim.esm", "name": "Staff of Lesser Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17763:Dragonborn.esm": { "out": "29b73:Skyrim.esm", "name": "Staff of Paralysis", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17762:Dragonborn.esm": { "out": "be121:Skyrim.esm", "name": "Staff of Magelight", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17761:Dragonborn.esm": { "out": "10fcf2:Skyrim.esm", "name": "Staff of Incineration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17760:Dragonborn.esm": { "out": "10fcf7:Skyrim.esm", "name": "Staff of Icy Spear", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "1775f:Dragonborn.esm": { "out": "29b83:Skyrim.esm", "name": "Staff of Ice Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "1775e:Dragonborn.esm": { "out": "4ded8:Skyrim.esm", "name": "Staff of Ice Spikes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1775d:Dragonborn.esm": { "out": "29b99:Skyrim.esm", "name": "Staff of Mending", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "1775c:Dragonborn.esm": { "out": "29b93:Skyrim.esm", "name": "Staff of the Healing Hand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1775b:Dragonborn.esm": { "out": "29b89:Skyrim.esm", "name": "Staff of Fury", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1775a:Dragonborn.esm": { "out": "4dee1:Skyrim.esm", "name": "Staff of Frostbite", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17759:Dragonborn.esm": { "out": "29b8f:Skyrim.esm", "name": "Staff of Frenzy", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17758:Dragonborn.esm": { "out": "4dee0:Skyrim.esm", "name": "Staff of Flames", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17757:Dragonborn.esm": { "out": "4c6ca:Skyrim.esm", "name": "Staff of Firebolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17756:Dragonborn.esm": { "out": "29b82:Skyrim.esm", "name": "Staff of Fireballs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17755:Dragonborn.esm": { "out": "29b8c:Skyrim.esm", "name": "Staff of Fear", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17754:Dragonborn.esm": { "out": "29b7e:Skyrim.esm", "name": "Staff of Expulsion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17753:Dragonborn.esm": { "out": "29b7c:Skyrim.esm", "name": "Staff of Dread Zombies", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17752:Dragonborn.esm": { "out": "29b88:Skyrim.esm", "name": "Staff of Courage", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17751:Dragonborn.esm": { "out": "29b7d:Skyrim.esm", "name": "Staff of the Storm Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17750:Dragonborn.esm": { "out": "be120:Skyrim.esm", "name": "Staff of the Frost Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "1774f:Dragonborn.esm": { "out": "29b78:Skyrim.esm", "name": "Staff of the Flame Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1774e:Dragonborn.esm": { "out": "29b75:Skyrim.esm", "name": "Staff of the Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1774d:Dragonborn.esm": { "out": "29b7b:Skyrim.esm", "name": "Staff of Daedric Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "1774c:Dragonborn.esm": { "out": "29b84:Skyrim.esm", "name": "Staff of Chain Lightning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "1774b:Dragonborn.esm": { "out": "29b8b:Skyrim.esm", "name": "Staff of Calm", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1774a:Dragonborn.esm": { "out": "29b79:Skyrim.esm", "name": "Staff of Banishing", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17737:Dragonborn.esm": { "out": "4dee3:Skyrim.esm", "name": "Staff of Lightning Bolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
+    "17773:Dragonborn.esm": { "out": "10fcf4:Skyrim.esm", "name": "Staff of Thunderbolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "10f7ee:Skyrim.esm" },
+    "17772:Dragonborn.esm": { "out": "29b87:Skyrim.esm", "name": "Staff of the Storm Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "35d81:Skyrim.esm" },
+    "17771:Dragonborn.esm": { "out": "29b86:Skyrim.esm", "name": "Staff of the Frost Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "35d80:Skyrim.esm" },
+    "17770:Dragonborn.esm": { "out": "29b85:Skyrim.esm", "name": "Staff of the Flame Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "35d7f:Skyrim.esm" },
+    "1776f:Dragonborn.esm": { "out": "29b94:Skyrim.esm", "name": "Minor Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4b146:Skyrim.esm" },
+    "1776e:Dragonborn.esm": { "out": "29b95:Skyrim.esm", "name": "Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "5dd5d:Skyrim.esm" },
+    "1776d:Dragonborn.esm": { "out": "29b97:Skyrim.esm", "name": "Grand Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "5dd5e:Skyrim.esm" },
+    "1776c:Dragonborn.esm": { "out": "4dee2:Skyrim.esm", "name": "Staff of Sparks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2dd2a:Skyrim.esm" },
+    "1776b:Dragonborn.esm": { "out": "be122:Skyrim.esm", "name": "Staff of Soul Trapping", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4dba4:Skyrim.esm" },
+    "1776a:Dragonborn.esm": { "out": "29b92:Skyrim.esm", "name": "Staff of Vanquishment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "4deef:Skyrim.esm" },
+    "17769:Dragonborn.esm": { "out": "29b7a:Skyrim.esm", "name": "Staff of Greater Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "96d94:Skyrim.esm" },
+    "17768:Dragonborn.esm": { "out": "29b9b:Skyrim.esm", "name": "Grand Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "247c86:Odin - Skyrim Magic Overhaul.esp" },
+    "17767:Dragonborn.esm": { "out": "29b9a:Skyrim.esm", "name": "Greater Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "26121c:Odin - Skyrim Magic Overhaul.esp" },
+    "17766:Dragonborn.esm": { "out": "29b76:Skyrim.esm", "name": "Staff of Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "65bd7:Skyrim.esm" },
+    "17765:Dragonborn.esm": { "out": "29b8e:Skyrim.esm", "name": "Staff of Inspiration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4deec:Skyrim.esm" },
+    "17764:Dragonborn.esm": { "out": "29b74:Skyrim.esm", "name": "Staff of Lesser Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "7e8e1:Skyrim.esm" },
+    "17763:Dragonborn.esm": { "out": "29b73:Skyrim.esm", "name": "Staff of Paralysis", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "5ad5f:Skyrim.esm" },
+    "17762:Dragonborn.esm": { "out": "be121:Skyrim.esm", "name": "Staff of Magelight", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "43323:Skyrim.esm" },
+    "17761:Dragonborn.esm": { "out": "10fcf2:Skyrim.esm", "name": "Staff of Incineration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "10f7ed:Skyrim.esm" },
+    "17760:Dragonborn.esm": { "out": "10fcf7:Skyrim.esm", "name": "Staff of Icy Spear", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "10f7ec:Skyrim.esm" },
+    "1775f:Dragonborn.esm": { "out": "29b83:Skyrim.esm", "name": "Staff of Ice Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "45f9c:Skyrim.esm" },
+    "1775e:Dragonborn.esm": { "out": "4ded8:Skyrim.esm", "name": "Staff of Ice Spikes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2b96c:Skyrim.esm" },
+    "1775d:Dragonborn.esm": { "out": "29b99:Skyrim.esm", "name": "Staff of Mending", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "12fd2:Skyrim.esm" },
+    "1775c:Dragonborn.esm": { "out": "29b93:Skyrim.esm", "name": "Staff of the Healing Hand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4d3f2:Skyrim.esm" },
+    "1775b:Dragonborn.esm": { "out": "29b89:Skyrim.esm", "name": "Staff of Fury", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4deeb:Skyrim.esm" },
+    "1775a:Dragonborn.esm": { "out": "4dee1:Skyrim.esm", "name": "Staff of Frostbite", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2b96b:Skyrim.esm" },
+    "17759:Dragonborn.esm": { "out": "29b8f:Skyrim.esm", "name": "Staff of Frenzy", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4deee:Skyrim.esm" },
+    "17758:Dragonborn.esm": { "out": "4dee0:Skyrim.esm", "name": "Staff of Flames", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "12fcd:Skyrim.esm" },
+    "17757:Dragonborn.esm": { "out": "4c6ca:Skyrim.esm", "name": "Staff of Firebolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "12fd0:Skyrim.esm" },
+    "17756:Dragonborn.esm": { "out": "29b82:Skyrim.esm", "name": "Staff of Fireballs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "1c789:Skyrim.esm" },
+    "17755:Dragonborn.esm": { "out": "29b8c:Skyrim.esm", "name": "Staff of Fear", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4deea:Skyrim.esm" },
+    "17754:Dragonborn.esm": { "out": "29b7e:Skyrim.esm", "name": "Staff of Expulsion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "6f952:Skyrim.esm" },
+    "17753:Dragonborn.esm": { "out": "29b7c:Skyrim.esm", "name": "Staff of Dread Zombies", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "96d95:Skyrim.esm" },
+    "17752:Dragonborn.esm": { "out": "29b88:Skyrim.esm", "name": "Staff of Courage", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4dee8:Skyrim.esm" },
+    "17751:Dragonborn.esm": { "out": "29b7d:Skyrim.esm", "name": "Staff of the Storm Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "204c5:Skyrim.esm" },
+    "17750:Dragonborn.esm": { "out": "be120:Skyrim.esm", "name": "Staff of the Frost Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "204c4:Skyrim.esm" },
+    "1774f:Dragonborn.esm": { "out": "29b78:Skyrim.esm", "name": "Staff of the Flame Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "204c3:Skyrim.esm" },
+    "1774e:Dragonborn.esm": { "out": "29b75:Skyrim.esm", "name": "Staff of the Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "640b6:Skyrim.esm" },
+    "1774d:Dragonborn.esm": { "out": "29b7b:Skyrim.esm", "name": "Staff of Daedric Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "6f953:Skyrim.esm" },
+    "1774c:Dragonborn.esm": { "out": "29b84:Skyrim.esm", "name": "Staff of Chain Lightning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "45f9d:Skyrim.esm" },
+    "1774b:Dragonborn.esm": { "out": "29b8b:Skyrim.esm", "name": "Staff of Calm", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4dee9:Skyrim.esm" },
+    "1774a:Dragonborn.esm": { "out": "29b79:Skyrim.esm", "name": "Staff of Banishing", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "6d22c:Skyrim.esm" },
+    "17737:Dragonborn.esm": { "out": "4dee3:Skyrim.esm", "name": "Staff of Lightning Bolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2dd29:Skyrim.esm" },
     "2ba5f3:WindhelmSSE.esp": { "out": "2ba5f0:WindhelmSSE.esp", "name": "Pelt of Karhu", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Body armour", "open": false },
-    "17b5e3:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5df:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Panic", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8168:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd23:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Minor Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a817d:Odin - Skyrim Magic Overhaul.esp": { "out": "21a2f5:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Illusions", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "bae31:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eed:Odin - Skyrim Magic Overhaul.esp", "name": "Greater Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "2a8164:Odin - Skyrim Magic Overhaul.esp": { "out": "293d23:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Corrosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8165:Odin - Skyrim Magic Overhaul.esp": { "out": "293d0c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Vulnerability", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17b5e1:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5dc:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Soothe", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17b5e2:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5dd:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Subjugation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8185:Odin - Skyrim Magic Overhaul.esp": { "out": "2a8184:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Purge Magic", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "2a8172:Odin - Skyrim Magic Overhaul.esp": { "out": "2a305d:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Frosthand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d4350:Odin - Skyrim Magic Overhaul.esp": { "out": "d434f:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Ancestors", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "bae2f:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eeb:Odin - Skyrim Magic Overhaul.esp", "name": "Minor Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a8177:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Arctic Frost", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8173:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7a4:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Ice Shards", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a816a:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd26:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a816b:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd2b:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Major Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a816c:Odin - Skyrim Magic Overhaul.esp": { "out": "1b4e31:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Ursine Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a816d:Odin - Skyrim Magic Overhaul.esp": { "out": "1b4e34:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Mourning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8180:Odin - Skyrim Magic Overhaul.esp": { "out": "23897a:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Damned", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a816f:Odin - Skyrim Magic Overhaul.esp": { "out": "26b480:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Lightning Grasp", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a8169:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd2c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Feline Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8170:Odin - Skyrim Magic Overhaul.esp": { "out": "2a305c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Firehand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a817e:Odin - Skyrim Magic Overhaul.esp": { "out": "21f403:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Mute", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8166:Odin - Skyrim Magic Overhaul.esp": { "out": "293d24:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Corrosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a818b:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7b0:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Tears", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "2a8179:Odin - Skyrim Magic Overhaul.esp": { "out": "26b485:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Shockblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8189:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7ae:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Disintegration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8187:Odin - Skyrim Magic Overhaul.esp": { "out": "21a2f6:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Shadow Legion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "2a816e:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47b:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Arctic Blast", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a8174:Odin - Skyrim Magic Overhaul.esp": { "out": "26b481:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Charged Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e78:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47d:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Taldam's Scorcher", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17b5e4:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5e0:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Bravery", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e7d:Odin - Skyrim Magic Overhaul.esp": { "out": "26b483:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Fireblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "2a8167:Odin - Skyrim Magic Overhaul.esp": { "out": "293d15:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Vulnerability", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8178:Odin - Skyrim Magic Overhaul.esp": { "out": "26b484:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Frostblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8171:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47e:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Flame Darts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8186:Odin - Skyrim Magic Overhaul.esp": { "out": "2100da:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Domination", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "2a817a:Odin - Skyrim Magic Overhaul.esp": { "out": "26b482:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Thundering Grasp", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8176:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47f:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Wildfire", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17b5e5:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5de:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Rage", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "bae30:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eec:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8175:Odin - Skyrim Magic Overhaul.esp": { "out": "7c848:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Stormhand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a817f:Odin - Skyrim Magic Overhaul.esp": { "out": "23386b:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Illusions", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a817b:Odin - Skyrim Magic Overhaul.esp": { "out": "22963a:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Crying Eyes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a817c:Odin - Skyrim Magic Overhaul.esp": { "out": "20afcf:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2c16a7:Odin - Skyrim Magic Overhaul.esp": { "out": "2c16a6:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Hush", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a818a:Odin - Skyrim Magic Overhaul.esp": { "out": "2611f4:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a8188:Odin - Skyrim Magic Overhaul.esp": { "out": "23897b:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of the Damned", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "2a8181:Odin - Skyrim Magic Overhaul.esp": { "out": "21f40c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Wizard Rend", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8163:Odin - Skyrim Magic Overhaul.esp": { "out": "293d09:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Horsemanship", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "8a4:Gourmet.esp": { "out": "64b30:Skyrim.esm", "name": "Boiled Creme Treat", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "novice", "family": "Desserts", "open": false },
-    "80e:Gourmet.esp": { "out": "3533:HearthFires.esm", "name": "Apple Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "novice", "family": "Desserts", "open": false },
-    "80f:Gourmet.esp": { "out": "80d:Gourmet.esp", "name": "Juniper Berry Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "novice", "family": "Desserts", "open": false },
-    "811:Gourmet.esp": { "out": "810:Gourmet.esp", "name": "Mammoth Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "812:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "813:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "814:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "819:Gourmet.esp": { "out": "818:Gourmet.esp", "name": "Mammoth Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "master", "family": "Stews", "open": false },
-    "81a:Gourmet.esp": { "out": "817:Gourmet.esp", "name": "Boar Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
-    "81b:Gourmet.esp": { "out": "816:Gourmet.esp", "name": "Ash Hopper Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Stews", "open": false },
-    "81d:Gourmet.esp": { "out": "81c:Gourmet.esp", "name": "Goat Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
-    "81e:Gourmet.esp": { "out": "3cf72:Dragonborn.esm", "name": "Cooked Boar Meat", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Meat dishes", "open": false },
-    "81f:Gourmet.esp": { "out": "64b3a:Skyrim.esm", "name": "Baked Potatoes", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Vegetable dishes", "open": false },
-    "820:Gourmet.esp": { "out": "64b43:Skyrim.esm", "name": "Apple Pie", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
-    "84b:Gourmet.esp": { "out": "64b3e:Skyrim.esm", "name": "Grilled Leeks", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Vegetable dishes", "open": false },
-    "9b4:Gourmet.esp": { "out": "64b38:Skyrim.esm", "name": "Honey Nut Treat", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
-    "8a6:Gourmet.esp": { "out": "64b38:Skyrim.esm", "name": "Honey Nut Treat", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
-    "8ab:Gourmet.esp": { "out": "8aa:Gourmet.esp", "name": "Cooked Dog", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Other food and drink", "open": false },
-    "8ad:Gourmet.esp": { "out": "e8448:Skyrim.esm", "name": "Cooked Skeever", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
-    "8af:Gourmet.esp": { "out": "64b3c:Skyrim.esm", "name": "Slaughterfish Steak", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Fish dishes", "open": false },
-    "8b4:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "8b5:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "8ba:Gourmet.esp": { "out": "8b3:Gourmet.esp", "name": "Carrot Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
-    "8bb:Gourmet.esp": { "out": "8b1:Gourmet.esp", "name": "Gourd Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
-    "8e3:Gourmet.esp": { "out": "8e2:Gourmet.esp", "name": "Roasted Carrots", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Vegetable dishes", "open": false },
-    "8e5:Gourmet.esp": { "out": "8e4:Gourmet.esp", "name": "Roasted Yams", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Vegetable dishes", "open": false },
-    "8ec:Gourmet.esp": { "out": "8ea:Gourmet.esp", "name": "Rabbit Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
-    "8ed:Gourmet.esp": { "out": "8eb:Gourmet.esp", "name": "Pheasant Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
-    "8f8:Gourmet.esp": { "out": "8f5:Gourmet.esp", "name": "Mushroom Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
-    "8f9:Gourmet.esp": { "out": "8f6:Gourmet.esp", "name": "Wild Mushroom Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
-    "8fa:Gourmet.esp": { "out": "8f7:Gourmet.esp", "name": "Glowing Mushroom Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
-    "904:Gourmet.esp": { "out": "901:Gourmet.esp", "name": "Roasted Mushrooms", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Other food and drink", "open": false },
-    "905:Gourmet.esp": { "out": "902:Gourmet.esp", "name": "Roasted Wild Mushrooms", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Other food and drink", "open": false },
-    "906:Gourmet.esp": { "out": "903:Gourmet.esp", "name": "Roasted Glowing Mushroom", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Other food and drink", "open": false },
-    "98b:Gourmet.esp": { "out": "981:Gourmet.esp", "name": "Jelly Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
-    "994:Gourmet.esp": { "out": "3533:HearthFires.esm", "name": "Apple Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
-    "995:Gourmet.esp": { "out": "3533:HearthFires.esm", "name": "Apple Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
-    "996:Gourmet.esp": { "out": "64b43:Skyrim.esm", "name": "Apple Pie", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
-    "997:Gourmet.esp": { "out": "64b43:Skyrim.esm", "name": "Apple Pie", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "master", "family": "Desserts", "open": false },
-    "998:Gourmet.esp": { "out": "816:Gourmet.esp", "name": "Ash Hopper Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Stews", "open": false },
-    "999:Gourmet.esp": { "out": "8e4:Gourmet.esp", "name": "Roasted Yams", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Vegetable dishes", "open": false },
-    "99a:Gourmet.esp": { "out": "3cd5b:Dragonborn.esm", "name": "Ash Yam Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Soups", "open": false },
-    "99b:Gourmet.esp": { "out": "721e8:Skyrim.esm", "name": "Cooked Beef", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
-    "99c:Gourmet.esp": { "out": "f4314:Skyrim.esm", "name": "Beef Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
-    "99d:Gourmet.esp": { "out": "3cf72:Dragonborn.esm", "name": "Cooked Boar Meat", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Meat dishes", "open": false },
-    "99e:Gourmet.esp": { "out": "817:Gourmet.esp", "name": "Boar Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
-    "99f:Gourmet.esp": { "out": "64b30:Skyrim.esm", "name": "Boiled Creme Treat", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
-    "9a0:Gourmet.esp": { "out": "9db:HearthFires.esm", "name": "Braided Bread", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Bread", "open": false },
-    "9a1:Gourmet.esp": { "out": "65c97:Skyrim.esm", "name": "Bread Loaf", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Bread", "open": false },
-    "9a2:Gourmet.esp": { "out": "f431b:Skyrim.esm", "name": "Cabbage Potato Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Soups", "open": false },
-    "9a3:Gourmet.esp": { "out": "eba02:Skyrim.esm", "name": "Cabbage Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
-    "9a4:Gourmet.esp": { "out": "eba01:Skyrim.esm", "name": "Cabbage and Tomato Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Soups", "open": false },
-    "9a5:Gourmet.esp": { "out": "8e2:Gourmet.esp", "name": "Roasted Carrots", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Vegetable dishes", "open": false },
-    "9a6:Gourmet.esp": { "out": "8b3:Gourmet.esp", "name": "Carrot Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
-    "9a7:Gourmet.esp": { "out": "e8947:Skyrim.esm", "name": "Grilled Chicken Breast", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
-    "9a8:Gourmet.esp": { "out": "353e:HearthFires.esm", "name": "Clam Chowder", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Chowders", "open": false },
-    "9a9:Gourmet.esp": { "out": "8aa:Gourmet.esp", "name": "Cooked Dog", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Other food and drink", "open": false },
-    "9aa:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "9ab:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "9ac:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "9ad:Gourmet.esp": { "out": "9dc:HearthFires.esm", "name": "Garlic Bread", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Bread", "open": false },
-    "9ae:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "9af:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "9b0:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "9b1:Gourmet.esp": { "out": "7224c:Skyrim.esm", "name": "Goat Roast", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
-    "9b2:Gourmet.esp": { "out": "81c:Gourmet.esp", "name": "Goat Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
-    "9b3:Gourmet.esp": { "out": "8b1:Gourmet.esp", "name": "Gourd Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
-    "a09:Gourmet.esp": { "out": "722b0:Skyrim.esm", "name": "Horse Haunch", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Meat dishes", "open": false },
-    "9b5:Gourmet.esp": { "out": "7224e:Skyrim.esm", "name": "Horker Loaf", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Meat dishes", "open": false },
-    "9b6:Gourmet.esp": { "out": "353a:HearthFires.esm", "name": "Jazbay Crostata", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "master", "family": "Desserts", "open": false },
-    "9b7:Gourmet.esp": { "out": "117ff:HearthFires.esm", "name": "Jazbay Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
-    "9b8:Gourmet.esp": { "out": "981:Gourmet.esp", "name": "Jelly Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
-    "9b9:Gourmet.esp": { "out": "3539:HearthFires.esm", "name": "Juniper Berry Crostata", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "master", "family": "Desserts", "open": false },
-    "9ba:Gourmet.esp": { "out": "80d:Gourmet.esp", "name": "Juniper Berry Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
-    "9bb:Gourmet.esp": { "out": "64b3e:Skyrim.esm", "name": "Grilled Leeks", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Vegetable dishes", "open": false },
-    "9bc:Gourmet.esp": { "out": "810:Gourmet.esp", "name": "Mammoth Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
-    "9bd:Gourmet.esp": { "out": "722bb:Skyrim.esm", "name": "Mammoth Steak", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "master", "family": "Meat dishes", "open": false },
-    "9be:Gourmet.esp": { "out": "818:Gourmet.esp", "name": "Mammoth Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "master", "family": "Stews", "open": false },
-    "9bf:Gourmet.esp": { "out": "353f:HearthFires.esm", "name": "Steamed Mudcrab Legs", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Crab dishes", "open": false },
-    "9c0:Gourmet.esp": { "out": "901:Gourmet.esp", "name": "Roasted Mushrooms", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Other food and drink", "open": false },
-    "9c1:Gourmet.esp": { "out": "902:Gourmet.esp", "name": "Roasted Wild Mushrooms", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Other food and drink", "open": false },
-    "9c2:Gourmet.esp": { "out": "903:Gourmet.esp", "name": "Roasted Glowing Mushroom", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Other food and drink", "open": false },
-    "9c3:Gourmet.esp": { "out": "8f5:Gourmet.esp", "name": "Mushroom Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
-    "9c4:Gourmet.esp": { "out": "8f6:Gourmet.esp", "name": "Wild Mushroom Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
-    "9c5:Gourmet.esp": { "out": "8f7:Gourmet.esp", "name": "Glowing Mushroom Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
-    "9c6:Gourmet.esp": { "out": "722c7:Skyrim.esm", "name": "Pheasant Roast", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
-    "9c7:Gourmet.esp": { "out": "8eb:Gourmet.esp", "name": "Pheasant Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
-    "9c8:Gourmet.esp": { "out": "64b3a:Skyrim.esm", "name": "Baked Potatoes", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Vegetable dishes", "open": false },
-    "9c9:Gourmet.esp": { "out": "3537:HearthFires.esm", "name": "Potato Bread", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Bread", "open": false },
-    "9ca:Gourmet.esp": { "out": "353d:HearthFires.esm", "name": "Potato Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
-    "9cb:Gourmet.esp": { "out": "722c2:Skyrim.esm", "name": "Rabbit Haunch", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
-    "9cc:Gourmet.esp": { "out": "8ea:Gourmet.esp", "name": "Rabbit Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
-    "9cd:Gourmet.esp": { "out": "64b3b:Skyrim.esm", "name": "Salmon Steak", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Fish dishes", "open": false },
-    "9ce:Gourmet.esp": { "out": "e8448:Skyrim.esm", "name": "Cooked Skeever", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
-    "9cf:Gourmet.esp": { "out": "64b3c:Skyrim.esm", "name": "Slaughterfish Steak", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Fish dishes", "open": false },
-    "9d0:Gourmet.esp": { "out": "353b:HearthFires.esm", "name": "Snowberry Crostata", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "master", "family": "Desserts", "open": false },
-    "9d1:Gourmet.esp": { "out": "11801:HearthFires.esm", "name": "Snowberry Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
-    "9d2:Gourmet.esp": { "out": "64b3d:Skyrim.esm", "name": "Sweet Roll", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
-    "9d3:Gourmet.esp": { "out": "f431c:Skyrim.esm", "name": "Tomato Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Soups", "open": false },
-    "9d4:Gourmet.esp": { "out": "f431e:Skyrim.esm", "name": "Vegetable Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Soups", "open": false },
-    "9d5:Gourmet.esp": { "out": "722bd:Skyrim.esm", "name": "Venison Chop", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
-    "9d6:Gourmet.esp": { "out": "f431d:Skyrim.esm", "name": "Venison Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
-    "9eb:Gourmet.esp": { "out": "f4315:Skyrim.esm", "name": "Horker Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Stews", "open": false },
+    "17b5e3:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5df:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Panic", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "17b5c9:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8168:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd23:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Minor Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "18c58c:Odin - Skyrim Magic Overhaul.esp" },
+    "2a817d:Odin - Skyrim Magic Overhaul.esp": { "out": "21a2f5:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Illusions", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "8558a:Odin - Skyrim Magic Overhaul.esp" },
+    "bae31:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eed:Odin - Skyrim Magic Overhaul.esp", "name": "Greater Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "247c89:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8164:Odin - Skyrim Magic Overhaul.esp": { "out": "293d23:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Corrosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "27a7b1:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8165:Odin - Skyrim Magic Overhaul.esp": { "out": "293d0c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Vulnerability", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "173074:Odin - Skyrim Magic Overhaul.esp" },
+    "17b5e1:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5dc:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Soothe", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "17b5c2:Odin - Skyrim Magic Overhaul.esp" },
+    "17b5e2:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5dd:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Subjugation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "17b5d1:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8185:Odin - Skyrim Magic Overhaul.esp": { "out": "2a8184:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Purge Magic", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "27569c:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8172:Odin - Skyrim Magic Overhaul.esp": { "out": "2a305d:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Frosthand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "2a3051:Odin - Skyrim Magic Overhaul.esp" },
+    "d4350:Odin - Skyrim Magic Overhaul.esp": { "out": "d434f:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Ancestors", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "d4349:Odin - Skyrim Magic Overhaul.esp" },
+    "bae2f:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eeb:Odin - Skyrim Magic Overhaul.esp", "name": "Minor Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "3f52:Dawnguard.esm" },
+    "2a8177:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Arctic Frost", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1e78ad:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8173:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7a4:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Ice Shards", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "27f2e:Odin - Skyrim Magic Overhaul.esp" },
+    "2a816a:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd26:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "18c58e:Odin - Skyrim Magic Overhaul.esp" },
+    "2a816b:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd2b:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Major Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1967b9:Odin - Skyrim Magic Overhaul.esp" },
+    "2a816c:Odin - Skyrim Magic Overhaul.esp": { "out": "1b4e31:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Ursine Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1a5ad7:Odin - Skyrim Magic Overhaul.esp" },
+    "2a816d:Odin - Skyrim Magic Overhaul.esp": { "out": "1b4e34:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Mourning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1916b1:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8180:Odin - Skyrim Magic Overhaul.esp": { "out": "23897a:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Damned", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "224526:Odin - Skyrim Magic Overhaul.esp" },
+    "2a816f:Odin - Skyrim Magic Overhaul.esp": { "out": "26b480:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Lightning Grasp", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "1e279f:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8169:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd2c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Feline Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1a5aea:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8170:Odin - Skyrim Magic Overhaul.esp": { "out": "2a305c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Firehand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "2a304f:Odin - Skyrim Magic Overhaul.esp" },
+    "2a817e:Odin - Skyrim Magic Overhaul.esp": { "out": "21f403:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Mute", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "21f3fd:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8166:Odin - Skyrim Magic Overhaul.esp": { "out": "293d24:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Corrosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "27a7b4:Odin - Skyrim Magic Overhaul.esp" },
+    "2a818b:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7b0:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Tears", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "159d8:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8179:Odin - Skyrim Magic Overhaul.esp": { "out": "26b485:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Shockblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1dd699:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8189:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7ae:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Disintegration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "3e0f:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8187:Odin - Skyrim Magic Overhaul.esp": { "out": "21a2f6:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Shadow Legion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "21a2eb:Odin - Skyrim Magic Overhaul.esp" },
+    "2a816e:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47b:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Arctic Blast", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "1d347b:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8174:Odin - Skyrim Magic Overhaul.esp": { "out": "26b481:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Charged Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "24e49:Odin - Skyrim Magic Overhaul.esp" },
+    "d1e78:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47d:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Taldam's Scorcher", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "1d3482:Odin - Skyrim Magic Overhaul.esp" },
+    "17b5e4:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5e0:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Bravery", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "17b5bb:Odin - Skyrim Magic Overhaul.esp" },
+    "d1e7d:Odin - Skyrim Magic Overhaul.esp": { "out": "26b483:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Fireblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1d8588:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8167:Odin - Skyrim Magic Overhaul.esp": { "out": "293d15:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Vulnerability", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "293d0e:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8178:Odin - Skyrim Magic Overhaul.esp": { "out": "26b484:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Frostblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1dd697:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8171:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47e:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Flame Darts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1d347e:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8186:Odin - Skyrim Magic Overhaul.esp": { "out": "2100da:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Domination", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "2100d4:Odin - Skyrim Magic Overhaul.esp" },
+    "2a817a:Odin - Skyrim Magic Overhaul.esp": { "out": "26b482:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Thundering Grasp", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1e27a7:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8176:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47f:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Wildfire", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1d858b:Odin - Skyrim Magic Overhaul.esp" },
+    "17b5e5:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5de:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Rage", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "17b5b3:Odin - Skyrim Magic Overhaul.esp" },
+    "bae30:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eec:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "38b6:Dawnguard.esm" },
+    "2a8175:Odin - Skyrim Magic Overhaul.esp": { "out": "7c848:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Stormhand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "7c83b:Odin - Skyrim Magic Overhaul.esp" },
+    "2a817f:Odin - Skyrim Magic Overhaul.esp": { "out": "23386b:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Illusions", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "233865:Odin - Skyrim Magic Overhaul.esp" },
+    "2a817b:Odin - Skyrim Magic Overhaul.esp": { "out": "22963a:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Crying Eyes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "229634:Odin - Skyrim Magic Overhaul.esp" },
+    "2a817c:Odin - Skyrim Magic Overhaul.esp": { "out": "20afcf:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "20afc9:Odin - Skyrim Magic Overhaul.esp" },
+    "2c16a7:Odin - Skyrim Magic Overhaul.esp": { "out": "2c16a6:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Hush", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2c169f:Odin - Skyrim Magic Overhaul.esp" },
+    "2a818a:Odin - Skyrim Magic Overhaul.esp": { "out": "2611f4:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "256fce:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8188:Odin - Skyrim Magic Overhaul.esp": { "out": "23897b:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of the Damned", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "224524:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8181:Odin - Skyrim Magic Overhaul.esp": { "out": "21f40c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Wizard Rend", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "21f405:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8163:Odin - Skyrim Magic Overhaul.esp": { "out": "293d09:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Horsemanship", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "289aec:Odin - Skyrim Magic Overhaul.esp" },
     "d9a:Hothtrooper44_ArmorCompilation.esp": { "out": "d62:Hothtrooper44_ArmorCompilation.esp", "name": "Falkreath Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Armoured boots", "open": false },
     "d9c:Hothtrooper44_ArmorCompilation.esp": { "out": "d63:Hothtrooper44_ArmorCompilation.esp", "name": "Falkreath Crown", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Other armour and clothing", "open": false },
     "d9d:Hothtrooper44_ArmorCompilation.esp": { "out": "d64:Hothtrooper44_ArmorCompilation.esp", "name": "Falkreath Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "expert", "family": "Body armour", "open": false },
@@ -8725,9 +8839,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "231d2:Hothtrooper44_ArmorCompilation.esp": { "out": "23188:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Hood Green", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": false },
     "231d3:Hothtrooper44_ArmorCompilation.esp": { "out": "23189:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Hood Red", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": false },
     "231d4:Hothtrooper44_ArmorCompilation.esp": { "out": "2318a:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Hood White", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": false },
-    "231d5:Hothtrooper44_ArmorCompilation.esp": { "out": "2318b:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe Black", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "master", "family": "Robes and body wear", "open": false },
-    "231d6:Hothtrooper44_ArmorCompilation.esp": { "out": "2318c:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe Blue", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "master", "family": "Robes and body wear", "open": false },
-    "231d7:Hothtrooper44_ArmorCompilation.esp": { "out": "2318d:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe Green", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "master", "family": "Robes and body wear", "open": false },
+    "231d5:Hothtrooper44_ArmorCompilation.esp": { "out": "2318b:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe Black", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
+    "231d6:Hothtrooper44_ArmorCompilation.esp": { "out": "2318c:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe Blue", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
+    "231d7:Hothtrooper44_ArmorCompilation.esp": { "out": "2318d:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe Green", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
     "231d8:Hothtrooper44_ArmorCompilation.esp": { "out": "2318e:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe Red", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "master", "family": "Robes and body wear", "open": false },
     "231d9:Hothtrooper44_ArmorCompilation.esp": { "out": "2318f:Hothtrooper44_ArmorCompilation.esp", "name": "Tribunal Unarmored Robe White", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "master", "family": "Robes and body wear", "open": false },
     "2326c:Hothtrooper44_ArmorCompilation.esp": { "out": "2325c:Hothtrooper44_ArmorCompilation.esp", "name": "Bandana", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": true },
@@ -8820,7 +8934,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "372ff:Hothtrooper44_ArmorCompilation.esp": { "out": "372fb:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Unarmored Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "master", "family": "Gloves", "open": false },
     "37300:Hothtrooper44_ArmorCompilation.esp": { "out": "372fc:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Unarmored Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "master", "family": "Hats and hoods", "open": false },
     "37301:Hothtrooper44_ArmorCompilation.esp": { "out": "372fd:Hothtrooper44_ArmorCompilation.esp", "name": "Ebony Mage Unarmored Robe", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "master", "family": "Robes and body wear", "open": false },
-    "37306:Hothtrooper44_ArmorCompilation.esp": { "out": "37305:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Unarmored Robe", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "master", "family": "Robes and body wear", "open": false },
+    "37306:Hothtrooper44_ArmorCompilation.esp": { "out": "37305:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Unarmored Robe", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
     "37307:Hothtrooper44_ArmorCompilation.esp": { "out": "37304:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Unarmored Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "master", "family": "Hats and hoods", "open": false },
     "37308:Hothtrooper44_ArmorCompilation.esp": { "out": "37303:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Unarmored Gauntlets", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Gloves", "open": false },
     "37309:Hothtrooper44_ArmorCompilation.esp": { "out": "37302:Hothtrooper44_ArmorCompilation.esp", "name": "Dwarven Mage Unarmored Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Shoes and light boots", "open": false },
@@ -8851,7 +8965,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "6a9f5:Hothtrooper44_ArmorCompilation.esp": { "out": "6a9f0:Hothtrooper44_ArmorCompilation.esp", "name": "Stormlord Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Body armour", "open": false },
     "6a9f6:Hothtrooper44_ArmorCompilation.esp": { "out": "6a9f1:Hothtrooper44_ArmorCompilation.esp", "name": "Stormlord Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Gauntlets", "open": false },
     "6a9f7:Hothtrooper44_ArmorCompilation.esp": { "out": "6a9f3:Hothtrooper44_ArmorCompilation.esp", "name": "Stormlord Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Helmets", "open": false },
-    "6aa09:Hothtrooper44_ArmorCompilation.esp": { "out": "6aa04:Hothtrooper44_ArmorCompilation.esp", "name": "Imperial Knight Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "master", "family": "Robes and body wear", "open": false },
+    "6aa09:Hothtrooper44_ArmorCompilation.esp": { "out": "6aa04:Hothtrooper44_ArmorCompilation.esp", "name": "Imperial Knight Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
     "6aa0a:Hothtrooper44_ArmorCompilation.esp": { "out": "6aa05:Hothtrooper44_ArmorCompilation.esp", "name": "Imperial Knight Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Body armour", "open": false },
     "6aa0b:Hothtrooper44_ArmorCompilation.esp": { "out": "6aa06:Hothtrooper44_ArmorCompilation.esp", "name": "Imperial Knight Greaves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Armoured boots", "open": false },
     "6aa0c:Hothtrooper44_ArmorCompilation.esp": { "out": "6aa07:Hothtrooper44_ArmorCompilation.esp", "name": "Imperial Knight Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Helmets", "open": false },
@@ -8859,7 +8973,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "82ebf:Hothtrooper44_ArmorCompilation.esp": { "out": "82eb5:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Unarmored Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
     "82ec0:Hothtrooper44_ArmorCompilation.esp": { "out": "82eb6:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Unarmored Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Gloves", "open": false },
     "82ec1:Hothtrooper44_ArmorCompilation.esp": { "out": "82eb7:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Unarmored Cap", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Hats and hoods", "open": false },
-    "82ec2:Hothtrooper44_ArmorCompilation.esp": { "out": "82eb8:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Unarmored Robe", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "master", "family": "Robes and body wear", "open": false },
+    "82ec2:Hothtrooper44_ArmorCompilation.esp": { "out": "82eb8:Hothtrooper44_ArmorCompilation.esp", "name": "Shaman Unarmored Robe", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
     "84f20:Hothtrooper44_ArmorCompilation.esp": { "out": "849b2:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Classic Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Helmets", "open": false },
     "84f3a:Hothtrooper44_ArmorCompilation.esp": { "out": "849b3:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Classic Veiled Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Helmets", "open": false },
     "84f3b:Hothtrooper44_ArmorCompilation.esp": { "out": "849b4:Hothtrooper44_ArmorCompilation.esp", "name": "Dragonscale Ebonsteel Claw Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Helmets", "open": false },
@@ -8890,6 +9004,109 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "bc99a:Hothtrooper44_ArmorCompilation.esp": { "out": "48d8:Hothtrooper44_ArmorCompilation.esp", "name": "Fur Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
     "bc99b:Hothtrooper44_ArmorCompilation.esp": { "out": "48dd:Hothtrooper44_ArmorCompilation.esp", "name": "Padded Fur Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Helmets", "open": false },
     "bc99c:Hothtrooper44_ArmorCompilation.esp": { "out": "48da:Hothtrooper44_ArmorCompilation.esp", "name": "Armored Fur Hood", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Helmets", "open": false },
+    "8a4:Gourmet.esp": { "out": "64b30:Skyrim.esm", "name": "Boiled Creme Treat", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "novice", "family": "Desserts", "open": false },
+    "80e:Gourmet.esp": { "out": "3533:HearthFires.esm", "name": "Apple Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
+    "80f:Gourmet.esp": { "out": "80d:Gourmet.esp", "name": "Juniper Berry Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "novice", "family": "Desserts", "open": false },
+    "811:Gourmet.esp": { "out": "810:Gourmet.esp", "name": "Mammoth Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "812:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "813:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "814:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "819:Gourmet.esp": { "out": "818:Gourmet.esp", "name": "Mammoth Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "master", "family": "Stews", "open": false },
+    "81a:Gourmet.esp": { "out": "817:Gourmet.esp", "name": "Boar Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
+    "81b:Gourmet.esp": { "out": "816:Gourmet.esp", "name": "Ash Hopper Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Stews", "open": false },
+    "81d:Gourmet.esp": { "out": "81c:Gourmet.esp", "name": "Goat Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
+    "81e:Gourmet.esp": { "out": "3cf72:Dragonborn.esm", "name": "Cooked Boar Meat", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Meat dishes", "open": false },
+    "81f:Gourmet.esp": { "out": "64b3a:Skyrim.esm", "name": "Baked Potatoes", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Vegetable dishes", "open": false },
+    "820:Gourmet.esp": { "out": "64b43:Skyrim.esm", "name": "Apple Pie", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
+    "84b:Gourmet.esp": { "out": "64b3e:Skyrim.esm", "name": "Grilled Leeks", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Vegetable dishes", "open": false },
+    "9b4:Gourmet.esp": { "out": "64b38:Skyrim.esm", "name": "Honey Nut Treat", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
+    "8a6:Gourmet.esp": { "out": "64b38:Skyrim.esm", "name": "Honey Nut Treat", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "novice", "family": "Desserts", "open": false },
+    "8ab:Gourmet.esp": { "out": "8aa:Gourmet.esp", "name": "Cooked Dog", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Other food and drink", "open": false },
+    "8ad:Gourmet.esp": { "out": "e8448:Skyrim.esm", "name": "Cooked Skeever", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
+    "8af:Gourmet.esp": { "out": "64b3c:Skyrim.esm", "name": "Slaughterfish Steak", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Fish dishes", "open": false },
+    "8b4:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "8b5:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "8ba:Gourmet.esp": { "out": "8b3:Gourmet.esp", "name": "Carrot Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
+    "8bb:Gourmet.esp": { "out": "8b1:Gourmet.esp", "name": "Gourd Soup", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
+    "8e3:Gourmet.esp": { "out": "8e2:Gourmet.esp", "name": "Roasted Carrots", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Vegetable dishes", "open": false },
+    "8e5:Gourmet.esp": { "out": "8e4:Gourmet.esp", "name": "Roasted Yams", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Vegetable dishes", "open": false },
+    "8ec:Gourmet.esp": { "out": "8ea:Gourmet.esp", "name": "Rabbit Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
+    "8ed:Gourmet.esp": { "out": "8eb:Gourmet.esp", "name": "Pheasant Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
+    "8f8:Gourmet.esp": { "out": "8f5:Gourmet.esp", "name": "Mushroom Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
+    "8f9:Gourmet.esp": { "out": "8f6:Gourmet.esp", "name": "Wild Mushroom Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
+    "8fa:Gourmet.esp": { "out": "8f7:Gourmet.esp", "name": "Glowing Mushroom Stew", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
+    "904:Gourmet.esp": { "out": "901:Gourmet.esp", "name": "Roasted Mushrooms", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Other food and drink", "open": false },
+    "905:Gourmet.esp": { "out": "902:Gourmet.esp", "name": "Roasted Wild Mushrooms", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Other food and drink", "open": false },
+    "906:Gourmet.esp": { "out": "903:Gourmet.esp", "name": "Roasted Glowing Mushroom", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Other food and drink", "open": false },
+    "98b:Gourmet.esp": { "out": "981:Gourmet.esp", "name": "Jelly Dumpling", "type": "ALCH", "makes": 1, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "novice", "family": "Desserts", "open": false },
+    "994:Gourmet.esp": { "out": "3533:HearthFires.esm", "name": "Apple Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
+    "995:Gourmet.esp": { "out": "3533:HearthFires.esm", "name": "Apple Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
+    "996:Gourmet.esp": { "out": "64b43:Skyrim.esm", "name": "Apple Pie", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
+    "997:Gourmet.esp": { "out": "64b43:Skyrim.esm", "name": "Apple Pie", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "expert", "family": "Desserts", "open": false },
+    "998:Gourmet.esp": { "out": "816:Gourmet.esp", "name": "Ash Hopper Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Stews", "open": false },
+    "999:Gourmet.esp": { "out": "8e4:Gourmet.esp", "name": "Roasted Yams", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Vegetable dishes", "open": false },
+    "99a:Gourmet.esp": { "out": "3cd5b:Dragonborn.esm", "name": "Ash Yam Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Soups", "open": false },
+    "99b:Gourmet.esp": { "out": "721e8:Skyrim.esm", "name": "Cooked Beef", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
+    "99c:Gourmet.esp": { "out": "f4314:Skyrim.esm", "name": "Beef Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
+    "99d:Gourmet.esp": { "out": "3cf72:Dragonborn.esm", "name": "Cooked Boar Meat", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Meat dishes", "open": false },
+    "99e:Gourmet.esp": { "out": "817:Gourmet.esp", "name": "Boar Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
+    "99f:Gourmet.esp": { "out": "64b30:Skyrim.esm", "name": "Boiled Creme Treat", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "novice", "family": "Desserts", "open": false },
+    "9a0:Gourmet.esp": { "out": "9db:HearthFires.esm", "name": "Braided Bread", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Bread", "open": false },
+    "9a1:Gourmet.esp": { "out": "65c97:Skyrim.esm", "name": "Bread Loaf", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Bread", "open": false },
+    "9a2:Gourmet.esp": { "out": "f431b:Skyrim.esm", "name": "Cabbage Potato Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Soups", "open": false },
+    "9a3:Gourmet.esp": { "out": "eba02:Skyrim.esm", "name": "Cabbage Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
+    "9a4:Gourmet.esp": { "out": "eba01:Skyrim.esm", "name": "Cabbage and Tomato Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Soups", "open": false },
+    "9a5:Gourmet.esp": { "out": "8e2:Gourmet.esp", "name": "Roasted Carrots", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Vegetable dishes", "open": false },
+    "9a6:Gourmet.esp": { "out": "8b3:Gourmet.esp", "name": "Carrot Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
+    "9a7:Gourmet.esp": { "out": "e8947:Skyrim.esm", "name": "Grilled Chicken Breast", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
+    "9a8:Gourmet.esp": { "out": "353e:HearthFires.esm", "name": "Clam Chowder", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Chowders", "open": false },
+    "9a9:Gourmet.esp": { "out": "8aa:Gourmet.esp", "name": "Cooked Dog", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Other food and drink", "open": false },
+    "9aa:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "9ab:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "9ac:Gourmet.esp": { "out": "f4320:Skyrim.esm", "name": "Goat Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "9ad:Gourmet.esp": { "out": "9dc:HearthFires.esm", "name": "Garlic Bread", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Bread", "open": false },
+    "9ae:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "9af:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "9b0:Gourmet.esp": { "out": "815:Gourmet.esp", "name": "Eidar Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "9b1:Gourmet.esp": { "out": "7224c:Skyrim.esm", "name": "Goat Roast", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
+    "9b2:Gourmet.esp": { "out": "81c:Gourmet.esp", "name": "Goat Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
+    "9b3:Gourmet.esp": { "out": "8b1:Gourmet.esp", "name": "Gourd Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
+    "a09:Gourmet.esp": { "out": "722b0:Skyrim.esm", "name": "Horse Haunch", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Meat dishes", "open": false },
+    "9b5:Gourmet.esp": { "out": "7224e:Skyrim.esm", "name": "Horker Loaf", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Meat dishes", "open": false },
+    "9b6:Gourmet.esp": { "out": "353a:HearthFires.esm", "name": "Jazbay Crostata", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
+    "9b7:Gourmet.esp": { "out": "117ff:HearthFires.esm", "name": "Jazbay Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
+    "9b8:Gourmet.esp": { "out": "981:Gourmet.esp", "name": "Jelly Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
+    "9b9:Gourmet.esp": { "out": "3539:HearthFires.esm", "name": "Juniper Berry Crostata", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
+    "9ba:Gourmet.esp": { "out": "80d:Gourmet.esp", "name": "Juniper Berry Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
+    "9bb:Gourmet.esp": { "out": "64b3e:Skyrim.esm", "name": "Grilled Leeks", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Vegetable dishes", "open": false },
+    "9bc:Gourmet.esp": { "out": "810:Gourmet.esp", "name": "Mammoth Cheese Fondue", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Cheese", "open": false },
+    "9bd:Gourmet.esp": { "out": "722bb:Skyrim.esm", "name": "Mammoth Steak", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "master", "family": "Meat dishes", "open": false },
+    "9be:Gourmet.esp": { "out": "818:Gourmet.esp", "name": "Mammoth Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "master", "family": "Stews", "open": false },
+    "9bf:Gourmet.esp": { "out": "353f:HearthFires.esm", "name": "Steamed Mudcrab Legs", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Crab dishes", "open": false },
+    "9c0:Gourmet.esp": { "out": "901:Gourmet.esp", "name": "Roasted Mushrooms", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Other food and drink", "open": false },
+    "9c1:Gourmet.esp": { "out": "902:Gourmet.esp", "name": "Roasted Wild Mushrooms", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Other food and drink", "open": false },
+    "9c2:Gourmet.esp": { "out": "903:Gourmet.esp", "name": "Roasted Glowing Mushroom", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Other food and drink", "open": false },
+    "9c3:Gourmet.esp": { "out": "8f5:Gourmet.esp", "name": "Mushroom Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
+    "9c4:Gourmet.esp": { "out": "8f6:Gourmet.esp", "name": "Wild Mushroom Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
+    "9c5:Gourmet.esp": { "out": "8f7:Gourmet.esp", "name": "Glowing Mushroom Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Stews", "open": false },
+    "9c6:Gourmet.esp": { "out": "722c7:Skyrim.esm", "name": "Pheasant Roast", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
+    "9c7:Gourmet.esp": { "out": "8eb:Gourmet.esp", "name": "Pheasant Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
+    "9c8:Gourmet.esp": { "out": "64b3a:Skyrim.esm", "name": "Baked Potatoes", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Vegetable dishes", "open": false },
+    "9c9:Gourmet.esp": { "out": "3537:HearthFires.esm", "name": "Potato Bread", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Bread", "open": false },
+    "9ca:Gourmet.esp": { "out": "353d:HearthFires.esm", "name": "Potato Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Soups", "open": false },
+    "9cb:Gourmet.esp": { "out": "722c2:Skyrim.esm", "name": "Rabbit Haunch", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
+    "9cc:Gourmet.esp": { "out": "8ea:Gourmet.esp", "name": "Rabbit Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
+    "9cd:Gourmet.esp": { "out": "64b3b:Skyrim.esm", "name": "Salmon Steak", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Fish dishes", "open": false },
+    "9ce:Gourmet.esp": { "out": "e8448:Skyrim.esm", "name": "Cooked Skeever", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
+    "9cf:Gourmet.esp": { "out": "64b3c:Skyrim.esm", "name": "Slaughterfish Steak", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Fish dishes", "open": false },
+    "9d0:Gourmet.esp": { "out": "353b:HearthFires.esm", "name": "Snowberry Crostata", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
+    "9d1:Gourmet.esp": { "out": "11801:HearthFires.esm", "name": "Snowberry Dumpling", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
+    "9d2:Gourmet.esp": { "out": "64b3d:Skyrim.esm", "name": "Sweet Roll", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Confectioner", "race": "", "rank": "advanced", "family": "Desserts", "open": false },
+    "9d3:Gourmet.esp": { "out": "f431c:Skyrim.esm", "name": "Tomato Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Soups", "open": false },
+    "9d4:Gourmet.esp": { "out": "f431e:Skyrim.esm", "name": "Vegetable Soup", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "expert", "family": "Soups", "open": false },
+    "9d5:Gourmet.esp": { "out": "722bd:Skyrim.esm", "name": "Venison Chop", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Meat dishes", "open": false },
+    "9d6:Gourmet.esp": { "out": "f431d:Skyrim.esm", "name": "Venison Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "novice", "family": "Stews", "open": false },
+    "9eb:Gourmet.esp": { "out": "f4315:Skyrim.esm", "name": "Horker Stew", "type": "ALCH", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "advanced", "family": "Stews", "open": false },
     "843:MoreCraftableEquipment.esp": { "out": "6f398:Skyrim.esm", "name": "Fur Shoes", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Armoured boots", "open": true },
     "844:MoreCraftableEquipment.esp": { "out": "6f393:Skyrim.esm", "name": "Fur Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
     "845:MoreCraftableEquipment.esp": { "out": "10594b:Skyrim.esm", "name": "Fur Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
@@ -8897,7 +9114,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "847:MoreCraftableEquipment.esp": { "out": "10594f:Skyrim.esm", "name": "Fur Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
     "848:MoreCraftableEquipment.esp": { "out": "6f39b:Skyrim.esm", "name": "Fur Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Gauntlets", "open": true },
     "849:MoreCraftableEquipment.esp": { "out": "6f39e:Skyrim.esm", "name": "Fur Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Helmets", "open": true },
-    "84a:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
+    "84a:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
     "84b:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
     "84c:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
     "84d:MoreCraftableEquipment.esp": { "out": "6ce001:Update.esm", "name": "Thread", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
@@ -8916,7 +9133,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "85a:MoreCraftableEquipment.esp": { "out": "10eb5b:Skyrim.esm", "name": "Shrouded Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Body armour", "open": false },
     "85b:MoreCraftableEquipment.esp": { "out": "805:MoreCraftableEquipment.esp", "name": "Shrouded Short-Sleeved Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Body armour", "open": false },
     "85c:MoreCraftableEquipment.esp": { "out": "10eb5e:Skyrim.esm", "name": "Shrouded Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Gauntlets", "open": false },
-    "85d:MoreCraftableEquipment.esp": { "out": "10eb5d:Skyrim.esm", "name": "Shrouded Cowl", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Helmets", "open": false },
+    "85d:MoreCraftableEquipment.esp": { "out": "10eb5d:Skyrim.esm", "name": "Worn Shrouded Cowl", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Helmets", "open": false },
     "85e:MoreCraftableEquipment.esp": { "out": "802:MoreCraftableEquipment.esp", "name": "Shrouded Masked Cowl", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Helmets", "open": false },
     "85f:MoreCraftableEquipment.esp": { "out": "14757:Dawnguard.esm", "name": "Dawnguard Heavy Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Armoured boots", "open": false },
     "860:MoreCraftableEquipment.esp": { "out": "f400:Dawnguard.esm", "name": "Dawnguard Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Armoured boots", "open": false },
@@ -9038,186 +9255,304 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "8ff:MoreCraftableEquipment.esp": { "out": "7a91a:Skyrim.esm", "name": "Scimitar", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "advanced", "family": "Swords", "open": false },
     "900:MoreCraftableEquipment.esp": { "out": "10c6fb:Skyrim.esm", "name": "Silver Greatsword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "advanced", "family": "Greatswords", "open": false },
     "901:MoreCraftableEquipment.esp": { "out": "10aa19:Skyrim.esm", "name": "Silver Sword", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "advanced", "family": "Swords", "open": false },
-    "91f:MoreCraftableEquipment.esp": { "out": "5b6a1:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "920:MoreCraftableEquipment.esp": { "out": "5b6a0:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "921:MoreCraftableEquipment.esp": { "out": "6ff38:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "922:MoreCraftableEquipment.esp": { "out": "13106:Skyrim.esm", "name": "Ragged Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "923:MoreCraftableEquipment.esp": { "out": "13104:Skyrim.esm", "name": "Ragged Cap", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": true },
+    "91f:MoreCraftableEquipment.esp": { "out": "5b6a1:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "920:MoreCraftableEquipment.esp": { "out": "5b6a0:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "921:MoreCraftableEquipment.esp": { "out": "6ff38:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "922:MoreCraftableEquipment.esp": { "out": "13106:Skyrim.esm", "name": "Ragged Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "923:MoreCraftableEquipment.esp": { "out": "13104:Skyrim.esm", "name": "Ragged Cap", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
     "924:MoreCraftableEquipment.esp": { "out": "13105:Skyrim.esm", "name": "Ragged Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
-    "925:MoreCraftableEquipment.esp": { "out": "5b69f:Skyrim.esm", "name": "Blacksmith's Apron", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "926:MoreCraftableEquipment.esp": { "out": "5b69e:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "927:MoreCraftableEquipment.esp": { "out": "6ff37:Skyrim.esm", "name": "Blacksmith's Apron", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "928:MoreCraftableEquipment.esp": { "out": "d1921:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "929:MoreCraftableEquipment.esp": { "out": "1bc82:Skyrim.esm", "name": "Chef's Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "92a:MoreCraftableEquipment.esp": { "out": "1bca7:Skyrim.esm", "name": "Chef's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": true },
-    "92b:MoreCraftableEquipment.esp": { "out": "18801:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "936:MoreCraftableEquipment.esp": { "out": "10e2dc:Skyrim.esm", "name": "College Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "937:MoreCraftableEquipment.esp": { "out": "10e2ce:Skyrim.esm", "name": "College Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
+    "925:MoreCraftableEquipment.esp": { "out": "5b69f:Skyrim.esm", "name": "Blacksmith's Apron", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "926:MoreCraftableEquipment.esp": { "out": "5b69e:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "927:MoreCraftableEquipment.esp": { "out": "6ff37:Skyrim.esm", "name": "Blacksmith's Apron", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "928:MoreCraftableEquipment.esp": { "out": "d1921:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "929:MoreCraftableEquipment.esp": { "out": "1bc82:Skyrim.esm", "name": "Chef's Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "92a:MoreCraftableEquipment.esp": { "out": "1bca7:Skyrim.esm", "name": "Chef's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
+    "92b:MoreCraftableEquipment.esp": { "out": "18801:Skyrim.esm", "name": "Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "936:MoreCraftableEquipment.esp": { "out": "10e2dc:Skyrim.esm", "name": "College Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "937:MoreCraftableEquipment.esp": { "out": "10e2ce:Skyrim.esm", "name": "College Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
     "938:MoreCraftableEquipment.esp": { "out": "10cee8:Skyrim.esm", "name": "Novice Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
     "939:MoreCraftableEquipment.esp": { "out": "10d2b5:Skyrim.esm", "name": "Apprentice Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": false },
     "93a:MoreCraftableEquipment.esp": { "out": "10cee6:Skyrim.esm", "name": "Adept Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": false },
-    "93b:MoreCraftableEquipment.esp": { "out": "10d2b4:Skyrim.esm", "name": "Novice Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": true },
-    "93c:MoreCraftableEquipment.esp": { "out": "6b46b:Skyrim.esm", "name": "Mage Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "93d:MoreCraftableEquipment.esp": { "out": "10cee3:Skyrim.esm", "name": "Adept Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "93e:MoreCraftableEquipment.esp": { "out": "10d662:Skyrim.esm", "name": "Expert Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "93f:MoreCraftableEquipment.esp": { "out": "10d664:Skyrim.esm", "name": "Master Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "940:MoreCraftableEquipment.esp": { "out": "808:MoreCraftableEquipment.esp", "name": "Shrouded Hand Wraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Gloves", "open": false },
-    "941:MoreCraftableEquipment.esp": { "out": "809:MoreCraftableEquipment.esp", "name": "Shrouded Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": false },
-    "942:MoreCraftableEquipment.esp": { "out": "80a:MoreCraftableEquipment.esp", "name": "Jester's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "943:MoreCraftableEquipment.esp": { "out": "80b:MoreCraftableEquipment.esp", "name": "Jester's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "944:MoreCraftableEquipment.esp": { "out": "80c:MoreCraftableEquipment.esp", "name": "Jester's Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Gloves", "open": false },
-    "945:MoreCraftableEquipment.esp": { "out": "80d:MoreCraftableEquipment.esp", "name": "Jester's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": false },
-    "946:MoreCraftableEquipment.esp": { "out": "e0dd4:Skyrim.esm", "name": "Dark Redguard Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "redguard", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "947:MoreCraftableEquipment.esp": { "out": "e0dd0:Skyrim.esm", "name": "Dark Hammerfell Garb", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "redguard", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "948:MoreCraftableEquipment.esp": { "out": "e0dd2:Skyrim.esm", "name": "Dark Alik'r Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "redguard", "rank": "advanced", "family": "Hats and hoods", "open": false },
-    "949:MoreCraftableEquipment.esp": { "out": "806:MoreCraftableEquipment.esp", "name": "Shrouded Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "94a:MoreCraftableEquipment.esp": { "out": "807:MoreCraftableEquipment.esp", "name": "Shrouded Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "94b:MoreCraftableEquipment.esp": { "out": "19adf:Dawnguard.esm", "name": "Vampire Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "94c:MoreCraftableEquipment.esp": { "out": "19ae1:Dawnguard.esm", "name": "Vampire Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "94d:MoreCraftableEquipment.esp": { "out": "19ae3:Dawnguard.esm", "name": "Vampire Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Gloves", "open": false },
-    "94e:MoreCraftableEquipment.esp": { "out": "19ade:Dawnguard.esm", "name": "Vampire Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": false },
-    "94f:MoreCraftableEquipment.esp": { "out": "47d7:Dawnguard.esm", "name": "Moth Priest Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "950:MoreCraftableEquipment.esp": { "out": "47d9:Dawnguard.esm", "name": "Moth Priest Sandals", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "951:MoreCraftableEquipment.esp": { "out": "37b8e:Dragonborn.esm", "name": "Cultist Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "952:MoreCraftableEquipment.esp": { "out": "37b8c:Dragonborn.esm", "name": "Cultist Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Gloves", "open": false },
-    "953:MoreCraftableEquipment.esp": { "out": "37b8a:Dragonborn.esm", "name": "Cultist Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "master", "family": "Robes and body wear", "open": false },
-    "957:MoreCraftableEquipment.esp": { "out": "82c:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "958:MoreCraftableEquipment.esp": { "out": "82d:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "959:MoreCraftableEquipment.esp": { "out": "82f:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "95a:MoreCraftableEquipment.esp": { "out": "830:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "95b:MoreCraftableEquipment.esp": { "out": "831:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "95c:MoreCraftableEquipment.esp": { "out": "832:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "95d:MoreCraftableEquipment.esp": { "out": "3705a:Dragonborn.esm", "name": "Dunmer Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "advanced", "family": "Shoes and light boots", "open": false },
+    "93b:MoreCraftableEquipment.esp": { "out": "10d2b4:Skyrim.esm", "name": "Novice Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "93c:MoreCraftableEquipment.esp": { "out": "6b46b:Skyrim.esm", "name": "Mage Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "93d:MoreCraftableEquipment.esp": { "out": "10cee3:Skyrim.esm", "name": "Adept Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "93e:MoreCraftableEquipment.esp": { "out": "10d662:Skyrim.esm", "name": "Expert Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "93f:MoreCraftableEquipment.esp": { "out": "10d664:Skyrim.esm", "name": "Master Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "940:MoreCraftableEquipment.esp": { "out": "808:MoreCraftableEquipment.esp", "name": "Shrouded Hand Wraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Gloves", "open": false },
+    "941:MoreCraftableEquipment.esp": { "out": "809:MoreCraftableEquipment.esp", "name": "Shrouded Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "942:MoreCraftableEquipment.esp": { "out": "80a:MoreCraftableEquipment.esp", "name": "Jester's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "943:MoreCraftableEquipment.esp": { "out": "80b:MoreCraftableEquipment.esp", "name": "Jester's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "944:MoreCraftableEquipment.esp": { "out": "80c:MoreCraftableEquipment.esp", "name": "Jester's Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Gloves", "open": false },
+    "945:MoreCraftableEquipment.esp": { "out": "80d:MoreCraftableEquipment.esp", "name": "Jester's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "946:MoreCraftableEquipment.esp": { "out": "e0dd4:Skyrim.esm", "name": "Dark Redguard Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "redguard", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "947:MoreCraftableEquipment.esp": { "out": "e0dd0:Skyrim.esm", "name": "Dark Hammerfell Garb", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "redguard", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "948:MoreCraftableEquipment.esp": { "out": "e0dd2:Skyrim.esm", "name": "Dark Alik'r Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "redguard", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "949:MoreCraftableEquipment.esp": { "out": "806:MoreCraftableEquipment.esp", "name": "Shrouded Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "94a:MoreCraftableEquipment.esp": { "out": "807:MoreCraftableEquipment.esp", "name": "Shrouded Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "94b:MoreCraftableEquipment.esp": { "out": "19adf:Dawnguard.esm", "name": "Vampire Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "94c:MoreCraftableEquipment.esp": { "out": "19ae1:Dawnguard.esm", "name": "Vampire Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "94d:MoreCraftableEquipment.esp": { "out": "19ae3:Dawnguard.esm", "name": "Vampire Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Gloves", "open": false },
+    "94e:MoreCraftableEquipment.esp": { "out": "19ade:Dawnguard.esm", "name": "Vampire Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "94f:MoreCraftableEquipment.esp": { "out": "47d7:Dawnguard.esm", "name": "Moth Priest Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "950:MoreCraftableEquipment.esp": { "out": "47d9:Dawnguard.esm", "name": "Moth Priest Sandals", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "951:MoreCraftableEquipment.esp": { "out": "37b8e:Dragonborn.esm", "name": "Cultist Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "952:MoreCraftableEquipment.esp": { "out": "37b8c:Dragonborn.esm", "name": "Cultist Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Gloves", "open": false },
+    "953:MoreCraftableEquipment.esp": { "out": "37b8a:Dragonborn.esm", "name": "Cultist Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "957:MoreCraftableEquipment.esp": { "out": "82c:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "958:MoreCraftableEquipment.esp": { "out": "82d:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "959:MoreCraftableEquipment.esp": { "out": "82f:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "95a:MoreCraftableEquipment.esp": { "out": "830:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "95b:MoreCraftableEquipment.esp": { "out": "831:MoreCraftableEquipment.esp", "name": "Dunmer Hooded Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "95c:MoreCraftableEquipment.esp": { "out": "832:MoreCraftableEquipment.esp", "name": "Dunmer Outfit", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "95d:MoreCraftableEquipment.esp": { "out": "3705a:Dragonborn.esm", "name": "Dunmer Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "novice", "family": "Shoes and light boots", "open": false },
     "95e:MoreCraftableEquipment.esp": { "out": "39112:Dragonborn.esm", "name": "Skaal Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "nord", "rank": "novice", "family": "Armoured boots", "open": false },
     "95f:MoreCraftableEquipment.esp": { "out": "3910e:Dragonborn.esm", "name": "Skaal Coat", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "nord", "rank": "novice", "family": "Body armour", "open": false },
     "960:MoreCraftableEquipment.esp": { "out": "39110:Dragonborn.esm", "name": "Skaal Gloves", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "nord", "rank": "novice", "family": "Gauntlets", "open": false },
     "961:MoreCraftableEquipment.esp": { "out": "39114:Dragonborn.esm", "name": "Skaal Hat", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "nord", "rank": "novice", "family": "Helmets", "open": false },
-    "962:MoreCraftableEquipment.esp": { "out": "834:MoreCraftableEquipment.esp", "name": "Telvanni Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "darkelf", "rank": "master", "family": "Robes and body wear", "open": false },
-    "963:MoreCraftableEquipment.esp": { "out": "835:MoreCraftableEquipment.esp", "name": "Telvanni Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "964:MoreCraftableEquipment.esp": { "out": "3b04b:Dragonborn.esm", "name": "Temple Priest Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "965:MoreCraftableEquipment.esp": { "out": "3b04e:Dragonborn.esm", "name": "Temple Priest Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": false },
-    "966:MoreCraftableEquipment.esp": { "out": "9f0:MoreCraftableEquipment.esp", "name": "Temple Priest Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "967:MoreCraftableEquipment.esp": { "out": "15516:Skyrim.esm", "name": "Emperor's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "master", "family": "Robes and body wear", "open": false },
-    "96b:MoreCraftableEquipment.esp": { "out": "1be1b:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "96c:MoreCraftableEquipment.esp": { "out": "209a5:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "96d:MoreCraftableEquipment.esp": { "out": "261bd:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "96e:MoreCraftableEquipment.esp": { "out": "3452f:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "96f:MoreCraftableEquipment.esp": { "out": "1be1a:Skyrim.esm", "name": "Belted Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "970:MoreCraftableEquipment.esp": { "out": "209a6:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "971:MoreCraftableEquipment.esp": { "out": "261c0:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "972:MoreCraftableEquipment.esp": { "out": "17696:Skyrim.esm", "name": "Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": true },
-    "973:MoreCraftableEquipment.esp": { "out": "17695:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "974:MoreCraftableEquipment.esp": { "out": "3452e:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "975:MoreCraftableEquipment.esp": { "out": "6c1d9:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "976:MoreCraftableEquipment.esp": { "out": "6c1da:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "977:MoreCraftableEquipment.esp": { "out": "6c1d8:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "978:MoreCraftableEquipment.esp": { "out": "261c1:Skyrim.esm", "name": "Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Gloves", "open": true },
-    "979:MoreCraftableEquipment.esp": { "out": "330b3:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": true },
-    "97a:MoreCraftableEquipment.esp": { "out": "209aa:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": true },
-    "97b:MoreCraftableEquipment.esp": { "out": "330bc:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": true },
-    "97c:MoreCraftableEquipment.esp": { "out": "86993:Skyrim.esm", "name": "Fine Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "97d:MoreCraftableEquipment.esp": { "out": "cee82:Skyrim.esm", "name": "Fine Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "97e:MoreCraftableEquipment.esp": { "out": "86991:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "97f:MoreCraftableEquipment.esp": { "out": "f8713:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "980:MoreCraftableEquipment.esp": { "out": "cee80:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "981:MoreCraftableEquipment.esp": { "out": "f8715:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "982:MoreCraftableEquipment.esp": { "out": "cee84:Skyrim.esm", "name": "Fine Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": true },
-    "984:MoreCraftableEquipment.esp": { "out": "5db7b:Skyrim.esm", "name": "Noble Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "985:MoreCraftableEquipment.esp": { "out": "8698c:Skyrim.esm", "name": "Fur-Trimmed Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "986:MoreCraftableEquipment.esp": { "out": "cee76:Skyrim.esm", "name": "Fine Raiment", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "987:MoreCraftableEquipment.esp": { "out": "ead49:Skyrim.esm", "name": "Embroidered Garment", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "962:MoreCraftableEquipment.esp": { "out": "834:MoreCraftableEquipment.esp", "name": "Telvanni Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "darkelf", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "963:MoreCraftableEquipment.esp": { "out": "835:MoreCraftableEquipment.esp", "name": "Telvanni Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "darkelf", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "964:MoreCraftableEquipment.esp": { "out": "3b04b:Dragonborn.esm", "name": "Temple Priest Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "965:MoreCraftableEquipment.esp": { "out": "3b04e:Dragonborn.esm", "name": "Temple Priest Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "966:MoreCraftableEquipment.esp": { "out": "9f0:MoreCraftableEquipment.esp", "name": "Temple Priest Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "967:MoreCraftableEquipment.esp": { "out": "15516:Skyrim.esm", "name": "Emperor's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "96b:MoreCraftableEquipment.esp": { "out": "1be1b:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "96c:MoreCraftableEquipment.esp": { "out": "209a5:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "96d:MoreCraftableEquipment.esp": { "out": "261bd:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "96e:MoreCraftableEquipment.esp": { "out": "3452f:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "96f:MoreCraftableEquipment.esp": { "out": "1be1a:Skyrim.esm", "name": "Belted Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "970:MoreCraftableEquipment.esp": { "out": "209a6:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "971:MoreCraftableEquipment.esp": { "out": "261c0:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "972:MoreCraftableEquipment.esp": { "out": "17696:Skyrim.esm", "name": "Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
+    "973:MoreCraftableEquipment.esp": { "out": "17695:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "974:MoreCraftableEquipment.esp": { "out": "3452e:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "975:MoreCraftableEquipment.esp": { "out": "6c1d9:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "976:MoreCraftableEquipment.esp": { "out": "6c1da:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "977:MoreCraftableEquipment.esp": { "out": "6c1d8:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "978:MoreCraftableEquipment.esp": { "out": "261c1:Skyrim.esm", "name": "Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Gloves", "open": true },
+    "979:MoreCraftableEquipment.esp": { "out": "330b3:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
+    "97a:MoreCraftableEquipment.esp": { "out": "209aa:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
+    "97b:MoreCraftableEquipment.esp": { "out": "330bc:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
+    "97c:MoreCraftableEquipment.esp": { "out": "86993:Skyrim.esm", "name": "Fine Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "97d:MoreCraftableEquipment.esp": { "out": "cee82:Skyrim.esm", "name": "Fine Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "97e:MoreCraftableEquipment.esp": { "out": "86991:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "97f:MoreCraftableEquipment.esp": { "out": "f8713:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "980:MoreCraftableEquipment.esp": { "out": "cee80:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "981:MoreCraftableEquipment.esp": { "out": "f8715:Skyrim.esm", "name": "Fine Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "982:MoreCraftableEquipment.esp": { "out": "cee84:Skyrim.esm", "name": "Fine Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
+    "984:MoreCraftableEquipment.esp": { "out": "5db7b:Skyrim.esm", "name": "Noble Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "985:MoreCraftableEquipment.esp": { "out": "8698c:Skyrim.esm", "name": "Fur-Trimmed Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "986:MoreCraftableEquipment.esp": { "out": "cee76:Skyrim.esm", "name": "Fine Raiment", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "987:MoreCraftableEquipment.esp": { "out": "ead49:Skyrim.esm", "name": "Embroidered Garment", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
     "988:MoreCraftableEquipment.esp": { "out": "e84c1:Skyrim.esm", "name": "Gilded Wristguards", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Gloves", "open": false },
     "989:MoreCraftableEquipment.esp": { "out": "86990:Skyrim.esm", "name": "Fine Armguards", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Gloves", "open": false },
-    "98a:MoreCraftableEquipment.esp": { "out": "5db7e:Skyrim.esm", "name": "Fur-lined Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "98b:MoreCraftableEquipment.esp": { "out": "8698e:Skyrim.esm", "name": "Pleated Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "98c:MoreCraftableEquipment.esp": { "out": "cee78:Skyrim.esm", "name": "Cuffed Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "98d:MoreCraftableEquipment.esp": { "out": "e84c4:Skyrim.esm", "name": "Embellished Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "master", "family": "Robes and body wear", "open": false },
-    "98e:MoreCraftableEquipment.esp": { "out": "e84c6:Skyrim.esm", "name": "Refined Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "98f:MoreCraftableEquipment.esp": { "out": "4223d:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "990:MoreCraftableEquipment.esp": { "out": "4223c:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "991:MoreCraftableEquipment.esp": { "out": "6ff45:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "992:MoreCraftableEquipment.esp": { "out": "4223b:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": true },
-    "993:MoreCraftableEquipment.esp": { "out": "6b46c:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "994:MoreCraftableEquipment.esp": { "out": "825:MoreCraftableEquipment.esp", "name": "Archmage's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Shoes and light boots", "open": false },
-    "995:MoreCraftableEquipment.esp": { "out": "828:MoreCraftableEquipment.esp", "name": "Archmage's Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": false },
-    "996:MoreCraftableEquipment.esp": { "out": "826:MoreCraftableEquipment.esp", "name": "Archmage's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "997:MoreCraftableEquipment.esp": { "out": "827:MoreCraftableEquipment.esp", "name": "Hooded Archmage's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "998:MoreCraftableEquipment.esp": { "out": "80699:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "999:MoreCraftableEquipment.esp": { "out": "80697:Skyrim.esm", "name": "Miner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "99a:MoreCraftableEquipment.esp": { "out": "6ff43:Skyrim.esm", "name": "Miner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "99b:MoreCraftableEquipment.esp": { "out": "bacd7:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "99c:MoreCraftableEquipment.esp": { "out": "bacf3:Skyrim.esm", "name": "Monk Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "99d:MoreCraftableEquipment.esp": { "out": "10cfef:Skyrim.esm", "name": "Brown Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "98a:MoreCraftableEquipment.esp": { "out": "5db7e:Skyrim.esm", "name": "Fur-lined Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "98b:MoreCraftableEquipment.esp": { "out": "8698e:Skyrim.esm", "name": "Pleated Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "98c:MoreCraftableEquipment.esp": { "out": "cee78:Skyrim.esm", "name": "Cuffed Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "98d:MoreCraftableEquipment.esp": { "out": "e84c4:Skyrim.esm", "name": "Embellished Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "98e:MoreCraftableEquipment.esp": { "out": "e84c6:Skyrim.esm", "name": "Refined Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "98f:MoreCraftableEquipment.esp": { "out": "4223d:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "990:MoreCraftableEquipment.esp": { "out": "4223c:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "991:MoreCraftableEquipment.esp": { "out": "6ff45:Skyrim.esm", "name": "Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "992:MoreCraftableEquipment.esp": { "out": "4223b:Skyrim.esm", "name": "Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
+    "993:MoreCraftableEquipment.esp": { "out": "6b46c:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "994:MoreCraftableEquipment.esp": { "out": "825:MoreCraftableEquipment.esp", "name": "Archmage's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "995:MoreCraftableEquipment.esp": { "out": "828:MoreCraftableEquipment.esp", "name": "Archmage's Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "996:MoreCraftableEquipment.esp": { "out": "826:MoreCraftableEquipment.esp", "name": "Archmage's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "997:MoreCraftableEquipment.esp": { "out": "827:MoreCraftableEquipment.esp", "name": "Hooded Archmage's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "998:MoreCraftableEquipment.esp": { "out": "80699:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "999:MoreCraftableEquipment.esp": { "out": "80697:Skyrim.esm", "name": "Miner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "99a:MoreCraftableEquipment.esp": { "out": "6ff43:Skyrim.esm", "name": "Miner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "99b:MoreCraftableEquipment.esp": { "out": "bacd7:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "99c:MoreCraftableEquipment.esp": { "out": "bacf3:Skyrim.esm", "name": "Monk Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "99d:MoreCraftableEquipment.esp": { "out": "10cfef:Skyrim.esm", "name": "Brown Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
     "99e:MoreCraftableEquipment.esp": { "out": "83a:MoreCraftableEquipment.esp", "name": "Brown Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "99f:MoreCraftableEquipment.esp": { "out": "10cfe4:Skyrim.esm", "name": "Hooded Brown Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "9a0:MoreCraftableEquipment.esp": { "out": "10cff0:Skyrim.esm", "name": "Green Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "99f:MoreCraftableEquipment.esp": { "out": "10cfe4:Skyrim.esm", "name": "Hooded Brown Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9a0:MoreCraftableEquipment.esp": { "out": "10cff0:Skyrim.esm", "name": "Green Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
     "9a1:MoreCraftableEquipment.esp": { "out": "83b:MoreCraftableEquipment.esp", "name": "Green Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "9a2:MoreCraftableEquipment.esp": { "out": "10cfec:Skyrim.esm", "name": "Hooded Green Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "9a3:MoreCraftableEquipment.esp": { "out": "10cff1:Skyrim.esm", "name": "Grey Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "9a2:MoreCraftableEquipment.esp": { "out": "10cfec:Skyrim.esm", "name": "Hooded Green Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9a3:MoreCraftableEquipment.esp": { "out": "10cff1:Skyrim.esm", "name": "Grey Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
     "9a4:MoreCraftableEquipment.esp": { "out": "83c:MoreCraftableEquipment.esp", "name": "Grey Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "9a5:MoreCraftableEquipment.esp": { "out": "10cfea:Skyrim.esm", "name": "Hooded Grey Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "9a6:MoreCraftableEquipment.esp": { "out": "10cff2:Skyrim.esm", "name": "Red Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "9a5:MoreCraftableEquipment.esp": { "out": "10cfea:Skyrim.esm", "name": "Hooded Grey Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9a6:MoreCraftableEquipment.esp": { "out": "10cff2:Skyrim.esm", "name": "Red Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
     "9a7:MoreCraftableEquipment.esp": { "out": "83d:MoreCraftableEquipment.esp", "name": "Red Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "9a8:MoreCraftableEquipment.esp": { "out": "10cfeb:Skyrim.esm", "name": "Hooded Red Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "9a8:MoreCraftableEquipment.esp": { "out": "10cfeb:Skyrim.esm", "name": "Hooded Red Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
     "9a9:MoreCraftableEquipment.esp": { "out": "839:MoreCraftableEquipment.esp", "name": "Monk Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "9aa:MoreCraftableEquipment.esp": { "out": "107106:Skyrim.esm", "name": "Hooded Monk Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9ab:MoreCraftableEquipment.esp": { "out": "646ab:Skyrim.esm", "name": "Mourner's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": true },
-    "9ac:MoreCraftableEquipment.esp": { "out": "646a7:Skyrim.esm", "name": "Mourner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "9ad:MoreCraftableEquipment.esp": { "out": "b1460:Skyrim.esm", "name": "Mythic Dawn Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "9ae:MoreCraftableEquipment.esp": { "out": "b145b:Skyrim.esm", "name": "Mythic Dawn Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Gloves", "open": false },
+    "9aa:MoreCraftableEquipment.esp": { "out": "107106:Skyrim.esm", "name": "Hooded Monk Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9ab:MoreCraftableEquipment.esp": { "out": "646ab:Skyrim.esm", "name": "Mourner's Hat", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
+    "9ac:MoreCraftableEquipment.esp": { "out": "646a7:Skyrim.esm", "name": "Mourner's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "9ad:MoreCraftableEquipment.esp": { "out": "b1460:Skyrim.esm", "name": "Mythic Dawn Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "9ae:MoreCraftableEquipment.esp": { "out": "b145b:Skyrim.esm", "name": "Mythic Dawn Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Gloves", "open": false },
     "9af:MoreCraftableEquipment.esp": { "out": "842:MoreCraftableEquipment.esp", "name": "Mythic Dawn Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": false },
-    "9b0:MoreCraftableEquipment.esp": { "out": "840:MoreCraftableEquipment.esp", "name": "Mythic Dawn Hooded Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9b1:MoreCraftableEquipment.esp": { "out": "841:MoreCraftableEquipment.esp", "name": "Mythic Dawn Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9b2:MoreCraftableEquipment.esp": { "out": "c36e8:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "9b3:MoreCraftableEquipment.esp": { "out": "829:MoreCraftableEquipment.esp", "name": "Necromancer Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": true },
+    "9b0:MoreCraftableEquipment.esp": { "out": "840:MoreCraftableEquipment.esp", "name": "Mythic Dawn Hooded Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9b1:MoreCraftableEquipment.esp": { "out": "841:MoreCraftableEquipment.esp", "name": "Mythic Dawn Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9b2:MoreCraftableEquipment.esp": { "out": "c36e8:Skyrim.esm", "name": "Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "9b3:MoreCraftableEquipment.esp": { "out": "829:MoreCraftableEquipment.esp", "name": "Necromancer Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
     "9b4:MoreCraftableEquipment.esp": { "out": "83f:MoreCraftableEquipment.esp", "name": "Necromancer Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "9b5:MoreCraftableEquipment.esp": { "out": "82a:MoreCraftableEquipment.esp", "name": "Hooded Necromancer Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9b6:MoreCraftableEquipment.esp": { "out": "8f19a:Skyrim.esm", "name": "Ragged Trousers", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "9b7:MoreCraftableEquipment.esp": { "out": "3ca00:Skyrim.esm", "name": "Footwraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": true },
-    "9b8:MoreCraftableEquipment.esp": { "out": "3c9fe:Skyrim.esm", "name": "Roughspun Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "9b9:MoreCraftableEquipment.esp": { "out": "65b9b:Skyrim.esm", "name": "Psijic Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Shoes and light boots", "open": false },
-    "9ba:MoreCraftableEquipment.esp": { "out": "65b9d:Skyrim.esm", "name": "Psijic Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Gloves", "open": false },
-    "9bb:MoreCraftableEquipment.esp": { "out": "65b99:Skyrim.esm", "name": "Psijic Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": false },
-    "9bc:MoreCraftableEquipment.esp": { "out": "65b94:Skyrim.esm", "name": "Psijic Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9bd:MoreCraftableEquipment.esp": { "out": "7bc15:Skyrim.esm", "name": "Redguard Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "redguard", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "9be:MoreCraftableEquipment.esp": { "out": "7bc19:Skyrim.esm", "name": "Hammerfell Garb", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "redguard", "rank": "advanced", "family": "Robes and body wear", "open": false },
-    "9c0:MoreCraftableEquipment.esp": { "out": "7bc1a:Skyrim.esm", "name": "Alik'r Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "redguard", "rank": "advanced", "family": "Hats and hoods", "open": false },
-    "9c1:MoreCraftableEquipment.esp": { "out": "106661:Skyrim.esm", "name": "Black Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": true },
+    "9b5:MoreCraftableEquipment.esp": { "out": "82a:MoreCraftableEquipment.esp", "name": "Hooded Necromancer Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9b6:MoreCraftableEquipment.esp": { "out": "8f19a:Skyrim.esm", "name": "Ragged Trousers", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "9b7:MoreCraftableEquipment.esp": { "out": "3ca00:Skyrim.esm", "name": "Footwraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "9b8:MoreCraftableEquipment.esp": { "out": "3c9fe:Skyrim.esm", "name": "Roughspun Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "9b9:MoreCraftableEquipment.esp": { "out": "65b9b:Skyrim.esm", "name": "Psijic Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "9ba:MoreCraftableEquipment.esp": { "out": "65b9d:Skyrim.esm", "name": "Psijic Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Gloves", "open": false },
+    "9bb:MoreCraftableEquipment.esp": { "out": "65b99:Skyrim.esm", "name": "Psijic Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "9bc:MoreCraftableEquipment.esp": { "out": "65b94:Skyrim.esm", "name": "Psijic Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9bd:MoreCraftableEquipment.esp": { "out": "7bc15:Skyrim.esm", "name": "Redguard Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "redguard", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "9be:MoreCraftableEquipment.esp": { "out": "7bc19:Skyrim.esm", "name": "Hammerfell Garb", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "redguard", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9c0:MoreCraftableEquipment.esp": { "out": "7bc1a:Skyrim.esm", "name": "Alik'r Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "redguard", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "9c1:MoreCraftableEquipment.esp": { "out": "106661:Skyrim.esm", "name": "Black Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
     "9c2:MoreCraftableEquipment.esp": { "out": "83e:MoreCraftableEquipment.esp", "name": "Black Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "9c3:MoreCraftableEquipment.esp": { "out": "107108:Skyrim.esm", "name": "Hooded Black Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9c4:MoreCraftableEquipment.esp": { "out": "a199b:Skyrim.esm", "name": "Blue Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": true },
+    "9c3:MoreCraftableEquipment.esp": { "out": "107108:Skyrim.esm", "name": "Hooded Black Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9c4:MoreCraftableEquipment.esp": { "out": "a199b:Skyrim.esm", "name": "Blue Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
     "9c5:MoreCraftableEquipment.esp": { "out": "812:MoreCraftableEquipment.esp", "name": "Blue Cowl", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "9c6:MoreCraftableEquipment.esp": { "out": "10710a:Skyrim.esm", "name": "Hooded Blue Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9c7:MoreCraftableEquipment.esp": { "out": "824:MoreCraftableEquipment.esp", "name": "Greybeard's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
+    "9c6:MoreCraftableEquipment.esp": { "out": "10710a:Skyrim.esm", "name": "Hooded Blue Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9c7:MoreCraftableEquipment.esp": { "out": "824:MoreCraftableEquipment.esp", "name": "Greybeard's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
     "9c8:MoreCraftableEquipment.esp": { "out": "823:MoreCraftableEquipment.esp", "name": "Greybeard's Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Hats and hoods", "open": false },
-    "9c9:MoreCraftableEquipment.esp": { "out": "822:MoreCraftableEquipment.esp", "name": "Greybeard's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9ca:MoreCraftableEquipment.esp": { "out": "65bac:Skyrim.esm", "name": "Thalmor Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
-    "9cb:MoreCraftableEquipment.esp": { "out": "65bb3:Skyrim.esm", "name": "Thalmor Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Gloves", "open": false },
-    "9cc:MoreCraftableEquipment.esp": { "out": "821:MoreCraftableEquipment.esp", "name": "Thalmor Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Hats and hoods", "open": false },
-    "9cd:MoreCraftableEquipment.esp": { "out": "81f:MoreCraftableEquipment.esp", "name": "Thalmor Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9ce:MoreCraftableEquipment.esp": { "out": "820:MoreCraftableEquipment.esp", "name": "Hooded Thalmor Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
-    "9cf:MoreCraftableEquipment.esp": { "out": "88956:Skyrim.esm", "name": "Wedding Dress", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "9c9:MoreCraftableEquipment.esp": { "out": "822:MoreCraftableEquipment.esp", "name": "Greybeard's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9ca:MoreCraftableEquipment.esp": { "out": "65bac:Skyrim.esm", "name": "Thalmor Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
+    "9cb:MoreCraftableEquipment.esp": { "out": "65bb3:Skyrim.esm", "name": "Thalmor Gloves", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Gloves", "open": false },
+    "9cc:MoreCraftableEquipment.esp": { "out": "821:MoreCraftableEquipment.esp", "name": "Thalmor Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Hats and hoods", "open": false },
+    "9cd:MoreCraftableEquipment.esp": { "out": "81f:MoreCraftableEquipment.esp", "name": "Thalmor Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9ce:MoreCraftableEquipment.esp": { "out": "820:MoreCraftableEquipment.esp", "name": "Hooded Thalmor Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9cf:MoreCraftableEquipment.esp": { "out": "88956:Skyrim.esm", "name": "Wedding Dress", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
     "9d0:MoreCraftableEquipment.esp": { "out": "88958:Skyrim.esm", "name": "Wedding Sandals", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
     "9d1:MoreCraftableEquipment.esp": { "out": "8895a:Skyrim.esm", "name": "Wedding Wreath", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "9d2:MoreCraftableEquipment.esp": { "out": "d191f:Skyrim.esm", "name": "Tavern Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": true },
-    "9dc:MoreCraftableEquipment.esp": { "out": "e739b:Skyrim.esm", "name": "Vaermina Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "expert", "family": "Robes and body wear", "open": false },
+    "9d2:MoreCraftableEquipment.esp": { "out": "d191f:Skyrim.esm", "name": "Tavern Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "9dc:MoreCraftableEquipment.esp": { "out": "e739b:Skyrim.esm", "name": "Vaermina Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
     "9dd:MoreCraftableEquipment.esp": { "out": "5cbfe:Skyrim.esm", "name": "General Tullius' Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Body armour", "open": false },
-    "9de:MoreCraftableEquipment.esp": { "out": "62303:Skyrim.esm", "name": "Ulfric's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Robes and body wear", "open": false },
+    "9de:MoreCraftableEquipment.esp": { "out": "62303:Skyrim.esm", "name": "Ulfric's Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Robes and body wear", "open": false },
     "9df:MoreCraftableEquipment.esp": { "out": "6230b:Skyrim.esm", "name": "Ulfric's Armguards", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Gloves", "open": false },
-    "9e0:MoreCraftableEquipment.esp": { "out": "62311:Skyrim.esm", "name": "Ulfric's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Shoes and light boots", "open": false },
+    "9e0:MoreCraftableEquipment.esp": { "out": "62311:Skyrim.esm", "name": "Ulfric's Boots", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Shoes and light boots", "open": false },
     "9ee:MoreCraftableEquipment.esp": { "out": "214eb:Skyrim.esm", "name": "Windhelm Guard's Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Shields", "open": false },
-    "9f4:MoreCraftableEquipment.esp": { "out": "9f3:MoreCraftableEquipment.esp", "name": "Telvanni Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "darkelf", "rank": "master", "family": "Robes and body wear", "open": false },
-    "9f5:MoreCraftableEquipment.esp": { "out": "c742:HearthFires.esm", "name": "Boy's Red Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
-    "9f6:MoreCraftableEquipment.esp": { "out": "c743:HearthFires.esm", "name": "Boy's Green Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
-    "9f7:MoreCraftableEquipment.esp": { "out": "c744:HearthFires.esm", "name": "Boy's Blue Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
-    "9f8:MoreCraftableEquipment.esp": { "out": "c745:HearthFires.esm", "name": "Boy's Grey Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
-    "9f9:MoreCraftableEquipment.esp": { "out": "c746:HearthFires.esm", "name": "Boy's Yellow Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
-    "9fa:MoreCraftableEquipment.esp": { "out": "d821:HearthFires.esm", "name": "Girl's Red Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
-    "9fb:MoreCraftableEquipment.esp": { "out": "d81f:HearthFires.esm", "name": "Girl's Green Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
-    "9fc:MoreCraftableEquipment.esp": { "out": "d81e:HearthFires.esm", "name": "Girl's Blue Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
-    "9fd:MoreCraftableEquipment.esp": { "out": "d820:HearthFires.esm", "name": "Girl's Grey Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
-    "9fe:MoreCraftableEquipment.esp": { "out": "d822:HearthFires.esm", "name": "Girl's Yellow Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
+    "9f4:MoreCraftableEquipment.esp": { "out": "9f3:MoreCraftableEquipment.esp", "name": "Telvanni Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "darkelf", "rank": "novice", "family": "Robes and body wear", "open": false },
+    "9f5:MoreCraftableEquipment.esp": { "out": "c742:HearthFires.esm", "name": "Boy's Red Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "9f6:MoreCraftableEquipment.esp": { "out": "c743:HearthFires.esm", "name": "Boy's Green Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "9f7:MoreCraftableEquipment.esp": { "out": "c744:HearthFires.esm", "name": "Boy's Blue Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "9f8:MoreCraftableEquipment.esp": { "out": "c745:HearthFires.esm", "name": "Boy's Grey Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "9f9:MoreCraftableEquipment.esp": { "out": "c746:HearthFires.esm", "name": "Boy's Yellow Tunic", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "9fa:MoreCraftableEquipment.esp": { "out": "d821:HearthFires.esm", "name": "Girl's Red Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "9fb:MoreCraftableEquipment.esp": { "out": "d81f:HearthFires.esm", "name": "Girl's Green Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "9fc:MoreCraftableEquipment.esp": { "out": "d81e:HearthFires.esm", "name": "Girl's Blue Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "9fd:MoreCraftableEquipment.esp": { "out": "d820:HearthFires.esm", "name": "Girl's Grey Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "9fe:MoreCraftableEquipment.esp": { "out": "d822:HearthFires.esm", "name": "Girl's Yellow Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
     "9ff:MoreCraftableEquipment.esp": { "out": "426c8:Skyrim.esm", "name": "Shiv", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Daggers", "open": false },
+    "d1e8e:Apocalypse - Magic of Skyrim.esp": { "out": "89702:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Skyfall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "b646:Apocalypse - Magic of Skyrim.esp" },
+    "1a793f:Apocalypse - Magic of Skyrim.esp": { "out": "1a793e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Poisoned Chalice", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "15e721:Apocalypse - Magic of Skyrim.esp" },
+    "d1e71:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b8:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Honor Guard", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "133d6:Apocalypse - Magic of Skyrim.esp" },
+    "d1e6d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b6:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Cat Totem", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "27144:Apocalypse - Magic of Skyrim.esp" },
+    "d1e6e:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Pit Fighter", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "12364:Apocalypse - Magic of Skyrim.esp" },
+    "161633:Apocalypse - Magic of Skyrim.esp": { "out": "161632:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ice Prisms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "15e73e:Apocalypse - Magic of Skyrim.esp" },
+    "d1e6f:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Xivilai Sorcerer", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1228a8:Apocalypse - Magic of Skyrim.esp" },
+    "10983d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ac:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Seidkona", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "3789f:Apocalypse - Magic of Skyrim.esp" },
+    "d1e72:Apocalypse - Magic of Skyrim.esp": { "out": "7a7bd:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Herne", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "128e8:Apocalypse - Magic of Skyrim.esp" },
+    "10c70a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Incendiary Flows", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "85910:Apocalypse - Magic of Skyrim.esp" },
+    "d1e78:Apocalypse - Magic of Skyrim.esp": { "out": "7c848:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Thundercracks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "7c83b:Apocalypse - Magic of Skyrim.esp" },
+    "d1e79:Apocalypse - Magic of Skyrim.esp": { "out": "7a79f:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Bolides", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "294cd:Apocalypse - Magic of Skyrim.esp" },
+    "d1e7a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a1:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Electrospheres", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1879:Apocalypse - Magic of Skyrim.esp" },
+    "d1e7b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a0:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ice Shivs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "24b44:Apocalypse - Magic of Skyrim.esp" },
+    "d1e80:Apocalypse - Magic of Skyrim.esp": { "out": "7a797:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Silent", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "17509:Apocalypse - Magic of Skyrim.esp" },
+    "d1e8c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b1:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Decomposition", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1f1fb:Apocalypse - Magic of Skyrim.esp" },
+    "d1e7e:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a6:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Clouds", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "2878:Apocalypse - Magic of Skyrim.esp" },
+    "d1e7f:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a5:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Bombardment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "294d4:Apocalypse - Magic of Skyrim.esp" },
+    "d1e8b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b0:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ruin", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "159d8:Apocalypse - Magic of Skyrim.esp" },
+    "d1e81:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Illusory Flames", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "3682f:Apocalypse - Magic of Skyrim.esp" },
+    "d1e82:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a8:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Mind Vision", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "378a9:Apocalypse - Magic of Skyrim.esp" },
+    "d1e8d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Nature's Balance", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "12dc:Apocalypse - Magic of Skyrim.esp" },
+    "d1e84:Apocalypse - Magic of Skyrim.esp": { "out": "7a7aa:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Shadowbond", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "31c4d:Apocalypse - Magic of Skyrim.esp" },
+    "d1e85:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ab:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Empathic Agony", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "a4ef7:Apocalypse - Magic of Skyrim.esp" },
+    "d1e87:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ad:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "378ae:Apocalypse - Magic of Skyrim.esp" },
+    "d1e88:Apocalypse - Magic of Skyrim.esp": { "out": "7a798:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Leech Seed", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "13e4fd:Apocalypse - Magic of Skyrim.esp" },
+    "d1e89:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ae:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Slaying", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "3e0f:Apocalypse - Magic of Skyrim.esp" },
+    "d1e8a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7af:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Death", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "35452:Apocalypse - Magic of Skyrim.esp" },
+    "d1e99:Apocalypse - Magic of Skyrim.esp": { "out": "bb974:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Atronach Marks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2cd7e:Apocalypse - Magic of Skyrim.esp" },
+    "d1e92:Apocalypse - Magic of Skyrim.esp": { "out": "896fd:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Blaze", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "85594:Apocalypse - Magic of Skyrim.esp" },
+    "d1e70:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ba:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Champion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "128df:Apocalypse - Magic of Skyrim.esp" },
+    "d1e90:Apocalypse - Magic of Skyrim.esp": { "out": "896fb:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Flesh", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "88694:Apocalypse - Magic of Skyrim.esp" },
+    "d1e91:Apocalypse - Magic of Skyrim.esp": { "out": "bb97a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Summoning Runes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "124ec5:Apocalypse - Magic of Skyrim.esp" },
+    "d1e97:Apocalypse - Magic of Skyrim.esp": { "out": "896fa:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Undermining", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "2e31:Apocalypse - Magic of Skyrim.esp" },
+    "d1e93:Apocalypse - Magic of Skyrim.esp": { "out": "896fe:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Shadows", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "8558a:Apocalypse - Magic of Skyrim.esp" },
+    "d1e94:Apocalypse - Magic of Skyrim.esp": { "out": "896ff:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Welling Blood", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "1fcd9:Apocalypse - Magic of Skyrim.esp" },
+    "d1e95:Apocalypse - Magic of Skyrim.esp": { "out": "89700:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Wilting", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "12214:Apocalypse - Magic of Skyrim.esp" },
+    "d1e96:Apocalypse - Magic of Skyrim.esp": { "out": "974e2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Lamb", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "36a03:Apocalypse - Magic of Skyrim.esp" },
+    "1a792f:Apocalypse - Magic of Skyrim.esp": { "out": "1a792e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ganking", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1a1b79:Apocalypse - Magic of Skyrim.esp" },
+    "d1e98:Apocalypse - Magic of Skyrim.esp": { "out": "803f7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Perilous Paths", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "803f2:Apocalypse - Magic of Skyrim.esp" },
+    "d1e67:Apocalypse - Magic of Skyrim.esp": { "out": "7a799:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Crackling", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "109653:Apocalypse - Magic of Skyrim.esp" },
+    "1a7933:Apocalypse - Magic of Skyrim.esp": { "out": "1a7932:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Silvery Barbs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "15b843:Apocalypse - Magic of Skyrim.esp" },
+    "d1e9a:Apocalypse - Magic of Skyrim.esp": { "out": "bb977:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Deadeye Captain", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "37e17:Apocalypse - Magic of Skyrim.esp" },
+    "d1e9e:Apocalypse - Magic of Skyrim.esp": { "out": "bb96e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Pain", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "43ce1:Apocalypse - Magic of Skyrim.esp" },
+    "1a7937:Apocalypse - Magic of Skyrim.esp": { "out": "1a7934:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Hrormir's Misdirection", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "15b847:Apocalypse - Magic of Skyrim.esp" },
+    "d1e9d:Apocalypse - Magic of Skyrim.esp": { "out": "bdfac:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Scorching Hands", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "2388c:Apocalypse - Magic of Skyrim.esp" },
+    "d1e9b:Apocalypse - Magic of Skyrim.esp": { "out": "896fc:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Corpse Explosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1212eb:Apocalypse - Magic of Skyrim.esp" },
+    "1a793b:Apocalypse - Magic of Skyrim.esp": { "out": "1a793a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Automaton Breaking", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1a4a46:Apocalypse - Magic of Skyrim.esp" },
+    "d1e83:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Whispers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "58655:Apocalypse - Magic of Skyrim.esp" },
+    "d1e74:Apocalypse - Magic of Skyrim.esp": { "out": "7a79c:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Creeping Cold", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "279bd:Apocalypse - Magic of Skyrim.esp" },
+    "d1e8f:Apocalypse - Magic of Skyrim.esp": { "out": "896f9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Imprisonment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "2e25:Apocalypse - Magic of Skyrim.esp" },
+    "d1e7d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a4:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Sleet Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "27f2e:Apocalypse - Magic of Skyrim.esp" },
+    "d1e75:Apocalypse - Magic of Skyrim.esp": { "out": "7c849:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Dragon's Teeth", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "24361:Apocalypse - Magic of Skyrim.esp" },
+    "d1e76:Apocalypse - Magic of Skyrim.esp": { "out": "7a79d:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Fractures", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "279c0:Apocalypse - Magic of Skyrim.esp" },
+    "d1e77:Apocalypse - Magic of Skyrim.esp": { "out": "7a79e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Rift Bolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "253c2:Apocalypse - Magic of Skyrim.esp" },
+    "d1e9c:Apocalypse - Magic of Skyrim.esp": { "out": "bb97c:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Oathbound", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "18ae7:Apocalypse - Magic of Skyrim.esp" },
+    "d1e9f:Apocalypse - Magic of Skyrim.esp": { "out": "bb968:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Illusory Pyres", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "32c8b:Apocalypse - Magic of Skyrim.esp" },
+    "d1ea0:Apocalypse - Magic of Skyrim.esp": { "out": "bb969:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Necroplagues", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "34d12:Apocalypse - Magic of Skyrim.esp" },
+    "d1e6c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b5:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Churl", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "12359:Apocalypse - Magic of Skyrim.esp" },
+    "161624:Apocalypse - Magic of Skyrim.esp": { "out": "161625:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Monarch Mark", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "161621:Apocalypse - Magic of Skyrim.esp" },
+    "d1e7c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a3:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Scattershocks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "24e49:Apocalypse - Magic of Skyrim.esp" },
+    "d1e66:Apocalypse - Magic of Skyrim.esp": { "out": "7a234:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Avenging Wraith", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "17a8e:Apocalypse - Magic of Skyrim.esp" },
+    "d1e73:Apocalypse - Magic of Skyrim.esp": { "out": "7a7bc:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Xivilai Lord", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "12370:Apocalypse - Magic of Skyrim.esp" },
+    "d1e68:Apocalypse - Magic of Skyrim.esp": { "out": "7a79b:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Hailstones", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2e634:Apocalypse - Magic of Skyrim.esp" },
+    "d1e69:Apocalypse - Magic of Skyrim.esp": { "out": "7a79a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Withering", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "12649c:Apocalypse - Magic of Skyrim.esp" },
+    "d1e6a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b3:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Entombing", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "4581c:Apocalypse - Magic of Skyrim.esp" },
+    "d1e6b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b4:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Lockblasting", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "ab69:Apocalypse - Magic of Skyrim.esp" },
+    "3383:CommonClothes.esp": { "out": "1870:CommonClothes.esp", "name": "Boiled Leather Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
+    "3384:CommonClothes.esp": { "out": "1879:CommonClothes.esp", "name": "Robed Iron Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
+    "3385:CommonClothes.esp": { "out": "1871:CommonClothes.esp", "name": "Mail Tunic", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
+    "3386:CommonClothes.esp": { "out": "1872:CommonClothes.esp", "name": "Mail and Surcoat", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
+    "3387:CommonClothes.esp": { "out": "1873:CommonClothes.esp", "name": "Mail and Jacket", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
+    "3388:CommonClothes.esp": { "out": "1874:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
+    "3389:CommonClothes.esp": { "out": "1875:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
+    "338a:CommonClothes.esp": { "out": "1875:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Body armour", "open": true },
+    "338b:CommonClothes.esp": { "out": "1877:CommonClothes.esp", "name": "Oiled Mail Hauberk", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
+    "338c:CommonClothes.esp": { "out": "1878:CommonClothes.esp", "name": "Oiled Mail and Jacket", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
+    "43e8:CommonClothes.esp": { "out": "187a:CommonClothes.esp", "name": "Robed Iron Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
+    "1d5bb:CommonClothes.esp": { "out": "10f63:CommonClothes.esp", "name": "Mail and Hide Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
+    "1d5bc:CommonClothes.esp": { "out": "10f64:CommonClothes.esp", "name": "Oiled Mail and Hide Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
+    "2e00:Cloaks&Capes.esp": { "out": "2dec:Cloaks&Capes.esp", "name": "Linen Cape (Yellow)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2dff:Cloaks&Capes.esp": { "out": "2889:Cloaks&Capes.esp", "name": "Linen Cape (Purple)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2dfe:Cloaks&Capes.esp": { "out": "2888:Cloaks&Capes.esp", "name": "Linen Cape (Green)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2dfd:Cloaks&Capes.esp": { "out": "2887:Cloaks&Capes.esp", "name": "Linen Cape (Blue)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2dfc:Cloaks&Capes.esp": { "out": "12c7:Cloaks&Capes.esp", "name": "Linen Cape (Red)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2e03:Cloaks&Capes.esp": { "out": "1d8e:Cloaks&Capes.esp", "name": "Fur Cloak (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
+    "2e04:Cloaks&Capes.esp": { "out": "2883:Cloaks&Capes.esp", "name": "Fur Cloak (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
+    "2e05:Cloaks&Capes.esp": { "out": "2884:Cloaks&Capes.esp", "name": "Fur Cloak (Brown)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
+    "2e06:Cloaks&Capes.esp": { "out": "2885:Cloaks&Capes.esp", "name": "Fur Cloak (Snowy Sabre)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
+    "2e07:Cloaks&Capes.esp": { "out": "2886:Cloaks&Capes.esp", "name": "Fur Cloak (Vale Sabre)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
+    "2e08:Cloaks&Capes.esp": { "out": "2df0:Cloaks&Capes.esp", "name": "Pale Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2e0a:Cloaks&Capes.esp": { "out": "2df2:Cloaks&Capes.esp", "name": "Hjaalmarch Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2e0b:Cloaks&Capes.esp": { "out": "2df3:Cloaks&Capes.esp", "name": "Markarth Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2e0c:Cloaks&Capes.esp": { "out": "2df4:Cloaks&Capes.esp", "name": "Riften Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2e0d:Cloaks&Capes.esp": { "out": "2df5:Cloaks&Capes.esp", "name": "Solitude Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2e0e:Cloaks&Capes.esp": { "out": "2df6:Cloaks&Capes.esp", "name": "Whiterun Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2e0f:Cloaks&Capes.esp": { "out": "2df7:Cloaks&Capes.esp", "name": "Stormcloak Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2e10:Cloaks&Capes.esp": { "out": "2df8:Cloaks&Capes.esp", "name": "Winterhold Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "2e02:Cloaks&Capes.esp": { "out": "2ded:Cloaks&Capes.esp", "name": "Linen Cape (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "55bd:Cloaks&Capes.esp": { "out": "2def:Cloaks&Capes.esp", "name": "Leather Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "2e01:Cloaks&Capes.esp": { "out": "2dee:Cloaks&Capes.esp", "name": "Linen Cape (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "55ad:Cloaks&Capes.esp": { "out": "2dfa:Cloaks&Capes.esp", "name": "College of Winterhold Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "55ae:Cloaks&Capes.esp": { "out": "2dfb:Cloaks&Capes.esp", "name": "Dark Brotherhood Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "55ac:Cloaks&Capes.esp": { "out": "2df9:Cloaks&Capes.esp", "name": "Dawngaurd Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "92d4:FishingInSkyrim.esp": { "out": "92d3:FishingInSkyrim.esp", "name": "Dwemer Fire Paste", "type": "INGR", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "master", "family": "Ingredients", "open": true },
+    "1f24f:FishingInSkyrim.esp": { "out": "20d45:FishingInSkyrim.esp", "name": "Fishing Pole - Crude", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "2180d:FishingInSkyrim.esp": { "out": "207e2:FishingInSkyrim.esp", "name": "Fishing Pole - Fine", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "expert", "family": "Other goods", "open": true },
+    "1f252:FishingInSkyrim.esp": { "out": "1f253:FishingInSkyrim.esp", "name": "Fishing Pole - Master", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "master", "family": "Other goods", "open": true },
+    "15480:Thornswood-Content.esp": { "out": "15481:Thornswood-Content.esp", "name": "Poor Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "15486:Thornswood-Content.esp": { "out": "15482:Thornswood-Content.esp", "name": "Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
+    "15487:Thornswood-Content.esp": { "out": "15484:Thornswood-Content.esp", "name": "Charcoal Briquette", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "expert", "family": "Other goods", "open": true },
+    "15488:Thornswood-Content.esp": { "out": "15485:Thornswood-Content.esp", "name": "Coke", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "master", "family": "Other goods", "open": true },
+    "1548d:Thornswood-Content.esp": { "out": "e3c16:Skyrim.esm", "name": "Pickaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "War axes", "open": true },
+    "1548e:Thornswood-Content.esp": { "out": "2f2f4:Skyrim.esm", "name": "Woodcutter's Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other weapons", "open": true },
+    "15491:Thornswood-Content.esp": { "out": "15490:Thornswood-Content.esp", "name": "Tool Handle", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "15492:Thornswood-Content.esp": { "out": "f5d05:Skyrim.esm", "name": "Shovel", "type": "MISC", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "15496:Thornswood-Content.esp": { "out": "15495:Thornswood-Content.esp", "name": "Key Mold", "type": "MISC", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other goods", "open": true },
+    "15497:Thornswood-Content.esp": { "out": "15494:Thornswood-Content.esp", "name": "Key", "type": "MISC", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other goods", "open": true },
     "37668:ZIA_Complete Pack.esp": { "out": "3764f:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Helmets", "open": false },
     "3766f:ZIA_Complete Pack.esp": { "out": "335a2:ZIA_Complete Pack.esp", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Helmets", "open": false },
     "3766e:ZIA_Complete Pack.esp": { "out": "d2846:Skyrim.esm", "name": "Masque of Clavicus Vile", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Helmets", "open": false },
@@ -9467,110 +9802,33 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "5ecc:DIS_Heavy_Legion.esp": { "out": "5ebd:DIS_Heavy_Legion.esp", "name": "Old Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Shields", "open": true },
     "6eff:DIS_Heavy_Legion.esp": { "out": "5ec2:DIS_Heavy_Legion.esp", "name": "Old Captain Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Helmets", "open": true },
     "6f00:DIS_Heavy_Legion.esp": { "out": "5ebb:DIS_Heavy_Legion.esp", "name": "Old Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Helmets", "open": true },
-    "d1e8e:Apocalypse - Magic of Skyrim.esp": { "out": "89702:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Skyfall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "1a793f:Apocalypse - Magic of Skyrim.esp": { "out": "1a793e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Poisoned Chalice", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e71:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b8:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Honor Guard", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e6d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b6:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Cat Totem", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e6e:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Pit Fighter", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "161633:Apocalypse - Magic of Skyrim.esp": { "out": "161632:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ice Prisms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e6f:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Xivilai Sorcerer", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "10983d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ac:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Seidkona", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e72:Apocalypse - Magic of Skyrim.esp": { "out": "7a7bd:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Herne", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "10c70a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Incendiary Flows", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e78:Apocalypse - Magic of Skyrim.esp": { "out": "7c848:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Thundercracks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e79:Apocalypse - Magic of Skyrim.esp": { "out": "7a79f:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Bolides", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e7a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a1:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Electrospheres", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e7b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a0:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ice Shivs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e80:Apocalypse - Magic of Skyrim.esp": { "out": "7a797:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Silent", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e8c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b1:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Decomposition", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e7e:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a6:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Clouds", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e7f:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a5:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Bombardment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e8b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b0:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ruin", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e81:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Illusory Flames", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e82:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a8:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Mind Vision", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e8d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Nature's Balance", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e84:Apocalypse - Magic of Skyrim.esp": { "out": "7a7aa:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Shadowbond", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e85:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ab:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Empathic Agony", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e87:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ad:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e88:Apocalypse - Magic of Skyrim.esp": { "out": "7a798:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Leech Seed", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e89:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ae:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Slaying", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e8a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7af:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Death", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e99:Apocalypse - Magic of Skyrim.esp": { "out": "bb974:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Atronach Marks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e92:Apocalypse - Magic of Skyrim.esp": { "out": "896fd:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Blaze", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e70:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ba:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Champion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e90:Apocalypse - Magic of Skyrim.esp": { "out": "896fb:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Flesh", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e91:Apocalypse - Magic of Skyrim.esp": { "out": "bb97a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Summoning Runes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e97:Apocalypse - Magic of Skyrim.esp": { "out": "896fa:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Undermining", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e93:Apocalypse - Magic of Skyrim.esp": { "out": "896fe:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Shadows", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e94:Apocalypse - Magic of Skyrim.esp": { "out": "896ff:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Welling Blood", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e95:Apocalypse - Magic of Skyrim.esp": { "out": "89700:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Wilting", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e96:Apocalypse - Magic of Skyrim.esp": { "out": "974e2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Lamb", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "1a792f:Apocalypse - Magic of Skyrim.esp": { "out": "1a792e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ganking", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e98:Apocalypse - Magic of Skyrim.esp": { "out": "803f7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Perilous Paths", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e67:Apocalypse - Magic of Skyrim.esp": { "out": "7a799:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Crackling", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1a7933:Apocalypse - Magic of Skyrim.esp": { "out": "1a7932:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Silvery Barbs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e9a:Apocalypse - Magic of Skyrim.esp": { "out": "bb977:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Deadeye Captain", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e9e:Apocalypse - Magic of Skyrim.esp": { "out": "bb96e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Pain", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "1a7937:Apocalypse - Magic of Skyrim.esp": { "out": "1a7934:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Hrormir's Misdirection", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e9d:Apocalypse - Magic of Skyrim.esp": { "out": "bdfac:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Scorching Hands", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e9b:Apocalypse - Magic of Skyrim.esp": { "out": "896fc:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Corpse Explosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "1a793b:Apocalypse - Magic of Skyrim.esp": { "out": "1a793a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Automaton Breaking", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e83:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Whispers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e74:Apocalypse - Magic of Skyrim.esp": { "out": "7a79c:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Creeping Cold", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e8f:Apocalypse - Magic of Skyrim.esp": { "out": "896f9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Imprisonment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e7d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a4:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Sleet Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e75:Apocalypse - Magic of Skyrim.esp": { "out": "7c849:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Dragon's Teeth", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e76:Apocalypse - Magic of Skyrim.esp": { "out": "7a79d:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Fractures", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e77:Apocalypse - Magic of Skyrim.esp": { "out": "7a79e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Rift Bolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e9c:Apocalypse - Magic of Skyrim.esp": { "out": "bb97c:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Oathbound", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e9f:Apocalypse - Magic of Skyrim.esp": { "out": "bb968:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Illusory Pyres", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1ea0:Apocalypse - Magic of Skyrim.esp": { "out": "bb969:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Necroplagues", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e6c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b5:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Churl", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "161624:Apocalypse - Magic of Skyrim.esp": { "out": "161625:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Monarch Mark", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e7c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a3:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Scattershocks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e66:Apocalypse - Magic of Skyrim.esp": { "out": "7a234:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Avenging Wraith", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e73:Apocalypse - Magic of Skyrim.esp": { "out": "7a7bc:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Xivilai Lord", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e68:Apocalypse - Magic of Skyrim.esp": { "out": "7a79b:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Hailstones", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e69:Apocalypse - Magic of Skyrim.esp": { "out": "7a79a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Withering", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e6a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b3:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Entombing", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "d1e6b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b4:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Lockblasting", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "master", "family": "Staves", "open": false },
-    "3383:CommonClothes.esp": { "out": "1870:CommonClothes.esp", "name": "Boiled Leather Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
-    "3384:CommonClothes.esp": { "out": "1879:CommonClothes.esp", "name": "Robed Iron Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
-    "3385:CommonClothes.esp": { "out": "1871:CommonClothes.esp", "name": "Mail Tunic", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
-    "3386:CommonClothes.esp": { "out": "1872:CommonClothes.esp", "name": "Mail and Surcoat", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
-    "3387:CommonClothes.esp": { "out": "1873:CommonClothes.esp", "name": "Mail and Jacket", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
-    "3388:CommonClothes.esp": { "out": "1874:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
-    "3389:CommonClothes.esp": { "out": "1875:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
-    "338a:CommonClothes.esp": { "out": "1875:CommonClothes.esp", "name": "Leather Doublet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Body armour", "open": true },
-    "338b:CommonClothes.esp": { "out": "1877:CommonClothes.esp", "name": "Oiled Mail Hauberk", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
-    "338c:CommonClothes.esp": { "out": "1878:CommonClothes.esp", "name": "Oiled Mail and Jacket", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
-    "43e8:CommonClothes.esp": { "out": "187a:CommonClothes.esp", "name": "Robed Iron Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
-    "1d5bb:CommonClothes.esp": { "out": "10f63:CommonClothes.esp", "name": "Mail and Hide Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
-    "1d5bc:CommonClothes.esp": { "out": "10f64:CommonClothes.esp", "name": "Oiled Mail and Hide Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
-    "2e00:Cloaks&Capes.esp": { "out": "2dec:Cloaks&Capes.esp", "name": "Linen Cape (Yellow)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "2dff:Cloaks&Capes.esp": { "out": "2889:Cloaks&Capes.esp", "name": "Linen Cape (Purple)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "2dfe:Cloaks&Capes.esp": { "out": "2888:Cloaks&Capes.esp", "name": "Linen Cape (Green)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "2dfd:Cloaks&Capes.esp": { "out": "2887:Cloaks&Capes.esp", "name": "Linen Cape (Blue)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "2dfc:Cloaks&Capes.esp": { "out": "12c7:Cloaks&Capes.esp", "name": "Linen Cape (Red)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "2e03:Cloaks&Capes.esp": { "out": "1d8e:Cloaks&Capes.esp", "name": "Fur Cloak (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
-    "2e04:Cloaks&Capes.esp": { "out": "2883:Cloaks&Capes.esp", "name": "Fur Cloak (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
-    "2e05:Cloaks&Capes.esp": { "out": "2884:Cloaks&Capes.esp", "name": "Fur Cloak (Brown)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
-    "2e06:Cloaks&Capes.esp": { "out": "2885:Cloaks&Capes.esp", "name": "Fur Cloak (Snowy Sabre)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
-    "2e07:Cloaks&Capes.esp": { "out": "2886:Cloaks&Capes.esp", "name": "Fur Cloak (Vale Sabre)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
-    "2e08:Cloaks&Capes.esp": { "out": "2df0:Cloaks&Capes.esp", "name": "Pale Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "2e0a:Cloaks&Capes.esp": { "out": "2df2:Cloaks&Capes.esp", "name": "Hjaalmarch Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "2e0b:Cloaks&Capes.esp": { "out": "2df3:Cloaks&Capes.esp", "name": "Markarth Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "2e0c:Cloaks&Capes.esp": { "out": "2df4:Cloaks&Capes.esp", "name": "Riften Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "2e0d:Cloaks&Capes.esp": { "out": "2df5:Cloaks&Capes.esp", "name": "Solitude Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "2e0e:Cloaks&Capes.esp": { "out": "2df6:Cloaks&Capes.esp", "name": "Whiterun Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "2e0f:Cloaks&Capes.esp": { "out": "2df7:Cloaks&Capes.esp", "name": "Stormcloak Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "2e10:Cloaks&Capes.esp": { "out": "2df8:Cloaks&Capes.esp", "name": "Winterhold Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "2e02:Cloaks&Capes.esp": { "out": "2ded:Cloaks&Capes.esp", "name": "Linen Cape (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "55bd:Cloaks&Capes.esp": { "out": "2def:Cloaks&Capes.esp", "name": "Leather Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "2e01:Cloaks&Capes.esp": { "out": "2dee:Cloaks&Capes.esp", "name": "Linen Cape (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "55ad:Cloaks&Capes.esp": { "out": "2dfa:Cloaks&Capes.esp", "name": "College of Winterhold Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "55ae:Cloaks&Capes.esp": { "out": "2dfb:Cloaks&Capes.esp", "name": "Dark Brotherhood Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "55ac:Cloaks&Capes.esp": { "out": "2df9:Cloaks&Capes.esp", "name": "Dawngaurd Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
+    "800:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "12c7:Cloaks&Capes.esp", "name": "Linen Cape (Red)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "801:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2887:Cloaks&Capes.esp", "name": "Linen Cape (Blue)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "802:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2888:Cloaks&Capes.esp", "name": "Linen Cape (Green)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "803:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2889:Cloaks&Capes.esp", "name": "Linen Cape (Purple)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "804:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dec:Cloaks&Capes.esp", "name": "Linen Cape (Yellow)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "805:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dee:Cloaks&Capes.esp", "name": "Linen Cape (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "806:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2ded:Cloaks&Capes.esp", "name": "Linen Cape (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "807:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "1d8e:Cloaks&Capes.esp", "name": "Fur Cloak (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
+    "808:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2883:Cloaks&Capes.esp", "name": "Fur Cloak (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
+    "809:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2884:Cloaks&Capes.esp", "name": "Fur Cloak (Brown)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
+    "80a:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2885:Cloaks&Capes.esp", "name": "Fur Cloak (Snowy Sabre)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
+    "80b:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2886:Cloaks&Capes.esp", "name": "Fur Cloak (Vale Sabre)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
+    "80c:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df0:Cloaks&Capes.esp", "name": "Pale Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "80e:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df2:Cloaks&Capes.esp", "name": "Hjaalmarch Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "80f:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df3:Cloaks&Capes.esp", "name": "Markarth Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "810:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df4:Cloaks&Capes.esp", "name": "Riften Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "811:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df5:Cloaks&Capes.esp", "name": "Solitude Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "812:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df6:Cloaks&Capes.esp", "name": "Whiterun Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "813:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df7:Cloaks&Capes.esp", "name": "Stormcloak Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "814:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df8:Cloaks&Capes.esp", "name": "Winterhold Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "815:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df9:Cloaks&Capes.esp", "name": "Dawngaurd Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "816:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dfa:Cloaks&Capes.esp", "name": "College of Winterhold Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "817:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dfb:Cloaks&Capes.esp", "name": "Dark Brotherhood Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "818:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2def:Cloaks&Capes.esp", "name": "Leather Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
+    "2de5:PlayFluteLuteDrum.esp": { "out": "287f:PlayFluteLuteDrum.esp", "name": "Drum", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "novice", "family": "Other weapons", "open": true },
+    "1838:PlayFluteLuteDrum.esp": { "out": "d62:PlayFluteLuteDrum.esp", "name": "Flute", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "novice", "family": "Other weapons", "open": true },
+    "2de4:PlayFluteLuteDrum.esp": { "out": "1d9b:PlayFluteLuteDrum.esp", "name": "Lute", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "novice", "family": "Other weapons", "open": true },
     "94f:YokuWeapons.esp": { "out": "800:YokuWeapons.esp", "name": "Light Mercenary Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Shields", "open": false },
     "950:YokuWeapons.esp": { "out": "f2b:YokuWeapons.esp", "name": "Memnos Shield", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Shields", "open": false },
     "84b:YokuWeapons.esp": { "out": "809:YokuWeapons.esp", "name": "Forebears' Saber", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "advanced", "family": "Swords", "open": false },
@@ -9633,37 +9891,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "946:YokuWeapons.esp": { "out": "f50:YokuWeapons.esp", "name": "Alik'r Red Nomad Turban", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "redguard", "rank": "advanced", "family": "Helmets", "open": false },
     "94b:YokuWeapons.esp": { "out": "f29:YokuWeapons.esp", "name": "Yokudan Lion-Robes", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "redguard", "rank": "master", "family": "Body armour", "open": false },
     "94d:YokuWeapons.esp": { "out": "f3e:YokuWeapons.esp", "name": "Yokudan Brave-Helm", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "redguard", "rank": "expert", "family": "Helmets", "open": false },
-    "92d4:FishingInSkyrim.esp": { "out": "92d3:FishingInSkyrim.esp", "name": "Dwemer Fire Paste", "type": "INGR", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "master", "family": "Ingredients", "open": true },
-    "1f24f:FishingInSkyrim.esp": { "out": "20d45:FishingInSkyrim.esp", "name": "Fishing Pole - Crude", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
-    "2180d:FishingInSkyrim.esp": { "out": "207e2:FishingInSkyrim.esp", "name": "Fishing Pole - Fine", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "expert", "family": "Other goods", "open": true },
-    "1f252:FishingInSkyrim.esp": { "out": "1f253:FishingInSkyrim.esp", "name": "Fishing Pole - Master", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "master", "family": "Other goods", "open": true },
-    "800:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "12c7:Cloaks&Capes.esp", "name": "Linen Cape (Red)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "801:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2887:Cloaks&Capes.esp", "name": "Linen Cape (Blue)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "802:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2888:Cloaks&Capes.esp", "name": "Linen Cape (Green)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "803:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2889:Cloaks&Capes.esp", "name": "Linen Cape (Purple)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "804:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dec:Cloaks&Capes.esp", "name": "Linen Cape (Yellow)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "805:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dee:Cloaks&Capes.esp", "name": "Linen Cape (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "806:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2ded:Cloaks&Capes.esp", "name": "Linen Cape (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "807:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "1d8e:Cloaks&Capes.esp", "name": "Fur Cloak (White)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
-    "808:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2883:Cloaks&Capes.esp", "name": "Fur Cloak (Black)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
-    "809:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2884:Cloaks&Capes.esp", "name": "Fur Cloak (Brown)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
-    "80a:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2885:Cloaks&Capes.esp", "name": "Fur Cloak (Snowy Sabre)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
-    "80b:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2886:Cloaks&Capes.esp", "name": "Fur Cloak (Vale Sabre)", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "expert", "family": "Other armour and clothing", "open": false },
-    "80c:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df0:Cloaks&Capes.esp", "name": "Pale Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "80e:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df2:Cloaks&Capes.esp", "name": "Hjaalmarch Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "80f:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df3:Cloaks&Capes.esp", "name": "Markarth Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "810:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df4:Cloaks&Capes.esp", "name": "Riften Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "811:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df5:Cloaks&Capes.esp", "name": "Solitude Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "812:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df6:Cloaks&Capes.esp", "name": "Whiterun Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "813:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df7:Cloaks&Capes.esp", "name": "Stormcloak Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "814:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df8:Cloaks&Capes.esp", "name": "Winterhold Guard Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "815:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2df9:Cloaks&Capes.esp", "name": "Dawngaurd Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "816:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dfa:Cloaks&Capes.esp", "name": "College of Winterhold Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "817:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2dfb:Cloaks&Capes.esp", "name": "Dark Brotherhood Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
-    "818:MoreCraftableEquipment_CloaksandCapes.esp": { "out": "2def:Cloaks&Capes.esp", "name": "Leather Cape", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other armour and clothing", "open": false },
-    "2de5:PlayFluteLuteDrum.esp": { "out": "287f:PlayFluteLuteDrum.esp", "name": "Drum", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "novice", "family": "Other weapons", "open": true },
-    "1838:PlayFluteLuteDrum.esp": { "out": "d62:PlayFluteLuteDrum.esp", "name": "Flute", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "novice", "family": "Other weapons", "open": true },
-    "2de4:PlayFluteLuteDrum.esp": { "out": "1d9b:PlayFluteLuteDrum.esp", "name": "Lute", "type": "WEAP", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "novice", "family": "Other weapons", "open": true },
     "659f:Playable Rieklings.esp": { "out": "659d:Playable Rieklings.esp", "name": "Riekling Chief Fur Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Other armour and clothing", "open": true },
     "c33c:Playable Rieklings.esp": { "out": "c33b:Playable Rieklings.esp", "name": "Riekling Claws", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "riekling", "rank": "novice", "family": "Other weapons", "open": true },
     "19f8c:Playable Rieklings.esp": { "out": "19f5f:Playable Rieklings.esp", "name": "Riekling Fur Armour", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Body armour", "open": true },
@@ -9770,7 +9997,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "bfee1:Playable Rieklings.esp": { "out": "bfd90:Playable Rieklings.esp", "name": "Riekling Blacksmith's Apron", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
     "bfee2:Playable Rieklings.esp": { "out": "bfd95:Playable Rieklings.esp", "name": "Riekling Chef's Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
     "bfee3:Playable Rieklings.esp": { "out": "bfd96:Playable Rieklings.esp", "name": "Riekling Executioner's Hood", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Hats and hoods", "open": true },
-    "bfee4:Playable Rieklings.esp": { "out": "bfd97:Playable Rieklings.esp", "name": "Riekling Executioner's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "riekling", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "bfee4:Playable Rieklings.esp": { "out": "bfd97:Playable Rieklings.esp", "name": "Riekling Executioner's Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
     "bfee5:Playable Rieklings.esp": { "out": "bfd98:Playable Rieklings.esp", "name": "Riekling Belted Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
     "bfee6:Playable Rieklings.esp": { "out": "bfd99:Playable Rieklings.esp", "name": "Riekling Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
     "bfee7:Playable Rieklings.esp": { "out": "bfd9a:Playable Rieklings.esp", "name": "Riekling Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
@@ -9783,7 +10010,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "bfeee:Playable Rieklings.esp": { "out": "bfda5:Playable Rieklings.esp", "name": "Riekling Noble Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
     "bfeef:Playable Rieklings.esp": { "out": "bfe44:Playable Rieklings.esp", "name": "Riekling Gilded Wristguards", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Gauntlets", "open": true },
     "bfef0:Playable Rieklings.esp": { "out": "bfe45:Playable Rieklings.esp", "name": "Riekling Fine Armguards", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Gauntlets", "open": true },
-    "bfef1:Playable Rieklings.esp": { "out": "bfda9:Playable Rieklings.esp", "name": "Riekling Embellished Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "riekling", "rank": "advanced", "family": "Robes and body wear", "open": true },
+    "bfef1:Playable Rieklings.esp": { "out": "bfda9:Playable Rieklings.esp", "name": "Riekling Embellished Robes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
     "bfef2:Playable Rieklings.esp": { "out": "bfdaa:Playable Rieklings.esp", "name": "Riekling Refined Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
     "bfef3:Playable Rieklings.esp": { "out": "bfdab:Playable Rieklings.esp", "name": "Riekling Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
     "bfef4:Playable Rieklings.esp": { "out": "bfdac:Playable Rieklings.esp", "name": "Riekling Clothes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
@@ -9813,16 +10040,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "bff34:Playable Rieklings.esp": { "out": "bff30:Playable Rieklings.esp", "name": "Riekling Bandit Fur Kilt&Cloak", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Body armour", "open": true },
     "bff38:Playable Rieklings.esp": { "out": "bff36:Playable Rieklings.esp", "name": "Riekling Bandit Fur Shoes", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Armoured boots", "open": true },
     "c0374:Playable Rieklings.esp": { "out": "c0372:Playable Rieklings.esp", "name": "Riekling Shrouded Shoes", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "15480:Thornswood-Content.esp": { "out": "15481:Thornswood-Content.esp", "name": "Poor Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "novice", "family": "Other goods", "open": true },
-    "15486:Thornswood-Content.esp": { "out": "15482:Thornswood-Content.esp", "name": "Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
-    "15487:Thornswood-Content.esp": { "out": "15484:Thornswood-Content.esp", "name": "Charcoal Briquette", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "expert", "family": "Other goods", "open": true },
-    "15488:Thornswood-Content.esp": { "out": "15485:Thornswood-Content.esp", "name": "Coke", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "master", "family": "Other goods", "open": true },
-    "1548d:Thornswood-Content.esp": { "out": "e3c16:Skyrim.esm", "name": "Pickaxe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "War axes", "open": true },
-    "1548e:Thornswood-Content.esp": { "out": "2f2f4:Skyrim.esm", "name": "Woodcutter's Axe", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other weapons", "open": true },
-    "15491:Thornswood-Content.esp": { "out": "15490:Thornswood-Content.esp", "name": "Tool Handle", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "novice", "family": "Other goods", "open": true },
-    "15492:Thornswood-Content.esp": { "out": "f5d05:Skyrim.esm", "name": "Shovel", "type": "MISC", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other goods", "open": true },
-    "15496:Thornswood-Content.esp": { "out": "15495:Thornswood-Content.esp", "name": "Key Mold", "type": "MISC", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other goods", "open": true },
-    "15497:Thornswood-Content.esp": { "out": "15494:Thornswood-Content.esp", "name": "Key", "type": "MISC", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Other goods", "open": true },
     "306f:HearthFires.esm": { "out": "3012:HearthFires.esm", "name": "Lock", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "a lock, and locks are not made at a forge here. A door takes the key its holder cut from a mold." },
     "306e:HearthFires.esm": { "out": "3011:HearthFires.esm", "name": "Hinge", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "a hinge, for a house nobody builds here. Property is claimed with a deed and opened with a key cut from a mold." },
     "306d:HearthFires.esm": { "out": "300f:HearthFires.esm", "name": "Nails", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "a nail, for a house nobody builds here. Property is claimed with a deed and opened with a key cut from a mold." },
@@ -11846,7 +12063,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 
   // ==== ADMIN_NAMES ====
   /* Built by scripts\dev\Build-AdminNameTables.py out of the 101 plugins in the load order.
-     Do not hand edit. 10903 item names and 2190 actor names, for /give and /spawn, which
+     Do not hand edit. 10898 item names and 2190 actor names, for /give and /spawn, which
      read them after their own tables. Lower-case name -> [name as written, record]. */
   var ADMIN_ITEMS = {
     "123 abc def ghijklmnop qrstu vwxyz 123456789": ["123 Abc Def Ghijklmnop Qrstu VWXYZ 123456789", "b7736:Skyrim.esm"],
@@ -15162,7 +15379,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "elven helmet of major magicka": ["Elven Helmet of Major Magicka", "bdff3:Skyrim.esm"],
     "elven helmet of major restoration": ["Elven Helmet of Major Restoration", "bdff7:Skyrim.esm"],
     "elven helmet of restoration": ["Elven Helmet of Restoration", "bdff6:Skyrim.esm"],
-    "elven horse armor": ["Elven Horse Armor", "30ca:Update.esm"],
     "elven light armor": ["Elven Light Armor", "105f12:Skyrim.esm"],
     "elven light boots": ["Elven Light Boots", "105f11:Skyrim.esm"],
     "elven light gauntlets": ["Elven Light Gauntlets", "105f13:Skyrim.esm"],
@@ -19647,7 +19863,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "roras's letter": ["Roras's Letter", "37f8a:Skyrim.esm"],
     "rorik's manor key": ["Rorik's Manor Key", "9e131:Skyrim.esm"],
     "rorikstead shop key": ["Rorikstead Shop Key", "4c4c:JKs Skyrim.esp"],
-    "rot scale": ["Rot Scale", "306d:Update.esm"],
     "roughspun tunic": ["Roughspun Tunic", "3c9fe:Skyrim.esm"],
     "round table": ["Round Table", "c736:HearthFires.esm"],
     "round table and chairs": ["Round Table and Chairs", "5a1c:HearthFires.esm"],
@@ -19839,7 +20054,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "scrap of paper": ["Scrap of Paper", "1a436:Dawnguard.esm"],
     "scrawled note": ["Scrawled Note", "31cc8:Dragonborn.esm"],
     "scrawled page": ["Scrawled page", "d3979:Skyrim.esm"],
-    "screaming maw": ["Screaming Maw", "306e:Update.esm"],
     "scribbled note": ["Scribbled Note", "5b9c9:Skyrim.esm"],
     "scribbles of a madman": ["Scribbles of a Madman", "27a21:Dragonborn.esm"],
     "scroll of acceleration rune": ["Scroll of Acceleration Rune", "3a9c5:Apocalypse - Magic of Skyrim.esp"],
@@ -21694,7 +21908,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "steel helmet of restoration": ["Steel Helmet of Restoration", "b50e7:Skyrim.esm"],
     "steel helmet of waterbreathing": ["Steel Helmet of Waterbreathing", "92a86:Skyrim.esm"],
     "steel horned helmet": ["Steel Horned Helmet", "f6f24:Skyrim.esm"],
-    "steel horse armor": ["Steel Horse Armor", "30c9:Update.esm"],
     "steel imperial gauntlets": ["Steel Imperial Gauntlets", "f6f23:Skyrim.esm"],
     "steel ingot": ["Steel Ingot", "5ace5:Skyrim.esm"],
     "steel katana": ["Steel Katana", "747c3:Immersive Weapons.esp"],
@@ -22224,7 +22437,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "thistle branch": ["Thistle Branch", "134aa:Skyrim.esm"],
     "thistle branch (3)": ["Thistle Branch (3)", "b48:HearthFires.esm"],
     "thonar's journal": ["Thonar's Journal", "d674a:Skyrim.esm"],
-    "thorn hook": ["Thorn Hook", "306f:Update.esm"],
     "thread": ["Thread", "6ce001:Update.esm"],
     "three thieves": ["Three Thieves", "1b276:Skyrim.esm"],
     "thresher maul": ["Thresher Maul", "557d63:Immersive Weapons.esp"],
@@ -24958,16 +25170,24 @@ function isRecipe(recipeDesc) {
 }
 
 /*
-  Everybody who has been told once that a profession will start deciding this.
+  NO PROFESSION, NOTHING MADE. Patrick, 29 September, closing issue #1037:
+  "There should be no grace at all they shouldn't be allowed to just make
+  anything because they didn't choose a profession."
 
-  In memory rather than on the character, because it is bookkeeping about what
-  has been said in this session and not a fact about the person. A restart says
-  it to them once more, which is the right side to be wrong on: the sentence
-  exists so that a new character at a forge learns why nothing is stopping them
-  yet, and saying it twice over two evenings costs nothing while never saying it
-  costs somebody the explanation.
+  Until then a character with no profession was let through every craft and
+  every held bench, which was called a first-evening allowance and never
+  ended: picking a profession only took things away. So the recipe gate
+  (craftAnswer), the bench gate (benchGate) and the brew and enchant gate
+  (recipelessCraft) all refuse somebody with no profession, with this one
+  sentence, because the answer is the same key wherever they are standing.
+
+  WHAT IS STILL NOBODY'S WORK is unchanged: a recipe no half owns (smelting
+  ore into ingots, tanning a hide into leather, the 1,679 in recipes.json that
+  every trade needs) never reaches craftAnswer, and a bench whose BENCH_ACCESS
+  row says anyone (the smelter, the tanning rack, the forge) still opens. What
+  such a bench holds that IS somebody's work is then refused here.
 */
-var toldCraftingIsComing = {};
+const NO_PROFESSION_AT_A_BENCH = 'You have not chosen a profession yet, so there is nothing you can make here. Press K and choose one.';
 
 /**
  * What the rulebook calls a profession, or the word itself when the rules do
@@ -25257,14 +25477,9 @@ function benchGate(actorId, baseDesc) {
   }
   if (!s) { return null; }
 
-  /*
-    NOBODY IS SHUT OUT ON THEIR FIRST EVENING, which is the same allowance
-    craftAnswer makes and for the same reason. Somebody who has not pressed K
-    yet has no half, so every bench in the province would refuse them with no
-    way to work out why, and creation is exactly when a person is most likely to
-    be standing at one.
-  */
-  if (!s.prof) { return null; }
+  // No profession, nothing made, and the sentence says which key fixes it
+  // (NO_PROFESSION_AT_A_BENCH, #1037).
+  if (!s.prof) { return NO_PROFESSION_AT_A_BENCH; }
 
   const halves = bench.halves || {};
   for (const half in halves) {
@@ -25426,19 +25641,13 @@ function craftAnswer(actorId, row) {
   const halfName = C.nameOf ? C.nameOf(half) : half;
 
   /*
-    NOBODY IS STRANDED AT A FORGE ON THEIR FIRST EVENING. A character with no
-    profession yet is let through and told once why that will change. The
-    alternative is somebody who has not pressed K yet standing at a workbench
-    that refuses everything with no way to work out what is wrong, and creation
-    is exactly when a person is most likely to be at one.
+    NO PROFESSION, NOTHING MADE (#1037). Every row that reaches this gate is
+    somebody's work, so a character with no profession is refused it and told
+    to press K. What is nobody's work never gets here; see
+    NO_PROFESSION_AT_A_BENCH.
   */
   if (!s.prof) {
-    if (!Object.prototype.hasOwnProperty.call(toldCraftingIsComing, actorId)) {
-      toldCraftingIsComing[actorId] = true;
-      out.note = 'You have no profession yet, so nothing is stopping you making that. ' +
-                 'Press K and pick one: from then on your half of it decides what you ' +
-                 'can make at all.';
-    }
+    out.refusal = NO_PROFESSION_AT_A_BENCH;
     return out;
   }
 
@@ -25451,6 +25660,13 @@ function craftAnswer(actorId, row) {
     plate, because anybody who works a forge does.'
   */
   if (P.canWork(s, half, rank)) {
+    // A staff also needs its spell learned from a tome (THE STAFF SPELLS, #967).
+    const staff = globalThis.__thornswoodStaffSpells;
+    const unlearned = (staff && row.spell) ? staff.refusal(s, row) : null;
+    if (unlearned) {
+      out.refusal = unlearned;
+      return out;
+    }
     out.credit = half;
     return out;
   }
@@ -25744,9 +25960,16 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
     log('the recipeless craft gate threw reading the character, so it is open:', e);
     return;
   }
-  // Nobody is stranded on their first evening, the same rule the recipe gate
-  // keeps: a character with no profession yet is let through.
-  if (!s || !s.prof) { return; }
+  if (!s) { return; }
+  // No profession, no brewing and no enchanting, the same rule the recipe gate
+  // keeps (NO_PROFESSION_AT_A_BENCH, #1037).
+  if (!s.prof) {
+    notify(actorId, NO_PROFESSION_AT_A_BENCH);
+    say(actorId, NO_PROFESSION_AT_A_BENCH);
+    log(actorId.toString(16), 'was refused a recipeless craft with no profession at bench',
+        (workbenchId || 0).toString(16), '(' + (whatBench || 'unknown bench') + ')');
+    return false;
+  }
 
   var P = globalThis.__thornswoodProgression;
 
@@ -25820,7 +26043,7 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
   The recipe that makes a key, and how long to wait before naming what it made.
 
   ThornswoodRecipeKey is added to Thornswood-Content.esp by
-  tools\Add-ContentRecords.py, one iron ingot at a forge. The delay is a tick
+  scripts\mods\Add-ContentRecords.py, one iron ingot at a forge. The delay is a tick
   rather than a measurement: the output lands as soon as this handler returns
   and nobody blocked, so anything above zero is enough and a quarter second is
   well clear of a slow frame.
@@ -26061,7 +26284,7 @@ log('gamemode loaded:',
   if (globalThis.__thornswoodVoiceFeed) {
     try { clearInterval(globalThis.__thornswoodVoiceFeed); } catch (e) { }
   }
-  globalThis.__thornswoodVoiceFeed = setInterval(function () {
+  globalThis.__thornswoodVoiceFeed = setInterval(guard('voiceFeed', function () {
     var who = [];
     try {
       var online = mp.get(0, 'onlinePlayers') || [];
@@ -26071,16 +26294,20 @@ log('gamemode loaded:',
           var pos = mp.get(id, 'pos');
           if (!pos) continue;
           var angle = mp.get(id, 'angle') || [0, 0, 0];
+          // Each read once: five times a second for everybody on, an
+          // appearance read twice was ten parses a person a second (#385).
+          var pid = mp.get(id, 'profileId');
+          var look = mp.get(id, 'appearance');
           who.push({
-            profileId: mp.get(id, 'profileId'),
+            profileId: pid,
             pos: pos,
             angleZ: angle[2],
             // Two people in the same room share this string. Two people either
             // side of a loading door do not, which is exactly the line voice
             // should stop at.
             cell: String(mp.get(id, 'worldOrCellDesc') || ''),
-            name: String(mp.get(id, 'appearance') && mp.get(id, 'appearance').name || ''),
-            party: partyFor(mp.get(id, 'profileId'))
+            name: String(look && look.name || ''),
+            party: partyFor(pid)
           });
         } catch (e) { }
       }
@@ -26088,14 +26315,14 @@ log('gamemode loaded:',
 
     if (who.length === 0) return;
     try { send({ who: who }); } catch (e) { }
-  }, EVERY_MS);
+  }), EVERY_MS);
 
   // ------------------------------------------------------------- online ---
   // How many people are awake, written where the launcher can read it.
   //
   // There is no way to ask a SkyMP server how busy it is: its networking has
-  // no status packet, and the public list the old build used belongs to Skyrim
-  // Together and this server never reports to it. But the server already
+  // no status packet, and the public list the old build used belongs to the
+  // old multiplayer mod and this server never reports to it. But the server already
   // serves its resources folder over HTTP, so a small file dropped in there is
   // readable by every launcher without opening anything new or inventing a
   // protocol.
@@ -26103,13 +26330,28 @@ log('gamemode loaded:',
     var fs = require('fs');
     var path = require('path');
     var dataDir = 'data';
+    var privDir = 'private';
     try {
       var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
       if (cfg && cfg.dataDir) dataDir = String(cfg.dataDir);
+      if (cfg && cfg.privDir) privDir = String(cfg.privDir);
     } catch (e) { }
 
     var onlineFile = path.join(dataDir, 'online.json');
     var lastWritten = -1;
+
+    /*
+      Who is on, by character name, for the deploy scripts (issue #520).
+
+      Deploy-DevGamemode and Deploy-Server read the count before they stop
+      anything and warn the room, but a count cannot say whose evening is
+      about to be interrupted. The names go into the private folder, never
+      next to online.json: that folder is served over HTTP to anybody who
+      asks, and who is on right now is nobody else's business. The deploy
+      reads this one over ssh.
+    */
+    var namesFile = path.join(privDir, 'online-names.json');
+    var lastNames = null;
 
     // Cleared on a hot reload, so reloading does not leave two writers
     // racing each other over the same file.
@@ -26117,10 +26359,34 @@ log('gamemode loaded:',
       try { clearInterval(globalThis.__thornswoodOnlineWriter); } catch (e) { }
     }
     var lastRestarting = false;
+    var lastMax = -1;
+    var lastLine = -1;
+    var lastFull = null;
 
     globalThis.__thornswoodOnlineWriter = setInterval(function () {
       var n = 0;
-      try { n = (mp.get(0, 'onlinePlayers') || []).length; } catch (e) { return; }
+      var on = [];
+      try { on = mp.get(0, 'onlinePlayers') || []; n = on.length; } catch (e) { return; }
+
+      // Written on its own test, before the count's: one person leaving and
+      // another arriving between two passes leaves the count where it was.
+      var names = [];
+      for (var i = 0; i < on.length; i++) {
+        var nm = '';
+        try { nm = String((mp.get(on[i], 'appearance') || {}).name || ''); } catch (e) { }
+        if (!nm) {
+          try { nm = 'profile ' + mp.get(on[i], 'profileId'); } catch (e) { nm = 'somebody'; }
+        }
+        names.push(nm);
+      }
+      names.sort();
+      var namesKey = names.join('\n');
+      if (namesKey !== lastNames) {
+        try {
+          fs.writeFileSync(namesFile, JSON.stringify({ at: Date.now(), names: names }));
+          lastNames = namesKey;
+        } catch (e) { }
+      }
 
       /*
         Whether a countdown is running, for the client's own probe.
@@ -26157,12 +26423,29 @@ log('gamemode loaded:',
       // Only when something moves. This file sits in a folder the server
       // serves, and rewriting it twice a second for no reason is churn nobody
       // asked for.
-      if (n === lastWritten && restarting === lastRestarting) return;
+      // And the most the world holds at once (#481), so the launcher and the
+      // site say "N of 25" from the server's own number.
+      var max = 0;
+      try { max = Number((mp.getServerSettings() || {}).thornswoodMostOnline) || 0; } catch (e) { max = 0; }
+      // And how many wait at the menu, and whether somebody picking now would
+      // wait too, from the seats block (#481): the menu reads full to decide
+      // between joining and taking a place in line, the site to say so.
+      var line = 0, full = false;
+      try {
+        var seatsNow = globalThis.__thornswoodSeats ? globalThis.__thornswoodSeats.status() : null;
+        line = seatsNow ? Number(seatsNow.line) || 0 : 0;
+        full = !!(seatsNow && seatsNow.full);
+      } catch (e) { line = 0; full = false; }
+      if (n === lastWritten && restarting === lastRestarting && max === lastMax &&
+          line === lastLine && full === lastFull) return;
       lastWritten = n;
       lastRestarting = restarting;
+      lastMax = max;
+      lastLine = line;
+      lastFull = full;
       try {
         fs.writeFileSync(onlineFile, JSON.stringify({
-          now: n, at: Date.now(), restarting: restarting
+          now: n, at: Date.now(), restarting: restarting, max: max, line: line, full: full
         }));
       } catch (e) { }
     }, 2000);
@@ -26425,6 +26708,57 @@ log('gamemode loaded:',
     nobody else's (POST /api/play/roster with the Discord ticket). Sent when
     the book changes, and once after a start so a restart is not a blank.
   */
+  /*
+    WHICH OF THE LAUNCHERS' CHARACTERS THIS WORLD STILL HOLDS (#955).
+
+    Patrick picked his character on dev on 28 Sep and was sent to creation.
+    The dev server's log: "Creating character ff000005", "1 logged as
+    902356861". The engine found no actor under that profile and made a new
+    one, so the gamemode was right to treat it as new. The character had been
+    made on 20 Sep in a dev world that started over on 23 Sep, and since 26 Sep
+    the engine also skips any character whose saved race no longer loads
+    ("Skipping ChangeForm ...: bad raceId in appearanceDump"). The launcher
+    still listed it, with its old name off the site's roster, which never
+    forgets a row.
+
+    So the server says which characters it has. Every profile the site allows
+    in (allowed.json, which the door refreshes) is looked up in this world, and
+    the answer goes to the site with the roster: checked is the list looked
+    at, held the ones with a character here. The site tells each launcher
+    which of its own characters this server does not have, and the menu marks
+    them. Sent once after a start and every HELD_EVERY_MS.
+  */
+  var HELD_EVERY_MS = 300000;
+  var serverName = 'main';
+  try {
+    var cfgS = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+    serverName = String((cfgS && cfgS.thornswoodServer) || '').trim().toLowerCase() || 'main';
+  } catch (e) { }
+  var heldSaid = false;
+  function heldReport() {
+    if (typeof mp === 'undefined' || !mp || typeof mp.getActorsByProfileId !== 'function') {
+      if (!heldSaid) { heldSaid = true; console.log('[thornswood] roster: this server cannot look characters up by profile, so the menu is not told which are gone'); }
+      return null;
+    }
+    var ids = [];
+    try {
+      var doc = JSON.parse(fs.readFileSync(path.join(privDir, 'allowed.json'), 'utf8').replace(/^﻿/, ''));
+      var list = (doc && Array.isArray(doc.profiles)) ? doc.profiles : [];
+      for (var i = 0; i < list.length; i++) {
+        var n = Number(list[i]);
+        if (n > 0 && ids.indexOf(n) < 0) ids.push(n);
+      }
+    } catch (e) { return null; }
+    if (!ids.length) return null;
+    var held = [];
+    for (var j = 0; j < ids.length; j++) {
+      var got;
+      try { got = mp.getActorsByProfileId(ids[j]); } catch (e) { return null; }
+      if (got && got.length) held.push(ids[j]);
+    }
+    return { checked: ids, held: held };
+  }
+
   var pushSaid = false;
   function push() {
     var conf;
@@ -26436,7 +26770,10 @@ log('gamemode loaded:',
     try { https = require('https'); } catch (e) { return; }
     var u;
     try { u = new URL(String(conf.site).replace(/\/+$/, '') + '/api/roster'); } catch (e) { return; }
-    var body = JSON.stringify({ key: String(conf.key), who: book });
+    var msg = { key: String(conf.key), who: book, server: serverName };
+    var rep = heldReport();
+    if (rep) { msg.checked = rep.checked; msg.held = rep.held; }
+    var body = JSON.stringify(msg);
     try {
       var req = https.request({
         host: u.hostname, port: u.port || 443, path: u.pathname, method: 'POST', timeout: 5000,
@@ -26459,6 +26796,12 @@ log('gamemode loaded:',
     } catch (e) { }
   }
   setTimeout(push, 15000);
+  // The held report goes again every five minutes, a new character included.
+  // Stored so a hot reload replaces it rather than adding another.
+  if (globalThis.__thornswoodHeldPush) {
+    try { clearInterval(globalThis.__thornswoodHeldPush); } catch (e) { }
+  }
+  globalThis.__thornswoodHeldPush = setInterval(push, HELD_EVERY_MS);
 
   var dirty = false;
 
@@ -26636,7 +26979,17 @@ log('gamemode loaded:',
           if (jid) jarlIds[jid] = true;
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, count: Object.keys(ids).length };
+      // Who holds one of the Discord staff roles itself (#481), for the staff
+      // seats. Not devProfiles: that also counts the site's hand written
+      // admins list, which is not a role.
+      var staffRoleIds = {};
+      if (Array.isArray(doc.staffRoleProfiles)) {
+        for (var sr = 0; sr < doc.staffRoleProfiles.length; sr++) {
+          var sid = Number(doc.staffRoleProfiles[sr]);
+          if (sid) staffRoleIds[sid] = true;
+        }
+      }
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -26660,6 +27013,11 @@ log('gamemode loaded:',
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsAdmin = function (profileId) {
     var l = load();
     return !!(l && l.adminIds && l.adminIds[Number(profileId)]);
+  };
+  // A Discord staff role on the account, for the staff seats (#481).
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodHoldsStaffRole = function (profileId) {
+    var l = load();
+    return !!(l && l.staffRoleIds && l.staffRoleIds[Number(profileId)]);
   };
 
   /*
@@ -26906,6 +27264,7 @@ log('gamemode loaded:',
       devProfiles: merged(doc.devProfiles, had.devProfiles),
       adminProfiles: merged(doc.adminProfiles, had.adminProfiles),
       jarlProfiles: merged(doc.jarlProfiles, had.jarlProfiles),
+      staffRoleProfiles: merged(doc.staffRoleProfiles, had.staffRoleProfiles),
       people: people
     };
   }
@@ -27014,6 +27373,7 @@ log('gamemode loaded:',
             doc.devProfiles = kept.devProfiles;
             doc.adminProfiles = kept.adminProfiles;
             doc.jarlProfiles = kept.jarlProfiles;
+            doc.staffRoleProfiles = kept.staffRoleProfiles;
             doc.people = kept.people;
             note(doc.failedProfiles.length + ' profiles could not be checked with Discord ' +
                  'and keep the standing they had' +
@@ -27027,7 +27387,16 @@ log('gamemode loaded:',
               devProfiles: Array.isArray(doc.devProfiles) ? doc.devProfiles : [],
               adminProfiles: Array.isArray(doc.adminProfiles) ? doc.adminProfiles : [],
               jarlProfiles: Array.isArray(doc.jarlProfiles) ? doc.jarlProfiles : [],
+              // The Discord staff roles themselves, for the staff seats (#481).
+              staffRoleProfiles: Array.isArray(doc.staffRoleProfiles) ? doc.staffRoleProfiles : [],
               people: doc.people || [],
+              // Staff bans with why and until (#412), from the site's own
+              // file rather than Discord, so they are fresh even when the
+              // lists above were kept. The staff block ends a banned session.
+              bans: Array.isArray(doc.bans) ? doc.bans : [],
+              // Characters staff have killed for good (#1010). The staff
+              // block ends one quietly if it is in the world.
+              pk: Array.isArray(doc.pk) ? doc.pk : [],
               at: new Date().toISOString(),
               note: 'Written by the gamemode from the site. Set enforce true to turn the door on.'
             }, null, 2));
@@ -27148,6 +27517,10 @@ log('gamemode loaded:',
       return false;
     }
 
+    // Kept for the load order refusal below, which compares what a client
+    // reports against exactly the list the client itself is compared with.
+    globalThis.__thornswoodManifestMods = mods;
+
     var dropped = doc.mods.length - mods.length;
     console.log('[thornswood] load order manifest published at /api/servers/' + KEY +
                 '/manifest.json, ' + mods.length + ' plugins' +
@@ -27223,6 +27596,1322 @@ log('gamemode loaded:',
   }, 1000);
 })();
 // ==== end thornswood server manifest ====
+
+// ==== thornswood load order refusal ====
+/*
+  A MISMATCHED SESSION IS TOLD, AND CAN BE REFUSED (#402).
+
+  The game's own check (loadOrderVerificationService in the client) compares
+  the manifest above against Game.getModName, position by position, by name,
+  size and crc32, and on a difference it paints LOAD ORDER ERROR in red and
+  carries on. Nothing ends the session and nothing says what to do. On 17 Sep a
+  tester's screenshot of the mining bug had that caption on it: he was playing
+  a session where every custom object could resolve to something else, and
+  reporting what he saw as bugs.
+
+  So the front plugin reports its load order here, every two minutes, and this
+  compares it with the manifest. On a difference the person is told in one
+  sentence where it goes wrong and to press Fix, and, when the server is set to
+  refuse, the session is ended a few seconds later so the sentence lands first.
+
+  THE REPORT. A chat line is capped at 400 characters by the voice service, so
+  the list cannot ride it as names. Each plugin is a five hex mark instead,
+  FNV-1a over its lowercased name, size and crc32 (loadOrderMark, which the
+  front plugin carries a copy of, and tests\test-load-order-refusal.js holds
+  the two to each other), sent as
+
+      /loadorder <total> <from> <mark><mark>...
+
+  sixty four marks a line, so any length of list fits. A mark that differs
+  names the position, which a single digest over the whole list could not.
+  Twenty bits a mark means one wrong plugin in a million goes unseen, which is
+  a lot better than the caption everybody ignores.
+
+  NAME ONLY IS ACCEPTED TOO. The front marks the Bethesda masters and the
+  Creation Club files by name alone, the same ten Verify.cs leaves out of its
+  byte check: Steam owns those, Fix cannot mend them, and a refusal that says
+  "press Fix" over one would be a door with no way through. It does the same
+  for a plugin whose bytes it could not read. So a position passes when its
+  mark matches the server's plugin with bytes or without, and fails only when
+  it matches neither.
+
+  PLUGINS AFTER THE SERVER'S LAST ARE LEFT ALONE, as the game's own check
+  leaves them (a yellow warning only): they sit after every position the server
+  resolves a form by, so nothing of the server's points anywhere else. The
+  launcher refuses Play over them anyway. A client list that is SHORTER is a
+  mismatch at the first position it does not have.
+
+  WATCHING UNTIL IT IS SWITCHED ON. thornswoodLoadOrderRefuse in
+  server-settings.json, true to end the session. Anything else tells the person
+  and writes WOULD REFUSE to the log, and they stay. It is a setting and not a
+  default because it is a decision (#402 leaves it with Patrick and Djinn): the
+  launcher already refuses Play over the same list, and a kick with no process
+  restart behind it left a reconnecting character with no world on 17 Sep (see
+  clearTheServer). The door works the same way round, with its own enforce.
+
+  WHAT THIS WIDENS, said plainly. The profile id a report arrives under is a
+  claim, as for every line on this queue (see the note over rolelist), so with
+  refusing on, somebody who can pose as another profile on the voice socket can
+  end that person's session. Voice joins with a token close that hole, and
+  THORNSWOOD_VOICE_AUTH is on for both voice services (28 Sep).
+
+  NO REPORT IS A MISMATCH TOO (Patrick, 28 Sep: in game, an older launcher or
+  front plugin is not kept working; only updating and security are). The front
+  sends its report as soon as it has it and again every two minutes, so a
+  report lost on the way is sent again. A profile online for GRACE_MS with no
+  complete report is treated the way a list that differs is: told, and refused
+  when refusing is on. A partial report is no report.
+
+  THE SERVER'S OWN FAILURES NEVER REFUSE ANYBODY. When this server cannot do
+  the check, it logs and lets them stay: no manifest published, or the command
+  relay from the voice service not answering (the report rides it, so the
+  clock waits until the relay has been up for the whole grace), or the check
+  itself throwing.
+*/
+(function () {
+  var g = globalThis;
+
+  var CHUNK = 64;           // marks a line; 64 * 5 plus the words stays under 400
+  var WAIT_MS = 120000;     // a report whose last line never came is dropped
+
+  function loadOrderMark(name, size, crc32) {
+    var s = String(name == null ? '' : name).trim().toLowerCase();
+    if (size !== undefined && size !== null) { s += '|' + Number(size) + '|' + (Number(crc32) >>> 0); }
+    var h = 0x811c9dc5;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return ('00000' + ((h >>> 0) & 0xfffff).toString(16)).slice(-5);
+  }
+
+  /*
+    The comparison, with nothing else in it. serverMods is the manifest's mods,
+    marks the client's list in order. Returns null when they agree, or where
+    they part: { at, theirs } with theirs the plugin the server has there.
+  */
+  function loadOrderVerdict(serverMods, marks) {
+    var mods = Array.isArray(serverMods) ? serverMods : [];
+    var have = Array.isArray(marks) ? marks : [];
+    for (var i = 0; i < mods.length; i++) {
+      var m = mods[i] || {};
+      if (i >= have.length) { return { at: i, theirs: String(m.filename) }; }
+      var mark = String(have[i]).toLowerCase();
+      if (mark !== loadOrderMark(m.filename, m.size, m.crc32) &&
+          mark !== loadOrderMark(m.filename)) {
+        return { at: i, theirs: String(m.filename) };
+      }
+    }
+    return null;
+  }
+
+  /** The one sentence, both ways round. */
+  function loadOrderSentence(verdict, refusing) {
+    return 'Your plugins are not the server\'s from position ' + verdict.at +
+           ', where the server has ' + verdict.theirs + ', so ' +
+           (refusing ? 'this session is being ended before anything goes wrong: '
+                     : 'what you see may not be what the server means: close the game, ') +
+           'press Fix in the launcher, then Play again.';
+  }
+
+  function refusing() {
+    try {
+      var cfg = mp.getServerSettings() || {};
+      return cfg.thornswoodLoadOrderRefuse === true;
+    } catch (e) { return false; }
+  }
+
+  // Half arrived reports, by profile. On globalThis so a hot reload between
+  // two lines of one report does not lose the first.
+  if (!g.__thornswoodLoadOrderParts) { g.__thornswoodLoadOrderParts = {}; }
+  var parts = g.__thornswoodLoadOrderParts;
+
+  /*
+    Who has reported and who is online, for the report that never comes.
+    reported: profile -> when its last complete report arrived.
+    online:   profile -> { joined, clock, actorId, judged } while it is online.
+    last:     profile -> { key, at }, the last verdict said, so a report sent
+              again every two minutes is not said again every two minutes.
+  */
+  if (!g.__thornswoodLoadOrderSeen) { g.__thornswoodLoadOrderSeen = { reported: {}, online: {}, last: {} }; }
+  var seen = g.__thornswoodLoadOrderSeen;
+
+  var GRACE_MS = 300000;          // online this long with no complete report: no report
+  var REPORT_BEFORE_MS = 600000;  // a report this long before the character arrived still counts
+  var RELAY_STALE_MS = 10000;     // the command poll runs every 1.5 s
+  var SAY_AGAIN_MS = 600000;      // the same verdict is said and logged at most this often
+  var SWEEP_MS = 15000;
+
+  function actorOfProfile(profileId) {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return 0; }
+    for (var i = 0; i < online.length; i++) {
+      var pid = 0;
+      try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+      if (pid === profileId) { return online[i]; }
+    }
+    return 0;
+  }
+
+  // After the sentence, so it is on screen before the connection goes.
+  function refuseLater(profileId, actorId) {
+    setTimeout(function () {
+      var actor = actorId || actorOfProfile(profileId);
+      var userId = -1;
+      try { userId = mp.getUserByActor(actor); } catch (e) { userId = -1; }
+      if (userId === undefined || userId === null || userId < 0) {
+        console.log('[thornswood] could not find the connection of profile ' + profileId + ', so they stayed');
+        return;
+      }
+      try { mp.kick(userId); } catch (e) { console.log('[thornswood] could not refuse profile ' + profileId + ': ' + e); }
+    }, 5000);
+  }
+
+  /* True when this verdict has not been said to this profile lately. */
+  function fresh(profileId, key, now) {
+    var l = seen.last[profileId];
+    if (l && l.key === key && now - l.at < SAY_AGAIN_MS) { return false; }
+    seen.last[profileId] = { key: key, at: now };
+    return true;
+  }
+
+  /*
+    One line of a report. tell(text) says a line to the person; actorId is
+    their character, which the dispatcher has already waited for. Returns the
+    verdict once the whole list is in, and undefined until then.
+  */
+  function take(profileId, words, actorId, tell) {
+    var total = Number(words[1]);
+    var from = Number(words[2]);
+    var marks = String(words[3] || '').match(/[0-9a-f]{5}/gi) || [];
+    if (!(total >= 0) || !(from >= 0) || total > 4096) { return undefined; }
+
+    var now = Date.now();
+    for (var k in parts) {
+      if (Object.prototype.hasOwnProperty.call(parts, k) && now - parts[k].at > WAIT_MS) { delete parts[k]; }
+    }
+    var p = parts[profileId];
+    if (from === 0) { p = parts[profileId] = { total: total, marks: [], at: now }; }
+    if (!p || p.total !== total || p.marks.length !== from) {
+      console.log('[thornswood] load order report from profile ' + profileId +
+                  ' arrived out of order, so it was not checked');
+      delete parts[profileId];
+      return undefined;
+    }
+    p.marks = p.marks.concat(marks);
+    p.at = now;
+    if (p.marks.length < total) { return undefined; }
+    delete parts[profileId];
+    seen.reported[profileId] = now;
+
+    var mods = g.__thornswoodManifestMods;
+    if (!Array.isArray(mods) || !mods.length) {
+      console.log('[thornswood] load order report from profile ' + profileId +
+                  ' not checked: the manifest is not published yet');
+      return undefined;
+    }
+
+    var verdict = loadOrderVerdict(mods, p.marks.slice(0, total));
+    if (!verdict) {
+      if (fresh(profileId, 'match', now)) {
+        console.log('[thornswood] load order of profile ' + profileId + ' matches the server\'s, ' +
+                    mods.length + ' plugins' +
+                    (total > mods.length ? ' and ' + (total - mods.length) + ' after them' : ''));
+      }
+      return null;
+    }
+
+    var refuse = refusing();
+    if (!refuse) {
+      if (fresh(profileId, 'at ' + verdict.at, now)) {
+        tell(loadOrderSentence(verdict, false));
+        console.log('[thornswood] WOULD REFUSE profile ' + profileId + ': load order differs at ' +
+                    verdict.at + ', where the server has ' + verdict.theirs +
+                    '. Watching only, they stayed (thornswoodLoadOrderRefuse is not true).');
+      }
+      return verdict;
+    }
+    seen.last[profileId] = { key: 'at ' + verdict.at, at: now };
+    tell(loadOrderSentence(verdict, true));
+    console.log('[thornswood] refusing profile ' + profileId + ': load order differs at ' +
+                verdict.at + ', where the server has ' + verdict.theirs);
+    refuseLater(profileId, actorId);
+    return verdict;
+  }
+
+  /** The sentence for a report that never came. */
+  function noReportSentence(refusing) {
+    return 'Your game has not told the server which plugins it loaded, so ' +
+           (refusing ? 'this session is being ended before anything goes wrong: '
+                     : 'what you see may not be what the server means: close the game, ') +
+           'press Fix in the launcher, then Play again.';
+  }
+
+  /*
+    Once every SWEEP_MS: who has been online GRACE_MS with no complete report.
+    online is [{ actorId, profileId }]; tell(profileId, text) says a line.
+    Returns the profiles judged this sweep. Pure but for the log, the tell and
+    the kick, so the test can drive it with its own clock.
+  */
+  function sweep(now, online, tell) {
+    var mods = g.__thornswoodManifestMods;
+    var poll = g.__thornswoodCommandPoll || {};
+    // The server's own failures: the clock only runs while the server could
+    // have heard a report, and it starts again after any break in the relay.
+    var canCheck = Array.isArray(mods) && mods.length > 0 &&
+                   !!poll.okAt && now - poll.okAt <= RELAY_STALE_MS;
+    var here = {};
+    var judged = [];
+    for (var i = 0; i < online.length; i++) {
+      var pid = Number(online[i] && online[i].profileId) || 0;
+      if (!pid) { continue; }
+      here[pid] = true;
+      var e = seen.online[pid];
+      if (!e) { e = seen.online[pid] = { joined: now, clock: now, actorId: 0, judged: false }; }
+      e.actorId = online[i].actorId;
+      if (!canCheck) { e.clock = now; continue; }
+      if (poll.failAt && poll.failAt > e.clock) { e.clock = poll.failAt; }
+      if (e.judged) { continue; }
+      var r = seen.reported[pid] || 0;
+      if (r && r >= e.joined - REPORT_BEFORE_MS) { continue; }
+      if (now - e.clock < GRACE_MS) { continue; }
+      e.judged = true;
+      judged.push(pid);
+      var refuse = refusing();
+      tell(pid, noReportSentence(refuse));
+      if (!refuse) {
+        console.log('[thornswood] WOULD REFUSE profile ' + pid + ': no load order report in ' +
+                    Math.round((now - e.clock) / 1000) + 's online. Watching only, they stayed ' +
+                    '(thornswoodLoadOrderRefuse is not true).');
+        continue;
+      }
+      console.log('[thornswood] refusing profile ' + pid + ': no load order report in ' +
+                  Math.round((now - e.clock) / 1000) + 's online');
+      refuseLater(pid, e.actorId);
+    }
+    for (var k in seen.online) {
+      if (Object.prototype.hasOwnProperty.call(seen.online, k) && !here[k]) { delete seen.online[k]; }
+    }
+    for (var q in seen.reported) {
+      if (Object.prototype.hasOwnProperty.call(seen.reported, q) && !here[q] &&
+          now - seen.reported[q] > REPORT_BEFORE_MS) { delete seen.reported[q]; }
+    }
+    return judged;
+  }
+
+  g.__thornswoodLoadOrder = { mark: loadOrderMark, verdict: loadOrderVerdict,
+                              sentence: loadOrderSentence, noReport: noReportSentence,
+                              take: take, sweep: sweep, chunk: CHUNK, grace: GRACE_MS };
+
+  // The sweep's own failure is the server's, so it logs and refuses nobody.
+  if (g.__thornswoodLoadOrderTimer) { clearInterval(g.__thornswoodLoadOrderTimer); }
+  g.__thornswoodLoadOrderTimer = setInterval(function () {
+    try {
+      var list = [];
+      var online = mp.get(0, 'onlinePlayers') || [];
+      for (var i = 0; i < online.length; i++) {
+        var pid = 0;
+        try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+        if (pid) { list.push({ actorId: online[i], profileId: pid }); }
+      }
+      var say = g.__thornswoodToProfile;
+      sweep(Date.now(), list, function (pid, text) { if (say) { say(pid, text); } });
+    } catch (e) {
+      console.log('[thornswood] load order sweep failed, nobody refused: ' + e);
+    }
+  }, SWEEP_MS);
+})();
+// ==== end thornswood load order refusal ====
+
+
+// ==== thornswood join pass ====
+/*
+  NOBODY IS IN THE WORLD WHO DID NOT COME THROUGH AN UP TO DATE LAUNCHER (#937).
+
+  Patrick, 28 Sep: "People should not be allowed in at all if they don't join
+  from our launcher." Until this only the launcher checked: it holds Play while
+  an update waits, but the server never asked which launcher, if any, started
+  the game. Skyrim or skse started by hand, another launcher, or an old one of
+  ours walked straight in, under a profile id the client picks (#410).
+
+  THE PASS. When a character is picked at the menu, the launcher asks the site
+  (/api/play/pass) with the Discord ticket it holds. The site answers only for
+  an account that may play, for its own character, from a launcher between the
+  channel's minLauncher and its current one, and signs the profile, the server,
+  the launcher version, the Discord id and a ten minute expiry with the key it
+  shares with this server: passKey in door.json, which Set-Door.ps1 -Connect
+  copies there from the site. The launcher leaves it in
+  Data/Platform/thornswood-pass.txt and renews it every four minutes, and the
+  front plugin sends it here as "/joinpass <pass>" over the command relay, at
+  once and every minute. The format is makePass in site/server.js.
+
+  WHAT IS CHECKED, here and with nothing asked of anybody: the signature, the
+  expiry, that it names this server (thornswoodServer in server-settings.json,
+  "dev" on the dev box, "main" when absent), and that its profile is the one
+  the relay says sent it, which the voice join token proves.
+
+  THE PROFILE ID IS THE PASS'S. Every profile online needs a valid pass
+  received since it was first seen, or in the minute before. One with none is
+  told one line and ended GRACE_MS after it was first seen. A session under
+  somebody else's number cannot have a pass for it: the site will not issue
+  one and nothing else can sign one. A pass is forgotten when its profile
+  leaves, so a reconnect needs a fresh one, which the front sends within the
+  minute and the launcher keeps fresh.
+
+  THE SERVER'S OWN FAILURES REFUSE TOO, decided on purpose (the standing rule
+  is that refusing is the secure side, #937): no passKey in door.json, a relay
+  that is down, a site that would not issue a pass. Each leaves a session with
+  no valid pass, and the log says which.
+
+  WATCHING UNTIL IT IS SWITCHED ON. thornswoodRequirePass true in
+  server-settings.json ends sessions; anything else writes WOULD REFUSE and
+  lets them stay, so the server can go out before a launcher that fetches the
+  pass does. Deploy-DevGamemode.ps1 -RequirePass on|off sets it on the dev box.
+  No older launcher or plugin is kept working once it is on (Patrick, 28 Sep).
+*/
+(function () {
+  var g = globalThis;
+  var crypto = null, fs = null, path = null;
+  try { crypto = require('crypto'); fs = require('fs'); path = require('path'); } catch (e) { }
+
+  var GRACE_MS = 180000;      // online this long with no valid pass: ended
+  var BEFORE_MS = 60000;      // a pass this long before the session was first seen counts
+  var SWEEP_MS = 5000;
+  var KEY_READ_MS = 60000;
+  var SAY_AGAIN_MS = 600000;  // the same bad pass is logged at most this often
+  var SENTENCE = 'This game was not started from an up to date Thornswood launcher, so ' +
+                 'the session is being ended. Open the Thornswood launcher, let it update, ' +
+                 'then press Play.';
+
+  // On globalThis, so a hot reload keeps who has shown a pass.
+  // passes: profile -> { at, x, v }; online: profile -> { joined, judged, actorId }.
+  if (!g.__thornswoodPassSeen) { g.__thornswoodPassSeen = { passes: {}, online: {}, said: {} }; }
+  var seen = g.__thornswoodPassSeen;
+
+  function settings() {
+    try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
+  }
+  function requiring() { return settings().thornswoodRequirePass === true; }
+  function serverName() {
+    return String(settings().thornswoodServer || '').trim().toLowerCase() || 'main';
+  }
+
+  var keyAt = 0;
+  var keyHad = '';
+  function passKey(now) {
+    if (keyAt && now - keyAt < KEY_READ_MS) { return keyHad; }
+    keyAt = now;
+    var k = '';
+    try {
+      var dir = String(settings().privDir || 'private');
+      var doc = JSON.parse(String(fs.readFileSync(path.join(dir, 'door.json'), 'utf8')).replace(/^﻿/, ''));
+      k = String((doc && doc.passKey) || '');
+    } catch (e) { k = ''; }
+    if (!k && fresh('no key', now)) {
+      console.log('[thornswood] door.json has no passKey, so no join pass can be checked and every ' +
+                  'session counts as having none. Set-Door.ps1 -Connect copies it from the site.');
+    }
+    keyHad = k;
+    return k;
+  }
+
+  /* True when this line has not been said lately. */
+  function fresh(key, now) {
+    if (seen.said[key] && now - seen.said[key] < SAY_AGAIN_MS) { return false; }
+    seen.said[key] = now;
+    return true;
+  }
+
+  function b64u(buf) {
+    return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  /*
+    What a pass says, or why it says nothing. { ok, p, v, x } or { why, p }.
+    The signature is checked before anything in the body is believed, with
+    timingSafeEqual, so how long this takes says nothing about a guess.
+  */
+  function readPass(raw, key, now, server) {
+    if (!key) { return { why: 'this server has no join pass key' }; }
+    var parts = String(raw == null ? '' : raw).trim().split('.');
+    if (parts.length !== 3 || parts[0] !== 'jp1' || !parts[1] || !parts[2]) { return { why: 'not a join pass' }; }
+    var want = Buffer.from(b64u(crypto.createHmac('sha256', key).update('jp1.' + parts[1]).digest()));
+    var got = Buffer.from(parts[2]);
+    if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) {
+      return { why: 'a signature that does not check out' };
+    }
+    var o = null;
+    try { o = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8')); } catch (e) { o = null; }
+    var p = o ? Number(o.p) : 0;
+    if (!o || !(p > 0) || !(Number(o.x) > 0)) { return { why: 'a pass with nothing in it' }; }
+    if (now > Number(o.x)) { return { why: 'an expired pass', p: p }; }
+    if (String(o.s) !== server) { return { why: 'a pass for the ' + String(o.s) + ' server', p: p }; }
+    // d is the Discord account the site signed it for; /stuck's staff record
+    // names it (#414).
+    return { ok: true, p: p, v: String(o.v || ''), x: Number(o.x), d: String(o.d || '') };
+  }
+
+  /* One "/joinpass <pass>" from the relay, sent under profileId. */
+  function take(profileId, raw, now) {
+    var r = readPass(raw, passKey(now), now, serverName());
+    if (r.ok && r.p !== profileId) { r = { why: 'a pass for profile ' + r.p, p: r.p }; }
+    if (!r.ok) {
+      if (fresh('bad ' + profileId + ' ' + r.why, now)) {
+        console.log('[thornswood] join pass from profile ' + profileId + ' not taken: ' + r.why);
+      }
+      return r;
+    }
+    if (!seen.passes[profileId]) {
+      console.log('[thornswood] join pass for profile ' + profileId + ', launcher ' + r.v);
+    }
+    seen.passes[profileId] = { at: now, x: r.x, v: r.v, d: r.d };
+    return r;
+  }
+
+  // After the sentence, so it is on screen before the connection goes.
+  function refuseLater(profileId, actorId) {
+    setTimeout(function () {
+      var userId = -1;
+      try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
+      if (userId === undefined || userId === null || userId < 0) {
+        console.log('[thornswood] could not find the connection of profile ' + profileId + ', so they stayed');
+        return;
+      }
+      try { mp.kick(userId); } catch (e) { console.log('[thornswood] could not end profile ' + profileId + ': ' + e); }
+    }, 5000);
+  }
+
+  /*
+    Once every SWEEP_MS. online is [{ actorId, profileId }]; tell(profileId,
+    text) says a line. Returns the profiles judged to have no pass this sweep.
+  */
+  function sweep(now, online, tell) {
+    var here = {};
+    var judged = [];
+    for (var i = 0; i < online.length; i++) {
+      var pid = Number(online[i] && online[i].profileId) || 0;
+      if (!pid) { continue; }
+      here[pid] = true;
+      var e = seen.online[pid];
+      if (!e) { e = seen.online[pid] = { joined: now, judged: false, actorId: 0 }; }
+      e.actorId = online[i].actorId;
+      if (e.judged) { continue; }
+      var had = seen.passes[pid];
+      if (had && had.at >= e.joined - BEFORE_MS) { e.judged = true; continue; }
+      if (now - e.joined < GRACE_MS) { continue; }
+      e.judged = true;
+      judged.push(pid);
+      var why = passKey(now) ? 'no valid join pass in ' + Math.round((now - e.joined) / 1000) + 's online'
+                             : 'this server has no join pass key in door.json';
+      if (!requiring()) {
+        console.log('[thornswood] WOULD REFUSE profile ' + pid + ': ' + why +
+                    '. Watching only, they stayed (thornswoodRequirePass is not true).');
+        continue;
+      }
+      tell(pid, SENTENCE);
+      console.log('[thornswood] refusing profile ' + pid + ': ' + why);
+      refuseLater(pid, e.actorId);
+    }
+    // Gone: the next session under that number needs a pass of its own.
+    for (var k in seen.online) {
+      if (Object.prototype.hasOwnProperty.call(seen.online, k) && !here[k]) {
+        delete seen.online[k];
+        delete seen.passes[k];
+      }
+    }
+    for (var q in seen.passes) {
+      if (Object.prototype.hasOwnProperty.call(seen.passes, q) && !here[q] &&
+          now - seen.passes[q].at > BEFORE_MS) { delete seen.passes[q]; }
+    }
+    return judged;
+  }
+
+  g.__thornswoodJoinPass = { take: take, sweep: sweep, readPass: readPass,
+                             grace: GRACE_MS, sentence: SENTENCE };
+
+  if (g.__thornswoodPassTimer) { clearInterval(g.__thornswoodPassTimer); }
+  g.__thornswoodPassTimer = setInterval(function () {
+    try {
+      var list = [];
+      var online = mp.get(0, 'onlinePlayers') || [];
+      for (var i = 0; i < online.length; i++) {
+        var pid = 0;
+        try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+        if (pid) { list.push({ actorId: online[i], profileId: pid }); }
+      }
+      var say = g.__thornswoodToProfile;
+      sweep(Date.now(), list, function (p, text) { if (say) { say(p, text); } });
+    } catch (e) {
+      console.log('[thornswood] join pass sweep failed: ' + e);
+    }
+  }, SWEEP_MS);
+
+  console.log('[thornswood] join pass ' + (requiring() ? 'REQUIRED' : 'watched only') +
+              ' on the ' + serverName() + ' server, key ' + (passKey(Date.now()) ? 'present' : 'MISSING'));
+})();
+// ==== end thornswood join pass ====
+
+
+/// ==== thornswood seats ====
+/*
+  HOW MANY ARE IN THE WORLD AT ONCE, AND THE LINE PAST IT (#481).
+
+  Patrick, 28 Sep: at most 25 people at once for the alpha, raised later.
+  Patrick, 29 Sep: "5 staff seats for now and only allow those seats to be
+  filled by the discord roles, we need a queue system as well that lets them
+  in the main menu if full but they sit there until a slot is free and it's
+  their turn to join".
+
+  THE NUMBERS. thornswoodMostOnline in server-settings.json is the seats
+  anybody may take. maxPlayers is the engine's slot count, written above it,
+  and the difference is the staff seats. The deploy scripts write both from
+  records\most-online.json, the one place they live (25 and 5, so maxPlayers
+  30). No thornswoodMostOnline means nobody is turned away and nobody waits.
+
+  WHO MAY TAKE A STAFF SEAT. Only a profile whose Discord account holds one of
+  the site's staff roles (access.dev, which folds access.admin in: Owner, Dev,
+  Gamemaster, Moderator, Loremaster), from staffRoleProfiles in allowed.json,
+  and only with a valid join pass on hand, because a profile id on its own is
+  a claim (#937). The written thornswoodAdmins and thornswoodDevs lists and the
+  site's hand written admins list are not Discord roles and do not count here.
+  Staff in the world are counted into the staff seats first, so staff never
+  keep anybody else out of the 25.
+
+  THE LINE. Somebody who picks a character at the menu while the world is
+  full does not join. The front plugin keeps them at the menu and says
+  "/line" over the command relay every LINE_EVERY_MS; the relay knows who
+  they are by their voice join token, and "/joinpass" rides the same way.
+  The line lives here and only here, in the order each profile first asked:
+  nothing a client sends moves its place. When a seat frees, the first in
+  line has it held for them (GRANT_MS to arrive) and is told to come in, and
+  their menu joins by itself. A staff role with a pass is given a staff seat
+  at once, ahead of the line.
+
+  A PLACE GOES WITH THE CONNECTION. Patrick, 29 Sep: "they shouldn't need to
+  check in while waiting in the queue ... just have it automatically lose a
+  player's spot when they disconnect." The relay (voice-server.js) knows when
+  the socket that said "/line" closes, and says "/line gone" under that
+  profile at once, marked as its own; that is gone() below, and the place
+  goes then. Closing the game from the page says "/line leave" first. Two
+  backstops for a close that never arrives: a new relay (it restarted, and
+  its sockets died with it) gives every waiting menu RELAY_BACK_MS to ask
+  again, which the menus do by themselves every LINE_EVERY_MS once their chat
+  is back, so a restart keeps the line in order; and a place not heard from
+  for LINE_SILENT_MS while the relay answers goes. While the relay does not
+  answer at all, nobody's silence counts.
+
+  MOVED OUT FOR BEING IDLE (#1142, the idle block below). idleOut() frees the
+  seat at once and puts the person at the end of the line. Their menu then
+  shows the character choice, and any of their characters can take the place:
+  the menu says "/line hand <profile>" under the one that holds it, and that
+  profile's first "/line" within HAND_MS takes it over.
+
+  AT THE DOOR. Everybody in the world when this starts keeps their seat, so a
+  hot reload never ends a session. After that an arrival is seated when a
+  seat was held for them, or when nobody is waiting and a seat is free, or,
+  holding a staff role with a pass, when a staff seat is free (a staff role
+  still waiting on its pass gets STAFF_WAIT_MS). Anybody else came in past
+  the line: they are told one plain line, the log says "door: full", and the
+  session ends KICK_AFTER_MS later. The site no longer refuses Play for
+  numbers; it says there may be a wait, and the menu shows the place.
+*/
+(function () {
+  var g = globalThis;
+
+  var SWEEP_MS = 2000;
+  var STAFF_WAIT_MS = 60000;   // a staff role arriving over the number: this long to show a join pass
+  var KICK_AFTER_MS = 10000;   // after the line, so it is on screen first
+  var LINE_SILENT_MS = 600000; // backstop: nothing from a waiting menu this long, while the relay answers, and the place goes
+  var RELAY_BACK_MS = 60000;   // after a relay restart: this long for each waiting menu to ask again
+  var HAND_MS = 120000;        // a place handed to another of the same game's characters waits this long for it
+  var OUT_FOR_MS = 15000;      // moved out for being idle: not judged as an arrival for this long while their game leaves
+  var GRANT_MS = 60000;        // a seat held for the one whose turn it is, this long to arrive (Patrick, 29 Sep: a minute)
+  var SAY_AGAIN_MS = 10000;    // a place is said again this often even when it has not moved
+  var LINE_EVERY_MS = 10000;   // how often the menu says it is still waiting (the front's side)
+
+  function sentence(cap) {
+    return 'Thornswood is full: ' + cap + ' people are in the world, the most it holds at ' +
+           'once during the alpha, and others are waiting at the menu for a seat. Close the ' +
+           'game and press Play again to take your place in line.';
+  }
+
+  // On globalThis, so a hot reload keeps who holds a seat and the line.
+  // seated: profile -> when; waiting: staff profile -> since; refused: profile -> when;
+  // line: [{ p, since, seen, said, saidAt, back?, handTo?, handAt?, closed?, idle? }] in order;
+  // held: profile -> { at, staff, handTo?, handAt? }; out: profile -> when moved out for being idle.
+  if (!g.__thornswoodSeatState) {
+    g.__thornswoodSeatState = { seated: {}, waiting: {}, refused: {}, primed: false };
+  }
+  var state = g.__thornswoodSeatState;
+  if (!state.line) { state.line = []; }
+  if (!state.held) { state.held = {}; }
+  if (!state.out) { state.out = {}; }
+  if (!state.status) { state.status = { line: 0, full: false }; }
+
+  function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+
+  function settings() {
+    try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
+  }
+  /* The number, or 0 for none. */
+  function capOf(s) {
+    var n = Number((s || settings()).thornswoodMostOnline);
+    return (n > 0 && Math.floor(n) === n) ? n : 0;
+  }
+  /* The staff seats: the engine's slots over the number, or 0. */
+  function staffSeatsOf(s) {
+    s = s || settings();
+    var cap = capOf(s);
+    var most = Number(s.maxPlayers);
+    if (!cap || !(most > cap) || Math.floor(most) !== most) { return 0; }
+    return most - cap;
+  }
+
+  function lineIndex(pid) {
+    for (var i = 0; i < state.line.length; i++) { if (state.line[i].p === pid) { return i; } }
+    return -1;
+  }
+
+  /*
+    Once every SWEEP_MS. online is [{ actorId, profileId }] in the engine's
+    order; how is { cap, staffSeats, holdsStaffRole(pid), hasPass(pid, now),
+    tell(pid, text), line(pid, what), end(pid, actorId), log(line), relayOk }.
+    relayOk false means the relay is not answering the command poll.
+    Returns what it decided this sweep.
+  */
+  function sweep(now, online, how) {
+    var cap = how.cap;
+    var extra = cap ? (how.staffSeats || 0) : 0;
+    var out = { seated: 0, refused: [], staffOver: [], waiting: [], granted: [], dropped: [] };
+    function holds(pid) { try { return !!how.holdsStaffRole(pid); } catch (e) { return false; } }
+    function proven(pid) { try { return !!how.hasPass(pid, now); } catch (e) { return false; } }
+
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      var p = Number(online[i] && online[i].profileId) || 0;
+      if (p) { here[p] = online[i].actorId; }
+    }
+    var lists = [state.seated, state.waiting, state.refused, state.out];
+    for (var l = 0; l < lists.length; l++) {
+      for (var k in lists[l]) {
+        if (own(lists[l], k) && here[k] === undefined) { delete lists[l][k]; }
+      }
+    }
+    // Moved out for being idle and still here after their game had time to
+    // leave: the session was ended (endLater), so from now on they are an
+    // arrival like anybody, and one past the line is refused.
+    for (var o in state.out) {
+      if (own(state.out, o) && now - state.out[o] > OUT_FOR_MS) { delete state.out[o]; }
+    }
+    // The same for somebody refused. The engine keeps one actor per character
+    // and skymp5-client connects again by itself after a session ends, so a
+    // way back in between two sweeps looked like never having left, and the
+    // refusal was never made again: judged afresh once the end has had its time.
+    for (var rf in state.refused) {
+      if (own(state.refused, rf) && now - state.refused[rf] > OUT_FOR_MS) { delete state.refused[rf]; }
+    }
+    // Everybody already in the world when this started keeps their seat.
+    if (!state.primed) {
+      state.primed = true;
+      var kept = 0;
+      for (var q in here) {
+        if (own(here, q)) { state.seated[q] = now; kept++; }
+      }
+      if (kept) { how.log('[thornswood] seats: ' + kept + ' already in the world keep their seats'); }
+    }
+
+    // Arrivals a seat was held for go first: that seat is already counted.
+    for (var a = 0; a < online.length; a++) {
+      var ap = Number(online[a] && online[a].profileId) || 0;
+      if (!ap || state.seated[ap] || state.out[ap] || !state.held[ap]) { continue; }
+      state.seated[ap] = now;
+      delete state.held[ap];
+      how.log('[thornswood] seats: profile ' + ap + ' took the seat held for them');
+    }
+
+    // The line: whoever is in the world now is off it, and so is a place the
+    // backstops say has gone (a close arriving from the relay is gone() below).
+    var relayOk = how.relayOk !== false;
+    var still = [];
+    for (var n = 0; n < state.line.length; n++) {
+      var e = state.line[n];
+      if (state.seated[e.p]) { continue; }
+      // The relay is not answering, so nothing could have been heard: silence does not count.
+      if (!relayOk) { e.seen = now; still.push(e); continue; }
+      var lost = '';
+      if (e.handTo && now - e.handAt > HAND_MS) {
+        if (e.closed) {
+          lost = 'their game closed after handing it to profile ' + e.handTo + ', who never asked for it';
+        } else {
+          how.log('[thornswood] line: profile ' + e.handTo + ' never asked for the place profile ' + e.p +
+                  ' handed it, so profile ' + e.p + ' keeps it');
+        }
+        delete e.handTo; delete e.handAt; delete e.closed;
+      }
+      if (!lost && e.back && now > e.back) {
+        lost = 'the relay restarted and their menu did not ask again within ' + Math.round(RELAY_BACK_MS / 1000) + 's';
+      } else if (!lost && !e.back && now - e.seen > LINE_SILENT_MS) {
+        lost = 'nothing from their menu in ' + Math.round((now - e.seen) / 60000) +
+               ' minutes, and the relay never said their game closed';
+      }
+      if (lost) {
+        out.dropped.push(e.p);
+        how.log('[thornswood] line: profile ' + e.p + ' lost their place: ' + lost);
+        continue;
+      }
+      still.push(e);
+    }
+    state.line = still;
+    for (var h in state.held) {
+      if (own(state.held, h) && now - state.held[h].at > GRANT_MS) {
+        delete state.held[h];
+        how.log('[thornswood] seats: the seat held for profile ' + h + ' went unused for ' +
+                Math.round(GRANT_MS / 1000) + 's, so it goes to the next in line');
+      }
+    }
+
+    // Who is where. Staff in the world or on their way count into the staff seats first.
+    var total = 0, staffIn = 0, held = 0, heldStaff = 0;
+    for (var s in state.seated) {
+      if (own(state.seated, s)) { total++; if (holds(Number(s))) { staffIn++; } }
+    }
+    for (var hs in state.held) {
+      if (own(state.held, hs)) { held++; if (state.held[hs].staff) { heldStaff++; } }
+    }
+    function publicFree() {
+      if (!cap) { return 1; }
+      return cap - (total + held - Math.min(staffIn + heldStaff, extra));
+    }
+    function anyFree() {
+      if (!cap) { return 1; }
+      return cap + extra - (total + held);
+    }
+    function grant(pid, staff, why) {
+      state.held[pid] = { at: now, staff: staff };
+      held++;
+      if (staff) { heldStaff++; }
+      out.granted.push(pid);
+      how.log('[thornswood] seats: a seat is held for profile ' + pid + ', ' + why);
+      how.line(pid, { go: true, secs: Math.round(GRANT_MS / 1000) });
+    }
+
+    // A staff role with a pass skips the line into a staff seat.
+    var rest = [];
+    for (var f = 0; f < state.line.length; f++) {
+      var w = state.line[f];
+      if (cap && anyFree() > 0 && holds(w.p) && proven(w.p)) {
+        grant(w.p, true, 'a staff role, ahead of the line');
+        continue;
+      }
+      rest.push(w);
+    }
+    state.line = rest;
+    // Then the line in order, while a seat anybody may take is free.
+    while (state.line.length && publicFree() > 0) {
+      var first = state.line.shift();
+      grant(first.p, holds(first.p), cap ? 'first in line' : 'nobody is turned away for numbers');
+    }
+    // And everybody still waiting is told their place when it moves.
+    for (var t = 0; t < state.line.length; t++) {
+      var we = state.line[t];
+      if (we.said !== t + 1 || we.saidOf !== state.line.length || now - we.saidAt >= SAY_AGAIN_MS) {
+        we.said = t + 1;
+        we.saidOf = state.line.length;
+        we.saidAt = now;
+        how.line(we.p, { place: t + 1, of: state.line.length });
+      }
+    }
+
+    // Everybody else who has just arrived.
+    for (var j = 0; j < online.length; j++) {
+      var pid = Number(online[j] && online[j].profileId) || 0;
+      if (!pid || state.seated[pid] || state.refused[pid] || state.out[pid]) { continue; }
+      var staff = holds(pid);
+      if (!cap || (!state.line.length && publicFree() > 0)) {
+        state.seated[pid] = now;
+        delete state.waiting[pid];
+        total++;
+        if (staff) { staffIn++; }
+        continue;
+      }
+      var reason = '';
+      if (staff && anyFree() > 0) {
+        if (proven(pid)) {
+          state.seated[pid] = now;
+          delete state.waiting[pid];
+          total++;
+          staffIn++;
+          out.staffOver.push(pid);
+          how.log('[thornswood] seats: profile ' + pid + ' holds a staff role, seated in a staff seat (' +
+                  total + ' in the world, the number is ' + cap + ')');
+          continue;
+        }
+        if (!state.waiting[pid]) { state.waiting[pid] = now; }
+        if (now - state.waiting[pid] < STAFF_WAIT_MS) { out.waiting.push(pid); continue; }
+        reason = ' (a staff role, but no join pass was shown)';
+      } else if (staff) {
+        reason = ' (a staff role, but every staff seat is taken)';
+      }
+      state.refused[pid] = now;
+      delete state.waiting[pid];
+      out.refused.push(pid);
+      how.log('[thornswood] door: full, refusing profile ' + pid + ': ' + total + ' of ' + cap +
+              ' already in the world' + (state.line.length ? ', ' + state.line.length + ' waiting in line' : '') +
+              reason);
+      how.tell(pid, sentence(cap));
+      how.end(pid, online[j].actorId);
+    }
+
+    out.seated = total;
+    state.status = { line: state.line.length, full: !!cap && (state.line.length > 0 || publicFree() <= 0) };
+    return out;
+  }
+
+  /*
+    One "/line" from the menu, under the profile the relay says sent it. A
+    first ask goes to the end of the line; a later one only says they are
+    still there. Somebody a seat is held for is told again to come in, so a
+    lost answer is never a lost turn. With thornswoodRequirePass on, nobody
+    waits without a join pass on hand, since without one they could not stay.
+  */
+  function want(pid, now, how) {
+    pid = Number(pid) || 0;
+    if (!pid) { return 'nobody'; }
+    if (state.seated[pid]) { return 'in the world'; }
+    if (state.held[pid]) {
+      how.line(pid, { go: true, secs: Math.max(0, Math.ceil((GRANT_MS - (now - state.held[pid].at)) / 1000)) });
+      return 'held';
+    }
+    var at = lineIndex(pid);
+    if (at >= 0) { state.line[at].seen = now; delete state.line[at].back; return 'waiting'; }
+    // A place or a held seat another of this game's characters handed to this one (#1142).
+    for (var hh in state.held) {
+      if (own(state.held, hh) && state.held[hh].handTo === pid && now - state.held[hh].handAt <= HAND_MS) {
+        state.held[pid] = { at: state.held[hh].at, staff: state.held[hh].staff };
+        delete state.held[hh];
+        how.log('[thornswood] seats: profile ' + pid + ' takes the seat held for profile ' + hh + ', which handed it over');
+        how.line(pid, { go: true, secs: Math.max(0, Math.ceil((GRANT_MS - (now - state.held[pid].at)) / 1000)) });
+        return 'held';
+      }
+    }
+    for (var hl = 0; hl < state.line.length; hl++) {
+      var he = state.line[hl];
+      if (he.handTo === pid && now - he.handAt <= HAND_MS) {
+        how.log('[thornswood] line: profile ' + pid + ' takes the place profile ' + he.p + ' handed it, ' +
+                (hl + 1) + ' of ' + state.line.length);
+        he.p = pid; he.seen = now; he.said = 0; he.saidAt = 0;
+        delete he.handTo; delete he.handAt; delete he.closed; delete he.back;
+        return 'handed';
+      }
+    }
+    var hasOne = false;
+    try { hasOne = !!how.hasPass(pid, now); } catch (e) { hasOne = false; }
+    if (how.requirePass && !hasOne) { how.line(pid, { pass: true }); return 'no pass'; }
+    state.line.push({ p: pid, since: now, seen: now, said: 0, saidAt: 0 });
+    how.log('[thornswood] line: profile ' + pid + ' is waiting at the menu, ' + state.line.length + ' in line');
+    return 'joined';
+  }
+
+  /* "/line leave": the menu let go of its place on purpose. */
+  function leave(pid, how) {
+    pid = Number(pid) || 0;
+    var at = lineIndex(pid);
+    if (at >= 0) {
+      state.line.splice(at, 1);
+      how.log('[thornswood] line: profile ' + pid + ' left the line');
+    }
+    if (state.held[pid]) {
+      delete state.held[pid];
+      how.log('[thornswood] seats: profile ' + pid + ' let go of the seat held for them');
+    }
+  }
+
+  /*
+    "/line gone", from the relay itself: the connection that asked for this
+    place has closed, so the game is closed, crashed or off the network, and
+    the place goes now (Patrick, 29 Sep). A seat already held for them is left
+    to run out its minute: pressing Join now loads the world, which can close
+    and open the page's connection on the way in, and the minute is short.
+    A place just handed to another of the same game's characters is kept for
+    that character (hand below).
+  */
+  function gone(pid, now, how) {
+    pid = Number(pid) || 0;
+    var at = lineIndex(pid);
+    if (at < 0) { return 'not waiting'; }
+    var e = state.line[at];
+    if (e.handTo && now - e.handAt <= HAND_MS) {
+      e.closed = now;
+      how.log('[thornswood] line: profile ' + pid + ' closed its connection after handing its place to profile ' +
+              e.handTo + ', so the place waits for that one');
+      return 'handed';
+    }
+    state.line.splice(at, 1);
+    how.log('[thornswood] line: profile ' + pid + ' lost their place: their game closed its connection to the relay');
+    return 'dropped';
+  }
+
+  /*
+    "/line hand <profile>": the menu this place belongs to switched to another
+    of its characters (after being moved out for being idle, the choice
+    offers any of them). The connection that holds the place says so before
+    it becomes the other character's, so only the holder can give it away,
+    and the other takes it with its first "/line" within HAND_MS.
+  */
+  function hand(pid, to, now, how) {
+    pid = Number(pid) || 0;
+    to = Number(to) || 0;
+    if (!pid || !to || pid === to) { return 'nothing'; }
+    var at = lineIndex(pid);
+    var what = at >= 0 ? state.line[at] : state.held[pid];
+    if (!what) { return 'nothing'; }
+    what.handTo = to;
+    what.handAt = now;
+    how.log('[thornswood] line: profile ' + pid + ' hands its ' + (at >= 0 ? 'place in line' : 'held seat') +
+            ' to profile ' + to + ', another character of the same game');
+    return 'handing';
+  }
+
+  /*
+    Moved out of the world for being idle (#1142): the seat frees now, the next
+    in line is told at the next sweep, and they wait at the end of the line at
+    the menu. actorId is given while they are still in the world: they are not
+    judged as an arrival for OUT_FOR_MS, and a game that has not left by then
+    has its session ended.
+  */
+  function idleOut(pid, now, how, actorId) {
+    pid = Number(pid) || 0;
+    if (!pid) { return 'nobody'; }
+    var had = !!state.seated[pid];
+    delete state.seated[pid];
+    delete state.waiting[pid];
+    delete state.refused[pid];
+    if (actorId) {
+      state.out[pid] = now;
+      how.end(pid, actorId);
+    }
+    if (lineIndex(pid) < 0 && !state.held[pid]) {
+      state.line.push({ p: pid, since: now, seen: now, said: 0, saidAt: 0, idle: true });
+      how.log('[thornswood] line: profile ' + pid + ' was moved out for being idle and waits at the menu, ' +
+              state.line.length + ' in line');
+    }
+    how.line(pid, { afk: 'out' });
+    return had ? 'seat freed' : 'in line';
+  }
+
+  /* The relay restarted: every waiting menu has RELAY_BACK_MS to ask again. */
+  function relayRestarted(now, how) {
+    for (var i = 0; i < state.line.length; i++) { state.line[i].back = now + RELAY_BACK_MS; }
+    if (state.line.length) {
+      how.log('[thornswood] line: the relay restarted; the ' + state.line.length + ' waiting keep their places ' +
+              'if their menus ask again within ' + Math.round(RELAY_BACK_MS / 1000) + 's');
+    }
+    return state.line.length;
+  }
+
+  function endLater(pid, actorId) {
+    setTimeout(function () {
+      var userId = -1;
+      try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
+      if (userId === undefined || userId === null || userId < 0) {
+        console.log('[thornswood] seats: profile ' + pid + ' left before the session was ended');
+        return;
+      }
+      try { mp.kick(userId); } catch (e) { console.log('[thornswood] seats: could not end profile ' + pid + ': ' + e); }
+    }, KICK_AFTER_MS);
+  }
+
+  /* The Discord staff roles, as the site knows them; see the door block. */
+  function holdsStaffRole(pid) {
+    var f = g.__thornswoodHoldsStaffRole;
+    return typeof f === 'function' ? !!f(pid) : false;
+  }
+  function hasPass(pid, now) {
+    var seen = g.__thornswoodPassSeen;
+    var p = seen && seen.passes ? seen.passes[pid] : null;
+    return !!(p && Number(p.x) > now);
+  }
+
+  function liveHow() {
+    var s = settings();
+    var say = g.__thornswoodToProfile;
+    // The chat commands block's poll of the relay (pollSaid): answering unless its last try failed.
+    var poll = g.__thornswoodCommandPoll;
+    return {
+      cap: capOf(s), staffSeats: staffSeatsOf(s), requirePass: s.thornswoodRequirePass === true,
+      relayOk: !poll || !poll.failAt || poll.okAt >= poll.failAt,
+      holdsStaffRole: holdsStaffRole, hasPass: hasPass,
+      tell: function (p, text) { if (say) { say(p, text); } },
+      // The chat commands block posts it to the menu page (__thornswoodSayLine).
+      line: function (p, what) { var f = g.__thornswoodSayLine; if (typeof f === 'function') { f(p, what); } },
+      end: endLater,
+      log: function (line) { console.log(line); }
+    };
+  }
+
+  g.__thornswoodSeats = {
+    sweep: sweep, want: want, leave: leave, liveHow: liveHow,
+    gone: gone, hand: hand, idleOut: idleOut, relayRestarted: relayRestarted,
+    cap: capOf, staffSeats: staffSeatsOf, sentence: sentence,
+    status: function () { return state.status; },
+    staffWait: STAFF_WAIT_MS, kickAfter: KICK_AFTER_MS, lineSilent: LINE_SILENT_MS,
+    relayBack: RELAY_BACK_MS, handFor: HAND_MS, outFor: OUT_FOR_MS,
+    grantFor: GRANT_MS, lineEvery: LINE_EVERY_MS
+  };
+
+  if (g.__thornswoodSeatTimer) { clearInterval(g.__thornswoodSeatTimer); }
+  g.__thornswoodSeatTimer = setInterval(function () {
+    try {
+      var list = [];
+      var online = mp.get(0, 'onlinePlayers') || [];
+      for (var i = 0; i < online.length; i++) {
+        var pid = 0;
+        try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+        if (pid) { list.push({ actorId: online[i], profileId: pid }); }
+      }
+      sweep(Date.now(), list, liveHow());
+    } catch (e) {
+      console.log('[thornswood] seats sweep failed: ' + e);
+    }
+  }, SWEEP_MS);
+
+  var capNow = capOf();
+  console.log('[thornswood] seats: ' + (capNow
+    ? 'at most ' + capNow + ' in the world at once, ' + staffSeatsOf() + ' staff seats over it for the ' +
+      'Discord staff roles, and a line at the menu past that'
+    : 'no thornswoodMostOnline in server-settings.json, so nobody is turned away for numbers'));
+})();
+// ==== end thornswood seats ====
+
+
+// ==== thornswood idle ====
+/*
+  NOBODY IDLE KEEPS A SEAT (#1142).
+
+  Patrick, 29 Sep: "we also need an AFK kick in game after 15 mins idle with
+  the opportunity for a menu to pop after that 15 minutes with the option to
+  click I am still here, if they do click I'm still here it resets, if not it
+  kicks them to the main menu where they can rechoose their character and
+  they automatically rejoin the queue with the same 1 minute to join rule".
+  Agreed the same day: the window counts down 60 seconds, and staff get the
+  check too.
+
+  THE GAME ASKS. thornswood-front.js watches the keys, the mouse and the
+  character. After 15 minutes with none of them it puts up "Are you still
+  here?" (thornswood-afk.js) with an "I am still here" button and a 60 second
+  countdown. Pressed, it says "/afk here" and the 15 minutes start again. Not
+  pressed, it says "/afk out", leaves the world and shows the character
+  choice. While it sees input it says "/afk active", every two minutes at
+  most, so this knows somebody is there while the character stands still (a
+  crafting menu, a long talk, the camera turned in third person).
+
+  THE SERVER JUDGES. Every SAMPLE_MS this looks at everybody in the world:
+  where the character stands and which way it faces. Nothing moved and
+  nothing from their game for SERVER_IDLE_MS, which is the game's 15 minutes
+  and its 60 seconds with two minutes to spare, and this moves them out
+  itself, whether or not their game ever asked. Somebody in character
+  creation is never idle.
+
+  MOVED OUT, either way the same (out below): the seats block frees the seat
+  and puts them at the end of the line (the next in line is told at its next
+  sweep), their menu is told over the relay, and a game that has not left by
+  itself is ended KICK_AFTER_MS later. thornswood.log and moderation.log say
+  who and why, and the Discord bot says moderation.log in the staff channel.
+*/
+(function () {
+  var g = globalThis;
+
+  var SAMPLE_MS = 5000;
+  var ASK_MIN = 15;                           // the game's own numbers, for the words
+  var WINDOW_S = 60;
+  var SERVER_IDLE_MS = (ASK_MIN * 60 + WINDOW_S + 120) * 1000;
+  var MOVE_UNITS = 16;                        // a quarter of a metre
+  var TURN_DEGREES = 2;
+  var LEFT_KEEP_MS = 60000;                   // an "/afk out" can arrive just after the game has gone
+  var OUT_RESET_MS = 20000;                   // moved out and here again after this: judged afresh (the seats block's 15 s, and a sample)
+
+  // On globalThis, so a hot reload does not start everybody's clock again.
+  // by: profile -> { actorId, last, pos, rot, out }; left: profile -> when they left the world.
+  if (!g.__thornswoodIdleState) { g.__thornswoodIdleState = { by: {}, left: {} }; }
+  var state = g.__thornswoodIdleState;
+  if (!state.left) { state.left = {}; }
+
+  function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+
+  function turned(a, b) {
+    var d = Math.abs((Number(a) || 0) - (Number(b) || 0)) % 360;
+    return Math.min(d, 360 - d);
+  }
+  function changed(was, at) {
+    if (!was || !was.pos || !at || !at.pos) { return false; }
+    var dx = at.pos[0] - was.pos[0], dy = at.pos[1] - was.pos[1], dz = at.pos[2] - was.pos[2];
+    if (dx * dx + dy * dy + dz * dz > MOVE_UNITS * MOVE_UNITS) { return true; }
+    var r0 = was.rot || [0, 0, 0], r1 = at.rot || [0, 0, 0];
+    return turned(r0[0], r1[0]) > TURN_DEGREES || turned(r0[2], r1[2]) > TURN_DEGREES;
+  }
+
+  /*
+    Once every SAMPLE_MS. online is [{ actorId, profileId }]; how is
+    { place(actorId) -> { pos, rot } or null, creating(actorId),
+    out(pid, actorId, why) }. Returns the profiles moved out this time.
+  */
+  function sweep(now, online, how) {
+    var here = {};
+    var moved = [];
+    for (var i = 0; i < online.length; i++) {
+      var pid = Number(online[i] && online[i].profileId) || 0;
+      if (!pid) { continue; }
+      var actorId = online[i].actorId;
+      here[pid] = true;
+      var at = null;
+      try { at = how.place(actorId); } catch (e) { at = null; }
+      var e = state.by[pid];
+      if (!e || e.actorId !== actorId) {
+        state.by[pid] = { actorId: actorId, last: now, pos: at && at.pos, rot: at && at.rot, out: 0 };
+        delete state.left[pid];
+        continue;
+      }
+      if (e.out) {
+        // Still or again in the world well after being moved out: back in the
+        // same character (a seat of their own, or refused by the seats block),
+        // so a fresh clock. The engine keeps one actor per character, so a
+        // quick way back in looks the same as never having left.
+        if (now - e.out > OUT_RESET_MS) { state.by[pid] = { actorId: actorId, last: now, pos: at && at.pos, rot: at && at.rot, out: 0 }; }
+        continue;
+      }
+      var creating = false;
+      try { creating = !!how.creating(actorId); } catch (e2) { creating = false; }
+      if (creating || changed(e, at)) { e.last = now; }
+      if (at) { e.pos = at.pos; e.rot = at.rot; }
+      if (now - e.last >= SERVER_IDLE_MS) {
+        e.out = now;
+        moved.push(pid);
+        how.out(pid, actorId, 'nothing moved and nothing came from their game for ' +
+                Math.round((now - e.last) / 60000) + ' minutes, so the server moved them');
+      }
+    }
+    for (var k in state.by) {
+      if (own(state.by, k) && !here[k]) { delete state.by[k]; state.left[k] = now; }
+    }
+    for (var q in state.left) {
+      if (own(state.left, q) && now - state.left[q] > LEFT_KEEP_MS) { delete state.left[q]; }
+    }
+    return moved;
+  }
+
+  /*
+    One "/afk <word>" from the relay, under the profile it came from. active
+    and here are somebody at the game; out is their game taking them out
+    because nobody pressed "I am still here". Only for a profile that is in
+    the world or has just left it, so a stray line moves nobody and writes
+    nothing to the staff log.
+  */
+  function heard(pid, word, now, how) {
+    pid = Number(pid) || 0;
+    if (!pid) { return 'nobody'; }
+    var e = state.by[pid];
+    if (word === 'active' || word === 'here') {
+      if (e) { e.last = now; }
+      return e ? word : 'not in the world';
+    }
+    if (word === 'out') {
+      if (e && e.out) { return 'already'; }
+      if (!e && !state.left[pid]) { return 'not in the world'; }
+      if (e) { e.out = now; }
+      delete state.left[pid];
+      how.out(pid, e ? e.actorId : 0, 'no answer to "Are you still here?" within ' + WINDOW_S +
+              ' seconds, after ' + ASK_MIN + ' minutes with nothing from the keyboard, mouse or character');
+      return 'out';
+    }
+    return 'unknown';
+  }
+
+  function nameOf(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      var n = String((ap && ap.name) || '');
+      if (n) { return n; }
+    } catch (e) { }
+    return 'somebody';
+  }
+  function settings() {
+    try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
+  }
+
+  /* The staff log: one line in moderation.log, which the Discord bot says in the staff channel. */
+  function record(pid, name, why) {
+    var fs = null, path = null;
+    try { fs = require('fs'); path = require('path'); } catch (e) { return; }
+    var s = settings();
+    var row = { at: new Date().toISOString(), server: String(s.thornswoodServer || '').trim().toLowerCase() || 'main',
+                did: 'idle', by: pid, byName: name, who: pid, whoName: name, why: String(why || '').slice(0, 300) };
+    try {
+      fs.appendFileSync(path.join(String(s.privDir || 'private'), 'moderation.log'), JSON.stringify(row) + '\n');
+    } catch (e) {
+      console.log('[thornswood] idle: could not write moderation.log, so the staff channel will not hear of it: ' + e);
+    }
+  }
+
+  function out(pid, actorId, why) {
+    var now = Date.now();
+    var name = actorId ? nameOf(actorId) : 'somebody';
+    var seats = g.__thornswoodSeats;
+    var still = false;
+    if (actorId) {
+      try { var u = mp.getUserByActor(actorId); still = u !== undefined && u !== null && u >= 0; } catch (e) { still = false; }
+    }
+    if (seats) {
+      try { seats.idleOut(pid, now, seats.liveHow(), still ? actorId : 0); }
+      catch (e) { console.log('[thornswood] idle: the seats block would not take profile ' + pid + ': ' + e); }
+    }
+    console.log('[thornswood] idle: ' + name + ' (profile ' + pid + ') was taken out of the world to the ' +
+                'character choice and put in line: ' + why);
+    record(pid, name, why);
+  }
+
+  function liveHow() {
+    return {
+      place: function (actorId) {
+        var pos = mp.get(actorId, 'pos');
+        if (!pos) { return null; }
+        var rot = [0, 0, 0];
+        try { rot = (mp.get(actorId, 'angle') || [0, 0, 0]).slice(0, 3); } catch (e) { }
+        return { pos: [Number(pos[0]) || 0, Number(pos[1]) || 0, Number(pos[2]) || 0], rot: rot };
+      },
+      creating: function (actorId) {
+        var cg = g.__thornswoodChargen;
+        return !!(cg && cg.inCreation && cg.inCreation(actorId));
+      },
+      out: out
+    };
+  }
+
+  g.__thornswoodIdle = {
+    sweep: sweep, heard: heard, liveHow: liveHow, state: state,
+    serverIdle: SERVER_IDLE_MS, askMinutes: ASK_MIN, windowSecs: WINDOW_S
+  };
+
+  if (g.__thornswoodIdleTimer) { clearInterval(g.__thornswoodIdleTimer); }
+  g.__thornswoodIdleTimer = setInterval(function () {
+    try {
+      var list = [];
+      var online = mp.get(0, 'onlinePlayers') || [];
+      for (var i = 0; i < online.length; i++) {
+        var pid = 0;
+        try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+        if (pid) { list.push({ actorId: online[i], profileId: pid }); }
+      }
+      sweep(Date.now(), list, liveHow());
+    } catch (e) {
+      console.log('[thornswood] idle sweep failed: ' + e);
+    }
+  }, SAMPLE_MS);
+
+  console.log('[thornswood] idle: after ' + ASK_MIN + ' minutes with no input the game asks "Are you still here?" ' +
+              'for ' + WINDOW_S + ' seconds; the server moves anybody still for ' +
+              Math.round(SERVER_IDLE_MS / 60000) + ' minutes itself');
+})();
+// ==== end thornswood idle ====
 
 
 // ==== thornswood progression ====
@@ -27346,8 +29035,20 @@ log('gamemode loaded:',
     collegeSemester: 2,   // points a mage earns per semester at the College
     outsiderSemester: 1,  // points a non-mage earns per semester, novice only
     outsiderSpells: 2,    // the most spells a non-mage can ever hold
+    // An Enchanter's staff spells, built the way a mage's spells are (#1128):
+    enchanterStartStaff: 2,   // staff spell points an Enchanter begins with
+    enchanterMasterStaff: 2,  // more at Master Bladebinder, as a mage's at Master
     skillCap: 5           // NOT IN THE RULEBOOK. Placeholder, see above.
   };
+
+  /*
+    THE HALF THAT MAKES STAVES, and the rank an Enchanter's staff spells climb
+    on (#1128). Staves are Bladebinder work: the craft gate asks this half's
+    rank before a staff is made, so the staff spells ask the same one. A
+    Bladebinder climbs it as their own half; a Wardweaver holds it as the
+    sister half, at Novice until a Master Bladebinder takes them on.
+  */
+  var STAFF_HALF = 'bladebinder';
 
   /*
     The spell book, school by school and rank by rank.
@@ -27945,6 +29646,11 @@ log('gamemode loaded:',
       taught     ['hearthcook']                 halves learned from a Master
                  of another profession, novice only, at most LIMITS.secondaries
       spells     { points: 2, known: [...] }    a mage's spell points and spells
+      staffSpells ['12fcd:Skyrim.esm', ...]     the staff spells unlocked, by the
+                 spell's form id desc: what a staff may bind (#967, #1128)
+      staffPoints 2                             an Enchanter's staff spell points.
+                 Missing on an Enchanter from before #1128: staffPoints()
+                 reads it as what their Bladebinder rank has given them.
       tree       { vitality: 3, ... }           points spent per sub-skill
       points     4                              unspent tree points
       work       { miner: 7, charburner: 2 }    yields handed out since the
@@ -28200,6 +29906,9 @@ log('gamemode loaded:',
     s.ranks[half] = 'novice';
     var sister = sisterOf(prof, half);
     if (sister) { s.ranks[sister] = 'novice'; }
+    // An Enchanter starts with staff spell points the way a mage starts with
+    // spell points (#1128).
+    if (prof === 'enchanter') { s.staffPoints = LIMITS.enchanterStartStaff; }
     place(s, 'professions', prof);
     place(s, 'halves', half);
     return yes(s);
@@ -28253,6 +29962,9 @@ log('gamemode loaded:',
     }
 
     var next = RANKS[rankIndex(cur) + 1];
+    // Read before the rank moves: an Enchanter from before #1128 has no stored
+    // staff points, and what they hold is what the rank below gave them.
+    var staffWas = (s.prof === 'enchanter' && half === STAFF_HALF) ? staffPoints(s) : null;
     s.ranks[half] = next;
 
     /*
@@ -28268,6 +29980,11 @@ log('gamemode loaded:',
       s.spells.points += LIMITS.mageMasterSpells;
     } else if (s.prof === 'mage' && mine) {
       s.spells.points += 1;   // one more spell point with every rank
+    }
+    // The same for an Enchanter's staff spells (#1128): one more staff spell
+    // point with every Bladebinder rank, and two at Master.
+    if (staffWas !== null) {
+      s.staffPoints = staffWas + (next === 'master' ? LIMITS.enchanterMasterStaff : 1);
     }
     return yes(s);
   }
@@ -28332,6 +30049,7 @@ log('gamemode loaded:',
     var was = rankOf(s, k);
     var pointsWas = s.points || 0;
     var spellsWas = (s.spells && s.spells.points) || 0;
+    var staffWas = staffPoints(s);
     var up = rankUp(s, k, masterState);
     if (!up.ok) {
       // Held at the ceiling. The count waits there rather than climbing
@@ -28345,7 +30063,8 @@ log('gamemode loaded:',
     for (var f in up.state) { if (own(up.state, f)) { s[f] = up.state[f]; } }
     return { key: k, from: was, to: rankOf(s, k),
              points: (s.points || 0) - pointsWas,
-             spellPoints: ((s.spells && s.spells.points) || 0) - spellsWas };
+             spellPoints: ((s.spells && s.spells.points) || 0) - spellsWas,
+             staffPoints: s.prof === 'enchanter' ? staffPoints(s) - staffWas : 0 };
   }
 
   /*
@@ -28471,16 +30190,23 @@ log('gamemode loaded:',
     return null;
   }
 
-  /** Does the book they already hold have anything of that rank in that school. */
+  /**
+    Does the book they already hold have anything of that rank in that school.
+    A spell a tome taught that SPELLS does not list (a mod's) counts by the
+    school and rank recorded beside it in spells.tomes when it was learned.
+  */
   function knowsRank(state, school, rank) {
     var s = state || fresh();
     var known = (s.spells && s.spells.known) || [];
     var book = own(SPELLS, school) ? SPELLS[school] : {};
     var names = (own(book, rank) && book[rank]) || [];
+    var tomes = (s.spells && s.spells.tomes) || {};
     for (var i = 0; i < known.length; i++) {
       for (var j = 0; j < names.length; j++) {
         if (known[i] === names[j]) { return true; }
       }
+      var t = own(tomes, known[i]) ? tomes[known[i]] : null;
+      if (t && t.school === school && t.rank === rank) { return true; }
     }
     return false;
   }
@@ -28553,7 +30279,15 @@ log('gamemode loaded:',
     if (below && !knowsRank(s, spell.school, below)) {
       return no('you need a ' + below + ' spell of ' + spell.school + ' first');
     }
+    return addToBook(s, spell);
+  }
 
+  /**
+    The spell into a state the caller has already cloned and checked, and the
+    point it costs: pickSpell and learnFromTome both end here, so a tome costs
+    exactly what the panel does and counts as the same hours in its school.
+  */
+  function addToBook(s, spell) {
     if (!s.spells) { s.spells = { points: 0, known: [] }; }
     if (!s.spells.known) { s.spells.known = []; }
     // A mage spends a stored point. Everybody else spends a place under the
@@ -28584,6 +30318,299 @@ log('gamemode loaded:',
     var s = state || fresh();
     var known = (s.spells && s.spells.known) || [];
     return known.indexOf(name) !== -1;
+  }
+
+  /*
+    A SPELL TOME TEACHES UNDER THE SAME RULES AS THE PANEL. Patrick, 29
+    September, on issue #1026: "No they still need the spell points, the
+    level, and a spell from the level below."
+
+    Until then the engine taught any tome's spell to anybody who read it
+    (ReadBookEvent in the fork) and none of pickSpell's rules were asked, so a
+    Smith could read Fireball and cast it. Now mp.onReadBook asks
+    learnFromTome, and the tome teaches only when all three hold:
+      points  a spell point to spend (spellPoints: a mage's stored points, or
+              what is left under the cap for somebody a Master mage taught)
+      level   their rank in the spell's school has reached the spell's rank
+      below   they already know a spell of that school one rank down; Novice
+              has nothing below it
+    Otherwise nothing is learned, the tome is kept, and every one of the
+    three that is missing is said. That is everybody, Enchanters included:
+    a staff spell is learned from its tome only through these same rules.
+
+    A tome's spell is the book's own entry when SPELL_IDS has its form id, so
+    the rulebook decides a spell it lists. A spell it does not list (the magic
+    mods' own) comes with the school and rank the tomes block read out of the
+    game's records, and is written into spells.tomes beside the name so the
+    rank below can be asked of it later.
+  */
+
+  /** Skyrim's minimum skill level to a rank: Apprentice and Adept are both Advanced, as SPELLS sorts them. */
+  function rankForLevel(level) {
+    var n = Number(level);
+    if (!isFinite(n) || n < 0) { return null; }
+    if (n >= 100) { return 'master'; }
+    if (n >= 75) { return 'expert'; }
+    if (n >= 25) { return 'advanced'; }
+    return 'novice';
+  }
+
+  /** The book's entry for a spell by its form id desc ('1c789:Skyrim.esm'), or null. */
+  function spellByDesc(desc) {
+    var want = String(desc || '').toLowerCase();
+    if (!want) { return null; }
+    for (var name in SPELL_IDS) {
+      if (own(SPELL_IDS, name) && String(SPELL_IDS[name]).toLowerCase() === want) {
+        return spellAt(name);
+      }
+    }
+    return null;
+  }
+
+  function word(key) { return String(key).charAt(0).toUpperCase() + String(key).slice(1); }
+
+  /**
+    Which of the three this character is missing for this spell, as
+    { what: 'points' | 'level' | 'below', why: '<what is needed, and what they have>' }.
+    Empty when nothing is missing. spell is { name, school, rank }.
+  */
+  function tomeMissing(state, spell) {
+    var s = state || fresh();
+    var out = [];
+    var school = word(spell.school);
+    if (spellPoints(s) <= 0) {
+      var because = s.prof === 'mage'
+        ? 'a mage earns one with every rank'
+        : (schoolsOf(s).length
+          ? 'anybody who is not a Mage holds ' + LIMITS.outsiderSpells + ' spells at most'
+          : 'magic is not yours until a Master mage takes you on');
+      out.push({ what: 'points', why: 'a spell point to spend, and you have none (' + because + ')' });
+    }
+    var have = rankOf(s, spell.school);
+    if (!have || rankIndex(have) < rankIndex(spell.rank)) {
+      out.push({ what: 'level', why: word(spell.rank) + ' rank in ' + school + ', and you ' +
+                 (have ? 'are ' + word(have) + ' in it' : 'have no rank in it') });
+    }
+    var below = RANKS[rankIndex(spell.rank) - 1];
+    if (below && !knowsRank(s, spell.school, below)) {
+      out.push({ what: 'below', why: (/^[aeiou]/.test(below) ? 'an ' : 'a ') + word(below) + ' ' + school +
+                 ' spell you already know, and you know none' });
+    }
+    return out;
+  }
+
+  /**
+    Reading a tome of spell ({ name, school, rank }). Answers what pickSpell
+    answers on a yes, or { ok: false, why, missing } with every one of the
+    three that stands in the way. A spell already in the book is a no with
+    why 'you already know that one' and nothing missing.
+  */
+  function learnFromTome(state, spell) {
+    if (!spell || !spell.name || SCHOOLS.indexOf(spell.school) === -1 || rankIndex(spell.rank) < 0) {
+      return no('that tome\'s spell has no school and rank the rules can read');
+    }
+    var s = clone(state);
+    if (knowsSpell(s, spell.name)) { return no('you already know that one'); }
+    var missing = tomeMissing(s, spell);
+    if (missing.length) {
+      var r = no('missing ' + missing.map(function (m) { return m.what; }).join(', '));
+      r.missing = missing;
+      return r;
+    }
+    var listed = spellAt(spell.name);
+    if (!listed || listed.school !== spell.school || listed.rank !== spell.rank) {
+      if (!s.spells) { s.spells = { points: 0, known: [] }; }
+      if (!s.spells.tomes) { s.spells.tomes = {}; }
+      s.spells.tomes[spell.name] = { school: spell.school, rank: spell.rank };
+    }
+    return addToBook(s, spell);
+  }
+
+  /*
+    STAFF SPELLS, AN ENCHANTER'S OWN SPELL BOOK. Patrick, 29 September, on
+    issue #1128: "Enchanters also get their own spell point and spell
+    unlocking system like the Mages have, so they can actually learn staff
+    spells: like Mages, they do not need the tomes; their Enchanter rank
+    decides which ranks they can unlock", and "just like mages enchanters
+    can't unlock a spell even if they are the correct rank and have the spell
+    points, they must also have at least one spell of the level below".
+
+    So it is the Mage's system, point for point, with the Bladebinder half in
+    place of a school:
+      points  staff spell points. An Enchanter starts with two
+              (LIMITS.enchanterStartStaff), earns one with every Bladebinder
+              rank and two at Master (rankUp), and spends one per spell, on
+              K, with no tome (pickStaffSpell).
+      level   the Enchanter's Bladebinder rank has reached the spell's rank.
+      below   they have already unlocked a staff spell one rank down; Novice
+              has nothing below it.
+    What a staff binds is recorded in staffSpells, by the spell's form id
+    desc, and the staff gate asks that list and nothing else.
+
+    AND FOR EVERYBODY ELSE, THE NON-MAGE RULES. "A non-Enchanter taught by a
+    Master Enchanter follows the same rules a non-Mage has for magic: needs
+    the tome and an earned spell point, and can only learn Novice." A Master
+    Bladebinder teaching them (teach, once, and it counts as one of their two
+    other trades) is what gives them standing in the half, at Novice for good.
+    They learn a staff spell only from its tome (learnStaffFromTome), and
+    what they hold is places under the same cap a non-mage has for spells,
+    LIMITS.outsiderSpells, never more.
+
+    The staff table (STAFF_SPELLS) lives in the staff spells block further
+    down, so these rules are handed the spell as { desc, name, rank } and a
+    rankOfStaff(desc) that answers the rank of any staff spell, the way
+    learnFromTome is handed its spell by the tomes block.
+  */
+
+  /** Is this character an Enchanter, whose staff spells are unlocked on K. */
+  function isEnchanter(state) { return !!state && state.prof === 'enchanter'; }
+
+  /** Taught the Bladebinder half by a Master Enchanter, and not an Enchanter. */
+  function staffTaught(state) {
+    var s = state || fresh();
+    return !isEnchanter(s) && (s.taught || []).indexOf(STAFF_HALF) !== -1 && !!rankOf(s, STAFF_HALF);
+  }
+
+  /** The staff spells unlocked, as a fresh array of descs. */
+  function staffKnown(state) {
+    var list = state && state.staffSpells;
+    return Array.isArray(list) ? list.slice() : [];
+  }
+
+  function knowsStaff(state, desc) { return staffKnown(state).indexOf(desc) !== -1; }
+
+  /** Staff spell points an Enchanter has been given by reaching this Bladebinder rank. */
+  function staffEarned(rank) {
+    var n = LIMITS.enchanterStartStaff;
+    var at = rankIndex(rank || 'novice');
+    for (var i = 1; i <= at; i++) {
+      n += RANKS[i] === 'master' ? LIMITS.enchanterMasterStaff : 1;
+    }
+    return n;
+  }
+
+  /**
+    Staff spell points to spend right now. An Enchanter's are stored, like a
+    mage's; one from before #1128 has none stored and holds what their rank
+    has given them, with the staves they already learned from tomes kept for
+    nothing. Somebody a Master Enchanter taught has the places left under
+    the non-mage cap. Anybody else has none.
+  */
+  function staffPoints(state) {
+    var s = state || fresh();
+    if (isEnchanter(s)) {
+      if (typeof s.staffPoints === 'number') { return s.staffPoints; }
+      return staffEarned(rankOf(s, STAFF_HALF));
+    }
+    if (!staffTaught(s)) { return 0; }
+    return Math.max(0, LIMITS.outsiderSpells - staffKnown(s).length);
+  }
+
+  /** Has this character unlocked any staff spell of that rank. */
+  function knowsStaffRank(state, rank, rankOfStaff) {
+    var known = staffKnown(state);
+    for (var i = 0; i < known.length; i++) {
+      if (typeof rankOfStaff === 'function' && rankOfStaff(known[i]) === rank) { return true; }
+    }
+    return false;
+  }
+
+  /**
+    Which of the three this character is missing for this staff spell, as
+    { what: 'points' | 'level' | 'below', why }, the shape tomeMissing gives.
+    Empty when nothing is missing. spell is { desc, name, rank }.
+  */
+  function staffMissing(state, spell, rankOfStaff) {
+    var s = state || fresh();
+    var out = [];
+    if (staffPoints(s) <= 0) {
+      var because = isEnchanter(s)
+        ? 'an Enchanter earns one with every Bladebinder rank'
+        : (staffTaught(s)
+          ? 'somebody a Master Enchanter taught holds ' + LIMITS.outsiderSpells + ' staff spells at most'
+          : 'staff spells are an Enchanter\'s, or taught by a Master Enchanter');
+      out.push({ what: 'points', why: 'a staff spell point to spend, and you have none (' + because + ')' });
+    }
+    var have = rankOf(s, STAFF_HALF);
+    if (!have || rankIndex(have) < rankIndex(spell.rank)) {
+      out.push({ what: 'level', why: word(spell.rank) + ' rank as a Bladebinder, the half that makes staves, and you ' +
+                 (have ? 'are ' + word(have) + (staffTaught(s) ? ', which a taught trade never goes past' : '')
+                       : 'have no rank in it') });
+    }
+    var below = RANKS[rankIndex(spell.rank) - 1];
+    if (below && !knowsStaffRank(s, below, rankOfStaff)) {
+      out.push({ what: 'below', why: (/^[aeiou]/.test(below) ? 'an ' : 'a ') + word(below) +
+                 ' staff spell you have already unlocked, and you have none' });
+    }
+    return out;
+  }
+
+  /** The refusal for a list of missing requirements, every one of them named. */
+  function staffNeeds(spell, missing) {
+    var needs = missing.map(function (m) { return m.why; });
+    var list = needs.length === 1 ? needs[0]
+      : needs.slice(0, -1).join('; ') + '; and ' + needs[needs.length - 1];
+    return 'to unlock ' + spell.name + ' (' + word(spell.rank) + ') for staves you need ' + list;
+  }
+
+  /** The staff spell into a state already cloned and checked, and the point it costs. */
+  function addStaff(s, spell) {
+    // An Enchanter spends a stored point. Somebody a Master Enchanter taught
+    // spends a place under the cap, which is the push below and nothing else.
+    if (isEnchanter(s)) { s.staffPoints = staffPoints(s) - 1; }
+    s.staffSpells = staffKnown(s);
+    s.staffSpells.push(spell.desc);
+    return yes(s);
+  }
+
+  function badStaff(spell) {
+    return !spell || !spell.desc || !spell.name || rankIndex(spell.rank) < 0;
+  }
+
+  /**
+    An Enchanter unlocks a staff spell on K, with no tome: pickSpell's rules
+    over the Bladebinder rank. Answers { ok, state } or { ok: false, why,
+    missing } with every one of the three that stands in the way.
+  */
+  function pickStaffSpell(state, spell, rankOfStaff) {
+    if (badStaff(spell)) { return no('that is not a staff spell whose rank can be read'); }
+    var s = clone(state);
+    if (!isEnchanter(s)) {
+      return no(staffTaught(s)
+        ? 'somebody a Master Enchanter taught learns a staff spell from its tome, not here'
+        : 'staff spells are unlocked by Enchanters');
+    }
+    if (knowsStaff(s, spell.desc)) { return no('you have already unlocked ' + spell.name + ' for staves'); }
+    var missing = staffMissing(s, spell, rankOfStaff);
+    if (missing.length) {
+      var r = no(staffNeeds(spell, missing));
+      r.missing = missing;
+      return r;
+    }
+    return addStaff(s, spell);
+  }
+
+  /**
+    Somebody a Master Enchanter taught reads the tome of a staff spell: the
+    non-mage rules, a place under the cap and Novice only (the taught half
+    never leaves Novice, so the level rule is what holds them there).
+  */
+  function learnStaffFromTome(state, spell, rankOfStaff) {
+    if (badStaff(spell)) { return no('that tome\'s spell is not a staff spell whose rank can be read'); }
+    var s = clone(state);
+    if (!staffTaught(s)) {
+      return no(isEnchanter(s)
+        ? 'an Enchanter unlocks staff spells on K, with no tome'
+        : 'staff spells are an Enchanter\'s, or taught by a Master Enchanter');
+    }
+    if (knowsStaff(s, spell.desc)) { return no('you have already unlocked ' + spell.name + ' for staves'); }
+    var missing = staffMissing(s, spell, rankOfStaff);
+    if (missing.length) {
+      var r = no(staffNeeds(spell, missing));
+      r.missing = missing;
+      return r;
+    }
+    return addStaff(s, spell);
   }
 
   /** Every perk this character holds right now, from state alone. */
@@ -28633,7 +30660,13 @@ log('gamemode loaded:',
     nextRank: nextRank, rankOf: rankOf, treeApplies: treeApplies,
     placedIn: placedIn, has: own,
     pickSpell: pickSpell, spellAt: spellAt, spellPoints: spellPoints,
-    knowsSpell: knowsSpell, schoolsOf: schoolsOf
+    knowsSpell: knowsSpell, schoolsOf: schoolsOf,
+    rankForLevel: rankForLevel, spellByDesc: spellByDesc,
+    tomeMissing: tomeMissing, learnFromTome: learnFromTome,
+    STAFF_HALF: STAFF_HALF, isEnchanter: isEnchanter, staffTaught: staffTaught,
+    staffKnown: staffKnown, knowsStaff: knowsStaff, staffPoints: staffPoints,
+    staffMissing: staffMissing, pickStaffSpell: pickStaffSpell,
+    learnStaffFromTome: learnStaffFromTome
   };
 })();
 // ==== end thornswood progression ====
@@ -30683,14 +32716,23 @@ log('gamemode loaded:',
       '        var r = sp.ObjectReference.from(sp.Game.getFormEx(v.shut[i]));',
       // A door in a cell nobody has loaded does not resolve, and there is
       // nothing to lock until it does. The tick below comes back to it.
-      '        if (r) { r.lock(true, false); }',
+      // ONLY A DOOR IN THE WRONG STATE IS TOUCHED (#963). lock() fires the
+      // game's lockChanged event even when nothing changes, and the front
+      // plugin answers every one with a log line and a blockActivation: the
+      // dev log of 28 September has the same open door "opened" twice every
+      // four seconds, 16 events costing 408 ms in 30 s, worst 229 ms, which
+      // is a stutter on each heartbeat. If isLocked cannot be read the door
+      // is locked anyway, so this fails shut.
+      '        if (r) { var was = null; try { was = r.isLocked(); } catch (e2) { }',
+      '          if (was !== true) { r.lock(true, false); } }',
       '        shutMap[v.shut[i]] = true;',
       '      } catch (e) { }',
       '    }',
       '    for (var j = 0; j < (v.open || []).length; j++) {',
       '      try {',
       '        var o = sp.ObjectReference.from(sp.Game.getFormEx(v.open[j]));',
-      '        if (o) { o.lock(false, false); }',
+      '        if (o) { var shut = true; try { shut = o.isLocked(); } catch (e2) { }',
+      '          if (shut !== false) { o.lock(false, false); } }',
       '        delete shutMap[v.open[j]];',
       '      } catch (e) { }',
       '    }',
@@ -33539,6 +35581,14 @@ log('gamemode loaded:',
     if (!creating) {
       var book = bookView(s);
       if (book) { view.book = book; }
+      /*
+        An Enchanter's staff spells (#1128), drawn as a spell book of its own
+        and left off for everybody else. The staff spells block owns the table
+        and loads after this one, so it is asked at write time.
+      */
+      var SS = g.__thornswoodStaffSpells;
+      var staff = (SS && SS.view) ? SS.view(P, s) : null;
+      if (staff) { view.staff = staff; }
     }
     // Left out entirely when there is nothing to say, per the contract.
     var climbing = progressView(s);
@@ -33816,6 +35866,10 @@ log('gamemode loaded:',
       line += ' ' + raised.spellPoints + ' more spell point' +
               (raised.spellPoints === 1 ? '' : 's') + ' as well.';
     }
+    if (raised.staffPoints > 0) {
+      line += ' ' + raised.staffPoints + ' more staff spell point' +
+              (raised.staffPoints === 1 ? '' : 's') + ' to unlock staff spells with, on K.';
+    }
     return line;
   }
 
@@ -33890,12 +35944,36 @@ log('gamemode loaded:',
   function grantKnown(actorId) {
     var s = stateOf(actorId);
     var known = (s.spells && s.spells.known) || [];
+    // A spell a tome taught that the book does not list (#1026) has no name
+    // in SPELL_IDS; the engine put it on the character when the tome was read
+    // and keeps it in learnedSpells, so it is skipped here, not logged as
+    // missing on every spawn.
+    var tomes = (s.spells && s.spells.tomes) || {};
     var n = 0;
     for (var i = 0; i < known.length; i++) {
+      if (P.has(tomes, known[i])) { continue; }
       if (grantSpell(actorId, known[i], true)) { n++; }
     }
     if (known.length) {
       clog('spawn:', n, 'of', known.length, 'known spells put back on', actorId.toString(16));
+    }
+    /*
+      And every staff spell unlocked (#1128), by its form id desc. The game's
+      crafting menu lists a staff only for somebody who holds its spell (the
+      recipe's HasSpell), so an unlocked staff spell has to be on the
+      character as well as in the record, or the staff never shows.
+    */
+    var staff = P.staffKnown ? P.staffKnown(s) : [];
+    var put = 0;
+    for (var j = 0; j < staff.length; j++) {
+      try {
+        if (typeof spellOn === 'function' && spellOn(actorId, staff[j], true)) { put++; }
+      } catch (e) {
+        clog('could not put staff spell', staff[j], 'back on', actorId.toString(16), e);
+      }
+    }
+    if (staff.length) {
+      clog('spawn:', put, 'of', staff.length, 'staff spells put back on', actorId.toString(16));
     }
     return n;
   }
@@ -33911,6 +35989,8 @@ log('gamemode loaded:',
       /pick profession mage destruction,restoration
       /pick town riften                  while creating, and never after
       /pick spell Ice Spike              one spell out of the book
+      /pick staffspell Thunderbolt       an Enchanter unlocks a staff spell (#1128);
+                                         the K page sends the spell's desc
       /pick spend vitality               the panel's spelling of /spend
       /spend vitality
 
@@ -33997,6 +36077,7 @@ log('gamemode loaded:',
     var r = null;
     var spellPicked = null;   // set when this command was a spell, so it can
                               // be put on the character after the write
+    var staffPicked = null;   // the same for a staff spell: { desc, name, rank }
     /*
       WHICH PICK A REFUSAL ANSWERS. Part of the contract with the panel: a
       note carries about, so the panel clears that one pick and leaves the
@@ -34069,11 +36150,23 @@ log('gamemode loaded:',
           var book = P.spellAt(wanted);
           spellPicked = book ? book.name : null;
         }
+      } else if (what === 'staffspell') {
+        /*
+          An Enchanter unlocks a staff spell (#1128): the K page sends the
+          spell's desc, and a person typing can give its name. Everything
+          after the word is the spell, spaces and all ('Odin - Skyrim Magic
+          Overhaul.esp' has them).
+        */
+        about = 'staffspell';
+        var SS = g.__thornswoodStaffSpells;
+        r = (SS && SS.unlock) ? SS.unlock(P, s, parts.slice(2).join(' '))
+          : { ok: false, why: 'staff spells are not running on this server right now' };
+        if (r.ok) { staffPicked = r.spell; }
       } else if (what === 'spend') {
         about = 'spend';
         r = P.spendPoint(s, String(parts[2] || '').toLowerCase(), parts[3]);
       } else {
-        toProfile(profileId, 'Pick what? class, profession, spell or town.');
+        toProfile(profileId, 'Pick what? class, profession, spell, staffspell or town.');
         return true;
       }
     } else {
@@ -34184,6 +36277,23 @@ log('gamemode loaded:',
       if (climbed) { toProfile(profileId, climbed); }
     }
 
+    /*
+      A staff spell unlocked goes on the character too, by its desc: the
+      crafting menu lists a staff only for somebody who holds its spell (the
+      recipe's HasSpell), and grantKnown puts it back on every spawn.
+    */
+    if (staffPicked) {
+      try {
+        if (typeof spellOn === 'function') { spellOn(actorId, staffPicked.desc, true); }
+      } catch (eStaff) {
+        clog('could not put staff spell', staffPicked.desc, 'on', actorId.toString(16), eStaff);
+      }
+      var left = P.staffPoints(st);
+      toProfile(profileId, 'You unlock ' + staffPicked.name + ' for staves, and you can bind it into a staff ' +
+                'at a staff enchanter now. ' + (left ? left + ' staff spell point' + (left === 1 ? '' : 's') + ' left.'
+                                                      : 'No staff spell points left; more come with every Bladebinder rank.'));
+    }
+
     // The home is the one pick that ends creation. Class and profession may
     // still be unset: they are picked in the world, from the same panel, and
     // the rules (pickClass, pickProfession) refuse only a second one.
@@ -34217,12 +36327,704 @@ log('gamemode loaded:',
     forPanel: forPanel, mapHalf: mapHalf, migrate: migrate, command: command,
     beginCreation: beginCreation, updateOwnerScript: updateOwnerScript,
     gate: gate, gateHalf: gateHalf, credit: credit,
-    grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf,
+    grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
     rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
 })();
 // ==== end thornswood character ====
+
+// ==== thornswood spell tomes ====
+/*
+  A SPELL TOME TEACHES ONLY UNDER THE MAGE RULES. Patrick, 29 September, on
+  issue #1026: "No they still need the spell points, the level, and a spell
+  from the level below."
+
+  The engine teaches the spell of any book with the teaches-spell flag and
+  spends the book (ReadBookEvent::OnFireSuccess in the fork), unless
+  mp.onReadBook answers false: then the book is kept and the engine takes the
+  spell back off the client (OnFireBlocked). So the handler at the end of the
+  staff spells block asks read() below, which asks the rules
+  (learnFromTome in the progression block) and answers whether to refuse and
+  the line to say. Every one of the three that is missing is named.
+
+  WHICH SPELL, AND WHAT SCHOOL AND RANK, READ OUT OF THE GAME'S OWN RECORDS at
+  the moment somebody reads, through mp.lookupEspmRecordById (the same way the
+  spoils block classifies a container), so nothing is generated and a magic
+  mod's tomes are covered the day it is added:
+    BOOK  DATA byte 0 carries flag 0x04 (TeachesSpell, libespm BOOK.h) and the
+          uint32 at offset 4 is the spell, a plugin-local form id turned
+          global with the lookup's own toGlobalRecordId.
+    SPEL  a spell SPELLS lists (by its form id in SPELL_IDS) is the rulebook's,
+          school and rank and all. Anything else: the half cost perk in SPIT
+          at offset 32, whose editor id names both (DestructionAdept50,
+          AlterationNovice00), and failing that its effects.
+    MGEF  DATA int32 at offset 12 is the magic skill (actor value 18
+          Alteration, 19 Conjuration, 20 Destruction, 21 Illusion, 22
+          Restoration) and uint32 at 40 the minimum skill level. The highest
+          level among the effects of the five schools decides.
+  Skyrim's levels map to ranks as SPELLS sorts them: 0 Novice, 25 Apprentice
+  and 50 Adept are Advanced, 75 Expert, 100 Master (rankForLevel).
+
+  MEASURED 29 September, this block run against the 57 plugins of the server
+  load order read off disk: 497 books teach a spell, 84 of them a spell
+  SPELLS lists, and 492 give a school and rank. The five that do not are the
+  Oghma Infinium (a mod makes it teach Dragon Knowledge) and the four Fishing
+  in Skyrim cheat books, and refusing all five is right. For the 85 spells
+  SPELLS lists, the records alone agree with the book on 83; Odin moves
+  Invisibility to Expert and Call to Arms to Master, and the book wins.
+
+  A tome whose spell has no school or rank that can be read is refused and
+  logged: handing out a spell nobody could check would be the hole this
+  closes. A missing character block is a build fault and lets the book read
+  as Skyrim reads it, the same choice every gate in this file makes.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+
+  var TEACHES_SPELL = 0x04;
+  var AV_SCHOOL = { 18: 'alteration', 19: 'conjuration', 20: 'destruction', 21: 'illusion', 22: 'restoration' };
+  var PERK_RANK = /(alteration|conjuration|destruction|illusion|restoration)(novice|apprentice|adept|expert|master)/i;
+  var PERK_WORD = { novice: 'novice', apprentice: 'advanced', adept: 'advanced', expert: 'expert', master: 'master' };
+
+  function tlog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[tomes]');
+    console.log(a.join(' '));
+  }
+
+  function lookup(id) {
+    if (!id) { return null; }
+    try { return mp.lookupEspmRecordById(id) || null; } catch (e) { return null; }
+  }
+  function fieldsOf(res, type) {
+    var out = [];
+    var fields = (res && res.record && res.record.fields) || [];
+    for (var i = 0; i < fields.length; i++) {
+      if (String(fields[i].type) === type) { out.push(fields[i].data || []); }
+    }
+    return out;
+  }
+  function field(res, type) { return fieldsOf(res, type)[0] || null; }
+  function u32(b, at) {
+    if (!b || b.length < at + 4) { return null; }
+    return (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16)) + b[at + 3] * 0x1000000;
+  }
+  function i32(b, at) {
+    var n = u32(b, at);
+    return n === null ? null : (n | 0);
+  }
+  function globalOf(res, local) {
+    if (!res || typeof res.toGlobalRecordId !== 'function') { return 0; }
+    try { return Number(res.toGlobalRecordId(local)) || 0; } catch (e) { return 0; }
+  }
+
+  /** School and rank out of a SPEL record: its half cost perk, then its effects. */
+  function schoolAndRank(P, spellRes) {
+    var perkLocal = u32(field(spellRes, 'SPIT'), 32);
+    if (perkLocal) {
+      var perk = lookup(globalOf(spellRes, perkLocal));
+      var m = perk && perk.record ? PERK_RANK.exec(String(perk.record.editorId || '')) : null;
+      if (m) { return { school: m[1].toLowerCase(), rank: PERK_WORD[m[2].toLowerCase()] }; }
+    }
+    var best = null;
+    var efids = fieldsOf(spellRes, 'EFID');
+    for (var i = 0; i < efids.length; i++) {
+      var mgef = lookup(globalOf(spellRes, u32(efids[i], 0)));
+      var data = field(mgef, 'DATA');
+      var av = i32(data, 12);
+      var level = u32(data, 40);
+      if (!Object.prototype.hasOwnProperty.call(AV_SCHOOL, av) || level === null) { continue; }
+      if (!best || level > best.level) { best = { school: AV_SCHOOL[av], level: level }; }
+    }
+    if (!best) { return null; }
+    return { school: best.school, rank: P.rankForLevel(best.level) };
+  }
+
+  /** A name a person reads: the staff table's, else the record's FULL when it is plain text, else its editor id. */
+  function nameOf(spellRes, desc) {
+    var staff = g.__thornswoodStaffSpells;
+    var st = staff && staff.STAFF_SPELLS;
+    if (st && Object.prototype.hasOwnProperty.call(st, desc) && st[desc].name) { return st[desc].name; }
+    var full = field(spellRes, 'FULL');
+    if (full && full.length > 1) {
+      var text = '';
+      for (var i = 0; i < full.length && full[i]; i++) {
+        if (full[i] < 32 || full[i] > 126) { text = ''; break; }
+        text += String.fromCharCode(full[i]);
+      }
+      if (text) { return text; }
+    }
+    var edid = spellRes && spellRes.record && spellRes.record.editorId;
+    return edid ? String(edid) : desc;
+  }
+
+  /*
+    The spell a book teaches, as the rules want it: { desc, name, school,
+    rank }, school null when it cannot be read, or null when the book teaches
+    no spell. Memoed per book, because a record never changes under a running
+    server.
+  */
+  var byBook = {};
+  function tomeSpell(bookBaseId) {
+    var key = String(bookBaseId);
+    if (Object.prototype.hasOwnProperty.call(byBook, key)) { return byBook[key]; }
+    var P = g.__thornswoodProgression;
+    var out = null;
+    var book = lookup(bookBaseId);
+    var data = field(book, 'DATA');
+    if (book && book.record && String(book.record.type) === 'BOOK' && data && (data[0] & TEACHES_SPELL)) {
+      var spellId = globalOf(book, u32(data, 4));
+      var desc = '';
+      try { desc = String(mp.getDescFromId(spellId) || ''); } catch (e) { desc = ''; }
+      var listed = (P && desc) ? P.spellByDesc(desc) : null;
+      if (listed) {
+        out = { desc: desc, name: listed.name, school: listed.school, rank: listed.rank };
+      } else {
+        var res = lookup(spellId);
+        var sr = (P && res) ? schoolAndRank(P, res) : null;
+        out = { desc: desc, name: nameOf(res, desc), school: sr ? sr.school : null, rank: sr ? sr.rank : null };
+      }
+    }
+    byBook[key] = out;
+    return out;
+  }
+
+  function word(key) { return String(key).charAt(0).toUpperCase() + String(key).slice(1); }
+
+  /** The one line for a refusal: what the tome teaches and every one of the three that is missing. */
+  function refusalLine(spell, missing) {
+    var needs = missing.map(function (m) { return m.why; });
+    var list = needs.length === 1 ? needs[0]
+      : needs.slice(0, -1).join('; ') + '; and ' + needs[needs.length - 1];
+    return 'You cannot learn ' + spell.name + ' (' + word(spell.rank) + ' ' + word(spell.school) +
+           ') from this tome yet, so you keep it. You need ' + list + '.';
+  }
+
+  /** Every missing requirement in one list: 'a; b; and c'. */
+  function joinNeeds(missing) {
+    var needs = missing.map(function (m) { return m.why; });
+    return needs.length === 1 ? needs[0]
+      : needs.slice(0, -1).join('; ') + '; and ' + needs[needs.length - 1];
+  }
+
+  /*
+    The tome goes when it unlocked a staff spell and the engine will not
+    spend it: the engine spends a book only when it taught the spell itself
+    (MpActor.cpp, spellLearned), and it does not when the character already
+    knew the spell. Same helper the tools use, so the pack is written once.
+  */
+  function spendTome(actorId, bookBaseId) {
+    try {
+      if (typeof takeItemById === 'function') { return !!takeItemById(actorId, bookBaseId, 1); }
+    } catch (e) {
+      tlog('could not spend the tome', Number(bookBaseId).toString(16), 'of', Number(actorId).toString(16) + ':', e);
+    }
+    return false;
+  }
+
+  /*
+    Somebody read a book. Answers null to let it read as Skyrim reads it and
+    say nothing, or { refused, line }: refused true keeps the book and the
+    spell away from them, and line is said either way.
+
+    A tome of a staff spell does one more thing for one kind of reader (#1128):
+    somebody a Master Enchanter taught learns it for staves under the non-mage
+    rules (a place under the cap, Novice only), whether or not the Mage rules
+    would have taught it, and the engine then teaches the spell and spends
+    the tome as it does for anybody, because the crafting menu shows a staff
+    only to somebody who holds its spell. An Enchanter is told that staves
+    need no tome: they unlock the spell on K.
+  */
+  function read(actorId, bookBaseId) {
+    var spell = tomeSpell(bookBaseId);
+    if (!spell) { return null; }
+    var C = g.__thornswoodCharacter;
+    var P = g.__thornswoodProgression;
+    var S = g.__thornswoodStaffSpells;
+    if (!C || !C.stateOf || !P || !P.learnFromTome) {
+      tlog('the character block is not loaded, so', spell.name, 'is taught as Skyrim teaches it');
+      return null;
+    }
+    var s = C.stateOf(actorId);
+    if (!spell.school || !spell.rank) {
+      tlog('no school and rank readable for', spell.desc, '(' + spell.name + '), so the tome is refused to',
+           Number(actorId).toString(16));
+      return { refused: true, line: 'Nobody can learn ' + spell.name + ' from a tome here yet, because ' +
+               'its school and rank cannot be read. You keep the tome; tell staff with /helpme.' };
+    }
+
+    var staffDesc = (S && S.isStaffSpell && spell.desc && S.isStaffSpell(spell.desc)) ? spell.desc : null;
+    var fresh = !!staffDesc && !!P.knowsStaff && !P.knowsStaff(s, staffDesc);
+    var outsider = fresh && !!P.staffTaught && P.staffTaught(s);
+    var enchNote = (fresh && P.isEnchanter && P.isEnchanter(s))
+      ? ' Staves need no tome for an Enchanter: press K and unlock ' + spell.name + ' under Staff spells.'
+      : '';
+
+    // Already in their book: nothing to spend, and the engine keeps a tome
+    // whose spell the character has. Only the staff record can be new, for
+    // somebody a Master Enchanter taught.
+    if (P.knowsSpell(s, spell.name)) {
+      if (outsider) {
+        var again = S.learn(P, s, staffDesc);
+        if (again.ok) {
+          C.writeState(actorId, again.state);
+          var gone = spendTome(actorId, bookBaseId);
+          return { refused: false, line: 'You know ' + spell.name + ' already, and the tome unlocks it for staves: ' +
+                   'you can bind it into a staff at a staff enchanter now.' + (gone ? ' The tome is spent.' : '') };
+        }
+        return { refused: false, line: 'You know ' + spell.name + ' already, and you cannot unlock it for staves yet. You need ' +
+                 joinNeeds(again.missing || [{ why: again.why }]) + '.' };
+      }
+      return enchNote ? { refused: false, line: 'You know ' + spell.name + ' already.' + enchNote } : null;
+    }
+
+    var r = P.learnFromTome(s, spell);
+    if (!r.ok) {
+      tlog(Number(actorId).toString(16), 'was refused', spell.name, spell.desc + ':', r.why);
+      if (outsider) {
+        var st = S.learn(P, s, staffDesc);
+        if (st.ok) {
+          /*
+            Unlocked for staves under the non-mage rules, so the engine is let
+            teach the spell and spend the tome: the game's crafting menu lists
+            a staff only for somebody who knows its spell (the recipe's
+            HasSpell), so a staff spell nobody holds is a staff nobody sees.
+            It is not written into their spell book, so it takes none of the
+            places a Master mage's teaching gives.
+          */
+          C.writeState(actorId, st.state);
+          tlog(Number(actorId).toString(16), 'unlocked', spell.name, spell.desc, 'for staves from a tome');
+          return { refused: false, line: 'The tome unlocks ' + spell.name + ' for staves: you can bind it into a staff ' +
+                   'at a staff enchanter now. It took one of your ' + P.TABLE.limits.outsiderSpells +
+                   ' staff spell places, and the tome is spent.' };
+        }
+        var both = r.missing ? refusalLine(spell, r.missing)
+          : 'You cannot learn ' + spell.name + ' from this tome: ' + r.why + '. You keep the tome.';
+        return { refused: true, line: both + ' Nor can you unlock it for staves yet: you need ' +
+                 joinNeeds(st.missing || [{ why: st.why }]) + '.' };
+      }
+      return { refused: true, line: (r.missing ? refusalLine(spell, r.missing)
+               : 'You cannot learn ' + spell.name + ' from this tome: ' + r.why + '. You keep the tome.') + enchNote };
+    }
+
+    var next = r.state;
+    var staffLine = enchNote;
+    if (outsider) {
+      var st2 = S.learn(P, next, staffDesc);
+      if (st2.ok) {
+        next = st2.state;
+        staffLine = ' It is unlocked for staves too: you can bind it into a staff at a staff enchanter now.';
+      } else {
+        staffLine = ' It is not unlocked for staves: you need ' + joinNeeds(st2.missing || [{ why: st2.why }]) + '.';
+      }
+    }
+    C.writeState(actorId, next);
+    var raised = C.raiseLines ? C.raiseLines(actorId, r) : null;
+    tlog(Number(actorId).toString(16), 'learned', spell.name, spell.desc, 'from a tome');
+    return { refused: false, line: 'The tome teaches you ' + spell.name + ', ' + word(spell.rank) + ' ' +
+             word(spell.school) + '. It cost a spell point.' + staffLine + (raised ? ' ' + raised : '') };
+  }
+
+  g.__thornswoodTomes = { tomeSpell: tomeSpell, read: read, refusalLine: refusalLine };
+})();
+// ==== end thornswood spell tomes ====
+
+// ==== thornswood staff spells ====
+/*
+  THE STAFF SPELLS: WHAT A STAFF BINDS, AND WHO HAS UNLOCKED IT.
+
+  160 of the Bladebinder's 161 staff recipes carry a HasSpell condition naming
+  the staff's own spell. A staff is made only when its spell is unlocked for
+  staves: recorded in staffSpells on the character (the thornswoodCharacter
+  property, so it survives a restart), which craftAnswer asks through
+  refusal() below once rank and half have said yes.
+
+  HOW A SPELL IS UNLOCKED, since 29 September (#1128). Patrick: "Enchanters
+  also get their own spell point and spell unlocking system like the Mages
+  have ... like Mages, they do not need the tomes; their Enchanter rank
+  decides which ranks they can unlock", and "they must also have at least one
+  spell of the level below".
+    - An Enchanter (either half) unlocks it on K, under Staff spells, which
+      sends '/pick staffspell <desc>' (unlock below, P.pickStaffSpell in the
+      rules). Three things, the Mage's three: a staff spell point (two to
+      start, one with every Bladebinder rank, two at Master), Bladebinder rank
+      at or above the spell's rank, and a staff spell of the rank below
+      already unlocked (Novice needs none). No tome.
+    - Somebody a Master Enchanter taught the Bladebinder half learns it only
+      from its tome, under the non-mage rules (learn below,
+      P.learnStaffFromTome): a place under LIMITS.outsiderSpells, and Novice
+      only, since a taught half never leaves Novice. The spell tomes block
+      calls learn when they read one, and spends the tome when the engine
+      would not.
+    - Reading a tome is otherwise the Mage rules for the spell itself, for an
+      Enchanter as for anybody (THE SPELL TOMES block above), and records
+      nothing for an Enchanter's staves: the K page is their way in.
+  What was recorded under #967 and #1026, when a tome was the only way in,
+  stays unlocked.
+
+  WHAT RANK A STAFF SPELL IS. rankOf below: the rulebook's SPELLS when it
+  lists the spell, otherwise the rank Build-RecipeTable read out of the game's
+  records and wrote beside it in STAFF_SPELLS (the half cost perk's editor
+  id, then the effects, the same reading the tomes block does at runtime).
+
+  A SPELL NO TOME TEACHES. Some Apocalypse staves name the copy of a spell only
+  a creature casts. Build-RecipeTable prints every one and STAFF_SPELLS lists
+  them with no tomes: an Enchanter can still unlock one, and nobody else can.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+
+  // ==== STAFF_SPELLS ====
+  /* Built by scripts\dev\Build-RecipeTable.ps1 out of the game's own records. Do not hand edit.
+     160 spells a staff recipe binds, 160 of them taught by a spell tome.
+     Spell desc -> its name, its school and rank read out of the records (#1128; null when they cannot be),
+     and every BOOK record whose teaches spell flag names it. */
+  var STAFF_SPELLS = {
+    "10f7ee:Skyrim.esm": { "name": "Thunderbolt", "school": "destruction", "rank": "expert", "tomes": ["10f7f5:Skyrim.esm"] },
+    "35d81:Skyrim.esm": { "name": "Wall of Storms", "school": "destruction", "rank": "expert", "tomes": ["a270b:Skyrim.esm"] },
+    "35d80:Skyrim.esm": { "name": "Wall of Frost", "school": "destruction", "rank": "expert", "tomes": ["a270a:Skyrim.esm"] },
+    "35d7f:Skyrim.esm": { "name": "Wall of Flames", "school": "destruction", "rank": "expert", "tomes": ["a2709:Skyrim.esm"] },
+    "4b146:Skyrim.esm": { "name": "Turn Lesser Undead", "school": "restoration", "rank": "advanced", "tomes": ["a271f:Skyrim.esm"] },
+    "5dd5d:Skyrim.esm": { "name": "Turn Undead", "school": "restoration", "rank": "advanced", "tomes": ["a2721:Skyrim.esm"] },
+    "5dd5e:Skyrim.esm": { "name": "Turn Greater Undead", "school": "restoration", "rank": "expert", "tomes": ["a2729:Skyrim.esm"] },
+    "2dd2a:Skyrim.esm": { "name": "Sparks", "school": "destruction", "rank": "novice", "tomes": ["9cd53:Skyrim.esm"] },
+    "4dba4:Skyrim.esm": { "name": "Soul Trap", "school": "conjuration", "rank": "advanced", "tomes": ["9cd54:Skyrim.esm"] },
+    "4deef:Skyrim.esm": { "name": "Rout", "school": "illusion", "rank": "expert", "tomes": ["a2718:Skyrim.esm"] },
+    "96d94:Skyrim.esm": { "name": "Reanimate Greater Corpse", "school": "conjuration", "rank": "advanced", "tomes": ["a26f2:Skyrim.esm"] },
+    "247c86:Odin - Skyrim Magic Overhaul.esp": { "name": "Toxic Cloud", "school": "restoration", "rank": "expert", "tomes": ["a2726:Skyrim.esm"] },
+    "26121c:Odin - Skyrim Magic Overhaul.esp": { "name": "Black Hand", "school": "restoration", "rank": "advanced", "tomes": ["a2725:Skyrim.esm"] },
+    "65bd7:Skyrim.esm": { "name": "Reanimate Corpse", "school": "conjuration", "rank": "advanced", "tomes": ["a26eb:Skyrim.esm"] },
+    "4deec:Skyrim.esm": { "name": "Rally", "school": "illusion", "rank": "advanced", "tomes": ["a2713:Skyrim.esm"] },
+    "7e8e1:Skyrim.esm": { "name": "Reanimate Lesser Corpse", "school": "conjuration", "rank": "novice", "tomes": ["9e2aa:Skyrim.esm"] },
+    "5ad5f:Skyrim.esm": { "name": "Paralyze", "school": "alteration", "rank": "expert", "tomes": ["a26e8:Skyrim.esm"] },
+    "43323:Skyrim.esm": { "name": "Magelight", "school": "alteration", "rank": "advanced", "tomes": ["a26e2:Skyrim.esm"] },
+    "10f7ed:Skyrim.esm": { "name": "Incinerate", "school": "destruction", "rank": "expert", "tomes": ["10f7f4:Skyrim.esm"] },
+    "10f7ec:Skyrim.esm": { "name": "Icy Spear", "school": "destruction", "rank": "expert", "tomes": ["10f7f3:Skyrim.esm"] },
+    "45f9c:Skyrim.esm": { "name": "Ice Storm", "school": "destruction", "rank": "advanced", "tomes": ["a2707:Skyrim.esm"] },
+    "2b96c:Skyrim.esm": { "name": "Ice Spike", "school": "destruction", "rank": "advanced", "tomes": ["a26fe:Skyrim.esm"] },
+    "12fd2:Skyrim.esm": { "name": "Heal Other", "school": "restoration", "rank": "advanced", "tomes": ["a2727:Skyrim.esm"] },
+    "4d3f2:Skyrim.esm": { "name": "Healing Hands", "school": "restoration", "rank": "advanced", "tomes": ["a271e:Skyrim.esm"] },
+    "4deeb:Skyrim.esm": { "name": "Fury", "school": "illusion", "rank": "novice", "tomes": ["9e2ac:Skyrim.esm"] },
+    "2b96b:Skyrim.esm": { "name": "Frostbite", "school": "destruction", "rank": "novice", "tomes": ["9cd52:Skyrim.esm"] },
+    "4deee:Skyrim.esm": { "name": "Frenzy", "school": "illusion", "rank": "advanced", "tomes": ["a2714:Skyrim.esm"] },
+    "12fcd:Skyrim.esm": { "name": "Flames", "school": "destruction", "rank": "novice", "tomes": ["9cd51:Skyrim.esm"] },
+    "12fd0:Skyrim.esm": { "name": "Firebolt", "school": "destruction", "rank": "advanced", "tomes": ["a26fd:Skyrim.esm"] },
+    "1c789:Skyrim.esm": { "name": "Fireball", "school": "destruction", "rank": "advanced", "tomes": ["a2706:Skyrim.esm"] },
+    "4deea:Skyrim.esm": { "name": "Fear", "school": "illusion", "rank": "advanced", "tomes": ["a2712:Skyrim.esm"] },
+    "6f952:Skyrim.esm": { "name": "Expel Daedra", "school": "conjuration", "rank": "expert", "tomes": ["a26f8:Skyrim.esm"] },
+    "96d95:Skyrim.esm": { "name": "Dread Zombie", "school": "conjuration", "rank": "expert", "tomes": ["a26f7:Skyrim.esm"] },
+    "4dee8:Skyrim.esm": { "name": "Courage", "school": "illusion", "rank": "novice", "tomes": ["9e2ad:Skyrim.esm"] },
+    "204c5:Skyrim.esm": { "name": "Conjure Storm Atronach", "school": "conjuration", "rank": "expert", "tomes": ["a26f0:Skyrim.esm"] },
+    "204c4:Skyrim.esm": { "name": "Conjure Frost Atronach", "school": "conjuration", "rank": "advanced", "tomes": ["a26ef:Skyrim.esm"] },
+    "204c3:Skyrim.esm": { "name": "Conjure Flame Atronach", "school": "conjuration", "rank": "advanced", "tomes": ["a26ec:Skyrim.esm"] },
+    "640b6:Skyrim.esm": { "name": "Conjure Familiar", "school": "conjuration", "rank": "novice", "tomes": ["9e2ab:Skyrim.esm"] },
+    "6f953:Skyrim.esm": { "name": "Command Daedra", "school": "conjuration", "rank": "expert", "tomes": ["a26f6:Skyrim.esm"] },
+    "45f9d:Skyrim.esm": { "name": "Chain Lightning", "school": "destruction", "rank": "advanced", "tomes": ["a2708:Skyrim.esm"] },
+    "4dee9:Skyrim.esm": { "name": "Calm", "school": "illusion", "rank": "advanced", "tomes": ["a2711:Skyrim.esm"] },
+    "6d22c:Skyrim.esm": { "name": "Banish Daedra", "school": "conjuration", "rank": "advanced", "tomes": ["a26ee:Skyrim.esm"] },
+    "2dd29:Skyrim.esm": { "name": "Lightning Bolt", "school": "destruction", "rank": "advanced", "tomes": ["a26ff:Skyrim.esm"] },
+    "17b5c9:Odin - Skyrim Magic Overhaul.esp": { "name": "Panic", "school": "illusion", "rank": "advanced", "tomes": ["17b5db:Odin - Skyrim Magic Overhaul.esp"] },
+    "18c58c:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Clannfear", "school": "conjuration", "rank": "advanced", "tomes": ["1afd19:Odin - Skyrim Magic Overhaul.esp"] },
+    "8558a:Odin - Skyrim Magic Overhaul.esp": { "name": "Simulacrum", "school": "illusion", "rank": "advanced", "tomes": ["21a2f7:Odin - Skyrim Magic Overhaul.esp"] },
+    "247c89:Odin - Skyrim Magic Overhaul.esp": { "name": "Sun Storm", "school": "restoration", "rank": "expert", "tomes": ["261216:Odin - Skyrim Magic Overhaul.esp"] },
+    "27a7b1:Odin - Skyrim Magic Overhaul.esp": { "name": "Corrosion", "school": "alteration", "rank": "advanced", "tomes": ["293d18:Odin - Skyrim Magic Overhaul.esp"] },
+    "173074:Odin - Skyrim Magic Overhaul.esp": { "name": "Vulnerability", "school": "alteration", "rank": "advanced", "tomes": ["275692:Odin - Skyrim Magic Overhaul.esp"] },
+    "17b5c2:Odin - Skyrim Magic Overhaul.esp": { "name": "Soothe", "school": "illusion", "rank": "advanced", "tomes": ["17b5d8:Odin - Skyrim Magic Overhaul.esp"] },
+    "17b5d1:Odin - Skyrim Magic Overhaul.esp": { "name": "Subjugate", "school": "illusion", "rank": "advanced", "tomes": ["17b5da:Odin - Skyrim Magic Overhaul.esp"] },
+    "27569c:Odin - Skyrim Magic Overhaul.esp": { "name": "Purge Magic", "school": "illusion", "rank": "expert", "tomes": ["27569e:Odin - Skyrim Magic Overhaul.esp"] },
+    "2a3051:Odin - Skyrim Magic Overhaul.esp": { "name": "Frosthand", "school": "destruction", "rank": "advanced", "tomes": ["2a3054:Odin - Skyrim Magic Overhaul.esp"] },
+    "d4349:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Gloom Wraith", "school": "conjuration", "rank": "advanced", "tomes": ["d4351:Odin - Skyrim Magic Overhaul.esp"] },
+    "3f52:Dawnguard.esm": { "name": "Sun Fire", "school": "restoration", "rank": "advanced", "tomes": ["3f51:Dawnguard.esm"] },
+    "1e78ad:Odin - Skyrim Magic Overhaul.esp": { "name": "Arctic Frost", "school": "destruction", "rank": "expert", "tomes": ["26b450:Odin - Skyrim Magic Overhaul.esp"] },
+    "27f2e:Odin - Skyrim Magic Overhaul.esp": { "name": "Ice Shards", "school": "destruction", "rank": "advanced", "tomes": ["3e090:Odin - Skyrim Magic Overhaul.esp"] },
+    "18c58e:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Daedroth", "school": "conjuration", "rank": "advanced", "tomes": ["1afd1a:Odin - Skyrim Magic Overhaul.esp"] },
+    "1967b9:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Houndmaster", "school": "conjuration", "rank": "expert", "tomes": ["1afd1b:Odin - Skyrim Magic Overhaul.esp"] },
+    "1a5ad7:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Ursine Familiar", "school": "conjuration", "rank": "expert", "tomes": ["1afd1e:Odin - Skyrim Magic Overhaul.esp"] },
+    "1916b1:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Dread Shade", "school": "conjuration", "rank": "expert", "tomes": ["1afd22:Odin - Skyrim Magic Overhaul.esp"] },
+    "224526:Odin - Skyrim Magic Overhaul.esp": { "name": "Discordant Wail", "school": "illusion", "rank": "advanced", "tomes": ["23897e:Odin - Skyrim Magic Overhaul.esp"] },
+    "1e279f:Odin - Skyrim Magic Overhaul.esp": { "name": "Lightning Grasp", "school": "destruction", "rank": "advanced", "tomes": ["3db25:Odin - Skyrim Magic Overhaul.esp"] },
+    "1a5aea:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Feline Familiar", "school": "conjuration", "rank": "advanced", "tomes": ["1afd1d:Odin - Skyrim Magic Overhaul.esp"] },
+    "2a304f:Odin - Skyrim Magic Overhaul.esp": { "name": "Firehand", "school": "destruction", "rank": "advanced", "tomes": ["2a3053:Odin - Skyrim Magic Overhaul.esp"] },
+    "21f3fd:Odin - Skyrim Magic Overhaul.esp": { "name": "Mute", "school": "illusion", "rank": "advanced", "tomes": ["21f417:Odin - Skyrim Magic Overhaul.esp"] },
+    "27a7b4:Odin - Skyrim Magic Overhaul.esp": { "name": "Dire Corrosion", "school": "alteration", "rank": "expert", "tomes": ["293d19:Odin - Skyrim Magic Overhaul.esp"] },
+    "159d8:Odin - Skyrim Magic Overhaul.esp": { "name": "Enervate", "school": "restoration", "rank": "expert", "tomes": ["3eb87:Odin - Skyrim Magic Overhaul.esp"] },
+    "1dd699:Odin - Skyrim Magic Overhaul.esp": { "name": "Shockbloom", "school": "destruction", "rank": "expert", "tomes": ["26b44c:Odin - Skyrim Magic Overhaul.esp"] },
+    "3e0f:Odin - Skyrim Magic Overhaul.esp": { "name": "Destroy Living", "school": "restoration", "rank": "advanced", "tomes": ["3eb82:Odin - Skyrim Magic Overhaul.esp"] },
+    "21a2eb:Odin - Skyrim Magic Overhaul.esp": { "name": "Shadow Legion", "school": "illusion", "rank": "expert", "tomes": ["21a2f8:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d347b:Odin - Skyrim Magic Overhaul.esp": { "name": "Arctic Blast", "school": "destruction", "rank": "advanced", "tomes": ["26b446:Odin - Skyrim Magic Overhaul.esp"] },
+    "24e49:Odin - Skyrim Magic Overhaul.esp": { "name": "Charged Storm", "school": "destruction", "rank": "advanced", "tomes": ["26b44e:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d3482:Odin - Skyrim Magic Overhaul.esp": { "name": "Taldam's Scorcher", "school": "destruction", "rank": "advanced", "tomes": ["26b445:Odin - Skyrim Magic Overhaul.esp"] },
+    "17b5bb:Odin - Skyrim Magic Overhaul.esp": { "name": "Bravery", "school": "illusion", "rank": "expert", "tomes": ["17b5d9:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d8588:Odin - Skyrim Magic Overhaul.esp": { "name": "Firebloom", "school": "destruction", "rank": "expert", "tomes": ["26b44a:Odin - Skyrim Magic Overhaul.esp"] },
+    "293d0e:Odin - Skyrim Magic Overhaul.esp": { "name": "Dire Vulnerability", "school": "alteration", "rank": "expert", "tomes": ["293d12:Odin - Skyrim Magic Overhaul.esp"] },
+    "1dd697:Odin - Skyrim Magic Overhaul.esp": { "name": "Frostbloom", "school": "destruction", "rank": "expert", "tomes": ["26b44b:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d347e:Odin - Skyrim Magic Overhaul.esp": { "name": "Flame Darts", "school": "destruction", "rank": "advanced", "tomes": ["26b44d:Odin - Skyrim Magic Overhaul.esp"] },
+    "2100d4:Odin - Skyrim Magic Overhaul.esp": { "name": "Dominate", "school": "illusion", "rank": "expert", "tomes": ["2100db:Odin - Skyrim Magic Overhaul.esp"] },
+    "1e27a7:Odin - Skyrim Magic Overhaul.esp": { "name": "Thundering Grasp", "school": "destruction", "rank": "expert", "tomes": ["3db2c:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d858b:Odin - Skyrim Magic Overhaul.esp": { "name": "Wildfire", "school": "destruction", "rank": "expert", "tomes": ["26b44f:Odin - Skyrim Magic Overhaul.esp"] },
+    "17b5b3:Odin - Skyrim Magic Overhaul.esp": { "name": "Rage", "school": "illusion", "rank": "expert", "tomes": ["17b5d7:Odin - Skyrim Magic Overhaul.esp"] },
+    "38b6:Dawnguard.esm": { "name": "Vampire's Bane", "school": "restoration", "rank": "advanced", "tomes": ["3f4d:Dawnguard.esm"] },
+    "7c83b:Odin - Skyrim Magic Overhaul.esp": { "name": "Stormhand", "school": "destruction", "rank": "advanced", "tomes": ["2a3055:Odin - Skyrim Magic Overhaul.esp"] },
+    "233865:Odin - Skyrim Magic Overhaul.esp": { "name": "Greater Simulacrum", "school": "illusion", "rank": "advanced", "tomes": ["23386c:Odin - Skyrim Magic Overhaul.esp"] },
+    "229634:Odin - Skyrim Magic Overhaul.esp": { "name": "Crying Eye", "school": "illusion", "rank": "novice", "tomes": ["22e73b:Odin - Skyrim Magic Overhaul.esp"] },
+    "20afc9:Odin - Skyrim Magic Overhaul.esp": { "name": "Command", "school": "illusion", "rank": "advanced", "tomes": ["20afd0:Odin - Skyrim Magic Overhaul.esp"] },
+    "2c169f:Odin - Skyrim Magic Overhaul.esp": { "name": "Hush", "school": "illusion", "rank": "advanced", "tomes": ["2c16a3:Odin - Skyrim Magic Overhaul.esp"] },
+    "256fce:Odin - Skyrim Magic Overhaul.esp": { "name": "Viperbolt", "school": "restoration", "rank": "advanced", "tomes": ["2611fa:Odin - Skyrim Magic Overhaul.esp"] },
+    "224524:Odin - Skyrim Magic Overhaul.esp": { "name": "Dirge", "school": "illusion", "rank": "expert", "tomes": ["23897f:Odin - Skyrim Magic Overhaul.esp"] },
+    "21f405:Odin - Skyrim Magic Overhaul.esp": { "name": "Wizard Rend", "school": "illusion", "rank": "expert", "tomes": ["21f416:Odin - Skyrim Magic Overhaul.esp"] },
+    "289aec:Odin - Skyrim Magic Overhaul.esp": { "name": "Haste Mount", "school": "alteration", "rank": "advanced", "tomes": ["298e2d:Odin - Skyrim Magic Overhaul.esp"] },
+    "b646:Apocalypse - Magic of Skyrim.esp": { "name": "Drop Zone", "school": "alteration", "rank": "advanced", "tomes": ["3c51a:Apocalypse - Magic of Skyrim.esp"] },
+    "15e721:Apocalypse - Magic of Skyrim.esp": { "name": "Poisoned Chalice", "school": "restoration", "rank": "expert", "tomes": ["15e723:Apocalypse - Magic of Skyrim.esp"] },
+    "133d6:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Honor Guard", "school": "conjuration", "rank": "expert", "tomes": ["3d5b2:Apocalypse - Magic of Skyrim.esp"] },
+    "27144:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Cat Totem", "school": "conjuration", "rank": "advanced", "tomes": ["3d048:Apocalypse - Magic of Skyrim.esp"] },
+    "12364:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Pit Fighter", "school": "conjuration", "rank": "advanced", "tomes": ["3d049:Apocalypse - Magic of Skyrim.esp"] },
+    "15e73e:Apocalypse - Magic of Skyrim.esp": { "name": "Ice Prism", "school": "destruction", "rank": "expert", "tomes": ["16160a:Apocalypse - Magic of Skyrim.esp"] },
+    "1228a8:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Xivilai Sorcerer", "school": "conjuration", "rank": "advanced", "tomes": ["3d04b:Apocalypse - Magic of Skyrim.esp"] },
+    "3789f:Apocalypse - Magic of Skyrim.esp": { "name": "Seidstone", "school": "illusion", "rank": "expert", "tomes": ["3e60f:Apocalypse - Magic of Skyrim.esp"] },
+    "128e8:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Herne", "school": "conjuration", "rank": "expert", "tomes": ["3d5b3:Apocalypse - Magic of Skyrim.esp"] },
+    "85910:Apocalypse - Magic of Skyrim.esp": { "name": "Incendiary Flow", "school": "destruction", "rank": "advanced", "tomes": ["3db2b:Apocalypse - Magic of Skyrim.esp"] },
+    "7c83b:Apocalypse - Magic of Skyrim.esp": { "name": "Thundercrack", "school": "destruction", "rank": "advanced", "tomes": ["3db25:Apocalypse - Magic of Skyrim.esp"] },
+    "294cd:Apocalypse - Magic of Skyrim.esp": { "name": "Bolide", "school": "destruction", "rank": "advanced", "tomes": ["3db27:Apocalypse - Magic of Skyrim.esp"] },
+    "1879:Apocalypse - Magic of Skyrim.esp": { "name": "Electrosphere", "school": "destruction", "rank": "advanced", "tomes": ["3db28:Apocalypse - Magic of Skyrim.esp"] },
+    "24b44:Apocalypse - Magic of Skyrim.esp": { "name": "Ice Shiv", "school": "destruction", "rank": "advanced", "tomes": ["3db2a:Apocalypse - Magic of Skyrim.esp"] },
+    "17509:Apocalypse - Magic of Skyrim.esp": { "name": "Curse of the Silent", "school": "illusion", "rank": "advanced", "tomes": ["3e5ff:Apocalypse - Magic of Skyrim.esp"] },
+    "1f1fb:Apocalypse - Magic of Skyrim.esp": { "name": "Decompose", "school": "restoration", "rank": "expert", "tomes": ["3eb8e:Apocalypse - Magic of Skyrim.esp"] },
+    "2878:Apocalypse - Magic of Skyrim.esp": { "name": "Lightning Strike", "school": "destruction", "rank": "expert", "tomes": ["3e092:Apocalypse - Magic of Skyrim.esp"] },
+    "294d4:Apocalypse - Magic of Skyrim.esp": { "name": "Bombardment", "school": "destruction", "rank": "expert", "tomes": ["3e094:Apocalypse - Magic of Skyrim.esp"] },
+    "159d8:Apocalypse - Magic of Skyrim.esp": { "name": "Ruin", "school": "restoration", "rank": "advanced", "tomes": ["3eb87:Apocalypse - Magic of Skyrim.esp"] },
+    "3682f:Apocalypse - Magic of Skyrim.esp": { "name": "Illusory Flames", "school": "illusion", "rank": "advanced", "tomes": ["3e602:Apocalypse - Magic of Skyrim.esp"] },
+    "378a9:Apocalypse - Magic of Skyrim.esp": { "name": "Mind Vision", "school": "illusion", "rank": "advanced", "tomes": ["3e603:Apocalypse - Magic of Skyrim.esp"] },
+    "12dc:Apocalypse - Magic of Skyrim.esp": { "name": "Nature's Balance", "school": "restoration", "rank": "expert", "tomes": ["3eb8c:Apocalypse - Magic of Skyrim.esp"] },
+    "31c4d:Apocalypse - Magic of Skyrim.esp": { "name": "Shadowbond", "school": "illusion", "rank": "advanced", "tomes": ["3e60a:Apocalypse - Magic of Skyrim.esp"] },
+    "a4ef7:Apocalypse - Magic of Skyrim.esp": { "name": "Empathic Agony", "school": "illusion", "rank": "expert", "tomes": ["3e60c:Apocalypse - Magic of Skyrim.esp"] },
+    "378ae:Apocalypse - Magic of Skyrim.esp": { "name": "Mind Control", "school": "illusion", "rank": "expert", "tomes": ["3e60d:Apocalypse - Magic of Skyrim.esp"] },
+    "13e4fd:Apocalypse - Magic of Skyrim.esp": { "name": "Leech Seed", "school": "restoration", "rank": "advanced", "tomes": ["3eb7f:Apocalypse - Magic of Skyrim.esp"] },
+    "3e0f:Apocalypse - Magic of Skyrim.esp": { "name": "Slay Living", "school": "restoration", "rank": "advanced", "tomes": ["3eb82:Apocalypse - Magic of Skyrim.esp"] },
+    "35452:Apocalypse - Magic of Skyrim.esp": { "name": "Finger of Death", "school": "restoration", "rank": "advanced", "tomes": ["3eb84:Apocalypse - Magic of Skyrim.esp"] },
+    "2cd7e:Apocalypse - Magic of Skyrim.esp": { "name": "Atronach Mark", "school": "conjuration", "rank": "advanced", "tomes": ["3d043:Apocalypse - Magic of Skyrim.esp"] },
+    "85594:Apocalypse - Magic of Skyrim.esp": { "name": "Blaze", "school": "destruction", "rank": "novice", "tomes": ["89709:Apocalypse - Magic of Skyrim.esp"] },
+    "128df:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Champion", "school": "conjuration", "rank": "expert", "tomes": ["3d5b1:Apocalypse - Magic of Skyrim.esp"] },
+    "88694:Apocalypse - Magic of Skyrim.esp": { "name": "Azure Reconstruction", "school": "conjuration", "rank": "novice", "tomes": ["89706:Apocalypse - Magic of Skyrim.esp"] },
+    "124ec5:Apocalypse - Magic of Skyrim.esp": { "name": "Summoning Rune", "school": "conjuration", "rank": "advanced", "tomes": ["3d04e:Apocalypse - Magic of Skyrim.esp"] },
+    "2e31:Apocalypse - Magic of Skyrim.esp": { "name": "Undermine", "school": "alteration", "rank": "advanced", "tomes": ["3c520:Apocalypse - Magic of Skyrim.esp"] },
+    "8558a:Apocalypse - Magic of Skyrim.esp": { "name": "Pale Shadow", "school": "illusion", "rank": "novice", "tomes": ["8970c:Apocalypse - Magic of Skyrim.esp"] },
+    "1fcd9:Apocalypse - Magic of Skyrim.esp": { "name": "Welling Blood", "school": "restoration", "rank": "advanced", "tomes": ["3eb7d:Apocalypse - Magic of Skyrim.esp"] },
+    "12214:Apocalypse - Magic of Skyrim.esp": { "name": "Horrid Wilting", "school": "restoration", "rank": "advanced", "tomes": ["3eb85:Apocalypse - Magic of Skyrim.esp"] },
+    "36a03:Apocalypse - Magic of Skyrim.esp": { "name": "Lamb of Mara", "school": "restoration", "rank": "advanced", "tomes": ["3eb7e:Apocalypse - Magic of Skyrim.esp"] },
+    "1a1b79:Apocalypse - Magic of Skyrim.esp": { "name": "Gank", "school": "conjuration", "rank": "advanced", "tomes": ["1a1b7b:Apocalypse - Magic of Skyrim.esp"] },
+    "803f2:Apocalypse - Magic of Skyrim.esp": { "name": "Perilous Path", "school": "alteration", "rank": "advanced", "tomes": ["3c51b:Apocalypse - Magic of Skyrim.esp"] },
+    "109653:Apocalypse - Magic of Skyrim.esp": { "name": "Crackle", "school": "destruction", "rank": "novice", "tomes": ["3db1f:Apocalypse - Magic of Skyrim.esp"] },
+    "15b843:Apocalypse - Magic of Skyrim.esp": { "name": "Silvery Barbs", "school": "illusion", "rank": "novice", "tomes": ["15b845:Apocalypse - Magic of Skyrim.esp"] },
+    "37e17:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Deadeye Captain", "school": "conjuration", "rank": "advanced", "tomes": ["3d046:Apocalypse - Magic of Skyrim.esp"] },
+    "43ce1:Apocalypse - Magic of Skyrim.esp": { "name": "Figment of Pain", "school": "illusion", "rank": "advanced", "tomes": ["3e607:Apocalypse - Magic of Skyrim.esp"] },
+    "15b847:Apocalypse - Magic of Skyrim.esp": { "name": "Hrormir's Misdirection", "school": "illusion", "rank": "expert", "tomes": ["15b84c:Apocalypse - Magic of Skyrim.esp"] },
+    "2388c:Apocalypse - Magic of Skyrim.esp": { "name": "Scorching Hands", "school": "destruction", "rank": "expert", "tomes": ["3e08f:Apocalypse - Magic of Skyrim.esp"] },
+    "1212eb:Apocalypse - Magic of Skyrim.esp": { "name": "Corpse Explosion", "school": "conjuration", "rank": "advanced", "tomes": ["3d04d:Apocalypse - Magic of Skyrim.esp"] },
+    "1a4a46:Apocalypse - Magic of Skyrim.esp": { "name": "Dust in the Clockwork", "school": "restoration", "rank": "advanced", "tomes": ["1a4a48:Apocalypse - Magic of Skyrim.esp"] },
+    "58655:Apocalypse - Magic of Skyrim.esp": { "name": "Compelling Whispers", "school": "illusion", "rank": "advanced", "tomes": ["3e606:Apocalypse - Magic of Skyrim.esp"] },
+    "279bd:Apocalypse - Magic of Skyrim.esp": { "name": "Creeping Cold", "school": "destruction", "rank": "advanced", "tomes": ["3db22:Apocalypse - Magic of Skyrim.esp"] },
+    "2e25:Apocalypse - Magic of Skyrim.esp": { "name": "Tharn's Prison", "school": "alteration", "rank": "advanced", "tomes": ["3c524:Apocalypse - Magic of Skyrim.esp"] },
+    "27f2e:Apocalypse - Magic of Skyrim.esp": { "name": "Sleet Storm", "school": "destruction", "rank": "expert", "tomes": ["3e090:Apocalypse - Magic of Skyrim.esp"] },
+    "24361:Apocalypse - Magic of Skyrim.esp": { "name": "Dragon's Teeth", "school": "destruction", "rank": "advanced", "tomes": ["3db21:Apocalypse - Magic of Skyrim.esp"] },
+    "279c0:Apocalypse - Magic of Skyrim.esp": { "name": "Fracture", "school": "destruction", "rank": "advanced", "tomes": ["3db23:Apocalypse - Magic of Skyrim.esp"] },
+    "253c2:Apocalypse - Magic of Skyrim.esp": { "name": "Rift Bolt", "school": "destruction", "rank": "advanced", "tomes": ["3db26:Apocalypse - Magic of Skyrim.esp"] },
+    "18ae7:Apocalypse - Magic of Skyrim.esp": { "name": "Oathbound Guardian", "school": "conjuration", "rank": "expert", "tomes": ["3d5b5:Apocalypse - Magic of Skyrim.esp"] },
+    "32c8b:Apocalypse - Magic of Skyrim.esp": { "name": "Illusory Pyre", "school": "illusion", "rank": "advanced", "tomes": ["3e609:Apocalypse - Magic of Skyrim.esp"] },
+    "34d12:Apocalypse - Magic of Skyrim.esp": { "name": "Necroplague", "school": "restoration", "rank": "advanced", "tomes": ["3eb81:Apocalypse - Magic of Skyrim.esp"] },
+    "12359:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Churl", "school": "conjuration", "rank": "advanced", "tomes": ["3d045:Apocalypse - Magic of Skyrim.esp"] },
+    "161621:Apocalypse - Magic of Skyrim.esp": { "name": "Monarch Mark", "school": "conjuration", "rank": "expert", "tomes": ["161623:Apocalypse - Magic of Skyrim.esp"] },
+    "24e49:Apocalypse - Magic of Skyrim.esp": { "name": "Scattershock", "school": "destruction", "rank": "advanced", "tomes": ["3db2c:Apocalypse - Magic of Skyrim.esp"] },
+    "17a8e:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Avenging Wraith", "school": "conjuration", "rank": "expert", "tomes": ["3d041:Apocalypse - Magic of Skyrim.esp"] },
+    "12370:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Xivilai Lord", "school": "conjuration", "rank": "expert", "tomes": ["3d5b4:Apocalypse - Magic of Skyrim.esp"] },
+    "2e634:Apocalypse - Magic of Skyrim.esp": { "name": "Hailstone", "school": "destruction", "rank": "novice", "tomes": ["3db20:Apocalypse - Magic of Skyrim.esp"] },
+    "12649c:Apocalypse - Magic of Skyrim.esp": { "name": "Wither", "school": "alteration", "rank": "advanced", "tomes": ["3c51e:Apocalypse - Magic of Skyrim.esp"] },
+    "4581c:Apocalypse - Magic of Skyrim.esp": { "name": "Entomb", "school": "alteration", "rank": "expert", "tomes": ["3f65b:Apocalypse - Magic of Skyrim.esp"] },
+    "ab69:Apocalypse - Magic of Skyrim.esp": { "name": "Detonate Lock", "school": "alteration", "rank": "expert", "tomes": ["3c527:Apocalypse - Magic of Skyrim.esp"] }
+  };
+  // ==== end STAFF_SPELLS ====
+
+  function own(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+
+  // Tome desc -> the spell desc it teaches, built once out of STAFF_SPELLS.
+  var byTome = null;
+  function spellForTome(tomeDesc) {
+    if (!byTome) {
+      byTome = {};
+      for (var sp in STAFF_SPELLS) {
+        if (!own(STAFF_SPELLS, sp)) { continue; }
+        var tomes = STAFF_SPELLS[sp].tomes || [];
+        for (var i = 0; i < tomes.length; i++) { byTome[tomes[i]] = sp; }
+      }
+    }
+    return own(byTome, tomeDesc) ? byTome[tomeDesc] : null;
+  }
+
+  function spellName(spellDesc) {
+    return (own(STAFF_SPELLS, spellDesc) && STAFF_SPELLS[spellDesc].name) || 'its spell';
+  }
+
+  function taught(spellDesc) {
+    return own(STAFF_SPELLS, spellDesc) && (STAFF_SPELLS[spellDesc].tomes || []).length > 0;
+  }
+
+  function isStaffSpell(spellDesc) { return own(STAFF_SPELLS, spellDesc); }
+
+  /*
+    THE RANK OF A STAFF SPELL (#1128). A spell the rulebook's SPELLS lists is
+    the book's, rank and all, the same rule the tomes block keeps; any other
+    takes the rank Build-RecipeTable read out of the game's records (the half
+    cost perk, then the effects), written beside it in STAFF_SPELLS. null when
+    neither can say, and nobody can unlock a spell whose rank cannot be read.
+  */
+  function rankOf(spellDesc) {
+    if (!own(STAFF_SPELLS, spellDesc)) { return null; }
+    var P = g.__thornswoodProgression;
+    var listed = (P && P.spellByDesc) ? P.spellByDesc(spellDesc) : null;
+    if (listed) { return listed.rank; }
+    return STAFF_SPELLS[spellDesc].rank || null;
+  }
+
+  /** A staff spell as the rules take it: { desc, name, rank }, or null. */
+  function spellFor(spellDesc) {
+    if (!own(STAFF_SPELLS, spellDesc)) { return null; }
+    return { desc: spellDesc, name: spellName(spellDesc), rank: rankOf(spellDesc) };
+  }
+
+  /** A staff spell by its desc or by its name as somebody typed it, or null. */
+  function find(words) {
+    var want = String(words || '').trim();
+    if (!want) { return null; }
+    if (own(STAFF_SPELLS, want)) { return spellFor(want); }
+    var lower = want.toLowerCase();
+    for (var sp in STAFF_SPELLS) {
+      if (own(STAFF_SPELLS, sp) && sp.toLowerCase() === lower) { return spellFor(sp); }
+    }
+    for (var sp2 in STAFF_SPELLS) {
+      if (own(STAFF_SPELLS, sp2) && String(STAFF_SPELLS[sp2].name || '').toLowerCase() === lower) { return spellFor(sp2); }
+    }
+    return null;
+  }
+
+  /** The staff spells recorded on this character state, as a fresh array. */
+  function known(state) {
+    var list = state && state.staffSpells;
+    return Array.isArray(list) ? list.slice() : [];
+  }
+
+  function knows(state, spellDesc) { return known(state).indexOf(spellDesc) !== -1; }
+
+  /**
+    An Enchanter unlocks a staff spell on K (/pick staffspell <name>). words
+    is the spell's desc or its name. Pure: { ok, state, spell } or
+    { ok: false, why, missing }.
+  */
+  function unlock(P, state, words) {
+    var spell = find(words);
+    if (!spell) { return { ok: false, why: 'no staff binds a spell called ' + String(words || '').trim() }; }
+    if (!spell.rank) { return { ok: false, why: 'nobody can unlock ' + spell.name + ' yet, because its rank cannot be read' }; }
+    var r = P.pickStaffSpell(state, spell, rankOf);
+    if (r.ok) { r.spell = spell; }
+    return r;
+  }
+
+  /**
+    Somebody a Master Enchanter taught reads the tome of a staff spell: the
+    non-mage rules (P.learnStaffFromTome). Pure, the same answer as unlock.
+  */
+  function learn(P, state, spellDesc) {
+    var spell = spellFor(spellDesc);
+    if (!spell) { return { ok: false, why: 'not a staff spell' }; }
+    if (!spell.rank) { return { ok: false, why: 'nobody can learn ' + spell.name + ' for staves yet, because its rank cannot be read' }; }
+    var r = P.learnStaffFromTome(state, spell, rankOf);
+    if (r.ok) { r.spell = spell; }
+    return r;
+  }
+
+  /*
+    THE STAFF SPELL PAGE ON K, for an Enchanter, and null for anybody else.
+
+      { points: n, rank: '<their Bladebinder rank>', mine: [desc, ...],
+        spells: [[desc, name, rank], ...] }
+
+    spells is every staff spell whose rank can be read, Novice first, then by
+    name: 160 short rows, sent only to an Enchanter and only when the panel
+    changes. The page draws it the way it draws a mage's spell book and sends
+    back '/pick staffspell <desc>' for each one marked.
+  */
+  var pageRows = null;
+  function view(P, state) {
+    if (!state || !P || !P.isEnchanter || !P.isEnchanter(state)) { return null; }
+    if (!pageRows) {
+      var order = { novice: 0, advanced: 1, expert: 2, master: 3 };
+      var rows = [];
+      for (var sp in STAFF_SPELLS) {
+        if (!own(STAFF_SPELLS, sp)) { continue; }
+        var rk = rankOf(sp);
+        if (!rk || !own(order, rk)) { continue; }
+        rows.push([sp, spellName(sp), rk]);
+      }
+      rows.sort(function (a, b) {
+        if (order[a[2]] !== order[b[2]]) { return order[a[2]] - order[b[2]]; }
+        return a[1] < b[1] ? -1 : (a[1] > b[1] ? 1 : 0);
+      });
+      pageRows = rows;
+    }
+    return { points: P.staffPoints(state), rank: P.rankOf(state, P.STAFF_HALF) || 'novice',
+             mine: known(state), spells: pageRows };
+  }
+
+  /** null when this state may bind this row's spell, otherwise the sentence. */
+  function refusal(state, row) {
+    if (!row || !row.spell || knows(state, row.spell)) { return null; }
+    var made = aWord(row.name || 'staff');
+    made = made.charAt(0).toUpperCase() + made.slice(1);
+    var name = spellName(row.spell);
+    var rk = rankOf(row.spell);
+    if (!rk) {
+      return made + ' binds ' + name + ', and its rank cannot be read, so nobody can make one yet.';
+    }
+    var P = g.__thornswoodProgression;
+    if (P && P.isEnchanter && P.isEnchanter(state)) {
+      return made + ' binds ' + name + ', and you have not unlocked it for staves yet. ' +
+             'Press K and unlock it under Staff spells: it takes a staff spell point, ' +
+             rk.charAt(0).toUpperCase() + rk.slice(1) +
+             ' rank as a Bladebinder, and a staff spell of the rank below. No tome is needed.';
+    }
+    if (!taught(row.spell)) {
+      return made + ' binds ' + name + ', and no spell tome here teaches it, so only an Enchanter can unlock it.';
+    }
+    return made + ' binds ' + name + ', and you have not learned it for staves yet. ' +
+           'Read a spell tome of ' + name + ': somebody a Master Enchanter taught learns Novice staff spells ' +
+           'from their tomes, up to ' + ((P && P.TABLE && P.TABLE.limits.outsiderSpells) || 2) + ' of them.';
+  }
+
+  g.__thornswoodStaffSpells = {
+    STAFF_SPELLS: STAFF_SPELLS, spellForTome: spellForTome, known: known, knows: knows,
+    isStaffSpell: isStaffSpell, rankOf: rankOf, spellFor: spellFor, find: find,
+    unlock: unlock, learn: learn, view: view, refusal: refusal
+  };
+})();
+
+/*
+  Reading a book. A book that teaches no spell reads exactly as it does in
+  Skyrim and nothing is said. A spell tome is decided by THE SPELL TOMES block
+  above under the Mage rules (#1026): false keeps the tome and the spell away
+  from the reader, and the line says which of the rules is missing, or what
+  was learned.
+*/
+mp.onReadBook = guard('onReadBook', function (actorId, bookBaseId) {
+  const tomes = globalThis.__thornswoodTomes;
+  const r = tomes ? tomes.read(actorId, bookBaseId) : null;
+  if (r && r.line) {
+    notify(actorId, r.line);
+    say(actorId, r.line);
+  }
+  if (r && r.refused) { return false; }
+});
+// ==== end thornswood staff spells ====
 
 // ==== thornswood chat commands ====
 /*
@@ -34248,6 +37050,11 @@ log('gamemode loaded:',
   to check.
 */
 const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
+               // Asking staff for help and reporting somebody; see the asking
+               // staff block at the end of this file.
+               '/helpme', '/help-me', '/report',
+               // Out of a wedged spot; see the stuck block after it.
+               '/stuck',
                '/pick', '/spend',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
@@ -34258,6 +37065,15 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // absent from PLAYER_WORDS: naming them in /help would be an
                // invitation, and the gate answers everybody else anyway.
                '/give', '/spawn',
+               // Staff's, gated on the staff roles and left out of
+               // PLAYER_WORDS for the same reason. See the staff block.
+               '/kick', '/freeze', '/unfreeze', '/bring', '/silence',
+               '/unsilence', '/warn', '/spawnat', '/ban', '/unban', '/note',
+               // One character or the whole account, and a character killed
+               // for good (#1010).
+               '/banaccount', '/unbanaccount', '/pk',
+               // An admin undoing a PK made by mistake (#1010, 29 September).
+               '/unpk',
                /*
                  NOT A COMMAND ANYBODY TYPES. The client reports each fall of
                  the axe with it, because the server sees a press and Skyrim's
@@ -34278,9 +37094,15 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // The client saying its race menu is still up. Never typed; see
                // FACE_SEEN_MS.
                '/racemenu',
+               // A mod settings menu changed on this client. Never typed;
+               // see the mod settings block at the end of this file.
+               '/modset',
                // The mold key: a blank pressed into the door under the
                // crosshair. Sent by the plugin, not typed; see moldHere.
                '/moldhere',
+               // The client's load order, every two minutes. Sent by the front
+               // plugin, never typed; see the load order refusal block.
+               '/loadorder',
                // Friends, parties, mutes, trade and journals. See the
                // social block at the end of this file.
                '/friend', '/party', '/mute', '/trade', '/journal',
@@ -34313,6 +37135,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty.
                       '/needs', '/rest', '/eat', '/drink', '/bard',
+                      // Everybody's, and the one thing a person in trouble
+                      // must be able to find: asking staff, and getting
+                      // out of a wedged spot (#414).
+                      '/helpme', '/report', '/stuck',
                       // Everybody's, and they have to be findable: a key
                       // prompt nobody sees is a feature nobody has.
                       '/friend', '/party', '/mute', '/trade', '/journal',
@@ -34390,6 +37216,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   function toProfile(profileId, text) {
     post('/say', { profileId: profileId, text: text });
   }
+  // For the load order sweep, which says a line to somebody who sent nothing.
+  g.__thornswoodToProfile = toProfile;
+
+  /*
+    The line at the menu (#481): somebody's place, or that it is their turn,
+    for the menu page to show. Data rather than words, under a name no person
+    can send from (the service puts from 0 on it), and the page takes it out
+    of the chat; see thornswood-chat.js.
+  */
+  var LINE_NAME = 'Thornswood line';
+  g.__thornswoodSayLine = function (profileId, what) {
+    post('/say', { profileId: profileId, name: LINE_NAME, text: JSON.stringify(what || {}) });
+  };
 
   /*
     actorId for a connected profile, or 0.
@@ -34496,6 +37335,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     // "The race menu is up" is a moment too, and one replayed a minute late
     // would hold the give up for somebody who has already left it.
     if (word === '/racemenu') { return true; }
+    // Kept by profile id, so it needs no character to run.
+    if (word === '/modset') { return true; }
     return WORDS.indexOf(word) === -1;
   }
 
@@ -34512,6 +37353,44 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     var profileId = Number(cmd && cmd.profileId) || 0;
     var parts = String((cmd && cmd.text) || '').trim().split(/\s+/);
     var word = parts[0].toLowerCase();
+    // The launcher's join pass, from the front plugin (#937). Needs no
+    // character and answers nothing; see the join pass block.
+    if (word === '/joinpass') {
+      var jp = g.__thornswoodJoinPass;
+      if (jp && profileId) {
+        try { jp.take(profileId, parts[1], Date.now()); } catch (eJp) { log('/joinpass failed:', eJp); }
+      }
+      return;
+    }
+    // The line at the menu while the world is full (#481), from the front
+    // plugin: "/line" to wait or say they still are, "/line leave" to go,
+    // "/line hand <profile>" to give the place to another of the same game's
+    // characters. "/line gone" is the relay's own word that the connection
+    // closed, and counts only when the relay marked it so (cmd.relay).
+    // Needs no character; the place is the seats block's alone.
+    if (word === '/line') {
+      var seatsApi = g.__thornswoodSeats;
+      if (seatsApi && profileId) {
+        try {
+          var sub = String(parts[1] || '').toLowerCase();
+          if (sub === 'leave') { seatsApi.leave(profileId, seatsApi.liveHow()); }
+          else if (sub === 'gone') { if (cmd.relay === true) { seatsApi.gone(profileId, Date.now(), seatsApi.liveHow()); } }
+          else if (sub === 'hand') { seatsApi.hand(profileId, Number(parts[2]) || 0, Date.now(), seatsApi.liveHow()); }
+          else { seatsApi.want(profileId, Date.now(), seatsApi.liveHow()); }
+        } catch (eLine) { log('/line failed:', eLine); }
+      }
+      return;
+    }
+    // Are you still here (#1142), from the front plugin: "/afk active" and
+    // "/afk here" are somebody at the game, "/afk out" is nobody. See the idle block.
+    if (word === '/afk') {
+      var idleApi = g.__thornswoodIdle;
+      if (idleApi && profileId) {
+        try { idleApi.heard(profileId, String(parts[1] || '').toLowerCase(), Date.now(), idleApi.liveHow()); }
+        catch (eAfk) { log('/afk failed:', eAfk); }
+      }
+      return;
+    }
     if (!profileId || runsNow(word, parts)) { handle(cmd); return; }
 
     var q = held[profileId];
@@ -34523,9 +37402,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       log('holding', word, 'for profile', profileId, 'until the character is in the world');
     }
     q.lines.push({ cmd: cmd, at: Date.now() });
-    // Said once, and never for the client's own lines: /face, /ate and a
-    // broken lockpick are not things anybody typed.
-    if (!q.told && word !== '/face' && word !== '/ate' && word !== '/tspicks') {
+    // Said once, and never for the client's own lines: /face, /ate, a
+    // broken lockpick and the load order report are not things anybody typed.
+    if (!q.told && word !== '/face' && word !== '/ate' && word !== '/tspicks' &&
+        word !== '/loadorder') {
       q.told = true;
       toProfile(profileId, 'Your character is not back in the world yet. That will run ' +
                            'as soon as you arrive.');
@@ -35103,6 +37983,17 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       it, and the message says what to do about it.
     */
     var actorId = actorOf(profileId);
+
+    // The plugin, not a person: mod settings menu values that changed on this
+    // client. Kept by the mod settings block; answered with nothing.
+    if (word === '/modset') {
+      var mods = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodModSettings;
+      if (mods) {
+        try { mods.command(profileId, actorId, parts); } catch (eMods) { log('/modset failed:', eMods); }
+      }
+      return;
+    }
+
     function needCharacter() {
       if (actorId) { return true; }
       toProfile(profileId,
@@ -35517,6 +38408,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       return true;
     }
 
+    // The client's load order, a line of it at a time. Not a human command:
+    // it answers nothing until the whole list is in, and then only when it
+    // differs from the server's. See the load order refusal block.
+    if (word === '/loadorder') {
+      try {
+        var lo = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodLoadOrder;
+        if (lo && lo.take) {
+          lo.take(profileId, parts, actorId, function (text) { toProfile(profileId, text); });
+        }
+      } catch (eLo) { log('/loadorder failed:', eLo); }
+      return;
+    }
+
     if (word === '/tspicks') {
       if (!needCharacter()) { return; }
       var picks = Math.max(1, Math.min(20, Number(parts[1]) || 1));
@@ -35540,6 +38444,24 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       log('command: /where', actorId.toString(16), cell,
           round1(pos[0]), round1(pos[1]), round1(pos[2]), round1(ang[2]));
       return;
+    }
+
+    /*
+      Staff: /kick, /freeze, /unfreeze, /bring, /goto <person>, /silence,
+      /unsilence, /warn, /spawnat, and /give, /spawn and /tp aimed at a
+      person (#412). The staff block at the end of this file does the work
+      and says whether it took the line; it reuses /give's, /spawn's and
+      /tp's lookups, handed over here. A /give, /spawn, /tp or /goto that
+      names no person goes on to the branches below, and /ooc or /roll from
+      somebody staff silenced stops here.
+    */
+    var staffCmd = g.__thornswoodStaff;
+    if (staffCmd) {
+      try {
+        if (staffCmd.command(cmd, word, parts, profileId, actorId, isStaff,
+                             { findThing: findThing, findBeast: findBeast,
+                               byFormId: byFormId, findPlace: findPlace })) { return; }
+      } catch (eStaff) { log('staff command failed:', eStaff); }
     }
 
     if (word === '/tp' || word === '/goto') {
@@ -35730,48 +38652,32 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         return;
       }
 
-      // /spawn. Where they are standing, which is the only place that is
-      // certainly somewhere real.
+      // /spawn. A few steps in front of where they are standing and facing,
+      // which is certainly somewhere real, and spread round them when there
+      // are several, so three cows are three cows. placeActors (#959).
       var baseId = idOf(hit.desc);
       if (!baseId) {
         toProfile(profileId, hit.name + '\'s plugin is not in this load order.');
         return;
       }
-      var at = null, inCell = '';
+      var at = null, inCell = '', facing = null;
       try {
         at = mp.get(actorId, 'pos');
         inCell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+        facing = mp.get(actorId, 'angle');
       } catch (e) { at = null; }
       if (!at || !inCell) {
         toProfile(profileId, 'The server cannot tell where you are standing.');
         return;
       }
-      var cellId = idOf(inCell);
-      if (!cellId) {
-        toProfile(profileId, 'The server cannot place anything in this cell.');
-        return;
-      }
-      var made = 0;
-      for (var s = 0; s < count; s++) {
-        try {
-          // Spread them out a little, so three cows are three cows and not
-          // one cow with a stacking fault.
-          var ang = (s / Math.max(1, count)) * Math.PI * 2;
-          var away = count > 1 ? 120 : 0;
-          mp.createActor(baseId,
-            [at[0] + Math.cos(ang) * away, at[1] + Math.sin(ang) * away, at[2]],
-            0, cellId);
-          made++;
-        } catch (e) {
-          log('/spawn failed on', hit.name + ':', e);
-          break;
-        }
-      }
+      var put = placeActors(baseId, { desc: inCell, pos: at, rot: facing || [0, 0, 0] }, count, 150);
+      var made = put.made;
       if (!made) {
-        toProfile(profileId, 'Nothing was spawned. The server log says why.');
+        log('/spawn failed on', hit.name + ':', put.why);
+        toProfile(profileId, 'Nothing was spawned: ' + (put.why || 'the server would not place it') + '.');
         return;
       }
-      toProfile(profileId, 'Spawned ' + made + ' ' + hit.name + '.');
+      toProfile(profileId, 'Spawned ' + made + ' ' + hit.name + (made < count ? ' of the ' + count + ' asked for: ' + put.why : '') + '.');
       log('command: /spawn', actorId.toString(16), '->', made, hit.name, hit.desc);
       return;
     }
@@ -35961,6 +38867,36 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       the unknown-command reply below did not: it advertised /tp to
       everybody and then refused them. Both read the same list now.
     */
+    // Out of a wedged spot (#414). The work is in the stuck block at the end
+    // of this file; this only hands it the character.
+    if (word === '/stuck') {
+      if (!needCharacter()) { return; }
+      var stuck = g.__thornswoodStuck;
+      if (!stuck) {
+        toProfile(profileId, '/stuck is not working on the server right now. /helpme reaches ' +
+                  'staff, who can move you by hand.');
+        return;
+      }
+      stuck.command(profileId, actorId);
+      return;
+    }
+
+    // Asking staff for help, and reporting somebody (#414). The work is in
+    // the asking staff block at the end of this file; this only hands it the
+    // character, the reply and who counts as staff.
+    if (word === '/helpme' || word === '/help-me' || word === '/report') {
+      if (!needCharacter()) { return; }
+      var askStaff = g.__thornswoodAskStaff;
+      if (!askStaff) {
+        toProfile(profileId, 'Staff cannot be reached from the game right now. Open a ticket ' +
+                  'in the Discord and it will reach them.');
+        return;
+      }
+      askStaff.ask(word === '/report' ? 'report' : 'help', parts, profileId, actorId,
+                   toProfile, isDev);
+      return;
+    }
+
     if (word === '/help' || word === '/commands') {
       var topic = String(parts[1] || '').toLowerCase();
       var extra = isPlaytester(profileId)
@@ -36013,16 +38949,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
       if (topic === 'staff' || topic === 'rules' || topic === 'help') {
         toProfile(profileId,
-          'The rules and the way to reach somebody are on thornswood.net and in ' +
-          'the Discord. Anything that needs a person is better raised there than ' +
-          'in the room: this chat reaches whoever is standing near you and ' +
-          'nobody else.');
+          '/helpme <what is wrong> reaches staff from here, stuck or otherwise. ' +
+          '/report <name> <what they did> reports somebody to staff and nobody ' +
+          'else. /stuck, when you are wedged in the world, takes you back a few ' +
+          'steps or to the nearest temple; once every 5 minutes, a 15 second wait ' +
+          'in a fight, and every use is logged for staff. The rules are on thornswood.net and in the Discord, and a ticket ' +
+          'there reaches staff too. Ordinary chat reaches whoever is standing ' +
+          'near you and nobody else.');
         return;
       }
 
       toProfile(profileId,
         'Ask for one of these: /help talking, /help people, /help living, ' +
-        '/help work, /help land, /help staff. Press K for your profession and ' +
+        '/help work, /help land, /help staff, and /helpme reaches staff. Press K for your profession and ' +
         'skills, P for friends and party, J for journals, Enter to talk and ' +
         'hold V to speak.' + extra);
       return;
@@ -36166,6 +39105,16 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     if (isAdmin(profileId)) { return true; }
     if (rolelist('thornswoodDevs').indexOf(Number(profileId)) !== -1) { return true; }
     return roleFromDoor('Dev', profileId);
+  }
+
+  /*
+    Staff, for the moderator commands (#412): the dev tier. The site's
+    devProfiles are its access.dev roles, which are the Discord staff roles
+    (Owner, Dev, Gamemaster, Moderator, Loremaster; #605), and isDev already
+    folds in the admins and the written thornswoodDevs list.
+  */
+  function isStaff(profileId) {
+    return isDev(profileId);
   }
 
   function isPlaytester(profileId) {
@@ -36560,9 +39509,12 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       res.on('data', function (d) { body += d; });
       res.on('end', function () {
         var list = [];
+        var doc = null;
         // Nothing is acknowledged when this fails, so the service offers the
         // same batch again on the next poll rather than it being lost.
-        try { list = (JSON.parse(body) || {}).commands || []; } catch (e) { return; }
+        try { doc = JSON.parse(body) || {}; list = doc.commands || []; } catch (e) { pollSaid(false); return; }
+        pollSaid(true);
+        relayBoot(doc.boot);
         var ran = [];
         for (var i = 0; i < list.length; i++) {
           var id = (list[i] && list[i].id) ? String(list[i].id) : '';
@@ -36581,9 +39533,35 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         if (ran.length) { post('/commands/ack', { ids: ran }); }
       });
     });
-    req.on('error', function () { });
-    req.on('timeout', function () { req.destroy(); });
+    req.on('error', function () { pollSaid(false); });
+    req.on('timeout', function () { pollSaid(false); req.destroy(); });
     req.end();
+  }
+
+  // Whether the relay is answering, for the load order sweep: a report rides
+  // it, so no report while it is down is the server's failure, not theirs.
+  function pollSaid(ok) {
+    var s = g.__thornswoodCommandPoll || (g.__thornswoodCommandPoll = { okAt: 0, failAt: 0 });
+    if (ok) { s.okAt = Date.now(); } else { s.failAt = Date.now(); }
+  }
+
+  /*
+    The relay's boot stamp, on every answer. A new one means the voice service
+    restarted, and every socket that was waiting in line died with it without
+    a word, so the seats block gives each waiting menu a minute to ask again
+    (#481). On globalThis, so a hot reload of this file is not taken for one.
+  */
+  function relayBoot(boot) {
+    boot = String(boot || '');
+    if (!boot) { return; }
+    var was = g.__thornswoodRelayBoot;
+    g.__thornswoodRelayBoot = boot;
+    if (!was || was === boot) { return; }
+    log('the relay restarted (' + was + ' is now ' + boot + ')');
+    var seatsApi = g.__thornswoodSeats;
+    if (seatsApi) {
+      try { seatsApi.relayRestarted(Date.now(), seatsApi.liveHow()); } catch (e) { log('relay restart for the line failed:', e); }
+    }
   }
 
   if (g.__thornswoodCommandTimer) { clearInterval(g.__thornswoodCommandTimer); }
@@ -36668,9 +39646,11 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     onPutItem     Putting into a container. mp.onPutItem refuses anything but
                   coin into a hold's box, and says nothing about any other
                   container.
-    onTakeItem    Taking out of a container or a body. Watched below, never
-                  refused. TakeItemEvent::OnFireSuccess is what removes the
-                  items, so a false here would refuse the take.
+    onTakeItem    Taking out of a container or a body. Watched below, and
+                  refused on one path only: THE TAKE LIMIT, another person's
+                  body or a container in a building another person holds.
+                  TakeItemEvent::OnFireSuccess is what removes the items, so
+                  a false here refuses the take.
     onDropItem    Dropping from the pack onto the ground. Watched below, never
                   refused. MpActor::DropItem stops before RemoveItems on a
                   false. Gold cannot be dropped at all: DropItem returns before
@@ -36684,14 +39664,21 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     onEatItem     Eating or drinking something in the pack. No handler: the
                   engine applies a potion's effects. The needs block hears
                   about eating from the client's /ate line instead.
-    onReadBook    Reading a book. No handler since 21 September, when books
-                  stopped moving anybody's rank. The engine teaches the spell a
-                  spell tome carries.
+    onReadBook    Reading a book. A spell tome teaches only under the Mage
+                  rules (a spell point, the rank, a spell of the rank below),
+                  and mp.onReadBook refuses it otherwise, keeping the tome
+                  and saying which is missing (THE SPELL TOMES, #1026); it
+                  also records a staff's spell for somebody who makes staves
+                  (THE STAFF SPELLS, #967). Books stopped moving anybody's
+                  rank on 21 September.
     onUpdateAppearanceAttempt
-                  A face sent to the server. No handler. The engine refuses it
-                  by itself unless the server opened the race menu
+                  A face sent to the server. The engine refuses it by itself
+                  unless the server opened the race menu
                   (ActionListener::OnUpdateAppearance), and its OnFireBlocked
                   is not written, so nothing here may ever return false to it.
+                  mp.onUpdateAppearanceAttempt holds the one body value in it,
+                  weight, to 0 to 100 and drops any field the engine does not
+                  know (BODY SHAPE, below, #993). It always returns true.
     onUpdateEquipmentAttempt
                   What somebody is wearing. No handler, and the same warning
                   about false. The engine checks it itself, by
@@ -36792,13 +39779,14 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   and /give and /spawn log what they made. That is the one way a person can
   make an item on this server, and it is logged.
 
-  WHAT IS NOT REFUSED YET, AND WHY. The rules page asks for "no griefing", and
-  rule 4 in the world says "You cannot empty someone's house because you found
-  it unlocked while they were offline". Which take the server should refuse
-  to hold that rule, a box inside somebody else's claim or another person's
-  body, is a decision Patrick has not made. A handler that answers false too
-  eagerly shuts every chest in Skyrim for everybody at once, so until he makes
-  it the two handlers below watch and refuse nothing.
+  WHAT IS REFUSED, AND WHY ONLY THAT. The rules page asks for "no griefing",
+  and rule 4 in the world says "You cannot empty someone's house because you
+  found it unlocked while they were offline". Patrick decided on 28 September
+  (issue #475) which takes the server holds to that rule: another person's
+  body and another person's containers, online or offline, a few things each
+  and only a share of a stack. THE TAKE LIMIT below is that and nothing more.
+  A handler that answers false too eagerly shuts every chest in Skyrim for
+  everybody at once, so every other take is watched and let through.
 
   Hits are a different case: nothing here can refuse one, only hear it,
   through onPapyrusEvent:OnHit. Nothing listens to it yet. It is raised for
@@ -36822,9 +39810,11 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   of, and the cell the person was standing in, which for a house is the house.
   Grep for "take:" and "drop:".
 
-  THEY NEVER RETURN ANYTHING, and that is the whole of the safety. guard()
-  turns a throw into undefined and every read below has its own try, so the
-  worst a fault here can do is a line with less in it.
+  THEY RETURN NOTHING, with one exception, and that is the whole of the
+  safety. guard() turns a throw into undefined and every read below has its
+  own try, so the worst a fault here can do is a line with less in it. The
+  exception is a take THE TAKE LIMIT refuses: a false then, and a "take
+  refused:" line. A limit that is missing or throws lets the take through.
 */
 
 /*
@@ -36877,6 +39867,15 @@ function auditCell(actorId) {
 }
 
 mp.onTakeItem = guard('onTakeItem', function (sourceRefrId, actorId, baseId, count) {
+  var limit = globalThis.__thornswoodTakeLimit;
+  var no = null;
+  try { no = (limit && limit.take) ? limit.take(sourceRefrId, actorId, baseId, count) : null; }
+  catch (e) { no = null; }
+  if (no) {
+    log('take refused:', auditPerson(actorId), 'asked for', Number(count) || 0, auditItem(baseId),
+        'from', auditSource(sourceRefrId), 'in', auditCell(actorId), '(' + no + ')');
+    return false;
+  }
   log('take:', auditPerson(actorId), 'took', Number(count) || 0, auditItem(baseId),
       'from', auditSource(sourceRefrId), 'in', auditCell(actorId));
 });
@@ -36885,6 +39884,340 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   log('drop:', auditPerson(actorId), 'dropped', Number(count) || 0, auditItem(baseId),
       'in', auditCell(actorId));
 });
+
+/*
+  BODY SHAPE: HEIGHT AND WEIGHT, NOTHING ELSE (#993).
+
+  Patrick, 28 September: "I don't want jiggle physics or the ability to change
+  boob/pussy/dick/ass/nipple related stuff during creation." For men and women
+  alike. Height and weight stay.
+
+  WHAT A CLIENT CAN SEND. The one thing a client sends about its body is the
+  appearance (UpdateAppearanceMessage), and the engine keeps eleven fields of
+  it: isFemale, raceId, weight, skinColor, hairColor, headpartIds,
+  headTextureSetId, options (the face sliders), presets (the face presets),
+  tints and name (Appearance.h). Nothing in it is a breast, a butt, a genital
+  or a nipple: RaceMenu's body sliders and body morphs are NiOverride data on
+  the person's own machine and SkyMP never sends them, so nobody else's game
+  ever draws them. Height is the same, on the person's own machine only.
+
+  WEIGHT IS THE ONE THAT CARRIES SHAPE. The game draws a body between its thin
+  and heavy meshes by weight, and the difference between those two meshes is
+  mostly chest, hips and seat. The race menu offers 0 to 100; a changed client
+  can send 300 or -200, which draws that difference three times over, and the
+  engine stores it and sends it on to everybody near (ActionListener.cpp
+  OnUpdateAppearance). So weight is held to 0 to 100 here, and anything that is
+  not one of the eleven fields is dropped, so a field some later client adds
+  cannot carry a shape through either.
+
+  WHEN. mp.onUpdateAppearanceAttempt hears every appearance the engine stored,
+  straight after it was stored and sent on. A corrected one is set back with
+  mp.set, which stores it and sends it to everybody who can see that person
+  (AppearanceBinding::Set), so the stretched body lasts one message. It always
+  returns true: its refusal is not written in the engine (see the list of
+  events above), and the engine decides the race menu question itself.
+
+  CHARACTERS MADE BEFORE THIS. thornswoodBodyReset in server-settings.json,
+  on unless it is false (Patrick, 28 September: existing characters are reset
+  to the default body shape, height and weight stay adjustable). Each
+  character is looked at once when it comes online and its stored appearance
+  is put through the same check. The person's own machine clears any body
+  slider it still holds on its own (thornswood-front.js, "body shape").
+*/
+const BODY_APPEARANCE_FIELDS = ['isFemale', 'raceId', 'weight', 'skinColor', 'hairColor',
+  'headpartIds', 'headTextureSetId', 'options', 'presets', 'tints', 'name'];
+const BODY_WEIGHT_MIN = 0;
+const BODY_WEIGHT_MAX = 100;
+// What a weight that is not a number at all becomes: the middle of the slider.
+const BODY_WEIGHT_DEFAULT = 50;
+
+function bodyResetWanted() {
+  try {
+    const s = mp.getServerSettings();
+    if (s && s.thornswoodBodyReset === false) { return false; }
+  } catch (e) {
+    // no settings object. on is the default Patrick chose.
+  }
+  return true;
+}
+
+/**
+ * The appearance with only height-and-weight body shape left in it, and what
+ * was changed. Null when there is no appearance to look at.
+ */
+function bodyShapeGuard(appearance) {
+  if (!appearance || typeof appearance !== 'object' || Array.isArray(appearance)) { return null; }
+  const out = {};
+  const changes = [];
+  for (const k of Object.keys(appearance)) {
+    if (BODY_APPEARANCE_FIELDS.indexOf(k) < 0) { changes.push('dropped ' + k); continue; }
+    out[k] = appearance[k];
+  }
+  if (Object.prototype.hasOwnProperty.call(appearance, 'weight')) {
+    const w = Number(appearance.weight);
+    let held = w;
+    if (appearance.weight === null || appearance.weight === '' || !isFinite(w)) { held = BODY_WEIGHT_DEFAULT; }
+    else if (w < BODY_WEIGHT_MIN) { held = BODY_WEIGHT_MIN; }
+    else if (w > BODY_WEIGHT_MAX) { held = BODY_WEIGHT_MAX; }
+    if (held !== appearance.weight) {
+      changes.push('weight ' + String(appearance.weight) + ' -> ' + held);
+    }
+    out.weight = held;
+  }
+  return { appearance: out, changes: changes };
+}
+
+/** Puts one character's stored appearance through bodyShapeGuard. */
+function bodyShapeCheck(actorId, appearance, why) {
+  const r = bodyShapeGuard(appearance);
+  if (!r || !r.changes.length) { return false; }
+  mp.set(actorId, 'appearance', r.appearance);
+  log('body shape:', auditPerson(actorId), why + ':', r.changes.join(', '));
+  return true;
+}
+
+mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (actorId, appearance, isAllowed) {
+  if (isAllowed) { bodyShapeCheck(actorId, appearance, 'sent'); }
+  return true;
+});
+
+(function bodyResetExisting() {
+  const g = globalThis;
+  if (g.__thornswoodBodyReset) { clearInterval(g.__thornswoodBodyReset); g.__thornswoodBodyReset = null; }
+  if (!bodyResetWanted()) {
+    log('body shape: characters made before the body sliders went are left as they are (thornswoodBodyReset is false)');
+    return;
+  }
+  const seen = new Set();
+  g.__thornswoodBodyReset = setInterval(guard('bodyResetExisting', function () {
+    let online;
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    const here = new Set(online);
+    for (const id of Array.from(seen)) { if (!here.has(id)) { seen.delete(id); } }
+    for (const id of online) {
+      if (seen.has(id)) { continue; }
+      seen.add(id);
+      let a = null;
+      try { a = mp.get(id, 'appearance'); } catch (e) { a = null; }
+      bodyShapeCheck(id, a, 'made before the body sliders went');
+    }
+  }), 5000);
+})();
+
+/*
+  THE TAKE LIMIT: A FEW THINGS FROM ANOTHER PERSON, AND ONLY A SHARE OF A STACK.
+
+  Patrick, 28 September, issue #475: "Bodies and storages even if they are
+  offline they should be allowed to take some things. They should not be
+  allowed to just take alot off of them and if they take spetum it should only
+  be a percentages and still count as one of the few so let's say they can take
+  3 things and if they are taking something that is a stack only a percentage
+  of that stack". Rule 4 on the rules page says the same thing in the world's
+  words: "Take something. Take a good thing. Leave the rest".
+
+  WHAT IS LIMITED. A take from another person's body, and a take from a
+  container in a building another person holds (the property register,
+  holderOf, which is the one record of who owns what). Whether that person is
+  online makes no difference. Everything else is let through untouched: a
+  world container nobody holds, an NPC's body, your own body and anything in
+  a building you hold. A hold's box belongs to the hold rather than to a
+  person, so it is not limited either, unless it stands in somebody's house.
+
+  THE RULE. At most TAKE_LIMIT takes per taker, per body or container, per
+  TAKE_WINDOW_MS. A stack counts as one take, and one take may carry off no
+  more than STACK_SHARE of that stack, rounded down and never less than one.
+  The taker is a profile, not a character, so a second character on the same
+  account does not start a fresh count.
+
+  WHY 24 HOURS AND NOT A RESPAWN. A body here is the person's own actor: it
+  gets up where it respawns and falls again as the same reference, so there is
+  no new body to hang a fresh count on, and a container has no natural end at
+  all. One real day is the same answer for both, and it is easy to say in
+  chat. The window starts at the first take and the fourth is refused until it
+  has run out.
+
+  WHY A TAKE OVER THE SHARE IS REFUSED RATHER THAN SHRUNK. The engine hands
+  mp.onTakeItem a count and moves exactly that count on success
+  (TakeItemEvent::OnFireSuccess, RemoveItems on the entry it was given, which
+  is const). A handler can only say yes or no. So the taker is told in chat how
+  many of that stack they may take, and takes again.
+
+  THE CLIENT MOVES THE ITEM FIRST and then asks (containersService.ts), so on a
+  refusal the taker's own pack is sent back to them as the server has it, the
+  same message every successful take sends, and the thing leaves their pack
+  again. It is still in the body or container, and opening it again shows it.
+
+  THE COUNTS SURVIVE A RESTART, in the private folder as take-limit.json,
+  written to a temp copy and renamed like characters.json. A deploy restarts
+  the server, and a limit that a restart forgets is a limit a thief waits out.
+  Rows past their window are dropped whenever the file is read or written.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+
+  // How many takes one person may make from one body or one container.
+  var TAKE_LIMIT = 3;
+  // How long those takes are counted for: 24 real hours from the first one.
+  var TAKE_WINDOW_MS = 24 * 60 * 60 * 1000;
+  // How much of one stack one take may carry off: a quarter, rounded down, at least 1.
+  var STACK_SHARE = 0.25;
+
+  var fs = null, path = null;
+  try { fs = require('fs'); path = require('path'); } catch (e) { return; }
+
+  var privDir = 'private';
+  try {
+    var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+    if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
+  } catch (e) { }
+  var FILE = path.join(privDir, 'take-limit.json');
+
+  function now() { return Date.now(); }
+
+  // "<taker profile>|<source form id in hex>" -> { n: takes counted, at: first take }
+  var counts = loadCounts();
+
+  function loadCounts() {
+    var out = {};
+    var raw = null;
+    try { raw = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { return out; }
+    var rows = (raw && typeof raw === 'object' && raw.counts && typeof raw.counts === 'object')
+      ? raw.counts : {};
+    var t = now();
+    for (var k in rows) {
+      if (!Object.prototype.hasOwnProperty.call(rows, k) || k === '__proto__') { continue; }
+      var r = rows[k];
+      var n = Number(r && r.n) || 0;
+      var at = Number(r && r.at) || 0;
+      if (n <= 0 || at <= 0 || t - at >= TAKE_WINDOW_MS) { continue; }
+      out[k] = { n: n, at: at };
+    }
+    return out;
+  }
+
+  function saveCounts() {
+    var t = now();
+    for (var k in counts) {
+      if (Object.prototype.hasOwnProperty.call(counts, k) && t - counts[k].at >= TAKE_WINDOW_MS) {
+        delete counts[k];
+      }
+    }
+    var text = JSON.stringify({ at: t, counts: counts });
+    var tmp = FILE + '.tmp';
+    try {
+      try { fs.mkdirSync(privDir, { recursive: true }); } catch (e) { }
+      fs.writeFileSync(tmp, text);
+      try {
+        fs.renameSync(tmp, FILE);
+      } catch (e) {
+        fs.writeFileSync(FILE, text);
+        try { fs.unlinkSync(tmp); } catch (e2) { }
+      }
+    } catch (e) {
+      console.log('[thornswood] could not write the take limit: ' + e);
+    }
+  }
+
+  function profileOf(refrId) {
+    var pid = 0;
+    try { pid = Number(mp.get(refrId, 'profileId')) || 0; } catch (e) { pid = 0; }
+    return pid > 0 ? pid : 0;
+  }
+
+  /*
+    Whose this body or container is, or null when it is nobody's. A body
+    answers its own profile id (an NPC answers -1, which is nobody). A
+    container answers whoever holds the building it stands in, found by the
+    cell it is in, since a building here is its interior cell.
+  */
+  function ownerOf(refrId) {
+    var pid = profileOf(refrId);
+    if (pid) { return { pid: pid, what: 'body' }; }
+    var prop = g.__thornswoodProperty;
+    if (!prop || !prop.holderOf) { return null; }
+    var cell = '';
+    try { cell = String(mp.get(refrId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    if (!cell) { return null; }
+    var held = null;
+    try { held = prop.holderOf(cell); } catch (e) { held = null; }
+    var by = held ? (Number(held.by) || 0) : 0;
+    return by > 0 ? { pid: by, what: 'container' } : null;
+  }
+
+  /* How many of this item the body or container holds before the take. */
+  function stackOf(refrId, baseId) {
+    var inv = null;
+    try { inv = mp.get(refrId, 'inventory'); } catch (e) { inv = null; }
+    var entries = (inv && inv.entries) || [];
+    var n = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && Number(e.baseId) === Number(baseId)) { n += Number(e.count) || 0; }
+    }
+    return n;
+  }
+
+  /* Send the taker their pack as the server has it, so a refused item leaves it. */
+  function packAsServerHasIt(actorId) {
+    try { mp.set(actorId, 'inventory', mp.get(actorId, 'inventory')); } catch (e) { }
+  }
+
+  function refuse(actorId, text, why) {
+    say(actorId, text);
+    packAsServerHasIt(actorId);
+    return why;
+  }
+
+  /*
+    The answer to one take: null lets it through, a short reason refuses it
+    (mp.onTakeItem logs the reason and answers false).
+  */
+  function limitTake(sourceRefrId, actorId, baseId, count) {
+    var taker = profileOf(actorId);
+    if (!taker) { return null; }
+    var owner = ownerOf(sourceRefrId);
+    if (!owner || owner.pid === taker) { return null; }
+
+    var n = Number(count) || 0;
+    if (n < 1) { n = 1; }
+    var key = taker + '|' + ((Number(sourceRefrId) || 0) >>> 0).toString(16);
+    var row = Object.prototype.hasOwnProperty.call(counts, key) ? counts[key] : null;
+    if (row && now() - row.at >= TAKE_WINDOW_MS) { row = null; }
+    var used = row ? row.n : 0;
+    var where = owner.what === 'body' ? 'this body' : 'this container';
+
+    if (used >= TAKE_LIMIT) {
+      var hours = Math.max(1, Math.ceil((row.at + TAKE_WINDOW_MS - now()) / 3600000));
+      return refuse(actorId, 'You have already taken ' + TAKE_LIMIT + ' things from ' + where +
+                    '. Leave the rest. You may take again in ' + hours +
+                    (hours === 1 ? ' hour.' : ' hours.'),
+                    'the limit of ' + TAKE_LIMIT + ' takes');
+    }
+
+    var stack = stackOf(sourceRefrId, baseId);
+    if (stack < n) { stack = n; }
+    if (stack > 1) {
+      var share = Math.max(1, Math.floor(stack * STACK_SHARE));
+      if (n > share) {
+        return refuse(actorId, 'You may take up to ' + share + ' of those ' + stack +
+                      ', not ' + n + '. Only ' + Math.round(STACK_SHARE * 100) +
+                      '% of a stack may be taken from ' + where + '.',
+                      'over the share, ' + share + ' of ' + stack);
+      }
+    }
+
+    counts[key] = { n: used + 1, at: row ? row.at : now() };
+    saveCounts();
+    return null;
+  }
+
+  g.__thornswoodTakeLimit = {
+    take: limitTake, ownerOf: ownerOf,
+    TAKE_LIMIT: TAKE_LIMIT, TAKE_WINDOW_MS: TAKE_WINDOW_MS, STACK_SHARE: STACK_SHARE
+  };
+})();
+// end of the take limit
 
 
 // ==== thornswood needs: hunger, thirst and exhaustion ====
@@ -38773,10 +42106,10 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
      use youyr cursor and a bunch of other bs I just want to press a key while
      looking at them."
 
-  THE TRADE MENU HE REMEMBERS IS GONE AND IS NOT COMING BACK. It was
-  TradeTogether, a Skyrim Together mod: the launcher still carries six key
-  bindings for it (Keys.cs, "Start a trade", "Offer the selected item") and
-  writes them into Data\SKSE\Plugins\TradeTogether.ini. That file does not
+  THE TRADE MENU HE REMEMBERS IS GONE AND IS NOT COMING BACK. It was an
+  add-on of the old multiplayer mod: the launcher carried six key bindings
+  for it (Keys.cs, "Start a trade", "Offer the selected item") and wrote
+  them into that add-on's ini under Data\SKSE\Plugins. That file does not
   exist in this build and neither does the DLL, checked on 23 September. So
   every one of those rows on the controls page has been setting a key in a
   file nobody reads, which is why looking at somebody does nothing, and it is
@@ -38858,7 +42191,28 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
     return { friends: {}, muted: {}, journals: [], at: 0 };
   }
 
+  /*
+    ONE READ PER PERSON PER TICK, issue #385. The tick builds every person's
+    panel, and each panel used to ask the engine for every other person's
+    name, profile id and journals: at twenty people that was about 1,270
+    engine reads a second, an appearance parsed 547 times a second, all to
+    learn the same twenty names. While a tick runs, tickMemo holds what was
+    read, so each fact is read once; outside a tick it is null and nothing is
+    held, so a command always reads fresh. tests\test-server-tick-cost.js.
+  */
+  var tickMemo = null;
+
+  function memo(key, get) {
+    if (!tickMemo) { return get(); }
+    if (Object.prototype.hasOwnProperty.call(tickMemo, key)) { return tickMemo[key]; }
+    return (tickMemo[key] = get());
+  }
+
   function read(actorId) {
+    return memo('s' + actorId, function () { return readNow(actorId); });
+  }
+
+  function readNow(actorId) {
     var v = null;
     try { v = mp.get(actorId, SOCIAL_PROPERTY); } catch (e) { v = null; }
     if (!v || typeof v !== 'object') { return null; }
@@ -38878,6 +42232,7 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
 
   function write(actorId, s) {
     s.at = Date.now();
+    if (tickMemo) { tickMemo['s' + actorId] = s; }
     try { mp.set(actorId, SOCIAL_PROPERTY, s); return true; }
     catch (e) { return false; }
   }
@@ -38891,20 +42246,26 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   // ------------------------------------------------------------- people --
 
   function profileOf(actorId) {
-    try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+    return memo('p' + actorId, function () {
+      try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+    });
   }
 
   function nameOfPerson(actorId) {
-    try {
-      var ap = mp.get(actorId, 'appearance');
-      var n = String((ap && ap.name) || '');
-      if (n) { return n; }
-    } catch (e) { }
-    return 'somebody';
+    return memo('n' + actorId, function () {
+      try {
+        var ap = mp.get(actorId, 'appearance');
+        var n = String((ap && ap.name) || '');
+        if (n) { return n; }
+      } catch (e) { }
+      return 'somebody';
+    });
   }
 
   function online() {
-    try { return mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+    return memo('online', function () {
+      try { return mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+    });
   }
 
   function actorForProfile(pid) {
@@ -39519,6 +42880,11 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   // ------------------------------------------------------------ the tick --
 
   function tick() {
+    tickMemo = {};
+    try { tickBody(); } finally { tickMemo = null; }
+  }
+
+  function tickBody() {
     try { nearTick(); } catch (e) { slog('near tick:', e); }
     try { partyTick(); } catch (e) { slog('party tick:', e); }
     var all = online();
@@ -39603,9 +42969,9 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   trade menu and when it did you had to use youyr cursor and a bunch of other
   bs I just want to press a key while looking at them."
 
-  The menu he remembers was TradeTogether, a Skyrim Together mod. The launcher
-  still carries six key bindings for it in Keys.cs, writing into
-  Data\SKSE\Plugins\TradeTogether.ini, and neither that file nor the DLL is
+  The menu he remembers was an add-on of the old multiplayer mod. The launcher
+  carried six key bindings for it in Keys.cs, writing into that add-on's ini
+  under Data\SKSE\Plugins, and neither that file nor the DLL is
   anywhere in this build; checked 23 September. So those rows have been
   setting keys in a file nobody reads, which is why looking at somebody does
   nothing, and the cursor he remembers was that mod's mouse menu.
@@ -40083,3 +43449,2238 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   tlog('ready: two piles, two confirmations, and any change takes both back');
 })();
 // ==== end thornswood trade ====
+
+// ==== thornswood mod settings ====
+/*
+  ============================================================================
+  MOD SETTINGS MENUS THAT WOULD OTHERWISE RESET EVERY SESSION. Issue #488.
+
+  A classic SkyUI menu keeps what somebody chose in the save, and there is no
+  save here: the character lives on the server. So Apocalypse, AHZmoreHUD,
+  atlas map markers, Skyrim Unbound and chfshVariousActions started from the
+  plugin's own values every time the game started. Patrick decided on
+  28 September to keep them for all five.
+
+  WHAT CAN BE KEPT IS WHAT IS IN A GLOB RECORD, and nothing else. A classic
+  menu's own variables live in its script, which Skyrim Platform cannot write;
+  a global variable it can. scripts\mods\Audit-ModMenus.js -v reads the
+  plugins and lists the 176 globals wired to those five menus, and MOD_GLOBALS
+  below is that list: plugin, editor id, and the id inside the plugin, which
+  does not move when the load order does. The MCM Helper menus need nothing,
+  because they keep their 421 settings in ini files on the machine, and
+  SkyUI_SE's three script values are out of reach.
+
+  THE CHANNEL IS THE ONE /ate AND /place ALREADY USE. The front plugin reads
+  those globals when the game's journal (where the menus live) opens and
+  again when it closes, and sends what moved as /modset lines over the chat
+  socket. This block keeps them per character, by profile id, in
+  private\mod-settings.json, written to a temp copy and renamed over the old
+  one the same way characters.json is. When the character is in the world the
+  values go back through an owner-visible property whose updateOwner script
+  sets each global on that person's own machine, edge triggered on a stamp
+  like the swing and the alert, because updateOwner runs every frame.
+
+  WHAT A CLIENT CAN SEND IS BOUNDED. Only the 176 names below, only plain
+  numbers, at most MOD.pairs a line, each name and number short, and at most
+  MOD.profiles characters in the file. Anything else is refused and logged.
+  The profile id is the one the voice service stamped from the connection, so
+  the worst a modified client can do is set its own menus.
+  ============================================================================
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var fs = null, path = null;
+  try { fs = require('fs'); path = require('path'); } catch (e) { return; }
+
+  function mlog() {
+    var a = ['[thornswood mods]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+
+  var MOD_SETTINGS_PROPERTY = 'thornswoodModSettings';
+
+  var MOD = {
+    // How often the online list is walked for somebody who just came in.
+    every: 3000,
+    // The most name=value pairs taken from one line. A line is cut at 400
+    // characters by the voice service, so a real one never comes near this.
+    pairs: 40,
+    // The longest editor id in the list is 53 characters.
+    name: 64,
+    // A float written out in full is under 25 characters.
+    number: 32,
+    // Hotkeys, percentages, multipliers and switches, none near this.
+    most: 1e9,
+    // Characters kept in the file before a new one is refused.
+    profiles: 5000
+  };
+
+  /*
+    Written out of Audit-ModMenus.js on 28 September against the shipping
+    load order: 31 + 40 + 98 + 6 + 1 = 176. test-mod-settings.js checks this
+    table and the one in thornswood-front.js are the same, name for name.
+  */
+  var MOD_GLOBALS = {
+    'Apocalypse - Magic of Skyrim.esp': {
+      WB_Alteration_ThrummingStone_Global_Delay: 0xa6ec1,
+      WB_Alteration_TranasasReversal_Global_XP: 0x98ff9,
+      WB_Alteration_Undermine_Global_Mult: 0x98ffc, WB_Alteration_Undermine_Global_XP: 0x98ffb,
+      WB_Conjuration_AtronachMark_Global_XP: 0x3ba29,
+      WB_Conjuration_ConjureAvengingWraith_Global_Mult: 0x17aaf,
+      WB_Conjuration_ConjureDremoraAssassin_Global_Health: 0x1a60d,
+      WB_Conjuration_ConjureLich_Global_Cost: 0x1b649,
+      WB_Conjuration_ConjureLich_Global_Cost_DualCast: 0x1b64a,
+      WB_Destruction_ShockScythe_Global_Threshold: 0x24e48,
+      WB_Destruction_Shockbloom_Global_Percentage: 0x2283f,
+      WB_Destruction_Shockbloom_Global_XP: 0x3996f, WB_General_Global_XP: 0x43cef,
+      WB_Illusion_Counterspell_Global_Percentage: 0x207bd,
+      WB_Illusion_EmpathicAgony_Global_XP: 0x321bd, WB_Illusion_Global_AllowNNPC: 0x40bef,
+      WB_Illusion_HarrowingDirge_Global_Percentage: 0x20d36,
+      WB_Illusion_HarrowingDirge_Global_XP: 0x30c19, WB_Illusion_Lobotomize_Global_Mult2: 0x73b52,
+      WB_Illusion_Lobotomize_Global_XP: 0x71ad2, WB_Illusion_MagickaVoid_Global_XP: 0x71ad5,
+      WB_Illusion_MimicsCloak_Global_XP: 0x30c1f, WB_Illusion_PaleMoon_Global_Drain: 0x32c8f,
+      WB_Illusion_ScreamOfPain_Global_XP: 0x321b9,
+      WB_Restoration_Bloodseeker_Global_Mult: 0x71ad7,
+      WB_Restoration_Bloodseeker_Global_XP: 0x71ad6,
+      WB_Restoration_CullingRune_Global_Threshold: 0x3527a,
+      WB_Restoration_CullingRune_Global_XP: 0x35279,
+      WB_Restoration_FingerOfDeath_Global_Percentage: 0x1e196,
+      WB_Restoration_KingsHeart_Global_EnableCraftingSkills: 0xba90a,
+      WB_Restoration_WellingBlood_Global_Threshold: 0x1fcd4
+    },
+    'AHZmoreHUD.esp': {
+      AHZActivationMode: 0x145b4, AHZBottomWidgetRightAligned: 0x10513,
+      AHZBottomWidgetScale: 0x1b15b, AHZBottomWidgetXPercent: 0xdf5e,
+      AHZBottomWidgetYPercent: 0xdf5f, AHZDisplayDelay: 0x227b9, AHZEffectsWidgetStyle: 0x10fd9,
+      AHZEnemyLevelMax: 0x1e72a, AHZEnemyLevelMin: 0x1e72b, AHZHotKey: 0x145b3,
+      AHZHotkeyToggles: 0x16604, AHZIconSize: 0x25d94, AHZIngredientsWidgetStyle: 0x10fda,
+      AHZInventoryWidgetRightAligned: 0x10514, AHZInventoryWidgetScale: 0x1b15d,
+      AHZInventoryWidgetXPercent: 0xffaf, AHZInventoryWidgetYPercent: 0xffb0,
+      AHZShowBookSkill: 0x1507a, AHZShowBooksRead: 0x11aa1, AHZShowBottomWidget: 0x9963,
+      AHZShowBottomWidgetAlways: 0x242a2, AHZShowEffectsWidget: 0x10fdb,
+      AHZShowEnchantmentKnown: 0x1ec8d, AHZShowEnemyHealthStats: 0x24d6c,
+      AHZShowEnemyLevel: 0x1d1a5, AHZShowEnemyMagickaMeter: 0x24d68,
+      AHZShowEnemyMagickaStats: 0x24d6b, AHZShowEnemySoulLevel: 0x24805,
+      AHZShowEnemyStaminaMeter: 0x24d69, AHZShowEnemyStaminaStats: 0x24d6a,
+      AHZShowIngredientWidget: 0x22ed, AHZShowInventoryCount: 0xffae,
+      AHZShowInventoryCountWithZero: 0x25831, AHZShowTargetWeight: 0x155dd, AHZShowVW: 0x19112,
+      AHZShowWeightClass: 0x11aa2, AHZSideWidgetScale: 0x1b15c, AHZSideWidgetXPercent: 0xdf61,
+      AHZSideWidgetYPercent: 0xdf60, AHZToggleState: 0x14b17
+    },
+    'atlas map markers.esp': {
+      ATLASGroupAltarGV: 0x83f, ATLASGroupAltarVanGV: 0x89b, ATLASGroupAnimalDenGV: 0x840,
+      ATLASGroupBLK1GV: 0x841, ATLASGroupBLK2GV: 0x842, ATLASGroupBLK3GV: 0x86d,
+      ATLASGroupBLKLiftsGV: 0x89c, ATLASGroupBYOHHousesGV: 0x89d, ATLASGroupCWCampImpGV: 0x847,
+      ATLASGroupCWCampSonsGV: 0xc72, ATLASGroupCampGV: 0x843, ATLASGroupCampVanGV: 0x89e,
+      ATLASGroupCaravanCampGV: 0x844, ATLASGroupCavesGV: 0x89f, ATLASGroupCityDocksGV: 0x8a0,
+      ATLASGroupCityGV: 0x824, ATLASGroupCityInnGV: 0x845, ATLASGroupCityShopGV: 0x846,
+      ATLASGroupCityStablesGV: 0x8a1, ATLASGroupClearingsGV: 0x8a2, ATLASGroupDB1GV: 0x883,
+      ATLASGroupDB2GV: 0x884, ATLASGroupDB3GV: 0x885, ATLASGroupDB4GV: 0x886,
+      ATLASGroupDG1GV: 0x84d, ATLASGroupDG2GV: 0x84e, ATLASGroupDGFV0GV: 0x84b,
+      ATLASGroupDGFV1GV: 0x848, ATLASGroupDGFV2GV: 0x849, ATLASGroupDGFV3GV: 0x84a,
+      ATLASGroupDGMainGV: 0x8c0, ATLASGroupDGSC1GV: 0x84c, ATLASGroupDGSC2GV: 0x850,
+      ATLASGroupDGSC3GV: 0x851, ATLASGroupDaedricShrinesGV: 0x8a3, ATLASGroupDoomstonesGV: 0x8a4,
+      ATLASGroupDragonGV: 0x852, ATLASGroupDragonLairGV: 0x8a5, ATLASGroupDunExitGV: 0x853,
+      ATLASGroupDwemerRuinsGV: 0x8a6, ATLASGroupFactionCOGV: 0x854, ATLASGroupFactionDBGV: 0x8a8,
+      ATLASGroupFactionDBVanGV: 0x8a9, ATLASGroupFactionMGGV: 0x8a7,
+      ATLASGroupFactionTGVanGV: 0x8aa, ATLASGroupFarmGV: 0x827, ATLASGroupFarmVanGV: 0x8ab,
+      ATLASGroupFishingFreezingGV: 0xc74, ATLASGroupFishingLakeGV: 0xc75,
+      ATLASGroupFishingStreamGV: 0xc76, ATLASGroupFishingUndergroundGV: 0xc77,
+      ATLASGroupFortsGV: 0x8ac, ATLASGroupGiantCampsGV: 0x8ad, ATLASGroupHallDeadGV: 0x855,
+      ATLASGroupImportantGV: 0x856, ATLASGroupImportantTownGV: 0x857,
+      ATLASGroupImportantVanGV: 0x8ae, ATLASGroupInnGV: 0x858, ATLASGroupLandmarkGV: 0x859,
+      ATLASGroupLandmarkVanGV: 0x8af, ATLASGroupLumberMillGV: 0x85a,
+      ATLASGroupLumberMillVanGV: 0x8b0, ATLASGroupMainCitiesGV: 0x8b2,
+      ATLASGroupMainTownsGV: 0x8b3, ATLASGroupMakerStonesGV: 0x8b4, ATLASGroupMineGV: 0x85b,
+      ATLASGroupMineVanGV: 0x8b1, ATLASGroupMntPassesGV: 0x8b5, ATLASGroupMoreCityGV: 0x85c,
+      ATLASGroupMoreCityVanGV: 0x8b6, ATLASGroupMoreTownGV: 0x85d, ATLASGroupNordicRuinsGV: 0x8b7,
+      ATLASGroupOrcHoldsGV: 0x8b8, ATLASGroupPOIGV: 0x85f, ATLASGroupPlayerHomeGV: 0x85e,
+      ATLASGroupRuinGV: 0x860, ATLASGroupShacksGV: 0x8b9, ATLASGroupShipwreckGV: 0x861,
+      ATLASGroupShipwreckVanGV: 0x8ba, ATLASGroupShopGV: 0x862,
+      ATLASGroupShrineAdditionalGV: 0xc7d, ATLASGroupShrineCityGV: 0xc7f,
+      ATLASGroupShrineGV: 0x863, ATLASGroupShrineStepsGV: 0x864, ATLASGroupSkillBookGV: 0x867,
+      ATLASGroupSmallSettlementsGV: 0x8bb, ATLASGroupSpecialLocGV: 0x8c4,
+      ATLASGroupStructuresGV: 0x865, ATLASGroupTempleGV: 0x866, ATLASGroupToSolstheimGV: 0x8bc,
+      ATLASGroupWaterGV: 0x869, ATLAS_CCORDetected: 0x8cb, ATLAS_CorundumToCopperVal: 0x8c6,
+      ATLAS_FishingMarkersEnabled: 0xc78, ATLAS_MalachiteToGlassVal: 0x8c7,
+      ATLAS_MalachiteToMoldaviteVal: 0x8c8, ATLAS_QuicksilverToMithrilVal: 0x8c9,
+      ATLAS_USKPDetected: 0x8ca
+    },
+    'Skyrim Unbound.esp': {
+      DelayDragonLevel1: 0x1209c, DelayDragonLevel2: 0x1209d, DelayDragonMax: 0xfae4,
+      DelayDragonMin: 0xfae3, UnlockShouts: 0x1209b, WhiterunThanePrerequisite: 0xb8eb5e
+    },
+    'chfshVariousActions.esp': {
+      chfshVAMenuHotkey: 0x539c
+    }
+  };
+
+  // name -> [plugin, id inside it]. Own properties only, so a name like
+  // __proto__ or constructor is never found.
+  var BY_NAME = {};
+  var TOTAL = 0;
+  Object.keys(MOD_GLOBALS).forEach(function (file) {
+    Object.keys(MOD_GLOBALS[file]).forEach(function (name) {
+      BY_NAME[name] = [file, MOD_GLOBALS[file][name]];
+      TOTAL++;
+    });
+  });
+  function known(name) {
+    return Object.prototype.hasOwnProperty.call(BY_NAME, name) ? BY_NAME[name] : null;
+  }
+
+  var privDir = 'private';
+  try {
+    var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+    if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
+  } catch (e) { }
+  try { if (!fs.existsSync(privDir)) { fs.mkdirSync(privDir, { recursive: true }); } } catch (e) { }
+  var FILE = path.join(privDir, 'mod-settings.json');
+
+  /*
+    The book: profile id -> { name: number }. Read at load, so a restart
+    starts from what was written. Anything in the file that is not a known
+    name with a finite number is dropped as it is read, so a hand edit or an
+    older table cannot put a stray value on anybody's machine.
+  */
+  var book = {};
+  try {
+    var had = JSON.parse(fs.readFileSync(FILE, 'utf8'));
+    var who = had && had.who;
+    if (who && typeof who === 'object') {
+      Object.keys(who).forEach(function (pid) {
+        if (!/^\d{1,12}$/.test(pid) || !who[pid] || typeof who[pid] !== 'object') { return; }
+        var row = {};
+        var n = 0;
+        Object.keys(who[pid]).forEach(function (name) {
+          var v = who[pid][name];
+          if (known(name) && typeof v === 'number' && isFinite(v) && Math.abs(v) <= MOD.most) {
+            row[name] = v; n++;
+          }
+        });
+        if (n) { book[pid] = row; }
+      });
+    }
+  } catch (e) { book = {}; }
+
+  /* Into a temp file beside it and renamed over it; see the roster's write(). */
+  function write() {
+    var text = JSON.stringify({ at: Date.now(), who: book });
+    var tmp = FILE + '.tmp';
+    try {
+      fs.writeFileSync(tmp, text);
+      try {
+        fs.renameSync(tmp, FILE);
+      } catch (e) {
+        fs.writeFileSync(FILE, text);
+        try { fs.unlinkSync(tmp); } catch (e2) { }
+      }
+      return true;
+    } catch (e) {
+      mlog('could not write', FILE + ':', e);
+      return false;
+    }
+  }
+
+  /* A plain decimal number and nothing else: no hex, no Infinity, no NaN. */
+  function numberOf(text) {
+    var s = String(text);
+    if (!s || s.length > MOD.number) { return NaN; }
+    if (!/^-?(\d+(\.\d*)?|\.\d+)(e[-+]?\d+)?$/i.test(s)) { return NaN; }
+    var v = Number(s);
+    if (!isFinite(v) || Math.abs(v) > MOD.most) { return NaN; }
+    return v;
+  }
+
+  /*
+    What goes on the property: the values grouped by plugin, as the id inside
+    the plugin and the number, so the script on the client needs no table.
+  */
+  function payload(pid, at) {
+    var row = book[String(pid)];
+    if (!row) { return null; }
+    var set = {};
+    var n = 0;
+    Object.keys(row).forEach(function (name) {
+      var where = known(name);
+      if (!where) { return; }
+      (set[where[0]] = set[where[0]] || []).push([where[1], row[name]]);
+      n++;
+    });
+    return n ? { at: at, set: set } : null;
+  }
+
+  /*
+    Run on the person's own machine EVERY FRAME for as long as the property
+    holds a value (see the note over SWING_PROPERTY), so it is edge triggered
+    on v.at: a value that has not changed costs one comparison. The world may
+    not be up the first time it runs, so a pass that finds none of the globals
+    is tried again a second later, up to thirty times, and then left.
+  */
+  function putBackScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || !v.at || !v.set) { return; }',
+      '    var st = ctx.state;',
+      '    if (!st) { return; }',
+      '    if (st.thornswoodModsAt === v.at) { return; }',
+      '    var now = Date.now();',
+      '    if (st.thornswoodModsFor !== v.at) { st.thornswoodModsFor = v.at; st.thornswoodModsTries = 0; st.thornswoodModsLast = 0; }',
+      '    if (now - (st.thornswoodModsLast || 0) < 1000) { return; }',
+      '    st.thornswoodModsLast = now;',
+      '    st.thornswoodModsTries = (st.thornswoodModsTries || 0) + 1;',
+      '    var sp = ctx.sp;',
+      '    var put = 0, miss = 0;',
+      '    for (var file in v.set) {',
+      '      if (!Object.prototype.hasOwnProperty.call(v.set, file)) { continue; }',
+      '      var rows = v.set[file];',
+      '      if (!rows || !rows.length) { continue; }',
+      '      for (var i = 0; i < rows.length; i++) {',
+      '        var id = Number(rows[i] && rows[i][0]);',
+      '        var val = Number(rows[i] && rows[i][1]);',
+      '        if (!id || !isFinite(val)) { miss++; continue; }',
+      '        try {',
+      '          var gv = sp.GlobalVariable.from(sp.Game.getFormFromFile(id, String(file)));',
+      '          if (gv) { gv.setValue(val); put++; } else { miss++; }',
+      '        } catch (e) { miss++; }',
+      '      }',
+      '    }',
+      '    if (put > 0 || st.thornswoodModsTries >= 30) {',
+      '      st.thornswoodModsAt = v.at;',
+      '      try { sp.printConsole("[thornswood] mod settings put back: " + put + " set, " + miss + " not found"); } catch (e) { }',
+      '    }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  /*
+    Who has been sent their values this session: actor id -> the stamp. Kept
+    on globalThis so a hot reload does not send everybody's again.
+  */
+  if (!g.__thornswoodModSent) { g.__thornswoodModSent = {}; }
+  var sent = g.__thornswoodModSent;
+
+  function send(actorId, pid, at) {
+    var v = payload(pid, at);
+    if (!v) { return false; }
+    try { mp.set(actorId, MOD_SETTINGS_PROPERTY, v); return true; }
+    catch (e) { mlog('could not set the property on', actorId.toString(16) + ':', e); return false; }
+  }
+
+  /* Once every MOD.every: anybody newly in the world gets their values. */
+  function tick() {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      var actorId = online[i];
+      here[actorId] = true;
+      if (sent[actorId]) { continue; }
+      var pid = 0;
+      try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+      if (!pid) { continue; }
+      var at = Date.now();
+      sent[actorId] = { at: at, pid: pid };
+      if (send(actorId, pid, at)) { mlog('put back the mod settings for profile', pid); }
+    }
+    Object.keys(sent).forEach(function (k) { if (!here[k]) { delete sent[k]; } });
+  }
+
+  /*
+    One /modset line: "/modset Name=value Name=value ...". Returns what was
+    taken and what was refused, for the log and for the test. Nothing is said
+    back in the chat: nobody typed it.
+  */
+  function take(pid, parts) {
+    var out = { took: 0, refused: [] };
+    var key = String(Number(pid) || 0);
+    if (key === '0') { out.refused.push('no profile'); return out; }
+    var row = book[key];
+    if (!row && Object.keys(book).length >= MOD.profiles) {
+      out.refused.push('the file is full');
+      return out;
+    }
+    var fresh = row ? null : {};
+    var target = row || fresh;
+    var changed = false;
+    for (var i = 1; i < parts.length; i++) {
+      var pair = String(parts[i] || '');
+      if (!pair) { continue; }
+      if (i > MOD.pairs) { out.refused.push(pair.slice(0, 24) + ' (too many on one line)'); continue; }
+      var eq = pair.indexOf('=');
+      var name = eq > 0 ? pair.slice(0, eq) : '';
+      if (!name || name.length > MOD.name || !known(name)) {
+        out.refused.push(pair.slice(0, 24) + ' (not a setting this server keeps)');
+        continue;
+      }
+      var v = numberOf(pair.slice(eq + 1));
+      if (isNaN(v)) { out.refused.push(name + ' (not a number)'); continue; }
+      if (target[name] !== v) { target[name] = v; changed = true; }
+      out.took++;
+    }
+    if (fresh && out.took) { book[key] = fresh; }
+    if (changed) { write(); }
+    return out;
+  }
+
+  function command(pid, actorId, parts) {
+    var r = take(pid, parts);
+    if (r.refused.length) { mlog('refused from profile', pid + ':', r.refused.join(', ')); }
+    // Keep the property current under the same stamp, so the next login
+    // carries the new values without this one setting them again.
+    if (r.took && actorId && sent[actorId]) { send(actorId, pid, sent[actorId].at); }
+    return r;
+  }
+
+  try {
+    mp.makeProperty(MOD_SETTINGS_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: putBackScript(), updateNeighbor: ''
+    });
+  } catch (e) { /* already made by a previous load */ }
+
+  if (g.__thornswoodModTimer) { try { clearInterval(g.__thornswoodModTimer); } catch (e) { } }
+  g.__thornswoodModTimer = setInterval(guard('modSettingsTick', tick), MOD.every);
+
+  g.__thornswoodModSettings = {
+    MOD: MOD, MOD_GLOBALS: MOD_GLOBALS, MOD_SETTINGS_PROPERTY: MOD_SETTINGS_PROPERTY,
+    FILE: FILE, book: book, known: known, numberOf: numberOf, payload: payload,
+    putBackScript: putBackScript, take: take, command: command, tick: tick, sent: sent
+  };
+
+  mlog('ready:', TOTAL, 'settings in', Object.keys(MOD_GLOBALS).length, 'menus,',
+       Object.keys(book).length, 'characters kept in', FILE);
+})();
+// ==== end thornswood mod settings ====
+
+// ==== thornswood asking staff ====
+/*
+  ASKING STAFF FOR HELP, AND REPORTING SOMEBODY, FROM INSIDE THE GAME (#414).
+
+  Until this the only way to reach a moderator was to leave the game and open
+  a ticket in the Discord, so a person stuck in a wall or being harassed at
+  midnight had nothing to press. Two commands now:
+
+    /helpme <what is wrong>          (/help-me as well)
+    /report <name> <what they did>
+
+  Each one goes three places at once:
+
+    - to every member of staff who is in the world right now, as a private
+      line in their chat, EXCEPT the person being reported, so a report about
+      a moderator is never read first by that moderator;
+    - to the site, on a keyed route (/api/report/game, or /dev/api/report/game
+      for the dev server, because the dev door.json names the site with /dev
+      on the end), which writes it into the inbox the admins read;
+    - and from that inbox the Discord bot says it in the staff channel, which
+      is how the site's public report page already reaches staff.
+
+  The person who asked is told which of those it reached, after the site has
+  answered, so "sent" is never said about something that was not.
+
+  NOT ANONYMOUS, AND NOT A WAY TO SPAM. A line only counts from a character
+  that is in the world; the site only takes these from a caller holding the
+  door key, which is the game server and nobody else; and the limits below
+  hold one profile to a handful an hour and the whole server to a few dozen.
+  The site keeps its own count per profile on top of this one.
+
+  WHAT A REPORT IS WORTH, SAID PLAINLY. The profile id a chat line arrives
+  under is a claim the client makes, not a fact (see /tp in handle()). The
+  record says so, so nobody reads it as more authoritative than it is. Nothing
+  here keeps any chat around the report: what somebody said stays wherever
+  the chat log already keeps it, and a moderator reads it there.
+
+  /stuck, the escape hatch the issue also names, is the stuck block right
+  after this one, built to Patrick's rules of 28 September.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var fs = null, path = null;
+  try { fs = require('fs'); path = require('path'); } catch (e) { return; }
+
+  function slog() {
+    var a = ['[thornswood staff]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+
+  var LIMIT = {
+    // One profile: this many of either kind in an hour. The site takes five
+    // an hour from one profile as well, so this is the one people meet.
+    hour: 5,
+    // /helpme again within this long is the same call, not a new one.
+    helpEvery: 5 * 60 * 1000,
+    // The same person reported by the same person within this long.
+    sameEvery: 60 * 60 * 1000,
+    // The whole server, because the profile id is a claim and a script could
+    // send lines under a hundred made up ones.
+    all: 30,
+    // How long the site gets to answer before the person is told it did not.
+    wait: 8000,
+    // The longest a reason is kept, and a name.
+    said: 300,
+    name: 60
+  };
+
+  // On globalThis, so a hot reload does not hand everybody a fresh allowance.
+  if (!g.__thornswoodAskSeen) { g.__thornswoodAskSeen = { by: {}, all: [] }; }
+  var seen = g.__thornswoodAskSeen;
+
+  function prune(now) {
+    var cut = now - 60 * 60 * 1000;
+    seen.all = seen.all.filter(function (t) { return t > cut; });
+    for (var k in seen.by) {
+      if (!Object.prototype.hasOwnProperty.call(seen.by, k)) { continue; }
+      var kept = seen.by[k].filter(function (r) { return r.at > cut; });
+      if (kept.length) { seen.by[k] = kept; } else { delete seen.by[k]; }
+    }
+  }
+
+  function minutes(ms) {
+    var m = Math.max(1, Math.ceil(ms / 60000));
+    return m === 1 ? 'a minute' : m + ' minutes';
+  }
+
+  /** Why this one is refused, in a sentence, or '' when it may go. */
+  function refusal(kind, profileId, aboutKey, now) {
+    prune(now);
+    var mine = seen.by[profileId] || [];
+    if (mine.length >= LIMIT.hour) {
+      return 'That is ' + LIMIT.hour + ' calls to staff from you in the last hour, which is ' +
+             'as many as the game takes. Try again in ' +
+             minutes(mine[0].at + 60 * 60 * 1000 - now) +
+             ', or open a ticket in the Discord if it cannot wait.';
+    }
+    for (var i = mine.length - 1; i >= 0; i--) {
+      var r = mine[i];
+      if (kind === 'help' && r.kind === 'help' && now - r.at < LIMIT.helpEvery) {
+        return 'Staff already have your call for help from ' + minutes(now - r.at) +
+               ' ago. Somebody will come to you; try again in ' +
+               minutes(r.at + LIMIT.helpEvery - now) + ' if nobody has.';
+      }
+      if (kind === 'report' && r.kind === 'report' && aboutKey && r.about === aboutKey &&
+          now - r.at < LIMIT.sameEvery) {
+        return 'You reported them ' + minutes(now - r.at) + ' ago and staff have it. ' +
+               'Anything new about the same thing can go in a ticket in the Discord.';
+      }
+    }
+    if (seen.all.length >= LIMIT.all) {
+      return 'Staff are taking a lot of calls from the game right now. Open a ticket ' +
+             'in the Discord and it will reach them.';
+    }
+    return '';
+  }
+
+  function taken(kind, profileId, aboutKey, now) {
+    if (!seen.by[profileId]) { seen.by[profileId] = []; }
+    seen.by[profileId].push({ kind: kind, about: aboutKey || '', at: now });
+    seen.all.push(now);
+  }
+
+  function nameOf(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      return String((ap && ap.name) || '').slice(0, LIMIT.name);
+    } catch (e) { return ''; }
+  }
+
+  function round1(n) { return Math.round((Number(n) || 0) * 10) / 10; }
+
+  /** Everybody in the world: [{ actorId, profileId, name }]. */
+  function everyone() {
+    var out = [], online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    for (var i = 0; i < online.length; i++) {
+      var pid = 0;
+      try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+      if (pid) { out.push({ actorId: online[i], profileId: pid, name: nameOf(online[i]) }); }
+    }
+    return out;
+  }
+
+  /*
+    Who a report is about, out of "/report Lydia Stormblade shoved me off the
+    bridge". Names have spaces, so the longest name of somebody in the world
+    that the line starts with wins; then a first name that only one person in
+    the world has; and failing both, the first word, kept as typed, because a
+    person who has already logged off can still be reported.
+  */
+  function whoAbout(words, people) {
+    var line = words.join(' ').toLowerCase();
+    var best = null, bestName = '';
+    for (var i = 0; i < people.length; i++) {
+      var n = String(people[i].name || '').toLowerCase().trim();
+      if (!n) { continue; }
+      if ((line === n || line.indexOf(n + ' ') === 0) && n.length > bestName.length) {
+        best = people[i];
+        bestName = n;
+      }
+    }
+    if (best) {
+      var used = bestName.split(/\s+/).length;
+      return { name: best.name, person: best, rest: words.slice(used).join(' ').trim() };
+    }
+    var first = String(words[0] || '').toLowerCase();
+    var same = people.filter(function (p) {
+      return String(p.name || '').toLowerCase().trim().split(/\s+/)[0] === first;
+    });
+    if (first && same.length === 1) {
+      return { name: same[0].name, person: same[0], rest: words.slice(1).join(' ').trim() };
+    }
+    return { name: String(words[0] || '').slice(0, LIMIT.name), person: null,
+             rest: words.slice(1).join(' ').trim() };
+  }
+
+  /** Where the site is and the key to it, from the door's own file. */
+  function door() {
+    var privDir = 'private';
+    try {
+      var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
+    } catch (e) { }
+    try {
+      var conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8')
+                              .replace(/^﻿/, ''));
+      if (conf && conf.site && conf.key) { return { site: String(conf.site), key: String(conf.key) }; }
+    } catch (e) { }
+    return null;
+  }
+
+  /*
+    The post to the site. done(true) once the site has written it into the
+    inbox, done(false, why) for anything else, and done is called once.
+    The key goes in a header and never the address, like the door's fetch.
+  */
+  function toSite(row, done) {
+    var once = false;
+    function end(ok, why) { if (!once) { once = true; done(ok, why || ''); } }
+    var conf = door();
+    if (!conf) { end(false, 'no door.json'); return; }
+    var url;
+    try { url = new URL(conf.site.replace(/\/+$/, '') + '/api/report/game'); }
+    catch (e) { end(false, 'the site address in door.json is not an address'); return; }
+    var lib;
+    try { lib = require(url.protocol === 'http:' ? 'http' : 'https'); }
+    catch (e) { end(false, 'no ' + url.protocol); return; }
+    var body = JSON.stringify(row);
+    var req;
+    try {
+      req = lib.request(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json',
+                   'content-length': Buffer.byteLength(body),
+                   'X-Thornswood-Key': conf.key }
+      }, function (resp) {
+        var buf = '';
+        resp.on('data', function (d) { buf += d; });
+        resp.on('end', function () {
+          if (resp.statusCode === 200) { end(true); return; }
+          var why = 'the site answered ' + resp.statusCode;
+          try { var j = JSON.parse(buf); if (j && j.error) { why += ' (' + j.error + ')'; } } catch (e) { }
+          end(false, why);
+        });
+      });
+    } catch (e) { end(false, String((e && e.message) || e)); return; }
+    req.on('error', function (e) { end(false, String((e && e.message) || e)); });
+    try { req.setTimeout(LIMIT.wait, function () { req.destroy(); end(false, 'the site took too long'); }); } catch (e) { }
+    req.end(body);
+  }
+
+  /*
+    One call to staff. Called from handle() with the character already found,
+    and with handle()'s own toProfile and staff test, so a reply goes out
+    exactly the way every other command's does.
+  */
+  function ask(kind, parts, profileId, actorId, toProfile, isStaff) {
+    var now = Date.now();
+    var words = parts.slice(1).filter(Boolean);
+    var people = everyone();
+    var mine = nameOf(actorId) || 'Somebody';
+    var about = null, said = '';
+
+    if (kind === 'report') {
+      if (words.length < 2) {
+        toProfile(profileId, 'Say /report, the name of the person, and what they did: ' +
+                  '/report Lydia shoved me off the bridge. It goes to staff and nobody else.');
+        return;
+      }
+      about = whoAbout(words, people);
+      said = about.rest;
+      if (!said) {
+        toProfile(profileId, 'Say what ' + about.name + ' did after the name, so staff know ' +
+                  'what they are looking for.');
+        return;
+      }
+      if (about.person && about.person.profileId === profileId) {
+        toProfile(profileId, 'That is you. /helpme reaches staff if something is wrong.');
+        return;
+      }
+    } else {
+      said = words.join(' ');
+    }
+    said = said.slice(0, LIMIT.said);
+
+    var aboutKey = about ? (about.person ? 'p' + about.person.profileId
+                                         : 'n' + about.name.toLowerCase()) : '';
+    var no = refusal(kind, profileId, aboutKey, now);
+    if (no) { toProfile(profileId, no); return; }
+    taken(kind, profileId, aboutKey, now);
+
+    var pos = [0, 0, 0], cell = '';
+    try {
+      pos = mp.get(actorId, 'pos') || [0, 0, 0];
+      cell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+    } catch (e) { }
+
+    // Staff in the world, told now. Never the person reported, and never the
+    // one asking, who is told separately below.
+    var told = 0;
+    var line = kind === 'help'
+      ? '[staff] ' + mine + ' asks for help at ' + (cell || 'somewhere unknown') +
+        (said ? ': ' + said : '.')
+      : '[staff] ' + mine + ' reported ' + about.name + ': ' + said +
+        ' (at ' + (cell || 'somewhere unknown') + ')';
+    for (var i = 0; i < people.length; i++) {
+      var p = people[i];
+      if (p.profileId === profileId) { continue; }
+      if (about && about.person && p.profileId === about.person.profileId) { continue; }
+      var staff = false;
+      try { staff = !!isStaff(p.profileId); } catch (e) { staff = false; }
+      if (!staff) { continue; }
+      toProfile(p.profileId, line);
+      told++;
+    }
+
+    var row = {
+      kind: kind,
+      profileId: profileId,
+      name: mine,
+      about: about ? about.name : '',
+      aboutProfileId: (about && about.person) ? about.person.profileId : 0,
+      said: said,
+      cell: cell,
+      pos: [round1(pos[0]), round1(pos[1]), round1(pos[2])],
+      at: now,
+      staffTold: told
+    };
+    slog(kind === 'help' ? '/helpme' : '/report', 'from profile', profileId,
+         about ? 'about ' + (row.aboutProfileId || JSON.stringify(row.about)) : '',
+         'at', cell, 'staff in the world told:', told);
+
+    toSite(row, function (ok, why) {
+      if (!ok) { slog('the site did not take it:', why); }
+      var inWorld = told
+        ? (told === 1 ? 'A member of staff in the world has it now'
+                      : told + ' members of staff in the world have it now')
+        : 'Nobody from staff is in the world right now';
+      var what = kind === 'help' ? 'Your call for help' : 'Your report';
+      if (ok) {
+        toProfile(profileId, what + ' reached staff. ' + inWorld +
+                  ', and it is in the staff channel in the Discord, where somebody will pick it up.' +
+                  (kind === 'report' ? ' Nobody else was told.' : ''));
+      } else if (told) {
+        toProfile(profileId, what + ' reached staff in the world: ' + inWorld.toLowerCase() +
+                  '. It could not reach the staff channel in the Discord, so if nobody comes to ' +
+                  'you, open a ticket there.');
+      } else {
+        toProfile(profileId, what + ' did not reach anybody: nobody from staff is in the world ' +
+                  'and the site could not be reached. Open a ticket in the Discord (' +
+                  (kind === 'help' ? 'I need help' : 'Report somebody') + ') and it will.');
+      }
+    });
+  }
+
+  g.__thornswoodAskStaff = {
+    ask: ask, whoAbout: whoAbout, refusal: refusal, taken: taken, seen: seen,
+    LIMIT: LIMIT, toSite: toSite, door: door
+  };
+  slog('ready: /helpme and /report reach staff in the world and the staff channel');
+})();
+// ==== end thornswood asking staff ====
+
+// ==== thornswood stuck ====
+/*
+  /STUCK, FOR SOMEBODY WEDGED IN THE WORLD (#414).
+
+  Patrick, 28 September, the rules this follows:
+    - it takes you back a few steps, to a recent spot where you were standing
+      safely, out of a short trail the server keeps of where each character
+      has been; when no such spot is known, or the one it knows is the same
+      stuck place, it sends you to the nearest temple instead;
+    - once every 5 minutes for each character;
+    - refused outright while you are dead, with a line saying why;
+    - in a fight it is a soft lock: a 15 second wait, cancelled if you are hit
+      or you move, with a line either way; out of a fight it works at once;
+    - it is only for being truly stuck, the rules say so, and misuse can mean
+      a warning or a ban from staff. So every use that moves somebody, and
+      every wait a fight cancelled, is written to private/moderation.log, the
+      staff record #412 built, which the Discord bot says in the staff
+      channel: the character, the profile, the Discord account from the join
+      pass, where from, where to, and when. The reply says it is logged.
+
+  Everything is on the server. The client is not asked anything: a client
+  that could say "I am not in a fight" could skip the wait.
+
+  IN A FIGHT, as the server can see it. The server has no combat state of its
+  own and no hit event reaches this file, so a fight is either of two things
+  the server does hold, sampled once a second: the character's health went
+  down (the server applies weapon damage itself, ActionListener::OnWeaponHit),
+  or its last animation event was a swing, a bash, a bow draw or a cast. Either
+  in the last 15 seconds counts. Being hurt by anything counts, a fall
+  included, which errs on the side of the wait.
+
+  THE TRAIL. Every 3 seconds, for each character in the world who is alive
+  and not still being made: a new point when they are 200 units or more from
+  the last one, or in another cell, 10 kept. A sample that dropped more than
+  300 units since the last one is a fall and never becomes a point, so
+  somebody who fell through the world is not sent back into the air.
+
+  WHICH POINT. The newest one at least 256 units from where they are now (any
+  point in another cell counts), and not within 256 units of where their last
+  /stuck started, which is a place already known to be a trap. And when they
+  are still standing where their last /stuck put them, the trail is not
+  trusted at all: that spot is the same stuck place, so it is the temple.
+
+  WHICH TEMPLE: TEMPLES below, the nearest one on the same map. Every temple
+  inside is an interior, so the distance is measured to its door on the
+  map outside:
+    - standing outdoors in Tamriel or one of the five walled cities, which all
+      share Tamriel's coordinates: from where they stand, over the five
+      mainland temples;
+    - on Solstheim: Raven Rock's, the only temple on that map;
+    - indoors, or on any other map (Blackreach, Sovngarde, the Soul Cairn):
+      from the newest trail point on one of those two maps, which is where
+      they went in; failing that, the capital of the hold the cell is in
+      (DATA.cellToHold and DATA.capitals, the same tables the death respawn
+      reads); failing that, Whiterun's, the death respawn's own fallback.
+
+  Nothing here is kept on disk. A restart forgets the trail and the 5 minutes,
+  which only ever lets somebody use it sooner, once.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  var fs = null, path = null;
+  try { fs = require('fs'); path = require('path'); } catch (e) { }
+
+  var AGAIN_MS = 5 * 60 * 1000;   // once every 5 minutes for each character
+  // How long the last use is remembered: the 5 minutes, and where it started
+  // and put them, which is what makes a second use in the same trap go to
+  // the temple rather than back into it.
+  var REMEMBER_MS = 60 * 60 * 1000;
+  var WAIT_MS = 15000;            // the wait when in a fight
+  var FIGHT_MS = 15000;           // hurt or swinging this recently is a fight
+  var TICK_MS = 1000;
+  var TRAIL_MS = 3000;            // between trail samples
+  var TRAIL_KEEP = 10;
+  var TRAIL_STEP = 200;           // units from the last point before a new one
+  var SAME_PLACE = 256;           // units: closer than this is the same place
+  var FALL = 300;                 // units dropped between samples: a fall
+  var MOVE_SLACK = 100;           // units moved during the wait: cancelled
+  var FIGHT_ANIM = /attack|bash|bowdraw|begincast|spellcast|swing/i;
+
+  /*
+    THE TEMPLES, with where each number comes from.
+
+    desc, pos and rot: the point inside the temple the death respawn has
+    sent people to since it shipped, read out of the Respawn - Death Overhaul
+    marker in that cell (REFR DATA, radians turned to degrees), kept in
+    game\data\data.json as destinations.<key>.temple and installed in DATA.
+    door and doorWorld: the temple's door on the map outside, the same
+    record's entrancePos and entranceWorld. The cell names are the load
+    order's own, out of BUILDING_NAME. tests\test-stuck.js checks every number
+    here against DATA and every cell against BUILDING_NAME, so this table
+    cannot drift from what the respawn uses.
+  */
+  var TEMPLES = [
+    { key: 'whiterun', name: 'the Temple of Kynareth in Whiterun', frame: 'tamriel',
+      desc: '165a7:Skyrim.esm', pos: [1056.2, 254.9, 63], rot: [0, 0, -90],
+      door: [23280, -3368], doorWorld: '1a26f:Skyrim.esm' },
+    { key: 'solitude', name: 'the Temple of the Divines in Solitude', frame: 'tamriel',
+      desc: '16a02:Skyrim.esm', pos: [2769.2, 921.3, 288], rot: [0, 0, -90],
+      door: [-58079.7, 110488.4], doorWorld: '37edf:Skyrim.esm' },
+    { key: 'windhelm', name: 'the Temple of Talos in Windhelm', frame: 'tamriel',
+      desc: '16785:Skyrim.esm', pos: [-1, -1510, 149.8], rot: [0, 0, -180],
+      door: [133910.9, 38718.9], doorWorld: '1691d:Skyrim.esm' },
+    { key: 'markarth', name: 'the Temple of Dibella in Markarth', frame: 'tamriel',
+      desc: '16df3:Skyrim.esm', pos: [-1872, -1456, 64], rot: [0, 0, 0],
+      door: [-176816, 4500], doorWorld: '16d71:Skyrim.esm' },
+    { key: 'riften', name: 'the Temple of Mara in Riften', frame: 'tamriel',
+      desc: '16bd7:Skyrim.esm', pos: [-1408, -384, 68], rot: [0, 0, 0],
+      door: [176376, -97022], doorWorld: '16bb4:Skyrim.esm' },
+    { key: 'ravenrock', name: 'the temple in Raven Rock', frame: 'solstheim',
+      desc: '17ec3:Dragonborn.esm', pos: [1.4, -542.8, 0], rot: [0, 0, -1.28],
+      door: [32848.4, 35142], doorWorld: '800:Dragonborn.esm' }
+  ];
+  var FALLBACK = 'whiterun';
+
+  /*
+    Which maps share which coordinates. Tamriel (3c) and the five walled
+    cities, whose worldspaces are the doorWorld of the five mainland temples
+    above and are laid out in Tamriel's coordinates; and Solstheim, which is
+    not. Anything else has coordinates of its own and is never measured
+    against these.
+  */
+  var FRAME = {
+    '3c:skyrim.esm': 'tamriel', '1a26f:skyrim.esm': 'tamriel', '37edf:skyrim.esm': 'tamriel',
+    '1691d:skyrim.esm': 'tamriel', '16d71:skyrim.esm': 'tamriel', '16bb4:skyrim.esm': 'tamriel',
+    '800:dragonborn.esm': 'solstheim'
+  };
+  function frameOf(desc) { return FRAME[String(desc || '').toLowerCase()] || ''; }
+
+  // On globalThis, so a hot reload keeps the trails, the 5 minutes and any
+  // wait in progress. Keyed by character (actor id), which is what the
+  // 5 minutes are counted against; waits by profile, since a profile has
+  // one character in the world at a time.
+  if (!g.__thornswoodStuckState) { g.__thornswoodStuckState = { chars: {}, used: {}, waiting: {} }; }
+  var state = g.__thornswoodStuckState;
+
+  function slog() {
+    var a = ['stuck:'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    log(a.join(' '));
+  }
+  function tell(pid, text) {
+    var t = g.__thornswoodToProfile;
+    if (t && pid) { t(pid, text); }
+  }
+  function round1(n) { return Math.round((Number(n) || 0) * 10) / 10; }
+  function dist3(a, b) {
+    var dx = a[0] - b[0], dy = a[1] - b[1], dz = (a[2] || 0) - (b[2] || 0);
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+  function samePlace(a, b) {
+    return !!(a && b && a.desc === b.desc && dist3(a.pos, b.pos) < SAME_PLACE);
+  }
+  function hex(id) { return (Number(id) >>> 0).toString(16); }
+  function where(p) {
+    if (!p) { return 'somewhere unknown'; }
+    return p.desc + ' (' + round1(p.pos[0]) + ', ' + round1(p.pos[1]) + ', ' + round1(p.pos[2]) + ')';
+  }
+  function settings() {
+    try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
+  }
+  function serverName() {
+    return String(settings().thornswoodServer || '').trim().toLowerCase() || 'main';
+  }
+  function nameOf(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      var n = String((ap && ap.name) || '');
+      if (n) { return n.slice(0, 60); }
+    } catch (e) { }
+    return 'somebody';
+  }
+  function isDead(actorId) {
+    try { return !!mp.get(actorId, 'isDead'); } catch (e) { return false; }
+  }
+  function inCreation(actorId) {
+    try {
+      var cg = g.__thornswoodChargen;
+      return !!(cg && cg.inCreation && cg.inCreation(actorId));
+    } catch (e) { return false; }
+  }
+  function placeOf(actorId) {
+    try {
+      var desc = String(mp.get(actorId, 'worldOrCellDesc') || '');
+      var pos = mp.get(actorId, 'pos');
+      if (!desc || !pos) { return null; }
+      var rot = [0, 0, 0];
+      try { rot = (mp.get(actorId, 'angle') || [0, 0, 0]).slice(0, 3); } catch (e) { }
+      return { desc: desc, pos: [Number(pos[0]) || 0, Number(pos[1]) || 0, Number(pos[2]) || 0], rot: rot };
+    } catch (e) { return null; }
+  }
+  function health(actorId) {
+    try {
+      var p = mp.get(actorId, 'percentages');
+      var h = p ? Number(p.health) : NaN;
+      return isNaN(h) ? -1 : h;
+    } catch (e) { return -1; }
+  }
+  function charOf(actorId) {
+    var k = hex(actorId);
+    if (!state.chars[k]) { state.chars[k] = { trail: [], hp: -1, anim: '', fightAt: 0, last: null }; }
+    return state.chars[k];
+  }
+
+  /* The Discord account the join pass for this profile named, or ''. */
+  function accountOf(pid) {
+    var seen = g.__thornswoodPassSeen;
+    var p = seen && seen.passes ? seen.passes[pid] : null;
+    return (p && p.d) ? String(p.d) : '';
+  }
+
+  // ---------------------------------------------------------------- tick --
+  /* One character, once a second: the signs of a fight. */
+  function sample(actorId, now) {
+    var c = charOf(actorId);
+    var hp = health(actorId);
+    if (hp >= 0 && c.hp >= 0 && hp < c.hp - 0.001) { c.fightAt = now; }
+    if (hp >= 0) { c.hp = hp; }
+    var anim = '';
+    try { anim = String(mp.get(actorId, 'lastAnimEvent') || ''); } catch (e) { anim = ''; }
+    if (anim && anim !== c.anim && FIGHT_ANIM.test(anim)) { c.fightAt = now; }
+    c.anim = anim;
+  }
+
+  /* One character, every few seconds: the trail. */
+  function trailOne(actorId, now) {
+    var c = charOf(actorId);
+    if (isDead(actorId) || inCreation(actorId)) { c.last = null; return; }
+    var here = placeOf(actorId);
+    if (!here) { return; }
+    var falling = !!(c.last && c.last.desc === here.desc && c.last.pos[2] - here.pos[2] > FALL);
+    c.last = here;
+    if (falling) { return; }
+    var top = c.trail.length ? c.trail[c.trail.length - 1] : null;
+    if (top && top.desc === here.desc && dist3(top.pos, here.pos) < TRAIL_STEP) { return; }
+    here.at = now;
+    c.trail.push(here);
+    while (c.trail.length > TRAIL_KEEP) { c.trail.shift(); }
+  }
+
+  /*
+    Two timers, each making the same reads every time it runs: the fight signs
+    and any wait once a second, the trail every TRAIL_MS.
+  */
+  function trailTick() {
+    var now = Date.now();
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    for (var i = 0; i < online.length; i++) {
+      try { trailOne(online[i], now); } catch (e) { }
+    }
+  }
+
+  function tick() {
+    var now = Date.now();
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      here[hex(online[i])] = true;
+      try { sample(online[i], now); } catch (e) { }
+    }
+    // Somebody who left takes their trail with them; the 5 minutes stay.
+    for (var k in state.chars) {
+      if (Object.prototype.hasOwnProperty.call(state.chars, k) && !here[k]) { delete state.chars[k]; }
+    }
+    for (var u in state.used) {
+      if (Object.prototype.hasOwnProperty.call(state.used, u) && now - state.used[u].at >= REMEMBER_MS) {
+        delete state.used[u];
+      }
+    }
+    waitTick(now);
+  }
+
+  // ------------------------------------------------------------ where to --
+  /* The spot a few steps back, or null. */
+  function backSpot(actorId, here) {
+    var c = charOf(actorId);
+    var before = state.used[hex(actorId)];
+    // Still where the last /stuck put them: that spot is the stuck place.
+    if (before && before.to && samePlace(before.to, here)) { return null; }
+    for (var i = c.trail.length - 1; i >= 0; i--) {
+      var t = c.trail[i];
+      if (samePlace(t, here)) { continue; }
+      if (before && before.from && samePlace(t, before.from)) { continue; }
+      return t;
+    }
+    return null;
+  }
+
+  /* Where on a map this person is, for measuring: { frame, x, y } or null. */
+  function mapSpot(actorId, here) {
+    var f = frameOf(here.desc);
+    if (f) { return { frame: f, x: here.pos[0], y: here.pos[1] }; }
+    var c = charOf(actorId);
+    for (var i = c.trail.length - 1; i >= 0; i--) {
+      var tf = frameOf(c.trail[i].desc);
+      if (tf) { return { frame: tf, x: c.trail[i].pos[0], y: c.trail[i].pos[1] }; }
+    }
+    var hold = null;
+    try { hold = DATA.cellToHold[here.desc] || null; } catch (e) { hold = null; }
+    if (hold === 'DLC2SolstheimLocation') {
+      var rr = templeByKey('ravenrock');
+      return { frame: 'solstheim', x: rr.door[0], y: rr.door[1] };
+    }
+    var cap = null;
+    try { cap = hold ? DATA.capitals[hold] : null; } catch (e) { cap = null; }
+    if (cap && cap.pos) { return { frame: 'tamriel', x: cap.pos[0], y: cap.pos[1] }; }
+    return null;
+  }
+
+  function templeByKey(key) {
+    for (var i = 0; i < TEMPLES.length; i++) { if (TEMPLES[i].key === key) { return TEMPLES[i]; } }
+    return null;
+  }
+
+  function nearestTemple(spot) {
+    var best = null, bestD = Infinity;
+    if (spot) {
+      for (var i = 0; i < TEMPLES.length; i++) {
+        var t = TEMPLES[i];
+        if (t.frame !== spot.frame) { continue; }
+        var dx = t.door[0] - spot.x, dy = t.door[1] - spot.y;
+        var d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; best = t; }
+      }
+    }
+    return best || templeByKey(FALLBACK);
+  }
+
+  // ------------------------------------------------------------- record --
+  /*
+    One line in thornswood.log and one in moderation.log, the file the staff
+    block writes (#412) and the bot says in the staff channel. why is written
+    to be read after the person's name.
+  */
+  function record(pid, actorId, name, why, extra) {
+    var account = accountOf(pid);
+    var line = name + ' (profile ' + pid + ', character ' + hex(actorId) +
+               (account ? ', Discord ' + account : ', no join pass on hand') + ') ' + why;
+    slog(line);
+    if (!fs || !path) { return; }
+    var row = { at: new Date().toISOString(), server: serverName(), did: 'stuck',
+                by: pid, byName: name, who: pid, whoName: name,
+                character: hex(actorId), account: account,
+                why: String(why + ' Character ' + hex(actorId) +
+                            (account ? ', Discord ' + account : ', no join pass on hand') + '.').slice(0, 600) };
+    for (var k in extra) {
+      if (Object.prototype.hasOwnProperty.call(extra, k)) { row[k] = extra[k]; }
+    }
+    try {
+      fs.appendFileSync(path.join(String(settings().privDir || 'private'), 'moderation.log'),
+                        JSON.stringify(row) + '\n');
+    } catch (e) {
+      slog('could not write moderation.log, so the staff channel will not hear of it: ' + e);
+    }
+  }
+
+  var LOGGED = '/stuck is only for being truly stuck: every use is logged for staff, and ' +
+               'using it for anything else can mean a warning or a ban.';
+
+  function minutesLeft(ms) {
+    var m = Math.max(1, Math.ceil(ms / 60000));
+    return m === 1 ? 'a minute' : m + ' minutes';
+  }
+
+  // --------------------------------------------------------------- move --
+  function move(pid, actorId, now) {
+    var here = placeOf(actorId);
+    if (!here) {
+      tell(pid, 'The server cannot tell where you are right now, so /stuck did not move you. ' +
+                'Try again in a moment; /helpme reaches staff if it keeps saying this.');
+      slog('profile ' + pid + ' could not be placed, nothing moved');
+      return false;
+    }
+    var back = backSpot(actorId, here);
+    var dest, how, templeName = '';
+    if (back) {
+      dest = { desc: back.desc, pos: back.pos.slice(), rot: (back.rot || [0, 0, 0]).slice() };
+      how = 'trail';
+    } else {
+      var t = nearestTemple(mapSpot(actorId, here));
+      dest = { desc: t.desc, pos: t.pos.slice(), rot: t.rot.slice() };
+      how = 'temple';
+      templeName = t.name;
+    }
+    try {
+      mp.set(actorId, 'locationalData', { cellOrWorldDesc: dest.desc, pos: dest.pos, rot: dest.rot });
+    } catch (e) {
+      tell(pid, '/stuck could not move you (' + e + '). /helpme reaches staff, who can move you by hand.');
+      slog('profile ' + pid + ' could not be moved: ' + e);
+      return false;
+    }
+    state.used[hex(actorId)] = { at: now, from: here, to: dest };
+    var c = charOf(actorId);
+    c.last = null;
+    var name = nameOf(actorId);
+    var said = how === 'trail'
+      ? 'Sent back to where you were standing a moment ago.'
+      : 'No safe spot near you was known, so you were sent to ' + templeName + '.';
+    tell(pid, said + ' ' + LOGGED + ' You can use it again in 5 minutes.');
+    record(pid, actorId, name,
+           (how === 'trail' ? 'used /stuck and was sent back a few steps'
+                            : 'used /stuck and was sent to ' + templeName) +
+           ', from ' + where(here) + ' to ' + where(dest) + '.',
+           { result: how,
+             from: { desc: here.desc, pos: [round1(here.pos[0]), round1(here.pos[1]), round1(here.pos[2])] },
+             to: { desc: dest.desc, pos: [round1(dest.pos[0]), round1(dest.pos[1]), round1(dest.pos[2])] } });
+    return true;
+  }
+
+  // --------------------------------------------------------------- wait --
+  function cancel(pid, w, because, said) {
+    delete state.waiting[pid];
+    tell(pid, said);
+    record(pid, w.actorId, nameOf(w.actorId),
+           'used /stuck in a fight and the wait was cancelled because ' + because +
+           ', at ' + where(w.from) + '. Nobody was moved.',
+           { result: 'cancelled', because: because,
+             from: { desc: w.from.desc, pos: [round1(w.from.pos[0]), round1(w.from.pos[1]), round1(w.from.pos[2])] } });
+  }
+
+  function waitTick(now) {
+    for (var k in state.waiting) {
+      if (!Object.prototype.hasOwnProperty.call(state.waiting, k)) { continue; }
+      var pid = Number(k);
+      var w = state.waiting[k];
+      var still = 0;
+      try { still = Number(mp.get(w.actorId, 'profileId')) || 0; } catch (e) { still = 0; }
+      if (still !== pid) {
+        delete state.waiting[k];
+        slog('profile ' + pid + ' left during the /stuck wait, nothing moved');
+        continue;
+      }
+      if (isDead(w.actorId)) {
+        cancel(pid, w, 'they died',
+               '/stuck was cancelled because you died. You will wake at the nearest temple. ' +
+               'This use is logged for staff.');
+        continue;
+      }
+      var hp = health(w.actorId);
+      if (hp >= 0 && w.hp >= 0 && hp < w.hp - 0.001) {
+        cancel(pid, w, 'they were hit',
+               '/stuck was cancelled because you were hit. Get clear of the fight and try again. ' +
+               'This use is logged for staff.');
+        continue;
+      }
+      if (hp >= 0) { w.hp = hp; }
+      var here = placeOf(w.actorId);
+      if (here && (here.desc !== w.from.desc || dist3(here.pos, w.from.pos) > MOVE_SLACK)) {
+        cancel(pid, w, 'they moved',
+               '/stuck was cancelled because you moved. Stand still for the whole 15 seconds, ' +
+               'or walk out if you can. This use is logged for staff.');
+        continue;
+      }
+      if (now - w.at >= WAIT_MS) {
+        delete state.waiting[k];
+        move(pid, w.actorId, now);
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ command --
+  /* Called from handle() with the character already found. */
+  function command(pid, actorId, now) {
+    now = now || Date.now();
+    if (isDead(actorId)) {
+      tell(pid, 'You are dead, so /stuck cannot move you. You will wake at the nearest temple; ' +
+                'if you are stuck after that, use /stuck again.');
+      slog('profile ' + pid + ' refused: dead');
+      return;
+    }
+    if (inCreation(actorId)) {
+      tell(pid, '/stuck works once your character is made and in the world. Finish at the panel ' +
+                'and you will be sent to your town.');
+      slog('profile ' + pid + ' refused: still making the character');
+      return;
+    }
+    var frozen = g.__thornswoodStaffState && g.__thornswoodStaffState.frozen;
+    if (frozen && frozen[pid]) {
+      tell(pid, 'Staff have you frozen in place, so /stuck cannot move you. Wait here and ' +
+                'somebody will talk to you.');
+      slog('profile ' + pid + ' refused: frozen by staff');
+      return;
+    }
+    var w = state.waiting[pid];
+    if (w) {
+      tell(pid, 'Your /stuck is already counting down: ' +
+                Math.max(1, Math.ceil((WAIT_MS - (now - w.at)) / 1000)) + ' seconds left. ' +
+                'Stand still; being hit or moving cancels it.');
+      return;
+    }
+    var used = state.used[hex(actorId)];
+    if (used && now - used.at < AGAIN_MS) {
+      tell(pid, '/stuck works once every 5 minutes for each character. You can use it again in ' +
+                minutesLeft(used.at + AGAIN_MS - now) + '. If you cannot wait, /helpme reaches staff.');
+      slog('profile ' + pid + ' refused: used ' + Math.round((now - used.at) / 1000) + 's ago');
+      return;
+    }
+    var c = charOf(actorId);
+    if (c.fightAt && now - c.fightAt < FIGHT_MS) {
+      var from = placeOf(actorId);
+      if (!from) {
+        tell(pid, 'The server cannot tell where you are right now, so /stuck did not start. ' +
+                  'Try again in a moment.');
+        return;
+      }
+      state.waiting[pid] = { actorId: actorId, at: now, from: from, hp: health(actorId) };
+      tell(pid, 'You have been in a fight in the last 15 seconds, so /stuck waits 15 seconds ' +
+                'first. Stand still: being hit or moving cancels it. Every use is logged for staff.');
+      slog('profile ' + pid + ' started the 15 second wait at ' + where(from));
+      return;
+    }
+    move(pid, actorId, now);
+  }
+
+  g.__thornswoodStuck = {
+    command: command, tick: tick, trailTick: trailTick, sample: sample, backSpot: backSpot, mapSpot: mapSpot,
+    nearestTemple: nearestTemple, frameOf: frameOf, state: state, TEMPLES: TEMPLES,
+    AGAIN_MS: AGAIN_MS, WAIT_MS: WAIT_MS, FIGHT_MS: FIGHT_MS, TICK_MS: TICK_MS, TRAIL_MS: TRAIL_MS
+  };
+
+  if (g.__thornswoodStuckTimer) { try { clearInterval(g.__thornswoodStuckTimer); } catch (e) { } }
+  g.__thornswoodStuckTimer = setInterval(guard('stuckTick', tick), TICK_MS);
+  if (g.__thornswoodStuckTrailTimer) { try { clearInterval(g.__thornswoodStuckTrailTimer); } catch (e) { } }
+  g.__thornswoodStuckTrailTimer = setInterval(guard('stuckTrail', trailTick), TRAIL_MS);
+  log('stuck: ready, once every 5 minutes, a 15 second wait in a fight, logged for staff');
+})();
+// ==== end thornswood stuck ====
+
+// ==== thornswood staff ====
+/*
+  WHAT A MODERATOR CAN DO IN THE WORLD. Issue #412, "A moderator has no powers
+  in the game at all": a moderator watching somebody break a rule at midnight
+  had nothing to press but a Discord role the game never read.
+
+    /kick <person> [why]          ends their session, a few seconds after telling them
+    /freeze <person> [why]        holds them where they stand, across a reconnect
+    /unfreeze <person>            lets them go
+    /bring <person>               moves them to you
+    /goto <person>                moves you to them (/goto <place> is still the place teleport)
+    /silence <person> [minutes] [why]   nothing they type reaches anybody; 30 minutes unless said
+    /unsilence <person>           lets them speak again
+    /warn <person> <why>          tells them, in their chat, that staff have warned them
+    /give <person> <item> [count]         puts it in their pack
+    /spawn <creature> [count] on <person> and /spawnat <person> <creature> [count]
+                                  puts it beside them
+    /tp <person> <place or person>        sends them there
+
+  The last three were asked for by Patrick on 28 September. They reuse the
+  lookups /give, /spawn and /tp already have (every named item, every named
+  actor, every town and named building, or a form id), handed in by handle().
+  /give, /spawn and /tp that name no person are left to those branches, which
+  is how a playtester's /give iron ore still works.
+
+    /ban <person> <how long> <why>        this one character: 30m, 2h, 3d, 1w, or forever
+    /unban <person>                       lifts the ban on this character
+    /banaccount <person> <how long> <why> the whole Discord account: every character
+                                          on it, and any new one
+    /unbanaccount <person>                lifts the ban on the account
+    /pk <person> <why>                    the character dies for good (#1010)
+    /unpk <person or character> <why>     an admin undoes a PK made by mistake
+    /note <person> <text>                 kept against them, for staff to read
+
+  One character or the whole account, and PK, are Patrick's of 28 September
+  (#1010). A PK is not a ban: the character can never be played or picked
+  again, it is kept rather than deleted so staff can use it in events, the
+  account can make a new character, and it is quiet: only the staff member
+  and the person whose character it was are told, nobody else.
+
+  /unpk is Patrick's of 29 September: the admin role only, never the other
+  staff roles, with a reason. The dead character is not in the world, so the
+  site finds it (a profile number, the start of its name, or its owner, by
+  name or in the world). It comes back into a free slot on its account, and
+  when every slot is taken the site says so and nothing changes. The PK
+  stays on the site's record with the undo beside it.
+
+  Bans and notes are kept on the site (Patrick, 28 September: "put the bans
+  and notes on the site"), through its keyed /api/staff/game routes with the
+  door's key, the way /report reaches it. The site leaves a banned person out
+  of the door's list and sends the bans with why and until; the sweep below
+  ends the session of anybody banned who is online, whenever the ban was
+  made, and tells them both. A ban made here also ends their session at once.
+  A person for these can be a profile number, so somebody who has left can
+  still be banned or noted.
+
+  A person is a name (the start of it is enough while it is unique), the form
+  id the crosshair gives, or a profile number. Every one answers the moderator
+  in their own chat, tells the person it was done to, writes one line to
+  thornswood.log, and writes one line to private/moderation.log, which the
+  Discord bot reads and says in the staff channel (bot.py, watch_moderation),
+  so there is a record outside the game that a hot reload cannot lose.
+
+  WHO MAY. The staff roles: handle() passes isStaff, which is isDev, which is
+  the site's access.dev roles (Owner, Dev, Gamemaster, Moderator, Loremaster)
+  by way of devProfiles in allowed.json, plus the admins and the written
+  thornswoodDevs list. Anybody else is told "That one is not yours to run."
+
+  WHO IS ASKING, which is the part that makes this safe to ship. The profile id
+  a command arrives under is what the voice relay says, and on its own that is
+  a claim. So a staff command also needs both of:
+    - proven: the voice service checked this connection's join token, and says
+      so on every queued command (voice-server.js, commands.push);
+    - the join pass (#937, #943): a valid pass for this profile, from an up to
+      date launcher, is on hand right now. The site signs one only for the
+      account that owns the character.
+  Either missing and the command is refused with a sentence that says which.
+  No fallback for a launcher or plugin that sends no pass: that is the
+  standing rule, and here it is also the security one.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  var fs = null, path = null, http = null;
+  try { fs = require('fs'); path = require('path'); http = require('http'); } catch (e) { }
+
+  var WORDS_STAFF = ['/kick', '/freeze', '/unfreeze', '/bring', '/goto',
+                     '/silence', '/unsilence', '/warn', '/spawnat',
+                     '/ban', '/unban', '/note', '/banaccount', '/unbanaccount', '/pk', '/unpk'];
+  var BAN_SWEEP_MS = 10000;        // how often online people are checked against bans
+  var SITE_WAIT_MS = 8000;
+  // Everybody's (or a playtester's) words that staff can also aim at a person.
+  var AIMED = ['/give', '/spawn', '/tp'];
+  var GIVE_MOST = 100000;           // the same caps as /give and /spawn
+  var SPAWN_MOST = 40;
+  var SPAWN_AWAY = 150;             // units from the person, so it is beside them
+  var REFUSED = 'That one is not yours to run.';
+  // What a silenced person cannot say through the game server. Plain lines,
+  // /me, /do, /w and /s are held back by the voice service itself.
+  var SILENCED_WORDS = ['/ooc', '/o', '/roll', '/r'];
+  var KICK_AFTER_MS = 4000;         // long enough to read the line first
+  var FREEZE_EVERY_MS = 1000;
+  var FREEZE_SLACK = 64;            // units, a little under a metre
+  var FREEZE_SAY_EVERY_MS = 30000;
+  var SILENCE_DEFAULT_MIN = 30;
+  var SILENCE_MAX_MIN = 24 * 60;
+  var SILENCE_PUSH_MS = 30000;      // the voice service is told again this often
+
+  // On globalThis, so a hot reload keeps who is frozen and who is silenced.
+  if (!g.__thornswoodStaffState) { g.__thornswoodStaffState = { frozen: {}, silenced: {} }; }
+  var state = g.__thornswoodStaffState;
+  // Bans made here, until the door's next list carries them; and who is
+  // already on their way out, so the sweep tells them once.
+  if (!state.banned) { state.banned = {}; }
+  if (!state.ending) { state.ending = {}; }
+  // Characters killed for good here (#1010), until the door's list carries them.
+  if (!state.pk) { state.pk = {}; }
+  // PKs an admin undid here, so the door's older list does not end them again.
+  if (!state.unpk) { state.unpk = {}; }
+  // Bans lifted here, so the door's list, which can carry a lifted ban for up
+  // to its five minute refresh, does not end their session again meanwhile.
+  if (!state.lifted) { state.lifted = {}; }
+
+  function settings() {
+    try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
+  }
+  function serverName() {
+    return String(settings().thornswoodServer || '').trim().toLowerCase() || 'main';
+  }
+  function recordFile() {
+    return path ? path.join(String(settings().privDir || 'private'), 'moderation.log') : '';
+  }
+
+  function tell(pid, text) {
+    var t = g.__thornswoodToProfile;
+    if (t && pid) { t(pid, text); }
+  }
+
+  function online() {
+    try { return mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+  }
+  function profileOf(actorId) {
+    try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+  }
+  function nameOf(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      var n = String((ap && ap.name) || '');
+      if (n) { return n; }
+    } catch (e) { }
+    return 'somebody';
+  }
+  function actorFor(pid) {
+    var all = online();
+    for (var i = 0; i < all.length; i++) {
+      if (profileOf(all[i]) === pid) { return all[i]; }
+    }
+    return 0;
+  }
+
+  /*
+    Somebody, by what the moderator typed. A profile number first, because it
+    is exact and works for somebody who has left (for /unsilence); then the
+    social block's finder, the same one the friend and trade keys use (a form
+    id, or a name or the start of one).
+  */
+  function find(want) {
+    want = String(want || '').trim();
+    if (!want) { return { actorId: 0, pid: 0, why: 'Who?' }; }
+    if (/^\d{3,}$/.test(want)) {
+      var n = Number(want);
+      var a = actorFor(n);
+      if (a) { return { actorId: a, pid: n, name: nameOf(a), why: '' }; }
+    }
+    var soc = g.__thornswoodSocial;
+    var hit = (soc && soc.findPerson) ? soc.findPerson(want)
+                                      : { actorId: 0, why: 'Nobody here by that name.' };
+    if (hit && hit.actorId) {
+      return { actorId: hit.actorId, pid: profileOf(hit.actorId), name: nameOf(hit.actorId), why: '' };
+    }
+    if (/^\d{3,}$/.test(want)) {
+      return { actorId: 0, pid: Number(want), name: 'profile ' + want, why: 'Profile ' + want + ' is not in the world.' };
+    }
+    return { actorId: 0, pid: 0, why: (hit && hit.why) || 'Nobody here by that name.' };
+  }
+
+  /* The longest run of words from the front that names exactly one person,
+     so "Bjorn Iron-Hand spamming" finds Bjorn Iron-Hand and leaves "spamming". */
+  function takePerson(words) {
+    var first = null;
+    for (var n = words.length; n >= 1; n--) {
+      var r = find(words.slice(0, n).join(' '));
+      if (r.actorId) { r.rest = words.slice(n); return r; }
+      if (n === 1) { first = r; }
+    }
+    first = first || { actorId: 0, pid: 0, why: 'Who?' };
+    first.rest = words.slice(1);
+    return first;
+  }
+
+  /*
+    Whether the one asking has proved who they are, or the reason they have
+    not. See WHO IS ASKING above.
+  */
+  function unproven(cmd, pid) {
+    if (!cmd || cmd.proven !== true) {
+      return 'Staff commands need the chat to have proved who you are, and this ' +
+             'connection has not. Close the game, open the Thornswood launcher and ' +
+             'press Play.';
+    }
+    var seen = g.__thornswoodPassSeen;
+    var p = seen && seen.passes ? seen.passes[pid] : null;
+    if (!p || !(Number(p.x) > Date.now())) {
+      return 'Staff commands need your launcher\'s pass, and the server has none for ' +
+             'you right now. Leave the Thornswood launcher open while you play; if it ' +
+             'still says this in a minute, restart the game from the launcher.';
+    }
+    return '';
+  }
+
+  /* One line in thornswood.log and one in moderation.log for the bot. */
+  function record(did, by, byName, who, whoName, why, minutes) {
+    log('staff: ' + byName + ' (profile ' + by + ') ' + did + ' ' + whoName +
+        ' (profile ' + who + ')' + (minutes ? ' for ' + minutes + ' minutes' : '') +
+        (why ? ': ' + why : ''));
+    if (!fs) { return; }
+    var row = { at: new Date().toISOString(), server: serverName(), did: did,
+                by: by, byName: byName, who: who, whoName: whoName,
+                why: String(why || '').slice(0, 300) };
+    if (minutes) { row.minutes = minutes; }
+    try {
+      fs.appendFileSync(recordFile(), JSON.stringify(row) + '\n');
+    } catch (e) {
+      log('staff: could not write ' + recordFile() + ', so the staff channel will not hear of it: ' + e);
+    }
+  }
+
+  function placeOf(actorId) {
+    try {
+      return { desc: String(mp.get(actorId, 'worldOrCellDesc') || ''),
+               pos: (mp.get(actorId, 'pos') || [0, 0, 0]).slice(0, 3),
+               rot: (mp.get(actorId, 'angle') || [0, 0, 0]).slice(0, 3) };
+    } catch (e) { return null; }
+  }
+  function moveTo(actorId, where) {
+    mp.set(actorId, 'locationalData', { cellOrWorldDesc: where.desc, pos: where.pos, rot: where.rot });
+  }
+
+  // ------------------------------------------------------------ silence --
+  function silencedFor(pid) {
+    var s = state.silenced[pid];
+    if (!s) { return 0; }
+    if (Date.now() >= s.until) { delete state.silenced[pid]; pushSilenced(); return 0; }
+    return Math.max(1, Math.ceil((s.until - Date.now()) / 60000));
+  }
+
+  /* The whole list to the voice service, which holds back their lines. */
+  function pushSilenced() {
+    if (!http) { return; }
+    var now = Date.now();
+    var list = {};
+    for (var k in state.silenced) {
+      if (!Object.prototype.hasOwnProperty.call(state.silenced, k)) { continue; }
+      if (state.silenced[k].until > now) { list[k] = state.silenced[k].until; }
+      else { delete state.silenced[k]; }
+    }
+    var body = JSON.stringify({ profiles: list });
+    try {
+      var req = http.request({
+        host: '127.0.0.1', port: voicePort(), path: '/silenced', method: 'POST', timeout: 2000,
+        headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }
+      }, function (res) { try { res.resume(); } catch (e) { } });
+      req.on('error', function () { });
+      req.on('timeout', function () { req.destroy(); });
+      req.end(body);
+    } catch (e) { }
+  }
+
+  // ------------------------------------------------------------- freeze --
+  /* Anybody frozen who has moved is put back. Kept by profile, so leaving and
+     coming back does not undo it. */
+  function freezeTick() {
+    var now = Date.now();
+    for (var k in state.frozen) {
+      if (!Object.prototype.hasOwnProperty.call(state.frozen, k)) { continue; }
+      var f = state.frozen[k];
+      var a = actorFor(Number(k));
+      if (!a) { continue; }
+      var here = placeOf(a);
+      if (!here) { continue; }
+      var dx = here.pos[0] - f.pos[0], dy = here.pos[1] - f.pos[1], dz = here.pos[2] - f.pos[2];
+      if (here.desc === f.desc && dx * dx + dy * dy + dz * dz <= FREEZE_SLACK * FREEZE_SLACK) { continue; }
+      try { moveTo(a, f); } catch (e) { continue; }
+      if (!f.saidAt || now - f.saidAt >= FREEZE_SAY_EVERY_MS) {
+        f.saidAt = now;
+        tell(Number(k), 'Staff have you frozen in place. Wait here and somebody will talk to you.');
+      }
+    }
+  }
+
+  // ---------------------------------------- give, spawn and tp at a person --
+  /* A count as the last word, only when it is a number with something before it. */
+  function countOff(words) {
+    if (words.length > 1 && /^\d+$/.test(words[words.length - 1])) {
+      return { words: words.slice(0, words.length - 1), count: Number(words[words.length - 1]) };
+    }
+    return { words: words, count: 1 };
+  }
+  function lower(ws) { return ws.join(' ').trim().toLowerCase(); }
+
+  /*
+    What an aimed line asks for, or null when it names no person, which leaves
+    it to handle(): "/give iron ore" is a playtester's own /give, "/tp whiterun"
+    their own /tp.
+  */
+  function aimed(word, words) {
+    if (word === '/give' || word === '/spawnat') {
+      var p = takePerson(words);
+      if (!p.actorId || !p.rest.length) { return word === '/spawnat' ? { kind: 'spawn', them: p, want: '' } : null; }
+      var c = countOff(p.rest);
+      return { kind: word === '/give' ? 'give' : 'spawn', them: p, want: lower(c.words), count: c.count };
+    }
+    if (word === '/spawn') {
+      var at = -1;
+      for (var i = words.length - 2; i >= 1; i--) {
+        if (String(words[i]).toLowerCase() === 'on') { at = i; break; }
+      }
+      if (at < 0) { return null; }
+      var who = takePerson(words.slice(at + 1));
+      if (!who.actorId) { return null; }
+      var left = countOff(words.slice(0, at));
+      var n = left.count;
+      if (who.rest.length === 1 && /^\d+$/.test(who.rest[0])) { n = Number(who.rest[0]); }
+      else if (who.rest.length) { return null; }
+      return { kind: 'spawn', them: who, want: lower(left.words), count: n };
+    }
+    if (word === '/tp') {
+      var t = takePerson(words);
+      if (!t.actorId || !t.rest.length) { return null; }
+      return { kind: 'tp', them: t, to: t.rest };
+    }
+    return null;
+  }
+
+  /* Places a creature beside where, spread round them. The new reference from
+     mp.place(base) and then a locationalData move, because createActor's first
+     argument is the id the NEW actor gets, not the record to make it from. */
+  function spawnBeside(baseId, where, count) {
+    // The one placing /spawn uses too, so a fix to it reaches both (#959).
+    return placeActors(baseId, where, count, SPAWN_AWAY);
+  }
+
+  function doAimed(a, pid, actorId, me, look) {
+    var them = a.them;
+    if (!them.actorId) { tell(pid, them.why); return true; }
+
+    if (a.kind === 'give') {
+      var hit = look.findThing(a.want);
+      if (!hit.desc && look.byFormId) { hit = look.byFormId(a.want) || hit; }
+      if (!hit.desc) { tell(pid, hit.why); return true; }
+      var n = Math.min(a.count, GIVE_MOST);
+      if (!addItem(them.actorId, hit.desc, n)) {
+        tell(pid, hit.name + ' is named in this server\'s tables but its plugin is not in the load order, so there is nothing to give.');
+        return true;
+      }
+      tell(pid, 'Gave ' + them.name + ' ' + n + ' ' + hit.name + '.');
+      if (them.pid !== pid) { tell(them.pid, 'Staff gave you ' + n + ' ' + hit.name + '.'); }
+      record('give', pid, me, them.pid, them.name, n + ' ' + hit.name, 0);
+      return true;
+    }
+
+    if (a.kind === 'spawn') {
+      if (!a.want) {
+        tell(pid, 'Spawn what? /spawnat ' + them.name + ' troll, or /spawn troll 3 on ' + them.name + '.');
+        return true;
+      }
+      var beast = look.findBeast(a.want);
+      if (!beast.desc && look.byFormId) { beast = look.byFormId(a.want) || beast; }
+      if (!beast.desc) { tell(pid, beast.why); return true; }
+      var baseId = idOf(beast.desc);
+      if (!baseId) { tell(pid, beast.name + '\'s plugin is not in this load order.'); return true; }
+      var spot = placeOf(them.actorId);
+      if (!spot || !spot.desc) { tell(pid, 'The server cannot tell where ' + them.name + ' is right now. Try again.'); return true; }
+      var r = spawnBeside(baseId, spot, Math.min(a.count, SPAWN_MOST));
+      if (!r.made) {
+        tell(pid, 'Nothing was spawned beside ' + them.name + ': ' + (r.why || 'the server would not place it') + '.');
+        log('staff: spawning ' + beast.name + ' beside ' + them.name + ' failed: ' + r.why);
+        return true;
+      }
+      tell(pid, 'Spawned ' + r.made + ' ' + beast.name + ' beside ' + them.name + '.');
+      if (them.pid !== pid) { tell(them.pid, 'Staff put ' + r.made + ' ' + beast.name + ' beside you.'); }
+      record('spawn', pid, me, them.pid, them.name, r.made + ' ' + beast.name, 0);
+      return true;
+    }
+
+    // tp: another person first, then /tp's own places.
+    var dp = takePerson(a.to);
+    var dest = null, destName = '';
+    if (dp.actorId && !dp.rest.length) {
+      dest = placeOf(dp.actorId);
+      destName = dp.name;
+    } else {
+      var fp = look.findPlace(lower(a.to));
+      if (!fp.where) { tell(pid, fp.why); return true; }
+      dest = { desc: fp.where.desc, pos: fp.where.pos, rot: fp.where.rot || [0, 0, 0] };
+      destName = fp.where.town;
+    }
+    if (!dest || !dest.desc) { tell(pid, 'The server cannot tell where that is right now. Try again.'); return true; }
+    try { moveTo(them.actorId, dest); } catch (e) { tell(pid, 'That did not work: ' + e); return true; }
+    if (state.frozen[them.pid]) {
+      state.frozen[them.pid] = { desc: dest.desc, pos: dest.pos.slice(0, 3), rot: dest.rot.slice(0, 3), by: state.frozen[them.pid].by };
+    }
+    tell(pid, 'Sent ' + them.name + ' to ' + destName + '.');
+    if (them.pid !== pid) { tell(them.pid, 'Staff sent you to ' + destName + '.'); }
+    record('tp', pid, me, them.pid, them.name, 'to ' + destName, 0);
+    return true;
+  }
+
+  // ------------------------------------------------------ bans and notes --
+  /*
+    One keyed call to the site's /api/staff/game/<what>. done(true, answer)
+    on a 200, done(false, why, answer) for anything else, once; the answer
+    is null when there was none, and its message, when there is one, is a
+    sentence for the staff member (/unpk's). The key goes in a
+    header and never the address, like the door's own fetch; door.json names
+    the site with /dev on the end on the dev server.
+  */
+  function siteCall(what, row, done) {
+    var once = false;
+    function end(ok, v, j) { if (!once) { once = true; done(ok, v, j || null); } }
+    var conf = null;
+    try {
+      conf = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'door.json'), 'utf8')
+                          .replace(/^﻿/, ''));
+    } catch (e) { conf = null; }
+    if (!conf || !conf.site || !conf.key) { end(false, 'this server has no door.json naming the site'); return; }
+    var url;
+    try { url = new URL(String(conf.site).replace(/\/+$/, '') + '/api/staff/game/' + what); }
+    catch (e) { end(false, 'the site address in door.json is not an address'); return; }
+    var lib;
+    try { lib = require(url.protocol === 'http:' ? 'http' : 'https'); } catch (e) { end(false, 'no ' + url.protocol); return; }
+    var body = JSON.stringify(row);
+    var req;
+    try {
+      req = lib.request(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body),
+                   'X-Thornswood-Key': String(conf.key) }
+      }, function (resp) {
+        var buf = '';
+        resp.on('data', function (d) { buf += d; });
+        resp.on('end', function () {
+          var j = null;
+          try { j = JSON.parse(buf); } catch (e) { j = null; }
+          if (resp.statusCode === 200 && j && j.ok) { end(true, j); return; }
+          end(false, 'the site answered ' + resp.statusCode + (j && j.error ? ' (' + j.error + ')' : ''), j);
+        });
+      });
+    } catch (e) { end(false, String((e && e.message) || e)); return; }
+    req.on('error', function (e) { end(false, String((e && e.message) || e)); });
+    try { req.setTimeout(SITE_WAIT_MS, function () { req.destroy(); end(false, 'the site took too long'); }); } catch (e) { }
+    req.end(body);
+  }
+
+  /* "30m", "2h", "3d", "1w", a bare number of minutes, or "forever": minutes,
+     0 for good, or -1 when it is none of those. */
+  function banLength(word) {
+    var w = String(word || '').toLowerCase();
+    if (w === 'forever' || w === 'perm' || w === 'permanent' || w === 'permanently') { return 0; }
+    var m = /^(\d+)(m|min|mins|h|hr|hrs|d|day|days|w|wk|wks)?$/.exec(w);
+    if (!m || !(Number(m[1]) > 0)) { return -1; }
+    var u = (m[2] || 'm').charAt(0);
+    return Number(m[1]) * (u === 'h' ? 60 : u === 'd' ? 1440 : u === 'w' ? 10080 : 1);
+  }
+  function untilText(until) {
+    if (!(Number(until) > 0)) { return 'for good'; }
+    return 'until ' + new Date(Number(until)).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+  }
+
+  /* Every active ban the door's last list carried, and the ones made here since. */
+  var bansRead = { at: 0, list: [], pk: [] };
+  function readDoor(now) {
+    if (now - bansRead.at < BAN_SWEEP_MS) { return; }
+    bansRead.at = now;
+    var list = [], pk = [], written = 0;
+    try {
+      var doc = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'allowed.json'), 'utf8')
+                             .replace(/^﻿/, ''));
+      if (doc && Array.isArray(doc.bans)) { list = doc.bans; }
+      if (doc && Array.isArray(doc.pk)) { pk = doc.pk; }
+      written = Date.parse(String((doc && doc.at) || '')) || 0;
+    } catch (e) { list = []; pk = []; }
+    bansRead.list = list;
+    bansRead.pk = pk;
+    bansRead.written = written;
+    // A lift the door's list has caught up with needs remembering no longer.
+    for (var k in state.lifted) {
+      if (Object.prototype.hasOwnProperty.call(state.lifted, k) && written > state.lifted[k].at) { delete state.lifted[k]; }
+    }
+    // The same for a PK made or undone here: once the list is newer it says
+    // which holds, so a PK an admin undid on the site stops counting here too.
+    for (var p in state.pk) {
+      if (Object.prototype.hasOwnProperty.call(state.pk, p) && written > (Number(state.pk[p].at) || 0)) { delete state.pk[p]; }
+    }
+    for (var u in state.unpk) {
+      if (Object.prototype.hasOwnProperty.call(state.unpk, u) && written > state.unpk[u].at) { delete state.unpk[u]; }
+    }
+  }
+  /* Every character killed for good (#1010): the door's list and this server's own. */
+  function pkNow(now) {
+    readDoor(now);
+    var out = {};
+    for (var i = 0; i < bansRead.pk.length; i++) {
+      var d = Number(bansRead.pk[i]);
+      if (d > 0 && !(state.unpk[d] && state.unpk[d].at >= (bansRead.written || 0))) { out[d] = true; }
+    }
+    for (var k in state.pk) {
+      if (Object.prototype.hasOwnProperty.call(state.pk, k)) { out[Number(k)] = true; }
+    }
+    return out;
+  }
+  function bansNow(now) {
+    readDoor(now);
+    var out = {};
+    for (var i = 0; i < bansRead.list.length; i++) {
+      var b = bansRead.list[i] || {};
+      var until = Number(b.until) || 0;
+      if (until && until <= now) { continue; }
+      var ps = Array.isArray(b.profiles) ? b.profiles : [];
+      var scope = String(b.scope || 'account');
+      for (var j = 0; j < ps.length; j++) {
+        var p = Number(ps[j]);
+        if (!(p > 0)) { continue; }
+        var lift = state.lifted[p];
+        if (lift && lift.scope === scope && lift.at >= (bansRead.written || 0)) { continue; }
+        // A ban on the whole account says more than one on the character.
+        if (out[p] && out[p].scope === 'account') { continue; }
+        out[p] = { why: String(b.why || ''), until: until, scope: scope };
+      }
+    }
+    for (var k in state.banned) {
+      if (!Object.prototype.hasOwnProperty.call(state.banned, k)) { continue; }
+      var s = state.banned[k];
+      if (s.until && s.until <= now) { delete state.banned[k]; continue; }
+      out[Number(k)] = s;
+    }
+    return out;
+  }
+
+  /* Tell them why and until when, then end the session a few seconds later. */
+  function endBanned(pid, actorId, ban, now) {
+    if (state.ending[pid] && now - state.ending[pid] < 60000) { return; }
+    state.ending[pid] = now;
+    if (ban.scope === 'character') {
+      tell(pid, 'Staff have banned this character ' + untilText(ban.until) +
+                (ban.why ? ': ' + ban.why : '') + '. Your session is being ended. ' +
+                'You can still play your other characters.');
+    } else {
+      tell(pid, 'You are banned from Thornswood ' + untilText(ban.until) +
+                (ban.why ? ': ' + ban.why : '') + '. Your session is being ended.');
+    }
+    log('staff: ending the session of profile ' + pid + ', ' +
+        (ban.scope === 'character' ? 'character ' : '') + 'banned ' + untilText(ban.until));
+    endLater(pid, actorId);
+  }
+  function endLater(pid, actorId) {
+    setTimeout(function () {
+      var userId = -1;
+      try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
+      if (userId === undefined || userId === null || userId < 0) { return; }
+      try { mp.kick(userId); } catch (e) { log('staff: could not end the session of profile ' + pid + ': ' + e); }
+    }, KICK_AFTER_MS);
+  }
+
+  /* A character killed for good (#1010): only the one playing it is told,
+     and the session ends. Nothing is said to anybody else. */
+  function endPk(pid, actorId, now) {
+    if (state.ending[pid] && now - state.ending[pid] < 60000) { return; }
+    state.ending[pid] = now;
+    tell(pid, 'This character has died for good and cannot be played again. Your session is ' +
+              'being ended. Press Play in the launcher to pick another character or make a new one.');
+    log('staff: ending the session of profile ' + pid + ', whose character is dead for good');
+    endLater(pid, actorId);
+  }
+
+  /* Anybody banned or dead for good who is online, whoever did it and wherever. */
+  function banSweep() {
+    var now = Date.now();
+    var bans = bansNow(now);
+    var dead = pkNow(now);
+    var all = online();
+    for (var i = 0; i < all.length; i++) {
+      var pid = profileOf(all[i]);
+      if (pid && dead[pid]) { endPk(pid, all[i], now); }
+      else if (pid && bans[pid]) { endBanned(pid, all[i], bans[pid], now); }
+    }
+  }
+
+  function banOrNote(word, words, pid, me, them) {
+    if (!them.pid) { tell(pid, them.why); return true; }
+    var rest = them.rest || [];
+    if (word === '/ban' || word === '/banaccount') {
+      var whole = word === '/banaccount';
+      if (them.pid === pid) { tell(pid, 'That is you.'); return true; }
+      var minutes = banLength(rest[0]);
+      var why = rest.slice(1).join(' ').trim();
+      if (minutes < 0 || !why) {
+        tell(pid, 'Say how long and why: ' + word + ' ' + them.name + ' 3d spamming the market. ' +
+                  'How long is 30m, 2h, 3d, 1w or forever. ' +
+                  (whole ? '/banaccount bans every character on their account; /ban bans only this one.'
+                         : '/ban bans only this character; /banaccount bans every character on their account.'));
+        return true;
+      }
+      siteCall(whole ? 'banaccount' : 'ban', { profileId: them.pid, name: them.name, byProfileId: pid, byName: me,
+                                              why: why, minutes: minutes }, function (ok, v) {
+        if (!ok) { tell(pid, 'The site did not take the ban, so nothing changed: ' + v + '.'); return; }
+        var until = Number(v.until) || 0;
+        var covers = whole && Array.isArray(v.profiles) && v.profiles.length ? v.profiles : [them.pid];
+        var ban = { why: why, until: until, scope: whole ? 'account' : 'character' };
+        var now = Date.now();
+        for (var i = 0; i < covers.length; i++) {
+          var p = Number(covers[i]);
+          if (!(p > 0)) { continue; }
+          state.banned[p] = ban;
+          delete state.lifted[p];
+          var a = (p === them.pid && them.actorId) || actorFor(p);
+          if (a) { endBanned(p, a, ban, now); }
+        }
+        tell(pid, whole
+          ? ('Banned ' + them.name + '\'s whole account, every character on it and any new one, ' + untilText(until) + '.')
+          : ('Banned the character ' + them.name + ' ' + untilText(until) + '. Their other characters can still play.'));
+        if (whole) { record('banaccount', pid, me, them.pid, them.name, untilText(until) + ': ' + why, 0); }
+        else { record('ban', pid, me, them.pid, them.name, untilText(until) + ': ' + why, 0); }
+      });
+      return true;
+    }
+    if (word === '/unban' || word === '/unbanaccount') {
+      var wholeU = word === '/unbanaccount';
+      siteCall(wholeU ? 'unbanaccount' : 'unban', { profileId: them.pid, name: them.name, byProfileId: pid, byName: me },
+        function (ok, v) {
+          if (!ok) { tell(pid, 'The site did not take that, so nothing changed: ' + v + '.'); return; }
+          var now = Date.now();
+          var covers = wholeU && Array.isArray(v.profiles) && v.profiles.length ? v.profiles : [them.pid];
+          for (var i = 0; i < covers.length; i++) {
+            var p = Number(covers[i]);
+            var had = state.banned[p];
+            if (had && (had.scope || 'account') === (wholeU ? 'account' : 'character')) { delete state.banned[p]; }
+            delete state.ending[p];
+            // The door's list can still carry it for a few minutes.
+            if (v.was) { state.lifted[p] = { at: now, scope: wholeU ? 'account' : 'character' }; }
+          }
+          if (wholeU) {
+            tell(pid, v.was ? ('The ban on ' + them.name + '\'s account is lifted.') : (them.name + '\'s account was not banned.'));
+          } else {
+            tell(pid, v.was ? ('The ban on the character ' + them.name + ' is lifted.') : ('The character ' + them.name + ' was not banned.'));
+          }
+          if (v.was && wholeU) { record('unbanaccount', pid, me, them.pid, them.name, '', 0); }
+          else if (v.was) { record('unban', pid, me, them.pid, them.name, '', 0); }
+        });
+      return true;
+    }
+    if (word === '/pk') {
+      if (them.pid === pid) { tell(pid, 'That is you.'); return true; }
+      var whyPk = rest.join(' ').trim();
+      if (!whyPk) {
+        tell(pid, 'Say why: /pk ' + them.name + ' died in the siege of Whiterun. The character dies for good ' +
+                  'and can never be played again; it is kept for staff, and nobody else is told.');
+        return true;
+      }
+      siteCall('pk', { profileId: them.pid, name: them.name, byProfileId: pid, byName: me, why: whyPk },
+        function (ok, v) {
+          if (!ok) { tell(pid, 'The site did not take the PK, so nothing changed: ' + v + '.'); return; }
+          state.pk[them.pid] = { at: Number(v.at) || Date.now() };
+          if (v.was) { tell(pid, them.name + ' was already dead for good.'); return; }
+          tell(pid, them.name + ' is dead for good. The character is kept for staff and can never be played ' +
+                    'again; their account can make a new one. Nobody else was told.');
+          record('pk', pid, me, them.pid, them.name, whyPk, 0);
+          var a = them.actorId || actorFor(them.pid);
+          if (a) { endPk(them.pid, a, Date.now()); }
+        });
+      return true;
+    }
+    var text = rest.join(' ').trim();
+    if (!text) { tell(pid, 'Note what? /note ' + them.name + ' <what staff should know>.'); return true; }
+    siteCall('note', { profileId: them.pid, name: them.name, byProfileId: pid, byName: me, text: text },
+      function (ok, v) {
+        if (!ok) { tell(pid, 'The site did not keep the note: ' + v + '.'); return; }
+        tell(pid, 'Noted against ' + them.name + '. Staff see it on the site.');
+        record('note', pid, me, them.pid, them.name, text, 0);
+      });
+    return true;
+  }
+
+  /*
+    /unpk <person or character> <why> (#1010, Patrick, 29 September): an
+    admin undoes a PK made by mistake. The admin role only; the site asks
+    Discord again and refuses anybody else with the same line. The dead
+    character is not in the world, so a profile number or a person in the
+    world is sent as that, and anything else as the words, for the site to
+    find by the dead character's name or its owner's.
+  */
+  var ONLY_ADMIN = 'Only an admin can undo a PK.';
+  function unpk(words, pid, me) {
+    var adm = g.__thornswoodIsAdmin;
+    var isAdm = true;
+    try { if (typeof adm === 'function') { isAdm = !!adm(pid); } } catch (e) { isAdm = false; }
+    if (!isAdm) {
+      tell(pid, ONLY_ADMIN);
+      log('staff: /unpk refused profile ' + pid + ', who is staff but not an admin');
+      return true;
+    }
+    var row = { byProfileId: pid, byName: me };
+    var why = '';
+    if (/^\d{3,}$/.test(words[0])) {
+      row.profileId = Number(words[0]);
+      why = words.slice(1).join(' ').trim();
+    } else {
+      var them = takePerson(words);
+      if (them.actorId && them.pid) {
+        row.personProfileId = them.pid;
+        row.personName = them.name;
+        why = (them.rest || []).join(' ').trim();
+      } else {
+        row.words = words.slice(0, 40);
+      }
+    }
+    if (!row.words && !why) {
+      tell(pid, 'Say why: /unpk ' + words[0] + ' made by mistake. The character comes back from the dead, ' +
+                'and the PK stays on the record with your reason beside it.');
+      return true;
+    }
+    if (why) { row.why = why; }
+    siteCall('unpk', row, function (ok, v, j) {
+      if (!ok) {
+        tell(pid, (j && j.message) ? String(j.message) : ('The site did not undo the PK, so nothing changed: ' + v + '.'));
+        return;
+      }
+      var p = Number(v.profileId) || 0;
+      var name = String(v.name || '') || ('profile ' + p);
+      if (!v.was) { tell(pid, name + ' is not dead for good, so there was nothing to undo.'); return; }
+      delete state.pk[p];
+      delete state.ending[p];
+      state.unpk[p] = { at: Date.now() };
+      tell(pid, name + ' is no longer dead for good and can be played again from a free slot. ' +
+                'The PK stays on the record with your reason beside it.');
+      record('unpk', pid, me, p, name, String(v.why || why), 0);
+    });
+    return true;
+  }
+
+  // ------------------------------------------------------------ command --
+  /*
+    Called from handle() with the queued command, its word and parts, the
+    profile and actor it came from, isStaff, and /give's, /spawn's and /tp's
+    lookups (findThing, findBeast, byFormId, findPlace). True when this
+    answered the line, false to let handle() carry on.
+  */
+  function command(cmd, word, parts, pid, actorId, isStaff, look) {
+    if (SILENCED_WORDS.indexOf(word) !== -1) {
+      var left = silencedFor(pid);
+      if (!left) { return false; }
+      tell(pid, 'Staff have silenced you for another ' + left +
+                (left === 1 ? ' minute' : ' minutes') + ', so that did not reach anybody.');
+      return true;
+    }
+    var isAimed = AIMED.indexOf(word) !== -1;
+    if (!isAimed && WORDS_STAFF.indexOf(word) === -1) { return false; }
+
+    var staff = false;
+    try { staff = !!isStaff(pid); } catch (e) { staff = false; }
+    var words = parts.slice(1);
+
+    // /give, /spawn and /tp at a person are staff's; anything else is left.
+    if (isAimed) {
+      if (!staff || !look) { return false; }
+      var am = aimed(word, words);
+      if (!am) { return false; }
+      var whyA = unproven(cmd, pid);
+      if (whyA) {
+        tell(pid, whyA);
+        log('staff: ' + word + ' refused profile ' + pid + ', ' +
+            (cmd && cmd.proven === true ? 'no join pass on hand' : 'the voice service did not prove the connection'));
+        return true;
+      }
+      return doAimed(am, pid, actorId, actorId ? nameOf(actorId) : ('profile ' + pid), look);
+    }
+
+    // /goto a place is the playtester teleport in handle(); only a person is ours.
+    if (word === '/goto') {
+      if (!staff || !words.length) { return false; }
+      var gp = takePerson(words);
+      if (!gp.actorId || gp.rest.length) { return false; }
+    }
+
+    if (!staff) {
+      tell(pid, REFUSED);
+      log('staff: ' + word + ' refused profile ' + pid + ', who is not staff');
+      return true;
+    }
+    var why = unproven(cmd, pid);
+    if (why) {
+      tell(pid, why);
+      log('staff: ' + word + ' refused profile ' + pid + ', ' +
+          (cmd && cmd.proven === true ? 'no join pass on hand' : 'the voice service did not prove the connection'));
+      return true;
+    }
+
+    var me = actorId ? nameOf(actorId) : ('profile ' + pid);
+    if (!words.length) {
+      tell(pid, word + ' who? ' + word + ' <name, or the start of it, or a profile number>.');
+      return true;
+    }
+    if (word === '/spawnat') {
+      if (!look) { tell(pid, 'The server has no creature list to spawn from right now.'); return true; }
+      return doAimed(aimed(word, words), pid, actorId, me, look);
+    }
+    if (word === '/unpk') { return unpk(words, pid, me); }
+    if (word === '/ban' || word === '/unban' || word === '/note' ||
+        word === '/banaccount' || word === '/unbanaccount' || word === '/pk') {
+      return banOrNote(word, words, pid, me, takePerson(words));
+    }
+    var them = takePerson(words);
+    var reason = (them.rest || []).join(' ').trim();
+
+    if (word === '/unsilence') {
+      if (!them.pid) { tell(pid, them.why); return true; }
+      if (!state.silenced[them.pid]) { tell(pid, them.name + ' is not silenced.'); return true; }
+      delete state.silenced[them.pid];
+      pushSilenced();
+      tell(them.pid, 'Staff have let you speak again.');
+      tell(pid, them.name + ' can speak again.');
+      record('unsilence', pid, me, them.pid, them.name, '', 0);
+      return true;
+    }
+    if (word === '/unfreeze') {
+      if (!them.pid) { tell(pid, them.why); return true; }
+      if (!state.frozen[them.pid]) { tell(pid, them.name + ' is not frozen.'); return true; }
+      delete state.frozen[them.pid];
+      tell(them.pid, 'Staff have let you go. You can move again.');
+      tell(pid, them.name + ' can move again.');
+      record('unfreeze', pid, me, them.pid, them.name, '', 0);
+      return true;
+    }
+    if (word === '/silence') {
+      if (!them.pid) { tell(pid, them.why); return true; }
+      if (them.pid === pid) { tell(pid, 'That is you.'); return true; }
+      var mins = SILENCE_DEFAULT_MIN;
+      var rest = them.rest || [];
+      if (rest.length && /^\d+$/.test(rest[0])) {
+        mins = Math.max(1, Math.min(SILENCE_MAX_MIN, Number(rest[0])));
+        reason = rest.slice(1).join(' ').trim();
+      }
+      state.silenced[them.pid] = { until: Date.now() + mins * 60000, name: them.name, by: pid };
+      pushSilenced();
+      tell(them.pid, 'Staff have silenced you for ' + mins + ' minutes' +
+                     (reason ? ': ' + reason + '.' : '.') +
+                     ' Nothing you type in the chat reaches anybody until then.');
+      tell(pid, 'Silenced ' + them.name + ' for ' + mins + ' minutes. /unsilence ' +
+                them.name + ' ends it sooner.');
+      record('silence', pid, me, them.pid, them.name, reason, mins);
+      return true;
+    }
+
+    // Everything below needs the person in the world.
+    if (!them.actorId) { tell(pid, them.why); return true; }
+
+    if (word === '/warn') {
+      if (!reason) { tell(pid, 'Warn them about what? /warn ' + them.name + ' <what they did>.'); return true; }
+      tell(them.pid, 'A warning from staff: ' + reason + '. Read the rules on thornswood.net; ' +
+                     'the next step is being removed from the world.');
+      tell(pid, 'Warned ' + them.name + '.');
+      record('warn', pid, me, them.pid, them.name, reason, 0);
+      return true;
+    }
+    if (word === '/kick') {
+      if (them.pid === pid) { tell(pid, 'That is you.'); return true; }
+      tell(them.pid, 'Staff have ended your session' + (reason ? ': ' + reason + '.' : '.') +
+                     ' Read the rules on thornswood.net before you come back.');
+      tell(pid, 'Removing ' + them.name + ' from the world.');
+      record('kick', pid, me, them.pid, them.name, reason, 0);
+      var gone = them.actorId;
+      setTimeout(function () {
+        var userId = -1;
+        try { userId = mp.getUserByActor(gone); } catch (e) { userId = -1; }
+        if (userId === undefined || userId === null || userId < 0) {
+          log('staff: could not find the connection of ' + them.name + ' to kick; they had already left');
+          return;
+        }
+        try { mp.kick(userId); } catch (e) { log('staff: could not kick ' + them.name + ': ' + e); }
+      }, KICK_AFTER_MS);
+      return true;
+    }
+    if (word === '/freeze') {
+      if (them.pid === pid) { tell(pid, 'That is you.'); return true; }
+      var spot = placeOf(them.actorId);
+      if (!spot || !spot.desc) { tell(pid, 'The server cannot tell where ' + them.name + ' is right now. Try again.'); return true; }
+      spot.by = pid;
+      state.frozen[them.pid] = spot;
+      tell(them.pid, 'Staff have frozen you in place' + (reason ? ': ' + reason + '.' : '.') +
+                     ' Wait here and somebody will talk to you.');
+      tell(pid, 'Froze ' + them.name + '. /unfreeze ' + them.name + ' lets them go.');
+      record('freeze', pid, me, them.pid, them.name, reason, 0);
+      return true;
+    }
+    if (word === '/bring' || word === '/goto') {
+      if (them.pid === pid) { tell(pid, 'That is you.'); return true; }
+      if (!actorId) {
+        tell(pid, 'The server cannot find your character right now. Give it a moment and try again.');
+        return true;
+      }
+      var mover = (word === '/bring') ? them.actorId : actorId;
+      var dest = placeOf(word === '/bring' ? actorId : them.actorId);
+      if (!dest || !dest.desc) { tell(pid, 'The server cannot tell where that is right now. Try again.'); return true; }
+      try { moveTo(mover, dest); } catch (e) { tell(pid, 'That did not work: ' + e); return true; }
+      // Somebody frozen and then brought stays frozen where they were brought.
+      var movedPid = (word === '/bring') ? them.pid : pid;
+      if (state.frozen[movedPid]) { dest.by = state.frozen[movedPid].by; state.frozen[movedPid] = dest; }
+      if (word === '/bring') {
+        tell(them.pid, 'Staff brought you to them.');
+        tell(pid, 'Brought ' + them.name + ' to you.');
+        record('bring', pid, me, them.pid, them.name, '', 0);
+      } else {
+        tell(pid, 'Sent to ' + them.name + '.');
+        record('goto', pid, me, them.pid, them.name, '', 0);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  if (g.__thornswoodStaffTimer) { try { clearInterval(g.__thornswoodStaffTimer); } catch (e) { } }
+  g.__thornswoodStaffTimer = setInterval(guard('staffFreezeTick', freezeTick), FREEZE_EVERY_MS);
+  if (g.__thornswoodBanTimer) { try { clearInterval(g.__thornswoodBanTimer); } catch (e) { } }
+  g.__thornswoodBanTimer = setInterval(guard('staffBanSweep', banSweep), BAN_SWEEP_MS);
+  if (g.__thornswoodSilenceTimer) { try { clearInterval(g.__thornswoodSilenceTimer); } catch (e) { } }
+  g.__thornswoodSilenceTimer = setInterval(guard('staffSilencePush', pushSilenced), SILENCE_PUSH_MS);
+  // Once at load, so a voice service that restarted, or a reload, hears the list.
+  pushSilenced();
+
+  g.__thornswoodStaff = {
+    command: command, find: find, takePerson: takePerson, unproven: unproven,
+    freezeTick: freezeTick, pushSilenced: pushSilenced, silencedFor: silencedFor,
+    banSweep: banSweep, banLength: banLength, bansNow: bansNow, pkNow: pkNow,
+    state: state, REFUSED: REFUSED, WORDS: WORDS_STAFF
+  };
+  log('staff commands ready: ' + WORDS_STAFF.join(', ') + ', and ' + AIMED.join(', ') +
+      ' at a person, for the staff roles with a join pass');
+})();
+// ==== end thornswood staff ====

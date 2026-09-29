@@ -102,7 +102,12 @@ Yes 'the kiln still gives four grades of charcoal, one a rung' (
     (($kiln | Sort-Object At | ForEach-Object { $_.Key }) -join ',') -eq 'charcoalT1,charcoalT2,charcoalT3,charcoalT4')
 Yes 'the chopping blocks still give Firewood at novice' (
     $wood.Count -eq 1 -and $wood[0].Key -eq 'firewood' -and $wood[0].At -eq 0)
-Yes 'and nothing but those four verbs is read' (
-    @($res.Rows | Where-Object { @('mineSalt', 'burnCharcoal', 'chopWood', 'churn') -notcontains $_.Fn }).Count -eq 0)
+# milk() since #396 (#859): a farmer milks a living cow for a Jug of Milk,
+# the fifth verb in STATION_VERBS.
+$milk = @($res.Rows | Where-Object { $_.Fn -eq 'milk' })
+Yes 'milking a cow gives the farmer Milk at novice' (
+    $milk.Count -eq 1 -and $milk[0].Key -eq 'milk' -and $milk[0].Who -eq 'farmer' -and $milk[0].At -eq 0)
+Yes 'and nothing but those five verbs is read' (
+    @($res.Rows | Where-Object { @('mineSalt', 'burnCharcoal', 'chopWood', 'churn', 'milk') -notcontains $_.Fn }).Count -eq 0)
 
 Done

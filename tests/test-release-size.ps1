@@ -27,10 +27,10 @@ param([string]$PublishPath, [string]$ShipPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $PublishPath) { $PublishPath = Join-Path $Here '..\scripts\release\Publish-Update.ps1' }
-if (-not $ShipPath) { $ShipPath = Join-Path $Here '..\scripts\release\Ship.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $PublishPath) { $PublishPath = Join-Path $Here 'scripts\release\Publish-Update.ps1' }
+if (-not $ShipPath) { $ShipPath = Join-Path $Here 'scripts\release\Ship.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -106,7 +106,7 @@ Yes 'a lower cap given on the command line is the one used' ((Get-ReleaseSizeRef
 $sum    = $src.IndexOf('$changedBytes += ')
 $call   = $src.IndexOf('Get-ReleaseSizeRefusal $changedBytes $MaxReleaseMB $AcceptSize')
 $zip    = $src.IndexOf('[IO.Compression.ZipFile]::Open(')
-$upload = $src.IndexOf('gh release create')
+$upload = $src.IndexOf('# ==== thornswood site upload ====')
 Yes 'the gate is asked about $changedBytes, with the cap and the override' ($call -gt $b)
 Yes '  after the total is added up' ($sum -ge 0 -and $call -gt $sum)
 Yes '  before the first pack is zipped' ($zip -gt $call)

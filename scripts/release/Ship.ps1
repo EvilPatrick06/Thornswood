@@ -11,8 +11,9 @@
   reaches main through a pull request like any other change: main refuses a
   push from everybody, the owner included. Ship only reads this repository and
   writes nothing back to it. A main release is refused if anything is
-  uncommitted or unpushed, or if a file under tools is one git does not know,
-  so what ships and what is written down are the same thing.
+  uncommitted or unpushed, or if a file in a folder a release is built from is
+  one git does not know, so what ships and what is written down are the same
+  thing.
 
       .\scripts\release\Bump-Version.ps1        then the branch and pull request it prints
       git checkout main; git pull     once that pull request is merged
@@ -42,11 +43,11 @@
   off -Channel, owns the remirror and calls the website lane's script:
 
       1  the host feed remirror   scripts\deploy\Remirror-Site-Feed.ps1, the
-                                  website lane's. Main takes the
-                                  Thornswood-Releases tip to
-                                  thornswood.net/feed/, -Dev takes the
-                                  Thornswood-Releases-dev tip to
-                                  thornswood.net/feed-dev/.
+                                  website lane's. It checks every asset the
+                                  feed names is on thornswood.net/feed/ (-Dev:
+                                  /feed-dev/). Since #907 the publisher has
+                                  already sent version.json to the VPS store
+                                  there, so this finds it in place.
       2  the site news            Publish-News.ps1, then the #news post and the
                                   server's countdown, all unchanged and the news
                                   main only, as they always were.
@@ -56,6 +57,13 @@
 
   The feed is mirrored before the news steps tell people to update, because
   they send everybody to fetch a release the feed has to be serving.
+
+  LAST, THE TAG (#444). A release goes by one name, the id its packs carry
+  (20260928-1630, or 20260928-2324-dev on dev), and the feed records its
+  launcher, packs, baseline and commit against it (Release-Name.ps1). Once the
+  publisher has sent the feed, Ship tags that commit release/main/<id> or
+  release/dev/<id> and pushes the tag. Never on a dry run, and a tag that did
+  not go on is a line at the end, not a failed release.
 
   NO SWITCH TURNS THE REMIRROR OFF, asked for by the website and launcher
   lanes on 27 September: the block runs on every release, dev and main, so the
@@ -106,6 +114,15 @@
 .PARAMETER ModsOnly
   Skips the launcher and publishes only the mod files that changed. The
   version number stays where it is.
+
+  Since issue #921 a Ship does this by itself when nothing the launcher is
+  compiled from (launcher\, records\client-build.json, Build-Launcher.ps1)
+  changed since the launcher on that channel's feed: no new version, no
+  build, no signing, and the feed keeps the launcher it has.
+
+.PARAMETER RebuildLauncher
+  Build, sign and publish a new launcher even when nothing it is compiled
+  from changed since the one on the feed.
 
 .PARAMETER DryRun
   Builds and works out what would ship, and uploads no pack, publishes no
@@ -175,8 +192,9 @@
   main is the build everybody plays on, and ships only what is already on
   GitHub. It refuses a release that is not on main or on a hotfix/ branch,
   that is behind or ahead of the same branch on origin, that has anything
-  uncommitted, that has a file under tools git does not know about (the
-  build and Go.ps1 would take it anyway), or that asks for a new number with
+  uncommitted, that has a file in a folder a release is built from that git
+  does not know about (the build and Go.ps1 would take it anyway), or that
+  asks for a new number with
   -Version. A hotfix/ branch is the live build plus one fix and its version
   bump, cut from the commit the live release was built from. Ship refuses
   one that is not on GitHub, and it is Patrick's call like any live release.
@@ -194,6 +212,14 @@
   small changes go to the dev build launcher for pretesting". A main Ship is
   for a security fix or for something that leaves the game untestable, and he
   says which.
+
+.PARAMETER AllowUncoveredBodies
+  Lets a main release go out while a body in the game folder is nude (issue
+  #405). A main release reads the collection revision this machine has
+  installed and tells every launcher to match it, so it refuses while
+  scripts\mods\Check-CoveredBodies.ps1 finds a nude body here; a dev release
+  only warns. Give it for a security fix that cannot wait for the covered
+  bodies' collection revision, and only on Patrick's word.
 
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
@@ -261,18 +287,16 @@ param(
     # dev first and gets broken there; a plain Ship afterwards promotes it all
     # to main and resets dev to match.
     ,[ValidateSet('main', 'dev')][string]$Channel = 'main'
+    # Build, sign and publish a new launcher even when nothing it is compiled
+    # from changed since the one on the feed (issue #921).
+    ,[switch]$RebuildLauncher
+    # A main release with a nude body in the game folder (issue #405).
+    ,[switch]$AllowUncoveredBodies
 )
 
 
-# The launcher was SkyrimTogether.exe and is Thornswood.exe now. It replaces
-# itself in place when it updates rather than being reinstalled, so an install
-# made before the rename still carries the old name and both have to be looked
-# for, newest first.
+# The launcher, Thornswood.exe in the launcher folder.
 function Get-LauncherExe([string]$dir) {
-    foreach ($n in 'Thornswood.exe', 'SkyrimTogether.exe') {
-        $p = Join-Path $dir $n
-        if (Test-Path -LiteralPath $p) { return $p }
-    }
     return (Join-Path $dir 'Thornswood.exe')
 }
 
@@ -341,6 +365,139 @@ function Get-ReleaseLauncher([string]$repo, [string]$version, [string]$into) {
     }
     return ''
 }
+
+# THE TAG IS OLDER THAN THE LAUNCHER ON MAIN, issue #883. The exe CI built for
+# v<version> is the source at that tag, so a main Ship that has not moved the
+# version takes the exe of the last bump and quietly leaves out every launcher
+# change merged since. 20260927-1633 went out that way: its Thornswood.exe is
+# byte for byte the one from 20260927-0508 (sha256 38d4cd5d...), built from
+# v1.1.101 (deace6b), so Main never got the menu music fix (#772, #779) that
+# its own notes announced. And records\client-build.json is compiled into the
+# exe, so the stale launcher called the new client runtime in that same pack
+# "not the recorded build" and put the old skymp5-client.js back.
+# Returns the changed paths under launcher\ and records\client-build.json
+# between the tag and HEAD, or nothing when the tag is not here to compare
+# with (Get-ReleaseLauncher stops that Ship anyway). Markdown is not built.
+function Get-LauncherDrift([string]$repoDir, [string]$tag) {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+        & git -C $repoDir rev-parse --verify --quiet "refs/tags/$tag" *> $null
+        if ($LASTEXITCODE -ne 0) {
+            & git -C $repoDir fetch --quiet origin "refs/tags/$($tag):refs/tags/$tag" *> $null
+            & git -C $repoDir rev-parse --verify --quiet "refs/tags/$tag" *> $null
+            if ($LASTEXITCODE -ne 0) { return @() }
+        }
+        $paths = @(& git -C $repoDir diff --name-only "refs/tags/$tag" HEAD -- launcher records/client-build.json ':(exclude,glob)**/*.md' 2>$null |
+                   Where-Object { $_ })
+        if ($LASTEXITCODE -ne 0) { return @() }
+        return $paths
+    } finally { $ErrorActionPreference = $old }
+}
+
+# THE EXE CI BUILT IS NOT SIGNED, issue #921. release.yml compiles on the VPS
+# runner, which holds no signing certificate, so Sign-Artifact.ps1 there says
+# "not signing" and every v<version> draft carries an unsigned Thornswood.exe.
+# 20260927-1633 put exactly that on Main as 1.1.101 (sha256 38d4cd5d...), an
+# hour before the publish sign gate existed. Since then the gate refuses it,
+# which is safe but means no main Ship can go out at all.
+# So a main Ship signs the verified download here, with the same Sign-Artifact
+# and records\signing\signing.json a dev build signs with, -Required so a machine that
+# cannot sign stops, and reads it back against ExpectedSigner before a byte of
+# it is installed or packed. Already signed by us: left alone. Returns '' when
+# the exe is signed by ExpectedSigner, or a sentence saying why not.
+# Needs Get-PublishSignRefusal (Assert-PublishSigned.ps1) dot-sourced first.
+function Set-ReleaseLauncherSignature([string]$exe, [string]$signer, [string]$expectedSigner) {
+    if (-not $exe -or -not (Test-Path -LiteralPath $exe)) {
+        return "There is no launcher at $exe to sign. Nothing was published."
+    }
+    if (-not $expectedSigner) {
+        return 'ExpectedSigner is empty, so there is nothing to check the signature against. Nothing was published.'
+    }
+    if (-not (Get-PublishSignRefusal -Path $exe -ExpectedSigner $expectedSigner)) { return '' }
+    if (-not $signer -or -not (Test-Path -LiteralPath $signer)) {
+        return "Sign-Artifact.ps1 is not at $signer, so the launcher CI built cannot be signed. Nothing was published."
+    }
+    $global:LASTEXITCODE = 0
+    & $signer -Path $exe -Required | Out-Host
+    $rc = $LASTEXITCODE
+    if ($rc -ne 0) {
+        return ("Signing the launcher CI built stopped with exit code $rc. A main release has to be signed, " +
+                'the same as a dev one: Ship from the machine that holds records\signing\signing.json. Nothing was published.')
+    }
+    $why = Get-PublishSignRefusal -Path $exe -ExpectedSigner $expectedSigner
+    if ($why) { return ('Signing said it worked, but ' + $why) }
+    return ''
+}
+
+# WHAT THE LAUNCHER IS COMPILED FROM, as one sha256, issue #921. Every file
+# under launcher\ but the Markdown (the code, ui.xaml, the art, the video, the
+# WebView2 loader, the manifest), records\client-build.json, which is compiled
+# in, and Build-Launcher.ps1, which writes the version resource and picks what
+# goes in. Read off the working tree, not git, so a dev Ship of uncommitted
+# work counts it. Paths with / and sorted ordinally, so the same tree gives the
+# same answer on any machine; a line ending changed by git's autocrlf gives a
+# different one, which costs a rebuild and nothing worse.
+function Get-LauncherInputHash([string]$repoDir) {
+    $lines = New-Object System.Collections.Generic.List[string]
+    $launcherDir = Join-Path $repoDir 'launcher'
+    if (Test-Path -LiteralPath $launcherDir) {
+        foreach ($f in @(Get-ChildItem -LiteralPath $launcherDir -Recurse -File -Force -EA SilentlyContinue |
+                         Where-Object { $_.Extension -ne '.md' })) {
+            $rel = 'launcher/' + $f.FullName.Substring($launcherDir.Length).TrimStart('\', '/').Replace('\', '/')
+            $lines.Add($rel + "`t" + (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant())
+        }
+    }
+    foreach ($rel in 'records/client-build.json', 'scripts/release/Build-Launcher.ps1') {
+        $p = Join-Path $repoDir $rel
+        $h = 'missing'
+        if (Test-Path -LiteralPath $p) { $h = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant() }
+        $lines.Add($rel + "`t" + $h)
+    }
+    $arr = $lines.ToArray()
+    [Array]::Sort($arr, [StringComparer]::Ordinal)
+    $bytes = [Text.Encoding]::UTF8.GetBytes(($arr -join "`n"))
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return (-join ($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') })) }
+    finally { $sha.Dispose() }
+}
+
+# The launcher a channel's feed offers now ($branch is the channel, main or
+# dev), read from the site and from the copy last received into $dir when the
+# site cannot say. $null when there is no feed to read.
+function Get-PublishedLauncher([string]$dir, [string]$branch) {
+    # The feed as the site serves it (Read-SiteFeed, Feed-Store.ps1, #907),
+    # which is what launchers have; the copy last received into $dir only when
+    # the site cannot be read. Until #907 this read origin/<branch> of the
+    # Thornswood-Releases clone.
+    $doc = $null
+    if (Get-Command Read-SiteFeed -ErrorAction SilentlyContinue) {
+        try { $doc = Read-SiteFeed $branch } catch { $doc = $null }
+    }
+    if ($null -eq $doc) {
+        if (-not $dir -or -not (Test-Path -LiteralPath $dir)) { return $null }
+        $f = Join-Path $dir 'version.json'
+        if (-not (Test-Path -LiteralPath $f)) { return $null }
+        try { $doc = ([IO.File]::ReadAllText($f) -replace '^﻿', '') | ConvertFrom-Json } catch { return $null }
+    }
+    if ($null -eq $doc) { return $null }
+    function Field($o, [string]$k) { if ($o -and $o.PSObject.Properties[$k] -and $null -ne $o.$k) { return ([string]$o.$k).Trim() } return '' }
+    return [pscustomobject]@{
+        Version = (Field $doc 'launcherVersion')
+        Url     = (Field $doc 'launcherUrl')
+        Sha     = (Field $doc 'launcherSha256')
+        Inputs  = (Field $doc 'launcherInputs')
+    }
+}
+
+# True only when the feed names a whole launcher (version, url, sha256) AND the
+# fingerprint it was published with is this one. A feed with no fingerprint,
+# which is every feed before issue #921, is never "unchanged".
+function Test-LauncherUnchanged($published, [string]$inputs) {
+    if ($null -eq $published -or -not $inputs) { return $false }
+    if (-not $published.Inputs -or -not $published.Version -or -not $published.Url) { return $false }
+    if ($published.Sha -notmatch '^[0-9a-fA-F]{64}$') { return $false }
+    return ($published.Inputs -eq $inputs)
+}
 # ==== end thornswood release launcher ====
 
 Set-StrictMode -Version Latest
@@ -371,13 +528,19 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 # Launcher / setup-stub .pdb stay on this machine only (Ship-Rules, issue #462).
 . (Join-Path $Here 'Ship-Rules.ps1')
-# version.json lives in the public releases clone now, beside the source one.
-# Falls back to the source repo when that clone is not there yet, which is the
-# same thing Publish-Update does, so both agree about where the feed is.
-$ReleaseDir = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
-if (-not (Test-Path (Join-Path $ReleaseDir '.git'))) { $ReleaseDir = $RepoDir }
-$MainReleaseDir = $ReleaseDir
+# The publish sign helpers, loaded here rather than at the publish gate because
+# a main Ship signs and checks the exe CI built before it is installed (#921).
+. (Join-Path $Here 'Assert-PublishSigned.ps1')
+# The feed and its baseline live on the VPS beside the feed the site serves,
+# and each channel has a working folder on this machine that Publish-Update
+# receives them into and sends them back from (Feed-Store.ps1, #907). Until
+# then they were clones of Thornswood-Releases beside this repository.
+. (Join-Path $Here 'Feed-Store.ps1')
+# The release's one name and its tag (#444).
+. (Join-Path $Here 'Release-Name.ps1')
 $Dev = ($Channel -eq 'dev')
+$ReleaseDir = Get-FeedStoreDir $Channel
+$MainReleaseDir = Get-FeedStoreDir 'main'
 
 # ---- where the launcher is installed ----------------------------------------
 #
@@ -398,43 +561,14 @@ function Find-Root {
 if (-not $PSBoundParameters.ContainsKey('Root')) { $Root = Find-Root }
 
 # ------------------------------------------------------------ dev channel
-# The dev build follows the dev branch of the releases repo. That branch is
-# checked out as a git worktree beside the main clone, so both feeds sit on
-# disk at once and a publish to one cannot touch the other. Made on first use,
-# from main's tip, so the first dev version.json is exactly what main has.
-function Ensure-DevReleases([string]$mainRel) {
-    $devRel = Join-Path (Split-Path -Parent $mainRel) 'Thornswood-Releases-dev'
-    if (Test-Path (Join-Path $devRel 'version.json')) { return $devRel }
-    if (-not (Test-Path (Join-Path $mainRel '.git'))) {
-        Die "The dev channel needs the releases clone at $mainRel first."
-    }
-    Write-Host "  making the dev release worktree at $devRel" -ForegroundColor DarkGray
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    try {
-        & git -C $mainRel fetch origin 2>&1 | Out-Null
-        $remoteDev = & git -C $mainRel ls-remote --heads origin dev 2>$null
-        if ($remoteDev) {
-            & git -C $mainRel worktree add $devRel dev 2>&1 | Out-Host
-        } else {
-            # Making the dev branch means pushing it to the releases repository,
-            # and a dry run pushes nothing. Stopped before the branch is made,
-            # so nothing is left half done on this disk either.
-            if ($DryRun) { Die 'The releases repository has no dev branch that git could see, and making one means pushing it. A dry run pushes nothing. Run .\scripts\release\Ship.ps1 -Channel dev once without -DryRun.' }
-            & git -C $mainRel worktree add -b dev $devRel origin/main 2>&1 | Out-Host
-            & git -C $devRel push -u origin dev 2>&1 | Out-Host
-        }
-    } finally { $ErrorActionPreference = $old }
-    if (-not (Test-Path (Join-Path $devRel 'version.json'))) { Die "Could not make the dev release worktree at $devRel." }
-    return $devRel
-}
-
+# The dev build has its own feed and baseline on the VPS (feed-dev), and its
+# own working folder here. Until #907 it was a git worktree of the dev branch
+# of Thornswood-Releases, made on first use.
 if ($Dev) {
     if (-not $PSBoundParameters.ContainsKey('Root')) { $Root = (Find-Root) + '-DevBuild' }
     if (-not (Test-Path (Join-Path $Root 'Launcher'))) {
         Die "No dev build at $Root. Install it from the main launcher's Settings page (The dev build) first."
     }
-    if ($MainReleaseDir -eq $RepoDir) { Die 'The dev channel needs the public releases clone, Thornswood-Releases, beside this repo.' }
-    $ReleaseDir = Ensure-DevReleases $MainReleaseDir
 }
 
 Write-Host ''
@@ -502,17 +636,15 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
     $oldEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     $branch = (& git -C $RepoDir rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim()
     $dirty = @(& git -C $RepoDir status --porcelain --untracked-files=no 2>$null | Where-Object { $_ })
-    # And the files under tools that git has never been told about, which the
-    # line above leaves out. Ignored ones are not counted: measured 24 Sep, all
-    # 14 files under tools on Patrick's machine that git does not track are
-    # ignored (the webhooks, signing.json, __pycache__, a log, the front's zip),
-    # and counting them would stop every main release.
-    # tools, and every other folder a release is built from as the
-    # reorganisation moves them out of it (issue #440): the site's art goes
-    # into the menu, and game, launcher and installer are where the plugins,
-    # the launcher source and the installer are going.
+    # And the files git has never been told about, which the line above
+    # leaves out, in every folder a release is built from: the site's art goes
+    # into the menu, and game, launcher and installer hold the plugins, the
+    # launcher source and the installer. Ignored ones are not counted (the
+    # webhooks, records\signing\signing.json, __pycache__, a log), because
+    # counting them would stop every main release. tools\ went on 29 September
+    # (issue #440, phase 10).
     $moreRoots = @(@('scripts', 'records', 'site', 'game', 'launcher', 'installer') | Where-Object { Test-Path -LiteralPath (Join-Path $RepoDir $_) })
-    $loose = @(& git -C $RepoDir ls-files --others --exclude-standard -- tools @moreRoots 2>$null | Where-Object { $_ })
+    $loose = @(& git -C $RepoDir ls-files --others --exclude-standard -- @moreRoots 2>$null | Where-Object { $_ })
     & git -C $RepoDir fetch --quiet origin 2>$null | Out-Null
     $behind = 0
     $ahead = 0
@@ -528,7 +660,8 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
         # hotfix/... starts from the commit the live release was built from and
         # carries only the fix and its version bump; 1.1.93 went out that way.
         # Every other check below still applies to it: nothing uncommitted,
-        # nothing unknown under tools, nothing that is not on GitHub.
+        # nothing unknown in a folder a release is built from, nothing that is
+        # not on GitHub.
         $hotfix = $branch -like 'hotfix/*'
         if ($branch -ne 'main' -and -not $hotfix) { Die "A main release ships from main. This is $branch. Merge it into main first, or use -Channel dev to try it on the dev server." }
         if ($hotfix) {
@@ -570,13 +703,13 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
         # next", had moved to once Ship stopped committing. Found in the
         # review of entry 205 on 24 Sep.
         #
-        # One ignored file does ship and is not counted: tools\thornswood-
-        # front.zip, which Go.ps1 unpacks into Data\Platform\UI. *.zip keeps it
+        # One ignored file does ship and is not counted: local\thornswood-
+        # front.zip, which Go.ps1 unpacks into Data\Platform\UI. local\ keeps it
         # out of git and it has never been committed. Whether it should be is
         # not a question this gate can settle.
         if ($loose.Count) {
             foreach ($d in $loose | Select-Object -First 10) { Say "    $d" 'Yellow' }
-            Die ("There are $($loose.Count) file(s) under tools, or another folder a release is built from, that git does not know about. The build " +
+            Die ("There are $($loose.Count) file(s) in a folder a release is built from that git does not know about. The build " +
                  "and Go.ps1 take them anyway, so they would go out in this release without being on GitHub. " +
                  "Put them through a pull request, delete them, or add them to .gitignore, then Ship.")
         }
@@ -600,6 +733,29 @@ $src = Get-Content $updaterCs -Raw
 $m = [regex]::Match($src, 'Version\s*=\s*"([^"]+)"')
 if (-not $m.Success) { Die 'Could not read the version out of app\Updater.cs' }
 $current = $m.Groups[1].Value
+
+# NO NEW LAUNCHER WHEN NOTHING LAUNCHER-SIDE CHANGED, issue #921. Patrick, 28
+# Sep: "it should be signed only when a new installer goes up on the website so
+# we aren't signing for every single update". Every signed launcher refuses an
+# unsigned update, so the launcher cannot go out unsigned; what can stop is a
+# new one going out at all. A dev Ship used to bump 1.1.x.N, rebuild and sign
+# every time, even for a pack of textures. Now the feed records a fingerprint
+# of what the exe is compiled from (launcherInputs), and a Ship whose sources
+# match it keeps the launcher already published: same bytes, same sha256, no
+# build, no signing call, only the packs go out, exactly as -ModsOnly does.
+# The first Ship after this change finds no fingerprint and builds as before.
+# -RebuildLauncher or -Version builds one anyway.
+$LauncherInputs = Get-LauncherInputHash $RepoDir
+if (-not $ModsOnly -and -not $RebuildLauncher -and -not $Version) {
+    $feedBranch = if ($Dev) { 'dev' } else { 'main' }
+    $pubLauncher = Get-PublishedLauncher $ReleaseDir $feedBranch
+    if (Test-LauncherUnchanged $pubLauncher $LauncherInputs) {
+        Head 'The launcher'
+        Say ("  nothing it is built from changed since $($pubLauncher.Version) went out, so that one stays: " +
+             'no rebuild, no signing, only the packs. -RebuildLauncher to build one anyway.') 'Green'
+        $ModsOnly = $true
+    }
+}
 
 if ($ModsOnly) {
     $target = $current
@@ -658,38 +814,41 @@ elseif ($Dev) {
         return 0
     }
 
-    # WHAT IS PUBLISHED, READ OFF GITHUB, NOT OFF THIS DISK. Until 25 September
-    # both numbers came from the version.json files in this machine's releases
-    # clones, which nothing here pulls first. Djinn's clone was days old and
-    # still said 1.1.92, so his dev Ship went out as 1.1.92.3 while every dev
-    # launcher was on 1.1.94.x: lower, so never offered. And the count after
-    # the last dot came from the dev feed's current number only, so the next
-    # Ship after it would have restarted at .1 under numbers already out.
-    # Now both feeds are fetched and read from origin, and the dev number
-    # climbs past every launcher version the dev branch has ever published.
-    function Read-Published([string]$dir, [string]$branch) {
-        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    # WHAT IS PUBLISHED, READ OFF THE SITE, NOT OFF THIS DISK. Until 25
+    # September both numbers came from the version.json files in this
+    # machine's releases clones, which nothing here pulled first. Djinn's clone
+    # was days old and still said 1.1.92, so his dev Ship went out as 1.1.92.3
+    # while every dev launcher was on 1.1.94.x: lower, so never offered. And
+    # the count after the last dot came from the dev feed's current number
+    # only, so the next Ship after it would have restarted at .1 under numbers
+    # already out. From then until #907 both were read from origin in the
+    # clones, and the dev number climbed past every launcherVersion in the dev
+    # branch's history. Now main's number is the feed the site serves, and
+    # "every dev number ever published" is launchers.txt in the dev store on
+    # the VPS, which every send of the dev feed adds to (Feed-Store.ps1) and
+    # the one-off move seeded from the dev branch's whole history.
+    function Read-Published([string]$ch) {
         try {
-            & git -C $dir fetch --quiet origin $branch 2>$null | Out-Null
-            $j = (& git -C $dir show "origin/$($branch):version.json" 2>$null | Out-String)
-            if ($LASTEXITCODE -eq 0 -and $j.Trim()) { return [string](($j | ConvertFrom-Json).launcherVersion) }
-            $f = Join-Path $dir 'version.json'
-            if (-not (Test-Path -LiteralPath $f)) { return '' }
-            Say "  could not read origin/$branch in $dir, so this uses the copy on disk, which may be old" 'Yellow'
-            return [string]((Get-Content -LiteralPath $f -Raw | ConvertFrom-Json).launcherVersion)
-        } finally { $ErrorActionPreference = $old }
+            $d = Read-SiteFeed $ch
+            if ($null -ne $d -and $d.PSObject.Properties['launcherVersion']) { return [string]$d.launcherVersion }
+        } catch {
+            Say "  could not read the $ch feed from the site ($($_.Exception.Message)), so this uses the copy last received here, which may be old" 'Yellow'
+        }
+        $f = Join-Path (Get-FeedStoreDir $ch) 'version.json'
+        if (-not (Test-Path -LiteralPath $f)) { return '' }
+        return [string]((Get-Content -LiteralPath $f -Raw | ConvertFrom-Json).launcherVersion)
     }
-    function Read-EverPublished([string]$dir, [string]$branch) {
-        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try {
-            $log = (& git -C $dir log -p -n 400 "origin/$branch" -- version.json 2>$null | Out-String)
-            return @([regex]::Matches($log, '(?m)^[+-]\s*"launcherVersion"\s*:\s*"([0-9.]+)"') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
-        } finally { $ErrorActionPreference = $old }
+    function Read-EverPublished([string]$ch) {
+        try { return @(Get-FeedStoreLaunchers $ch) }
+        catch {
+            Say "  could not read the launchers $ch has published from the VPS ($($_.Exception.Message)); the number climbs from the current feed only" 'Yellow'
+            return @()
+        }
     }
 
     $base = $current
     try {
-        $mainWas = Read-Published $MainReleaseDir 'main'
+        $mainWas = Read-Published 'main'
         # Only the first three parts of main's number. Main never carries a
         # fourth, but reading defensively costs nothing and a 1.1.77.2 base
         # would produce a five part version nobody can read.
@@ -704,8 +863,8 @@ elseif ($Dev) {
     } catch { }
 
     $seen = @()
-    try { $seen = @(Read-EverPublished $ReleaseDir 'dev') } catch { }
-    try { $was = Read-Published $ReleaseDir 'dev'; if ($was) { $seen += $was } } catch { }
+    try { $seen = @(Read-EverPublished 'dev') } catch { }
+    try { $was = Read-Published 'dev'; if ($was) { $seen += $was } } catch { }
     $n = 1
     foreach ($v in $seen) {
         if ($v.StartsWith("$base.")) {
@@ -758,6 +917,22 @@ else {
     Say "  staying on $current" 'DarkGray'
 }
 
+# A main release ships the exe CI built for v$target, so the launcher on main
+# has to be the launcher at that tag (Get-LauncherDrift above, issue #883).
+# -ModsOnly publishes no exe, but the live launcher still judges the pack's
+# client runtime by the record compiled into it, so that one file counts there.
+if (-not $Dev -and (Test-Path -LiteralPath (Join-Path $RepoDir '.git'))) {
+    $drift = @(Get-LauncherDrift $RepoDir ('v' + $target))
+    if ($ModsOnly) { $drift = @($drift | Where-Object { $_ -eq 'records/client-build.json' }) }
+    if ($drift.Count) {
+        foreach ($d in $drift | Select-Object -First 10) { Say "    $d" 'Yellow' }
+        $why = ("$($drift.Count) launcher file(s) changed on this branch after v$target was tagged, and the exe CI built for v$target has none of it. " +
+                "Every launcher already on $target would keep the old one anyway. Move the version first: " +
+                ".\scripts\release\Bump-Version.ps1, its pull request, the new tag, then Ship again.")
+        if ($DryRun) { Say "  $why" 'Yellow' } else { Die $why }
+    }
+}
+
 # The new version goes into Updater.cs before anything is built, because the
 # exe has to carry it. Anything that stops the release after that point has to
 # put it back, or a failed run burns a number and the launcher people are
@@ -773,20 +948,12 @@ function Unbump([string]$why) {
 
 # ------------------------------------------------------------ build
 if (-not $ModsOnly) {
-    # Resolved twice on purpose. The install writes Thornswood.exe and removes a
-    # SkyrimTogether.exe left over from before the rename, so the path that
-    # existed going in is not necessarily the path that exists coming out.
-    # Holding on to the first answer makes a build that worked look like a
-    # build that produced nothing.
+    # The exe's time going in, so a build that put nothing in place is told
+    # from one that did.
     $launchDir = Join-Path $Root 'Launcher'
     $before = [datetime]::MinValue
-    foreach ($n in 'Thornswood.exe', 'SkyrimTogether.exe') {
-        $p = Join-Path $launchDir $n
-        if (Test-Path -LiteralPath $p) {
-            $t = (Get-Item -LiteralPath $p).LastWriteTimeUtc
-            if ($t -gt $before) { $before = $t }
-        }
-    }
+    $p = Get-LauncherExe $launchDir
+    if (Test-Path -LiteralPath $p) { $before = (Get-Item -LiteralPath $p).LastWriteTimeUtc }
 
     # The build and the install are two scripts since 24 September (To Do List
     # entry 243). The build compiles into a folder of its own, so csc never
@@ -811,6 +978,23 @@ if (-not $ModsOnly) {
             Die $why
         }
         Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item (Join-Path $buildOut 'Thornswood.exe')).Length / 1KB)) 'Green'
+
+        # Signed here, before it is installed or packed (issue #921): CI has no
+        # certificate, so the draft's exe is unsigned, and every launcher from
+        # dev 1.1.101.17 on refuses an unsigned update.
+        Head 'Signing the launcher from CI'
+        try {
+            $ciSigner = Get-ExpectedSignerFragment -RepoRoot $RepoDir
+        } catch {
+            Unbump 'ExpectedSigner could not be read'
+            Die ($_.Exception.Message + ' Nothing was published.')
+        }
+        $why = Set-ReleaseLauncherSignature (Join-Path $buildOut 'Thornswood.exe') (Join-Path $Here 'Sign-Artifact.ps1') $ciSigner
+        if ($why) {
+            Unbump 'the launcher from CI is not signed'
+            Die $why
+        }
+        Say '  Authenticode Valid, signed by ExpectedSigner' 'Green'
     }
     else {
         Head 'Building the launcher'
@@ -864,7 +1048,7 @@ if (-not $ModsOnly) {
     # Keep matching .pdb beside this release's version on the shipping machine.
     # Packs, the installer and public release assets never carry them (#462).
     $kept = @(Save-ShipSymbols $buildOut $target)
-    $stubPdb = Join-Path $Here '..\..\tools\setup-stub.pdb'
+    $stubPdb = Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'setup-stub.pdb'
     if (Test-Path -LiteralPath $stubPdb) {
         $extra = @(Save-ShipSymbols (Split-Path -Parent (Resolve-Path $stubPdb)) $target)
         if ($extra.Count -gt 0) { $kept = $kept + $extra }
@@ -1002,6 +1186,56 @@ if ($LASTEXITCODE -ne 0) {
     Die 'Sync-Client.ps1 refused. Rebuild the client, run .\scripts\release\New-ClientBuildRecord.ps1, and Ship again.'
 }
 
+# ------------------------------------------------------------ covered bodies
+# Issue #405, Patrick 28 Sep: "no nudity in players or NPCs for both males and
+# females". The bodies come from the Nexus collection, and a release tells every
+# launcher which collection revision to match by reading the one installed
+# here, so a main release out of a game folder whose body is nude points
+# everybody at a nude body. Check-CoveredBodies.ps1 reads the shapes in each
+# body mesh: 0 covered, 2 a nude body, 1 unreadable. Main refuses on 2 unless
+# -AllowUncoveredBodies; dev warns, so work can still be tried on the dev build
+# while the covered bodies' revision is on its way.
+Head 'Covered bodies'
+if ($GameDir) {
+    $global:LASTEXITCODE = 0
+    & (Join-Path $Here '..\mods\Check-CoveredBodies.ps1') -Game $GameDir -Quiet
+    $bodiesExit = $LASTEXITCODE
+    if ($bodiesExit -eq 2 -and -not $Dev -and -not $AllowUncoveredBodies) {
+        Unbump 'a body in the game folder is nude'
+        Die 'A body in the game folder is nude, and a main release would point everybody at this collection revision. Install the collection revision with the covered bodies (issue #405), bring the game folder up to date, and Ship again. -AllowUncoveredBodies ships anyway, on Patrick''s word only.'
+    }
+    if ($bodiesExit -eq 2) { Say '  a body in the game folder is nude (issue #405); shipping anyway' 'Yellow' }
+    elseif ($bodiesExit -ne 0) { Say '  the body meshes could not all be read; see above' 'Yellow' }
+} else {
+    Say '  no game folder here, so the bodies were not read' 'DarkGray'
+}
+
+# ------------------------------------------------------------ SkyUI's menus
+# Issue #960, 28 Sep: dev showed "SKYUI ERROR CODE 6", menu file version
+# mismatch, required 5.2 SE, detected 6.11 SE. SkyUI's script and its menus
+# came from different releases: SkyUI 5.2's loose scripts, which dev packs
+# carried, over the collection's newer SkyUI. Check-SkyUIMenus.js reads the
+# script and the menus the way the game picks them (loose over archive, later
+# plugin's archive over earlier): 0 they agree, 2 they do not, 1 unreadable.
+# Paths every pack deletes are read as gone, since every install loses them
+# with this release. It refuses both channels: the box is on every login.
+Head 'SkyUI menus'
+if ($GameDir -and (Get-Command node -ErrorAction SilentlyContinue)) {
+    $skyuiPlugins = Join-Path (Get-ShipLoadOrderDir $Root $profileDir) 'plugins.txt'
+    $global:LASTEXITCODE = 0
+    & node (Join-Path $Here '..\mods\Check-SkyUIMenus.js') --data (Join-Path $GameDir 'Data') --plugins $skyuiPlugins --gone (@(Get-ShipDeleteAlways) -join ';') --quiet
+    $skyuiExit = $LASTEXITCODE
+    if ($skyuiExit -eq 2) {
+        Unbump 'SkyUI''s menus are not the version its script wants'
+        Die 'SkyUI''s menus in the game folder are not the version its script wants, so everybody would get the SkyUI error box on the way in. See the lines above for which file wins and where it comes from, fix that, and Ship again.'
+    }
+    if ($skyuiExit -ne 0) { Say '  SkyUI''s menus could not all be read; see above' 'Yellow' }
+} elseif ($GameDir) {
+    Say '  node is not on this machine, so SkyUI''s menus were not read' 'Yellow'
+} else {
+    Say '  no game folder here, so SkyUI''s menus were not read' 'DarkGray'
+}
+
 # HOW FAR BEHIND the public installer is: the zip on disk against the releases
 # the feed lists. Asked twice, and the two answers differ on purpose. Before
 # publishing, the gate just below reads it to refuse a main release that would
@@ -1088,9 +1322,9 @@ if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
 # Site and feed only. Local Build-Launcher may print "not signing" and leave an
 # unsigned exe on disk; that must not reach Releases or the host feed.
 # CONTRIBUTING: only a signing machine may Ship, dev included. Soft skip is for
-# build machines, not for publish.
-. (Join-Path $Here 'Assert-PublishSigned.ps1')
-$signCfg = Join-Path $Here '..\..\tools\signing.json'
+# build machines, not for publish. Assert-PublishSigned.ps1 is dot-sourced at
+# the top, beside Ship-Rules.ps1.
+$signCfg = Join-Path $Here '..\..\records\signing\signing.json'
 $signWhy = Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir
 if ($signWhy) {
     Unbump 'this machine cannot sign'
@@ -1121,7 +1355,7 @@ Head 'Publishing'
 $pubArgs = @{ Notes = $Notes; Root = $Root; RepoDir = $RepoDir; ReleaseDir = $ReleaseDir; DistRoot = $DistRoot; NoPause = $true }
 if ($MoveServer) { $pubArgs['MoveServer'] = $true }
 if ($AcceptSize) { $pubArgs['AcceptSize'] = $true }
-if (-not $ModsOnly) { $pubArgs['Launcher'] = $true }
+if (-not $ModsOnly) { $pubArgs['Launcher'] = $true; $pubArgs['LauncherInputs'] = $LauncherInputs }
 if ($Dev) { $pubArgs['Channel'] = 'dev'; $pubArgs['VersionOverride'] = $target }
 # A dry run has to leave nothing behind, and NoUpload plus NoPush is not that.
 #
@@ -1163,6 +1397,10 @@ if ($DryRun) {
 
 # global: for the reason at the client patch step.
 $global:LASTEXITCODE = 0
+# The id the publisher sets once the feed is on the VPS, and nothing before
+# that; the release tag below goes on only then (#444). Cleared first, so a
+# run earlier in this same window can never be tagged by this one.
+$global:ThornswoodPublishedRelease = ''
 & (Join-Path $Here 'Publish-Update.ps1') @pubArgs
 $published = $LASTEXITCODE
 
@@ -1531,47 +1769,38 @@ if (-not $DryRun -and -not $NoAnnounce) {
 # false and the reset would take dev testers back to the hotfix until the next
 # dev Ship. Dev is left as it was; its next Ship still climbs from the hotfix's
 # number, because the dev version is read off main's published feed.
+#
+# THROUGH THE STORE (#907). The dev feed and baseline are received from the
+# VPS, rewritten from main's as this release left them, and sent back with the
+# same check a Ship makes, so the site serves the reset dev feed at once. Until
+# #907 this committed and pushed the Thornswood-Releases dev branch, and the
+# site's copy stayed on the old dev tip until somebody remirrored it.
 if (-not $DryRun -and -not $Dev -and -not $hotfix) {
-    $devRel = Join-Path (Split-Path -Parent $MainReleaseDir) 'Thornswood-Releases-dev'
-    if (Test-Path (Join-Path $devRel 'version.json')) {
-        Head 'Resetting dev to match'
-        try {
-            $mainDoc = Get-Content (Join-Path $MainReleaseDir 'version.json') -Raw | ConvertFrom-Json
-            $devDoc  = Get-Content (Join-Path $devRel 'version.json') -Raw | ConvertFrom-Json
-            foreach ($keep in 'serverPort', 'voicePort', 'voiceUrl') {
-                if ($devDoc.PSObject.Properties[$keep]) {
-                    if ($mainDoc.PSObject.Properties[$keep]) { $mainDoc.$keep = $devDoc.$keep }
-                    else { $mainDoc | Add-Member -NotePropertyName $keep -NotePropertyValue $devDoc.$keep }
-                }
+    Head 'Resetting dev to match'
+    try {
+        $devRel = Get-FeedStoreDir 'dev'
+        [void](Receive-FeedStore 'dev' $devRel)
+        $mainDoc = Get-Content (Join-Path $MainReleaseDir 'version.json') -Raw | ConvertFrom-Json
+        $devDoc  = Get-Content (Join-Path $devRel 'version.json') -Raw | ConvertFrom-Json
+        foreach ($keep in 'serverPort', 'voicePort', 'voiceUrl') {
+            if ($devDoc.PSObject.Properties[$keep]) {
+                if ($mainDoc.PSObject.Properties[$keep]) { $mainDoc.$keep = $devDoc.$keep }
+                else { $mainDoc | Add-Member -NotePropertyName $keep -NotePropertyValue $devDoc.$keep }
             }
-            [IO.File]::WriteAllText((Join-Path $devRel 'version.json'), ($mainDoc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
-            $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-            Push-Location $devRel
-            try {
-                $mainState = Join-Path $MainReleaseDir 'published.json'
-                if (Test-Path -LiteralPath $mainState) {
-                    Copy-Item -LiteralPath $mainState -Destination (Join-Path $devRel 'published.json') -Force
-                }
-                & git add version.json 2>&1 | Out-Null
-                if (Test-Path -LiteralPath (Join-Path $devRel 'published.json')) { & git add published.json 2>&1 | Out-Null }
-                & git commit -m "Dev follows main $target" 2>&1 | Out-Null
-                & git push -u origin HEAD 2>&1 | Out-Null
-                if ($LASTEXITCODE -ne 0) { Say '  the dev feed did not push, run Ship -Channel dev once to sort it' 'Yellow' }
-                else { Say "  dev feed now matches main $target, dev ports kept" 'Green' }
-                if (Test-Path -LiteralPath (Join-Path $devRel 'published.json')) { Say '  dev baseline is now main''s' 'Green' }
-                # The site's copy of the dev feed is not this step's to write.
-                # The mirror above ran for the channel that shipped, which is
-                # main, so thornswood.net/feed-dev still serves the dev tip from
-                # before this release until somebody mirrors it or the next dev
-                # Ship does. Said here rather than done here: this block is the
-                # feed in git, and a second mirror inside it would be a fourth
-                # thing that can fail after a live release is already out.
-                Say '  the site copy of the dev feed is not reset with it:' 'DarkGray'
-                Say '  .\scripts\deploy\Remirror-Site-Feed.ps1 -Dev   puts that right' 'DarkGray'
-            } finally { Pop-Location; $ErrorActionPreference = $old }
-        } catch {
-            Say "  could not reset the dev feed: $_" 'Yellow'
         }
+        [IO.File]::WriteAllText((Join-Path $devRel 'version.json'), ($mainDoc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+        $toSend = @('version.json')
+        $mainState = Join-Path $MainReleaseDir 'published.json'
+        if (Test-Path -LiteralPath $mainState) {
+            Copy-Item -LiteralPath $mainState -Destination (Join-Path $devRel 'published.json') -Force
+            $toSend += 'published.json'
+        }
+        [void](Send-FeedStore 'dev' $devRel $toSend)
+        Say "  dev feed now matches main $target, dev ports kept, and the site serves it" 'Green'
+        if ($toSend -contains 'published.json') { Say '  dev baseline is now main''s' 'Green' }
+    } catch {
+        Say "  could not reset the dev feed: $($_.Exception.Message)" 'Yellow'
+        Say '  Ship -Channel dev once puts dev on top of this release.' 'Yellow'
     }
 }
 
@@ -1595,6 +1824,27 @@ if (-not $DryRun -and -not $Dev -and (Test-Path (Join-Path $RepoDir '.git'))) {
     Say "  already on GitHub. The gate above refused anything uncommitted or unpushed," 'DarkGray'
     Say "  so what shipped and what is written down are the same thing." 'DarkGray'
 }
+
+# ==== thornswood release tag ====
+# THE COMMIT THIS RELEASE WAS BUILT FROM GETS A TAG (#444): release/main/<id>
+# or release/dev/<id>, the id the feed names the release by (Release-Name.ps1),
+# annotated with its launcher, packs and baseline, and pushed. Only after the
+# publisher has said it sent the feed, never on a dry run, and last, so a slow
+# or refused push never holds up the news or the countdown. A tag that did not
+# go on is a line in Done with the command that finishes it, like the other
+# follow-ons: the release is out either way.
+if (-not $DryRun -and $global:ThornswoodPublishedRelease) {
+    Head 'The tag'
+    $tagged = Add-ReleaseTag $RepoDir (Join-Path $ReleaseDir 'version.json') ([string]$global:ThornswoodPublishedRelease) 'origin' `
+        ('https://thornswood.net/' + $(if ($Dev) { 'feed-dev' } else { 'feed' }) + '/version.json')
+    if (-not $tagged.Why) {
+        Say "  $($tagged.Tag) marks $($tagged.Commit.Substring(0, 12)), and it is on GitHub" 'Green'
+    } else {
+        Say "  $($tagged.Why)" $(if ($tagged.PutRight) { 'Red' } else { 'Yellow' })
+        if ($tagged.PutRight) { $script:PostShipFailed += [pscustomobject]@{ What = 'the release tag'; PutRight = $tagged.PutRight } }
+    }
+}
+# ==== end thornswood release tag ====
 
 Head 'Done'
 # Repeated here on purpose. A red line in the middle of a release log is a line

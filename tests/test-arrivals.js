@@ -34,11 +34,11 @@
 // moved fails. Anywhere else that part says SKIP and the rest still runs.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -199,15 +199,15 @@ Object.keys(HAND).forEach(function (k) {
 // Four files told the next person Morthal and Dawnstar share a point, which
 // 1.1.41 had already made untrue and which was never a collision anyway.
 [
-  path.join(TOOLS_DIR, '..', 'launcher', 'Thornswood.ini'),
-  path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-mark.js'),
-  path.join(TOOLS_DIR, '..', 'scripts', 'ops', 'Mark-Spot.ps1')
+  path.join(REPO_DIR, 'launcher', 'Thornswood.ini'),
+  path.join(REPO_DIR, 'game', 'plugins', 'thornswood-mark.js'),
+  path.join(REPO_DIR, 'scripts', 'ops', 'Mark-Spot.ps1')
 ].forEach(function (f) {
   let text = '';
   try { text = fs.readFileSync(f, 'utf8'); } catch (e) { text = null; }
   // Comment markers go too, so a sentence broken across two // lines reads whole.
   const flat = text === null ? '' : text.replace(/[\s\/;#]+/g, ' ');
-  yes('C1 ' + path.relative(path.join(TOOLS_DIR, '..'), f) +
+  yes('C1 ' + path.relative(REPO_DIR, f) +
       ' no longer says Morthal and Dawnstar are two units apart',
       text !== null && !/two units apart/i.test(flat) && flat.indexOf('1824.1, -685.8') < 0);
 });

@@ -215,6 +215,8 @@ h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
 .live{margin-top:30px;font:400 13px/1 var(--sans);letter-spacing:.1em;
   text-transform:uppercase;color:rgba(240,230,206,.7);display:flex;gap:9px;
   align-items:center;justify-content:center;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.live a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+.live a:hover{color:var(--gold)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
 .dot.on{background:#79B05F;box-shadow:0 0 0 4px rgba(121,176,95,.16)}
 
@@ -516,9 +518,16 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
 
 <div class="notice">
   <div class="wrap">
+<!-- alpha -->
     <b>Alpha, eighteen and over.</b> Anyone can download and install Thornswood.
     Playing is locked until you apply in the Discord and are given the role.
     <a href="DISCORD_URL" target="_blank" rel="noopener">Apply &rarr;</a>
+<!-- /alpha -->
+<!-- open -->
+    <b>Open, eighteen and over.</b> Anyone can download Thornswood, and anyone
+    in the Discord can play.
+    <a href="DISCORD_URL" target="_blank" rel="noopener">Join the Discord &rarr;</a>
+<!-- /open -->
   </div>
 </div>
 
@@ -617,9 +626,16 @@ try {
       <div>
         <div class="num">02</div>
         <h3>No paperwork once you are in</h3>
+<!-- alpha -->
         <p>Getting in is a short Discord apply while we are in Alpha. After that
           there is no character sheet to have approved, no lore exam, and no
           waiting on somebody to bless your backstory.</p>
+<!-- /alpha -->
+<!-- open -->
+        <p>Getting in is joining the Discord. After that there is no character
+          sheet to have approved, no lore exam, and no waiting on somebody to
+          bless your backstory.</p>
+<!-- /open -->
       </div>
       <div>
         <div class="num">03</div>
@@ -704,7 +720,7 @@ try {
         <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3v18M5 8l7-5 7 5M5 8v8l7 5 7-5V8"/></svg>
         <h3>Nobody can do everything</h3>
         <p>You pick a profession, one half of it, and a class. An Edgewright
-          cannot make armour. Only a hunter can loot an animal, only a miner can
+          cannot make steel armour. Only a hunter can loot an animal, only a miner can
           mine. So the leather in your armour came off somebody, and they
           remember. <a href="/classes">Professions and classes</a>.</p>
       </div>
@@ -772,7 +788,12 @@ try {
   <div class="wrap">
     <h2>The road is open</h2>
     <p class="lede">Bring a name and a reason to be walking it.</p>
+<!-- alpha -->
     <a class="btn first" href="DISCORD_URL" target="_blank" rel="noopener">Apply in the Discord</a>
+<!-- /alpha -->
+<!-- open -->
+    <a class="btn first" href="DISCORD_URL" target="_blank" rel="noopener">Join the Discord</a>
+<!-- /open -->
   </div>
 </div>
 
@@ -858,13 +879,13 @@ var BLURB = {
   '/rules':   ['Rules', 'Nine rules, short on purpose. Nobody dies without agreeing to, play a person rather than a legend, and staff decide.'],
   '/join':    ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
   '/credits': ['Credits', 'Everyone whose work Thornswood is built on.'],
-  '/classes': ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make armour, so you find somebody who can.'],
+  '/classes': ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make steel armour, so you find somebody who can.'],
   '/known':   ['Known issues', 'What is limited or broken right now and why, and which of it is on the roadmap. Read this before reporting anything.'],
   '/help':    ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
   '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
   '/roadmap': ['Roadmap', 'What is being worked on and roughly in what order.'],
   '/news':    ['Every release', 'What changed, newest first. The same list the launcher shows.'],
-  '/report':  ['Report a problem', 'Something broken, or an idea. No account needed.'],
+  '/report':  ['Report a problem', 'Something broken, or an idea, with no account needed. Or somebody behaving badly, signed in.'],
   '/gallery': ['From the world', 'Pictures taken by people playing.'],
   '/privacy': ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no analytics.'],
   '/terms':   ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.'],
@@ -1027,12 +1048,23 @@ if (AGE_PATHS[here] && !ageOk()) {
   /* Public approved shots and a themed submit form for signed-in members.
      Staff Accept and Delete live on the hub Gallery page.
      Public report is the per-image flag on live shots; bug reports go to Inbox. */
-  Promise.all([
-    fetch('/api/public').then(function (r) { return r.json(); }),
-    fetch('/api/gallery/who', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).catch(function () { return {}; })
-  ]).then(function (pair) {
-    var d = pair[0] || {};
-    var who = pair[1] || {};
+  /* The pictures are drawn as soon as /api/public answers, and drawn again
+     with the Send and Report parts once /api/gallery/who has said who is
+     asking (#1096). They used to wait for both, so a signed in visitor saw
+     nothing while the site asked Discord who they were. */
+  var galData = null, galWho = null;
+  fetch('/api/gallery/who', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .catch(function () { return {}; })
+    .then(function (w) { galWho = w || {}; if (galData) drawGallery(); });
+  fetch('/api/public').then(function (r) { return r.json(); }).then(function (d) {
+    galData = d || {};
+    drawGallery();
+  }).catch(function () { show('<h1>From the world</h1><p>Could not load it.</p>'); });
+  function drawGallery() {
+    var d = galData;
+    var waiting = !galWho;
+    var who = galWho || {};
     var shots = d.gallery || [];
     var out = '<h1>From the world</h1><p>Every picture here was taken by ' +
       'somebody playing. Send yours in and it waits for staff to put it up.</p>';
@@ -1064,6 +1096,11 @@ if (AGE_PATHS[here] && !ageOk()) {
         '<div><button class="btn first" type="button" id="galSend">Send it</button></div>' +
         '<p class="said" id="galSaid" hidden></p>' +
         '</div></div>';
+    } else if (waiting) {
+      out += '<div class="gal-box"><p class="hint">Checking who you are.</p></div>';
+    } else if (who.signed && who.asked === false) {
+      out += '<div class="gal-box"><p class="hint">Thornswood could not ask Discord about your ' +
+        'account just now, so sending a picture has to wait. Try again in a minute.</p></div>';
     } else if (who.signed) {
       out += '<div class="gal-box"><p class="hint">Your Discord account is signed in, ' +
         'but it does not have a role that can send pictures yet.</p></div>';
@@ -1297,7 +1334,7 @@ if (AGE_PATHS[here] && !ageOk()) {
           .catch(function () { b.disabled = false; window.alert('Could not report it.'); });
       });
     });
-  }).catch(function () { show('<h1>From the world</h1><p>Could not load it.</p>'); });
+  }
 } else if (here === '/downloads') {
   /* This is the How to join section off the front page. It lived there and on
      this page in two different shapes, which meant two places to keep right
@@ -1374,12 +1411,18 @@ if (AGE_PATHS[here] && !ageOk()) {
            'mods get to you.</p>' +
            '<p class="lede"><strong>Eighteen and over.</strong> Downloading or playing ' +
            'Thornswood is you stating that you are eighteen or older.</p>' +
-           '<p class="lede"><strong>Thornswood is in alpha.</strong> The installer is ' +
-           'open to anybody, so you can download and install it now. The launcher will ' +
-           'not let you into the world until you have applied in the Discord and been ' +
-           'given the role, and we are taking people in small numbers because a bug found ' +
-           'by four people is a bug we can fix, and the same bug found by two hundred is a ' +
-           'bad week for everybody.</p>';
+           // The one switch (#428): /api/public says open when the site's
+           // config does, and this says what is true either way.
+           (d.open === true
+             ? '<p class="lede"><strong>Thornswood is open.</strong> Anyone can download ' +
+               'it, and anyone in the Discord can play. Being there means accepting the ' +
+               '<a href="/rules">rules</a>.</p>'
+             : '<p class="lede"><strong>Thornswood is in alpha, and the world is open by ' +
+               'application.</strong> The installer is open to anybody, so you can download ' +
+               'and install it now. Play unlocks once you have applied in the Discord and been ' +
+               'given the Playtester role. The application asks whether you are eighteen or ' +
+               'over and whether you accept the <a href="/rules">rules</a>, and your answers ' +
+               'are kept against your Discord account.</p>');
 
     // The button belongs under the step that tells you to take it, not above
     // the list where it is the first thing you meet and the instructions are
@@ -1407,14 +1450,23 @@ if (AGE_PATHS[here] && !ageOk()) {
              sum(exe) + '</p></div>';
     }
 
-    out += '<h2>Apply in Discord, then four steps</h2>' +
-           '<div class="steps">' +
-           '<div class="step"><div><h3>Come into the Discord and apply</h3>' +
-             '<p>The installer is open to anybody, but the world is not, so this is ' +
-             'the step that unlocks Play. Open a ticket saying who you are and why you ' +
-             'want in. It is a few lines, not an essay, and somebody answers. If you are ' +
-             'accepted your Discord account is what lets you through, so there is nothing ' +
-             'else to sign up for.</p>' +
+    out += (d.open === true
+             ? '<h2>Join the Discord, then four steps</h2>' +
+               '<div class="steps">' +
+               '<div class="step"><div><h3>Come into the Discord</h3>' +
+                 '<p>Anyone in the Discord can play. Read the <a href="/rules">rules</a>, ' +
+                 'because being there means accepting them. Your Discord account is what ' +
+                 'lets you through, so there is nothing else to sign up for.</p>'
+             : '<h2>Apply in Discord, then four steps</h2>' +
+               '<div class="steps">' +
+               '<div class="step"><div><h3>Come into the Discord and apply</h3>' +
+                 '<p>The installer is open to anybody, and this is the step that unlocks ' +
+                 'Play. Read the <a href="/rules">rules</a>, then open a ticket and pick ' +
+                 'Apply to be an alpha playtester. It asks whether you are eighteen or over, ' +
+                 'whether you accept the rules, and a few lines about who you want to play. ' +
+                 'It is not an essay, and somebody answers. Once you are accepted your ' +
+                 'Discord account is what lets you through, so there is nothing else to sign ' +
+                 'up for.</p>') +
              // The first step is the only one that had no way to do it from
              // here. The installer has its two buttons and the collection has
              // one, and this said come into the Discord without a door. The
@@ -1423,8 +1475,8 @@ if (AGE_PATHS[here] && !ageOk()) {
              (d.invite
                ? '<div class="grab"><a class="btn first" href="' + esc(d.invite) +
                  '" target="_blank" rel="noopener">Open the Discord</a>' +
-                 '<p class="also faintly">The invite never expires. Open a ticket ' +
-                 'once you are in.</p></div>'
+                 '<p class="also faintly">The invite never expires.' +
+                 (d.open === true ? '' : ' Open a ticket once you are in.') + '</p></div>'
                : '') +
              '</div></div>' +
            '<div class="step"><div><h3>Take the installer</h3>' +
@@ -1468,13 +1520,17 @@ if (AGE_PATHS[here] && !ageOk()) {
              'world.</p></div></div>' +
            '</div>';
 
-    out += '<p class="lede" style="margin-top:34px">The installer is open to anybody. ' +
-           'The world is not: the launcher asks Discord who you are every time it ' +
-           'starts, so downloading it before you have been accepted just means you are ' +
-           'ready when you are.</p>' +
+    out += (d.open === true
+             ? '<p class="lede" style="margin-top:34px">The installer is open to anybody, ' +
+               'and so is the world: the launcher asks Discord who you are every time it ' +
+               'starts, and being in the Discord is enough.</p>'
+             : '<p class="lede" style="margin-top:34px">The installer is open to anybody, ' +
+               'and the world is open by application: the launcher asks Discord who you are ' +
+               'every time it starts, so downloading it before you have been accepted just ' +
+               'means you are ready when you are.</p>') +
            '<div class="acts" style="justify-content:flex-start;margin-top:26px">' +
            '<a class="btn first" href="' + esc(d.invite || '/join') + '" target="_blank" ' +
-           'rel="noopener">Apply in the Discord</a>' +
+           'rel="noopener">' + (d.open === true ? 'Join the Discord' : 'Apply in the Discord') + '</a>' +
            '<a class="btn ghost" href="/join">The long version</a></div>';
 
     show(out);
@@ -1487,6 +1543,8 @@ if (AGE_PATHS[here] && !ageOk()) {
   show('<h1>Report a problem</h1>' +
     '<p>Something broken, or an idea. Either one lands in front of whoever is ' +
     'fixing things. You do not need an account and nothing here is public.</p>' +
+    '<p>Somebody behaving badly goes here too: tick the box about a person. ' +
+    'That one needs you signed in with Discord, and only staff read it.</p>' +
     '<form id="rep" class="form">' +
     '<div><label for="rTitle">What happened</label>' +
       '<span class="hint">One line. The rest goes below.</span>' +
@@ -1506,40 +1564,109 @@ if (AGE_PATHS[here] && !ageOk()) {
       'autocomplete="off"></div>' +
     '<label class="check"><input type="checkbox" id="rIdea"> ' +
       'This is an idea, not a fault</label>' +
+    /* Reporting a person (#414). Never anonymous: the site keeps it against
+       the Discord account that sent it, so this half asks for a sign in and
+       the server refuses it without one. */
+    '<label class="check"><input type="checkbox" id="rPerson"> ' +
+      'This is about a person, not the game</label>' +
+    '<div id="rWhoBox" hidden><label for="rWho">Who</label>' +
+      '<span class="hint">Their character name, or their Discord name. It goes to ' +
+      'staff and nobody else, and staff see that it came from you.</span>' +
+      '<input id="rWho" type="text" maxlength="60">' +
+      '<p id="rSign" class="hint" hidden>Reporting somebody needs you signed in, so staff ' +
+      'can come back to you about it. <a href="/auth/discord?back=/report">Sign in with ' +
+      'Discord</a>. In the game, /report does the same.</p>' +
+      '<p id="rNo" class="hint" hidden></p></div>' +
     '<div><button class="btn first" type="submit">Send it</button></div>' +
     '<p id="rSaid" class="said" hidden></p>' +
     '</form>');
   var form = document.getElementById('rep');
+  /* Who is asking, told apart (#1097): not signed in gets the sign in link;
+     signed in but not let in, banned, or Discord not answering gets the
+     site's own sentence (personSays, what /api/report would answer) and no
+     link, because they are signed in already. letIn is null until the site
+     answers, and the button waits for it. */
+  var letIn = null, personSays = '', needsSignIn = true;
+  fetch('/api/gallery/who', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      d = d || {};
+      letIn = !d.personWhy;
+      needsSignIn = d.personWhy === 'sign in';
+      personSays = d.personSays || '';
+      personBox();
+    })
+    .catch(function () { letIn = false; personBox(); });
+  function personBox() {
+    var on = document.getElementById('rPerson').checked;
+    var sign = document.getElementById('rSign');
+    var no = document.getElementById('rNo');
+    document.getElementById('rWhoBox').hidden = !on;
+    sign.hidden = !on || letIn !== false || !needsSignIn;
+    no.hidden = !on || letIn !== false || needsSignIn || !personSays;
+    no.textContent = personSays;
+    document.getElementById('rIdea').disabled = on;
+    form.querySelector('button').disabled = on && !letIn;
+  }
+  document.getElementById('rPerson').addEventListener('change', personBox);
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var said = document.getElementById('rSaid');
     var btn = form.querySelector('button');
+    if (btn.disabled) return;
+    // Said at once, on the button and under it, so a press never looks like
+    // nothing happened (#467). The site answers inside a second; if nothing
+    // has come back in fifteen, the page stops waiting and says so rather
+    // than leaving the button grey.
     btn.disabled = true;
+    btn.textContent = 'Sending';
+    said.hidden = false;
+    said.textContent = 'Sending it.';
+    var ctl = window.AbortController ? new AbortController() : null;
+    var gaveUp = false;
+    var timer = setTimeout(function () { gaveUp = true; if (ctl) ctl.abort(); }, 15000);
+    function finish(text) {
+      clearTimeout(timer);
+      said.hidden = false;
+      said.textContent = text;
+      btn.textContent = 'Send it';
+      btn.disabled = false;
+      personBox();
+    }
+    var aboutPerson = document.getElementById('rPerson').checked;
     fetch('/api/report', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin', signal: ctl ? ctl.signal : undefined,
       body: JSON.stringify({
         title:  document.getElementById('rTitle').value,
         detail: document.getElementById('rDetail').value,
         by:     document.getElementById('rBy').value,
         homepage: document.getElementById('rHome').value,
-        kind:   document.getElementById('rIdea').checked ? 'idea' : 'bug'
+        about:  aboutPerson ? document.getElementById('rWho').value : '',
+        kind:   aboutPerson ? 'report'
+              : (document.getElementById('rIdea').checked ? 'idea' : 'bug')
       })
-    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    }).then(function (r) {
+        // An answer that is not JSON (a proxy's error page) still ends here
+        // with a message, not in the catch with the button left waiting.
+        return r.json().catch(function () { return {}; })
+          .then(function (j) { return { ok: r.ok, j: j || {} }; });
+      })
       .then(function (res) {
-        said.hidden = false;
         if (res.ok) {
           form.querySelectorAll('input, textarea').forEach(function (i) {
             if (i.type === 'checkbox') { i.checked = false; } else { i.value = ''; }
           });
-          said.textContent = 'Sent. Somebody will read it.';
+          finish(aboutPerson
+            ? 'Sent to staff, and to nobody else. Somebody will read it.'
+            : 'Sent. Somebody will read it.');
         } else {
-          said.textContent = res.j.error || 'That did not send. Try again in a minute.';
+          finish(res.j.error || 'That did not send. Try again in a minute.');
         }
-        btn.disabled = false;
       }).catch(function () {
-        said.hidden = false;
-        said.textContent = 'That did not send. Try again in a minute.';
-        btn.disabled = false;
+        finish(gaveUp
+          ? 'No answer from the site after fifteen seconds, so it may not have gone. Try again in a minute.'
+          : 'That did not send. Try again in a minute.');
       });
   });
 }
@@ -1568,12 +1695,41 @@ fetch('/api/public', { credentials:'same-origin' })
       if (d.status && d.status.up) {
         dot.className = 'dot on';
         var n = d.status.online || 0;
-        t.textContent = n === 0 ? 'The world is open'
-          : (n === 1 ? '1 person in the world' : n + ' people in the world');
+        if (n === 0) {
+          /* Patrick's line, 28 Sep (#884). The second half goes to /join,
+             which says how to apply. Built from nodes, not markup. */
+          t.textContent = 'The world is open, ';
+          var apply = document.createElement('a');
+          apply.href = '/join';
+          /* With the one switch on (#428) there is nothing to apply for. */
+          apply.textContent = d.open === true
+            ? 'come into the Discord and play!'
+            : 'apply to be an alpha playtester in the Discord!';
+          t.appendChild(apply);
+        } else {
+          /* N of the most the world holds (#481). The site sends the number
+             even when the server has not said it, from records\most-online.json.
+             Staff seats over it are not counted: it is N of 25, never 27 of 25.
+             And how many wait at the menu when anybody does. */
+          var most = d.status.max > 0 ? d.status.max : 0;
+          var seen = most ? Math.min(n, most) : n;
+          var waiting = d.status.line > 0 ? d.status.line : 0;
+          if (most && (n >= most || d.status.full === true)) {
+            t.textContent = 'The world is full, ' + seen + ' of ' + most + ' people are in it' +
+              (waiting ? ', ' + waiting + ' waiting for a seat' : '');
+          } else if (most) {
+            t.textContent = seen + ' of ' + most + ' people in the world';
+          } else {
+            t.textContent = n === 1 ? '1 person in the world' : n + ' people in the world';
+          }
+        }
         var f = document.getElementById('figOnline');
         var w = document.getElementById('figOnlineWrap');
         // Only worth a tile of its own once there is somebody in it.
-        if (f && w && n > 0) { f.textContent = String(n); w.hidden = false; }
+        if (f && w && n > 0) {
+          f.textContent = d.status.max > 0 ? Math.min(n, d.status.max) + ' of ' + d.status.max : String(n);
+          w.hidden = false;
+        }
       } else {
         t.textContent = 'Server offline';
       }

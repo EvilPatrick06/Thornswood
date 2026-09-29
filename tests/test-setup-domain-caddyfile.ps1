@@ -13,14 +13,14 @@
   file against the tracked Caddyfile, with and without -Domain and -Email.
 #>
 [CmdletBinding()]
-param([string]$Tools)
+param([string]$Repo)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $Tools) { $Tools = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $Repo) { $Repo = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -29,8 +29,8 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$text = [IO.File]::ReadAllText((Join-Path $Tools '..\scripts\deploy\Setup-Domain.ps1'))
-$cf = [IO.File]::ReadAllText((Join-Path $Tools '..\scripts\deploy\Caddyfile'))
+$text = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\Setup-Domain.ps1'))
+$cf = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\Caddyfile'))
 
 Yes 'the tracked Caddyfile has the voice route' ($cf.Contains('handle_path /voice/*'))
 Yes '  and the dev voice route' ($cf.Contains('handle_path /voice-dev/*'))
@@ -48,7 +48,7 @@ if ($start -gt 0 -and $end -gt $start) {
     $code = $text.Substring($start, $end - $start)
     function Build([string]$Domain, [string]$Email) {
         # Setup-Domain and the Caddyfile sit together in scripts\deploy.
-        $Here = Join-Path $Tools '..\scripts\deploy'
+        $Here = Join-Path $Repo 'scripts\deploy'
         . ([scriptblock]::Create($code))
         return $caddyfile
     }

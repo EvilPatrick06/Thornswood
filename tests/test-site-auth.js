@@ -26,7 +26,7 @@
   Give it an older server.js and gamemode.js to watch it fail on the code from
   before the change.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -35,8 +35,8 @@ const net = require('net');
 const os = require('os');
 const path = require('path');
 
-const SITE_SRC = process.argv[2] || path.join(TOOLS_DIR, '..', 'site', 'server.js');
-const GAME_SRC = process.argv[3] || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SITE_SRC = process.argv[2] || path.join(REPO_DIR, 'site', 'server.js');
+const GAME_SRC = process.argv[3] || path.join(REPO_DIR, 'game', 'gamemode.js');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

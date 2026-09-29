@@ -1,0 +1,532 @@
+<#
+.SYNOPSIS
+  Checks and prepares a Windows machine to Ship dev, and says what is left
+  for a person to do.
+
+.DESCRIPTION
+  WHY IT EXISTS. Issue #458, "If One dies, the release process does not
+  survive". Since #907 the feed and the Ship baseline live on the VPS and the
+  release webhooks are read from there too, so most of what a Ship needs is
+  already off Patrick's machine (One). What was still only on One, measured on
+  29 September: the signing setup (records\signing\signing.json, which names a metadata
+  file outside the repository, Microsoft's signing client, and the az sign in
+  behind it) and the client runtime build the record names. No copy of the
+  recorded client sat anywhere on One but the dev game folder; the site's feed
+  had the only other one.
+
+  This does the parts a script can do and names the rest:
+
+    1. The tools a Ship calls: git, gh signed in, PowerShell 7, node, ssh,
+       the .NET Framework 4 compiler, signtool from the Windows SDK, az, and
+       the .NET 8 runtime Microsoft's signing client runs on.
+    2. Microsoft's signing client in records\signing\client. When it is not
+       there it is fetched from nuget.org at the version pinned below and
+       refused unless its sha256 is the pinned one.
+    3. records\signing\signing.json. When there is none it is written from
+       records\signing\signing.template.json, which holds paths and "enabled": true, no key. An
+       existing one is never changed: it is read, and anything wrong with it
+       is said.
+    4. The az sign in. Only Patrick's Azure account has signing access (the
+       Certificate Profile Signer role on the ThornswoodRelease profile), so
+       a second machine signs only while az on it is signed in as Patrick
+       (Patrick, 29 Sep, #1121). It asks the signing service, with this
+       machine's sign in, what identity the profile carries, and checks it is
+       the one the launcher pins (launcher\app\Signature.cs). A sign in that
+       cannot reach the profile says so here instead of at the end of a Ship.
+    5. The client runtime records\client-build.json names. When neither the
+       game folder nor the build folder holds it, the zip of that exact
+       commit is fetched from the site's feed (the clientRuntime entry in
+       /feed-dev/version.json or /feed/version.json), checked against the
+       feed's sha256 and size, unpacked, and each of the six files checked
+       against the record's sha256 before anything is put in the build
+       folder. Not on either feed: -Rebuild builds the fork instead.
+    6. Then Check-ShipReady.ps1 for the channel, which asks every other
+       question Ship asks (the dev build, its game folder, the Vortex profile,
+       the VPS and the feed store) and gives the verdict.
+
+  WHAT IT NEVER DOES. It writes no secret anywhere, never turns signing off
+  or writes "enabled": false, never edits an existing records\signing\signing.json,
+  never ships, publishes or deploys, and does not sign anything. The only
+  files it writes are the signing client under records\signing\client, a new
+  records\signing\signing.json, the six client files in the build folder
+  (Where.ps1 ClientDist), and its downloads under out\ship-machine, all
+  ignored by git.
+
+  A main Ship stays Patrick's (CONTRIBUTING.md): -Channel main checks, and
+  says so.
+
+.PARAMETER Channel
+  dev (the default) or main: which channel Check-ShipReady asks about, and
+  which game folder the client is checked in (<root>-DevBuild\Game for dev).
+
+.PARAMETER Check
+  Report only. Nothing is fetched or written; each step says what it would do.
+
+.PARAMETER Rebuild
+  When the recorded client is on neither feed, build the fork with
+  Build-Engine.ps1 (an hour or more the first time) instead of stopping with
+  the command.
+
+.PARAMETER NoVps
+  Passed to Check-ShipReady.ps1, which then skips the two questions that ask
+  the VPS over ssh.
+
+.PARAMETER NoPause
+  Exits without waiting for Enter.
+
+.PARAMETER Site
+  Where the feeds are read from. https://thornswood.net unless a harness says
+  otherwise.
+
+.EXAMPLE
+  .\scripts\release\Setup-ShipMachine.ps1 -Check
+  Says what this machine has and what it would fetch or write, and changes
+  nothing.
+
+.EXAMPLE
+  .\scripts\release\Setup-ShipMachine.ps1
+  Prepares what it can for a dev Ship, then runs Check-ShipReady -Channel dev.
+#>
+[CmdletBinding()]
+param(
+  [ValidateSet('dev', 'main')]
+  [string]$Channel = 'dev',
+  [switch]$Check,
+  [switch]$Rebuild,
+  [switch]$NoVps,
+  [switch]$NoPause,
+  [string]$Site = 'https://thornswood.net'
+)
+
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
+
+# ------------------------------------------------------------ the helpers --
+# tests\test-ship-machine.ps1 lifts these out of the script and runs them.
+
+# Microsoft's signing client, pinned. The sha256 is the one nuget.org served
+# for this version on 29 September 2026, and the same bytes One signs with.
+# A new version is a deliberate change: move the three together.
+function Get-SigningClientPin {
+  return [pscustomobject]@{
+    Id      = 'Microsoft.ArtifactSigning.Client'
+    Version = '1.0.128'
+    Sha256  = '74bd7d27e6ce1051409c38d9b46bc8df0400ecd643d51ffbf2ac00869061e40b'
+    Url     = 'https://api.nuget.org/v3-flatcontainer/microsoft.artifactsigning.client/1.0.128/microsoft.artifactsigning.client.1.0.128.nupkg'
+  }
+}
+
+function Get-Sha256([string]$Path) { return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
+
+# The default way a file is fetched. The harness passes its own.
+function Save-Url([string]$Url, [string]$Path) {
+  $old = $ProgressPreference; $ProgressPreference = 'SilentlyContinue'
+  try { Invoke-WebRequest -Uri $Url -OutFile $Path -UseBasicParsing -TimeoutSec 600 }
+  finally { $ProgressPreference = $old }
+}
+
+# The signing client's dlib under records\signing\client, x64, as a path
+# relative to the repository, or ''. Any layout: nuget.exe's (client\client\
+# <id>\bin\x64, what One has) and this script's (<id>\bin\x64) both count.
+function Find-SigningDlib([string]$Repo) {
+  $top = Join-Path $Repo 'records\signing\client'
+  if (-not (Test-Path -LiteralPath $top)) { return '' }
+  $hit = @(Get-ChildItem -LiteralPath $top -Recurse -File -Filter 'Azure.CodeSigning.Dlib.dll' -EA SilentlyContinue |
+           Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName) | Select-Object -First 1
+  if (-not $hit) { return '' }
+  return $hit.FullName.Substring($Repo.TrimEnd('\').Length).TrimStart('\')
+}
+
+# Fetches the pinned signing client and unpacks it into
+# records\signing\client\<id>. '' when it is there, else why not. Nothing is
+# unpacked unless the package is the pinned bytes.
+function Save-SigningClient([string]$Repo, $Pin, [scriptblock]$Fetch, [string]$Work) {
+  New-Item -ItemType Directory -Force -Path $Work | Out-Null
+  $pkg = Join-Path $Work ($Pin.Id + '.' + $Pin.Version + '.nupkg')
+  if (Test-Path -LiteralPath $pkg) { Remove-Item -LiteralPath $pkg -Force }
+  try { & $Fetch $Pin.Url $pkg } catch { return ('the signing client could not be fetched from ' + $Pin.Url + ': ' + $_.Exception.Message) }
+  if (-not (Test-Path -LiteralPath $pkg)) { return ('nothing came back from ' + $Pin.Url) }
+  $have = Get-Sha256 $pkg
+  if ($have -ne $Pin.Sha256) {
+    Remove-Item -LiteralPath $pkg -Force -EA SilentlyContinue
+    return ('the signing client from nuget.org is not the pinned one (sha256 ' + $have + ', pinned ' + $Pin.Sha256 + '). Nothing was unpacked.')
+  }
+  $dest = Join-Path $Repo ('records\signing\client\' + $Pin.Id)
+  $stage = $dest + '.part'
+  if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  [IO.Compression.ZipFile]::ExtractToDirectory($pkg, $stage)
+  if (-not (Test-Path -LiteralPath (Join-Path $stage 'bin\x64\Azure.CodeSigning.Dlib.dll'))) {
+    Remove-Item -LiteralPath $stage -Recurse -Force -EA SilentlyContinue
+    return 'the signing client has no bin\x64\Azure.CodeSigning.Dlib.dll in it. Nothing was put in place.'
+  }
+  if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
+  Move-Item -LiteralPath $stage -Destination $dest
+  return ''
+}
+
+# Writes records\signing\signing.json from the template when there is none. Never
+# touches one that exists, and never writes one that turns signing off: a
+# template whose "enabled" is anything but true is refused. The key is there
+# at all because Ship runs under Set-StrictMode -Version Latest, where
+# Assert-PublishSigned.ps1 and Sign-Artifact.ps1 reading a missing "enabled"
+# throws (measured 29 Sep). $DlibRel, when given, replaces the template's dlib
+# so the file names the client this machine actually has.
+function New-SigningConfig([string]$Template, [string]$Target, [string]$DlibRel) {
+  if (Test-Path -LiteralPath $Target) { return [pscustomobject]@{ Wrote = $false; Why = 'there is one already, left as it is' } }
+  if (-not (Test-Path -LiteralPath $Template)) { return [pscustomobject]@{ Wrote = $false; Why = ('the template is missing: ' + $Template) } }
+  $cfg = Get-Content -LiteralPath $Template -Raw | ConvertFrom-Json
+  $keys = @($cfg.PSObject.Properties.Name | Sort-Object)
+  if (($keys -join ',') -ne 'dlib,enabled,metadata,method,timestampUrl') {
+    return [pscustomobject]@{ Wrote = $false; Why = ('the template has keys it should not, or lacks one: ' + ($keys -join ', ')) }
+  }
+  if ($cfg.enabled -ne $true) {
+    return [pscustomobject]@{ Wrote = $false; Why = 'the template turns signing off; a signing.json from it would be refused by Ship' }
+  }
+  if ($DlibRel) { $cfg.dlib = $DlibRel }
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Target) | Out-Null
+  $json = $cfg | ConvertTo-Json
+  [IO.File]::WriteAllText($Target, $json + "`r`n", (New-Object Text.UTF8Encoding($false)))
+  return [pscustomobject]@{ Wrote = $true; Why = '' }
+}
+
+# The dlib and metadata a signing.json names, resolved the way Sign-Artifact
+# resolves them (relative means the repository's). Returns the ones missing.
+function Get-SigningPathsMissing([string]$ConfigPath, [string]$Repo) {
+  $cfg = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+  $missing = @()
+  foreach ($k in 'dlib', 'metadata') {
+    $v = ''
+    if ($cfg.PSObject.Properties[$k]) { $v = [string]$cfg.$k }
+    if (-not $v) { $missing += ($k + ' is not named'); continue }
+    if (-not [IO.Path]::IsPathRooted($v)) { $v = Join-Path $Repo $v }
+    if (-not (Test-Path -LiteralPath $v)) { $missing += ($k + ' ' + $v) }
+  }
+  return $missing
+}
+
+# The durable identities the launcher accepts, read out of Signature.cs the
+# way Watch-Outside.ps1 reads them.
+function Get-SignatureIdentities([string]$SignatureCs) {
+  if (-not (Test-Path -LiteralPath $SignatureCs)) { return @() }
+  $sig = [IO.File]::ReadAllText($SignatureCs)
+  $block = [regex]::Match($sig, 'Identities\s*=\s*\{([^}]*)\}').Groups[1].Value
+  return @([regex]::Matches($block, '"([0-9.]+)"') | ForEach-Object { $_.Groups[1].Value })
+}
+
+# Asks the signing service, with this machine's az sign in, which identity
+# the profile carries. The token stays in memory and is never printed.
+function Test-SigningReach([string]$MetadataPath, [string[]]$Identities) {
+  $az = Get-Command az -EA SilentlyContinue
+  if (-not $az) { return [pscustomobject]@{ Ok = $false; Why = 'az is not on this machine' } }
+  $meta = Get-Content -LiteralPath $MetadataPath -Raw | ConvertFrom-Json
+  $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  $out = & $az.Source account get-access-token --resource https://codesigning.azure.net --query accessToken -o tsv 2>$null
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $old
+  $t = ('' + (@($out) | Select-Object -Last 1)).Trim()
+  $out = $null
+  if ($code -ne 0 -or $t -notmatch '^ey') { return [pscustomobject]@{ Ok = $false; Why = 'az has no Azure sign in on this machine' } }
+  $url = ([string]$meta.Endpoint).TrimEnd('/') + '/codesigningaccounts/' + $meta.CodeSigningAccountName +
+         '/certificateprofiles/' + $meta.CertificateProfileName + '/sign/eku?api-version=2022-06-15-preview'
+  $status = 0; $body = ''
+  try {
+    $r = Invoke-WebRequest -Uri $url -Headers @{ Authorization = ('Bearer ' + $t); Accept = 'application/json' } -UseBasicParsing -TimeoutSec 30
+    $status = [int]$r.StatusCode; $body = [string]$r.Content
+  } catch {
+    $resp = $_.Exception.Response
+    if ($resp) { try { $status = [int]$resp.StatusCode } catch { $status = 0 } }
+    if (-not $status) { $t = $null; return [pscustomobject]@{ Ok = $false; Why = ('the signing service could not be reached: ' + $_.Exception.Message) } }
+  }
+  $t = $null
+  if ($status -eq 200) {
+    $ekus = @(); try { $ekus = @($body | ConvertFrom-Json) } catch { }
+    if (@($ekus | Where-Object { $Identities -contains $_ }).Count) {
+      return [pscustomobject]@{ Ok = $true; Why = ('profile ' + $meta.CertificateProfileName + ' answers this sign in with the identity the launcher pins') }
+    }
+    return [pscustomobject]@{ Ok = $false; Why = ('profile ' + $meta.CertificateProfileName + ' answered without the identity the launcher pins, so every installed launcher would refuse what it signs') }
+  }
+  if ($status -eq 401 -or $status -eq 403) {
+    return [pscustomobject]@{ Ok = $false; Why = ('the signing service refused this sign in (HTTP ' + $status + '): it has no signer role on profile ' + $meta.CertificateProfileName + ', and only Patrick''s Azure account does') }
+  }
+  return [pscustomobject]@{ Ok = $false; Why = ('the signing service answered HTTP ' + $status) }
+}
+
+# The clientRuntime entry, on any of the feeds given, whose forkCommit is the
+# record's. $Feeds is a list of @{ Name; Doc }. $null when no feed has it.
+function Find-ClientRuntime($Feeds, [string]$Commit) {
+  if (-not $Commit) { return $null }
+  foreach ($f in @($Feeds)) {
+    if ($null -eq $f -or $null -eq $f.Doc) { continue }
+    $d = $f.Doc
+    if (-not $d.PSObject.Properties['clientRuntime'] -or $null -eq $d.clientRuntime) { continue }
+    $c = $d.clientRuntime
+    $fc = ''; if ($c.PSObject.Properties['forkCommit']) { $fc = [string]$c.forkCommit }
+    if ($fc -ne $Commit) { continue }
+    $u = ''; if ($c.PSObject.Properties['url']) { $u = [string]$c.url }
+    $s = ''; if ($c.PSObject.Properties['sha256']) { $s = ([string]$c.sha256).ToLowerInvariant() }
+    $b = [long]0; if ($c.PSObject.Properties['bytes']) { $b = [long]$c.bytes }
+    if (-not $u -or $s -notmatch '^[0-9a-f]{64}$') { continue }
+    return [pscustomobject]@{ Feed = $f.Name; Url = $u; Sha256 = $s; Bytes = $b; Commit = $fc }
+  }
+  return $null
+}
+
+# How many of the record's files a folder holds as recorded.
+function Get-ClientMatch([string]$Record, [string]$Folder) {
+  $rec = Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json
+  $n = 0
+  if (-not $Folder -or -not (Test-Path -LiteralPath $Folder)) { return 0 }
+  foreach ($p in $rec.files.PSObject.Properties) {
+    $f = Join-Path $Folder $p.Name
+    if ((Test-Path -LiteralPath $f) -and ((Get-Sha256 $f) -eq ([string]$p.Value.sha256).ToLowerInvariant())) { $n++ }
+  }
+  return $n
+}
+
+# Unpacks a client runtime zip and puts the record's files in $Dist. '' when
+# they are all there as recorded, else why not. Checked twice: the zip against
+# the feed's sha256 and size, then each file against the record. Nothing goes
+# into $Dist unless every file passed, so a half placed build is not a state
+# this can leave behind.
+function Install-ClientRuntime([string]$Zip, [string]$Sha256, [long]$Bytes, [string]$Record, [string]$Dist, [string]$Stage) {
+  if (-not (Test-Path -LiteralPath $Zip)) { return ('no zip at ' + $Zip) }
+  $have = Get-Sha256 $Zip
+  if ($have -ne $Sha256.ToLowerInvariant()) { return ('the zip is not the one the feed names (sha256 ' + $have + ', the feed says ' + $Sha256 + '). Nothing was put in place.') }
+  if ($Bytes -gt 0 -and (Get-Item -LiteralPath $Zip).Length -ne $Bytes) { return 'the zip is not the size the feed names. Nothing was put in place.' }
+  if (Test-Path -LiteralPath $Stage) { Remove-Item -LiteralPath $Stage -Recurse -Force }
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  [IO.Compression.ZipFile]::ExtractToDirectory($Zip, $Stage)
+  $rec = Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json
+  $plan = @()
+  try {
+    foreach ($p in $rec.files.PSObject.Properties) {
+      $src = Join-Path $Stage $p.Name
+      if (-not (Test-Path -LiteralPath $src)) { return ('the zip has no ' + $p.Name + '. Nothing was put in place.') }
+      $h = Get-Sha256 $src
+      if ($h -ne ([string]$p.Value.sha256).ToLowerInvariant()) { return ($p.Name + ' in the zip is not the recorded build (sha256 ' + $h + '). Nothing was put in place.') }
+      $plan += [pscustomobject]@{ Src = $src; Dst = (Join-Path $Dist $p.Name); Want = ([string]$p.Value.sha256).ToLowerInvariant(); Rel = $p.Name }
+    }
+    foreach ($x in $plan) {
+      New-Item -ItemType Directory -Force -Path (Split-Path -Parent $x.Dst) | Out-Null
+      Copy-Item -LiteralPath $x.Src -Destination $x.Dst -Force
+      if ((Get-Sha256 $x.Dst) -ne $x.Want) { return ('the copy of ' + $x.Rel + ' in ' + $Dist + ' does not hash as the record; the folder may be in use') }
+    }
+  } finally {
+    Remove-Item -LiteralPath $Stage -Recurse -Force -EA SilentlyContinue
+  }
+  return ''
+}
+
+# Same rule as Find-Root in Ship.ps1 and Sync-Client.ps1.
+function Find-Root {
+  $first = 'C:\Thornswood'
+  if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
+  foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
+    $cand = Join-Path $d.Root 'Thornswood'
+    if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
+  }
+  return $first
+}
+
+# signtool the way Sign-Artifact.ps1 looks for it: newest x64 in the SDK.
+function Find-Signtool {
+  foreach ($r in @("${env:ProgramFiles(x86)}\Windows Kits\10\bin", "$env:ProgramFiles\Windows Kits\10\bin")) {
+    if (-not (Test-Path -LiteralPath $r)) { continue }
+    $f = Get-ChildItem -LiteralPath $r -Recurse -Filter 'signtool.exe' -EA SilentlyContinue |
+         Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+    if ($f) { return $f.FullName }
+  }
+  $c = Get-Command signtool.exe -EA SilentlyContinue
+  if ($c) { return $c.Source }
+  return ''
+}
+
+# ---------------------------------------------------------------- the run --
+$script:gaps = New-Object Collections.Generic.List[object]
+function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
+function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
+function Row([string]$what, [bool]$ok, [string]$detail, [string]$fix, [string]$who = 'you') {
+  $tail = $(if ($detail) { '  (' + $detail + ')' } else { '' })
+  if ($ok) { Say ('  yes   ' + $what + $tail) 'Green' }
+  else {
+    Say ('  NO    ' + $what + $tail) 'Red'
+    $script:gaps.Add([pscustomobject]@{ What = $what; Fix = $fix; Who = $who })
+  }
+}
+function Plan([string]$what) { Say ('  would ' + $what) 'Yellow' }
+
+Write-Host ''
+Write-Host ('  THORNSWOOD  -  get this machine ready to Ship (' + $Channel + ' channel)' + $(if ($Check) { ', checking only' } else { '' })) -ForegroundColor White
+if ($Channel -eq 'main') {
+  Say '  A main Ship is Patrick''s call, from his machine (CONTRIBUTING.md). This checks; it does not make it anybody else''s.' 'Yellow'
+}
+
+$Work = Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'ship-machine'
+
+# ------------------------------------------------------------ 1. the tools --
+Head '1. The tools a Ship calls'
+function Has([string]$n) { return [bool](Get-Command $n -EA SilentlyContinue) }
+Row 'git' (Has 'git') '' 'winget install --id Git.Git -e'
+$ghOk = $false
+if (Has 'gh') {
+  $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  & gh auth status *> $null; $ghOk = ($LASTEXITCODE -eq 0)
+  $ErrorActionPreference = $old
+  Row 'gh, signed in to GitHub' $ghOk '' 'gh auth login   (an account that is a collaborator on EvilPatrick06/Thornswood)'
+} else { Row 'gh, signed in to GitHub' $false 'gh is not installed' 'winget install --id GitHub.cli -e, then gh auth login' }
+Row 'PowerShell 7' (Has 'pwsh') '' 'winget install --id Microsoft.PowerShell -e'
+Row 'node' (Has 'node') '' 'winget install --id OpenJS.NodeJS.LTS -e'
+Row 'ssh' (Has 'ssh') '' 'Settings, System, Optional features, add OpenSSH Client'
+$csc = @("$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe", "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe") |
+       Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+Row 'the .NET Framework 4 compiler' ([bool]$csc) $csc 'Turn on .NET Framework 4.8 in Windows Features'
+$signtool = Find-Signtool
+Row 'signtool, from the Windows SDK' ([bool]$signtool) $signtool 'winget install --id Microsoft.WindowsSDK.10.0.26100 -e   (its signing tools are what matter)'
+Row 'az, the Azure command line' (Has 'az') '' 'winget install --id Microsoft.AzureCLI -e'
+$net8 = $false
+if (Has 'dotnet') {
+  $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  $rt = @(& dotnet --list-runtimes 2>$null)
+  $ErrorActionPreference = $old
+  foreach ($l in $rt) { $m = [regex]::Match([string]$l, '^Microsoft\.NETCore\.App (\d+)\.'); if ($m.Success -and [int]$m.Groups[1].Value -ge 8) { $net8 = $true } }
+}
+Row 'the .NET 8 runtime (or newer), which the signing client runs on' $net8 '' 'winget install --id Microsoft.DotNet.Runtime.8 -e'
+
+# --------------------------------------------------- 2. the signing client --
+Head '2. Microsoft''s signing client'
+$pin = Get-SigningClientPin
+$dlibRel = Find-SigningDlib $RepoDir
+if ($dlibRel) {
+  Row 'the signing client is in records\signing\client' $true $dlibRel ''
+} elseif ($Check) {
+  Plan ('fetch ' + $pin.Id + ' ' + $pin.Version + ' from nuget.org, check its sha256, and unpack it into records\signing\client')
+  Row 'the signing client is in records\signing\client' $false 'not yet' '.\scripts\release\Setup-ShipMachine.ps1   (without -Check) fetches it'
+} else {
+  Say ('  fetching ' + $pin.Id + ' ' + $pin.Version + ' from nuget.org') 'DarkGray'
+  $why = Save-SigningClient $RepoDir $pin ${function:Save-Url} $Work
+  $dlibRel = Find-SigningDlib $RepoDir
+  Row 'the signing client is in records\signing\client' ([bool]($dlibRel -and -not $why)) $(if ($why) { $why } else { $dlibRel }) 'Run this again; if the sha256 still differs, stop and tell Patrick rather than using another copy'
+}
+
+# ------------------------------------------------------ 3. signing.json --
+Head '3. records\signing\signing.json'
+$template = Join-Path $RepoDir 'records\signing\signing.template.json'
+$cfgPath = Join-Path $RepoDir 'records\signing\signing.json'
+if (-not (Test-Path -LiteralPath $cfgPath)) {
+  if ($Check) {
+    Plan ('write records\signing\signing.json from records\signing\signing.template.json' + $(if ($dlibRel) { ', naming ' + $dlibRel } else { '' }))
+  } else {
+    $r = New-SigningConfig $template $cfgPath $dlibRel
+    if ($r.Wrote) { Say '  wrote records\signing\signing.json from the template (paths, no key)' 'Green' }
+    else { Say ('  ' + $r.Why) 'Red' }
+  }
+}
+if (Test-Path -LiteralPath $cfgPath) {
+  . (Join-Path $Here 'Assert-PublishSigned.ps1')
+  $refuse = Get-SigningConfigRefusal -ConfigPath $cfgPath -RepoRoot $RepoDir
+  Row 'Ship would accept it' (-not $refuse) $refuse 'Fix what it says. Never set "enabled": false to get past it: a Ship from a machine that cannot sign is refused, on purpose'
+  $miss = @(Get-SigningPathsMissing $cfgPath $RepoDir)
+  Row 'the dlib and metadata it names are here' ($miss.Count -eq 0) ($miss -join '; ') `
+    'It was copied from another machine and names that machine''s paths. Move it aside (rename it records\signing\signing.json.old) and run this again: it writes one from the template'
+} else {
+  Row 'records\signing\signing.json is here' $false '' '.\scripts\release\Setup-ShipMachine.ps1   (without -Check) writes it from the template'
+}
+
+# ------------------------------------------------------ 4. the az sign in --
+Head '4. The Azure sign in signing uses'
+$metaPath = Join-Path $RepoDir 'records\signing\metadata.json'
+$ids = Get-SignatureIdentities (Join-Path $RepoDir 'launcher\app\Signature.cs')
+if (-not (Has 'az')) {
+  Row 'az can sign with the ThornswoodRelease profile' $false 'az is not installed' 'Install az (step 1), then az login'
+} else {
+  $reach = Test-SigningReach $metaPath $ids
+  $fix = $(if ($reach.Why -match 'no Azure sign in') { 'az login   (as Patrick: only his Azure account can sign)' }
+           elseif ($reach.Why -match 'signer role') { 'Only Patrick''s Azure account has the Certificate Profile Signer role on the ThornswoodSigning account, profile ThornswoodRelease, so this machine signs only while signed in as him: az logout, then Patrick runs az login on it' }
+           else { 'Run this again; if it keeps failing, the lines above say what the service answered' })
+  Row 'az can sign with the ThornswoodRelease profile' $reach.Ok $reach.Why $fix $(if ($reach.Why -match 'signer role') { 'patrick' } else { 'you' })
+}
+
+# ------------------------------------------------- 5. the client runtime --
+Head '5. The client runtime records\client-build.json names'
+$record = Join-Path $RepoDir 'records\client-build.json'
+$rec = Get-Content -LiteralPath $record -Raw | ConvertFrom-Json
+$commit = [string]$rec.forkCommit
+$total = @($rec.files.PSObject.Properties).Count
+$dist = & (Join-Path $Here 'Where.ps1') ClientDist
+$gameRoot = Find-Root
+if ($Channel -eq 'dev') { $gameRoot = $gameRoot + '-DevBuild' }
+$game = Join-Path $gameRoot 'Game'
+$inGame = Get-ClientMatch $record $game
+$inDist = Get-ClientMatch $record $dist
+Say ('  record ' + $commit + '; the game folder ' + $game + ' holds ' + $inGame + ' of ' + $total + ', the build folder ' + $inDist + ' of ' + $total) 'DarkGray'
+if ($inGame -eq $total -or $inDist -eq $total) {
+  Row 'the recorded client is here' $true $(if ($inGame -eq $total) { 'in the game folder' } else { 'in ' + $dist + ', and Ship copies it in' }) ''
+} else {
+  $feeds = @()
+  foreach ($pair in @(@('dev', '/feed-dev/version.json'), @('main', '/feed/version.json'))) {
+    $doc = $null
+    try { $doc = Invoke-RestMethod -Uri ($Site.TrimEnd('/') + $pair[1]) -UseBasicParsing -TimeoutSec 30 } catch { $doc = $null }
+    $feeds += [pscustomobject]@{ Name = $pair[0]; Doc = $doc }
+  }
+  $cr = Find-ClientRuntime $feeds $commit
+  if ($cr -and $Check) {
+    Plan ('fetch client-runtime-' + $commit + ' (' + [math]::Round($cr.Bytes / 1MB, 1) + ' MB) from the ' + $cr.Feed + ' feed, check it, and put the six files in ' + $dist)
+    Row 'the recorded client is here' $false 'not yet' '.\scripts\release\Setup-ShipMachine.ps1   (without -Check) fetches it'
+  } elseif ($cr) {
+    New-Item -ItemType Directory -Force -Path $Work | Out-Null
+    $zip = Join-Path $Work ('client-runtime-' + $commit + '.zip')
+    Say ('  fetching client-runtime-' + $commit + ' from the ' + $cr.Feed + ' feed') 'DarkGray'
+    $why = ''
+    try { Save-Url $cr.Url $zip } catch { $why = 'it could not be fetched: ' + $_.Exception.Message }
+    if (-not $why) { $why = Install-ClientRuntime $zip $cr.Sha256 $cr.Bytes $record $dist (Join-Path $Work ('client-runtime-' + $commit)) }
+    Remove-Item -LiteralPath $zip -Force -EA SilentlyContinue
+    Row 'the recorded client is here' (-not $why) $(if ($why) { $why } else { 'fetched from the ' + $cr.Feed + ' feed into ' + $dist + ', every file as recorded' }) `
+      'Run this again. If the feed''s copy is wrong, build it: .\scripts\release\Build-Engine.ps1'
+  } elseif ($Rebuild -and -not $Check) {
+    Say ('  client-runtime-' + $commit + ' is on neither feed; building the fork (-Rebuild)') 'Yellow'
+    $global:LASTEXITCODE = 0
+    & (Join-Path $Here 'Build-Engine.ps1') -NoPause
+    $inDist = Get-ClientMatch $record $dist
+    Row 'the recorded client is here' ($inDist -eq $total) ('the build folder holds ' + $inDist + ' of ' + $total) `
+      'Build-Engine.ps1 says above what stopped it. A build that differs from the record is somebody''s engine change: ask before running New-ClientBuildRecord.ps1'
+  } else {
+    Row 'the recorded client is here' $false ('client-runtime-' + $commit + ' is on neither feed, so it has to be built') `
+      '.\scripts\release\Setup-ShipMachine.ps1 -Rebuild   (or .\scripts\release\Build-Engine.ps1; Visual Studio 2022 Build Tools with C++, an hour or more)'
+  }
+}
+if ((Test-Path -LiteralPath $game) -and ($inGame -ne $total)) {
+  $global:LASTEXITCODE = 0
+  & (Join-Path $Here 'Sync-Client.ps1') -Check -NoPause -Game $game -Dist $dist -Record $record 6>$null | Out-Null
+  $sc = $LASTEXITCODE
+  Say ('  Sync-Client -Check says ' + $(switch ($sc) { 0 { 'the game folder holds it' } 2 { 'a matching build is here and Ship copies it in' } default { 'no (exit ' + $sc + ')' } })) $(if ($sc -eq 0 -or $sc -eq 2) { 'DarkGray' } else { 'Yellow' })
+}
+
+# ---------------------------------------------------------- what is left --
+Write-Host ''
+Write-Host ('  ' + ('=' * 68)) -ForegroundColor DarkGray
+if ($script:gaps.Count) {
+  Say ('  ' + $script:gaps.Count + ' thing(s) to do before this machine can sign and Ship:') 'Yellow'
+  $i = 0
+  foreach ($g in $script:gaps) {
+    $i++
+    Say ('  ' + $i + '. ' + $g.What) 'Yellow'
+    if ($g.Fix) { Say ('       ' + $g.Fix + $(if ($g.Who -eq 'patrick') { '   (Patrick does this one)' } else { '' })) 'White' }
+  }
+} else {
+  Say '  The signing setup and the client runtime are in place.' 'Green'
+}
+Say '  Then Check-ShipReady asks everything else a Ship asks:' 'DarkGray'
+
+# ------------------------------------------------------ 6. Check-ShipReady --
+$readyArgs = @{ Channel = $Channel; NoPause = $true }
+if ($NoVps) { $readyArgs['NoVps'] = $true }
+$global:LASTEXITCODE = 0
+& (Join-Path $Here 'Check-ShipReady.ps1') @readyArgs
+$readyCode = $LASTEXITCODE
+
+if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+if ($script:gaps.Count -or $readyCode -ne 0) { exit 1 }
+exit 0
