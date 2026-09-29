@@ -2,9 +2,9 @@
   Check-Backdrop.ps1
 
   Read only. Says what the main menu backdrop is in a game folder: the two
-  logo meshes (their hashes and the root scale that decides whether the
-  second plate draws) and the wallpaper texture (size, mip levels, format),
-  against what the repo carries in launcher\art\menu. Nothing is changed.
+  logo meshes (their hashes and how many shapes each carries, which decides
+  whether a second plate draws) and the wallpaper texture (size, mip levels,
+  format), against what the repo carries in game\menu. Nothing is changed.
 
     .\scripts\dev\Check-Backdrop.ps1                          C:\Thornswood\Game
     .\scripts\dev\Check-Backdrop.ps1 -Game C:\Thornswood-DevBuild\Game
@@ -24,10 +24,28 @@ $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoMenu = Join-Path $Here '..\..\game\menu'
 
 function Md5([string]$p) { (Get-FileHash -LiteralPath $p -Algorithm MD5).Hash.Substring(0, 8).ToLowerInvariant() }
-function ScaleAt([string]$p) {
+# How many blocks in a Skyrim SE nif are shapes (anything the engine draws:
+# BSTriShape, NiTriShape, NiTriStrips and their kin). -1 when it is not a nif
+# this can read. Issue #425: logo01ae.nif is an empty node, 0 shapes.
+function Shapes([string]$p) {
     $b = [IO.File]::ReadAllBytes($p)
-    if ($b.Length -lt 0x167) { return [double]::NaN }
-    return [BitConverter]::ToSingle($b, 0x163)
+    $o = [Array]::IndexOf($b, [byte]10) + 1
+    if ($o -le 0 -or $b.Length -lt $o + 21) { return -1 }
+    if ([BitConverter]::ToUInt32($b, $o) -ne 0x14020007) { return -1 }
+    $blocks = [BitConverter]::ToUInt32($b, $o + 9)
+    $o += 17
+    for ($i = 0; $i -lt 3; $i++) { $o += 1 + $b[$o] }
+    $ntypes = [BitConverter]::ToUInt16($b, $o); $o += 2
+    $types = @()
+    for ($i = 0; $i -lt $ntypes; $i++) {
+        $n = [BitConverter]::ToUInt32($b, $o); $o += 4
+        $types += [Text.Encoding]::ASCII.GetString($b, $o, $n); $o += $n
+    }
+    $count = 0
+    for ($i = 0; $i -lt $blocks; $i++) {
+        if ($types[[BitConverter]::ToUInt16($b, $o + 2 * $i)] -match 'TriShape|TriStrips') { $count++ }
+    }
+    return $count
 }
 function Dds([string]$p) {
     $b = [IO.File]::ReadAllBytes($p)
@@ -49,18 +67,19 @@ $files = @(
 )
 $bad = 0
 foreach ($f in $files) {
+    $badBefore = $bad
     $p = Join-Path $Game $f.Rel
     $leaf = Split-Path $f.Rel -Leaf
     $ours = Join-Path $repoMenu $leaf
     if (-not (Test-Path -LiteralPath $p)) { Write-Host "  $($f.Rel): MISSING" -ForegroundColor Red; $bad++; continue }
     $line = '  ' + $f.Rel + ': md5 ' + (Md5 $p)
     if ($f.Kind -eq 'mesh') {
-        $s = ScaleAt $p
-        $line += (', root scale {0:n3}' -f $s)
+        $s = Shapes $p
+        $line += (', {0} shape(s)' -f $s)
         if ($leaf -ieq 'logo01ae.nif') {
-            if ($s -eq 0) { $line += ' (collapsed, draws nothing: right)' }
-            else { $line += ' (DRAWS A SECOND PLATE: the double)'; $bad++ }
-        }
+            if ($s -eq 0) { $line += ' (empty node, draws nothing: right)' }
+            else { $line += ' (A SECOND PLATE: the double, or the old copy collapsed to scale 0)'; $bad++ }
+        } elseif ($s -ne 1) { $line += ' (the backdrop plate should be one shape)'; $bad++ }
     } else {
         $d = Dds $p
         $line += ', ' + $d
@@ -71,7 +90,7 @@ foreach ($f in $files) {
     } else {
         $line += ' (nothing to compare with in game\menu)'
     }
-    Write-Host $line -ForegroundColor $(if ($bad) { 'Yellow' } else { 'Green' })
+    Write-Host $line -ForegroundColor $(if ($bad -gt $badBefore) { 'Yellow' } else { 'Green' })
 }
 Write-Host ''
 if ($bad) { Write-Host "  $bad thing(s) wrong. Go.ps1 puts the repo's copies in; Ship carries them." -ForegroundColor Yellow; exit 1 }
