@@ -24,7 +24,7 @@
                                    somebody else's framework or modding tool under Data; never shipped, never removed
       Test-ShipBethesdaLeftAlone   Bethesda's, and a pack once carried it; never shipped, never removed
       Test-ShipRetired $rel        a mod Thornswood took out; never shipped, never removed (the launcher drops it)
-      Test-ShipBethesdaTool $rel   the Creation Kit, or a copy of one of the game's programs; never shipped, never recorded, never removed (the launcher drops it)
+      Test-ShipBethesdaTool $rel   the Creation Kit, its script sources, or a copy of one of the game's programs; never shipped, never recorded, never removed (the launcher drops it)
       Test-ShipBackup $rel         any *.bak; never shipped, never removed
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
       Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
@@ -383,9 +383,10 @@ $ShipVanillaDataDirs     = @('Video', 'Strings')
 # NirnLabUIPlatform is another roleplay server's user interface framework and
 # on its own it is 356 MB. Nemesis, FNIS, BodySlide and xEdit are tools that
 # belong on the machine of somebody who builds mods, not in a folder handed to
-# somebody who plays. Source is Papyrus script sources, which the game never
-# reads. The rest is documentation, installer leftovers and a shader cache
-# that rebuilds itself on first launch.
+# somebody who plays. The rest is documentation, installer leftovers and a
+# shader cache that rebuilds itself on first launch. Data\Source, Papyrus script
+# sources, was on this list until #1227 moved it to the Creation Kit's rule
+# (Test-ShipBethesdaTool) with Data\Scripts\Source, which this list never had.
 #
 # All of them stay where they are on every machine. This only decides what
 # goes into a pack or the installer.
@@ -405,7 +406,7 @@ $ShipVanillaDataDirs     = @('Video', 'Strings')
 $ShipForeignDataDirs = @(
     'NirnLabUIPlatform',
     'Nemesis_Engine', 'FNIS Behavior SE 7.6', 'CalienteTools', 'tools',
-    'Source', 'ModderResource', 'FOMod',
+    'ModderResource', 'FOMod',
     'Docs', 'Docs and Screenshots', 'readmes',
     'ShaderCache'
 )
@@ -585,7 +586,34 @@ function Test-ShipBodyShape([string]$rel) {
 # the launcher takes these out of its own game folder itself
 # (OwnGame.BethesdaTool, rules 10) and nothing touches a Steam copy. Change the
 # two together.
+#
+# THE CREATION KIT'S SCRIPT SOURCES (#1227). The Creation Kit unpacks
+# Data\Scripts.zip into Data\Source\Scripts the first time it runs: on the
+# shipping machine that was 14,298 .psc files (15.9 MB), which Thornswood's own
+# folder took from the Steam copy as its own. Packs had left Data\Source out
+# since 24 September, through the foreign frameworks list, but the launcher
+# did not. Data\Scripts\Source, the same folder under the name the first
+# Creation Kit and SKSE use, was on no list at all. Measured over HTTPS on
+# 29 September: all five dev records the feed lists (20260928-2324-dev to
+# 20260929-140118-dev) name Data\Scripts\Source\IED.psc, which was sent to the
+# site loose, and main packs 20260915-2018, 20260915-2104 and 20260915-2144
+# each carried the script extender's 62 sources there (SKSE.psc, Actor.psc and
+# the rest). No record or pack names anything under Data\Source.
+#
+# Both folders are the Creation Kit's alone: the game reads the compiled
+# scripts in Data\Scripts and never a source. So the whole of both folders
+# never ships, whoever put a file there: Bethesda's sources, and the sources
+# mod authors put beside them, which are the collection's to hand out.
+# Thornswood has no Papyrus sources in a game folder. Ours are the engine
+# fork's (engine\skymp: MpClientPlugin.psc and the Skyrim Platform ones), and
+# they stay in the repository; only their compiled scripts reach a game.
+#
+# Measured the same day on the Steam copy's Creation Kit install list (its two
+# Steam depots, 56 files): every file it installs is named here. The Creation
+# Kit then writes CreationKitPrefs.ini, EditorWarnings.txt, DataFiles.txt,
+# Data\DialogueViews and these sources as it runs; those are named here too.
 $ShipBethesdaToolRootDirs  = @('Tools', 'Papyrus Compiler', 'lex')
+$ShipBethesdaToolDataDirs  = @('Data\DialogueViews', 'Data\Source', 'Data\Scripts\Source')
 $ShipBethesdaToolRootFiles = @(
     'flowchartx64.dll', 'flowchartx32.dll', 'p4com64.dll',
     'EditorWarnings.txt', 'DataFiles.txt', 'SkyrimReservedAddOnIndexes.txt'
@@ -605,7 +633,9 @@ function Test-ShipBethesdaTool([string]$rel) {
         return $false
     }
     if ($rel -ieq 'Data\Scripts.zip') { return $true }
-    if ($rel.StartsWith('Data\DialogueViews\', 'OrdinalIgnoreCase')) { return $true }
+    foreach ($d in $ShipBethesdaToolDataDirs) {
+        if ($rel.StartsWith($d + '\', 'OrdinalIgnoreCase')) { return $true }
+    }
     return $false
 }
 
