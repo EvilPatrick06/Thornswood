@@ -85,6 +85,43 @@ let nextPeer = 1;
 const peers = new Map();     // peerId -> {ws, profileId, name}
 
 /*
+  THE GAME SERVER'S JOIN PASS SWITCH, FOLLOWED HERE (#410). The gamemode says
+  on every /positions whether thornswoodRequirePass is on. While it is, a
+  connection that cannot prove its profile with a join token is refused
+  whatever THORNSWOOD_VOICE_AUTH says, and any such connection already open is
+  closed the moment it turns on, so chat and voice never run under a profile
+  number the game server would not trust. One switch for both, so the two can
+  never disagree about who somebody is.
+*/
+let gameRequiresPass = false;
+
+/*
+  The name a line or the roster shows (#410): for a proven connection, the
+  character name the game server has for that profile (the /positions feed),
+  so nobody chooses the name their words go out under; the name the page sent
+  only while the game server has none (the menu), or for a connection that is
+  not proven, whose profile is a claim anyway.
+*/
+function peerName(p) {
+  if (p && p.proven) {
+    const at = positions.get(p.profileId);
+    if (at && at.name) return String(at.name).slice(0, 40);
+  }
+  return (p && p.name) || '';
+}
+
+function closeUnproven(why) {
+  let n = 0;
+  for (const [, p] of peers) {
+    if (p.proven) continue;
+    try { p.ws.send({ t: 'denied', why: why }); } catch (e) { }
+    try { p.ws.close(); } catch (e) { }
+    n++;
+  }
+  if (n) console.log('[voice] closed ' + n + ' connection(s) that did not prove their profile: ' + why);
+}
+
+/*
   Ask the site whether this ticket owns this profile.
 
   Answers 'yes', 'no', or 'unchecked' when there is nobody to ask. Never throws
@@ -286,7 +323,7 @@ function chatWrite(kind, peerId, me, text) {
       kind: kind,                                   /* say or command */
       peer: peerId,
       profileId: me ? me.profileId : 0,
-      name: (me && me.name) || '',
+      name: peerName(me),
       proven: !!(me && me.proven),
       mode: (me && me.mode) || '',
       text: text
@@ -876,7 +913,7 @@ function cleanMode(v) {
 function roster() {
   const list = [];
   for (const [id, p] of peers) {
-    list.push({ peer: id, profileId: p.profileId, name: p.name, mode: p.mode || 'local' });
+    list.push({ peer: id, profileId: p.profileId, name: peerName(p), mode: p.mode || 'local' });
   }
   return list;
 }
@@ -902,7 +939,7 @@ function onJoin(ws, msg) {
     }
   } else {
     why = !msg.token ? 'no token' : (tok && tok.expired ? 'an expired token' : 'a token that does not check out');
-    if (AUTH === 'on') {
+    if (AUTH === 'on' || gameRequiresPass) {
       console.log('[voice] REFUSED a join for profile ' + claimed + ': ' + why);
       ws.send({ t: 'denied', why: why });
       try { ws.close(); } catch (e) { }
@@ -1417,6 +1454,11 @@ const server = http.createServer((req, res) => {
           });
         }
         for (const pid of Array.from(positions.keys())) if (!seen.has(pid)) positions.delete(pid);
+        // The game server's join pass switch (#410), above.
+        const wants = doc.requirePass === true;
+        if (wants && !gameRequiresPass) closeUnproven('the game server now requires the launcher\'s pass');
+        if (wants !== gameRequiresPass) console.log('[voice] the game server ' + (wants ? 'requires' : 'no longer requires') + ' the join pass, so unproven connections are ' + (wants ? 'refused' : 'left to THORNSWOOD_VOICE_AUTH'));
+        gameRequiresPass = wants;
         res.writeHead(204).end();
       } catch (e) {
         res.writeHead(400).end('bad json');
@@ -1783,7 +1825,7 @@ server.on('upgrade', (req, socket, head) => {
         t: 'chat',
         from: myId,
         profileId: me ? me.profileId : 0,
-        name: (me && me.name) || '',
+        name: peerName(me),
         text: text,
         at: Date.now()
       };

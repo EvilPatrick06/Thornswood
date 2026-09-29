@@ -51,7 +51,11 @@ const CHAT_DAYS = 365;
 const logged = [];
 const console2 = { log: (m) => logged.push(m) };
 
-eval(grab('chatDay').replace(/^function/, 'function') + '\n' +
+// The name a line is logged under is peerName's (#410): the game server's
+// name for a proven profile, none known here, so the page's.
+const positions = new Map();
+eval(grab('peerName') + '\n' +
+     grab('chatDay').replace(/^function/, 'function') + '\n' +
      grab('chatWrite').replace('console.log', 'console2.log') + '\n' +
      grab('chatPrune'));
 
