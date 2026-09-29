@@ -285,6 +285,36 @@ foreach ($rel in @($Want.Keys)) {
   $placed += $rel
 }
 
+# READ BACK, BEFORE ANYTHING STARTS (#1222), when the caller named the keys its
+# release is meant to change ($ReleaseKeys, Deploy-Server.ps1 from
+# ServerSettings.ps1): every other key of the settings now in place must be
+# the one the server had. The staged file was carried from the running one,
+# so a difference means that file moved in between, and the old files go back.
+if ($moved -and $null -ne $ReleaseKeys -and $placed -contains 'server-settings.json') {
+  $was = $null
+  $got = $null
+  try { $was = [IO.File]::ReadAllText((Join-Path $prevDir 'server-settings.json')) | ConvertFrom-Json } catch { }
+  try { $got = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
+  $drift = @()
+  if ($null -eq $was -or $null -eq $got) { $drift += 'server-settings.json, which cannot be read' }
+  else {
+    $wn = @($was.PSObject.Properties | ForEach-Object { $_.Name })
+    $gn = @($got.PSObject.Properties | ForEach-Object { $_.Name })
+    foreach ($k in @($wn + $gn | Sort-Object -Unique)) {
+      if ($ReleaseKeys -contains $k) { continue }
+      $a = 'absent'
+      $b = 'absent'
+      if ($wn -contains $k) { $a = ConvertTo-Json -InputObject $was.$k -Compress -Depth 30 }
+      if ($gn -contains $k) { $b = ConvertTo-Json -InputObject $got.$k -Compress -Depth 30 }
+      if ($a -ne $b) { $drift += $k }
+    }
+  }
+  if ($drift.Count) {
+    'read back: ' + ($drift -join ', ') + ' would not be what the server had, so nothing is started'
+    $moved = $false
+  } else { 'read back: every setting outside this release is the one the server had' }
+}
+
 if ($moved) {
   'swapped in ' + $placed.Count + ' file(s), the ones they replaced are in ' + $prevDir
   Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
@@ -328,8 +358,15 @@ exit 1
 # them. Quoted here once, doubling any single quote, because a plugin name is
 # free text and one of them with an apostrophe in it would otherwise end the
 # string early on the far side.
-function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [string]$prevName, [int]$waitSeconds, $sums) {
+#
+# $releaseKeys, when given, are the settings keys the deploy is meant to
+# change: the swap then reads the settings back before it starts anything, and
+# ServerSettings.ps1's $settingsCarryBlock uses them (Deploy-Server.ps1). Left
+# out, $ReleaseKeys is $null and there is no read-back.
+function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [string]$prevName, [int]$waitSeconds, $sums, [string[]]$releaseKeys = $null) {
   $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
+  $keysLine = '$ReleaseKeys = $null'
+  if ($null -ne $releaseKeys) { $keysLine = '$ReleaseKeys = @(' + ((@($releaseKeys) | ForEach-Object { & $q $_ }) -join ', ') + ')' }
   $lines = @(
     ('$Root  = ' + (& $q $farRoot.Replace('/', '\'))),
     ('$Task  = ' + (& $q $taskName)),
@@ -337,6 +374,7 @@ function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [stri
     ('$Prev  = ' + (& $q $prevName)),
     ('$Wait  = ' + $waitSeconds),
     '$KeepStage = $false',
+    $keysLine,
     '$Want  = [ordered]@{}'
   )
   foreach ($k in @($sums.Keys)) { $lines += ('$Want[' + (& $q $k) + '] = ' + (& $q $sums[$k])) }

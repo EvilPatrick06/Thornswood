@@ -42,6 +42,16 @@
     - -FreshWorld starts with no world and leaves the old one in .prev
     - Publish-Server.ps1 exits 1 on a refused payload without having stopped
       anything, and publishes and puts back through the same installer
+    - issue #1222: a running server's own settings survive an install, a
+      put-back and a Publish-Server on the dev channel and on the live one
+      (every thornswood switch, npcSettings, the name, the port), with only
+      the load order, the start point and how many it holds taken from the
+      payload; a payload's npcSettings "default" key never reaches a running
+      server, and a first install of one is refused; settings that moved
+      under the install between its stage and its swap put the old folder
+      back before anything starts (INSTALL ROLLED BACK)
+    - issue #1214: a payload with no build record is refused, and so is a
+      Publish-Server whose zip holds a binary the record does not name
 
   Connects to nothing but 127.0.0.1.
 #>
@@ -148,6 +158,17 @@ function Tree([string]$dir) {
 function Beside([string]$kind) {
     return @(Get-ChildItem -LiteralPath $box -Directory -Force | Where-Object { $_.Name -like ('Thornswood-Server' + $kind) } |
              Sort-Object Name | ForEach-Object { $_.FullName })
+}
+# A root's settings, and the keys of one that another does not have the same,
+# leaving out the four a release is meant to change (ServerSettings.ps1).
+function SettingsOf([string]$dir) { return ((Get (Join-Path $dir 'server-settings.json')) | ConvertFrom-Json) }
+function Js($v) { if ($null -eq $v) { return 'null' }; return (ConvertTo-Json -InputObject $v -Compress -Depth 20) }
+function Carried($was, $now) {
+    $release = @('loadOrder', 'startPoints', 'thornswoodMostOnline', 'maxPlayers')
+    $a = @($was.PSObject.Properties | ForEach-Object { $_.Name })
+    $b = @($now.PSObject.Properties | ForEach-Object { $_.Name })
+    return @(@($a + $b | Sort-Object -Unique) | Where-Object {
+        $release -notcontains $_ -and (($a -contains $_) -ne ($b -contains $_) -or (Js $was.$_) -ne (Js $now.$_)) })
 }
 function Free([int]$p) {
     (-not @(Get-NetUDPEndpoint -LocalPort $p -EA SilentlyContinue).Count) -and
@@ -257,6 +278,12 @@ function Stop-ScheduledTask {
   [CmdletBinding()] param([string]$TaskName)
   $t = TsRead $TaskName
   if ($t -and $t.Pid) { Stop-Process -Id ([int]$t.Pid) -Force -EA SilentlyContinue }
+  # A case can have something happen at the moment the server is stopped,
+  # once: the settings moving under an install between its stage and its swap.
+  if ($env:TS_ON_STOP -and (Test-Path -LiteralPath $env:TS_ON_STOP_ONCE)) {
+    Remove-Item -LiteralPath $env:TS_ON_STOP_ONCE -Force
+    & ([scriptblock]::Create($env:TS_ON_STOP))
+  }
 }
 function Get-ScheduledTaskInfo { [CmdletBinding()] param([Parameter(ValueFromPipeline = $true)]$InputObject) process { [pscustomobject]@{ LastTaskResult = 0 } } }
 function Get-NetFirewallRule { }
@@ -322,7 +349,7 @@ $script:zipN = 0
 function Payload {
     param([string]$Gamemode = '// v2', [string[]]$Order = @('Skyrim.esm', 'A.esp'), [string[]]$Carry = @('Skyrim.esm', 'A.esp'),
           [string]$Binary = 'binary v2', [string]$RecordFor = '', [string]$Shipped = 'shipped v2', [int]$Port = $P,
-          [string]$ForRoot = $root)
+          [string]$ForRoot = $root, [hashtable]$Settings = @{}, [switch]$NoRecord)
     $script:zipN++
     $dir = Join-Path $work ('payload-' + $script:zipN)
     foreach ($n in $Carry) { Put (Join-Path $dir ('plugins\' + $n)) ('plugin ' + $n) }
@@ -332,11 +359,12 @@ function Payload {
     if (-not $RecordFor) { $RecordFor = $Binary }
     $h = [Security.Cryptography.SHA256]::Create()
     $sum = (($h.ComputeHash($utf8.GetBytes($RecordFor)) | ForEach-Object { $_.ToString('x2') }) -join '')
-    Put (Join-Path $dir 'server-build.json') ('{ "sha256": "' + $sum + '" }')
+    if (-not $NoRecord) { Put (Join-Path $dir 'server-build.json') ('{ "sha256": "' + $sum + '" }') }
     Put (Join-Path $dir 'data\shipped.txt') $Shipped
     $far = ($ForRoot -replace '\\', '/') + '/plugins/'
-    Put (Join-Path $dir 'server-settings.json') (([ordered]@{ port = $Port; name = 'Thornswood Test'; dataDir = 'data'
-        loadOrder = @($Order | ForEach-Object { $far + $_ }) }) | ConvertTo-Json -Depth 5)
+    $st = [ordered]@{ port = $Port; name = 'Thornswood Test'; dataDir = 'data'; loadOrder = @($Order | ForEach-Object { $far + $_ }) }
+    foreach ($k in $Settings.Keys) { $st[$k] = $Settings[$k] }
+    Put (Join-Path $dir 'server-settings.json') ($st | ConvertTo-Json -Depth 8)
     $zip = Join-Path $work ('payload-' + $script:zipN + '.zip')
     Compress-Archive -Path (Join-Path $dir '*') -DestinationPath $zip -Force
     return $zip
@@ -402,7 +430,9 @@ try {
         @{ Label = 'a gamemode that does not parse'; Why = 'gamemode\.js does not parse';
            Zip = { Payload -Gamemode 'function ( { not javascript' }; More = @() },
         @{ Label = 'a binary that is not its recorded build'; Why = 'not the build server-build\.json records';
-           Zip = { Payload -RecordFor 'some other binary' }; More = @() }
+           Zip = { Payload -RecordFor 'some other binary' }; More = @() },
+        @{ Label = 'a payload that carries no build record (#1214)'; Why = 'carries no server-build\.json';
+           Zip = { Payload -NoRecord }; More = @() }
     )) {
         $zip = & $case.Zip
         $out = Install $zip $case.More
@@ -480,6 +510,102 @@ try {
         $undone.Count -eq 1 -and (Get (Join-Path $undone[0] 'gamemode.js')) -eq '// v2' -and @(Beside '.prev-*').Count -eq 0)
     if ($script:fail -gt $failed) { Show }
 
+    # ---- the running server's settings are its own (#1222) ----------------------
+    # Dev rollout 6, 29 Sep: a publish put the build's settings over the dev
+    # server's, and it came up not marked dev, with no load order refusal, no
+    # join pass and an npcSettings default key that refused every NPC. Here
+    # the running server has its own switches and the payload has none of
+    # them, other values for some, and that default key.
+    $own = SettingsOf $root
+    foreach ($kv in @(
+        @('name', 'Thornswood Own Name'), @('thornswoodServer', 'dev'), @('thornswoodLoadOrderRefuse', $true),
+        @('thornswoodRequirePass', $true), @('thornswoodVoicePort', 7789), @('npcSettings', [pscustomobject]@{}),
+        @('npcEnabled', $true), @('npcAllowCrimeFaction', $true), @('thornswoodMostOnline', 20), @('maxPlayers', 25),
+        @('thornswoodSomethingNew', 'the server''s own'),
+        @('startPoints', @([pscustomobject]@{ worldOrCell = '0x0119BAD4'; pos = @(1, 2, 3); angleZ = 180 })))) {
+        $own | Add-Member -NotePropertyName $kv[0] -NotePropertyValue $kv[1] -Force
+    }
+    Put (Join-Path $root 'server-settings.json') ($own | ConvertTo-Json -Depth 8)
+    $own = SettingsOf $root
+    $theirs = @{ thornswoodServer = 'main'; thornswoodLoadOrderRefuse = $false; thornswoodMostOnline = 30; maxPlayers = 35
+                 npcSettings = @{ default = @{ spawnInInterior = $true; spawnInExterior = $true } }; npcAllowCrimeFaction = $false
+                 startPoints = @(@{ worldOrCell = '0x0219BAD4'; pos = @(1, 2, 3); angleZ = 180 }); thornswoodBuildOnly = 'not the server''s' }
+    $running = Owner $P
+    $out = Install (Payload -Gamemode '// v3 settings' -Order @('Skyrim.esm', 'A.esp', 'B.esp') -Carry @('Skyrim.esm', 'A.esp', 'B.esp') -Settings $theirs) @()
+    $failed = $script:fail
+    $after = SettingsOf $root
+    Yes 'an install over a server with its own switches is INSTALL OK, answering as a new process' (
+        ($out -contains 'INSTALL OK') -and (WaitUp $P) -and ((Owner $P) -ne $running))
+    Yes ('  and every setting outside the release is the server''s own: ' + ((Carried $own $after) -join ', ')) ((Carried $own $after).Count -eq 0)
+    Yes '  thornswoodServer, the load order refusal, the join pass, the voice port and the name among them' (
+        $after.thornswoodServer -eq 'dev' -and $after.thornswoodLoadOrderRefuse -eq $true -and $after.thornswoodRequirePass -eq $true -and
+        [int]$after.thornswoodVoicePort -eq 7789 -and $after.name -eq 'Thornswood Own Name' -and $after.npcAllowCrimeFaction -eq $true)
+    Yes '  and the payload''s npcSettings default key did not reach it' (
+        (Js $after.npcSettings) -eq '{}' -and -not ($after.PSObject.Properties.Name -contains 'thornswoodBuildOnly'))
+    Yes '  while the load order, the start point and how many it holds are the release''s' (
+        @($after.loadOrder).Count -eq 3 -and [int]$after.thornswoodMostOnline -eq 30 -and [int]$after.maxPlayers -eq 35 -and
+        [string]@($after.startPoints)[0].worldOrCell -eq '0x0219BAD4')
+    Yes '  and it says what it kept and what it read back' (
+        (($out -join "`n") -match 'kept as the running server has them, not as the release had them: .*thornswoodServer') -and
+        (($out -join "`n") -match 'read back: every setting outside this release is the one the server had'))
+    if ($script:fail -gt $failed) { Show }
+
+    # A put-back brings back the older release, not the older settings: a
+    # switch changed since the install stays as the running server has it.
+    $now = SettingsOf $root
+    $now | Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue $false -Force
+    Put (Join-Path $root 'server-settings.json') ($now | ConvertTo-Json -Depth 8)
+    $now = SettingsOf $root
+    $out = RunWrapped ("& '" + $installer.Replace("'", "''") + "' -Root '" + $root.Replace("'", "''") +
+                       "' -TaskName 'Thornswood Test Server' -StartNow -AllowGamingPc -Wait 8 -PutBack`r`nexit `$LASTEXITCODE`r`n")
+    $failed = $script:fail
+    $back = SettingsOf $root
+    Yes '-PutBack after it is INSTALL OK, and the older release is back' (
+        ($out -contains 'INSTALL OK') -and (Get (Join-Path $root 'gamemode.js')) -ne '// v3 settings' -and @($back.loadOrder).Count -eq 2 -and (WaitUp $P))
+    Yes '  with the running server''s settings, the switch changed since included' (
+        (Carried $now $back).Count -eq 0 -and $back.thornswoodRequirePass -eq $false -and $back.thornswoodServer -eq 'dev')
+    Yes '  and how many it holds as the older release had it' ([int]$back.thornswoodMostOnline -eq 20 -and [int]$back.maxPlayers -eq 25)
+    if ($script:fail -gt $failed) { Show }
+
+    # Settings that move under an install, between its stage and its swap:
+    # here the stand-in task scheduler turns the load order refusal off as the
+    # server is stopped. The stage was made from the file before that, so the
+    # read-back finds a switch that is not what the server had.
+    $once = Join-Path $work 'on-stop-once'
+    Put $once 'once'
+    $env:TS_ON_STOP_ONCE = $once
+    $env:TS_ON_STOP = ("`$p = '" + (Join-Path $root 'server-settings.json').Replace("'", "''") + "'`r`n" +
+                       "`$j = [IO.File]::ReadAllText(`$p) | ConvertFrom-Json`r`n" +
+                       "`$j | Add-Member -NotePropertyName thornswoodLoadOrderRefuse -NotePropertyValue `$false -Force`r`n" +
+                       "[IO.File]::WriteAllText(`$p, (`$j | ConvertTo-Json -Depth 20))")
+    $gmBefore = Get (Join-Path $root 'gamemode.js')
+    $running = Owner $P
+    try { $out = Install (Payload -Gamemode '// v6 moved under it') @() }
+    finally { Remove-Item Env:\TS_ON_STOP, Env:\TS_ON_STOP_ONCE -ErrorAction SilentlyContinue }
+    $failed = $script:fail
+    $moved = SettingsOf $root
+    Yes 'settings that moved between the stage and the swap are INSTALL ROLLED BACK' (($out -contains 'INSTALL ROLLED BACK') -and $script:lastCode -ne 0)
+    Yes '  and it names the switch, before anything was started' (
+        (($out -join "`n") -match 'read back: thornswoodLoadOrderRefuse would not be what the server had') -and
+        -not (($out -join "`n") -match 'started, giving it'))
+    Yes '  and the old folder is back, with the setting as the server had it when it stopped' (
+        (Get (Join-Path $root 'gamemode.js')) -eq $gmBefore -and $moved.thornswoodLoadOrderRefuse -eq $false)
+    Yes '  and the old server is answering again, as a new process' ((WaitUp $P) -and ((Owner $P) -ne $running))
+    $kept = @(Beside '.failed-*')
+    Yes '  and the folder that was refused is kept to read' ($kept.Count -ge 1 -and (Get (Join-Path $kept[-1] 'gamemode.js')) -eq '// v6 moved under it')
+    if ($script:fail -gt $failed) { Show }
+
+    # A first install has no server to keep settings from, so the payload's
+    # are held to what no server should start with.
+    $fresh = Join-Path $box 'Fresh\Thornswood-Server'
+    $fz = Payload -ForRoot $fresh -Settings @{ npcSettings = @{ default = @{ spawnInInterior = $true; spawnInExterior = $true } } }
+    $out = RunWrapped ("& '" + $installer.Replace("'", "''") + "' -Zip '" + $fz.Replace("'", "''") + "' -Root '" + $fresh.Replace("'", "''") +
+                       "' -NoTask -AllowGamingPc`r`nexit `$LASTEXITCODE`r`n")
+    $failed = $script:fail
+    Yes 'a first install of a payload whose npcSettings has a default key is INSTALL REFUSED' (
+        ($out -contains 'INSTALL REFUSED') -and (($out -join "`n") -match 'refuses every NPC') -and -not (Test-Path -LiteralPath $fresh))
+    if ($script:fail -gt $failed) { Show }
+
     # ---- a root something is holding -------------------------------------------
     $before = Tree $root
     $running = Owner $P
@@ -520,7 +646,7 @@ try {
         # names on C:\ land in the scratch folder, and the live root it reads
         # the roster from is the scratch one, which has none.
         function MapFar([string]$s) {
-            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\Roll-Log.ps1', 'C:\Thornswood-Server\') {
+            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\Roll-Log.ps1', 'C:\Thornswood-Server\') {
                 $to = Join-Path $global:TsBox.Box $p.Substring(3)
                 $s = $s.Replace($p, $to).Replace($p.Replace('\', '/'), $to)
             }
@@ -562,9 +688,15 @@ try {
             $global:LASTEXITCODE = 0
         }
         $global:TsSshSeen = New-Object Collections.Generic.List[string]
-        function Publish([string]$zip, [string[]]$more) {
-            $a = @{ Channel = 'dev'; VpsRoot = $devRoot; TaskName = 'Thornswood Test Dev'; VpsHost = '127.0.0.1'; VpsUser = 'nobody'
-                    Dist = $dist; Zip = $zip; SkipBuild = $true; NoPause = $true; Wait = 8 }
+        # The build record the payloads' binary is held to (#1214): Payload's
+        # default binary.
+        $recordFile = Join-Path $work 'server-build.json'
+        $hr = [Security.Cryptography.SHA256]::Create()
+        Put $recordFile ('{ "sha256": "' + (($hr.ComputeHash($utf8.GetBytes('binary v2')) | ForEach-Object { $_.ToString('x2') }) -join '') + '" }')
+        $hr.Dispose()
+        function Publish([string]$zip, [string[]]$more, [string]$channel = 'dev', [string]$vpsRoot = $devRoot, [string]$task = 'Thornswood Test Dev') {
+            $a = @{ Channel = $channel; VpsRoot = $vpsRoot; TaskName = $task; VpsHost = '127.0.0.1'; VpsUser = 'nobody'
+                    Dist = $dist; Zip = $zip; SkipBuild = $true; NoPause = $true; Wait = 8; Record = $recordFile; NoNews = $true; NoPush = $true }
             foreach ($x in $more) { $a[$x] = $true }
             $global:TsSshSeen.Clear()
             $global:LASTEXITCODE = 0
@@ -577,6 +709,18 @@ try {
         $failed = $script:fail
         Yes 'Publish-Server puts a first dev server up and exits 0' ($code -eq 0 -and (WaitUp 7787))
         if ($script:fail -gt $failed) { Show }
+        # The dev server's own switches, the ones dev rollout 6 lost (#1222).
+        $devOwn = SettingsOf $devRoot
+        foreach ($kv in @(@('name', 'Thornswood Dev'), @('thornswoodServer', 'dev'), @('thornswoodLoadOrderRefuse', $true),
+                          @('thornswoodRequirePass', $false), @('thornswoodVoicePort', 7789), @('npcSettings', [pscustomobject]@{}),
+                          @('npcAllowCrimeFaction', $true), @('npcAllowEssential', $true))) {
+            $devOwn | Add-Member -NotePropertyName $kv[0] -NotePropertyValue $kv[1] -Force
+        }
+        Put (Join-Path $devRoot 'server-settings.json') ($devOwn | ConvertTo-Json -Depth 8)
+        $devOwn = SettingsOf $devRoot
+        # What the build had on 29 Sep: none of those, and the default key.
+        $build = @{ name = 'Thornswood'; npcSettings = @{ default = @{ spawnInInterior = $true; spawnInExterior = $true } }
+                    npcAllowCrimeFaction = $false; npcAllowEssential = $false; thornswoodVoicePort = 7789 }
         $devBefore = Tree $devRoot
         $devPid = Owner 7787
 
@@ -597,16 +741,62 @@ try {
             $code -ne 0 -and ((Owner 7787) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
         if ($script:fail -gt $failed) { Show }
 
-        $code = Publish (Payload -Port 7787 -ForRoot $devRoot -Gamemode '// dev v2') @()
+        # A binary the record does not name, in a zip whose own record names it.
+        $code = Publish (Payload -Port 7787 -ForRoot $devRoot -Binary 'binary v9') @()
         $failed = $script:fail
+        Yes 'Publish-Server with a binary the build record does not name exits 1 (#1214)' ($code -ne 0 -and (($script:lastOut) -join "`n") -match 'not the recorded build')
+        Yes '  before anything is sent: the installer never ran, the same process, the root as it was' (
+            @($global:TsSshSeen | Where-Object { $_ -match '-File' }).Count -eq 0 -and ((Owner 7787) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
+        if ($script:fail -gt $failed) { Show }
+
+        $code = Publish (Payload -Port 7787 -ForRoot $devRoot -Gamemode '// dev v2' -Settings $build -Order @('Skyrim.esm', 'A.esp', 'B.esp') -Carry @('Skyrim.esm', 'A.esp', 'B.esp')) @()
+        $failed = $script:fail
+        $devAfter = SettingsOf $devRoot
         Yes 'Publish-Server with a good payload exits 0 and the new gamemode answers' (
             $code -eq 0 -and (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v2' -and (WaitUp 7787))
+        Yes ('  and the dev server keeps every one of its own settings (#1222): ' + ((Carried $devOwn $devAfter) -join ', ')) (
+            (Carried $devOwn $devAfter).Count -eq 0 -and $devAfter.thornswoodServer -eq 'dev' -and $devAfter.thornswoodLoadOrderRefuse -eq $true -and
+            $devAfter.thornswoodRequirePass -eq $false -and $devAfter.name -eq 'Thornswood Dev' -and (Js $devAfter.npcSettings) -eq '{}')
+        Yes '  and takes the release''s load order' (@($devAfter.loadOrder).Count -eq 3)
         if ($script:fail -gt $failed) { Show }
 
         $code = Publish '' @('PutBack')
         $failed = $script:fail
         Yes 'Publish-Server -PutBack exits 0 and the previous gamemode answers again' (
             $code -eq 0 -and (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v1' -and (WaitUp 7787))
+        Yes '  with the dev server''s own settings still' ((Carried $devOwn (SettingsOf $devRoot)).Count -eq 0)
+        if ($script:fail -gt $failed) { Show }
+    }
+
+    # ---- Publish-Server.ps1, whole, on the live channel (#1222) --------------------
+    # The same over a live server, on its own ports, 7777 and 3000.
+    if (-not ((Free 7777) -and (Free 3000))) {
+        Write-Host 'SKIP  a live Publish-Server is checked on 7777 and 3000, and something on this machine holds one'
+    } elseif (-not (Get-Command Publish -EA SilentlyContinue)) {
+        Write-Host 'SKIP  the live Publish-Server run needs the dev one''s stand-ins, which were skipped'
+    } else {
+        $liveRoot = Join-Path $box 'Live\Thornswood-Server'
+        $code = Publish (Payload -Port 7777 -ForRoot $liveRoot -Gamemode '// live v1') @() 'main' $liveRoot 'Thornswood Test Live'
+        $failed = $script:fail
+        Yes 'Publish-Server -Channel main puts a first live server up and exits 0' ($code -eq 0 -and (WaitUp 7777))
+        if ($script:fail -gt $failed) { Show }
+        $liveOwn = SettingsOf $liveRoot
+        foreach ($kv in @(@('name', 'Thornswood'), @('thornswoodServer', 'main'), @('thornswoodLoadOrderRefuse', $true),
+                          @('thornswoodRequirePass', $true), @('thornswoodVoicePort', 7778), @('npcSettings', [pscustomobject]@{}),
+                          @('thornswoodDevs', @(123456789)))) {
+            $liveOwn | Add-Member -NotePropertyName $kv[0] -NotePropertyValue $kv[1] -Force
+        }
+        Put (Join-Path $liveRoot 'server-settings.json') ($liveOwn | ConvertTo-Json -Depth 8)
+        $liveOwn = SettingsOf $liveRoot
+        $code = Publish (Payload -Port 7777 -ForRoot $liveRoot -Gamemode '// live v2' -Settings @{ name = 'Thornswood Test'
+                         npcSettings = @{ default = @{ spawnInInterior = $true } }; thornswoodRequirePass = $false }) @() 'main' $liveRoot 'Thornswood Test Live'
+        $failed = $script:fail
+        $liveAfter = SettingsOf $liveRoot
+        Yes 'a live publish over it exits 0 and the new gamemode answers' (
+            $code -eq 0 -and (Get (Join-Path $liveRoot 'gamemode.js')) -eq '// live v2' -and (WaitUp 7777))
+        Yes ('  and the live server keeps every one of its own settings: ' + ((Carried $liveOwn $liveAfter) -join ', ')) (
+            (Carried $liveOwn $liveAfter).Count -eq 0 -and $liveAfter.thornswoodServer -eq 'main' -and $liveAfter.thornswoodRequirePass -eq $true -and
+            $liveAfter.thornswoodLoadOrderRefuse -eq $true -and (Js $liveAfter.npcSettings) -eq '{}' -and @($liveAfter.thornswoodDevs).Count -eq 1)
         if ($script:fail -gt $failed) { Show }
     }
 }

@@ -24,6 +24,14 @@
        refuses before anything is sent
     4. -SkipBuild with a dev zip on the live channel: refused, nothing sent
     5. Export-ServerPayload.ps1 by itself, the same way round
+    6. a binary that is not the build the record names (#1214): refused
+       before anything is sent, by a publish on either channel, by -SkipBuild
+       with a zip made from it, and by Export-ServerPayload by itself; a good
+       zip carries the record, for the installer to hold it again
+    7. a build whose npcSettings has a "default" key, which refuses every NPC
+       (#1222): refused on either channel before anything is sent; a dev zip
+       says thornswoodServer dev, and a live export of one that says dev is
+       refused; ServerSettings.ps1 goes up beside the installer
 
   Run under whichever PowerShell runs this file, so running it under both
   checks both. Nothing here connects to the VPS.
@@ -60,16 +68,28 @@ $shell = (Get-Process -Id $PID).Path
 $oldPath = $env:PATH; $oldCalls = $env:TS_PUB_CALLS
 $listeners = @()
 
+$record = Join-Path $T 'server-build.json'
 function Write-Live {
-    param([int]$Port = 7777, [string]$Name = 'Thornswood', [int]$Voice = 7778)
+    param([int]$Port = 7777, [string]$Name = 'Thornswood', [int]$Voice = 7778, [string]$Server = '', [switch]$NpcDefault)
     $esp = (Join-Path $T 'plugins\ours.esp').Replace('\', '/')
     $s = [ordered]@{
         name = $Name; port = $Port; thornswoodVoicePort = $Voice; maxPlayers = 100
         loadOrder = @($esp); startPoints = @(@{ worldOrCell = '0x3C'; pos = @(0, 0, 0); angleZ = 0 })
     }
+    if ($Server) { $s.thornswoodServer = $Server }
+    if ($NpcDefault) { $s.npcSettings = @{ default = @{ spawnInInterior = $true; spawnInExterior = $true } } }
     [IO.File]::WriteAllText((Join-Path $dist 'server-settings.json'), ($s | ConvertTo-Json -Depth 6), $utf8)
 }
 function Hash([string]$p) { return (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash }
+# The binary in the build, and a record naming a build: -For says which.
+function Write-Binary([string]$text) { [IO.File]::WriteAllText((Join-Path $dist 'scam_native.node'), $text, $utf8) }
+function Write-Record([string]$for, [string]$path = $record) {
+    $h = [Security.Cryptography.SHA256]::Create()
+    $sum = (-join ($h.ComputeHash($utf8.GetBytes($for)) | ForEach-Object { $_.ToString('x2') }))
+    $h.Dispose()
+    [IO.File]::WriteAllText($path, ('{ "binary": "scam_native.node", "sha256": "' + $sum + '" }'), $utf8)
+    return $sum
+}
 # What the zip starts the server with, and whether its settings start with a BOM.
 function Read-Zip([string]$path) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -81,7 +101,15 @@ function Read-Zip([string]$path) {
         $b = $ms.ToArray()
         $bom = ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF)
         $j = ($utf8.GetString($b) -replace '^\uFEFF', '') | ConvertFrom-Json
-        return [pscustomobject]@{ Port = [string]$j.port; Voice = [string]$j.thornswoodVoicePort; Name = [string]$j.name; Bom = $bom }
+        $rec = ''
+        $re = $z.GetEntry('server-build.json')
+        if ($re) {
+            $rr = New-Object IO.StreamReader($re.Open())
+            try { $rec = [string]($rr.ReadToEnd() | ConvertFrom-Json).sha256 } finally { $rr.Dispose() }
+        }
+        $server = ''
+        if ($j.PSObject.Properties['thornswoodServer']) { $server = [string]$j.thornswoodServer }
+        return [pscustomobject]@{ Port = [string]$j.port; Voice = [string]$j.thornswoodVoicePort; Name = [string]$j.name; Bom = $bom; Rec = $rec; Server = $server }
     } finally { $z.Dispose() }
 }
 function Run([string]$script, [string[]]$more) {
@@ -92,10 +120,14 @@ function Run([string]$script, [string[]]$more) {
         $code = $LASTEXITCODE
     } finally { $ErrorActionPreference = $old }
     $calls = @(if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log | Where-Object { $_ } })
+    # PowerShell 7 prints an error wrapped to the window, each piece on a line
+    # of its own after a '|', so a message can break in the middle of the
+    # words matched below. Joined back up.
+    $out = $out -replace '\r?\n\s+\|\s+', ' '
     return [pscustomobject]@{ Code = $code; Out = $out; Calls = $calls }
 }
 function Publish([string[]]$more) {
-    return Run $publish (@('-Dist', $dist, '-Zip', $zip, '-VpsHost', '127.0.0.1', '-VpsUser', 'test', '-NoPause', '-NoNews', '-NoPush', '-Wait', '1') + @($more))
+    return Run $publish (@('-Dist', $dist, '-Zip', $zip, '-Record', $record, '-VpsHost', '127.0.0.1', '-VpsUser', 'test', '-NoPause', '-NoNews', '-NoPush', '-Wait', '1') + @($more))
 }
 function Tail($r, [bool]$ok) { if (-not $ok) { Write-Host (($r.Out -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 12) -join "`n") -ForegroundColor DarkGray } }
 function Sent($r) { return @($r.Calls | Where-Object { $_ -match '^scp .*thornswood-server\.zip' }).Count }
@@ -104,6 +136,8 @@ try {
     foreach ($d in $dist, $bin, (Join-Path $T 'plugins'), (Split-Path -Parent $zip)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
     [IO.File]::WriteAllText((Join-Path $T 'plugins\ours.esp'), 'a plugin', $utf8)
     [IO.File]::WriteAllText((Join-Path $dist 'skymp5-server.js'), '// the server', $utf8)
+    Write-Binary 'the recorded binary'
+    $recSum = Write-Record 'the recorded binary'
     # PowerShell scripts rather than .cmd files: a .cmd runs through cmd.exe,
     # which splits an unquoted argument at an ampersand, and a temp folder can
     # have one in its path. The real ssh and scp are programs and take it whole.
@@ -129,6 +163,9 @@ try {
     $z = Read-Zip $zip
     Yes ("  the zip starts the dev server: port {0}, voice {1}, name {2}" -f $z.Port, $z.Voice, $z.Name) ($z.Port -eq '7787' -and $z.Voice -eq '7789' -and $z.Name -eq 'Thornswood Dev')
     Yes '  its settings have no byte order mark' (-not $z.Bom)
+    Yes ("  it says thornswoodServer {0}, for a first install into an empty dev root" -f $z.Server) ($z.Server -eq 'dev')
+    Yes '  and it carries the build record, for the installer to hold the binary to (#1214)' ($z.Rec -eq $recSum)
+    Yes '  and ServerSettings.ps1 went up beside the installer (#1222)' (@($r.Calls | Where-Object { $_ -match '^scp .*ServerSettings\.ps1 .*C:/ServerSettings\.ps1' }).Count -eq 1)
     $local = Get-Content -LiteralPath $settings -Raw | ConvertFrom-Json
     Yes ("  and the build's own settings are the live ones still (port {0}, name {1})" -f $local.port, $local.name) ([int]$local.port -eq 7777 -and $local.name -eq 'Thornswood' -and [int]$local.thornswoodVoicePort -eq 7778)
     # The gamemode and the number of seats are the build's, written the same on
@@ -169,15 +206,55 @@ try {
 
     # ---- 5. Export-ServerPayload.ps1 by itself -------------------------------------------
     Write-Host ''; Write-Host 'Export-ServerPayload.ps1'
-    $x = Run $export @('-Dist', $dist, '-Zip', $zip, '-OutDir', (Join-Path $T 'out\_payload'), '-Channel', 'dev')
+    $ex = @('-Dist', $dist, '-Zip', $zip, '-OutDir', (Join-Path $T 'out\_payload'), '-Record', $record)
+    $x = Run $export ($ex + @('-Channel', 'dev'))
     $z = Read-Zip $zip
     Yes ("-Channel dev packs 7787 into the payload only (exit {0})" -f $x.Code) ($x.Code -eq 0 -and $z.Port -eq '7787' -and [int](Get-Content -LiteralPath $settings -Raw | ConvertFrom-Json).port -eq 7777)
-    $x = Run $export @('-Dist', $dist, '-Zip', $zip, '-OutDir', (Join-Path $T 'out\_payload'))
+    $x = Run $export $ex
     $z = Read-Zip $zip
     Yes ("no channel is live, and packs 7777 (exit {0})" -f $x.Code) ($x.Code -eq 0 -and $z.Port -eq '7777')
+    Yes '  with the build record in it' ($z.Rec -eq $recSum)
     Write-Live -Port 7777 -Name 'Thornswood' -Voice 7789
-    $x = Run $export @('-Dist', $dist, '-Zip', $zip, '-OutDir', (Join-Path $T 'out\_payload'))
+    $x = Run $export $ex
     Yes ("a live export of the dev voice port is refused (exit {0})" -f $x.Code) ($x.Code -ne 0 -and $x.Out -match 'dev voice port 7789')
+    Write-Live -Server 'dev'
+    $x = Run $export $ex
+    Yes ("a live export of settings that say thornswoodServer dev is refused (exit {0})" -f $x.Code) ($x.Code -ne 0 -and $x.Out -match 'thornswoodServer dev')
+
+    # ---- 6. a binary that is not the recorded build (#1214) ---------------------------
+    Write-Host ''; Write-Host 'a binary that is not the recorded build'
+    Write-Live
+    Write-Binary 'some other binary'
+    foreach ($ch in 'dev', 'main') {
+        $r = Publish @('-Channel', $ch)
+        $ok = $r.Code -ne 0 -and (Sent $r) -eq 0 -and @($r.Calls | Where-Object { $_ -match '^(ssh|scp) ' }).Count -eq 0 -and $r.Out -match 'not the build'
+        Yes ("a $ch publish of it is refused before anything is sent (exit {0})" -f $r.Code) $ok; Tail $r $ok
+    }
+    $x = Run $export $ex
+    Yes ("Export-ServerPayload by itself refuses it too (exit {0})" -f $x.Code) ($x.Code -ne 0 -and $x.Out -match 'not the build' -and $x.Out -match 'Nothing was packed')
+    # A zip made from it against a record that names it, sent with -SkipBuild
+    # against the real record: refused from what is in the zip.
+    $other = Join-Path $T 'other-record.json'
+    [void](Write-Record 'some other binary' $other)
+    $x = Run $export @('-Dist', $dist, '-Zip', $zip, '-OutDir', (Join-Path $T 'out\_payload'), '-Record', $other, '-Channel', 'dev')
+    Yes ("  (a zip made from it, against a record naming it, exit {0})" -f $x.Code) ($x.Code -eq 0)
+    $r = Publish @('-Channel', 'dev', '-SkipBuild')
+    $ok = $r.Code -ne 0 -and (Sent $r) -eq 0 -and $r.Out -match 'not the recorded build'
+    Yes ("-SkipBuild with that zip is refused before it is sent (exit {0})" -f $r.Code) $ok; Tail $r $ok
+    Write-Binary 'the recorded binary'
+    $r = Publish @('-Channel', 'dev')
+    $ok = $r.Code -eq 0 -and (Sent $r) -eq 1 -and $r.Out -match 'payload binary is the recorded build'
+    Yes ("  and the recorded binary goes again (exit {0})" -f $r.Code) $ok; Tail $r $ok
+
+    # ---- 7. an npcSettings "default" key (#1222) -----------------------------------------
+    Write-Host ''; Write-Host 'an npcSettings default key'
+    Write-Live -NpcDefault
+    foreach ($ch in 'dev', 'main') {
+        $r = Publish @('-Channel', $ch)
+        $ok = $r.Code -ne 0 -and (Sent $r) -eq 0 -and $r.Out -match 'refuses every NPC'
+        Yes ("a $ch publish of a build whose npcSettings has a default key is refused, nothing sent (exit {0})" -f $r.Code) $ok; Tail $r $ok
+    }
+    Write-Live
 }
 finally {
     foreach ($l in $listeners) { try { $l.Stop() } catch { } }
