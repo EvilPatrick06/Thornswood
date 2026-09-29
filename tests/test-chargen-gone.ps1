@@ -267,6 +267,8 @@ $lifted = [ordered]@{
     'OwnGame.CrashesUs'        = Get-CsMember $og 'static bool CrashesUs(string rel)'
     'OwnGame.RetiredFiles'     = (Get-CsMember $og 'static readonly string[] RetiredFiles =') + ';'
     'OwnGame.Retired'          = Get-CsMember $og 'static bool Retired(string rel)'
+    'OwnGame.BodyShapeFiles'   = (Get-CsMember $og 'static readonly string[] BodyShapeFiles =') + ';'
+    'OwnGame.BodyShape'        = Get-CsMember $og 'static bool BodyShape(string rel)'
     'OwnGame.Parked'          = Get-CsMember $og 'static bool Parked(string rel)'
     'OwnGame.wantedPlugins'    = Get-CsLine $og '(?m)^\s*static HashSet<string> wantedPlugins = [^\r\n]*;'
     'OwnGame.UnwantedCreation' = Get-CsMember $og 'static bool UnwantedCreation(string rel)'
@@ -309,6 +311,8 @@ namespace $ns
         $($lifted['OwnGame.CrashesUs'])
         $($lifted['OwnGame.RetiredFiles'])
         $($lifted['OwnGame.Retired'])
+        $($lifted['OwnGame.BodyShapeFiles'])
+        $($lifted['OwnGame.BodyShape'])
         $($lifted['OwnGame.Parked'])
         $($lifted['OwnGame.wantedPlugins'])
         $($lifted['OwnGame.UnwantedCreation'])
