@@ -70,7 +70,7 @@ handlers. So:
 - `Shell` is therefore a static class, not a `Window` subclass, and it is
   split across eight files: Shell.cs, Pages.cs (the read-only pages),
   ShellOwnGame.cs (the game folder card and offer), ShellSteamUpdates.cs (the
-  question about Steam's Updates setting after a downgrade), ShellUninstall.cs
+  question about Steam's Updates setting at the start), ShellUninstall.cs
   (the launcher as Windows' Uninstall button opens it), ShellProgress.cs (the
   Play button as a progress bar), Waiting.cs and Stall.cs.
 
@@ -100,7 +100,7 @@ it says a pool thread.
 | 13 | `Shell.cs:301 Discord.SendPendingLogs` | Pool thread. A session that ended without sending its logs (`Profile\logs-pending.txt` still there) sends them now, before a new game start truncates them. |
 | 14 | `Shell.cs:307 AutoJoin.Ensure` | Makes `Game\Data\Platform\Plugins\skymp5-client-settings.txt` when there is none (`AutoJoin.cs:52 Ensure()`). |
 | 15 | `Shell.cs:316 Checks.GameRunning` | A game still running from before the launcher was restarted is taken over: `Shell.cs:326 Hold.Take` holds our files again and nothing is pulled apart under it. Otherwise `Shell.cs:331 Swap.Restore` takes off any redirect a crash left and `Shell.cs:332 Keep.TakeNote` deletes a stale session note. |
-| 16 | `Shell.cs:334 Leaks.Clean` | Deletes the one sign in file a 16 Sep installer shipped, matched by hash. Then `Shell.cs:335 ThornIni.Ensure` writes `Game\Data\SKSE\Plugins\Thornswood.ini` from the template if it is missing, and `Shell.cs:336 ThornIni.UndoShippedFov` runs once per install. When no downgrade is needed, `Shell.cs:338 HoldSteamUpdatesOnStart` logs Steam's Updates setting for the Skyrim the downgrade looks after and sets it when it does not hold the version (see SteamUpdates below). |
+| 16 | `Shell.cs:334 Leaks.Clean` | Deletes the one sign in file a 16 Sep installer shipped, matched by hash. Then `Shell.cs:335 ThornIni.Ensure` writes `Game\Data\SKSE\Plugins\Thornswood.ini` from the template if it is missing, and `Shell.cs:336 ThornIni.UndoShippedFov` runs once per install. When no downgrade is needed, `Shell.cs:338 HoldSteamUpdatesOnStart` logs Steam's Updates setting for the Steam copy of Skyrim and sets it when it does not hold the version (see SteamUpdates below). |
 | 17 | `Shell.cs:340 Keep.Unpark` | Puts back plugins a crashed session left parked. Then `Shell.cs:344 Keep.Seed` fills `Profile\Keep` from pack records for files it has no copy of yet. |
 | 18 | `Shell.cs:353 Display.MatchScreen` | Unless Lock resolution is ticked: the game's resolution and menu scale follow the screen (`Shell.cs:359 Display.ScaleMenus`). |
 | 19 | `Shell.cs:370 Icons.Ensure` | Pool thread. The shortcut icon follows the exe. `Shell.cs:393 ClearLeftovers` (pool) ends a windowless Skyrim over three minutes old. `Shell.cs:407 Uninstall.DropScratch` (pool) deletes the installer's leftover `Thornswood-setup` folder. |
@@ -329,11 +329,18 @@ character is being played. The join token is only asked for over https,
 because the request carries the Discord ticket; with a voice address that is
 not https there is no token.
 
-**OwnGame** (OwnGame.cs, with ShellOwnGame.cs for its card and offer).
-`<Root>\Game` itself. `OwnGame.cs:477 Make()` builds it in `<Root>\Game.new`
-and moves it into place; `OwnGame.cs:554 Refresh()` brings it up to date with
-Vortex. The records are in `Profile\OwnGame`: `files.txt` (every file, linked
+**OwnGame** (OwnGame.cs and OwnGameShare.cs, with ShellOwnGame.cs for its card
+and offer). `<Root>\Game` itself. `OwnGame.cs:477 Make()` builds it in
+`<Root>\Game.new` and moves it into place; `OwnGame.cs:554 Refresh()` brings it
+up to date with Vortex. Once made, the folder needs nothing from the Steam copy
+(#1218): a refresh takes only the files Vortex's record lists, the game's own
+files are the folder's own copies, and nothing writes into the Steam copy, so
+it can be on any build and modded freely. Skyrim's archives are shared with the
+Steam copy only while the bytes are the same (`OwnGameShare.cs:246 Share()`),
+and checked before every Play (`OwnGameShare.cs:354 CheckShared()`).
+The records are in `Profile\OwnGame`: `files.txt` (every file, linked
 or copied, and whether Vortex deployed it, which Publish-Update reads),
+`shared.txt`, `differs.txt` and `changed.txt` (the archives, OwnGameShare.cs),
 `made.txt`, `left-out.txt`, `declined.txt`, and Vortex's `plugins.txt` and
 `loadorder.txt`. `OwnGame.cs:327 WhyNot()` names the one thing stopping the
 folder being made. Every writer into Game calls `OwnGame.cs:717 Unshare()` or
@@ -344,11 +351,12 @@ checked by SHA-256 against `records\client-build.json`, which is compiled into
 the exe (`ClientRuntime.cs:179 Good()`), and put back from a pack when they
 are not (`ClientRuntime.cs:206 Heal()`).
 
-**Downgrade** (Downgrade.cs). Puts the Steam copy back on Skyrim 1.6.1170
-through Steam's own console when Steam has updated it, after asking, since it
-takes over Steam's window and the keyboard; the question shows the three
-console lines (`Downgrade.cs:164 Commands()`). The game folder is then
-refreshed from it.
+**Downgrade** (Downgrade.cs). Gets Skyrim 1.6.1170's own files through
+Steam's own console, after asking, since it takes over Steam's window and the
+keyboard; the question shows the three console lines
+(`Downgrade.cs:164 Commands()`). They go into Thornswood's own folder
+(`OwnGameShare.cs:451 TakePinned()`), or, before it has one, the folder is
+made from them. The Steam copy is never written (#1218).
 
 **SteamUpdates** (SteamUpdates.cs, with ShellSteamUpdates.cs for its
 question). Steam's Updates setting for Skyrim, `AutoUpdateBehavior` in
@@ -359,12 +367,14 @@ game" or the file is marked read only, sets it (#493): `SteamUpdates.cs:302
 OnStart()` says write it at once when Steam is closed, or put
 `ShellSteamUpdates.cs:59 AskToHoldSteamUpdates()`, whose Yes closes Steam,
 waits for it to go, writes and starts Steam again. A No is remembered in
-config.json (`SteamUpdatesDeclined`); the question after a downgrade that
-works is asked regardless. `SteamUpdates.cs:400 Hold()` changes that one value,
+config.json (`SteamUpdatesDeclined`). `SteamUpdates.cs:400 Hold()` changes that one value,
 takes off a read-only mark and never writes while Steam runs. The mark is not
 what holds the version: Thornswood runs its own folder, whose exe is its own
-copy, and Steam puts an update in by moving new files into its own copy, so
-what an update would cost is a second downgrade, which the setting prevents.
+copy, and Steam puts an update in by moving new files into its own copy. Since
+#1218 a made folder does not read the Steam copy's game at all, so an update
+costs it nothing; the setting only saves a download before the folder is
+made. The question no longer follows a downgrade, which never writes the Steam
+copy now.
 Play is never held on it.
 
 **The settings Play writes every time.** Enforce.cs (`SkyrimSoulsRE.ini` and
@@ -475,7 +485,7 @@ configured at all, which is a developer's own build and never a tester's.
 | 8 | `ShellChars.cs:111 Chars.KnownIds` | Every profile id this install could pick, then `ShellChars.cs:117 CheckIn` for each on a pool thread, posting each one to `/api/play/join` so the server's allowed list has it before the person picks. A failure is a log line; the game still starts. | |
 | 9 | `ShellChars.cs:122 Play` | Into `Shell.cs:3870 Play()`. Its first four lines check `updatePending`, `collectionBarUp`, `ownGameBusy` and the feed's hold again, because the button is not the only way in. | |
 | 10 | `Shell.cs:3887 Paths.Loader` | `Game\skse64_loader.exe` has to exist, and `Shell.cs:3888 Paths.MpClient` (`Game\Data\SKSE\Plugins\MpClientPlugin.dll`). | |
-| 11 | `Shell.cs:3893 ClearStuckGame` | A Skyrim with no window is closed; one on screen is asked about. | |
+| 11 | `Shell.cs:3893 ClearStuckGame` | A Skyrim with no window is closed; one on screen is asked about. Then, under Waiting, `Shell.cs:3896 OwnGame.CheckShared`: every archive the folder shares with the Steam copy still has the bytes on record (the change time is read, and the bytes only when it moved). One that changed stops Play and brings up the Downgrade card. | `Profile\OwnGame\shared.txt` and `changed.txt`, when anything moved |
 | 12 | `Shell.cs:3899 Verify.Run` | Under Waiting. Reads the plugin list, the server's manifest and the plugins' bytes. Any problem that would get the person refused: the Diagnostics page (Scan and Fix) opens with a message saying what to do, and Play stops. | nothing |
 | 13 | `Shell.cs:3943 Verify.DeployPersonal` | `<Root>\Your Mods` copied into `Game\Data`, never a plugin. | those files in `Game\Data` |
 | 14 | `Shell.cs:3957 Display.MatchScreen` | Skipped when Lock resolution is ticked. The game's window size and Display Tweaks' resolution follow the screen, then `Shell.cs:3959 Display.ScaleMenus`. | `Game\Data\SKSE\Plugins\SSEDisplayTweaks.ini`, `Profile\MyGames\SkyrimPrefs.ini`, `Game\Data\Interface\skyui\config.txt` and `config.shipped.txt`, each only when it changes |

@@ -65,7 +65,10 @@ const body = whyNot ? whyNot[1] : '';
 
 // Skyrim's volume, then Vortex's staging folders: each still refuses rather
 // than falling through to copies.
-const gate = /if \(!SameVolume\(game, Paths\.Root\)\)\s*return OneDriveOnly\(/.test(body);
+// Since #1218 the folder checked is the Steam copy for a first build and the
+// folder Vortex deploys into once made, since only Vortex's files are linked
+// then (test-own-folder-alone.ps1).
+const gate = /string linked = made \? src : game;\s*if \(!SameVolume\(linked, Paths\.Root\)\)\s*return OneDriveOnly\(/.test(body);
 yes('Skyrim on another drive still refuses, through OneDriveOnly', gate);
 const staging = /foreach \(string dir in rec\.Staging\)[\s\S]*?if \(!SameVolume\(dir, Paths\.Root\)\)\s*return OneDriveOnly\(/.test(body);
 yes("Vortex's mods on another drive still refuse, through OneDriveOnly", staging);

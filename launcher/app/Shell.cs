@@ -384,8 +384,8 @@ namespace Thornswood
             try { string leak = Leaks.Clean(cfg); if (leak != null) Log(leak); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
-            // Steam's Updates setting for the Skyrim the downgrade looks after: logged, and set when it does not hold the version (ShellSteamUpdates.cs, #493).
-            try { if (!Downgrade.Needed(cfg) && !Downgrade.SourceNeeded(cfg)) HoldSteamUpdatesOnStart(); } catch (Exception ex) { Swallow.Note("Shell.Run, Steam's Updates setting", ex); }
+            // Steam's Updates setting for the Steam copy of Skyrim: logged, and set when it does not hold the version (ShellSteamUpdates.cs, #493).
+            try { if (!Downgrade.Needed(cfg)) HoldSteamUpdatesOnStart(); } catch (Exception ex) { Swallow.Note("Shell.Run, Steam's Updates setting", ex); }
             {
                 int parked = playing ? 0 : Keep.Unpark();
                 if (parked > 0) Log("Put back " + parked + " parked " + (parked == 1 ? "plugin" : "plugins") + " from another server or build left behind by the last session.");
@@ -2849,15 +2849,13 @@ namespace Thornswood
             // comes up by itself once the build is right. A real update still
             // outranks both, below, because an update can carry a new expected
             // build and settle the question by itself.
+            //
+            // Only the game Thornswood runs counts (#1218). A Steam copy that
+            // moved on after Thornswood's own folder was made no longer brings
+            // the card up: the folder holds 1.6.1170 itself and follows Vortex
+            // whatever build the Steam copy is on.
             bool wrongBuild = Downgrade.Needed(cfg);
-            // With Thornswood's own folder the card also comes up when only the
-            // Steam copy it is made from has moved on: Thornswood still plays,
-            // so Play is not held back, but the folder cannot follow Vortex until
-            // the Steam copy is back on the right build. The mods card waits for
-            // that one as well: Vortex deploys into the Steam copy, and the
-            // downgrade rewrites the Steam copy, so the order is the same.
-            bool steamCopyWrong = !wrongBuild && Downgrade.SourceNeeded(cfg);
-            if (updateBar != null && btnInstallNow != null && ModsMissing() && !wrongBuild && !steamCopyWrong)
+            if (updateBar != null && btnInstallNow != null && ModsMissing() && !wrongBuild)
             {
                 ShowCollectionBar();
             }
@@ -2875,10 +2873,12 @@ namespace Thornswood
             if (downgradeBar != null)
             {
                 bool updateUp = updateBar != null && updateBar.Visibility == Visibility.Visible;
-                downgradeBar.Visibility = ((wrongBuild || steamCopyWrong) && !updateUp && !playing) ? Visibility.Visible : Visibility.Collapsed;
+                downgradeBar.Visibility = (wrongBuild && !updateUp && !playing) ? Visibility.Visible : Visibility.Collapsed;
                 if (btnDowngrade != null) btnDowngrade.IsEnabled = !Downgrade.Busy && !ownGameBusy;
                 if (txtDowngradeTitle != null)
-                    txtDowngradeTitle.Text = steamCopyWrong ? "The Steam copy of Skyrim is on the wrong build" : "Skyrim is on the wrong build";
+                    txtDowngradeTitle.Text = Paths.Collection ? "Skyrim on Steam is not on the server's build"
+                        : OwnGame.Active && OwnGame.Changed().Count > 0 ? "Some of Skyrim's own files in Thornswood's folder changed"
+                        : "Skyrim is on the wrong build";
             }
 
             bool working = playBar.Active;
@@ -3080,10 +3080,9 @@ namespace Thornswood
         /// <summary>
         /// The Downgrade button. Everything happens on Downgrade's own thread;
         /// its words come back here through the dispatcher, into the log and
-        /// the line under the button, and the page is redrawn. With
-        /// Thornswood's own folder the downgrade is done to the Steam copy the
-        /// folder is made from, and the folder is brought up to date from it
-        /// once that has worked.
+        /// the line under the button, and the page is redrawn. The files go
+        /// into Thornswood's own folder, or, before it has one, the folder is
+        /// made from them. The Steam copy of Skyrim is never written (#1218).
         /// </summary>
         static void RunDowngrade()
         {
@@ -3096,7 +3095,9 @@ namespace Thornswood
                 "Steam only hands over an older build through its own console, so the launcher works that console for you. " +
                 "Steam's window comes to the front, the launcher clicks the console's command line and types these three lines into it, one at a time, each after the one before has finished downloading:\n\n" +
                 string.Join("\n", Downgrade.Commands(cfg)) + "\n\n" +
-                "Steam downloads about 11 GB under your own account, and the launcher then copies the files over the Steam copy of Skyrim. " +
+                "Steam downloads about 11 GB under your own account, and the launcher then " +
+                (Paths.Collection ? "makes Thornswood's own game folder from those files. " : "puts the files into Thornswood's own game folder. ") +
+                "Your Steam copy of Skyrim is not changed and can stay on any build.\n\n" +
                 "Do not type or click while Steam's window is in front, or the keys go to the wrong place.",
                 "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (r != MessageBoxResult.Yes) { Log("Left Skyrim on the build it is on."); return; }
@@ -3132,10 +3133,16 @@ namespace Thornswood
                             btnDowngrade.Content = ok ? "Done" : "Try again";
                             btnDowngrade.IsEnabled = !ok;
                             if (prgDowngrade != null) { prgDowngrade.IsIndeterminate = false; prgDowngrade.Visibility = Visibility.Collapsed; }
-                            if (ok && OwnGame.Active) StartOwnGame(false, true);
+                            // Before Thornswood has a folder of its own the
+                            // download is what the folder is made from, and
+                            // the person already said yes to that above. With
+                            // a folder, the files went straight into it, and
+                            // there is nothing for Vortex to bring in. The
+                            // Steam copy was not touched either way, so there
+                            // is no question about Steam's updates to ask here.
+                            if (ok && Paths.Collection && Downgrade.Downloaded(cfg) != null) StartOwnGame(true, true);
                             DrawStatus();
                             DrawBuildLine();
-                            if (ok) AskToHoldSteamUpdates();
                         }));
                     }
                     catch (Exception ex) { Swallow.Note("Shell.RunDowngrade, own game source", ex); }
@@ -5235,6 +5242,26 @@ namespace Thornswood
                 // how people end up staring at a launcher that says the game is
                 // running while their screen says otherwise.
                 if (!ClearStuckGame(true)) return;
+
+                // Skyrim's archives this folder shares with the Steam copy still
+                // hold 1.6.1170's bytes (#1217). The change time is all that is
+                // read unless it moved, so this is instant on an ordinary Play.
+                // The Steam copy is the person's to mod, and a file copied over
+                // one of its archives there changes the one here too, so this is
+                // checked on every Play, and the game never starts on another
+                // build's archives. See OwnGameShare.cs.
+                if (OwnGame.Active)
+                {
+                    string archives = null;
+                    Waiting(delegate { archives = OwnGame.CheckShared(OwnGame.Source(cfg), PresenceLog); });
+                    if (archives != null)
+                    {
+                        Log("Not launching. " + archives);
+                        DrawStatus();
+                        MessageBox.Show(archives, "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                }
 
                 // Checked again here, not just at startup, because the player's
                 // own mods folder and the plugin list can both change in between.

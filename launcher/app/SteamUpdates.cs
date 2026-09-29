@@ -81,10 +81,14 @@ namespace Thornswood
     ///     Steam copy's name and leaves the file Thornswood's folder links to
     ///     as it was. So a Steam update cannot reach the game Thornswood runs,
     ///     and Play still checks that folder's exe (Checks "Game build").
-    ///   - What an update does cost is the Steam copy: Thornswood's folder is
-    ///     brought up to date from it, OwnGame.WhyNot refuses while it is on
-    ///     another build, and the Downgrade has to be run again. That is what
-    ///     the setting above prevents.
+    ///   - What an update cost was the Steam copy: Thornswood's folder was
+    ///     brought up to date from it, OwnGame.WhyNot refused while it was on
+    ///     another build, and the Downgrade had to be run again. Since #1218 a
+    ///     folder that is made takes nothing but Vortex's files and never
+    ///     reads the Steam copy's game, so an update costs it nothing. The
+    ///     setting still saves a download before the folder is made, when
+    ///     the folder is made from the Steam copy only if that copy is on
+    ///     1.6.1170.
     ///   - The mark itself was never put to the test. Steam's file says it
     ///     holds build 24914197, taken on 10 September 11:06 (lastupdated),
     ///     two hours before the mark went on, and neither content log has an
@@ -100,7 +104,8 @@ namespace Thornswood
     /// carries the mark (OnStart): with Steam closed it is written there and
     /// then, with nothing to ask; with Steam open, a question whose Yes closes
     /// Steam, writes it, and starts Steam again, and a No that is remembered.
-    /// The question after a downgrade is the same one and is always asked.
+    /// It no longer follows a downgrade: the downgrade does not write the
+    /// Steam copy any more (#1218), so there is nothing there to hold.
     ///
     /// So the write:
     ///   - never while Steam is running. Steam keeps the setting in memory and
@@ -261,7 +266,7 @@ namespace Thornswood
             string mark = IsReadOnly(manifest) ? " " + Writable(manifest) : "";
             if (v == OnLaunchOnly)
                 return "Steam's Updates setting for Skyrim is \"" + Setting(v) + "\", so Steam leaves it on 1.6.1170 unless Skyrim is started from Steam." + mark;
-            return "Steam's Updates setting for Skyrim is \"" + Setting(v) + "\", so Steam can update it by itself, and the next Skyrim update Steam takes moves it off 1.6.1170 and it has to be downgraded again. " + How + mark;
+            return "Steam's Updates setting for Skyrim is \"" + Setting(v) + "\", so Steam can update it by itself. Thornswood's own game folder keeps its own 1.6.1170 files whatever Steam does, but until that folder is made, an update means the Downgrade button downloading 1.6.1170's files first. " + How + mark;
         }
 
         /// <summary>True when the file carries the ReadOnly attribute. False when it is not there or cannot be read.</summary>
@@ -323,7 +328,7 @@ namespace Thornswood
                        "But Steam's file for Skyrim is marked read only, which stops Steam saving Skyrim's state in it, so Steam logs a failure every six seconds:\n\n    " + manifest + "\n\n" +
                        "Yes takes that mark off and changes nothing in the file.\n\n" + steam +
                        "No leaves it as it is.";
-            return "Steam can update Skyrim by itself, and an update puts it back on the newer build, so it has to be downgraded again.\n\n" +
+            return "Steam can update its copy of Skyrim by itself. Thornswood's own game folder keeps its own 1.6.1170 files whatever Steam does, but until that folder is made, an update means downloading 1.6.1170's files for it first.\n\n" +
                    "Yes changes Steam's Updates setting for Skyrim to \"" + OnLaunchWords + "\", the same as picking it under Automatic Updates on Steam's own Properties, Updates page. " +
                    "Thornswood never starts Skyrim through Steam, so Steam then leaves it on 1.6.1170. " +
                    "It changes that one value in Steam's file for Skyrim and nothing else:\n\n    " + manifest + "\n\n" +
