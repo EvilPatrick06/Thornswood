@@ -238,6 +238,39 @@ function Test-ShipClientRecorded([string]$rel, [string]$full = '') {
     return ($have -eq $ShipClientHashes[$rel])
 }
 
+# SKYUI 5.2'S OWN SCRIPTS, LOOSE IN Data\Scripts. Issue #960, 28 September: on
+# dev, "SKYUI ERROR CODE 6", menu file version mismatch for magicmenu.swf,
+# skyui/itemcard.swf, skyui/bottombar.swf, map.swf and more, "required 5.2 SE,
+# detected 6.11 SE".
+#
+# MEASURED on the shipping machine. The collection's SkyUI (Nexus 12604, in
+# Vortex as SkyUI-12604-6-8) is one archive, SkyUI_SE.bsa: its menus say 6.11
+# SE, and its own ski_main.pex (compiled 6 April 2026) no longer compares menu
+# versions at all. But the ten names below sit loose in the Steam copy's
+# Data\Scripts: SkyUI 5.2 SE's scripts, compiled 3 October 2017, whose
+# ski_main.pex checks every menu for 5.2 SE. Loose beats an archive, so the old
+# script runs against the new menus and puts up the error box. Vortex's record
+# does not list them and no mod in its mods folder has them; the collection
+# installer put them there (Profile\installed-into-game.txt lists all ten), the
+# launcher linked them into Thornswood's folder, and the dev feed's baseline
+# lists all ten, so dev packs have been handing them to everybody.
+#
+# Only these ten. SKI_ConfigBase.pex and SKI_ConfigManager.pex are loose too,
+# but they are MCM Recorder's, deployed by Vortex, and stay.
+# scripts\mods\Check-SkyUIMenus.js is the check Ship runs against this.
+$ShipOldSkyUIScripts = @(
+    'Data\Scripts\ski_activeeffectswidget.pex',
+    'Data\Scripts\ski_configmenu.pex',
+    'Data\Scripts\ski_favoritesmanager.pex',
+    'Data\Scripts\ski_main.pex',
+    'Data\Scripts\ski_playerloadgamealias.pex',
+    'Data\Scripts\ski_qf_configmanagerinstance.pex',
+    'Data\Scripts\ski_questbase.pex',
+    'Data\Scripts\ski_settingsmanager.pex',
+    'Data\Scripts\ski_widgetbase.pex',
+    'Data\Scripts\ski_widgetmanager.pex'
+)
+
 function Test-ShipOtherServer([string]$rel) {
     # The client runtime, before anything else is asked: ours when it is the
     # recorded build, and not ours when it is anything else or is not there.
@@ -275,6 +308,9 @@ function Test-ShipOtherServer([string]$rel) {
     # collection wants it and taking it out keeps the good map.
     # OwnGame.Foreign carries the same rule; change the two together.
     if ($rel -ieq 'Data\Interface\map.swf') { return $true }
+    # SkyUI 5.2's own scripts, loose, issue #960. See $ShipOldSkyUIScripts.
+    # OwnGame.Foreign carries the same rule; change the two together.
+    if ($ShipOldSkyUIScripts -contains $rel) { return $true }
     if (-not $rel.StartsWith('Data\Platform\', 'OrdinalIgnoreCase')) { return $false }
     $leaf = Split-Path $rel -Leaf
     if ($rel.StartsWith('Data\Platform\PluginsNoLoad\', 'OrdinalIgnoreCase')) { return $true }
@@ -713,6 +749,11 @@ $ShipDeleteAlways = @(
     # stick. The name is never used again, so nothing legitimate is lost.
     'Data\Platform\Plugins\thornswood-chargen.js'
 )
+# SkyUI 5.2's loose scripts, issue #960: dev packs carried them, so leaving
+# them out of new packs would do nothing for the machines showing the SkyUI
+# error box. The collection's SkyUI keeps its scripts inside SkyUI_SE.bsa, so
+# nothing it installs is lost. See $ShipOldSkyUIScripts above.
+$ShipDeleteAlways += $ShipOldSkyUIScripts
 
 function Get-ShipDeleteAlways { return $ShipDeleteAlways }
 

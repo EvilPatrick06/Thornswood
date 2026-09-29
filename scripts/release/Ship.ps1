@@ -1215,6 +1215,32 @@ if ($GameDir) {
     Say '  no game folder here, so the bodies were not read' 'DarkGray'
 }
 
+# ------------------------------------------------------------ SkyUI's menus
+# Issue #960, 28 Sep: dev showed "SKYUI ERROR CODE 6", menu file version
+# mismatch, required 5.2 SE, detected 6.11 SE. SkyUI's script and its menus
+# came from different releases: SkyUI 5.2's loose scripts, which dev packs
+# carried, over the collection's newer SkyUI. Check-SkyUIMenus.js reads the
+# script and the menus the way the game picks them (loose over archive, later
+# plugin's archive over earlier): 0 they agree, 2 they do not, 1 unreadable.
+# Paths every pack deletes are read as gone, since every install loses them
+# with this release. It refuses both channels: the box is on every login.
+Head 'SkyUI menus'
+if ($GameDir -and (Get-Command node -ErrorAction SilentlyContinue)) {
+    $skyuiPlugins = Join-Path (Get-ShipLoadOrderDir $Root $profileDir) 'plugins.txt'
+    $global:LASTEXITCODE = 0
+    & node (Join-Path $Here '..\mods\Check-SkyUIMenus.js') --data (Join-Path $GameDir 'Data') --plugins $skyuiPlugins --gone (@(Get-ShipDeleteAlways) -join ';') --quiet
+    $skyuiExit = $LASTEXITCODE
+    if ($skyuiExit -eq 2) {
+        Unbump 'SkyUI''s menus are not the version its script wants'
+        Die 'SkyUI''s menus in the game folder are not the version its script wants, so everybody would get the SkyUI error box on the way in. See the lines above for which file wins and where it comes from, fix that, and Ship again.'
+    }
+    if ($skyuiExit -ne 0) { Say '  SkyUI''s menus could not all be read; see above' 'Yellow' }
+} elseif ($GameDir) {
+    Say '  node is not on this machine, so SkyUI''s menus were not read' 'Yellow'
+} else {
+    Say '  no game folder here, so SkyUI''s menus were not read' 'DarkGray'
+}
+
 # HOW FAR BEHIND the public installer is: the zip on disk against the releases
 # the feed lists. Asked twice, and the two answers differ on purpose. Before
 # publishing, the gate just below reads it to refuse a main release that would
