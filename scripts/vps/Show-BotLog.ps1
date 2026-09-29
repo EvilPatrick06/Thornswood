@@ -44,7 +44,10 @@ $filter = if ($All) { '.' } else { '^\s*\[(thornswood-bot|run)\]' }
 
 $script = @"
 `$ErrorActionPreference = 'Continue'
-`$log = '$rootWin\bot.log'
+# In the bot's data folder since #1104; beside the code on a box whose full
+# install is older.
+`$log = '$rootWin\data\bot.log'
+if (-not (Test-Path `$log) -and (Test-Path '$rootWin\bot.log')) { `$log = '$rootWin\bot.log' }
 if (-not (Test-Path `$log)) { 'there is no bot.log on the VPS yet'; exit }
 
 `$p = Get-CimInstance Win32_Process |

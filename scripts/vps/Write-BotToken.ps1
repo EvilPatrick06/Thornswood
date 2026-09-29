@@ -238,7 +238,9 @@ function Get-ThornswoodLogLength([string]$Log) {
 # service stops python and anything it started, so nothing is looked for by
 # its command line. Restart-Service starts a service that was stopped.
 function Restart-ThornswoodBot([string]$Root, [string]$Service = 'ThornswoodBot', [int]$WaitSeconds = 60) {
-  $log = Join-Path $Root 'bot.log'
+  # In data since #1104; beside the code on a box whose full install is older.
+  $log = Join-Path $Root 'data\bot.log'
+  if (-not (Test-Path -LiteralPath $log) -and (Test-Path -LiteralPath (Join-Path $Root 'bot.log'))) { $log = Join-Path $Root 'bot.log' }
   $before = Get-ThornswoodLogLength $log
   $out = @()
   try { Restart-Service -Name $Service -Force -ErrorAction Stop }

@@ -517,7 +517,7 @@ try {
         (Test-Path -LiteralPath (Join-Path $nSite 'feed\history\20260928T000000Z-version.json')) -and
         [IO.File]::ReadAllText((Join-Path $nSite "feed\assets\$('a' * 64)")) -eq 'mirrored already')
     $envFile = Join-Path $nBot 'bot.env.json'
-    Yes '  the bot''s settings and join record' ((Test-Path -LiteralPath $envFile) -and (Test-Path -LiteralPath (Join-Path $nBot 'joins.json')))
+    Yes '  the bot''s settings and join record' ((Test-Path -LiteralPath $envFile) -and (Test-Path -LiteralPath (Join-Path $nBot 'data\joins.json')))
     $acl = if (Test-Path -LiteralPath $envFile) { Get-Acl -LiteralPath $envFile } else { $null }
     $who = if ($acl) { @($acl.Access | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value }) } else { @() }
     $me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value

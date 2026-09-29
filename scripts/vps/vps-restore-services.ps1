@@ -20,7 +20,8 @@
                           Remirror-Site-Feed.ps1 fills.
     bot\bot.env.json   -> C:\Thornswood-Bot\bot.env.json, readable by SYSTEM
                           and Administrators only, as Install-Bot.ps1 leaves it
-    bot\joins.json     -> C:\Thornswood-Bot\joins.json
+    bot\joins.json     -> C:\Thornswood-Bot\data\joins.json, the bot's data
+                          folder (issue #1104)
     web\Caddyfile      -> C:\Thornswood-Caddy\Caddyfile
 
   Not put back: voice\choices.json. The backup still takes it, and nothing has
@@ -172,7 +173,7 @@ if (Test-Path -LiteralPath $envFile) {
     'locked    ' + $envFile + ' to SYSTEM and Administrators'
   } catch { 'COULD NOT LOCK ' + $envFile + ': ' + $_.Exception.Message }
 }
-Place 'bot\joins.json'   (Join-Path $BotRoot 'joins.json')
+Place 'bot\joins.json'   (Join-Path $BotRoot 'data\joins.json')
 Place 'web\Caddyfile'    (Join-Path $CaddyRoot 'Caddyfile')
 if (Test-Path -LiteralPath (Join-Path $From 'voice\choices.json')) {
   'left      voice\choices.json: nothing has read it since 20 September'

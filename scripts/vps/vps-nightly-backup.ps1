@@ -216,8 +216,12 @@ Grab (Join-Path $BotRoot  'bot.env.json')         'bot\bot.env.json'
 # how two cards came to say "The 28th to walk in", and anybody coming back is
 # given a new number. Only Backup-Server.ps1, which takes the whole bot
 # folder, had it until 24 September. A bot that has seen no join since that
-# fix has none yet, and that is a "missing" line, not a failure.
-Grab (Join-Path $BotRoot  'joins.json')           'bot\joins.json'
+# fix has none yet, and that is a "missing" line, not a failure. In the
+# bot's data folder since #1104; beside the code on a box whose bot install
+# is older. The name in the backup stays bot\joins.json either way.
+$joins = Join-Path $BotRoot 'data\joins.json'
+if (-not (Test-Path -LiteralPath $joins) -and (Test-Path -LiteralPath (Join-Path $BotRoot 'joins.json'))) { $joins = Join-Path $BotRoot 'joins.json' }
+Grab $joins                                       'bot\joins.json'
 # THE CHARACTER REGISTER IS GONE, 23 September, and so are the two files this
 # used to fetch for it: secret.txt, the shared secret it checked against, and
 # owners.json, the register itself. Nothing reads either any more, so backing

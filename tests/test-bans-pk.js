@@ -241,7 +241,7 @@ async function until(cond, ms) {
   return false;
 }
 const modlog = () => { try { return fs.readFileSync(path.join(PRIV, 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)); } catch (e) { return []; } };
-const hublog = () => { try { return fs.readFileSync(path.join(DATA, 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)); } catch (e) { return []; } };
+const hublog = () => { try { return fs.readFileSync(path.join(DATA, 'for-bot', 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)); } catch (e) { return []; } };
 
 function braceGrab(text, head) {
   const at = text.indexOf(head);
@@ -336,7 +336,7 @@ async function adminRoleOnly() {
   }));
   fs.writeFileSync(path.join(d2, 'stub.js'), '(' + discordStub.toString() + ')();\n');
   const pk2 = () => JSON.parse(fs.readFileSync(path.join(D2, 'pk.json'), 'utf8'));
-  const log2 = () => { try { return fs.readFileSync(path.join(D2, 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)); } catch (e) { return []; } };
+  const log2 = () => { try { return fs.readFileSync(path.join(D2, 'for-bot', 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)); } catch (e) { return []; } };
   const cookie2 = (id, name) => {
     const at = String(Date.now());
     const sig = crypto.createHmac('sha256', secret2).update(id + '|' + name + '|' + at).digest('hex').slice(0, 32);
