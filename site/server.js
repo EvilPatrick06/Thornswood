@@ -586,7 +586,12 @@ const PAGES = {
   server's own number into the same file as max, so the page says "3 of 25"
   and /api/play/join can say the world is full before the game starts.
 */
-let gameStatus = { up: false, online: 0, max: 0, at: 0 };
+/*
+  And how many wait at the menu for a seat (line), and whether somebody
+  picking now would wait too (full), which the gamemode's seats block works
+  out and writes beside the count.
+*/
+let gameStatus = { up: false, online: 0, max: 0, line: 0, full: false, at: 0 };
 function pollGame() {
   const sock = new net.Socket();
   let done = false;
@@ -594,13 +599,16 @@ function pollGame() {
     if (done) return;
     done = true;
     try { sock.destroy(); } catch (e) { }
-    let online = 0, max = 0;
+    let online = 0, max = 0, line = 0, full = false;
     try {
       const o = JSON.parse(fs.readFileSync(cfg.onlineFile, 'utf8'));
       if (o && typeof o.now === 'number') online = o.now;
       if (o && typeof o.max === 'number' && o.max > 0) max = o.max;
+      if (o && typeof o.line === 'number' && o.line > 0) line = o.line;
+      if (o && o.full === true) full = true;
     } catch (e) { }
-    gameStatus = { up, online: up ? online : 0, max: up ? max : 0, at: Date.now() };
+    gameStatus = { up, online: up ? online : 0, max: up ? max : 0, line: up ? line : 0,
+                   full: up && full, at: Date.now() };
   };
   sock.setTimeout(1500);
   sock.once('connect', () => finish(true));
@@ -612,13 +620,49 @@ function pollGame() {
 pollGame();
 setInterval(pollGame, 10000).unref?.();
 
-/* Whether the world is at its number, and what a person is told then (#481). */
+/*
+  Whether somebody pressing Play now would wait for a seat, and what they are
+  told (#481). Nobody is refused for numbers any more: Patrick, 29 Sep, a
+  full world lets them into the game's menu, where they wait in line and join
+  by themselves when it is their turn. The gamemode keeps the line.
+*/
 function seatsFull(st) {
-  return !!(st && st.up && st.max > 0 && st.online >= st.max);
+  return !!(st && st.up && (st.full === true || (st.max > 0 && st.online >= st.max)));
 }
 function worldFull(max) {
-  return 'Thornswood is full: ' + max + ' people are in the world, the most it holds at once ' +
-    'during the alpha. Try again in a few minutes.';
+  return 'Thornswood is full right now: ' + max + ' people are in the world, the most it holds ' +
+    'at once during the alpha. Pick your character anyway: you will wait at the menu with your ' +
+    'place in line on screen, and join by yourself when a seat frees.';
+}
+
+/*
+  The most the world holds, for the home page and /api/public, when the
+  server has not said (#481). Patrick, 29 Sep: "I still want it to say N of
+  25 anyway". records\most-online.json is the one place the number lives:
+  read here when the site runs from the repository, and otherwise the main
+  feed's maxOnline, which Publish-Update.ps1 writes from that same file and
+  which the site on the VPS already serves. The server's own max still wins.
+*/
+const MOST_ONLINE_RECORD = path.join(ROOT, '..', 'records', 'most-online.json');
+let mostOnlineSeen = { file: '', mtime: -1, size: -1, v: 0 };
+function mostOnlineFallback() {
+  for (const file of [MOST_ONLINE_RECORD, path.join(ROOT, 'feed', 'version.json')]) {
+    let st;
+    try { st = fs.statSync(file); } catch (e) { continue; }
+    if (mostOnlineSeen.file === file && mostOnlineSeen.mtime === st.mtimeMs && mostOnlineSeen.size === st.size) {
+      if (mostOnlineSeen.v > 0) return mostOnlineSeen.v;
+      continue;
+    }
+    let v = 0;
+    try {
+      const doc = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '')) || {};
+      const n = Number(file === MOST_ONLINE_RECORD ? doc.people : doc.maxOnline);
+      if (n > 0 && Math.floor(n) === n) v = n;
+    } catch (e) { v = 0; }
+    mostOnlineSeen = { file, mtime: st.mtimeMs, size: st.size, v };
+    if (v > 0) return v;
+  }
+  return 0;
 }
 
 const jsonFile = (p, fallback) => {
@@ -2616,6 +2660,7 @@ async function standing(discordId) {
         if (me.user && me.user.avatar) out.avatar = String(me.user.avatar);
         const names = await roleNames();
         out.roles = (me.roles || []).map((id) => names[id]).filter(Boolean);
+        out.staffRole = holdsStaffRole(out.roles);
       } else if (r.status !== 404) {
         out.lookupFailed = r.why;
       }
@@ -2654,7 +2699,21 @@ async function standing(discordId) {
   out.play = out.admin || has(cfg.access.play);
   out.dev = out.admin || has(cfg.access.dev);
   out.jarl = out.admin || has(cfg.access.jarl);
+  out.staffRole = holdsStaffRole(out.roles);
   return out;
+}
+
+/*
+  Whether these Discord roles include a staff role (#481): access.admin or
+  access.dev, by name. For the staff seats over the most the world holds,
+  which Patrick keeps for "the discord roles" (29 Sep), so it reads the roles
+  alone. st.dev is not the same thing: the hand written admins list sets it
+  for an account that holds no role at all.
+*/
+function holdsStaffRole(roles) {
+  const mine = Array.isArray(roles) ? roles : [];
+  const staff = [].concat(cfg.access.admin || [], cfg.access.dev || []);
+  return staff.some((n) => mine.indexOf(n) >= 0);
 }
 
 /*
@@ -3294,7 +3353,10 @@ async function handle(req, res) {
       open: cfg.open === true,
       invite: cfg.discord.invite || '',
       patreon: cfg.patreon || '',
-      status: { up: gameStatus.up, online: gameStatus.online, max: gameStatus.max },
+      // max is always the number when one is known anywhere, so the page
+      // says "N of 25" whether or not the server has said it (#481).
+      status: { up: gameStatus.up, online: gameStatus.online, max: gameStatus.max || mostOnlineFallback(),
+                line: gameStatus.line, full: seatsFull(gameStatus) },
       gallery: jsonFile(GALLERY, []),
       launcher: feed.launcher || '',
       collection: feed.collection || '',
@@ -4265,16 +4327,13 @@ async function handle(req, res) {
     if (wantsDev && !st.dev) return sendJson(res, 403, { ok:false, why:'dev', dev: false, message:
       'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
     /*
-      The world is full (#481). The main server's own number, from online.json
-      (the dev build is staff only, and staff may go over it). Said here so the
-      person is told before the game starts; the gamemode's seats block is
-      what holds when two people press Play at once. Not remembered by the
-      launcher as a no, since a seat can free up a minute later.
+      The world is full (#481). Not a no any more: Patrick, 29 Sep, a full
+      world lets people into the game's menu to wait in line. The yes below
+      carries wait and a sentence saying so, and the launcher logs it on the
+      Play page. A Discord staff role is not told: the gamemode gives them a
+      staff seat ahead of the line. The dev build is staff only.
     */
-    if (!wantsDev && seatsFull(gameStatus) && !st.dev && !st.admin) {
-      return sendJson(res, 403, { ok:false, why:'full', online: gameStatus.online, max: gameStatus.max,
-        message: worldFull(gameStatus.max) });
-    }
+    const wait = !wantsDev && seatsFull(gameStatus) && !st.staffRole;
 
     // The launcher sends the profile id it is about to play as. The game
     // server never sees a Discord account, only this number, so this is the
@@ -4419,7 +4478,13 @@ async function handle(req, res) {
       // Whether the profile id sent is now against this account. False when
       // none was sent, and when another account already holds it, in which
       // case it was left off this one and the door still said yes.
-      claimed: claimed
+      claimed: claimed,
+      // The world is full: in, but there may be a wait at the menu (#481).
+      wait: wait,
+      message: wait ? worldFull(gameStatus.max || mostOnlineFallback()) : '',
+      online: gameStatus.online,
+      max: gameStatus.max || mostOnlineFallback(),
+      line: gameStatus.line
     });
   }
 
@@ -4736,11 +4801,12 @@ async function handle(req, res) {
                   'September. The address form goes once no door says this.');
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], jarlProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], jarlProfiles: [], staffRoleProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
     const seenJarl = new Set();
+    const seenStaffRole = new Set();
     const seenFailed = new Set();
     const hasProfiles = (d) => (Array.isArray((linked[d] || {}).profiles) ? linked[d].profiles : [])
       .map(Number).some((n) => n > 0);
@@ -4787,6 +4853,11 @@ async function handle(req, res) {
       if (st.jarl) {
         for (const n of profiles) if (!seenJarl.has(n)) { seenJarl.add(n); out.jarlProfiles.push(n); }
       }
+      // A Discord staff role itself, not the hand written admins list, for
+      // the staff seats over the most the world holds (#481).
+      if (st.staffRole) {
+        for (const n of profiles) if (!seenStaffRole.has(n)) { seenStaffRole.add(n); out.staffRoleProfiles.push(n); }
+      }
       out.people.push({ id: String(d), name: st.name || row.name || '', profiles });
     }
     /* STAFF BANS (#412), which are this site's own file and need no Discord.
@@ -4802,7 +4873,7 @@ async function handle(req, res) {
     const barred = new Set(out.pk);
     for (const b of out.bans) for (const n of b.profiles) barred.add(Number(n));
     if (barred.size) {
-      for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'failedProfiles']) {
+      for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'staffRoleProfiles', 'failedProfiles']) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
       }
       out.people = out.people.map((p) => Object.assign({}, p, { profiles: p.profiles.filter((n) => !barred.has(Number(n))) }))
