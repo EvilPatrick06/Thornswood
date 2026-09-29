@@ -25,7 +25,6 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $tools = Join-Path (Split-Path -Parent $Here) 'tools'
 $deployPath = Join-Path $tools '..\scripts\deploy\Deploy-Server.ps1'
-$shimPath   = Join-Path $tools 'Deploy-Server.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -50,9 +49,6 @@ Yes 'OnlineNow zeroes the count when nothing is listening' (
     ($src -match "if \(-not ``\`$up\)" -and $src -match "'ONLINE 0'"))
 Yes 'StopOurs removes a leftover restart.json' (
     $src -match "removed a restart\.json the old process never read")
-Yes 'tools\Deploy-Server.ps1 still forwards to scripts\deploy' (
-    (Test-Path -LiteralPath $shimPath) -and
-    ((Get-Content -LiteralPath $shimPath -Raw) -match 'scripts\\deploy\\Deploy-Server\.ps1'))
 
 $open  = '# ==== thornswood live deploy warning ===='
 $close = '# ==== end thornswood live deploy warning ===='

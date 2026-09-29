@@ -22,7 +22,7 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 - `bot`: the Discord bot, in Python.
 - `records`: the client and server build records, and code signing.
 - `scripts`: what builds, ships and deploys it all, listed in
-  `scripts/README.md`; `tools` forwards the common commands there for now.
+  `scripts/README.md`; `tools` holds only files a machine keeps out of git.
 - `tests`: the test harnesses; all of them run every night on the VPS.
 - `engine/skymp`: the SkyMP fork our engine changes live in, a git submodule.
   `scripts/release/Build-Engine.ps1` fetches and builds it (engine/README.md).
