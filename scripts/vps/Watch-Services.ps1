@@ -773,7 +773,7 @@ if (Test-Path '$Root\watch.log') {
   'first run:'
   Get-Content '$Root\watch.log' -Tail 10 | ForEach-Object { '  ' + `$_ }
 }
-else { 'first run wrote nothing, which means all four were answering' }
+else { 'first run wrote nothing, which means everything it watches was answering' }
 if (Test-Path '$Root\alerts-webhook.txt') {
   `$null = & icacls '$Root\alerts-webhook.txt' /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' 2>&1
   'webhook   set, for when the bot is down'
