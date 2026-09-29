@@ -111,13 +111,19 @@ $ours = @(
     'Data\Platform\UI\index.html', 'Data\Platform\UI\thornswood-select.js', 'Data\Platform\Plugins\thornswood-front.js',
     'Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformImpl.dll', 'Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformCEF.exe.hidden',
     'Data\Platform\Modules\skyrimPlatform.ts', 'Data\Platform\Images\lock.png', 'Data\Platform\Fonts\x.ttf',
-    'Data\Interface\skyui\config.shipped.txt', 'Data\Interface\skyhud\skyhud.txt', 'Data\SKSE\Plugins\TrueHUD\RP_Bosses.ini',
+    'Data\Interface\skyui\config.shipped.txt', 'Data\Interface\skyhud\skyhud.txt',
     'Data\SKSE\Plugins\CommunityShaders\SettingsDefault.json', 'Data\MCM\Config\TrueHUD\settings.ini', 'Data\SKSE\Plugins\ImGuiVRHelper.toml',
     'Data\Thornswood-Content.esp', 'Data\ElysiumEstateSSE.esp', 'Data\Scripts\MCM.pex', 'Data\SKSE\Plugins\ThornswoodExtra.ini',
     'Data\meshes\armor\x.nif', 'Data\textures\CharGen\ours.dds', 'Data\Interface\racemenu\bottombar.swf', 'Data\music\special\mus_maintheme.xwm')
 foreach ($k in $ours) { Yes "$k ships" (-not (Test-ShipOneMachine $k)) }
 foreach ($k in @($ShipClientFiles)) { Yes "$k, a client file, is the build's by its recorded bytes and never one machine's" (-not (Test-ShipOneMachine $k)) }
 Yes 'the Data\Platform folder itself is not a file of one machine''s' (-not (Test-ShipOneMachine 'Data\Platform\'))
+# Another server's file, whose fate is a decision (#1253), not one machine's.
+Yes 'TrueHUD\RP_Bosses.ini is left to #1253, not taken as one machine''s' (-not (Test-ShipOneMachine 'Data\SKSE\Plugins\TrueHUD\RP_Bosses.ini'))
+# No setting Thornswood chose is in the repository as a mod menu file: the rule
+# can take Data\MCM\Settings whole without taking one of ours.
+$tracked = @(& git -C $repo ls-files 2>$null | Where-Object { $_ -match '(?i)MCM/Settings/|CommunityShaders/Settings(User|Test)\.json' })
+Yes 'no file in the repository is a mod menu settings file the rule would take' ($tracked.Count -eq 0)
 
 # ---- 3. what our own code writes straight into Data\Platform -------------------
 Write-Host ''; Write-Host 'what the launcher and the plugins write into Data\Platform'

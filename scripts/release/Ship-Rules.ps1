@@ -721,15 +721,31 @@ function Test-ShipBethesda([string]$rel) {
 #     mod's own defaults are in Data\MCM\Config and ship), and Community
 #     Shaders' SettingsUser.json and SettingsTest.json (its defaults,
 #     SettingsDefault.json, are the same on every install and stay).
+#     CHECKED 29 September that none of the ones the site carried is a setting
+#     Thornswood chose. Nothing in the repository writes, holds or names them
+#     (no file under game\, no script, no launcher Enforce rule, no decision on
+#     an issue). Precision.ini and TrueDirectionalMovement.ini open with "Daedric
+#     Online, enforced ..." and were written into the Steam copy on 14 September
+#     at 15:00 and 14:56, TrueHUD.ini at 14:43 in the same session, all before
+#     Thornswood's first pack (15 September); they were never in a pack, and
+#     reached people through the installer and the dev records. Community
+#     Shaders' SettingsUser.json was written on 19 September at the end of its
+#     first time setup on one machine (FirstTimeSetupCompleted, one effect off
+#     at boot, beside a window layout for a 2560x1440 screen), rode in one dev
+#     pack (20260928-1733-dev), and Community Shaders is in neither the
+#     repository nor the shipping machine's game today. A setting Thornswood
+#     wants everybody to have is Thornswood's own file (the Thornswood Content
+#     mod, or a launcher Enforce rule), never one machine's saved menu file.
 #   - Saves and profiles: a Saves folder, *.ess and *.skse, and a Profile or
 #     My Games folder at the top of the game folder.
 #   - ShaderCache, anywhere: rebuilt by the game on first launch for that GPU.
 #
 # NOT one machine's, and never caught here: the six client files in
-# client-build.json (ours by recorded bytes), a mod's own settings file that
-# ships in its archive (TrueHUD\RP_Bosses.ini, SkyHUD's skyhud.txt), and
-# SkyUI's config.shipped.txt, which is the launcher's copy of the settings the
-# build ships.
+# client-build.json (ours by recorded bytes), SkyHUD's skyhud.txt (its own
+# config), SkyUI's config.shipped.txt (the launcher's copy of the settings the
+# build ships), and TrueHUD\RP_Bosses.ini, which is another server's file
+# ("Daedric Online boss health bars", written with the two above) and so a
+# question of whose it is, not of which machine (#1253).
 #
 # Never packed, never in a record (as a file or as gone), and never on the site:
 # Publish-Update's scan and the installer's leave them out through
