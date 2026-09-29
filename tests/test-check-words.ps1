@@ -90,6 +90,24 @@ $readCount = 0
 foreach ($l in $r.Out) { $m = [regex]::Match($l, 'hold in all (\d+) file'); if ($m.Success) { $readCount = [int]$m.Groups[1].Value } }
 Yes ("it reads every Markdown file and public page, not ten named files ($readCount read)") ($readCount -ge 40)
 
+# ---- the name on the signing certificate (#1052) ----------------------------
+#
+# It is written once, ExpectedSigner in launcher\app\Updater.cs, which the
+# launcher checks every update against. Every page says "the name on the
+# signing certificate" or names the profile, ThornswoodRelease, and the tests
+# and scripts that need the name read it from there. Only the dated snapshots
+# in docs\archive are left as they were.
+$repoRoot = Split-Path -Parent $CheckPath | Split-Path -Parent | Split-Path -Parent
+$updater = Join-Path $repoRoot 'launcher\app\Updater.cs'
+$signer = [regex]::Match([System.IO.File]::ReadAllText($updater), 'const string ExpectedSigner = "([^"]+)"').Groups[1].Value
+Yes 'ExpectedSigner is read from launcher\app\Updater.cs' ([bool]$signer)
+if ($signer -and (Get-Command git -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath (Join-Path $repoRoot '.git'))) {
+    $named = @(& git -C $repoRoot grep -l -i -F -e $signer -- . ':!docs/archive' 2>$null | ForEach-Object { "$_" })
+    foreach ($n in $named) { Write-Host ("      " + $n) }
+    Yes ('the name on the signing certificate is in Updater.cs and in no other file git holds, docs\archive apart (' + $named.Count + ' file(s))') (
+        $named.Count -eq 1 -and $named[0] -eq 'launcher/app/Updater.cs')
+}
+
 # ---- a seeded tree ----------------------------------------------------------
 #
 # Built from code points, never typed, for the same reason the check is.
@@ -121,7 +139,11 @@ try {
         'Clone https://github.com/EvilPatrick06/Thornswood to start.'
     )
     Put $tmp 'SECURITY.md' @('Fine.', 'An entity &mdash; here.', 'A number &#8212; here.', 'A hex one &#x2014; here.',
-        'Signed as Gavin Knotts; the oldest branches use the gavin/ prefix.', 'Patrick holds the key, and this page may say so.')
+        'Signed as Ada  Signer; the oldest branches use the gavin/ prefix.', 'Patrick holds the key, and this page may say so.',
+        'Signed as the name on the signing certificate, profile ThornswoodRelease.', 'An Ada Signerton is someone else.')
+    # The name on the signing certificate is read from Updater.cs (#1052), so
+    # the tree carries a stand-in one and the pages name it.
+    Put $tmp 'launcher/app/Updater.cs' @('        public const string ExpectedSigner = "Ada Signer";')
     Put $tmp 'CONTRIBUTING.md' @('Never "player".', 'And a player here is not the rule.')
     Put $tmp 'launcher/app/Help.cs' @('new HelpItem("x", "fine"),', 'new HelpItem("y", "a single-player game"),')
     # With a byte order mark, which the check has to read through.
@@ -153,7 +175,7 @@ try {
 
     $want = @(
         'README.md:2:em-dash', 'README.md:3:banned-word', 'README.md:4:banned-word', 'README.md:7:old-owner', 'README.md:8:names-person',
-        'SECURITY.md:2:em-dash', 'SECURITY.md:3:em-dash', 'SECURITY.md:4:em-dash',
+        'SECURITY.md:2:em-dash', 'SECURITY.md:3:em-dash', 'SECURITY.md:4:em-dash', 'SECURITY.md:5:signer-name',
         'CONTRIBUTING.md:2:banned-word',
         'launcher/app/Help.cs:2:banned-word',
         'launcher/ui.xaml:2:em-dash',
@@ -179,9 +201,9 @@ try {
     foreach ($m in $missing) { Write-Host ("      not reported: " + $m) }
     foreach ($x in $extra) { Write-Host ("      reported but allowed: " + $x) }
     Yes ('every seeded break is reported at its own file, line and rule (' + $want.Count + ' wanted, ' + $s.Hits.Count + ' reported)') ($missing.Count -eq 0)
-    Yes 'nothing allowed is reported: multiplayer, playtest, getPlayer, an en dash, the certificate name, a gavin/ branch, a repository link, lore, the archive, code' ($extra.Count -eq 0)
+    Yes 'nothing allowed is reported: multiplayer, playtest, getPlayer, an en dash, a gavin/ branch, a longer name, a repository link, lore, the archive, code' ($extra.Count -eq 0)
     Yes ('every hit names the file, the line and the rule (' + $s.Errors.Count + ' error line(s), ' + $s.Hits.Count + ' in that shape)') ($s.Errors.Count -eq $s.Hits.Count)
-    foreach ($rule in 'em-dash', 'banned-word', 'old-owner', 'open-alpha', 'placeholder', 'names-person') {
+    foreach ($rule in 'em-dash', 'banned-word', 'old-owner', 'open-alpha', 'placeholder', 'names-person', 'signer-name') {
         $caught = @($s.Hits | Where-Object { $_ -like ('*:' + $rule) }).Count
         $planted = @($want | Where-Object { $_ -like ('*:' + $rule) }).Count
         Yes ("rule $rule catches every break planted for it ($caught of $planted)") ($planted -gt 0 -and $caught -eq $planted)
@@ -218,7 +240,7 @@ try {
     # Clean the seeded breaks away and the same tree passes, the one good
     # allowance still covering its line.
     Put $tmp 'README.md' @('# Seeded', 'A multiplayer engine, a playtest, getPlayer() and PlayerCharacter.', 'Clone https://github.com/EvilPatrick06/Thornswood to start.')
-    Put $tmp 'SECURITY.md' @('Fine.', 'Signed as Gavin Knotts; the oldest branches use the gavin/ prefix.', 'Patrick holds the key, and this page may say so.')
+    Put $tmp 'SECURITY.md' @('Fine.', 'Signed as the name on the signing certificate; the oldest branches use the gavin/ prefix.', 'Patrick holds the key, and this page may say so.')
     Put $tmp 'CONTRIBUTING.md' @('Never "player".', 'And people here are customers.')
     Put $tmp 'launcher/app/Help.cs' @('new HelpItem("x", "fine"),')
     Put $tmp 'launcher/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>') $utf8bom

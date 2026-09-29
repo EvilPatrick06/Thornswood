@@ -32,6 +32,14 @@
   is fine. Then the same scan runs over the shapes that leaked before this
   change, so it is known to catch them.
 
+  AND NO SECRET IS TYPED (issue #1069). A value typed after a parameter is
+  saved in PowerShell's history file and is in the command line of any
+  pwsh -File that runs the script, on the machine running it, whatever the
+  script does with it afterwards. So no script's own parameter with a
+  secret's name may take a value a person can type: it is a switch that asks
+  with a hidden prompt (Read-ThornswoodSecret, Read-Host -AsSecureString), or
+  a SecureString one script hands another, which cannot be typed.
+
   Read only. Never connects to anything.
 #>
 [CmdletBinding()]
@@ -59,8 +67,8 @@ $A = 'System.Management.Automation.Language'
 # ---- what a secret is ----------------------------------------------------
 $SecretName = '^(?i)(password|passwd|pw|pass|passphrase|token|tok|bottoken|clientsecret|secret|botkey|payload|webhook|hook|regtoken|removetoken|apikey|sitekey|passkey|signingsecret|thornswoodsecret)$'
 $SecretSource = '(?i)PtrToStringAuto|PtrToStringBSTR|PtrToStringUni|SecureStringToBSTR|GetNetworkCredential|registration-token|remove-token|\bNewKey\b'
-# Names that hold a secret in one script only. Discord-Hook.ps1 -Save takes
-# the webhook.
+# Names that hold a secret in one script only. Discord-Hook.ps1 -Save asks
+# for the webhook and -Url takes it from another script.
 $ExtraNames = @{ 'Discord-Hook.ps1' = @('Save', 'url') }
 
 # Live values, built here so this file holds none of them.
@@ -370,6 +378,106 @@ Yes 'Install-Runner.ps1 hands config.cmd no --windowslogonpassword argument' ($r
 Yes '  it hands both to config.cmd in its environment, and takes them out again' (
     $runner -match 'ACTIONS_RUNNER_INPUT_TOKEN' -and $runner -match 'ACTIONS_RUNNER_INPUT_WINDOWSLOGONPASSWORD' -and
     $runner -match 'Remove-Item Env:\\ACTIONS_RUNNER_INPUT_TOKEN, Env:\\ACTIONS_RUNNER_INPUT_WINDOWSLOGONPASSWORD')
+# ---- 4. no secret is a typed parameter (issue #1069) ------------------------
+#
+# Every script's own param block, the one a person types after the script's
+# name. A parameter with a secret's name has to be a switch (it asks, hidden)
+# or a SecureString (handed over by a script that asked); a string, an
+# untyped one or anything else that takes typed text fails.
+function TypedSecrets([string]$path, [string]$leaf) {
+    $tokens = $null; $errs = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errs)
+    $out = @()
+    if (-not $ast.ParamBlock) { return , $out }
+    $extra = @()
+    if ($ExtraNames.ContainsKey($leaf)) { $extra = $ExtraNames[$leaf] }
+    foreach ($prm in $ast.ParamBlock.Parameters) {
+        $n = NameOf $prm.Name
+        if (-not (($n -match $SecretName) -or ($extra -contains $n))) { continue }
+        $type = $prm.StaticType
+        if ($type -eq [System.Management.Automation.SwitchParameter] -or $type -eq [System.Security.SecureString]) { continue }
+        $out += ('{0}:{1}  -{2} takes a typed {3}' -f $leaf, $prm.Extent.StartLineNumber, $n, $type.Name)
+    }
+    return , $out
+}
+
+$tmp2 = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-typed-secret-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $tmp2 -Force | Out-Null
+try {
+    $typedControls = [ordered]@{
+        'a [string]$Password (Deploy-Docs and Rotate-ServerPassword before #1069)' = @('control-a.ps1', "param([string]`$Password, [switch]`$Site)")
+        'a [string]$Webhook (Publish-Discord before #1069)' = @('control-b.ps1', "param([string]`$Webhook, [switch]`$Dev)")
+        'a [string]$Save holding the webhook (Discord-Hook before #1069)' = @('Discord-Hook.ps1', "param([string]`$Name, [string]`$Save)")
+        'an untyped $Token' = @('control-c.ps1', "param(`$Token)")
+        'a [string]$Secret with attributes' = @('control-d.ps1', "[CmdletBinding()]`nparam([Parameter(Mandatory = `$true)][string]`$Secret)")
+    }
+    foreach ($k in $typedControls.Keys) {
+        $f = Join-Path $tmp2 $typedControls[$k][0]
+        [IO.File]::WriteAllText($f, $typedControls[$k][1], (New-Object Text.UTF8Encoding($false)))
+        Yes ("caught: $k") ((TypedSecrets $f $typedControls[$k][0]).Count -gt 0)
+        Remove-Item -LiteralPath $f -Force
+    }
+    $typedFine = [ordered]@{
+        'a [switch]$Password that asks' = @('fine-a.ps1', "param([switch]`$Password)")
+        'a [SecureString]$Secret handed over by a script (Remote.ps1)' = @('fine-b.ps1', "param([System.Security.SecureString]`$Secret)")
+        'a [SecureString]$Url beside a [switch]$Save (Discord-Hook)' = @('Discord-Hook.ps1', "param([string]`$Name, [switch]`$Save, [securestring]`$Url)")
+        'a [string]$RequirePass, which is on or off' = @('fine-c.ps1', "param([string]`$RequirePass, [string]`$KeyFile)")
+    }
+    foreach ($k in $typedFine.Keys) {
+        $f = Join-Path $tmp2 $typedFine[$k][0]
+        [IO.File]::WriteAllText($f, $typedFine[$k][1], (New-Object Text.UTF8Encoding($false)))
+        $hits = TypedSecrets $f $typedFine[$k][0]
+        Yes ("passed as safe: $k" + $(if ($hits.Count) { ': ' + ($hits -join '; ') } else { '' })) ($hits.Count -eq 0)
+        Remove-Item -LiteralPath $f -Force
+    }
+}
+finally { Remove-Item -LiteralPath $tmp2 -Recurse -Force -ErrorAction SilentlyContinue }
+
+$typed = @()
+foreach ($f in $files) { foreach ($h in (TypedSecrets $f.FullName $f.Name)) { if ($h) { $typed += $h } } }
+foreach ($h in $typed) { Write-Host "      $h" }
+Yes ('no script takes a secret as a typed parameter (' + $typed.Count + ' found in ' + $files.Count + ' scripts)') ($typed.Count -eq 0)
+
+# The four #1069 named, by what they do now, and what their usage text says.
+$typedNamed = [ordered]@{
+    'scripts\deploy\Deploy-Docs.ps1'          = 'Password'
+    'scripts\deploy\Rotate-ServerPassword.ps1' = 'Password'
+    'scripts\ops\Discord-Hook.ps1'            = 'Save'
+}
+foreach ($rel in $typedNamed.Keys) {
+    $path = Join-Path $repo $rel
+    $t = [IO.File]::ReadAllText($path)
+    $leaf = Split-Path -Leaf $rel
+    $pn = $typedNamed[$rel]
+    Yes "$leaf -$pn is a switch" ($t -match ('\[switch\]\$' + $pn + '\b'))
+    Yes "  it asks with a hidden prompt" ($t -match 'Read-ThornswoodSecret ' -and $t -match [regex]::Escape("..\vps\Send-Secret.ps1"))
+    Yes "  its usage text types no value after -$pn" ($t -notmatch ('(?m)^\s*\.\\\S*' + [regex]::Escape($leaf) + '.*-' + $pn + '[ \t]+[''"<]'))
+}
+$pub = [IO.File]::ReadAllText((Join-Path $repo 'scripts\ops\Publish-Discord.ps1'))
+$pubAst = [System.Management.Automation.Language.Parser]::ParseInput($pub, [ref]$null, [ref]$null)
+Yes 'Publish-Discord.ps1 has no -Webhook: it reads the webhook through Discord-Hook.ps1 only' (
+    @($pubAst.ParamBlock.Parameters | Where-Object { (NameOf $_.Name) -eq 'Webhook' }).Count -eq 0 -and $pub -match 'Discord-Hook\.ps1''\) -Name \$hookName')
+$hookText = [IO.File]::ReadAllText((Join-Path $repo 'scripts\ops\Discord-Hook.ps1'))
+Yes 'Discord-Hook.ps1 takes a webhook from another script only as a SecureString (-Url)' ($hookText -match '\[System\.Security\.SecureString\]\$Url')
+foreach ($caller in @('scripts\ops\Set-DevNews.ps1', 'scripts\deploy\Setup-Discord.ps1')) {
+    $ct = [IO.File]::ReadAllText((Join-Path $repo $caller))
+    Yes ((Split-Path -Leaf $caller) + ' hands Discord-Hook.ps1 the webhook as -Save -Url, a SecureString') ($ct -match 'Discord-Hook\.ps1''\) -Name \w+ -Save -Url ')
+}
+$remoteText = [IO.File]::ReadAllText((Join-Path $repo 'scripts\vps\Remote.ps1'))
+Yes 'Remote.ps1 -Secret is a SecureString' ($remoteText -match '\[System\.Security\.SecureString\]\$Secret')
+
+# Docs: no page shows a secret typed after one of these.
+$docHits = @()
+foreach ($d in @(Get-ChildItem -LiteralPath $repo -Recurse -File -Filter *.md -ErrorAction SilentlyContinue | Where-Object { $_.FullName.Substring($repo.Length) -notmatch '(?i)[\\/](docs[\\/]archive|engine|node_modules|\.git)[\\/]' })) {
+    $i = 0
+    foreach ($l in [IO.File]::ReadAllLines($d.FullName)) {
+        $i++
+        if ($l -match '(Discord-Hook(\.ps1)?[^|`]*-Save\s+[<''"\w])|(Rotate-ServerPassword(\.ps1)?\s+-Password\s+[<''"\w])|(Deploy-Docs(\.ps1)?\s+-Password\s+[<''"\w])|(Publish-Discord(\.ps1)?[^|`]*-Webhook\b)') { $docHits += ('{0}:{1}' -f $d.Name, $i) }
+    }
+}
+foreach ($h in $docHits) { Write-Host "      $h" }
+Yes ('no page shows a secret typed on the command line (' + $docHits.Count + ' found)') ($docHits.Count -eq 0)
+
 $false1 = @()
 foreach ($f in $files) {
     $t = [IO.File]::ReadAllText($f.FullName)

@@ -55,7 +55,10 @@ Yes 'Build-Launcher still leaves setup-stub unsigned' (
     $buildSrc -notmatch '\$toSign \+= \$stub')
 
 $frag = Get-ExpectedSignerFragment -RepoRoot $repo
-Yes 'ExpectedSigner fragment is Gavin Knotts' ($frag -eq 'Gavin Knotts')
+# Compared with Updater.cs read here, rather than with the name written out, so
+# the name stays in the one place it has to be (#1052).
+$pinned = [regex]::Match([IO.File]::ReadAllText((Join-Path $repo 'launcher\app\Updater.cs')), 'const string ExpectedSigner = "([^"]+)"').Groups[1].Value
+Yes 'ExpectedSigner fragment is the one Updater.cs pins' ($frag -and $frag -eq $pinned)
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-sign-gate-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Force -Path $work | Out-Null

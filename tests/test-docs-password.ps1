@@ -54,8 +54,11 @@ Yes 'Deploy-Docs.ps1 parses' (@($errors).Count -eq 0)
 $ifs = @($ast.FindAll({
     param($n)
     $n -is [System.Management.Automation.Language.IfStatementAst] -and
-    $n.Clauses[0].Item1.Extent.Text -eq '$Password'
+    $n.Clauses[0].Item1.Extent.Text -eq '$Password' -and
+    $n.Clauses[0].Item2.Extent.Text -match 'Invoke-ThornswoodSecretRemote'
 }, $true))
+# The other if ($Password) is the hidden prompt near the top (#1069), which
+# asks before anything is sent; this is the branch that sends it.
 Yes 'the -Password branch is in Deploy-Docs.ps1' ($ifs.Count -eq 1)
 if ($ifs.Count -ne 1) { Done }
 $t = $ifs[0].Clauses[0].Item2.Extent.Text
@@ -68,6 +71,11 @@ $read  = $branch.IndexOf('ReadAllText')
 $write = $branch.IndexOf('WriteAllText')
 Yes 'the branch reads config.json before it writes it' ($read -ge 0 -and $write -gt $read)
 Yes 'no WriteAllBytes is left in Deploy-Docs.ps1' (-not ((Get-Content -LiteralPath $DeployPath -Raw) -match 'WriteAllBytes'))
+# -Password asks, hidden, before anything is sent, and is never a typed value
+# (#1069): typed, the password would stay in the shell's history file.
+$deployText = Get-Content -LiteralPath $DeployPath -Raw
+Yes '-Password is a switch, not a typed value' ($deployText -match '\[switch\]\$Password\b')
+Yes 'the branch sends the password the hidden prompt gave' ($branch -match '-Secret \$newPassword\b' -and $deployText -match '\$newPassword = Read-ThornswoodSecret ')
 
 # ---- what runs it -------------------------------------------------------------
 $ps51 = Get-Command powershell.exe -ErrorAction SilentlyContinue
@@ -94,10 +102,11 @@ function ssh {
 }
 
 # Runs the branch with the two things it takes from the rest of Deploy-Docs:
-# the site's folder and the password. Its own Write-Host lines are kept out of
-# the results; what the far side printed is handed back.
+# the site's folder and the password, which the script asked for with a
+# hidden prompt before it sent anything (#1069). Its own Write-Host lines are
+# kept out of the results; what the far side printed is handed back.
 function Run-Branch([string]$rootWin, [string]$pw) {
-    $Password = $pw
+    $newPassword = $pw
     function Write-Host { }
     return @(. ([ScriptBlock]::Create($branch)) | ForEach-Object { [string]$_ })
 }
