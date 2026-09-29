@@ -100,7 +100,7 @@ it says a pool thread.
 | 13 | `Shell.cs:301 Discord.SendPendingLogs` | Pool thread. A session that ended without sending its logs (`Profile\logs-pending.txt` still there) sends them now, before a new game start truncates them. |
 | 14 | `Shell.cs:307 AutoJoin.Ensure` | Makes `Game\Data\Platform\Plugins\skymp5-client-settings.txt` when there is none (`AutoJoin.cs:52 Ensure()`). |
 | 15 | `Shell.cs:316 Checks.GameRunning` | A game still running from before the launcher was restarted is taken over: `Shell.cs:326 Hold.Take` holds our files again and nothing is pulled apart under it. Otherwise `Shell.cs:331 Swap.Restore` takes off any redirect a crash left and `Shell.cs:332 Keep.TakeNote` deletes a stale session note. |
-| 16 | `Shell.cs:334 Leaks.Clean` | Deletes the one sign in file a 16 Sep installer shipped, matched by hash. Then `Shell.cs:335 ThornIni.Ensure` writes `Game\Data\SKSE\Plugins\Thornswood.ini` from the template if it is missing, and `Shell.cs:336 ThornIni.UndoShippedFov` runs once per install. When no downgrade is needed, `Shell.cs:338 SteamUpdates.Report` logs Steam's Updates setting for the Skyrim the downgrade looks after, and writes nothing. |
+| 16 | `Shell.cs:334 Leaks.Clean` | Deletes the one sign in file a 16 Sep installer shipped, matched by hash. Then `Shell.cs:335 ThornIni.Ensure` writes `Game\Data\SKSE\Plugins\Thornswood.ini` from the template if it is missing, and `Shell.cs:336 ThornIni.UndoShippedFov` runs once per install. When no downgrade is needed, `Shell.cs:338 HoldSteamUpdatesOnStart` logs Steam's Updates setting for the Skyrim the downgrade looks after and sets it when it does not hold the version (see SteamUpdates below). |
 | 17 | `Shell.cs:340 Keep.Unpark` | Puts back plugins a crashed session left parked. Then `Shell.cs:344 Keep.Seed` fills `Profile\Keep` from pack records for files it has no copy of yet. |
 | 18 | `Shell.cs:353 Display.MatchScreen` | Unless Lock resolution is ticked: the game's resolution and menu scale follow the screen (`Shell.cs:359 Display.ScaleMenus`). |
 | 19 | `Shell.cs:370 Icons.Ensure` | Pool thread. The shortcut icon follows the exe. `Shell.cs:393 ClearLeftovers` (pool) ends a windowless Skyrim over three minutes old. `Shell.cs:407 Uninstall.DropScratch` (pool) deletes the installer's leftover `Thornswood-setup` folder. |
@@ -353,11 +353,19 @@ refreshed from it.
 **SteamUpdates** (SteamUpdates.cs, with ShellSteamUpdates.cs for its
 question). Steam's Updates setting for Skyrim, `AutoUpdateBehavior` in
 `steamapps\appmanifest_489830.acf` in the library that holds it.
-`SteamUpdates.cs:190 Report()` reads it into the log at every start. Only
-after a downgrade works does `ShellSteamUpdates.cs:22 AskToHoldSteamUpdates()`
-offer to set it to wait until the game is launched, and only on Yes, with
-Steam closed, does `SteamUpdates.cs:226 Hold()` change that one value. Play is
-never held on it.
+At every start `ShellSteamUpdates.cs:26 HoldSteamUpdatesOnStart()` logs it
+(`SteamUpdates.cs:256 Report()`) and, when it is not "Wait until I launch the
+game" or the file is marked read only, sets it (#493): `SteamUpdates.cs:302
+OnStart()` says write it at once when Steam is closed, or put
+`ShellSteamUpdates.cs:59 AskToHoldSteamUpdates()`, whose Yes closes Steam,
+waits for it to go, writes and starts Steam again. A No is remembered in
+config.json (`SteamUpdatesDeclined`); the question after a downgrade that
+works is asked regardless. `SteamUpdates.cs:400 Hold()` changes that one value,
+takes off a read-only mark and never writes while Steam runs. The mark is not
+what holds the version: Thornswood runs its own folder, whose exe is its own
+copy, and Steam puts an update in by moving new files into its own copy, so
+what an update would cost is a second downgrade, which the setting prevents.
+Play is never held on it.
 
 **The settings Play writes every time.** Enforce.cs (`SkyrimSoulsRE.ini` and
 `OpenAnimationReplacer.ini`, which those mods rewrite on exit; `SkyrimPlatform.ini`'s
