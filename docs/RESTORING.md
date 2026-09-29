@@ -228,7 +228,7 @@ under Windows PowerShell 5.1. The three scripts were copied up first, because
 the box has no repo:
 
 ```powershell
-scp .\scripts\deploy\Install-ThornswoodServer.ps1 Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/deploy/
+scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/deploy/
 scp .\scripts\vps\Restore-Server.ps1 .\scripts\vps\Restore-Backup.ps1 .\scripts\vps\Roll-Log.ps1 Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/vps/
 ```
 
