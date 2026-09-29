@@ -336,6 +336,23 @@ if ($LASTEXITCODE -ne 0) { Die "the installer on the VPS exited with $LASTEXITCO
   Install-ThornswoodServer.ps1 now sets the folder aside and restores it, so
   after the first seeding this is keeping the two in step rather than repairing
   a wipe.
+
+  ONLY THE DOOR, AND ASKING FOR THE DEV LIST (#964). This was
+  Copy-Item -LiteralPath (Join-Path $live '*'), and -LiteralPath reads the *
+  as a file name, so it never copied anything: the count it printed was what
+  dev already held. Copying the whole folder would have been wrong anyway. It
+  holds the dev server's own door.log, characters.json, property.json,
+  farm-claims.json, take-limit.json, mod-settings.json and online-names.json,
+  which belong to the dev world, and a door.json with the live address, which
+  gives the dev door the live list. The dev door asks
+  https://thornswood.net/dev, whose list is only the people the dev build is
+  for (docs\SYSTEM.md, "The door"); on 28 Sep that took the dev list from 46
+  to 28, which is right.
+
+  So now: door.json is live's key and join pass key with the address ending
+  in /dev, so a rotated key still reaches dev and the list stays the dev one.
+  allowed.json is copied only when dev has none, so the Owner has commands
+  on a fresh dev root until its door fetches its own. Nothing else is touched.
 #>
 if ($IsDev) {
     Head 'The roster'
@@ -350,9 +367,27 @@ if (-not (Test-Path -LiteralPath $live)) {
     'the live server has no private folder, so there is no roster to copy'
 } else {
     New-Item -ItemType Directory -Path $dev -Force | Out-Null
-    Copy-Item -LiteralPath (Join-Path $live '*') -Destination $dev -Recurse -Force
-    $n = @(Get-ChildItem -LiteralPath $dev -File -Force -EA SilentlyContinue).Count
-    "dev now has the same roster as main, $n file(s)"
+    $liveDoor = Join-Path $live 'door.json'
+    if (Test-Path -LiteralPath $liveDoor) {
+        try {
+            $d = Get-Content -LiteralPath $liveDoor -Raw | ConvertFrom-Json
+            $site = ([string]$d.site).TrimEnd('/')
+            if ($site -and $site -notmatch '/dev$') { $site = $site + '/dev' }
+            $d | Add-Member -NotePropertyName site -NotePropertyValue $site -Force
+            [IO.File]::WriteAllText((Join-Path $dev 'door.json'), ($d | ConvertTo-Json),
+                (New-Object Text.UTF8Encoding($false)))
+            "dev door.json has the live key and asks $site/api/allowed"
+        } catch {
+            'the live door.json could not be read, so the dev one was left as it was'
+        }
+    } else {
+        'the live server has no door.json, so the dev one was left as it was'
+    }
+    $devList = Join-Path $dev 'allowed.json'
+    if (-not (Test-Path -LiteralPath $devList) -and (Test-Path -LiteralPath (Join-Path $live 'allowed.json'))) {
+        Copy-Item -LiteralPath (Join-Path $live 'allowed.json') -Destination $devList -Force
+        'dev had no allowed.json, so it starts from the live one until its door fetches the dev list'
+    }
 }
 '@
     $seed = $seed.Replace('@@DEVROOT@@', $VpsRoot.TrimEnd('\'))
