@@ -140,6 +140,9 @@ if ($Dev -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
 # A run that sends nothing (-NoPush, which is Ship -DryRun) and already has
 # both files here uses them as they are, so a dry run never needs the VPS.
 . (Join-Path $Here 'Feed-Store.ps1')
+# What a release is diffed against: file contents, and the feed's own record
+# of what its last release left installed (#441). Release-Baseline.ps1 says why.
+. (Join-Path $Here 'Release-Baseline.ps1')
 if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir $Channel }
 if (-not (Test-Path -LiteralPath $ReleaseDir)) { New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null }
 $haveLocal = (Test-Path -LiteralPath (Join-Path $ReleaseDir 'version.json')) -and (Test-Path -LiteralPath (Join-Path $ReleaseDir 'published.json'))
@@ -201,9 +204,10 @@ if (Test-Path -LiteralPath $OldDist) {
 # (per machine, so a Dev Ship from a second machine started from nothing),
 # then in the Thornswood-Releases clone for the channel (#437). Since #907 it
 # is on the VPS beside the channel's feed, received above into the working
-# folder, so every machine that ships reads the same baseline. When the VPS
-# has none, the next line down stops with "No baseline yet": the one-off
-# scripts\oneoff\Move-FeedStore-ToVps.ps1 is what put the first one there.
+# folder, so every machine that ships reads the same baseline. Since #441 it is
+# a copy of the record the feed's last release names, and the block "what was
+# published" below reads that record from the site when this copy is missing
+# or is not it.
 # Pending notes stay under LOCALAPPDATA: they are about this machine's
 # unfinished send, not about the channel.
 $StateFile = Join-Path $ReleaseDir 'published.json'
@@ -478,6 +482,12 @@ if ((Test-Path -LiteralPath $menuLive) -and (Test-Path -LiteralPath $menuSrc)) {
 Say '  Scanning the build...'
 $prefix = $GameDir.TrimEnd('\') + '\'
 $now = @{}
+# Each file of ours is recorded by its bytes, '<size>:<sha256>', not by its
+# file time (#441): the same bytes are the same entry on any machine, after a
+# reinstall, and after something rewrites a file with what it already held.
+# Measured 24 September: 891 files, 661.9 MB, about 14 seconds to hash.
+$nowFile = @{}
+$hashWatch = [Diagnostics.Stopwatch]::StartNew()
 foreach ($f in (Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force)) {
     $rel = $f.FullName.Substring($prefix.Length)
     if (Test-FromCollection $rel) { continue }
@@ -487,9 +497,10 @@ foreach ($f in (Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force)) {
     # Dev only files ride in dev packs and never in a main one (Ship-Rules).
     if (-not $Dev -and (Test-ShipDevOnly $rel)) { continue }
     if ($f.Extension -in '.pdb', '.log') { continue }
-    $now[$rel] = ('{0}:{1}' -f $f.Length, $f.LastWriteTimeUtc.Ticks)
+    $now[$rel] = Get-BaselineEntry $f.FullName
+    $nowFile[$rel] = $f
 }
-Say ("  {0:n0} mod files" -f $now.Count) 'Green'
+Say ("  {0:n0} mod files, hashed in {1:n1} s" -f $now.Count, $hashWatch.Elapsed.TotalSeconds) 'Green'
 $others = @(Get-ChildItem -LiteralPath (Join-Path $GameDir 'Data\Platform') -Recurse -File -Force -ErrorAction SilentlyContinue |
             ForEach-Object { $_.FullName.Substring($prefix.Length) } | Where-Object { Test-OtherServer $_ })
 if ($others.Count) { Say ("  {0} of another server's file(s) in Data\Platform left alone: {1}" -f $others.Count, (($others | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')) 'DarkGray' }
@@ -544,16 +555,10 @@ if (Test-Path $srcDir) {
     }
 }
 
-$prev = @{}
-if (Test-Path $StateFile) {
-    $obj = Get-Content $StateFile -Raw | ConvertFrom-Json
-    foreach ($p in $obj.PSObject.Properties) { $prev[$p.Name] = $p.Value }
-}
-
+# The same bytes as the baseline this release publishes on the site (the
+# release manifest block), so the store copy and the feed's record agree.
 function Save-State {
-    $o = [ordered]@{}
-    foreach ($k in ($now.Keys | Sort-Object)) { $o[$k] = $now[$k] }
-    $o | ConvertTo-Json -Depth 3 -Compress | Set-Content $StateFile -Encoding UTF8
+    [void](Write-BaselineFile $now $StateFile)
 }
 
 # ==== thornswood publish resume ====
@@ -642,7 +647,24 @@ function Send-Baseline([string]$id) {
 }
 # ==== end thornswood baseline send ====
 
+# ==== thornswood what was published ====
+# A RELEASE IS DIFFED AGAINST WHAT THE FEED LAST PUBLISHED (#441), not
+# against whatever baseline a disk holds. Since this change every release
+# names, in version.json, the record of what it left installed, sent to the
+# site beside its packs. Resolve-ReleaseBaseline (Release-Baseline.ps1) uses
+# the store's published.json only when it is that record, reads the record
+# from the site when the store copy is missing or is not it, and rebuilds
+# from the feed's own packs when the feed names none.
+$feedPtr = $null
+try { $feedPtr = Get-FeedBaselinePointer ((([IO.File]::ReadAllText($VersionFile)) -replace '^\uFEFF', '') | ConvertFrom-Json) }
+catch { Die $_.Exception.Message }
 if ($Baseline) {
+    # Recording this build as published is only for a feed that does not say
+    # what it published. One that does is the answer, whatever this build is.
+    if ($null -ne $feedPtr) {
+        Die ("-Baseline records this build as already published, and the $Channel feed already names what its last release left installed " +
+             "(release $([string]$feedPtr.id)). Nothing was recorded. Run the release without -Baseline; it is diffed against that.")
+    }
     Save-State
     Send-Baseline 'from -Baseline'
     Head 'Done'
@@ -651,16 +673,38 @@ if ($Baseline) {
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 0
 }
-if (-not $prev.Count) {
-    Die ("No baseline yet: the VPS has no published.json for the $Channel channel. " +
-         'scripts\oneoff\Move-FeedStore-ToVps.ps1 puts the last one Thornswood-Releases held there; ' +
-         'failing that, run this once with -Baseline, which records this build as already published.')
+$prev = @{}
+$baselineFrom = ''
+try {
+    $resolved = Resolve-ReleaseBaseline $VersionFile $StateFile $DistDir (Get-FeedStoreSiteDir $SiteDir) $SiteUrl { param($m) Say $m 'Yellow' }
+    $prev = $resolved.Map
+    $baselineFrom = [string]$resolved.From
+    foreach ($l in @($resolved.Lines)) { Say $l $(if ($baselineFrom -eq 'store') { 'DarkGray' } else { 'Yellow' }) }
+} catch {
+    Die ("No baseline for the $Channel channel, so nothing was built: " + $_.Exception.Message + ' ' +
+         'The store has no published.json, the feed names no record of its last release, and its packs could not be read back. ' +
+         'Failing everything else, run this once with -Baseline, which records this build as already published.')
 }
+if (-not $prev.Count) {
+    Die ("No baseline for the $Channel channel: what was last published came back empty, so every file would look new. Nothing was built.")
+}
+# ==== end thornswood what was published ====
 
 # ------------------------------------------------------------ diff
 Head 'Changes'
 $changed = @(); $removed = @()
-foreach ($k in $now.Keys) { if (-not $prev.ContainsKey($k) -or $prev[$k] -ne $now[$k]) { $changed += $k } }
+# Test-BaselineSame also reads an entry written before #441, size and file
+# time, the way it was written, so the first release after the switch sends
+# only what really changed and records every entry as a hash from then on.
+$legacySame = 0
+foreach ($k in $now.Keys) {
+    if (-not $prev.ContainsKey($k)) { $changed += $k; continue }
+    if ($prev[$k] -eq $now[$k]) { continue }
+    $fk = if ($nowFile.ContainsKey($k)) { $nowFile[$k] } else { $null }
+    if (Test-BaselineSame ([string]$prev[$k]) ([string]$now[$k]) $fk) { $legacySame++; continue }
+    $changed += $k
+}
+if ($legacySame) { Say ("  {0:n0} file(s) compared by size and time, as the old baseline recorded them; recorded by hash from this release on" -f $legacySame) 'DarkGray' }
 foreach ($k in $prev.Keys) { if (-not $now.ContainsKey($k)) { $removed += $k } }
 
 $profileChanged = @($changed | Where-Object { $_ -like ':profile:*' })
@@ -1154,6 +1198,45 @@ if (-not $NoUpload) {
     # ==== end thornswood site upload ====
 }
 
+# ==== thornswood release manifest ====
+# tests\test-release-baseline.ps1 runs this block on its own. If the markers
+# move, it stops rather than quietly testing nothing.
+#
+# WHAT THIS RELEASE LEAVES INSTALLED, published beside its packs (#441): the
+# whole map, every file of ours with its size and sha256, the same bytes
+# Save-State writes into the store once the release is out. It goes to the
+# site like a pack, by its sha256, BEFORE version.json names it, and the feed
+# names it as "baseline", so the next release on any machine is diffed against
+# what this one really published. With -NoUpload it is only written here and
+# the feed names none; the next release then reads the store's copy rather
+# than a record the site does not hold. Two runs over the same tree write the
+# same bytes, which is how a dry run can be compared with a real one.
+$releaseBaseline = $null
+$manifestPath = Join-Path $DistDir ('manifest-' + $Id + '.json')
+$manifestSha = Write-BaselineFile $now $manifestPath
+Say ("  manifest-{0}.json: {1:n0} entries, sha256 {2}" -f $Id, $now.Count, $manifestSha) 'DarkGray'
+foreach ($old in @(Get-ChildItem -LiteralPath $DistDir -Filter 'manifest-*.json' -File -ErrorAction SilentlyContinue |
+                   Sort-Object Name -Descending | Select-Object -Skip 20)) {
+    Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
+}
+if (-not $NoUpload) {
+    $sendArgs = @{ Dev = $Dev; Send = @($manifestPath); Quiet = $true }
+    if ($SiteDir) { $sendArgs['SiteDir'] = $SiteDir }
+    $global:LASTEXITCODE = 0
+    $sendWhy = ''
+    try { & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @sendArgs }
+    catch { $sendWhy = $_.Exception.Message }
+    if (-not $sendWhy -and $LASTEXITCODE -ne 0) { $sendWhy = "Remirror-Site-Feed.ps1 -Send exited $LASTEXITCODE" }
+    if ($sendWhy) {
+        Say "  $sendWhy" 'Red'
+        Die ('The record of what this release installs did not reach the site, so version.json has not been touched. ' +
+             'Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test, then run Ship again.')
+    }
+    $releaseBaseline = New-FeedBaselinePointer $Id $manifestSha (Get-HostFeedAssetUrl $manifestSha -Dev:$Dev) $now.Count
+    Say '  what this release installs is on the site' 'Green'
+}
+# ==== end thornswood release manifest ====
+
 # ------------------------------------------------------------ version.json
 # ==== thornswood feed recheck ====
 # Two people can ship from two machines, and this run received the feed and
@@ -1261,6 +1344,16 @@ if ($clientRel -and $clientRel.url) {
         notice     = $SourceNoticeVersion
     })
     Say "  client runtime $($clientRel.forkCommit) recorded" 'Green'
+}
+# What this release leaves installed (the release manifest block), which the
+# next release is diffed against. Taken out when it was not sent, so the feed
+# never names a record the site does not hold.
+if ($releaseBaseline) {
+    Set-Prop $doc 'baseline' $releaseBaseline
+    Say ("  baseline {0} recorded, {1:n0} entries" -f $Id, $now.Count) 'Green'
+} elseif ($doc.PSObject.Properties['baseline']) {
+    $doc.PSObject.Properties.Remove('baseline')
+    Say '  -NoUpload: the feed no longer names a baseline, so the next release reads the store''s copy' 'Yellow'
 }
 if ($Launcher -and (Test-Path $exePath)) {
     $wasVersion = Val $doc 'launcherVersion'
