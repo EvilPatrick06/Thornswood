@@ -2287,6 +2287,8 @@ _MOD_DID = {
     'note': 'wrote a note on %s',
     # Not staff: somebody's own /stuck (#414), said as its why reads.
     'stuck': 'used /stuck',
+    # Not staff either: the server took somebody idle out of the world (#1142).
+    'idle': 'was moved out for being idle',
 }
 
 
@@ -2319,6 +2321,13 @@ def moderation_text(where, row):
         why = clean(row.get('why'), 600) or 'used /stuck.'
         return ('**/stuck on the %s server:** %s %s'
                 % (where, person(row.get('byName'), row.get('by')), why))[:1900]
+
+    # Moved out of the world for being idle (#1142): nobody did it to them, so
+    # it reads as what happened and why, which the gamemode writes.
+    if row['did'] == 'idle':
+        why = clean(row.get('why'), 600) or 'nothing from their game for too long'
+        return ('**Idle on the %s server:** %s was taken back to the character choice and put in line: %s'
+                % (where, person(row.get('whoName'), row.get('who')), why))[:1900]
 
     did = _MOD_DID[row['did']] % person(row.get('whoName'), row.get('who'))
     try:

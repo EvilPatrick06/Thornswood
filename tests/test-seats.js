@@ -84,8 +84,14 @@ yes('the seats block no longer borrows the chat commands staff check', !/g\.__th
 yes('the online count file carries max, how many wait, and whether it is full',
     /thornswoodMostOnline\) \|\| 0/.test(src) &&
     /restarting: restarting, max: max, line: line, full: full/.test(src));
-yes('dispatch() takes /line and /line leave from the relay, with no character needed',
-    /if \(word === '\/line'\) \{[\s\S]{0,500}seatsApi\.leave\(profileId, seatsApi\.liveHow\(\)\)[\s\S]{0,200}seatsApi\.want\(profileId, Date\.now\(\), seatsApi\.liveHow\(\)\)/.test(src));
+yes('dispatch() takes /line, /line leave and /line hand from the relay, with no character needed',
+    /if \(word === '\/line'\) \{[\s\S]{0,500}seatsApi\.leave\(profileId, seatsApi\.liveHow\(\)\)[\s\S]{0,400}seatsApi\.hand\(profileId, Number\(parts\[2\]\) \|\| 0, Date\.now\(\), seatsApi\.liveHow\(\)\)[\s\S]{0,200}seatsApi\.want\(profileId, Date\.now\(\), seatsApi\.liveHow\(\)\)/.test(src));
+yes('and /line gone only when the relay itself marked it (cmd.relay), so no person can drop a place with it',
+    /else if \(sub === 'gone'\) \{ if \(cmd\.relay === true\) \{ seatsApi\.gone\(profileId, Date\.now\(\), seatsApi\.liveHow\(\)\); \} \}/.test(src));
+yes('the command poll reads the relay boot stamp, and a new one tells the line the relay restarted',
+    /doc = JSON\.parse\(body\) \|\| \{\}; list = doc\.commands \|\| \[\];/.test(src) && /relayBoot\(doc\.boot\);/.test(src) &&
+    /if \(!was \|\| was === boot\) \{ return; \}[\s\S]{0,300}seatsApi\.relayRestarted\(Date\.now\(\), seatsApi\.liveHow\(\)\)/.test(src));
+yes('the 45 second check-in rule is gone', !/LINE_GRACE_MS/.test(src));
 yes('the place goes back to the menu as data under the name the page looks for',
     /var LINE_NAME = 'Thornswood line';/.test(src) &&
     /g\.__thornswoodSayLine = function \(profileId, what\) \{\s*post\('\/say', \{ profileId: profileId, name: LINE_NAME, text: JSON\.stringify\(what \|\| \{\}\) \}\);/.test(src));
@@ -116,6 +122,8 @@ function rig(settings, keep) {
   box.__thornswoodToProfile = function (p, text) { r.told.push({ p: p, text: text }); };
   box.__thornswoodSayLine = function (p, what) { r.lines.push({ p: p, what: JSON.parse(JSON.stringify(what)) }); };
   box.__thornswoodHoldsStaffRole = function (p) { return !!r.staff[p]; };
+  // The relay poll, as the chat commands block keeps it (pollSaid).
+  if (!box.__thornswoodCommandPoll) { box.__thornswoodCommandPoll = { okAt: 0, failAt: 0 }; }
   // The written lists, which must NOT open a staff seat: true for everybody.
   box.__thornswoodIsStaff = function () { return true; };
   box.__thornswoodIsDev = function () { return true; };
@@ -131,6 +139,11 @@ function rig(settings, keep) {
   r.pass = function (pid) { box.__thornswoodPassSeen.passes[pid] = { at: r.now, x: r.now + 600000, v: '1.1.102', d: '1' + pid }; };
   r.want = function (pid) { return r.api().want(pid, r.now, r.api().liveHow()); };
   r.quit = function (pid) { return r.api().leave(pid, r.api().liveHow()); };
+  r.gone = function (pid) { return r.api().gone(pid, r.now, r.api().liveHow()); };
+  r.hand = function (pid, to) { return r.api().hand(pid, to, r.now, r.api().liveHow()); };
+  r.relayDown = function () { box.__thornswoodCommandPoll.failAt = r.now; };
+  r.relayUp = function () { box.__thornswoodCommandPoll.okAt = r.now; };
+  r.relayRestarted = function () { return r.api().relayRestarted(r.now, r.api().liveHow()); };
   r.runTimers = function () { const t = r.timers; r.timers = []; t.forEach(function (fn) { fn(); }); };
   r.saidTo = function (pid) { return r.told.filter(function (t) { return t.p === pid; }); };
   r.linesTo = function (pid) { return r.lines.filter(function (t) { return t.p === pid; }).map(function (t) { return t.what; }); };
@@ -155,8 +168,10 @@ const SENTENCE = api.sentence(25);
 yes("the sentence for somebody who came in past the line says so and says how to wait ('" + SENTENCE + "')",
     /full/.test(SENTENCE) && /25 people/.test(SENTENCE) && /place in line/.test(SENTENCE));
 yes('the sentence has no em dash and never the word the house rules forbid', clean(SENTENCE));
-yes('the grace for a quiet place in line is short, and longer than the menu asks',
-    api.lineGrace === 45000 && api.lineEvery === 10000 && api.lineGrace > 3 * api.lineEvery);
+yes('no check-in: only a long backstop (10 minutes) for a close that never arrives, far past the menu own ask',
+    api.lineGrace === undefined && api.lineSilent === 600000 && api.lineEvery === 10000 && api.lineSilent >= 60 * api.lineEvery);
+yes('after a relay restart each menu has a minute to ask again, longer than the chat takes to come back (30 s at most)',
+    api.relayBack === 60000);
 
 // ---- 25 seated, the 26th and 27th wait in order
 for (let p = 1; p <= 25; p++) { r.join(100 + p); r.tick(); }
@@ -191,6 +206,12 @@ yes('coming into the world past the line is refused with the sentence',
 yes('and the log says door: full with the line', /door: full, refusing profile 128: 25 of 25 already in the world, 3 waiting in line/.test(r.log()));
 r.runTimers();
 yes('and that session is ended', r.kicked.indexOf(128) >= 0);
+// The client connects again by itself, and the same character is the same actor:
+// back between two sweeps, it never looked gone.
+r.tick(r.api().outFor + 1000); r.tick();
+yes('back in so fast the server never saw them go, they are refused again, not let stay',
+    r.saidTo(128).length === 2 && r.timers.length === 1);
+r.runTimers();
 r.leave(128); r.quit(128); r.tick();
 
 // ---- a seat frees: the first in line is told to come in and seated
@@ -209,17 +230,88 @@ yes('the 1st in line arrives and takes the seat held for them', r.saidTo(126).le
 yes('26 has a seat and 25 are in the world again', r.online.length === 25 && r.kicked.indexOf(126) < 0);
 yes('an ask from somebody already in the world does nothing', r.want(126) === 'in the world');
 
-// ---- a leaver is dropped after the grace
+// ---- a place goes the moment its connection closes, with nothing to check in (Patrick, 29 Sep)
 r = rig(SEATS); r.tick();
 r.fill(200, 25);
 r.want(226); r.tick(1000); r.want(227); r.tick(1000); r.want(228); r.tick();
-for (let s = 0; s < 5; s++) { r.tick(10000); r.want(226); r.want(228); }
-yes('somebody not heard from for the grace loses their place, and the log says why',
-    /line: profile 227 lost their place, not heard from at the menu in \d+s/.test(r.log()));
-yes('and whoever was behind them moves up', r.lastLine(228).place === 2);
-yes('a place kept by asking every ten seconds is not dropped', !/profile 226 lost their place/.test(r.log()));
+for (let s = 0; s < 6; s++) { r.tick(60000); }
+yes('six minutes without a word from anybody waiting: nobody loses their place',
+    !/lost their place/.test(r.log()) && r.api().status().line === 3 && r.lastLine(228).place === 3);
+yes('the relay says the connection closed: the place goes at once', r.gone(227) === 'dropped' &&
+    /line: profile 227 lost their place: their game closed its connection to the relay/.test(r.log()));
+r.tick();
+yes('and whoever was behind them moves up straight away', r.lastLine(228).place === 2 && r.lastLine(228).of === 2);
+yes('a close from somebody not waiting changes nothing', r.gone(999) === 'not waiting' && r.api().status().line === 2);
 r.quit(226); r.tick();
 yes('/line leave gives the place up at once', /line: profile 226 left the line/.test(r.log()) && r.lastLine(228).place === 1);
+
+// ---- the backstop: a close that never arrives
+r = rig(SEATS); r.tick();
+r.fill(1300, 25);
+r.want(1326); r.tick(1000); r.want(1327); r.tick();
+for (let s = 0; s < 9; s++) { r.tick(60000); r.want(1326); }
+yes('nine minutes on, a menu that went silent still has its place (the backstop is 10 minutes)',
+    !/profile 1327 lost/.test(r.log()));
+r.tick(60000); r.want(1326); r.tick(2000);
+yes('silent past 10 minutes while the relay answers, the place goes, and the log says why',
+    /line: profile 1327 lost their place: nothing from their menu in 10 minutes, and the relay never said their game closed/.test(r.log()) &&
+    !/profile 1326 lost/.test(r.log()));
+r.want(1328); r.tick(2000);
+r.relayDown();
+for (let s = 0; s < 15; s++) { r.tick(60000); }
+yes('while the relay does not answer at all, nobody silent for 15 minutes is dropped',
+    !/profile 1328 lost/.test(r.log()) && !/profile 1326 lost/.test(r.log()) && r.api().status().line === 2);
+r.relayUp(); r.tick(2000);
+yes('and when it answers again they still have their places', r.api().status().line === 2);
+
+// ---- a relay restart keeps the line
+r = rig(SEATS); r.tick();
+r.fill(1400, 25);
+r.want(1426); r.tick(1000); r.want(1427); r.tick(1000); r.want(1428); r.tick();
+yes('a relay restart gives the three waiting a minute to ask again, and says so',
+    r.relayRestarted() === 3 && /the relay restarted; the 3 waiting keep their places if their menus ask again within 60s/.test(r.log()));
+r.tick(20000); r.want(1428); r.tick(20000); r.want(1426); r.tick(10000);
+yes('those whose menus ask again within the minute keep their places, in the same order',
+    r.lastLine(1426).place === 1 && !/profile 1426 lost/.test(r.log()) && !/profile 1428 lost/.test(r.log()));
+r.tick(15000);
+yes('the one that did not come back after the restart loses its place, and the log says why',
+    /line: profile 1427 lost their place: the relay restarted and their menu did not ask again within 60s/.test(r.log()));
+r.tick();
+yes('and the one behind it moves up: 2nd of 2', r.lastLine(1428).place === 2 && r.lastLine(1428).of === 2);
+r.tick(9 * 60000); r.want(1426);
+r.tick(2 * 60000); r.tick();
+yes('after a restart the ordinary backstop applies again', /profile 1428 lost their place: nothing from their menu/.test(r.log()));
+
+// ---- a place handed to another of the same game's characters
+r = rig(SEATS); r.tick();
+r.fill(1500, 25);
+r.want(1526); r.tick(1000); r.want(1527); r.tick(1000); r.want(1528); r.tick();
+yes('the holder hands its place to another character', r.hand(1527, 1599) === 'handing' &&
+    /line: profile 1527 hands its place in line to profile 1599/.test(r.log()));
+yes('its connection closing then keeps the place for that character', r.gone(1527) === 'handed' && r.api().status().line === 3);
+r.tick(5000);
+yes('the other character asks and takes the place, still 2nd', r.want(1599) === 'handed' &&
+    /line: profile 1599 takes the place profile 1527 handed it, 2 of 3/.test(r.log()));
+r.tick();
+yes('and is told it is 2nd of 3', r.lastLine(1599).place === 2 && r.lastLine(1599).of === 3);
+yes('nobody else can take a place that was not handed to them', (function () {
+  r.want(1590); r.tick(); return r.lastLine(1590).place === 4;
+})());
+r.hand(1528, 1598); r.gone(1528);
+r.tick(r.api().handFor + 1000);
+yes('a place handed on and never taken goes once the holder has closed',
+    /profile 1528 lost their place: their game closed after handing it to profile 1598, who never asked for it/.test(r.log()));
+r.hand(1526, 1597); r.tick(r.api().handFor + 1000);
+yes('a hand never taken while the holder is still there leaves it with the holder',
+    /profile 1597 never asked for the place profile 1526 handed it, so profile 1526 keeps it/.test(r.log()) &&
+    r.lastLine(1526).place === 1);
+yes('a place cannot be handed to itself or to nobody', r.hand(1526, 1526) === 'nothing' && r.hand(1526, 0) === 'nothing');
+r.leave(1500); r.tick();
+yes('a held seat can be handed too', r.lastLine(1526).go === true && r.hand(1526, 1596) === 'handing' &&
+    r.want(1596) === 'held' && r.lastLine(1596).go === true && r.lastLine(1596).secs <= 60);
+r.join(1596); r.tick();
+yes('and the one it was handed to arrives and is seated', /profile 1596 took the seat held for them/.test(r.log()) &&
+    r.saidTo(1596).length === 0);
 
 // ---- a held seat nobody takes goes to the next
 r = rig(SEATS); r.tick();
