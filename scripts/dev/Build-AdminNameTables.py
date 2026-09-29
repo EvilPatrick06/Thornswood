@@ -74,6 +74,18 @@ START = '  // ==== ADMIN_NAMES ===='
 END = '  // ==== end ADMIN_NAMES ===='
 AFTER = '  // ==== end ITEM_NAMES ===='
 
+# Update.esm's own Creation Club records (#479): every Special Edition has
+# them, but their art comes with the Creation Club files Thornswood leaves
+# out, so /give and /spawn never hand one out. scripts\mods\Check-CreationForms.js
+# --write keeps the list; tests\test-special-edition-only.js holds this to it.
+CREATION_LIST = os.path.join(HERE, '..', '..', 'records', 'update-creation-club.json')
+
+
+def creation_records():
+    """'<id>:Update.esm' for each of Update.esm's own Creation Club records."""
+    with io.open(CREATION_LIST, encoding='utf-8') as f:
+        return set(k + ':Update.esm' for k in json.load(f)['records'])
+
 
 def u32(b, off=0):
     return struct.unpack_from('<I', b, off)[0]
@@ -148,10 +160,12 @@ def actor_name(recs, d):
     return ''
 
 
-def table(recs, rank, pick_items):
+def table(recs, rank, pick_items, creation=frozenset()):
     best = {}
     for d, r in recs.items():
         if pick_items != (r['type'] in ITEM_TYPES):
+            continue
+        if d in creation:
             continue
         if pick_items:
             if r['type'] in (b'ARMO', b'WEAP') and r['flags'] & NON_PLAYABLE:
@@ -211,8 +225,9 @@ def main():
         read(pl, rank, recs)
         failed += pl.failed
 
-    items = table(recs, rank, True)
-    actors = table(recs, rank, False)
+    creation = creation_records()
+    items = table(recs, rank, True, creation)
+    actors = table(recs, rank, False, creation)
     print('%d plugins, %d records read, %d failed to inflate' % (len(order), len(recs), failed))
     print('%d item names, %d actor names' % (len(items), len(actors)))
     for probe in ('troll', 'frost troll', 'giant', 'skeleton', 'draugr', 'mammoth', 'gold', 'iron sword', 'dragon'):

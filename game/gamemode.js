@@ -5645,9 +5645,6 @@ var HARVESTS_BY_BASE = {
   "23cff:Skyrim.esm": { "produce": "23d6f:Skyrim.esm", "name": "Pine Thrush Egg", "rank": "advanced" },
   "2a76:Dawnguard.esm": { "produce": "2a78:Dawnguard.esm", "name": "Yellow Mountain Flower", "rank": "advanced" },
   "2a77:Dawnguard.esm": { "produce": "2a78:Dawnguard.esm", "name": "Yellow Mountain Flower", "rank": "advanced" },
-  "306a:Update.esm": { "produce": "306e:Update.esm", "name": "Screaming Maw", "rank": "master" },
-  "306b:Update.esm": { "produce": "306d:Update.esm", "name": "Rot Scale", "rank": "master" },
-  "306c:Update.esm": { "produce": "306f:Update.esm", "name": "Thorn Hook", "rank": "master" },
   "34d2c:Skyrim.esm": { "produce": "34d32:Skyrim.esm", "name": "Frost Mirriam", "rank": "novice" },
   "34d2d:Skyrim.esm": { "produce": "34d31:Skyrim.esm", "name": "Elves Ear", "rank": "expert" },
   "34d30:Skyrim.esm": { "produce": "34d22:Skyrim.esm", "name": "Garlic", "rank": "novice" },
@@ -7142,7 +7139,6 @@ var HUNTS_BY_BASE = {
   "1e7a4:Skyrim.esm": { "name": "Cave Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
   "1e7a1:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
   "1e7a0:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
-  "3025:Update.esm": { "name": "Rabbit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "65c9e:Skyrim.esm", "name": "Raw Rabbit Leg", "count": 1 }] },
   "804:Update.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
   "138b8:Dawnguard.esm": { "name": "Giant Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 2 }] },
   "113c1:Dawnguard.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
@@ -11995,7 +11991,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 
   // ==== ADMIN_NAMES ====
   /* Built by scripts\dev\Build-AdminNameTables.py out of the 101 plugins in the load order.
-     Do not hand edit. 10903 item names and 2190 actor names, for /give and /spawn, which
+     Do not hand edit. 10898 item names and 2190 actor names, for /give and /spawn, which
      read them after their own tables. Lower-case name -> [name as written, record]. */
   var ADMIN_ITEMS = {
     "123 abc def ghijklmnop qrstu vwxyz 123456789": ["123 Abc Def Ghijklmnop Qrstu VWXYZ 123456789", "b7736:Skyrim.esm"],
@@ -15311,7 +15307,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "elven helmet of major magicka": ["Elven Helmet of Major Magicka", "bdff3:Skyrim.esm"],
     "elven helmet of major restoration": ["Elven Helmet of Major Restoration", "bdff7:Skyrim.esm"],
     "elven helmet of restoration": ["Elven Helmet of Restoration", "bdff6:Skyrim.esm"],
-    "elven horse armor": ["Elven Horse Armor", "30ca:Update.esm"],
     "elven light armor": ["Elven Light Armor", "105f12:Skyrim.esm"],
     "elven light boots": ["Elven Light Boots", "105f11:Skyrim.esm"],
     "elven light gauntlets": ["Elven Light Gauntlets", "105f13:Skyrim.esm"],
@@ -19796,7 +19791,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "roras's letter": ["Roras's Letter", "37f8a:Skyrim.esm"],
     "rorik's manor key": ["Rorik's Manor Key", "9e131:Skyrim.esm"],
     "rorikstead shop key": ["Rorikstead Shop Key", "4c4c:JKs Skyrim.esp"],
-    "rot scale": ["Rot Scale", "306d:Update.esm"],
     "roughspun tunic": ["Roughspun Tunic", "3c9fe:Skyrim.esm"],
     "round table": ["Round Table", "c736:HearthFires.esm"],
     "round table and chairs": ["Round Table and Chairs", "5a1c:HearthFires.esm"],
@@ -19988,7 +19982,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "scrap of paper": ["Scrap of Paper", "1a436:Dawnguard.esm"],
     "scrawled note": ["Scrawled Note", "31cc8:Dragonborn.esm"],
     "scrawled page": ["Scrawled page", "d3979:Skyrim.esm"],
-    "screaming maw": ["Screaming Maw", "306e:Update.esm"],
     "scribbled note": ["Scribbled Note", "5b9c9:Skyrim.esm"],
     "scribbles of a madman": ["Scribbles of a Madman", "27a21:Dragonborn.esm"],
     "scroll of acceleration rune": ["Scroll of Acceleration Rune", "3a9c5:Apocalypse - Magic of Skyrim.esp"],
@@ -21843,7 +21836,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "steel helmet of restoration": ["Steel Helmet of Restoration", "b50e7:Skyrim.esm"],
     "steel helmet of waterbreathing": ["Steel Helmet of Waterbreathing", "92a86:Skyrim.esm"],
     "steel horned helmet": ["Steel Horned Helmet", "f6f24:Skyrim.esm"],
-    "steel horse armor": ["Steel Horse Armor", "30c9:Update.esm"],
     "steel imperial gauntlets": ["Steel Imperial Gauntlets", "f6f23:Skyrim.esm"],
     "steel ingot": ["Steel Ingot", "5ace5:Skyrim.esm"],
     "steel katana": ["Steel Katana", "747c3:Immersive Weapons.esp"],
@@ -22373,7 +22365,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "thistle branch": ["Thistle Branch", "134aa:Skyrim.esm"],
     "thistle branch (3)": ["Thistle Branch (3)", "b48:HearthFires.esm"],
     "thonar's journal": ["Thonar's Journal", "d674a:Skyrim.esm"],
-    "thorn hook": ["Thorn Hook", "306f:Update.esm"],
     "thread": ["Thread", "6ce001:Update.esm"],
     "three thieves": ["Three Thieves", "1b276:Skyrim.esm"],
     "thresher maul": ["Thresher Maul", "557d63:Immersive Weapons.esp"],
