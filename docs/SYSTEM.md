@@ -157,7 +157,7 @@ when its check fails, three times an hour at most (`Watch-Services.ps1:198-247`)
 | Caddy | `C:\Thornswood-Caddy` | 80, 443 | `Thornswood Web` (at startup and every five minutes) | `Setup-Domain.ps1`; the Caddyfile itself is kept in step with `scripts\deploy\Caddyfile` by hand | `Setup-Domain.ps1:30,183,248-266`, `scripts/deploy/Caddyfile:4-7` |
 | Discord bot | `C:\Thornswood-Bot` | none | `Thornswood Bot` | `Install-Bot.ps1`, `-CodeOnly` for code and card art | `Install-Bot.ps1:28-30,496` |
 | Watchdog | `C:\Thornswood-Watch` (`watch.ps1`, `watch.log`) | none | `Thornswood Watch`, every five minutes as SYSTEM | `Watch-Services.ps1 -Install` | `Watch-Services.ps1:65-66,361` |
-| Nightly backup | `C:\Thornswood-Backup` (passphrase in `key.txt`) | none | `Thornswood Backup`, daily at 03:15 | `Install-Backup.ps1`; `Fetch-Backups.ps1` brings them down | `Install-Backup.ps1:30-34,149-152`, `vps-nightly-backup.ps1:41-52` |
+| Nightly backup | `C:\Thornswood-Backup` (passphrase in `key.txt`) | none | `Thornswood Backup`, daily at 03:15 | `Install-Backup.ps1`; `Fetch-Backups.ps1` brings them down | `Install-Backup.ps1:30-34,149-152`, `vps-nightly-backup.ps1:53-72` |
 
 What the watchdog checks: `https://thornswood.net/` for Caddy, then TCP 3001,
 3000, 7778, 7788 and 7789, and a python process with `Thornswood-Bot` in its
@@ -167,12 +167,15 @@ under 20 percent free on C: and DISK CRITICAL under 10. The bot reads
 channel (`bot/bot.py:219`, `Watch-Services.ps1:20-29`).
 
 What the backup takes: the live server's `world`, `private`, `data`,
-`server-settings.json` and `gamemode.js`; the site's data; the bot's config
-and join record; the voice service's `choices.json`; the Caddyfile. Encrypted,
-seven daily and four weekly kept (`vps-nightly-backup.ps1:8-33`). It takes
-nothing from `C:\Thornswood-Server-Dev` or `C:\Thornswood-Voice-Dev`
-(`vps-nightly-backup.ps1:41-46`); the dev world is meant to be thrown away
-(`vps-dev-instance.ps1:14-15`).
+`server-settings.json` and `gamemode.js`, and the same five from
+`C:\Thornswood-Server-Dev` under `game-dev` (issue #401); the site's data; the
+bot's config and join record; the voice service's `choices.json`; the
+Caddyfile. Encrypted, seven daily and four weekly kept
+(`vps-nightly-backup.ps1:8-51`). It takes nothing from
+`C:\Thornswood-Voice-Dev`. The copy off the box is pulled to Patrick's machine
+over ssh by the `Thornswood Fetch Backups` task there (`Fetch-Backups.ps1
+-Schedule`), never served over HTTPS; `Restore-Server.ps1` puts one back into
+a server folder, and `tests\test-backup-restore.ps1` proves the round trip.
 
 ## How the pieces talk
 
