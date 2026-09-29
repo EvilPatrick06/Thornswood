@@ -1,16 +1,34 @@
 <#
   Vps.ps1
 
-  Shared defaults for the VPS address, user, and ports. Dot-source it:
+  The one place every script gets the VPS address, user, and ports from.
+  Dot-source it:
 
       . (Join-Path $PSScriptRoot '..\vps\Vps.ps1')
 
   Then, after the param block:
 
+      if (-not $User) { $User = Get-ThornswoodVpsUser }
       if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
-  An explicit -Vps on the command line still wins, because the param keeps
-  whatever was passed; only an empty default is filled from vps.json.
+  An explicit -Vps or -User on the command line still wins, because the param
+  keeps whatever was passed; only an empty default is filled from here.
+
+  WHERE THE ANSWER COMES FROM, last one wins (issue #459):
+
+    1. scripts\vps\vps.json, tracked, the box everybody uses.
+    2. This machine's own file, never tracked:
+       %LOCALAPPDATA%\Thornswood\vps.json, or the file THORNSWOOD_VPS_LOCAL
+       names. Any field in it replaces the same field from the tracked one,
+       so {"address": "203.0.113.9"} on its own points this machine at
+       another box and keeps the rest.
+    3. The environment: THORNSWOOD_VPS for the address, THORNSWOOD_VPS_USER
+       for the user. For one shell or one scheduled task.
+
+  So a machine that reaches the box by another address, or a new box being
+  tried before Set-Vps.ps1 moves everybody, needs no edit to a tracked file.
+  tests\test-vps-defaults.ps1 fails on the address written anywhere else in a
+  script.
 #>
 
 function Get-ThornswoodVps {
@@ -22,8 +40,24 @@ function Get-ThornswoodVps {
     }
     $raw = Get-Content -LiteralPath $path -Raw -Encoding UTF8
     $j = $raw | ConvertFrom-Json
+    $local = Get-ThornswoodVpsLocalPath
+    if ($local -and (Test-Path -LiteralPath $local)) {
+        $mine = $null
+        try { $mine = Get-Content -LiteralPath $local -Raw -Encoding UTF8 | ConvertFrom-Json } catch { }
+        if (-not ($mine -is [Management.Automation.PSCustomObject])) { throw "This machine's VPS file does not read as a JSON object: $local" }
+        foreach ($p in $mine.PSObject.Properties) { $j | Add-Member -NotePropertyName $p.Name -NotePropertyValue $p.Value -Force }
+    }
+    if ($env:THORNSWOOD_VPS) { $j | Add-Member -NotePropertyName address -NotePropertyValue ([string]$env:THORNSWOOD_VPS) -Force }
+    if ($env:THORNSWOOD_VPS_USER) { $j | Add-Member -NotePropertyName user -NotePropertyValue ([string]$env:THORNSWOOD_VPS_USER) -Force }
     if (-not $j.address) { throw "vps.json has no address: $path" }
     return $j
+}
+
+# This machine's own VPS file, which nothing in git carries. It need not exist.
+function Get-ThornswoodVpsLocalPath {
+    if ($env:THORNSWOOD_VPS_LOCAL) { return [string]$env:THORNSWOOD_VPS_LOCAL }
+    if (-not $env:LOCALAPPDATA) { return '' }
+    return (Join-Path (Join-Path $env:LOCALAPPDATA 'Thornswood') 'vps.json')
 }
 
 function Get-ThornswoodVpsAddress {

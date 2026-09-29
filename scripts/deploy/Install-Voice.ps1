@@ -30,7 +30,7 @@ param(
   # turns that check off, which is how this behaved before it existed.
   [string]$Site = 'https://thornswood.net',
     [string]$VpsHost  = '',
-    [string]$VpsUser  = 'Administrator',
+    [string]$VpsUser  = '',
     [string]$Root     = 'C:\Thornswood-Voice',
     [int]$Port        = 7778,
     # Which addresses the service answers on. Every interface is how this
@@ -73,6 +73,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -157,7 +158,14 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
 }
 
 # ---------------------------------------------------------------- files -----
-$src = Join-Path $Here '..\..\voice'
+# What goes up is the voice artifact (issue #459, Artifact.ps1): the service
+# and its page as the commit holds them, in one zip named by commit and hash,
+# sent to the box's store first. The copies below are from its folder.
+. (Join-Path $Here 'Artifact.ps1')
+$artifact = New-ThornswoodArtifact -Component voice -RepoDir (Join-Path $Here '..\..') -Paths 'voice/voice-server.js', 'voice/public'
+Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
+Send-ThornswoodArtifact -Artifact $artifact -Target $target -SshArgs $ssh
+$src = Join-Path $artifact.Folder 'voice'
 foreach ($f in 'voice-server.js', 'public\index.html', 'public\voice.js') {
     if (-not (Test-Path -LiteralPath (Join-Path $src $f))) { Die "not found: $(Join-Path $src $f)" }
 }
@@ -497,5 +505,8 @@ if ($Bind -eq '127.0.0.1') {
     Say "Installed, but nothing is answering on ${VpsHost}:$Port." 'Red'
     Say "  ssh $target `"powershell -NoProfile -Command Get-Content '$Root\voice.log' -Tail 20`"" 'DarkGray'
 }
+# The service's files are in place: the box records that it runs this
+# artifact, and /health says so from then on (Artifact.ps1).
+$null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target $target -SshArgs $ssh -Root $Root
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

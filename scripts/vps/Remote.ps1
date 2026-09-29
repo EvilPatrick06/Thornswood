@@ -55,7 +55,7 @@ param(
     [string]$Arguments = '',
 
     [string]$VpsHost = '',
-    [string]$VpsUser = 'Administrator',
+    [string]$VpsUser = '',
 
     # Show the script before sending it. Worth doing for anything that writes.
     [switch]$Show,
@@ -72,6 +72,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 

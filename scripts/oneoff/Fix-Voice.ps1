@@ -15,7 +15,7 @@
 [CmdletBinding()]
 param(
   [string] $Vps  = '',
-  [string] $User = 'Administrator',
+  [string] $User = '',
   [switch] $Push
 )
 
@@ -25,6 +25,7 @@ $ProgressPreference    = 'SilentlyContinue'
 
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
 function Head($t) { Write-Host ''; Write-Host $t -ForegroundColor Cyan }

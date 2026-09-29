@@ -22,13 +22,14 @@ param(
     [switch]$FromClipboard,
     [switch]$Remove,
     [string]$VpsHost = '',
-    [string]$VpsUser = 'Administrator',
+    [string]$VpsUser = '',
     [switch]$NoPause
 )
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }

@@ -13,7 +13,7 @@
 [CmdletBinding()]
 param(
   [string] $Vps  = '',
-  [string] $User = 'Administrator',
+  [string] $User = '',
   [int]    $Lines = 60
 )
 
@@ -21,6 +21,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 Set-StrictMode -Off
 $ErrorActionPreference = 'Continue'

@@ -47,7 +47,8 @@ const STUN_ONLY = '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}';
 // with the backpressure work (voice/test-backpressure.js), and closedSilent
 // with the keepalive's other half (voice/test-keepalive.js), each separately
 // from the relay key.
-const HEALTH_FIELDS = ['ok', 'build', 'auth', 'uptimeSeconds', 'startedAt', 'bind', 'turn',
+// deploy is the artifact record Install-Voice.ps1 leaves beside the service (#459).
+const HEALTH_FIELDS = ['ok', 'build', 'deploy', 'auth', 'uptimeSeconds', 'startedAt', 'bind', 'turn',
                        'chatRange', 'peers', 'tracked', 'queuedCommands',
                        'backed', 'largestQueueBytes', 'droppedPositions', 'skippedRosters',
                        'closedBacklogged', 'closedSilent'];
