@@ -413,9 +413,8 @@ $gameRoot = if ($Dev) { 'C:\Thornswood-DevBuild' } else { 'C:\Thornswood' }
 $folders = @()
 foreach ($d in @($AssetDir)) { if ($d) { $folders += $d } }
 $folders += (Join-Path $FeedDir 'assets')
-# Where.ps1 looks for the old C:\Thornswood-Dev layout, so it needs a machine
-# that has a C drive to answer at all. A machine that cannot be asked still
-# sends whatever -AssetDir names. With -SiteDir (the tests) only the folders
+# Where.ps1 answers from the repository's layout.json. A machine where it
+# cannot be asked still sends whatever -AssetDir names. With -SiteDir (the tests) only the folders
 # named are read, never this machine's build output or install.
 if (-not $SiteDir) {
   try {

@@ -20,7 +20,7 @@ the theme the main menu plays, and the launcher plays it too while it is open.
 From the repo folder, with the game closed:
 
 ```
-.\tools\Go.ps1 -SkipServer
+.\scripts\release\Go.ps1 -SkipServer
 ```
 
 unpacks the front from `tools\thornswood-front.zip` into
@@ -49,4 +49,4 @@ folder, Publish-Update packs what changed (and puts this `index.html` back
 first if another server's menu has replaced it), and each launcher unpacks the
 pack, keeps a copy and holds the files read only while the game runs. Every
 change goes to the dev build first, with
-`.\tools\Ship.ps1 -Channel dev "what changed"`.
+`.\scripts\release\Ship.ps1 -Channel dev "what changed"`.

@@ -1,19 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
   "issue": 440,
-  "note": "Maps old tools paths to the layout after the reorganisation (issue #440). Where.ps1 and where.js prefer new, then old. Phase 0 added this file before any folder moved; the moves in phases 1 to 8 filled in the new side.",
-  "oldRootDefault": "C:\\Thornswood-Dev",
+  "note": "Where each place is in the repository, read by scripts/release/Where.ps1 and where.js. Version 1 also carried the old C:/Thornswood-Dev folder and the old tools paths as fallbacks for the reorganisation; those went on 28 September, when no machine had the old layout any more.",
   "places": {
-    "Engine": {
-      "new": "engine/skymp",
-      "oldUnderRoot": "skymp",
-      "presentWhen": "CMakeLists.txt"
-    },
-    "Out": {
-      "new": "out",
-      "oldIsRoot": true,
-      "oldPresentWhenAny": ["dist", "_payload"]
-    }
+    "Engine": "engine/skymp",
+    "Out": "out"
   },
   "derived": {
     "ServerDist": { "from": "Engine", "join": "build/dist/server" },
@@ -25,53 +16,16 @@
     "Payload": { "from": "Out", "join": "_payload" },
     "ServerZip": { "from": "Out", "join": "thornswood-server.zip" }
   },
-  "siblings": {},
-  "moves": {
-    "docs": {
-      "old": "tools/docs",
-      "new": "docs"
-    },
-    "bot": {
-      "old": "tools/discord",
-      "new": "bot"
-    },
-    "voice": {
-      "old": "tools/voice",
-      "new": "voice"
-    },
-    "site": {
-      "old": "tools/site",
-      "new": "site"
-    },
-    "tests": {
-      "old": "tools",
-      "new": "tests",
-      "note": "Every test-*.js and test-*.ps1 that lived among the scripts."
-    },
-    "game": {
-      "old": "tools",
-      "new": "game",
-      "note": "gamemode.js, plugins (was ts-plugins), ui (was ts-ui), data, content, required-data, menu (was art/menu)."
-    },
-    "launcher": {
-      "old": "tools/app",
-      "new": "launcher",
-      "note": "C# under launcher/app; emblem, icon, header art and Thornswood.ini beside it."
-    },
-    "installer": {
-      "old": "tools",
-      "new": "installer",
-      "note": "Setup-Thornswood.ps1, Install.bat, Setup.bat, READ ME FIRST.txt, setup/Bootstrap.cs."
-    },
-    "records": {
-      "old": "tools",
-      "new": "records",
-      "note": "client-build.json, server-build.json, steam-build.json, signing."
-    },
-    "scripts": {
-      "old": "tools",
-      "new": "scripts",
-      "note": "Sorted into scripts/release, deploy, vps, ops, mods, dev, oneoff. tools/ keeps forwarding stubs for one release."
-    }
+  "folders": {
+    "docs": "docs",
+    "bot": "bot",
+    "voice": "voice",
+    "site": "site",
+    "tests": "tests",
+    "game": "game",
+    "launcher": "launcher",
+    "installer": "installer",
+    "records": "records",
+    "scripts": "scripts"
   }
 }

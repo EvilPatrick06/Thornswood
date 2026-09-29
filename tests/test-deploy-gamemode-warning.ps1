@@ -27,8 +27,6 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $repo = Split-Path -Parent $Here
 $gmPath     = Join-Path $repo 'scripts\deploy\Deploy-Gamemode.ps1'
 $serverPath = Join-Path $repo 'scripts\deploy\Deploy-Server.ps1'
-$gmShim     = Join-Path $repo 'tools\Deploy-Gamemode.ps1'
-$serverShim = Join-Path $repo 'tools\Deploy-Server.ps1'
 $askPath    = Join-Path $repo 'scripts\vps\Request-Restart.ps1'
 
 $script:pass = 0
@@ -56,9 +54,6 @@ Yes 'Deploy-Gamemode.ps1 has no Request-Restart call' (
     $gm -notmatch 'Request-Restart\.ps1')
 Yes 'Deploy-Gamemode.ps1 has no Warn-LiveRoom / OnlineNow stop gate' (
     $gm -notmatch 'function OnlineNow' -and $gm -notmatch 'Warn-LiveRoom')
-Yes 'tools\Deploy-Gamemode.ps1 still forwards to scripts\deploy' (
-    (Test-Path -LiteralPath $gmShim) -and
-    ((Get-Content -LiteralPath $gmShim -Raw) -match 'scripts\\deploy\\Deploy-Gamemode\.ps1'))
 
 # ---- Deploy-Server carries the live warn / refuse path --------------------
 $open  = '# ==== thornswood live deploy warning ===='
@@ -99,9 +94,6 @@ Yes 'a missing Request-Restart refuses when people are online' (
     $sv -match 'Put Request-Restart\.ps1 back')
 Yes 'Request-Restart gets the data folder from Get-LiveOnline, not a hardcoded path' (
     $sv -match '-Data \$room\.Data' -and $sv -notmatch '-Data "\$Root/data"')
-Yes 'tools\Deploy-Server.ps1 still forwards' (
-    (Test-Path -LiteralPath $serverShim) -and
-    ((Get-Content -LiteralPath $serverShim -Raw) -match 'scripts\\deploy\\Deploy-Server\.ps1'))
 Yes 'Request-Restart.ps1 is still beside the vps scripts' (Test-Path -LiteralPath $askPath)
 
 # ---- drive Warn-LiveRoom with stand-ins -----------------------------------

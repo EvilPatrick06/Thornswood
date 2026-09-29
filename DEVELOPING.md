@@ -45,8 +45,7 @@ The server's SkyMP fork is on GitHub (github.com/EvilPatrick06/skymp, branch
 the commit the build records name: `git submodule update --init engine/skymp`
 fetches it into the repository folder. It is large and needs Visual Studio to
 build, so a machine that only copies server binaries can leave it unfetched.
-Its configured build tree and toolchain (`engine\skymp\build`, and
-`C:\Thornswood-Dev\skymp\build` until Patrick's machine has moved) are on
+Its configured build tree and toolchain (`engine\skymp\build`) are on
 Patrick's machine alone for now. The release output is `out` in the repository
 folder, ignored by git. `scripts\release\Where.ps1` says where each of these is on the
 machine it runs on. Who holds each thing Thornswood cannot run without, and who the
