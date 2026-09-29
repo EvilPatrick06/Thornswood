@@ -85,6 +85,14 @@ function Aside([string]$dst) {
   if (-not (Test-Path -LiteralPath $dst)) { return }
   $leaf = Split-Path -Leaf $dst
   $to = Join-Path (Split-Path -Parent $dst) ($leaf + '-before-restore-' + $stamp)
+  # Two restores inside one second (the harness does it on the build runner)
+  # would meet the first one's copy here: a file stops the move, a folder goes
+  # inside it. The second gets -2, the third -3 (issue #1107).
+  $n = 2
+  while (Test-Path -LiteralPath $to) {
+    $to = Join-Path (Split-Path -Parent $dst) ($leaf + '-before-restore-' + $stamp + '-' + $n)
+    $n++
+  }
   Move-Item -LiteralPath $dst -Destination $to
   'kept      ' + $dst + ' as it was, at ' + $to
 }
