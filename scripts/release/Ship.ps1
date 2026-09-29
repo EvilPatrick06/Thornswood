@@ -1268,15 +1268,15 @@ function Measure-Installer {
             if ($doc.PSObject.Properties['packs'] -and $doc.packs) {
                 $seen = @{}
                 foreach ($p in @($doc.packs)) {
-                    # ids are yyyyMMdd-HHmm, with -1 -2 -3 on the split ones, and
-                    # three parts of one release are still one release.
-                    $stamp = "$($p.id)"
-                    if ($stamp.Length -lt 13) { continue }
-                    $stamp = $stamp.Substring(0, 13)
-                    if ($seen.ContainsKey($stamp)) { continue }
-                    $seen[$stamp] = $true
+                    # ids are yyyyMMdd-HHmm, yyyyMMdd-HHmmss since #1057, with
+                    # -2 -3 on the split ones, and three parts of one release
+                    # are still one release; two releases in one minute are two.
+                    $m = [regex]::Match("$($p.id)", '^\d{8}-\d{4}(\d{2})?')
+                    if (-not $m.Success) { continue }
+                    if ($seen.ContainsKey($m.Value)) { continue }
+                    $seen[$m.Value] = $true
                     $t = [datetime]::MinValue
-                    if ([datetime]::TryParseExact($stamp, 'yyyyMMdd-HHmm', $null, 'None', [ref]$t)) {
+                    if ([datetime]::TryParseExact($m.Value.Substring(0, 13), 'yyyyMMdd-HHmm', $null, 'None', [ref]$t)) {
                         if ($t -gt $when) { $count++ }
                     }
                 }

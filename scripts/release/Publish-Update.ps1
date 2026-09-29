@@ -760,6 +760,12 @@ if ($collectionRemovals) {
 #
 # Added AFTER the collection filter on purpose, so nothing here can be removed
 # by it. See $ShipDeleteAlways in Ship-Rules.ps1 for what may go on the list.
+#
+# The removals this build really made are counted first. The rule paths go in
+# every pack that goes out, but they are not a reason to send one: counted as
+# removals they made every run a release, twice in a row included, and the
+# "Nothing to do" checks below could never pass (#1012).
+$realRemoved = $removed.Count
 $alwaysGone = @(Get-ShipDeleteAlways)
 foreach ($d in $alwaysGone) {
     if ($removed -notcontains $d) { $removed += $d }
@@ -772,7 +778,7 @@ $changedBytes = 0
 foreach ($c in $changed) { $changedBytes += [int64](($now[$c] -split ':')[0]) }
 if ($profileChanged.Count) { Say '  the plugin list changed' 'Green' }
 Say ("  {0:n0} added or changed ({1:n1} MB)" -f $changed.Count, ($changedBytes / 1MB)) $(if ($changed.Count) { 'Green' } else { 'DarkGray' })
-Say ("  {0:n0} removed" -f $removed.Count) $(if ($removed.Count) { 'Yellow' } else { 'DarkGray' })
+Say ("  {0:n0} removed" -f $realRemoved) $(if ($realRemoved) { 'Yellow' } else { 'DarkGray' })
 if ($collectionRemovals) {
     Say ("  {0:n0} more were the collection's files, left alone" -f $collectionRemovals) 'DarkGray'
 }
@@ -847,7 +853,7 @@ if ($removed.Count -gt $MaxRemovals -and -not $AcceptRemovals) {
 
 
 
-if (-not $changed.Count -and -not $removed.Count -and -not $profileChanged.Count -and -not $Launcher) {
+if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -and -not $Launcher) {
     Head 'Nothing to do'
     Say 'The build matches what is already published.' 'Gray'
     Write-Host ''
@@ -858,7 +864,7 @@ if (-not $changed.Count -and -not $removed.Count -and -not $profileChanged.Count
 # nothing: no mod files, no removals, no launcher source, just a higher
 # version number that everyone still had to download. Exit code 2 tells Ship
 # that happened so it can put the version number back.
-if (-not $changed.Count -and -not $removed.Count -and -not $profileChanged.Count -and -not $srcChanged.Count) {
+if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -and -not $srcChanged.Count) {
     Head 'Nothing to do'
     Say 'No mod files changed and no launcher source changed since the last release.' 'Gray'
     Say 'Publishing now would hand everyone a new launcher that does nothing.' 'Gray'
@@ -866,6 +872,8 @@ if (-not $changed.Count -and -not $removed.Count -and -not $profileChanged.Count
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 2
 }
 
+# The feed as received, for the ids it already uses (#1057).
+$feedNow = if (Test-Path -LiteralPath $VersionFile) { (([IO.File]::ReadAllText($VersionFile)) -replace '^\uFEFF', '') | ConvertFrom-Json } else { $null }
 if (-not $Id) {
     # An unfinished release is finished, not replaced. See the block beside
     # Save-State for why the id matters more than the timestamp.
@@ -878,7 +886,13 @@ if (-not $Id) {
         Say '  Its assets are already on the site, so this sends only what is missing' 'DarkGray'
         Say '  rather than making a second release.' 'DarkGray'
     } else {
-        $Id = Get-Date -Format 'yyyyMMdd-HHmm'; if ($Dev) { $Id += '-dev' }
+        # Never one the feed already names (#1057): see New-ReleaseId.
+        $Id = New-ReleaseId $feedNow -Dev:$Dev
+    }
+} elseif ((Get-FeedTakenIds $feedNow).Contains($Id)) {
+    $resume = Read-Pending $StateFile
+    if (-not $resume -or [string]$resume.id -ne $Id) {
+        Die "The feed already has a release or pack named $Id. A launcher that took it would skip this one as applied. Leave -Id out and a free one is made."
     }
 }
 
@@ -1596,7 +1610,7 @@ if (Test-Path $cfgPath) {
             Say 'If it has not, fix the address in the launcher first, or with:' 'Yellow'
             Say '    .\scripts\ops\Set-Server.ps1 -Address <ip> -Port <port>' 'Yellow'
             Write-Host ''
-            [void](Read-Host 'Enter to exit')
+            if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
             exit 1
         }
 
@@ -1983,8 +1997,16 @@ Say ("  release {0}{1}" -f $Id, $(if ($relRecord.commit) { ', built from ' + $re
 # is expecting. It locks out whoever would have to publish the fix as well.
 # So this stops here, before the send, while the only copy is the one on this
 # machine and the VPS has not been touched.
+#
+# Except on a run that neither uploads nor sends (-NoUpload -NoPush, what Ship
+# -DryRun passes): nothing went to the site, so every url is empty by design,
+# and this feed goes nowhere. It used to stop every dry run of a real change
+# with exit 1 and advice about the ssh key (#1056).
 $blank = @($chunks | Where-Object { -not $_.Url })
-if ($blank.Count) {
+if ($blank.Count -and $NoUpload -and $NoPush) {
+    Say ("  -NoUpload: {0} pack(s) have no url, because nothing was uploaded; this feed is not sent" -f $blank.Count) 'DarkGray'
+}
+elseif ($blank.Count) {
     Write-Host ''
     Say ("{0} pack(s) uploaded no asset, so their url is empty:" -f $blank.Count) 'Red'
     foreach ($b in $blank) { Say ("    " + $b.Id) 'Red' }
@@ -1993,7 +2015,7 @@ if ($blank.Count) {
     Say 'The send to the site is what failed, usually the ssh key. Fix that and run Ship again.' 'Yellow'
     Say ("If a bad one did go out, .\scripts\release\Repair-Manifest.ps1{0} takes it back out and sends the feed." -f $(if ($Dev) { ' -Channel dev' } else { '' })) 'Yellow'
     Write-Host ''
-    [void](Read-Host 'Enter to exit')
+    if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
     exit 1
 }
 
@@ -2085,7 +2107,7 @@ if ($profileChanged.Count) {
 # Patrick plays from and come to 10.9 GB.
 #
 # Newest kept by name, which sorts correctly because every id is
-# pack-YYYYMMDD-HHMM. The one just built is the newest, so it is never the one
+# pack-YYYYMMDD-HHMMSS (HHMM before #1057). The one just built is the newest, so it is never the one
 # that goes. -KeepPacks 0 keeps everything, for a machine that wants them.
 if ($KeepPacks -gt 0) {
     try {
@@ -2165,8 +2187,18 @@ if ($pushFailed) {
     Say "The baseline was NOT moved, so the next run finishes $Id rather than" 'Yellow'
     Say 'starting a new one. Nothing here is lost by running it again.' 'Yellow'
 }
+elseif ($NoPush) {
+    Say "-NoPush: $Id was not sent, so no launcher will see it." 'Yellow'
+}
 else {
     Say "Everyone's launcher will offer update $Id on next start." 'Green'
 }
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+# Said with an exit code, not only in red (#1055). This used to run off the end
+# after NOT SHIPPED, so its exit code was whatever ran last, measured 0, and a
+# Ship that keeps its launcher reads nothing else: it went on to #news, the
+# Discord and the server's countdown for a release no launcher could see.
+# Anything but 0 or 2 makes Ship stop with "NOTHING was published".
+if ($pushFailed) { exit 1 }
+exit 0
