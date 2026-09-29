@@ -26,9 +26,11 @@
     4. If a rename fails, or it does not answer, the old files go back, the
        old one is started again, and the run says SWAP ROLLED BACK and exits 1.
 
-  The newest three .prev folders are kept. -PutBack on each of those scripts
-  puts the newest one back the same checked way, and keeps what it took out in
-  <root>\.undone-<stamp>, so a put-back can itself be put back by hand.
+  The newest two .prev folders are kept, and the newest two .undone ones
+  (Patrick, 29 Sep, #1121: two, not three). -PutBack on each of those
+  scripts puts the newest one back the same checked way, and keeps what it
+  took out in <root>\.undone-<stamp>, so a put-back can itself be put back by
+  hand.
 
   What runs on the box is kept here as single quoted text, so what goes up is
   plain PowerShell a person can read and the harnesses can run against a
@@ -290,11 +292,11 @@ if ($moved) {
   if (Answering) {
     'PASS: the server is answering on ' + $resPort + ', game port ' + $port + ', pid ' + @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue)[0].OwningProcess
     Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
-    # The last three sets of replaced files stay, newest first by their stamp,
-    # and the last three a -PutBack took out.
+    # The last two sets of replaced files stay, newest first by their stamp,
+    # and the last two a -PutBack took out.
     foreach ($kind in '.prev-*', '.undone-*') {
       Get-ChildItem -LiteralPath $Root -Directory -Force -EA SilentlyContinue |
-        Where-Object { $_.Name -like $kind } | Sort-Object Name -Descending | Select-Object -Skip 3 |
+        Where-Object { $_.Name -like $kind } | Sort-Object Name -Descending | Select-Object -Skip 2 |
         ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -EA SilentlyContinue }
     }
     'SWAP OK'
@@ -505,10 +507,10 @@ if ($moved) {
   if (Healthy) {
     'PASS: ' + (Answer)
     Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
-    # The newest three of each, by their stamp.
+    # The newest two of each, by their stamp.
     foreach ($kind in '.prev-*', '.undone-*') {
       Get-ChildItem -LiteralPath $Root -Directory -Force -EA SilentlyContinue |
-        Where-Object { $_.Name -like $kind } | Sort-Object Name -Descending | Select-Object -Skip 3 |
+        Where-Object { $_.Name -like $kind } | Sort-Object Name -Descending | Select-Object -Skip 2 |
         ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -EA SilentlyContinue }
     }
     'SWAP OK'

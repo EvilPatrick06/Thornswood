@@ -141,7 +141,7 @@ typed on a command line or written on this page.
 | The bot token, the Discord client secret, the site's keys, the door key | inside the backup: the site's `config.json`, the bot's `bot.env.json`, each server's `private\door.json` | put back by Restore-Box, step 13; Install-Bot runs with `-NoToken`, so nothing asks for them |
 | The staff channel webhook | Discord: the staff channel, Edit Channel, Integrations, Webhooks, Copy Webhook URL | pasted at Watch-Services' prompt, step 21 |
 | Patrick's GitHub sign in | `gh auth login` on One | the build runner's registration, step 24 |
-| The DNS records | the Cloudflare account that holds thornswood.net | step 18 |
+| The DNS records | Patrick's own Cloudflare login, which he signs in to with GitHub, where thornswood.net is registered | step 18 |
 | Code signing | `tools\signing.json` on One and the Azure account behind it | the installer, step 17, and the main Ship, step 29 |
 
 ### Standing it up, while the old box still serves
@@ -205,7 +205,7 @@ typed on a command line or written on this page.
    The installer unpacks beside `C:\Thornswood-Server` and checks the payload
    there before it touches anything (issue #446); on a box that already has a
    server it keeps the one it replaces as `C:\Thornswood-Server.prev-<stamp>`,
-   and `.\scriptselease\Publish-Server.ps1 -PutBack` puts that back. On a
+   and `.\scripts\release\Publish-Server.ps1 -PutBack` puts that back. On a
    new box there is nothing to keep.
    The gamemode that goes up is this branch's, which is main's; if main holds
    gamemode changes that have not been tried on dev, tell Patrick before
@@ -286,7 +286,7 @@ as docs\RESTORING.md "The box is gone" says.
     `-AssetDir "C:\ThornswoodTemps&Worktrees\temp\move\feed-assets"`. Then
     `.\scripts\release\Publish-Installer.ps1` puts the installer from the last
     package build back on the site.
-18. **The name:** in the Cloudflare account, point the A records for
+18. **The name:** in Patrick's Cloudflare login, point the A records for
     `thornswood.net` and `www` at the new address, not proxied (Watch-Outside's
     dns check expects them straight at the box). When the name resolves there,
     `.\scripts\deploy\Setup-Domain.ps1`. It refuses until it does, then
@@ -355,6 +355,61 @@ but it is the way back if something on the new box turns out wrong
 last backups taken there. A week of it costs one month at the old price.
 Once the new box has run a week and Fetch-Backups has brought its backups
 here every night, cancel it.
+
+## Rehearsing the move on a throwaway server
+
+Everything above has only been checked on paper: `tests\test-new-box-runbook.ps1`
+proves every command and parameter is real and in the right order, but
+nobody has followed it on a real new box. A rehearsal is how to find the step
+that fails before the day it matters. Patrick, 29 September: "This a playtest
+server in alpha so everyone knows everything is throwaway rn, just add that
+all to the guide and I might do it eventually."
+
+**What it costs.** A small Windows Server 2022 VPS rented by the hour, for an
+afternoon. Nothing on the real box changes, and nobody playing notices.
+
+**During the alpha all world and character data is throwaway.** So a
+rehearsal that goes wrong costs nothing, and a real move that loses the world
+or the characters is acceptable too: tell people, and carry on.
+
+The steps, in order:
+
+1. **Rent it.** Any provider, the smallest Windows Server 2022 box it has,
+   billed by the hour. Note its address and leave its Administrator password
+   in the provider's panel.
+2. **Point only this rehearsal at it, never the real box.** Do not run
+   Set-Vps and do not edit `scripts\vps\vps.json`. Instead give it a
+   per-machine override (issue #1090, `scripts\vps\Vps.ps1`): a file holding
+   only `{"address": "<its address>", "hostKeys": ["SHA256:..."]}`, with the
+   fingerprints step 2 of "If it is a new machine" reads in its console.
+   Save it as `C:\ThornswoodTemps&Worktrees\temp\rehearsal\vps.json` and, in
+   the one PowerShell window the rehearsal runs in, set
+   `$env:THORNSWOOD_VPS_LOCAL = "C:\ThornswoodTemps&Worktrees\temp\rehearsal\vps.json"`.
+   Every script run from that window talks to the throwaway box, and every
+   other window and every lane on the machine still talks to the real one.
+   (`%LOCALAPPDATA%\Thornswood\vps.json` also works, but it points the whole
+   machine at the throwaway box, lanes included, so use it only on a machine
+   nothing else deploys from.)
+3. **Follow "If it is a new machine, new address" from start to finish** in
+   that window, including step 13, the restore from the newest backup in
+   `Downloads\Thornswood-Backups`. Skip only what would reach the real box or
+   the people on it: step 3 (the override stands in for it), steps 10 to 12
+   (they freeze the real box), step 18 (the name stays on the real box),
+   steps 20 to 22 and 24 (a second watchdog, alert poster and build runner
+   would answer for the real ones), and steps 26 to 30 (they move everybody).
+   Install the bot in step 15 to see it start, then stop it at once
+   (`.\scripts\vps\Remote.ps1 "Stop-Service ThornswoodBot"`): it holds the same
+   token as the real bot, and two of them answer everything twice. Check the
+   site by its address rather than by name, since the name still points at
+   the real box.
+4. **Write down every step that fails**, and every step whose wording did not
+   match what happened, on the issue for the rehearsal, with what was typed
+   and what came back. Fix the page from those notes in the same pull request
+   as anything a script needed.
+5. **Delete it all.** Cancel the server at the provider, delete the override
+   file, and remove the throwaway box's lines from `.ssh\known_hosts` (and
+   from `.ssh\config` if Setup-SshKey added one), so nothing is left pointing
+   at an address somebody else will be given next.
 
 ## The logs on the box, and how big they get
 
