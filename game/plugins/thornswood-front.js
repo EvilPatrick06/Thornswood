@@ -6880,9 +6880,10 @@
         const name = sp.Game.getModName(i);
         if (name) { names.push(name); }
       }
+      // Before the write, so a file that cannot be written still reports.
+      orderToReport = names.slice();
       fs.writeFileSync('Data/Platform/thornswood-loadorder.txt',
                        names.join('\n') + '\n');
-      orderToReport = names.slice();
 
       /* A build without the light index must still get the file above, so this
          is separate and its failure is not the other one's. */
@@ -6945,7 +6946,17 @@
     return ('00000' + ((h >>> 0) & 0xfffff).toString(16)).slice(-5);
   }
 
+  /*
+    SENT AGAIN EVERY TWO MINUTES, for the life of the game. The server treats a
+    profile online five minutes with no complete report as a list that differs,
+    so a report lost on the way (the voice service restarting, the server
+    restarting under a session that carries on, a line dropped from a full
+    queue) must not stay lost. The server says a verdict it has already said at
+    most every ten minutes, so this is quiet on the other end.
+  */
+  const LOAD_ORDER_RESEND_MS = 120000;
   const orderMarks = [];
+  let orderSentAt = 0;
   sp.on('update', guard('loadorderreport', () => {
     if (!orderToReport) { return; }
     if (orderMarks.length < orderToReport.length) {
@@ -6962,13 +6973,16 @@
       orderMarks.push(mark);
       return;
     }
+    const now = Date.now();
+    if (orderSentAt && now - orderSentAt < LOAD_ORDER_RESEND_MS) { return; }
+    const first = !orderSentAt;
+    orderSentAt = now;
     const total = orderMarks.length;
-    orderToReport = null;
     for (let from = 0; from < total; from += LOAD_ORDER_CHUNK) {
       tellServer('/loadorder ' + total + ' ' + from + ' ' +
                  orderMarks.slice(from, from + LOAD_ORDER_CHUNK).join(''));
     }
-    say('reported ' + total + ' plugins to the server to check against its own');
+    if (first) { say('reported ' + total + ' plugins to the server to check against its own'); }
   }));
 
   /*

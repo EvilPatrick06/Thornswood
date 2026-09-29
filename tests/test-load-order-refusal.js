@@ -75,8 +75,13 @@ yes('and so is the name alone', mark('Riften Expansion.esp') !== mark('Riften Ex
       /tellServer\('\/loadorder ' \+ total \+ ' ' \+ from \+ ' ' \+/.test(front));
   yes('it reads each plugin with getFileInfo, one a frame', /sp\.getFileInfo\(name\)/.test(front) &&
       /orderMarks\.push\(mark\);\s*return;/.test(front));
-  yes('the list it sends is the one it wrote to thornswood-loadorder.txt',
-      /names\.join\('\\n'\) \+ '\\n'\);\s*orderToReport = names\.slice\(\);/.test(front));
+  yes('the list it sends is the one it writes to thornswood-loadorder.txt, taken before the write',
+      /orderToReport = names\.slice\(\);\s*fs\.writeFileSync\('Data\/Platform\/thornswood-loadorder\.txt',\s*names\.join/.test(front));
+  const resend = /const LOAD_ORDER_RESEND_MS = (\d+);/.exec(front);
+  yes('it sends the report again every two minutes, so a lost one does not stay lost',
+      !!resend && Number(resend[1]) === 120000 &&
+      /if \(orderSentAt && now - orderSentAt < LOAD_ORDER_RESEND_MS\) \{ return; \}/.test(front) &&
+      !/^\s+orderToReport = null;/m.test(front));
 
   const chunk = /const LOAD_ORDER_CHUNK = (\d+);/.exec(front);
   const n = chunk ? Number(chunk[1]) : 0;
@@ -143,16 +148,30 @@ function rig(settings, mods) {
     console: { log: function () { r.logged.push(Array.prototype.join.call(arguments, ' ')); } },
     Date: Date, Math: Math, Number: Number, String: String, Array: Array, Object: Object,
     setTimeout: function (fn) { r.timers.push(fn); return r.timers.length; },
+    setInterval: function (fn) { r.interval = fn; return 1; },
+    clearInterval: function () { },
     mp: {
       getServerSettings: function () { return settings; },
       getUserByActor: function (actorId) { return actorId === 0xff000a01 ? 7 : -1; },
+      get: function (id, what) {
+        if (id === 0 && what === 'onlinePlayers') { return r.online.map(function (o) { return o.actorId; }); }
+        for (let i = 0; i < r.online.length; i++) { if (r.online[i].actorId === id) { return r.online[i].profileId; } }
+        throw new Error('no such actor');
+      },
       kick: function (userId) { r.kicked.push(userId); }
     }
   };
+  r.online = [];
+  r.box = box;
   vm.createContext(box);
   vm.runInContext(src.slice(a, b), box, { filename: 'gamemode.js (load order refusal)' });
   box.__thornswoodManifestMods = mods;
   r.lo = box.__thornswoodLoadOrder;
+  // The relay answering, as the command poll records it.
+  r.relay = function (okAt, failAt) { box.__thornswoodCommandPoll = { okAt: okAt || 0, failAt: failAt || 0 }; };
+  r.sweep = function (now) {
+    return r.lo.sweep(now, r.online, function (pid, t) { r.told.push(t); });
+  };
   r.send = function (profileId, lines) {
     let last;
     lines.forEach(function (line) {
@@ -261,11 +280,159 @@ if (a >= 0 && b > a) {
         r.send(9, linesFor(mods.slice(0, 3))) === undefined && r.told.length === 0);
   }
 
+  // ---------------------------------------------- the report that never comes
+  const ACTOR = 0xff000a01;
+  const G = 300000;
+  function online(r, pid) { r.online = [{ actorId: ACTOR, profileId: pid }]; }
+  function at(r, now) { r.relay(now - 1000, 0); return r.sweep(now); }
+
+  {
+    const r = rig({ thornswoodLoadOrderRefuse: true }, mods);
+    const t0 = Date.now();
+    online(r, 11);
+    yes('the grace is five minutes', r.lo.grace === G);
+    yes('no report yet is nothing while the grace runs',
+        at(r, t0).length === 0 && at(r, t0 + G - 1).length === 0 && r.told.length === 0);
+    const j = at(r, t0 + G + 1);
+    yes('online five minutes with no report, refusing on: judged', j.length === 1 && j[0] === 11);
+    yes('and told in one sentence that the game has not reported, and to press Fix',
+        r.told.length === 1 && /has not told the server which plugins it loaded/.test(r.told[0]) &&
+        /this session is being ended/.test(r.told[0]));
+    r.fire();
+    yes('and the session is ended after the sentence', r.kicked.length === 1 && r.kicked[0] === 7);
+    at(r, t0 + G + 60000);
+    yes('judged once, not again every sweep', r.told.length === 1);
+  }
+
   {
     const r = rig({}, mods);
-    const s = [r.lo.sentence({ at: 3, theirs: 'X.esp' }, false), r.lo.sentence({ at: 3, theirs: 'X.esp' }, true)];
+    const t0 = Date.now();
+    online(r, 12);
+    at(r, t0);
+    at(r, t0 + G + 1);
+    r.fire();
+    yes('no report while only watching: told, WOULD REFUSE in the log, and they stay',
+        r.told.length === 1 && r.kicked.length === 0 &&
+        r.logged.some(function (s) { return /WOULD REFUSE profile 12: no load order report/.test(s); }));
+  }
+
+  {
+    const r = rig({ thornswoodLoadOrderRefuse: true }, mods);
+    const t0 = Date.now();
+    online(r, 13);
+    at(r, t0);
+    r.send(13, linesFor(mods));
+    yes('a report that matches: never judged as no report', at(r, t0 + G + 1).length === 0 && r.told.length === 0);
+    r.fire();
+    yes('and nobody is disconnected', r.kicked.length === 0);
+  }
+
+  {
+    const r = rig({ thornswoodLoadOrderRefuse: true }, mods);
+    const t0 = Date.now();
+    r.send(14, linesFor(mods));   // sent from the main menu, before the character is online
+    online(r, 14);
+    yes('a report that came just before the character did still counts',
+        at(r, t0 + 1000).length === 0 && at(r, t0 + G + 2000).length === 0 && r.told.length === 0);
+  }
+
+  {
+    const big = manifest(150);
+    const r = rig({ thornswoodLoadOrderRefuse: true }, big);
+    const t0 = Date.now();
+    online(r, 15);
+    at(r, t0);
+    r.send(15, linesFor(big).slice(0, 2));
+    yes('a partial report is no report: judged once the grace is over',
+        at(r, t0 + G + 1).length === 1 && /has not told the server/.test(r.told[0]));
+  }
+
+  {
+    const r = rig({ thornswoodLoadOrderRefuse: true }, undefined);
+    const t0 = Date.now();
+    online(r, 16);
+    at(r, t0);
+    yes('the server’s own failure, no manifest published: nobody is judged',
+        at(r, t0 + G + 1).length === 0 && at(r, t0 + 3 * G).length === 0 && r.told.length === 0);
+  }
+
+  {
+    const r = rig({ thornswoodLoadOrderRefuse: true }, mods);
+    const t0 = Date.now();
+    online(r, 17);
+    r.relay(0, 0);
+    r.sweep(t0);
+    r.sweep(t0 + G + 1);
+    yes('the server’s own failure, the command relay never answering: nobody is judged', r.told.length === 0);
+    r.relay(t0 + G - 60000, 0);   // answered, but not lately
+    yes('nor while its last answer is stale', r.sweep(t0 + G + 1).length === 0);
+  }
+
+  {
+    const r = rig({ thornswoodLoadOrderRefuse: true }, mods);
+    const t0 = Date.now();
+    online(r, 18);
+    at(r, t0);
+    const broke = t0 + 100000;
+    r.relay(t0 + G, broke);
+    yes('a break in the relay during the grace starts the clock again',
+        r.sweep(t0 + G + 1).length === 0 && r.told.length === 0);
+    r.relay(broke + G + 1000, broke);
+    yes('and the grace then runs from the break', r.sweep(broke + G + 1).length === 1);
+  }
+
+  {
+    const r = rig({ thornswoodLoadOrderRefuse: true }, mods);
+    const t0 = Date.now();
+    online(r, 19);
+    at(r, t0);
+    r.online = [];
+    at(r, t0 + 1000);
+    online(r, 19);
+    at(r, t0 + 2000);
+    yes('a person who leaves and comes back starts a new grace',
+        at(r, t0 + G + 1).length === 0 && at(r, t0 + G + 2001).length === 1);
+  }
+
+  {
+    const r = rig({ thornswoodLoadOrderRefuse: true }, mods);
+    r.box.mp.get = function () { throw new Error('the server is having a bad moment'); };
+    let threw = false;
+    try { r.interval(); } catch (e) { threw = true; }
+    r.fire();
+    yes('the sweep failing is the server’s failure: logged, nobody refused',
+        !threw && r.kicked.length === 0 &&
+        r.logged.some(function (s) { return /load order sweep failed, nobody refused/.test(s); }));
+  }
+
+  {
+    const r = rig({}, mods);
+    r.send(20, linesFor(mods));
+    r.send(20, linesFor(mods));
+    yes('a report sent again says "matches" once, not every two minutes',
+        r.logged.filter(function (s) { return /load order of profile 20 matches/.test(s); }).length === 1);
+    const list = mods.slice(0, 20);
+    r.send(21, linesFor(list));
+    r.send(21, linesFor(list));
+    yes('and a list that differs is told once while only watching', r.told.length === 1);
+  }
+
+  {
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    yes('the command poll records when the relay answers and when it fails',
+        /pollSaid\(true\);/.test(code) && /req\.on\('error', function \(\) \{ pollSaid\(false\); \}\)/.test(code) &&
+        /req\.on\('timeout', function \(\) \{ pollSaid\(false\);/.test(code) &&
+        /g\.__thornswoodCommandPoll/.test(code));
+    yes('and the chat block lends the sweep its way of telling somebody',
+        /g\.__thornswoodToProfile = toProfile;/.test(code));
+  }
+
+  {
+    const r = rig({}, mods);
+    const s = [r.lo.sentence({ at: 3, theirs: 'X.esp' }, false), r.lo.sentence({ at: 3, theirs: 'X.esp' }, true),
+               r.lo.noReport(false), r.lo.noReport(true)];
     s.forEach(function (t, i) {
-      yes('the ' + (i ? 'refusing' : 'watching') + ' sentence is one sentence, with no em dash and no "player"',
+      yes('the ' + (i % 2 ? 'refusing' : 'watching') + (i > 1 ? ' no report' : '') + ' sentence is one sentence, with no em dash and no "player"',
           t.split('. ').length === 1 && t.indexOf('\u2014') < 0 && !/player/i.test(t));
     });
   }
