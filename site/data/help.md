@@ -4,11 +4,11 @@
 
 <!-- alpha -->
 Thornswood is in alpha and is eighteen and over, and the world is open by
-application. Anyone can install it. Play unlocks once you have applied in the
-Discord and been given the Playtester role: open a ticket and pick **Apply to
-be an alpha playtester**. It asks whether you are eighteen or over and
-whether you accept the [rules](/rules). The [join](/join) page has the whole
-of it.
+application. Anyone can install it. Come into the Discord, open a ticket and
+pick **Apply to be an alpha playtester**. It asks whether you are eighteen or
+over and whether you accept the [rules](/rules). When you are accepted you are
+given the Playtester role, and that role is what unlocks Play. The
+[join](/join) page says more.
 <!-- /alpha -->
 <!-- open -->
 Thornswood is open and is eighteen and over. Anyone can install it, and

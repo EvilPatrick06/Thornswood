@@ -127,8 +127,8 @@ function standingWith(open, roleIds) {
       /## 2\. Take the installer/.test(join.off) && /## 2\. Take the installer/.test(join.on));
 
   const help = modes('site/data/help.md');
-  yes('help, off: says open by application', /open by application/.test(help.off) && !/Thornswood is open\./.test(help.off));
-  yes('help, on: says anyone in the Discord can play', /anyone in the Discord can play/.test(help.on) && !/open by application/.test(help.on));
+  yes('help, off: says open by application', /open by\s+application/.test(help.off) && !/Thornswood is open /.test(help.off));
+  yes('help, on: says anyone in the Discord can play', /anyone in the Discord can play/.test(help.on.replace(/\s+/g, ' ')) && !/open by\s+application/.test(help.on));
   yes('help: the numbered steps survive the markers in both',
       /4\. Press \*\*Connect Discord\*\*/.test(help.off) &&
       /It works once your application has been accepted/.test(help.off.replace(/\s+/g, ' ')) &&
