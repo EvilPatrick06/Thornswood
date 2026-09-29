@@ -1,41 +1,69 @@
 # Collection revision 2: the Vortex pass
 
 One pass in Vortex on the shipping machine, in the Thornswood profile, then
-one upload to Nexus. It carries five changes to the Thornswood collection
-(`7essxf`) and fixes its plugin order so that a clean install lands exactly
-where the server expects. Every step here is done by hand in Vortex or on
-Nexus; nothing in the repository does them.
+one upload to Nexus. It carries the changes we made after revision 1 to the
+Thornswood collection (`7essxf`) and gives it the plugin rules that make a
+clean install land exactly where the server expects. Every step here is done
+by hand in Vortex or on Nexus; nothing in the repository does them.
+
+## Who wins where the collection and the servers differ
+
+Patrick, 29 September: make the servers match the published collection,
+"as it was supposed to have been done already", except "for the CBBE because
+we made changes to that so that doesn't count and anything else we
+specifically than later made changes on will overwrite what the collection
+says everything else needs to adapt."
 
 Measured on 29 September against revision 1 (the only published revision,
-27 September, 113 mods) and both servers' manifests. Live and dev hand out
-the same 48 plugins in the same order, byte for byte the same manifest, and
-the built server settings on the shipping machine say the same.
+27 September, 113 mods), the plugins it installs on the shipping machine
+(checked against the file hashes the collection itself records) and both
+servers' manifests. Live and dev hand out the same 48 plugins in the same
+order, byte for byte the same manifest.
 
-What a clean install of revision 1 gets wrong today:
+| What | The collection (revision 1) | The servers until the deploy | Wins | Why |
+| --- | --- | --- | --- | --- |
+| Elysium Estate | 5.0.1 (Nexus file 45193), `ElysiumEstate.esp`, 956,423 bytes | 4.3.5, `ElysiumEstateSSE.esp`, 980,322 bytes, at position 22 | The collection | No decision chose 4.3.5. The server kept the plugin name from the old collection, and the hand copy of 27 September (#689) only covered for it. The servers move to 5.0.1 at the same position 22 (#690). |
+| CBBE.esp | Switched on, a full plugin (10,512 bytes) | Not loaded | Ours | Patrick: the CBBE is ours. The collection switches it off (step 1). |
+| The covered body (#405) | CBBE 3BA installs the pre-built body mesh, which is nude | Nobody can be seen nude | Ours | Decided 28 September. The collection changes (step 1). |
+| Start On Save (#394, #490) | Installed | Taken out; the launcher already leaves it out of its game folder | Ours | It crashed a fresh install at the main menu. The collection removes it (step 2). |
+| Thornswood-Content.esp (#400) | 141,442 bytes, the same file the servers load | 141,442 bytes | Ours, once rebuilt | Today they are the same file. When the plugin without the Execution Block is rebuilt, the new file goes to both (step 3). |
+| The bounce physics (#993) | CBPC and its 3B bounce configs installed | No jiggle; the launcher already keeps the physics out of its game folder | Ours | Body shape is height and weight only (#1004). The collection removes them (step 4). |
+| The plugin order | The order it was exported in is the server's order, position for position, once the two lines above are applied | The same order | Both agree | Nothing moves but the name at position 22. |
+| The plugin rules | "Triumvirate loads after ElysiumEstateSSE.esp" names a plugin revision 1 does not have, so Elysium Estate and everything from Triumvirate to FishingInSkyrim are tied to nothing; AHZmoreHUD is not tied to Immersive Patrols II | No rules | The collection's own order | The rules are what hold the collection's order on a clean install, and these three do not (step 5). |
+| The other 47 plugins | Every one the same size and crc32 as the server's | | Both agree | Measured file by file. |
+| Light plugins | Anywhere LOOT puts them | Not counted | Both agree | A light plugin takes no position. |
 
-- It installs Elysium Estate 5.0.1, whose plugin is `ElysiumEstate.esp`. The
-  server loads `ElysiumEstateSSE.esp`, which only Elysium Estate 4.3.5 has.
-  The launcher carries that file itself for now (`game\required-data`,
-  issue #690), so nobody is locked out, but the collection is wrong.
-- It switches on `CBBE.esp`, a full plugin the server does not load. One
-  extra full plugin moves every plugin after it by one place.
-- Its rules leave two gaps, so LOOT may put Elysium Estate anywhere among
-  positions 9 to 21, and may mix the plugins from AHZmoreHUD down with the
-  ones from Thornswood-Content.esp to Immersive Patrols II.
-- A rule in this machine's Vortex, "ElysiumEstateSSE.esp loads after
-  Immersive Patrols II.esp", goes round in a circle with the rest of the
-  chain. Revision 1 left it out only because no mod in it had that plugin.
-  Once Elysium Estate 4.3.5 is in, the upload would carry it and LOOT would
-  refuse to sort anybody's list. Step 6 replaces it.
+What the dev deploy resets, which is fine during the alpha: anything the dev
+world saved inside Elysium Estate. Version 5.0.1 has no guest house, no loft
+and no note at the start, so the doors, buildings and names that pointed at
+them are gone from the gamemode. It has its own new doors, a caretaker, a
+shield, and its staff enchanter under a new record, and the gamemode knows
+those instead. Every record the gamemode names in it was checked against the
+collection's file.
+
+## The server side, done in the repository (#690)
+
+- The gamemode's tables name `ElysiumEstate.esp` and only the records it has:
+  doors, buildings, water, warmth, races, hunts, harvests, benches, the cast
+  and the admin names, worked out again by their own scripts against the
+  collection's file. Only what the plugin changes moved; the rest of each
+  table is as it was.
+- The launcher links Elysium Estate by its new plugin name.
+- `game\required-data` no longer carries `ElysiumEstateSSE.esp`, and every
+  pack deletes that file, so nobody keeps the old plugin in their game folder.
+- The order table below and `tests\test-collection-revision-2.ps1` hold
+  `ElysiumEstate.esp` at position 22.
+
+The deploy that moves the servers is in "Moving the servers" at the end.
 
 ## Before you start
 
 - Vortex open, the Thornswood profile active.
 - The rebuilt `Thornswood-Content.esp` from step 3 ready, or step 3 done first.
-- None of this changes the server's order, so no world wipe, no
-  `Sync-LoadOrder.ps1`, and nobody needs a new character.
+- The dev server already runs `ElysiumEstate.esp` ("Moving the servers"),
+  or the check in step 6 names it until it does.
 
-## 1. The covered body (#405)
+## 1. The covered body and CBBE.esp (#405)
 
 Nobody can be seen nude, men or women, people or NPCs. The female body
 becomes the covered CBBE body that is already in the collection.
@@ -43,14 +71,16 @@ becomes the covered CBBE body that is already in the collection.
 1. Mods page, **CBBE 3BA (3BBB) 2.48**: Reinstall.
 2. First page, "CBBE 3BA Base": keep "Base install" and "Nevernude", untick
    **"Pre-built Body mesh"**.
-3. Every later page as it was, except the bounce pages if you are doing
-   step 4: then leave the CBPC pages unticked.
+3. Every later page as it was, leaving the CBPC pages unticked (step 4).
 4. Deploy. Vortex should report no file conflict on `femalebody_0.nif` or
    `femalebody_1.nif` any more.
 5. Check, read only: `.\scripts\mods\Check-CoveredBodies.ps1` should end
    "Every body is covered".
 6. Collections, Thornswood, Mods tab: CBBE 3BA (3BBB) installs with "Same
    Installer Choices", so everybody gets the new choices.
+7. Plugins page: **CBBE.esp** switched off. It is not on the server, no plugin
+   in the game names it as a master, and its own description says it only
+   adds a rim light texture to vanilla outfits.
 
 ## 2. Start On Save comes out (#394, #490)
 
@@ -76,51 +106,40 @@ bytes.
    check at the end names this one file as a wrong file, and that is
    expected.
 
-## 4. The bounce physics come out (#993, optional)
+## 4. The bounce physics come out (#993)
 
-The launcher already keeps the physics out of its own game folder, so this is
-tidying. Neither has a plugin.
+The launcher already keeps the physics out of its own game folder, so a clean
+install through the launcher has none. The collection still installs them,
+and this takes them out. Neither has a plugin.
 
-1. Mods page: disable **CBPC - Physics with Collisions** (Nexus 21224, the
+1. Mods page: remove **CBPC - Physics with Collisions** (Nexus 21224, the
    main file) and its **3B Breast-Butt Bounce Configs** file.
 
-## 5. Elysium Estate: the file the server loads (#690)
+## 5. Elysium Estate stays 5.0.1, and the plugin rules
 
-The collection installs Elysium Estate 5.0.1 (Nexus file 45193), whose
-plugin is `ElysiumEstate.esp`, 956,423 bytes. The server loads
-`ElysiumEstateSSE.esp`, 980,322 bytes, and the only Elysium Estate file with
-that plugin is 4.3.5 (Nexus file 24701, under Old files; Nexus's own file
-preview lists `Data/ElysiumEstateSSE.esp`, 980.3 kB). Going back to 4.3.5
-keeps the world as it is. Moving the server to 5.0.1 instead would change
-the plugin every saved Elysium Estate record points into.
+Elysium Estate stays the version the collection installs, 5.0.1 (Nexus file
+45193), whose plugin is `ElysiumEstate.esp`. Nothing to download.
 
-1. Mods page, **Elysium Estate** (the entry reads 4.3.5, and it is really
-   5.0.1): Remove, and let Vortex delete its files.
-2. Nexus, Elysium Estate (mod 4119), Files, Old files, **Elysium Estate
-   4.3.5**: Mod Manager Download, then install and enable it.
-3. Deploy. If Vortex says `ElysiumEstateSSE.esp` in Data was put there
-   outside Vortex (the hand copy from 27 September), let Vortex's copy win;
-   it is the same file.
-4. Plugins page: `ElysiumEstate.esp` is gone and `ElysiumEstateSSE.esp` is
-   there and switched on.
-
-Once revision 2 is live, `game\required-data\ElysiumEstateSSE.esp` can come
-out of the repository (#690).
-
-## 6. The plugin order
-
-Three changes on the Plugins page. For each, click the plugin, and in its
-details on the right use **Load After** (the same rules show under the
-plugin's Dependencies column).
+1. Plugins page: **ElysiumEstate.esp** switched on. On the shipping machine
+   it has been switched off since 27 September, when the old plugin was
+   copied in by hand; an upload with it off would ship it off.
+2. If `ElysiumEstateSSE.esp` shows on the Plugins page, it is the hand copy of
+   27 September. Switch it off and delete the file from the Steam copy's
+   Data folder; no mod in the collection has it.
+3. The rules. For each plugin in the table, click it, and in its details on
+   the right use **Load After** (the same rules show under the plugin's
+   Dependencies column).
 
 | Plugin | Rule to remove | Rule to add |
 | --- | --- | --- |
-| ElysiumEstateSSE.esp | load after Immersive Patrols II.esp | load after aaaGraniteHill.esp |
+| ElysiumEstate.esp | none | load after aaaGraniteHill.esp |
+| Triumvirate - Mage Archetypes.esp | load after ElysiumEstateSSE.esp | load after ElysiumEstate.esp |
 | AHZmoreHUD.esp | none | load after Immersive Patrols II.esp |
 
-And switch **CBBE.esp** off. It is not on the server, no plugin in the game
-names it as a master, and its own description says it only adds a rim light
-texture to vanilla outfits.
+4. On the shipping machine Vortex also holds "ElysiumEstateSSE.esp loads after
+   Immersive Patrols II.esp". Remove it too: it goes round in a circle with
+   the rest of the chain, and LOOT refuses to sort anybody's list the day a
+   plugin of that name turns up again.
 
 Then Sort Now and Deploy. Every full plugin must then sit in exactly this
 order. Light plugins are left out of this table because they take no
@@ -150,8 +169,8 @@ position, so LOOT may put them anywhere.
 | 19 | Hothtrooper44_ArmorCompilation.esp | Keep. |
 | 20 | AnotherOakwood.esp | Keep. |
 | 21 | aaaGraniteHill.esp | Keep. |
-| 22 | ElysiumEstateSSE.esp | **Change.** From Elysium Estate 4.3.5 (step 5). Loads after aaaGraniteHill.esp and nothing else. |
-| 23 | Triumvirate - Mage Archetypes.esp | Keep. |
+| 22 | ElysiumEstate.esp | **Switch on** (step 5). Elysium Estate 5.0.1, as the collection installs it; loads after aaaGraniteHill.esp. The servers had ElysiumEstateSSE.esp here until the deploy. |
+| 23 | Triumvirate - Mage Archetypes.esp | **Change.** Loads after ElysiumEstate.esp. |
 | 24 | Apocalypse - Magic of Skyrim.esp | Keep. |
 | 25 | CommonClothes.esp | Keep. |
 | 26 | Cloaks&Capes.esp | Keep. |
@@ -179,10 +198,11 @@ position, so LOOT may put them anywhere.
 | 48 | Playable Rieklings.esp | Keep. |
 <!-- order:end -->
 
-Proved before writing this: revision 1's rules with these two changes, read
-against this machine's own list by `Check-CollectionRules.ps1`, hold every
-one of the 42 pairs of neighbouring full plugins, where revision 1 alone
-leaves two free.
+Proved before writing this: revision 1's own rules, read against this order
+by `Check-CollectionRules.ps1`, leave ElysiumEstate.esp named by no rule and
+two pairs free (aaaGraniteHill.esp then Triumvirate, Immersive Patrols II.esp
+then AHZmoreHUD.esp). With the three changes above they hold all 42 pairs of
+neighbouring full plugins.
 
 Six links of the chain pass through light plugins (LSFX-SSE-Audiosettings,
 MoreCraftableEquipment, the three RaceMenu plugins, XPMSE, DeadlySpellImpacts,
@@ -191,22 +211,22 @@ collection. If one of them ever comes out, give the plugin after the gap a
 rule straight onto the plugin before it in the table above;
 `Check-CollectionRules.ps1` names the exact rule.
 
-## 7. Check, then upload
+## 6. Check, then upload
 
 1. `.\scripts\mods\Check-CleanInstall.ps1 -Server dev`. It reads the plugin
    list Skyrim reads and the Steam copy's Data folder, and should say PASS
    (or only the step 3 line, until the dev server has the new file).
 2. Collections, Thornswood, workshop: the mod list has no Start On Save, no
-   CBPC if you did step 4, Elysium Estate 4.3.5, and the new Thornswood
-   Content. Upload New Revision.
+   CBPC, Elysium Estate 5.0.1, and the new Thornswood Content. Upload New
+   Revision.
 3. `.\scripts\mods\Check-CollectionRules.ps1` reads the upload's own copy of
    the rules against the list and should say HELD.
 
 A note for Nexus, in the words people read: "Bodies are covered for
-everybody, Start On Save is gone, Elysium Estate is the version the server
-runs, and the plugin order now installs exactly as the server expects."
+everybody, Start On Save and the bounce physics are gone, and the plugin
+order now installs exactly as the server expects."
 
-## 8. The proof: a clean install (#476)
+## 7. The proof: a clean install (#476)
 
 1. Vortex, Profiles: add a new profile ("Clean check"), switch to it.
 2. Install the Thornswood collection, revision 2, from Nexus. Leave **"Skip
@@ -306,11 +326,41 @@ shipping the output as ours the way Nemesis's is (#1259, Patrick's choice of
 Windhelm and Riften townsfolk refits are not among them and show their mods'
 own meshes.
 
+## Moving the servers (#690)
+
+Dev first; live only when Patrick says so. The files the dev server needs are
+already on the shipping machine: Vortex has Elysium Estate 5.0.1 deployed,
+and `C:\Thornswood\Game\Data\ElysiumEstate.esp` is the same 956,423 bytes
+the collection records.
+
+1. Step 5 in Vortex (switch ElysiumEstate.esp on, the three rules, Sort,
+   Deploy), so the plugin list Vortex writes has it at position 22 with
+   CBBE.esp off.
+2. `.\scripts\deploy\Deploy-Gamemode.ps1 -Vortex -NewOrder`. It writes the
+   built server's load order from that list. `-NewOrder` is needed because
+   the build otherwise keeps its old list and would put a plugin it has not
+   seen on the end. `pwsh -NoProfile -File .\tests\test-collection-revision-2.ps1`
+   then says the built server settings are this page's order.
+3. `.\scripts\deploy\Deploy-DevGamemode.ps1 -LoadOrder`. It sends
+   ElysiumEstate.esp from `C:\Thornswood\Game\Data` and the new gamemode, and
+   restarts the dev server.
+4. A dev Ship, so the launcher's own plugin list names ElysiumEstate.esp and
+   its game folder loses the old file.
+5. `.\scripts\mods\Check-CleanInstall.ps1 -Server dev` says PASS for the
+   shipping machine's list.
+
+Live is `Deploy-Gamemode.ps1` then `Deploy-Server.ps1` and a main Ship, the
+day Patrick says Main. Until then the live server keeps ElysiumEstateSSE.esp,
+and the built server on the shipping machine already has the new order, so
+nobody runs `Deploy-Server.ps1` before that day.
+
 ## Keeping this page true
 
 `tests\test-collection-revision-2.ps1` reads the table above against both
 servers' manifests and the built server settings, whichever it can reach,
-and fails the moment the server's order and this table part. Change the
-order, change this table in the same pull request. A plugin added to the
-collection later needs a rule loading it after Playable Rieklings.esp, the
-end of the chain, or it floats.
+and fails the moment the server's order and this table part. A server that
+still has the plugin a row says it had "until the deploy" is a wait, not a
+failure; take those words out of the row once both servers have moved.
+Change the order, change this table in the same pull request. A plugin added
+to the collection later needs a rule loading it after Playable Rieklings.esp,
+the end of the chain, or it floats.

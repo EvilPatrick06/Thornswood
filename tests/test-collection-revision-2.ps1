@@ -74,12 +74,18 @@ $start = [Array]::IndexOf($docLines, '<!-- order:start -->')
 $end = [Array]::IndexOf($docLines, '<!-- order:end -->')
 Yes 'the page marks where its order table starts and ends' ($start -ge 0 -and $end -gt $start)
 $order = New-Object Collections.Generic.List[string]
+# A row whose server side is still to move says "The servers had <plugin>
+# here until the deploy" (#690: Elysium Estate). A server that still has that
+# plugin at that position is waiting for its deploy, not wrong.
+$until = @{}
 $positionsRight = $true
 if ($start -ge 0 -and $end -gt $start) {
     foreach ($l in $docLines[($start + 1)..($end - 1)]) {
         $m = [regex]::Match($l, '^\|\s*(\d+)\s*\|\s*([^|]+?)\s*\|')
         if (-not $m.Success) { continue }
         if ([int]$m.Groups[1].Value -ne $order.Count + 1) { $positionsRight = $false }
+        $had = [regex]::Match($l, 'servers had (\S[^|]*?\.es[mpl]) here until the deploy')
+        if ($had.Success) { $until[$order.Count] = $had.Groups[1].Value }
         [void]$order.Add($m.Groups[2].Value)
     }
 }
@@ -118,7 +124,11 @@ foreach ($l in $docLines) {
     if ($remove -match '^load after (.+)$') {
         $wrong = $Matches[1].Trim()
         $pw = PositionOf $wrong
-        Yes "$p loses 'load after $wrong', which the table contradicts ($wrong is at $pw, after $at)" ($pw -gt $at)
+        # A rule onto a plugin the collection no longer has (ElysiumEstateSSE.esp)
+        # ties the plugin to nothing, which is why it goes; the table says so by
+        # not having that plugin at all.
+        if ($pw -eq 0) { Yes "$p loses 'load after $wrong', a plugin the table does not have" $true }
+        else { Yes "$p loses 'load after $wrong', which the table contradicts ($wrong is at $pw, after $at)" ($pw -gt $at) }
     }
 }
 Yes ("the page has a rule table ({0} rows)" -f $ruleRows) ($ruleRows -gt 0)
@@ -128,6 +138,16 @@ Yes 'the page names this harness as what keeps it true' ($doc -match 'tests\\tes
 Yes 'the page tells the person to leave "Skip plugin rules" off' ($doc -match 'Skip\s+plugin rules')
 Yes 'the page has no em dash' (-not $doc.Contains([string][char]0x2014))
 Yes 'the page never says player' (-not ($doc -match '\bplayers?\b'))
+
+# What wins where the collection and the servers differ (Patrick, 29 September,
+# #690): the collection, except CBBE and what we changed later. So the table is
+# the collection's order with CBBE.esp left out, and Elysium Estate is the
+# plugin the collection installs.
+Yes 'position 22 is ElysiumEstate.esp, the plugin the collection installs (#690)' ($order.Count -ge 22 -and (Same $order[21] 'ElysiumEstate.esp'))
+Yes 'ElysiumEstateSSE.esp is not in the order: the servers adapt to the collection' ((PositionOf 'ElysiumEstateSSE.esp') -eq 0)
+Yes 'CBBE.esp is not in the order: on CBBE our change wins' ((PositionOf 'CBBE.esp') -eq 0)
+Yes 'the page says who wins, row by row' ($doc -match '(?m)^\|\s*What\s*\|.*\|\s*Wins\s*\|\s*Why\s*\|')
+Yes 'the page says how the servers move, dev first' ($doc -match 'Deploy-DevGamemode\.ps1 -LoadOrder' -and $doc -match 'Deploy-Gamemode\.ps1 -Vortex -NewOrder')
 
 # ------------------------------------------- other people's loose files (#1178) --
 # The mods revision 2 adds are the ones Ship-Rules holds loose files for, no
@@ -167,12 +187,40 @@ foreach ($r in $loose) { $c = ($r -split '\|')[2].Trim(); if ($c -match '^\d+$')
 Yes ('the loose files table counts the 424 files measured on 29 September ({0})' -f $counted) ($counted -eq 424)
 
 # -------------------------------------------------------- against the truth --
-function Compare-Order([string]$label, [string[]]$truth) {
+# Where a server's order parts from the page's: At is the first position that
+# differs (-1 for none), Waiting the positions where the server still has the
+# plugin the page says it had until the deploy.
+function Get-Parting([string[]]$truth) {
     $n = [Math]::Max($truth.Count, $order.Count)
     $at = -1
+    $waiting = @()
     for ($i = 0; $i -lt $n; $i++) {
+        if ($i -lt $truth.Count -and $i -lt $order.Count -and $until.ContainsKey($i) -and (Same $truth[$i] $until[$i])) {
+            $waiting += ("{0} at {1}" -f $truth[$i], ($i + 1))
+            continue
+        }
         if ($i -ge $truth.Count -or $i -ge $order.Count -or -not (Same $truth[$i] $order[$i])) { $at = $i; break }
     }
+    return [pscustomobject]@{ At = $at; Waiting = $waiting }
+}
+
+# The wait itself, on made up orders, so it can never turn into a pass for
+# anything but the one plugin the page names.
+$pageOrder = [string[]]$order.ToArray()
+Yes 'the page names what the servers had at position 22 until the deploy' ($until.ContainsKey(21) -and (Same $until[21] 'ElysiumEstateSSE.esp'))
+$old = [string[]]$pageOrder.Clone(); $old[21] = 'ElysiumEstateSSE.esp'
+$p = Get-Parting $old
+Yes 'a server still on ElysiumEstateSSE.esp at 22 is waiting for its deploy, not wrong' ($p.At -lt 0 -and $p.Waiting.Count -eq 1)
+$other = [string[]]$pageOrder.Clone(); $other[21] = 'CBBE.esp'
+Yes '...and any other plugin there is still a difference' ((Get-Parting $other).At -eq 21)
+$moved = [string[]]$pageOrder.Clone(); $moved[21] = $pageOrder[22]; $moved[22] = 'ElysiumEstateSSE.esp'
+Yes '...and so is the old plugin anywhere but 22' ((Get-Parting $moved).At -eq 21)
+Yes 'the page''s own order parts from nothing' ((Get-Parting $pageOrder).At -lt 0)
+
+function Compare-Order([string]$label, [string[]]$truth) {
+    $p = Get-Parting $truth
+    $at = $p.At
+    if ($p.Waiting.Count) { Write-Host ("WAIT  $label still has {0}, which the page says it had until the deploy" -f ($p.Waiting -join ', ')) }
     $why = ''
     if ($at -ge 0) {
         $t = if ($at -lt $truth.Count) { $truth[$at] } else { '(nothing)' }
@@ -217,6 +265,24 @@ if ($settings -and (Test-Path -LiteralPath $settings)) {
     Skip 'the built server settings: not on this machine'
 }
 if ($sources -eq 0) { Skip 'nothing to compare the page''s order with here; the nightly run on the VPS reads the servers' }
+
+# ------------------------------------ the server side follows the collection --
+# #690: nothing the repository ships or deploys names Elysium Estate's old
+# plugin as something to load, and the old file is on its way out everywhere.
+function RepoText([string]$rel) { return [IO.File]::ReadAllText((Join-Path $Repo $rel), [Text.Encoding]::UTF8) }
+$gmText = RepoText 'game\gamemode.js'
+Yes 'no gamemode table keys a record to ElysiumEstateSSE.esp' (-not ($gmText -match '[0-9a-fA-F]+:ElysiumEstateSSE\.esp'))
+$dataHits = @(Get-ChildItem -LiteralPath (Join-Path $Repo 'game\data') -Filter *.json -File |
+              Where-Object { [IO.File]::ReadAllText($_.FullName) -match '[0-9a-fA-F]+:ElysiumEstateSSE\.esp' } | ForEach-Object Name)
+Yes ('no game\data table keys a record to ElysiumEstateSSE.esp' + $(if ($dataHits) { ' (' + ($dataHits -join ', ') + ')' })) ($dataHits.Count -eq 0)
+Yes 'the gamemode still knows Elysium Estate, by the collection''s plugin' ($gmText -match '[0-9a-fA-F]+:ElysiumEstate\.esp')
+Yes 'game\required-data no longer carries ElysiumEstateSSE.esp' (-not (Test-Path -LiteralPath (Join-Path $Repo 'game\required-data\ElysiumEstateSSE.esp')))
+$rulesText = RepoText 'scripts\release\Ship-Rules.ps1'
+Yes 'every pack deletes Data\ElysiumEstateSSE.esp' ($rulesText -match "(?s)\`$ShipDeleteAlways = @\(.*'Data\\ElysiumEstateSSE\.esp'")
+Yes '...and no pack carries it' ($rulesText -match "\`$rel -ieq 'Data\\ElysiumEstateSSE\.esp'")
+Yes '...and a refresh of the launcher''s game folder leaves it out' ((RepoText 'launcher\app\OwnGame.cs') -match 'rel\.Equals\("Data\\\\ElysiumEstateSSE\.esp"')
+$linksText = RepoText 'launcher\app\Links.cs'
+Yes 'the launcher links Elysium Estate by the collection''s plugin name' ($linksText -match 'A\("ElysiumEstate", 4119\)' -and -not ($linksText -match 'ElysiumEstateSSE'))
 
 # ------------------------------------------------ Check-CleanInstall itself --
 $root = Join-Path $Scratch ('thornswood-cleaninstall-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -297,7 +363,7 @@ try {
     Plugin $data 'ccQDRSSE001-SurvivalMode.esl' 0x200
 
     $server = @('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm',
-                'Water for ENB.esm', 'RaceCompatibility.esm', 'aaaGraniteHill.esp', 'ElysiumEstateSSE.esp',
+                'Water for ENB.esm', 'RaceCompatibility.esm', 'aaaGraniteHill.esp', 'ElysiumEstate.esp',
                 'Triumvirate - Mage Archetypes.esp', 'Thornswood-Content.esp', 'Immersive Patrols II.esp',
                 'AHZmoreHUD.esp', 'Playable Rieklings.esp')
     $manifest = Join-Path $root 'manifest.json'
@@ -306,7 +372,7 @@ try {
     # The list a clean install should write: light plugins wherever LOOT put
     # them, a switched off plugin, the server's full plugins in its order.
     $good = @('*Water for ENB.esm', '*Expressive Facegen Morphs.esl', '*RaceCompatibility.esm', '*LSFX-SSE-Audiosettings.esp',
-              '*aaaGraniteHill.esp', '*ElysiumEstateSSE.esp', '*Triumvirate - Mage Archetypes.esp', '*RaceMenu.esp', 'CBBE.esp',
+              '*aaaGraniteHill.esp', '*ElysiumEstate.esp', '*Triumvirate - Mage Archetypes.esp', '*RaceMenu.esp', 'CBBE.esp',
               '*Thornswood-Content.esp', '*Immersive Patrols II.esp', '*AHZmoreHUD.esp', '*Playable Rieklings.esp')
     $list = Join-Path $root 'plugins.txt'
     PluginList $list $good
@@ -332,11 +398,12 @@ try {
     Yes '...and it says how many it left out and why' (Has $r.Out '4 of them Creation Club plugins, not counted')
     Yes '...and none is called extra' (-not (Has $r.Out 'extra         '))
 
-    # Revision 1's Elysium Estate: the other plugin name.
-    PluginList $list ($good | ForEach-Object { if ($_ -eq '*ElysiumEstateSSE.esp') { '*ElysiumEstate.esp' } else { $_ } })
+    # The old Elysium Estate plugin, the one the servers had until #690: the
+    # other plugin name.
+    PluginList $list ($good | ForEach-Object { if ($_ -eq '*ElysiumEstate.esp') { '*ElysiumEstateSSE.esp' } else { $_ } })
     $r = Run @('-List', $list, '-Data', $data, '-Manifest', $manifest)
-    Yes 'ElysiumEstate.esp in place of ElysiumEstateSSE.esp: the server''s is missing, not in the list' ($r.Code -eq 1 -and (Has $r.Out 'missing       ElysiumEstateSSE.esp (server position 9): it is not in the list at all'))
-    Yes '...and ElysiumEstate.esp is extra' (Has $r.Out 'extra         ElysiumEstate.esp')
+    Yes 'ElysiumEstateSSE.esp in place of ElysiumEstate.esp: the server''s is missing, not in the list' ($r.Code -eq 1 -and (Has $r.Out 'missing       ElysiumEstate.esp (server position 9): it is not in the list at all'))
+    Yes '...and ElysiumEstateSSE.esp is extra' (Has $r.Out 'extra         ElysiumEstateSSE.esp')
 
     # Switched off.
     PluginList $list ($good | ForEach-Object { if ($_ -eq '*AHZmoreHUD.esp') { 'AHZmoreHUD.esp' } else { $_ } })
