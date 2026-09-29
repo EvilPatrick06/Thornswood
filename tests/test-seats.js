@@ -481,6 +481,12 @@ async function join(standing, status, channel) {
     gameStatus: status, seatsFull: seatsFull, worldFull: worldFull,
     mostOnlineFallback: function () { return 25; },
     departed: async function () { return new Set(); },
+    // Play's doors answer inside PLAY_ANSWER_MS (#1094); Discord answers at
+    // once here, so the real within() never reaches standingLate.
+    PLAY_ANSWER_MS: 10000, PLAY_BODY_MS: 5000,
+    passBodyFailure: function (e) { throw e; },
+    within: new Function(grabFn('within') + '\nreturn within;')(),
+    standingLate: function () { throw new Error('Discord answered here'); },
     jsonFile: function (f, fallback) { return f === 'linked.json' ? {} : fallback; },
     putJson: function () { },
     LINKED: 'linked.json',
