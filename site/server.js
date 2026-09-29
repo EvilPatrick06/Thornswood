@@ -912,7 +912,11 @@ function identity(req) {
 const standCache = new Map();
 async function standingCached(id) {
   const hit = standCache.get(id);
-  if (hit && Date.now() - hit.at < 60000) return hit.v;
+  // A staff ban (#412) is this site's own file, so a remembered one is asked
+  // again: one that ran out or was lifted lets them in now, not in a minute.
+  const stale = hit && hit.v && hit.v.byFile &&
+    !banActive(jsonFile(BANS, {})[String(id)] || null, Date.now());
+  if (hit && !stale && Date.now() - hit.at < 60000) return hit.v;
   const v = await standing(id);
   standCache.set(id, { at: Date.now(), v });
   return v;
@@ -1297,10 +1301,100 @@ const LINKED = path.join(DATA, 'linked.json');
   which is the branch that used to hand play to everybody.
 
   Shape: {"<discord id>": {"at": <unix ms>, "by": "<id or name>", "why": "..."}}
-  Nothing here writes it yet. It is read on every standing() and a missing file
-  means nobody is banned, which is what an empty server looks like.
+  It is read on every standing() and a missing file means nobody is banned,
+  which is what an empty server looks like.
+
+  WRITTEN BY STAFF SINCE #412 (Patrick, 28 September: "put the bans and notes
+  on the site"), from the game's /ban and from the hub. A ban now also carries
+  until (unix ms, 0 or missing for good), byId, name and profiles, and one
+  made in the game against a profile no Discord account holds is kept under
+  "p:<profile>" instead of an id. An old row with no until is a ban for good,
+  as it always was.
 */
 const BANS = path.join(DATA, 'bans.json');
+// Staff notes against a person, keyed the same way as bans. Staff read them.
+const NOTES = path.join(DATA, 'notes.json');
+// What staff did on the hub, one JSON line each, for the bot's staff channel.
+// The game servers write their own (private\moderation.log).
+const MODLOG = path.join(DATA, 'moderation.log');
+const NOTES_KEEP = 200;
+const BAN_MOST_MIN = 10 * 365 * 24 * 60;
+
+/* Whose Discord account holds this profile, from linked.json, or ''. */
+function accountOf(pid) {
+  const n = Number(pid) || 0;
+  if (!(n > 0)) return '';
+  const linked = jsonFile(LINKED, {});
+  for (const d of Object.keys(linked)) {
+    const ps = Array.isArray((linked[d] || {}).profiles) ? linked[d].profiles : [];
+    if (ps.map(Number).indexOf(n) >= 0) return String(d);
+  }
+  return '';
+}
+/* Where a ban or note about this profile is kept: the account, or the profile. */
+function recordKey(pid) { return accountOf(pid) || ('p:' + (Number(pid) || 0)); }
+function banActive(b, now) {
+  return !!b && typeof b === 'object' && (!(Number(b.until) > 0) || Number(b.until) > now);
+}
+/* Every profile an active ban covers, with why and until, for the door. */
+function activeBans(now) {
+  const table = jsonFile(BANS, {});
+  const linked = jsonFile(LINKED, {});
+  const out = [];
+  for (const k of Object.keys(table || {})) {
+    const b = table[k];
+    if (!banActive(b, now)) continue;
+    const set = new Set((Array.isArray(b.profiles) ? b.profiles : []).map(Number).filter((n) => n > 0));
+    if (k.indexOf('p:') === 0) set.add(Number(k.slice(2)));
+    else for (const n of ((linked[k] || {}).profiles || [])) if (Number(n) > 0) set.add(Number(n));
+    set.delete(0);
+    if (set.size) out.push({ profiles: Array.from(set), why: String(b.why || ''), until: Number(b.until) || 0 });
+  }
+  return out;
+}
+/* A ban, made or replaced. The account's standing is asked again at once. */
+function putBan(key, row) {
+  const table = jsonFile(BANS, {});
+  const had = table[key] || {};
+  const profiles = new Set([].concat(had.profiles || [], row.profiles || []).map(Number).filter((n) => n > 0));
+  table[key] = Object.assign({}, row, { profiles: Array.from(profiles) });
+  const ok = putJson(BANS, table);
+  standCache.delete(key);
+  return ok;
+}
+function dropBan(keys) {
+  const table = jsonFile(BANS, {});
+  let was = false;
+  for (const k of keys) {
+    if (k && Object.prototype.hasOwnProperty.call(table, k)) { delete table[k]; was = true; standCache.delete(k); }
+  }
+  return { was, ok: !was || putJson(BANS, table) };
+}
+function putNote(key, row) {
+  const notes = jsonFile(NOTES, {});
+  const list = Array.isArray(notes[key]) ? notes[key] : [];
+  list.unshift(row);
+  notes[key] = list.slice(0, NOTES_KEEP);
+  return putJson(NOTES, notes);
+}
+function modLog(row) {
+  try { fs.appendFileSync(MODLOG, JSON.stringify(Object.assign({ at: new Date().toISOString(), server: 'site' }, row)) + '\n'); }
+  catch (e) { console.log('[thornswood-docs] could not write moderation.log: ' + e.message); }
+}
+/* Every ban (with whether it still holds) and every note, for staff. */
+function staffRecords(now) {
+  const table = jsonFile(BANS, {});
+  const out = {};
+  for (const k of Object.keys(table || {})) {
+    out[k] = Object.assign({}, table[k] || {}, { active: banActive(table[k] || {}, now) });
+  }
+  return { bans: out, notes: jsonFile(NOTES, {}) };
+}
+/* Minutes as a ban length: 0 is for good, anything else is capped. */
+function banMinutes(v) {
+  const n = Math.floor(Number(v) || 0);
+  return n > 0 ? Math.min(n, BAN_MOST_MIN) : 0;
+}
 // The game server's character roster, pushed here by the gamemode with the
 // door key (POST /api/roster) and handed back per person (POST /api/play/roster).
 // Keyed by profile id; live and dev both push into it, their ids never meet.
@@ -2108,10 +2202,15 @@ async function standing(discordId) {
 
     So the list is read here, where nothing can route around it, and it wins.
   */
+  // A ban with an end (#412) stops counting once it has passed.
   const bans = jsonFile(BANS, {});
-  if (bans && Object.prototype.hasOwnProperty.call(bans, String(discordId))) {
+  if (bans && Object.prototype.hasOwnProperty.call(bans, String(discordId)) &&
+      !(Number((bans[String(discordId)] || {}).until) > 0 &&
+        Number((bans[String(discordId)] || {}).until) <= Date.now())) {
     out.banned = true;
     out.reason = String((bans[String(discordId)] || {}).why || '');
+    out.until = Number((bans[String(discordId)] || {}).until) || 0;
+    out.byFile = true;
     return out;
   }
 
@@ -2980,6 +3079,66 @@ async function handle(req, res) {
       return sendJson(res, 500, { error: 'could not save' });
     }
     reportTaken(key, Date.now());
+    return sendJson(res, 200, { ok: true });
+  }
+
+  /*
+    Bans and notes from staff in the game (#412): /ban, /unban and /note in
+    the gamemode's staff block. Keyed with the door's key in the header, like
+    /api/report/game above, and /dev on the front from the dev server.
+
+    The game server has already checked that the one asking holds a staff
+    role and proved who they are (join token and join pass). This checks the
+    role again here, on the Discord account that holds their profile, so a
+    game server cannot make somebody staff by saying so.
+
+    A ban is kept against the Discord account holding the profile, so every
+    character on it is covered and the door leaves them all out; a profile no
+    account holds is banned by itself. minutes 0 is for good.
+  */
+  const staffGame = /^(\/dev)?\/api\/staff\/game\/(ban|unban|note)$/.exec(route);
+  if (staffGame && req.method === 'POST') {
+    if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
+    if (!sameSecret(String(req.headers['x-thornswood-key'] || ''), String(cfg.botKey))) {
+      return sendJson(res, 401, { error: 'no' });
+    }
+    let o;
+    try { o = JSON.parse(await body(req, 8000)) || {}; }
+    catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+    const from = staffGame[1] ? 'the dev server' : 'the live server';
+    const pid = Number(o.profileId) || 0;
+    const byPid = Number(o.byProfileId) || 0;
+    if (!(pid > 0) || !(byPid > 0)) return sendJson(res, 400, { error: 'no profile' });
+    const byId = accountOf(byPid);
+    if (!byId) return sendJson(res, 403, { error: 'the staff profile is not linked to a Discord account' });
+    const st = await standingCached(byId);
+    if (st.lookupFailed && !st.admin) return sendJson(res, 503, { error: 'could not ask Discord' });
+    if (!st.dev || st.banned) return sendJson(res, 403, { error: 'that Discord account holds no staff role' });
+    const byName = String(o.byName || st.name || '').slice(0, 60);
+    const name = String(o.name || '').slice(0, 60);
+    const key = recordKey(pid);
+    const now = Date.now();
+
+    if (staffGame[2] === 'ban') {
+      const why = String(o.why || '').trim().slice(0, 500);
+      if (!why) return sendJson(res, 400, { error: 'a ban says why' });
+      const minutes = banMinutes(o.minutes);
+      const until = minutes ? now + minutes * 60000 : 0;
+      if (!putBan(key, { at: now, until, why, by: byName, byId, name, profiles: [pid], from })) {
+        return sendJson(res, 500, { error: 'could not save' });
+      }
+      return sendJson(res, 200, { ok: true, until, account: key.indexOf('p:') !== 0 });
+    }
+    if (staffGame[2] === 'unban') {
+      const r = dropBan([key, 'p:' + pid]);
+      if (!r.ok) return sendJson(res, 500, { error: 'could not save' });
+      return sendJson(res, 200, { ok: true, was: r.was });
+    }
+    const text = String(o.text || '').trim().slice(0, 1000);
+    if (!text) return sendJson(res, 400, { error: 'a note says something' });
+    if (!putNote(key, { at: now, by: byName, byId, text, profileId: pid, name, from })) {
+      return sendJson(res, 500, { error: 'could not save' });
+    }
     return sendJson(res, 200, { ok: true });
   }
 
@@ -4122,6 +4281,21 @@ async function handle(req, res) {
       }
       out.people.push({ id: String(d), name: st.name || row.name || '', profiles });
     }
+    /* STAFF BANS (#412), which are this site's own file and need no Discord.
+       Every profile under an active ban is left out of every list, including
+       a profile no account holds and one Discord could not be asked about,
+       and the bans go to the door with why and until, so the game server can
+       end the session of anybody banned who is online and tell them both. */
+    out.bans = activeBans(Date.now());
+    const barred = new Set();
+    for (const b of out.bans) for (const n of b.profiles) barred.add(Number(n));
+    if (barred.size) {
+      for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'failedProfiles']) {
+        out[k] = out[k].filter((n) => !barred.has(Number(n)));
+      }
+      out.people = out.people.map((p) => Object.assign({}, p, { profiles: p.profiles.filter((n) => !barred.has(Number(n))) }))
+        .filter((p) => p.profiles.length);
+    }
     return sendJson(res, 200, out);
   }
 
@@ -4328,6 +4502,9 @@ async function handle(req, res) {
         news: jsonFile(NEWS, { launcher:'', news: [] }),
         invite: cfg.discord.invite || '',
         linked: w.admin ? Object.values(jsonFile(LINKED, {})) : [],
+        // Bans and staff notes for the Linked accounts page (#412), which is
+        // an admin page; the notes are staff's to read and nobody else's.
+        records: w.admin ? staffRecords(Date.now()) : { bans: {}, notes: {} },
         sessions: w.admin ? sessionRows() : [],
         inbox: w.admin ? jsonFile(INBOX, []) : []
       });
@@ -4341,6 +4518,57 @@ async function handle(req, res) {
       try { obj = JSON.parse(await body(req)); }
       catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
       if (!putJson(RESULTS, obj)) return sendJson(res, 500, { error: 'could not save' });
+      return sendJson(res, 200, { ok: true });
+    }
+
+    /*
+      Bans and notes from the hub (#412), for staff (the access.dev roles).
+      Keyed by Discord id, the rows the Linked accounts page lists. Staff only
+      to read, because a note is staff's view of a person. What is done here
+      goes to moderation.log for the bot to say in the staff channel; the
+      game's /ban and /note are said from the game server's own log.
+    */
+    if (p === '/api/staff/records' && req.method === 'GET') {
+      if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+      return sendJson(res, 200, staffRecords(Date.now()));
+    }
+    const staffHub = /^\/api\/staff\/(ban|unban|note)$/.exec(p);
+    if (staffHub && req.method === 'POST') {
+      if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+      let o;
+      try { o = JSON.parse(await body(req, 8000)) || {}; }
+      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      const id = String(o.id || '').trim();
+      const linked = jsonFile(LINKED, {});
+      if (!/^\d{5,25}$/.test(id) || !linked[id]) return sendJson(res, 404, { error: 'nobody linked with that id' });
+      const whoName = String(linked[id].name || linked[id].handle || '').slice(0, 60);
+      const profiles = (Array.isArray(linked[id].profiles) ? linked[id].profiles : []).map(Number).filter((n) => n > 0);
+      const now = Date.now();
+      if (staffHub[1] === 'ban') {
+        const why = String(o.why || '').trim().slice(0, 500);
+        if (!why) return sendJson(res, 400, { error: 'a ban says why' });
+        const minutes = banMinutes(o.minutes);
+        const until = minutes ? now + minutes * 60000 : 0;
+        if (!putBan(id, { at: now, until, why, by: w.name, byId: w.id, name: whoName, profiles, from: 'the hub' })) {
+          return sendJson(res, 500, { error: 'could not save' });
+        }
+        modLog({ did: 'ban', byName: w.name, whoName,
+                 why: (until ? 'until ' + new Date(until).toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
+                             : 'for good') + ': ' + why });
+        return sendJson(res, 200, { ok: true, until });
+      }
+      if (staffHub[1] === 'unban') {
+        const r = dropBan([id].concat(profiles.map((n) => 'p:' + n)));
+        if (!r.ok) return sendJson(res, 500, { error: 'could not save' });
+        if (r.was) modLog({ did: 'unban', byName: w.name, whoName });
+        return sendJson(res, 200, { ok: true, was: r.was });
+      }
+      const text = String(o.text || '').trim().slice(0, 1000);
+      if (!text) return sendJson(res, 400, { error: 'a note says something' });
+      if (!putNote(id, { at: now, by: w.name, byId: w.id, text, profileId: 0, name: whoName, from: 'the hub' })) {
+        return sendJson(res, 500, { error: 'could not save' });
+      }
+      modLog({ did: 'note', byName: w.name, whoName, why: text });
       return sendJson(res, 200, { ok: true });
     }
 

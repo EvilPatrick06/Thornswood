@@ -182,17 +182,34 @@ try:
     # M8: every action the gamemode writes has words here.
     gm = open(os.path.join(HERE, '..', 'game', 'gamemode.js'), encoding='utf-8').read()
     dids = ['kick', 'freeze', 'unfreeze', 'bring', 'goto', 'silence', 'unsilence', 'warn',
-            'give', 'spawn', 'tp']
+            'give', 'spawn', 'tp', 'ban', 'unban', 'note']
     yes('M8 every action the staff block records has a sentence here',
         all(("record('%s'" % d) in gm and d in bot._MOD_DID for d in dids))
+    site = open(os.path.join(HERE, '..', 'site', 'server.js'), encoding='utf-8').read()
+    yes('M8 and so does every one the hub writes',
+        all(("modLog({ did: '%s'" % d) in site and d in bot._MOD_DID for d in ('ban', 'unban', 'note')))
+
+    # M10: the hub's lines say the site, and name a person by account.
+    hub = bot.moderation_text('site', {'did': 'ban', 'byName': 'Aela', 'whoName': 'Bjorn',
+                                       'why': 'until 2026-10-01 18:00 UTC: spam'})
+    yes('M10 a ban from the hub says the site, with no profile number',
+        hub == '**Staff on the site:** Aela banned Bjorn: until 2026-10-01 18:00 UTC: spam')
+    game = bot.moderation_text('live', json.loads(row('ban', why='for good: cheating')))
+    yes('M10 a ban from the game says the server and the profiles',
+        game == '**Staff on the live server:** Aela (profile 1001) banned Bjorn (profile 2002): for good: cheating')
+    note = bot.moderation_text('dev', json.loads(row('note', why='asked twice about the bridge')))
+    yes('M10 a note says what it says', 'wrote a note on Bjorn (profile 2002): asked twice' in note)
 
     # M9: started with the others, and sent through report_say (mentions off).
     src = inspect.getsource(bot.on_ready)
     yes('M9 on_ready starts it', 'asyncio.create_task(watch_moderation())' in src)
     yes('M9 it speaks through report_say', 'report_say(' in inspect.getsource(bot.watch_moderation))
-    yes('M9 by default it reads both game servers\' private folders',
-        [w for w, _ in bot.MODERATION_LOGS] == ['live', 'dev']
-        and all(p.endswith(os.path.join('private', 'moderation.log')) for _, p in bot.MODERATION_LOGS))
+    logs = dict(bot.MODERATION_LOGS)
+    yes('M9 by default it reads both game servers\' private folders and the site\'s data folder',
+        [w for w, _ in bot.MODERATION_LOGS] == ['live', 'dev', 'site']
+        and logs['live'].endswith(os.path.join('private', 'moderation.log'))
+        and logs['dev'].endswith(os.path.join('private', 'moderation.log'))
+        and os.path.dirname(logs['site']) == os.path.dirname(bot.TROUBLE_FILE))
 finally:
     shutil.rmtree(WORK, ignore_errors=True)
 

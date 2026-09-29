@@ -2340,6 +2340,10 @@ MODERATION_LOGS = [
                             r'C:\Thornswood-Server\private\moderation.log')),
     ('dev', os.environ.get('MODERATION_LOG_DEV',
                            r'C:\Thornswood-Server-Dev\private\moderation.log')),
+    # Bans and notes made on the hub, which the site writes beside
+    # trouble.json. The game's own /ban and /note are in the two above.
+    ('site', os.environ.get('MODERATION_LOG_SITE',
+                            os.path.join(os.path.dirname(TROUBLE_FILE), 'moderation.log'))),
 ]
 MODERATION_EVERY = _int_env('MODERATION_EVERY', 30)
 # More than this in one look from one server is said as a count, not a wall.
@@ -2357,6 +2361,9 @@ _MOD_DID = {
     'give': 'gave %s',
     'spawn': 'spawned beside %s',
     'tp': 'sent %s',
+    'ban': 'banned %s',
+    'unban': 'lifted the ban on %s',
+    'note': 'wrote a note on %s',
 }
 
 
@@ -2378,6 +2385,9 @@ def moderation_text(where, row):
             pid = int(pid)
         except (TypeError, ValueError):
             pid = 0
+        # The hub knows a person by account, not by profile.
+        if pid <= 0:
+            return clean(name, 40) or 'somebody'
         return '%s (profile %d)' % (clean(name, 40) or 'somebody', pid)
 
     did = _MOD_DID[row['did']] % person(row.get('whoName'), row.get('who'))
@@ -2388,8 +2398,10 @@ def moderation_text(where, row):
     if row['did'] == 'silence' and minutes > 0:
         did += ' for %d minute%s' % (minutes, '' if minutes == 1 else 's')
     why = clean(row.get('why'), 300)
-    return ('**Staff on the %s server:** %s %s%s'
-            % (where, person(row.get('byName'), row.get('by')), did,
+    head = ('**Staff on the site:**' if where == 'site'
+            else '**Staff on the %s server:**' % where)
+    return ('%s %s %s%s'
+            % (head, person(row.get('byName'), row.get('by')), did,
                (': ' + why) if why else '.'))[:1900]
 
 
@@ -2450,10 +2462,12 @@ async def watch_moderation():
                         texts.append(text)
                 if len(texts) > MODERATION_AT_ONCE:
                     await report_say(
-                        '**%d staff actions on the %s server** since the last '
-                        'look, more than this channel should carry one at a '
-                        'time. They are in private\\moderation.log on the VPS.'
-                        % (len(texts), where))
+                        '**%d staff actions on %s** since the last look, more '
+                        'than this channel should carry one at a time. They '
+                        'are in %s on the VPS.'
+                        % (len(texts),
+                           'the site' if where == 'site' else 'the %s server' % where,
+                           path))
                 else:
                     for text in texts:
                         await report_say(text)
