@@ -219,11 +219,26 @@ function Test-StaysWithLauncher([string]$k) { return ($k.StartsWith(':src:') -or
 $newMap = @{}
 foreach ($k in @($tgtMap.Keys)) { if (-not (Test-StaysWithLauncher $k)) { $newMap[$k] = [string]$tgtMap[$k] } }
 foreach ($k in @($curMap.Keys)) { if (Test-StaysWithLauncher $k) { $newMap[$k] = [string]$curMap[$k] } }
+# Said again below, only once every file of the new record is on the site
+# beside it (#1050); what is gone is worked out below too.
+foreach ($k in @($newMap.Keys)) { if ($k -eq $RecordFilesKey -or $k.StartsWith(':gone:')) { $newMap.Remove($k) } }
 
 $write = @(@($newMap.Keys | Where-Object { -not $_.StartsWith(':') -and (-not $curMap.ContainsKey($_) -or [string]$curMap[$_] -ne [string]$newMap[$_]) }) | Sort-Object)
 $delete = @(@($curMap.Keys | Where-Object { -not $_.StartsWith(':') -and -not $newMap.ContainsKey($_) }) | Sort-Object)
-$listMoved = @(@($newMap.Keys) + @($curMap.Keys) | Where-Object { $_ -like ':profile:*' -or $_ -like ':order:*' } | Sort-Object -Unique |
+$listMoved = @(@($newMap.Keys) + @($curMap.Keys) | Where-Object { $_ -like ':profile:*' -or $_ -like ':order:*' -or $_ -like ':golden:*' } | Sort-Object -Unique |
                Where-Object { [string]$newMap[$_] -ne [string]$curMap[$_] }).Count -gt 0
+
+# What a launcher that syncs to the record takes out (#1050): whatever either
+# record said was gone, and what the later releases added, unless the release
+# being gone back to has it.
+foreach ($pair in @(@($curMap, 'cur'), @($tgtMap, 'tgt'))) {
+    foreach ($k in @($pair[0].Keys)) {
+        if (-not $k.StartsWith(':gone:')) { continue }
+        if ($newMap.ContainsKey($k.Substring(6))) { continue }
+        if (-not $newMap.ContainsKey($k) -or [string]$pair[0][$k] -eq 'always') { $newMap[$k] = [string]$pair[0][$k] }
+    }
+}
+foreach ($d in $delete) { if (-not $newMap.ContainsKey(':gone:' + $d)) { $newMap[':gone:' + $d] = 'removed' } }
 $keptClient = @($tgtMap.Keys | Where-Object { $clientKeys.Contains($_) -and [string]$tgtMap[$_] -ne [string]$curMap[$_] }).Count
 if (-not $write.Count -and -not $delete.Count -and -not $listMoved) {
     Die ("$tgtId left the same game files and plugin list as the feed has now" +
@@ -277,6 +292,20 @@ foreach ($from in @($FilesFrom)) {
                 break
             }
         }
+    }
+}
+
+# Since #1050 every file of a release is on the site by its own sha256, beside
+# its record, so a file only the installer ever had can be put back too.
+foreach ($ptr in @($tgt, $cur)) {
+    foreach ($e in @($need.Keys)) {
+        $sha = $e.Split(':')[1]
+        $u = Get-RecordFileUrl ([string]$ptr.url) $sha
+        if (-not $u) { continue }
+        $one = Join-Path $WorkDir ('file-' + $sha)
+        try { [void](Get-FeedAssetFile $u $sha $one $sd $SiteUrl) } catch { continue }
+        Put-Staged $e { param($d) Copy-Item -LiteralPath $one -Destination $d -Force }
+        Remove-Item -LiteralPath $one -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -367,12 +396,51 @@ try {
         [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path (Join-Path $stage 'profile') $n), "profile/$n", 'Optimal')
     }
 } finally { $zip.Dispose() }
-Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
 $zipSha = Get-BaselineFileSha $zipPath
 Say ("  pack-{0}.zip, {1:n1} MB" -f $Id, ((Get-Item -LiteralPath $zipPath).Length / 1MB)) 'Green'
 
 & (Join-Path $Here '..\dev\Check-Secrets.ps1') -Zip @($zipPath)
-if ($LASTEXITCODE -ne 0) { Die 'Something that must never ship is in the pack. The lines above name each file and rule. Nothing was sent.' }
+if ($LASTEXITCODE -ne 0) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue; Die 'Something that must never ship is in the pack. The lines above name each file and rule. Nothing was sent.' }
+
+# ------------------------------------------------------------ the record's files
+# A launcher from #1050 on syncs to the record rather than taking the pack: it
+# downloads each file that differs from beside the record, /<feed>/assets/<sha>
+# in this channel's folder. So every file the new record lists has to be there.
+# Those of a record that says so (':record:files') in this same folder are; the
+# ones this rollback staged go up with the pack; any other is fetched from the
+# folder of either record and sent. When one cannot be had, the record goes out
+# without ':record:files', and every launcher takes the pack instead.
+$prefix = if ($Dev) { 'feed-dev' } else { 'feed' }
+foreach ($n in $profileFound) { $newMap[":golden:$n"] = Get-BaselineEntry (Join-Path (Join-Path $stage 'profile') $n) }
+$wantFiles = Get-RecordFileShas $newMap
+$present = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+foreach ($pair in @(@($curMap, $cur), @($tgtMap, $tgt))) {
+    if (-not $pair[0].ContainsKey($RecordFilesKey) -or ([string]$pair[1].url) -notmatch "/$prefix/assets/") { continue }
+    foreach ($h in @((Get-RecordFileShas $pair[0]).Keys)) { [void]$present.Add($h) }
+}
+$staged = @{}
+foreach ($rel in $write) { $staged[([string]$newMap[$rel]).Split(':')[1]] = Join-Path (Join-Path $stage 'game') $rel }
+foreach ($n in $profileFound) { $staged[([string]$newMap[":golden:$n"]).Split(':')[1]] = Join-Path (Join-Path $stage 'profile') $n }
+$fileDir = Join-Path $stage 'files'
+$sendFiles = @()
+$cannot = @()
+foreach ($h in @($wantFiles.Keys)) {
+    if ($present.Contains($h)) { continue }
+    if ($staged.ContainsKey($h)) { $sendFiles += $staged[$h]; continue }
+    $got = $false
+    foreach ($ptr in @($tgt, $cur)) {
+        $u = Get-RecordFileUrl ([string]$ptr.url) $h
+        if (-not $u) { continue }
+        try { [void](Get-FeedAssetFile $u $h (Join-Path $fileDir $h) $sd $SiteUrl); $got = $true; break } catch { }
+    }
+    if ($got) { $sendFiles += (Join-Path $fileDir $h) } else { $cannot += $h }
+}
+if ($cannot.Count) {
+    Say ("  {0} file(s) of {1} are not on the site one by one, so launchers take this as a pack, not file by file" -f $cannot.Count, $tgtId) 'Yellow'
+} else {
+    $newMap[$RecordFilesKey] = '1'
+    Say ("  every file of what {0} installed will be on the site by its sha256 ({1} to send)" -f $tgtId, $sendFiles.Count) 'DarkGray'
+}
 
 $manifestPath = Join-Path $WorkDir ("manifest-$Id.json")
 $manifestSha = Write-BaselineFile $newMap $manifestPath
@@ -397,6 +465,7 @@ if ($problems.Count) {
 }
 
 if ($DryRun) {
+    Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
     Head 'Dry run'
     Say "  nothing was sent. The pack is $zipPath and the record $manifestPath." 'Yellow'
     Say ("  it would add pack {0} to the {1} feed and name what it installs ({2:n0} entries)." -f $Id, $Channel, $newMap.Count) 'Yellow'
@@ -406,12 +475,13 @@ if ($DryRun) {
 
 # ------------------------------------------------------------ send
 Head 'Sending'
-$sendArgs = @{ Dev = $Dev; Send = @($zipPath, $manifestPath); Quiet = $true }
+$sendArgs = @{ Dev = $Dev; Send = @(@($zipPath, $manifestPath) + @($sendFiles)); Quiet = $true; WorkDir = $WorkDir }
 if ($SiteDir) { $sendArgs['SiteDir'] = $SiteDir }
 $global:LASTEXITCODE = 0
 $why = ''
 try { & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @sendArgs } catch { $why = $_.Exception.Message }
 if (-not $why -and $LASTEXITCODE -ne 0) { $why = "Remirror-Site-Feed.ps1 -Send exited $LASTEXITCODE" }
+Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
 if ($why) { Die ("The pack or its record did not reach the site, so version.json has not been touched: $why") }
 Say '  the pack and its record are on the site' 'Green'
 
