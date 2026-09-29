@@ -186,6 +186,51 @@ $counted = 0
 foreach ($r in $loose) { $c = ($r -split '\|')[2].Trim(); if ($c -match '^\d+$') { $counted += [int]$c } }
 Yes ('the loose files table counts the 424 files measured on 29 September ({0})' -f $counted) ($counted -eq 424)
 
+# The page is a checklist Claude Cowork follows on Patrick's PC (#476, 29
+# September): numbered steps in order, each saying what to check or what it
+# looks like after, and Patrick's own steps marked (signing in, Publish).
+$steps = @([regex]::Matches($doc, '(?m)^## (\d+)\. ') | ForEach-Object { [int]$_.Groups[1].Value })
+$inOrder = $steps.Count -ge 10
+for ($i = 0; $i -lt $steps.Count -and $inOrder; $i++) { if ($steps[$i] -ne $i + 1) { $inOrder = $false } }
+Yes ("the checklist numbers its steps 1 to {0} with no gap" -f $steps.Count) $inOrder
+$sections = [regex]::Split($doc, '(?m)^## ')
+$unchecked = @($sections | Where-Object { $_ -match '^\d+\. ' -and $_ -notmatch '(?m)^(Check|Checks)\b|^After:|PASS' } | ForEach-Object { ($_ -split "`n")[0].Trim() })
+Yes ('every step says what to check or what it looks like after' + $(if ($unchecked) { ' (' + ($unchecked -join '; ') + ')' })) ($unchecked.Count -eq 0)
+Yes 'Patrick signs in himself' ($doc -match '\*\*PATRICK\*\*: sign in to Nexus Mods')
+Yes 'and presses Publish himself' ($doc -match '\*\*PATRICK\*\*: read the draft and press \*\*Publish\*\*')
+Yes 'the page keeps Cowork in the Thornswood profile and off the servers' ($doc -match "Work only in Vortex's \*\*Thornswood\*\* profile" -and $doc -match 'nothing here deploys a server')
+Yes 'the page carries the audit of what reaches a game folder outside the collection' ($doc -match '(?m)^\| Item \| Reaches people through \| Where it belongs \| Why \|' -and $doc -match 'Creation Kit')
+Yes 'the page has the Client Runtime upload without the unused script (#421)' ($doc -match '___systemPolyfill\.js' -and $doc -match 'nexus-client-runtime')
+
+# The mods revision 2 adds are a numbered Cowork step with a check of its own,
+# and the place kept for the Pandora and Nemesis steps (#1247) sits after it and
+# before the collection's mod list is checked, so the output is made from the
+# final mod list.
+function Get-StepAt([int]$line) {
+    for ($i = $line; $i -ge 0; $i--) {
+        $m = [regex]::Match($docLines[$i], '^## (\d+)\. ')
+        if ($m.Success) { return [int]$m.Groups[1].Value }
+        if ($docLines[$i] -match '^## ') { return 0 }
+    }
+    return 0
+}
+$addsAt = [Array]::IndexOf($docLines, '<!-- adds:start -->')
+$keptAt = [Array]::IndexOf($docLines, '<!-- 1247:start -->')
+$keptEnd = [Array]::IndexOf($docLines, '<!-- 1247:end -->')
+$listAt = -1
+for ($i = 0; $i -lt $docLines.Count; $i++) { if ($docLines[$i] -match "^## \d+\. The collection's mod list") { $listAt = $i; break } }
+$addsStep = Get-StepAt $addsAt
+Yes ('the mods revision 2 adds are a numbered step of the checklist (step {0})' -f $addsStep) ($addsStep -gt 0)
+Yes 'the page keeps a marked place for the Pandora and Nemesis steps (#1247), after that step and before the collection''s mod list' (
+    $keptAt -gt $addsAt -and $keptEnd -gt $keptAt -and $listAt -gt $keptEnd -and (Get-StepAt $keptAt) -eq $addsStep)
+$addsCheck = [regex]::Match($doc, 'foreach \(\$id in ([\d, ]+)\) \{ \$f = @\(\$d\.files \| Where-Object \{ \$_\.source -match "-\$id-" \}\)')
+$checkIds = @(if ($addsCheck.Success) { $addsCheck.Groups[1].Value -split ',' | ForEach-Object { $_.Trim() } | Sort-Object -Unique })
+Yes ('the step''s check reads what Vortex deployed for exactly the mods in its table ({0})' -f ($checkIds -join ', ')) (
+    $doc -match 'vortex\.deployment\.json' -and $checkIds.Count -gt 0 -and (@(Compare-Object $checkIds $addIds).Count -eq 0))
+Yes 'and a plugin from any of them stops the pass' ($doc -match '\{2\} plugins' -and $doc -match 'each with more than 0 files and 0 plugins')
+Yes 'how the four look in game is Patrick''s to say' ($doc -match '\*\*PATRICK\*\*, in game: the male faces')
+Yes 'the collection''s mod list step checks the four are listed' ($doc -match 'the four mods of step \d+ are listed')
+
 # -------------------------------------------------------- against the truth --
 # Where a server's order parts from the page's: At is the first position that
 # differs (-1 for none), Waiting the positions where the server still has the
