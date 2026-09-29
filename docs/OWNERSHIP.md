@@ -22,8 +22,9 @@ measured, names a second person.
    carried, kept on the VPS beside the channel's feed so every shipping
    machine shares it (#907; until then in Thornswood-Releases).
    Losing it costs one oversized pack, never a wrong one.
-3. **The #news webhook.** One file on Patrick's machine. Anybody with the bot
-   token can fetch it again.
+3. **The #news webhook.** On the VPS since 25 September, where every machine
+   that ships reads it (`scripts\ops\Discord-Hook.ps1`); One had no local copy
+   on 29 September. Anybody with the bot token can fetch it again.
 4. **The update token in config.json.** Nobody holds one any more. It was
    empty in both launcher configs on 24 September, and the releases
    repository is public, so nothing needs it.
