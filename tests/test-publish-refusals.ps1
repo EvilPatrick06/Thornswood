@@ -131,7 +131,8 @@ try {
     # Each where it is in the repository since phase 8 of issue #440.
     $repoRoot = Split-Path -Parent (Split-Path -Parent $ToolsDir)
     foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
-                   'scripts\release\Feed-Store.ps1',
+                   'scripts\release\Feed-Store.ps1', 'scripts\release\Source-Notice.ps1',
+                   'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
                    'scripts\release\Where.ps1', 'records\client-build.json') {
         $from = Join-Path $repoRoot $f
         $to = Join-Path (Split-Path -Parent $tools) $f

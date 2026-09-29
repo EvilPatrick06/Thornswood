@@ -28,7 +28,10 @@ or the build check goes red.
   installer. Build-Launcher.ps1 compiles everything it needs into the one file.
 - **The client runtime**, the six files in `records\client-build.json`. They go
   out as `client-runtime-<commit>.zip` on the feed (Publish-Update.ps1), and
-  in game packs and the installer.
+  in game packs and the installer. The zip carries a `README.txt` saying where
+  their source is, with `GPL-3.0.txt` and `AGPL-3.0.txt` beside it, and so
+  does every pack that carries a SkyMP file, as `SOURCE CODE.txt`
+  (Source-Notice.ps1). The launcher takes only the game files out of either.
 - **Game packs and the installer payload**: every file in the game folder that
   the collection did not provide and Ship-Rules.ps1 does not hold back.
 - **Nexus Mods**, through the collection
@@ -91,8 +94,9 @@ The six files recorded in `records\client-build.json` are built from
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
 commit `fde333f1` (in full, `fde333f1e576d737fb32f990d8a68903ac925e8e`). That
 is upstream skyrim-multiplayer/skymp at `f926944b` with Thornswood's changes on
-top. The copies in `C:\Thornswood\Game` matched the recorded sha256 of all six
-on 24 September.
+top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
+recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
+recorded build.
 
 | File | Built from, in the fork | Licence |
 |---|---|---|
@@ -402,13 +406,18 @@ README still gives the source of CEF (https://github.com/chromiumembedded/cef),
 Chromium (https://chromium.googlesource.com/chromium/src) and Node
 (https://github.com/nodejs/node).
 
-The directions reach people in three places. The installer carries
+The directions reach people in four places. The installer carries
 `SOURCE CODE.txt`, which Package-Thornswood.ps1 writes from the two build
 records and Setup-Thornswood.ps1 copies into the install folder (entry 170).
 The public credits page has them under "Source code", at
 https://thornswood.net/credits#source, which the download page links beside
 the installer (entry 170). `tests\test-source-offer.ps1` holds both to the
-records. And the Thornswood Client Runtime's own README, installed as
+records. The update feed's own downloads carry them too: the client runtime
+zip has a `README.txt` and every pack that carries a SkyMP file has a
+`SOURCE CODE.txt`, each naming the recorded commit and the files it carries,
+with the GPL and AGPL texts beside it (Source-Notice.ps1, written by
+Publish-Update.ps1 from `records\client-build.json`). And the Thornswood
+Client Runtime's own README, installed as
 `Data\Docs\Thornswood Client Runtime\README.txt`, names the fork, its branch
 and upstream SkyMP, but no commit, and `___systemPolyfill.js` is not on that
 branch any more.
@@ -422,10 +431,12 @@ branch any more.
   installer also hands `GPL-3.0.txt`, `AGPL-3.0.txt` and `WebView2-LICENSE.txt`
   into the install folder beside `SOURCE CODE.txt` (Package-Thornswood.ps1
   stages them from `installer\licences`, Setup copies them, Uninstall removes
-  them). GitHub release pages for update packs now append a short source
-  footer (Publish-Update.ps1 `Get-ReleaseSourceFooter`, also Publish-Pack.ps1
-  and the launcher draft notes in `.github/workflows/release.yml`) naming the
-  recorded fork trees and https://thornswood.net/credits#source.
+  them). The update feed's client runtime zip and every pack that carries a
+  SkyMP file hand the GPL and AGPL texts with a note naming the recorded
+  commit (Source-Notice.ps1). Updates stopped going to GitHub release pages on
+  28 September (#907); the launcher's draft release notes in
+  `.github/workflows/release.yml` still point at
+  https://thornswood.net/credits#source.
 - The Client Runtime's README names the fork's branch and no commit, and
   `___systemPolyfill.js` is gone from that branch, so the README's directions
   do not lead to that file's source. The exact place is under "Where the
