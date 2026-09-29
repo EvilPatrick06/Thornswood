@@ -170,16 +170,25 @@ async function ready() {
 }
 
 /* A heavy feed, because the loopback buffers swallow a light one: at 200 rows
-   they absorbed the first 2.4 MB and the queue never moved in 20 s. */
-const BODY = JSON.stringify({ who: Array.from({ length: ROWS }, (_, i) => ({
-  profileId: 100000 + i,
-  pos: [12345.67 + i, -2345.67, 1234.5],
-  angleZ: 123.4,
-  cell: '0x0001a26f',
-  name: 'Tester ' + i
-})) });
+   they absorbed the first 2.4 MB and the queue never moved in 20 s.
+
+   And everybody in it walking, a unit further north on every feed. The
+   service sends only rows that changed since the last tick (issue #482), so
+   a crowd standing still is one whole view per socket and then nothing, and
+   nothing would ever back up. */
+let step = 0;
+function bodyOf(n) {
+  return JSON.stringify({ who: Array.from({ length: ROWS }, (_, i) => ({
+    profileId: 100000 + i,
+    pos: [12345.67 + i, -2345.67 + n, 1234.5],
+    angleZ: 123.4,
+    cell: '0x0001a26f',
+    name: 'Tester ' + i
+  })) });
+}
+const BODY = bodyOf(0);
 function feed() {
-  return fetch(BASE + '/positions', { method: 'POST', body: BODY }).catch(() => { });
+  return fetch(BASE + '/positions', { method: 'POST', body: bodyOf(++step) }).catch(() => { });
 }
 
 const opened = [];
@@ -298,7 +307,8 @@ yes('only the roster is sent newest-only',
   console.log('');
 
   await feed();
-  feeding = setInterval(feed, 500);
+  // As often as the tick, so nearly every tick has somebody who moved.
+  feeding = setInterval(feed, 200);
 
   /*
     Everybody here joins as somebody in the feed, standing among the other
@@ -317,7 +327,7 @@ yes('only the roster is sent newest-only',
   const heard = [];
   read(R, (m) => {
     if (m.t === 'peers') roster = m.peers;
-    if (m.t === 'pos') { got.push(Date.now()); posBytes = Math.max(posBytes, JSON.stringify(m).length); }
+    if (m.t === 'pos' || m.t === 'moved') { got.push(Date.now()); posBytes = Math.max(posBytes, JSON.stringify(m).length); }
     if (m.t === 'chat') heard.push(m);
   });
   send(R, { t: 'join', profileId: 100000, name: 'keeps up' });
