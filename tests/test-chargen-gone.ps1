@@ -348,7 +348,10 @@ Yes ('and still takes our {0} plugin(s)' -f $ours.Count) (@($ours | Where-Object
 # answers it before Foreign as a ClientFile.
 $twins = @($rel, 'Data\Platform\Plugins\somebody-else.js', 'Data\Interface\map.swf',
            'Data\Platform\UI\assets\app-1.js', 'Data\Platform\UI\thornswood-chat.js',
-           'Data\Platform\PluginsNoLoad\auth-data-no-load.js')
+           'Data\Platform\PluginsNoLoad\auth-data-no-load.js',
+           # #960: SkyUI 5.2's loose scripts are left out, MCM Recorder's are not.
+           'Data\Scripts\ski_main.pex', 'Data\Scripts\SKI_WidgetManager.pex',
+           'Data\Scripts\SKI_ConfigBase.pex', 'Data\Scripts\ski_configmanager.pex')
 $twins += @($ours | ForEach-Object { 'Data\Platform\Plugins\' + $_ })
 $apart = @($twins | Where-Object { [bool]$OwnGameT::Foreign($_) -ne [bool](Test-ShipOtherServer $_) })
 Yes ('OwnGame.Foreign and Test-ShipOtherServer agree on all {0} paths asked, the dresser among them' -f $twins.Count) ($apart.Count -eq 0)
