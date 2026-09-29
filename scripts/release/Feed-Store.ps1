@@ -19,6 +19,9 @@
       C:\Thornswood-Docs\feed\published.json    the live baseline (not served)
       C:\Thornswood-Docs\feed\launchers.txt     every launcher version this
                                                 channel has published (not served)
+      C:\Thornswood-Docs\feed\releases.txt      every release the feed has named,
+                                                by its id, with what else it is
+                                                known by (#444, not served)
       C:\Thornswood-Docs\feed\history\          each file as it was before it
                                                 was replaced, <utc stamp>-<name>
                                                 (not served)
@@ -47,6 +50,7 @@
                                          send them back, refusing if moved
       Get-FeedStoreThere main|dev        the sha256 of each file up there now
       Get-FeedStoreLaunchers main|dev    launchers.txt, one version a line
+      Get-FeedStoreReleases main|dev     releases.txt, one release a line
       Read-SiteFeed main|dev             the feed as the public reads it
 
   -SiteDir <folder>, or $env:THORNSWOOD_TEST_SITE_DIR, stands in for
@@ -107,6 +111,7 @@ function Get-FeedStoreVps([hashtable]$To) {
 # its inputs as the variables set in front of it and answers in lines:
 #   HAVE|<name>|<sha>|<bytes>   NONE|<name>      (look)
 #   L|<version>                                  (launchers)
+#   R|<id><tab>...                               (releases)
 #   MOVED|<what>   SHORT|<name>   SAME|<name>   SENT|<name>|<sha>   (swap)
 #   DONE                                          (the end of every op)
 $script:FeedStoreBody = @'
@@ -134,6 +139,14 @@ if ($op -eq 'look') {
 if ($op -eq 'launchers') {
   if (Test-Path -LiteralPath $launchers) {
     foreach ($l in @(Get-Content -LiteralPath $launchers)) { if ($l.Trim()) { 'L|' + $l.Trim() } }
+  }
+  'DONE'
+  return
+}
+if ($op -eq 'releases') {
+  $rel = Join-Path $dir 'releases.txt'
+  if (Test-Path -LiteralPath $rel) {
+    foreach ($l in @(Get-Content -LiteralPath $rel)) { if ($l.Trim()) { 'R|' + $l } }
   }
   'DONE'
   return
@@ -184,6 +197,21 @@ if ($op -eq 'swap') {
         if (Test-Path -LiteralPath $launchers) { $had = @(Get-Content -LiteralPath $launchers | ForEach-Object { $_.Trim() }) }
         if ($had -notcontains $v) { Add-Content -LiteralPath $launchers -Value $v -Encoding ASCII }
       }
+      # releases.txt (#444): one line a release, tab separated, its id first,
+      # then channel, launcher, packs, baseline, commit, tag, so its one name
+      # finds the rest. Never a reason to fail a send that has already landed.
+      try {
+        $rd = ([IO.File]::ReadAllText($p) -replace '^\uFEFF', '') | ConvertFrom-Json
+        if ($rd.PSObject.Properties['release'] -and $rd.release -and [string]$rd.release.id) {
+          $r = $rd.release
+          $f = @('id', 'channel', 'launcherVersion', 'packs', 'baseline', 'commit', 'tag') | ForEach-Object {
+            if ($r.PSObject.Properties[$_]) { (@($r.$_) | ForEach-Object { [string]$_ }) -join ',' } else { '' }
+          }
+          $rel = Join-Path $dir 'releases.txt'
+          $hadR = @(); if (Test-Path -LiteralPath $rel) { $hadR = @(Get-Content -LiteralPath $rel | ForEach-Object { ($_ -split "`t")[0] }) }
+          if ($hadR -notcontains $f[0]) { Add-Content -LiteralPath $rel -Value ($f -join "`t") -Encoding ASCII }
+        }
+      } catch { }
     }
     'SENT|' + $n + '|' + (Sha $p)
   }
@@ -399,6 +427,18 @@ function Get-FeedStoreLaunchers([string]$Channel, [string]$SiteDir, [hashtable]$
     $lines = @(Invoke-FeedStoreOp $Channel 'launchers' @() @{} @{} $SiteDir $To)
     if ($lines -notcontains 'DONE') { throw ("The VPS did not list the launchers " + (Get-FeedStorePrefix $Channel) + " has published.") }
     return @($lines | Where-Object { $_ -like 'L|*' } | ForEach-Object { $_.Substring(2) })
+}
+
+# Every release this channel's feed has named, oldest first, from releases.txt
+# (#444): Id, Channel, LauncherVersion, Packs, Baseline, Commit, Tag.
+function Get-FeedStoreReleases([string]$Channel, [string]$SiteDir, [hashtable]$To) {
+    $lines = @(Invoke-FeedStoreOp $Channel 'releases' @() @{} @{} $SiteDir $To)
+    if ($lines -notcontains 'DONE') { throw ("The VPS did not list the releases " + (Get-FeedStorePrefix $Channel) + " has named.") }
+    return @($lines | Where-Object { $_ -like 'R|*' } | ForEach-Object {
+        $f = @($_.Substring(2).Split("`t")) + @('', '', '', '', '', '', '')
+        [pscustomobject]@{ Id = $f[0]; Channel = $f[1]; LauncherVersion = $f[2]; Packs = @($f[3].Split(',') | Where-Object { $_ })
+                           Baseline = $f[4]; Commit = $f[5]; Tag = $f[6] }
+    })
 }
 
 # The feed as a launcher reads it: https://thornswood.net/feed[-dev]/version.json,
