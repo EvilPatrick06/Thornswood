@@ -3,19 +3,42 @@
 
       pwsh -NoProfile -File .\tests\test-ssh-host-keys.ps1
 
-  No script talks to the VPS with host key checking switched off.
+  Every ssh and scp a script runs against the VPS checks the box's host key
+  with StrictHostKeyChecking=yes, and the key it checks against is the one
+  scripts\vps\vps.json pins.
 
   WHY. About thirty scripts ran ssh and scp against the VPS as Administrator
   with StrictHostKeyChecking=no, which takes whatever key answers. Anything
   sitting between this machine and the box could have answered as the box and
   been handed the scripts, the logs and the secrets they carry. The 25
-  September audit found it; they use accept-new now, which records the box's
-  key the first time and refuses a key that has changed, the same as
-  Setup-SshKey.ps1 and Add-VpsKey.ps1 always did.
+  September audit found it and they moved to accept-new (#362), which still
+  takes whatever answers the first time a machine connects. Issue #450,
+  Patrick, 28 September: host key checking on in every script. So every call
+  says yes, ssh never adds a key by itself, and Setup-SshKey.ps1 is the one
+  step that writes the box into known_hosts, and only a key whose fingerprint
+  vps.json pins.
 
-  HOW. Every .ps1 under tools and scripts is read with PowerShell's own parser,
-  so a comment that explains the old option does not count and a string that
-  passes it to ssh does.
+  HOW. Every .ps1 under tools and scripts is read with PowerShell's own
+  parser, so a comment that explains the old option does not count and a
+  string that passes it to ssh does.
+    1. No token turns checking down: StrictHostKeyChecking with any value but
+       yes (no, off, accept-new, ask), or a known_hosts file of /dev/null or
+       NUL, which makes every key new.
+    2. Every command that runs ssh, scp or sftp carries
+       StrictHostKeyChecking=yes, on its own line or through a splatted
+       array (& ssh @ssh ...) that the same file fills with it. A bare
+       "& ssh $target" would fall back to ask, which prompts.
+    3. The same for the other languages: no .py, .js, .sh, .cmd or workflow
+       file turns it off.
+    4. vps.json pins the box's host keys as SHA256 fingerprints and carries
+       nothing that looks like a private key.
+    5. Setup-SshKey.ps1 writes StrictHostKeyChecking yes into the ssh config
+       Host block and writes known_hosts only through Add-ThornswoodKnownHost.
+    6. Add-ThornswoodKnownHost and Test-ThornswoodKnownHost (Vps.ps1), run
+       against throwaway keys made here and a stand-in ssh-keyscan: a pinned
+       key is written, a key that is not pinned is refused with nothing
+       written, and a known_hosts that already holds a wrong key is refused.
+       Never connects to anything.
 #>
 [CmdletBinding()]
 param([string]$Tools)
@@ -23,10 +46,9 @@ param([string]$Tools)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $Tools) { $Tools = $Here }
-$repo = Split-Path -Parent $Tools
+# The tests are in tests\, what they test is in tools\ and scripts\.
+$repo = Split-Path -Parent $Here
+if (-not $Tools) { $Tools = Join-Path $repo 'tools' }
 
 $script:pass = 0
 $script:fail = 0
@@ -34,27 +56,161 @@ function Yes([string]$what, [bool]$cond) {
     if ($cond) { $script:pass++; Write-Host "PASS  $what" }
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
+function Rel([string]$p) { return $p.Substring($repo.Length + 1) }
 
-$files = @(Get-ChildItem -LiteralPath $Tools -Filter *.ps1 -File -Recurse)
-$more = Join-Path $repo 'scripts'
-if (Test-Path -LiteralPath $more) { $files += @(Get-ChildItem -LiteralPath $more -Filter *.ps1 -File -Recurse) }
+$files = @()
+foreach ($d in @($Tools, (Join-Path $repo 'scripts'))) {
+    if (Test-Path -LiteralPath $d) { $files += @(Get-ChildItem -LiteralPath $d -Filter *.ps1 -File -Recurse) }
+}
 
+# ---- 1 and 2: the PowerShell scripts -------------------------------------------
 $off = @()
-$checked = 0
+$bare = @()
+$calls = 0
 foreach ($f in $files) {
     $tokens = $null; $errors = $null
-    [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors)
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors)
     foreach ($t in $tokens) {
         if ($t.Kind -eq 'Comment') { continue }
-        if ($t.Text -match '(?i)StrictHostKeyChecking\s*=\s*(no|off)\b') {
-            $off += ('{0}:{1}' -f $f.FullName.Substring($repo.Length + 1), $t.Extent.StartLineNumber)
+        $m = [regex]::Match($t.Text, '(?i)StrictHostKeyChecking\s*[= ]\s*"?([A-Za-z-]+)')
+        if ($m.Success -and $m.Groups[1].Value -ne 'yes') {
+            $off += ('{0}:{1} ({2})' -f (Rel $f.FullName), $t.Extent.StartLineNumber, $m.Groups[1].Value)
         }
-        elseif ($t.Text -match '(?i)StrictHostKeyChecking\s*=\s*(accept-new|yes)\b') { $checked++ }
+        if ($t.Text -match '(?i)(UserKnownHostsFile|GlobalKnownHostsFile)\s*[= ]\s*"?(/dev/null|NUL)\b') {
+            $off += ('{0}:{1} (known_hosts thrown away)' -f (Rel $f.FullName), $t.Extent.StartLineNumber)
+        }
+    }
+
+    # The arrays this file fills with the strict option, by variable name.
+    $strictVars = @{}
+    $assigns = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true)
+    foreach ($a in $assigns) {
+        $left = $a.Left
+        if ($left -is [System.Management.Automation.Language.ConvertExpressionAst]) { $left = $left.Child }
+        if ($left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+            $a.Right.Extent.Text -match 'StrictHostKeyChecking=yes') {
+            $strictVars[$left.VariablePath.UserPath.ToLowerInvariant()] = $true
+        }
+    }
+
+    $cmds = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)
+    foreach ($c in $cmds) {
+        $name = $c.GetCommandName()
+        if (-not $name) { continue }
+        if (@('ssh', 'scp', 'sftp', 'ssh.exe', 'scp.exe', 'sftp.exe') -notcontains $name.ToLowerInvariant()) { continue }
+        $calls++
+        $ok = $false
+        foreach ($e in $c.CommandElements) {
+            if ($e.Extent.Text -match 'StrictHostKeyChecking=yes') { $ok = $true; break }
+            if ($e -is [System.Management.Automation.Language.VariableExpressionAst] -and $e.Splatted -and
+                $strictVars.ContainsKey($e.VariablePath.UserPath.ToLowerInvariant())) { $ok = $true; break }
+        }
+        if (-not $ok) { $bare += ('{0}:{1}' -f (Rel $f.FullName), $c.Extent.StartLineNumber) }
     }
 }
 
-Yes ('no script switches host key checking off' + $(if ($off.Count) { ': ' + ($off -join ', ') } else { '' })) ($off.Count -eq 0)
-Yes ("the scripts that reach the VPS check its key ($checked places)") ($checked -ge 30)
+Yes ('no script turns host key checking down' + $(if ($off.Count) { ': ' + ($off -join ', ') } else { '' })) ($off.Count -eq 0)
+Yes ('every ssh, scp and sftp call carries StrictHostKeyChecking=yes' + $(if ($bare.Count) { ': ' + ($bare -join ', ') } else { '' })) ($bare.Count -eq 0)
+Yes ("  and there are real calls to check ($calls found)") ($calls -ge 100)
+
+# ---- 3: the other languages ----------------------------------------------------------
+$others = @()
+foreach ($d in 'scripts', 'bot', 'voice', 'site', 'tools', '.github', 'launcher') {
+    $p = Join-Path $repo $d
+    if (-not (Test-Path -LiteralPath $p)) { continue }
+    foreach ($f in (Get-ChildItem -LiteralPath $p -File -Recurse -Include *.py, *.js, *.sh, *.cmd, *.bat, *.yml, *.yaml, *.psm1, *.cs -ErrorAction SilentlyContinue)) {
+        if ($f.FullName -match '[\\/]node_modules[\\/]') { continue }
+        $n = 0
+        foreach ($line in [IO.File]::ReadAllLines($f.FullName)) {
+            $n++
+            if ($line -match '(?i)StrictHostKeyChecking\s*[= ]\s*"?(no|off|accept-new|ask)\b' -or
+                $line -match '(?i)UserKnownHostsFile\s*[= ]\s*"?(/dev/null|NUL)\b') {
+                $others += ('{0}:{1}' -f (Rel $f.FullName), $n)
+            }
+        }
+    }
+}
+Yes ('no other file turns host key checking down' + $(if ($others.Count) { ': ' + ($others -join ', ') } else { '' })) ($others.Count -eq 0)
+
+# ---- 4: the pin ------------------------------------------------------------------------
+$vpsJson = Join-Path $repo 'scripts\vps\vps.json'
+$raw = [IO.File]::ReadAllText($vpsJson)
+$j = $raw | ConvertFrom-Json
+$pins = @(@($j.hostKeys) | Where-Object { $_ })
+Yes "vps.json pins the box's host keys ($($pins.Count))" ($pins.Count -ge 1)
+Yes '  each one a SHA256 fingerprint, nothing else' (@($pins | Where-Object { [string]$_ -notmatch '^SHA256:[A-Za-z0-9+/]{43}$' }).Count -eq 0)
+Yes '  and no key material beside them' ($raw -notmatch '(?i)PRIVATE KEY|BEGIN OPENSSH|ssh-ed25519 AAAA|ssh-rsa AAAA|ecdsa-sha2')
+
+# ---- 5: the setup step --------------------------------------------------------------------
+$setup = [IO.File]::ReadAllText((Join-Path $repo 'scripts\vps\Setup-SshKey.ps1'))
+Yes 'Setup-SshKey.ps1 writes StrictHostKeyChecking yes into the Host block, both times' (([regex]::Matches($setup, '(?m)^\s+StrictHostKeyChecking yes\s*$')).Count -eq 2)
+Yes '  and writes known_hosts only through the pinned check' ($setup -match 'Add-ThornswoodKnownHost' -and $setup -notmatch 'Add-Content[^\r\n]*known_hosts')
+Yes '  and -Test does not write it' ($setup -match '(?s)elseif \(\$Test\) \{.*?\} else \{\s*try \{ \$n = Add-ThornswoodKnownHost')
+
+# ---- 6: the pinned check itself, against throwaway keys --------------------------------
+$keygen = Get-Command ssh-keygen -ErrorAction SilentlyContinue
+if (-not $keygen) {
+    Write-Host 'SKIP  no ssh-keygen here, so the pinned check was not run'
+} else {
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-hostkey-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+    try {
+        . (Join-Path $repo 'scripts\vps\Vps.ps1')
+        $keys = @{}
+        foreach ($k in 'box', 'impostor') {
+            $kp = Join-Path $tmp $k
+            $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+            foreach ($empty in '""', '') {
+                & ssh-keygen -q -t ed25519 -N $empty -C $k -f $kp 2>&1 | Out-Null
+                if (Test-Path -LiteralPath "$kp.pub") { break }
+            }
+            $ErrorActionPreference = $old
+            $pub = ([IO.File]::ReadAllText("$kp.pub")).Trim() -split '\s+'
+            $keys[$k] = '203.0.113.9 ' + $pub[0] + ' ' + $pub[1]
+        }
+        $boxFp = Get-ThornswoodSshFingerprint $keys['box']
+        $impFp = Get-ThornswoodSshFingerprint $keys['impostor']
+        Yes 'a key line gives its SHA256 fingerprint' ($boxFp -match '^SHA256:' -and $impFp -match '^SHA256:' -and $boxFp -ne $impFp)
+
+        $global:ThornswoodScanAnswer = @()
+        function global:ssh-keyscan { $global:ThornswoodScanAnswer }
+        $kh = Join-Path $tmp 'known_hosts'
+
+        Yes 'nothing held yet reads as none' ((Test-ThornswoodKnownHost -Address '203.0.113.9' -KnownHosts $kh -Pinned @($boxFp)).Status -eq 'none')
+
+        $global:ThornswoodScanAnswer = @('# 203.0.113.9:22 SSH-2.0-OpenSSH_for_Windows_9.5', $keys['impostor'])
+        $threw = $false
+        try { [void](Add-ThornswoodKnownHost -Address '203.0.113.9' -KnownHosts $kh -Pinned @($boxFp)) } catch { $threw = $true }
+        Yes 'a machine showing a key that is not pinned is refused' $threw
+        Yes '  and nothing is written' (-not (Test-Path -LiteralPath $kh))
+
+        $global:ThornswoodScanAnswer = @($keys['impostor'], $keys['box'])
+        $n = Add-ThornswoodKnownHost -Address '203.0.113.9' -KnownHosts $kh -Pinned @($boxFp)
+        $held = [IO.File]::ReadAllText($kh)
+        Yes 'the pinned key is written' ($n -eq 1 -and $held.Contains($keys['box']))
+        Yes '  and the one beside it that is not pinned is left out' (-not $held.Contains($keys['impostor']))
+        Yes '  after which it reads as trusted' ((Test-ThornswoodKnownHost -Address '203.0.113.9' -KnownHosts $kh -Pinned @($boxFp)).Status -eq 'trusted')
+        Yes '  and a second run writes nothing more' ((Add-ThornswoodKnownHost -Address '203.0.113.9' -KnownHosts $kh -Pinned @($boxFp)) -eq 0)
+
+        [IO.File]::WriteAllText($kh, $keys['impostor'] + "`n")
+        Yes 'a known_hosts holding a key that is not pinned reads as wrong' ((Test-ThornswoodKnownHost -Address '203.0.113.9' -KnownHosts $kh -Pinned @($boxFp)).Status -eq 'wrong')
+        $threw = $false
+        try { [void](Add-ThornswoodKnownHost -Address '203.0.113.9' -KnownHosts $kh -Pinned @($boxFp)) } catch { $threw = $true }
+        Yes '  and is refused rather than added to' ($threw -and ([IO.File]::ReadAllText($kh)).Trim() -eq $keys['impostor'])
+
+        $threw = $false
+        try { [void](Add-ThornswoodKnownHost -Address '203.0.113.9' -KnownHosts (Join-Path $tmp 'kh2') -Pinned @()) } catch { $threw = $true }
+        Yes 'with nothing pinned it refuses rather than trusting whatever answers' $threw
+
+        $real = @(Get-ThornswoodVpsHostKeys)
+        Yes 'Vps.ps1 reads the pin out of vps.json' ($real.Count -eq $pins.Count -and $real[0] -eq [string]$pins[0])
+    }
+    finally {
+        Remove-Item -Path function:global:ssh-keyscan -ErrorAction SilentlyContinue
+        Remove-Variable -Name ThornswoodScanAnswer -Scope Global -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
 
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
