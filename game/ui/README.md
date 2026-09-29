@@ -12,7 +12,8 @@ plugin runs. `thornswood-front.js` in `game\plugins` then fetches the
 overlays into that one page: the chat (`thornswood-chat.js`, which holds the
 one socket to the voice service), the emote wheel, voice, the character panel
 and character creation behind K (`thornswood-skills.js`), the party menu
-behind P, journals behind J, and the trade panel. `thornswood-theme.mp3` is
+behind P, journals behind J, the trade panel, and the "Are you still here?"
+window after 15 minutes idle (`thornswood-afk.js`). `thornswood-theme.mp3` is
 the theme the main menu plays, and the launcher plays it too while it is open.
 
 ## On your machine

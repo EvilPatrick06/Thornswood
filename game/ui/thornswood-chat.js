@@ -185,7 +185,15 @@
       if (!Number(msg.from) && !Number(msg.profileId) && msg.name === 'Thornswood line') {
         var said = null;
         try { said = JSON.parse(String(msg.text || '')); } catch (e) { said = null; }
-        if (said && typeof said === 'object') { said.t = 'line'; fanout(said); }
+        if (said && typeof said === 'object') {
+          // Moved out of the world for being idle (#1142): the front takes the
+          // game back to the character choice, if it has not already.
+          if (said.afk === 'out') {
+            try { window.skyrimPlatform.sendMessage('thornswood-front', 'afk:out server'); } catch (e) { }
+          }
+          said.t = 'line';
+          fanout(said);
+        }
         return;
       }
 
@@ -442,6 +450,32 @@
      */
     setToken: function (t) {
       TOKEN = String(t || '');
+    },
+
+    /**
+     * Another of this person's characters, at the character choice (#1142).
+     *
+     * Somebody moved out of the world for being idle keeps this page and its
+     * connection, which is the character they were, and waits in line as it.
+     * When they pick another character the front hands the place over and
+     * then calls this with that character's own join token: the connection
+     * closes and opens again as that character, the way setName does, since
+     * the service takes who somebody is from the token at the join and never
+     * after. The same character again only takes the token.
+     */
+    rejoinAs: function (id, t) {
+      id = Number(id) || 0;
+      TOKEN = String(t || '');
+      if (!id || id === ME) return false;
+      ME = id;
+      if (ws && (ws.readyState === 0 || ws.readyState === 1)) {
+        tries = 0;
+        if (joined) renaming = true;
+        try { ws.close(); } catch (e) { }
+      } else {
+        connect();
+      }
+      return true;
     }
   };
 

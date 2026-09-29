@@ -231,6 +231,22 @@ try:
                                           'why': 'used /stuck <@&111111111111111111>'})
     yes('M11 nothing in it pings anybody', '@everyone' not in pinged and '<@&111111111111111111>' not in pinged)
 
+    # M12: somebody moved out for being idle (#1142) says the server, the
+    # person and the gamemode's why, and pings nobody.
+    idle = bot.moderation_text('live', {
+        'did': 'idle', 'by': 2002, 'byName': 'Bjorn', 'who': 2002, 'whoName': 'Bjorn',
+        'why': 'no answer to "Are you still here?" within 60 seconds'})
+    yes('M12 an idle line says the server, the person, what happened and why',
+        idle == '**Idle on the live server:** Bjorn (profile 2002) was taken back to the character choice '
+                'and put in line: no answer to "Are you still here?" within 60 seconds')
+    yes('M12 the gamemode writes it', "did: 'idle'" in gm and 'idle' in bot._MOD_DID)
+    idle_ping = bot.moderation_text('dev', {'did': 'idle', 'who': 5, 'whoName': '@everyone',
+                                            'why': '<@&111111111111111111>'})
+    yes('M12 nothing in it pings anybody',
+        '@everyone' not in idle_ping and '<@&111111111111111111>' not in idle_ping)
+    yes('M12 no em dash and never the forbidden word',
+        chr(0x2014) not in idle and ('pla' + 'yer') not in idle.lower())
+
     # M9: started with the others, and sent through report_say (mentions off).
     src = inspect.getsource(bot.on_ready)
     yes('M9 on_ready starts it', 'asyncio.create_task(watch_moderation())' in src)

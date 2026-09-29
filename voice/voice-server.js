@@ -58,7 +58,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -180,7 +180,48 @@ const COMMAND_REFUSED_EVERY_MS = 10000;
 // proven says this connection's join token checked out, which the gamemode's
 // staff commands require (#412).
 function commandOut(c) {
-  return { id: c.id, profileId: c.profileId, name: c.name, text: c.text, at: c.at, proven: c.proven === true };
+  return { id: c.id, profileId: c.profileId, name: c.name, text: c.text, at: c.at, proven: c.proven === true,
+           relay: c.relay === true };
+}
+
+/*
+  A PLACE IN LINE GOES WITH THE CONNECTION THAT ASKED FOR IT (#481).
+
+  Patrick, 29 Sep: "they shouldn't need to check in while waiting in the
+  queue ... just have it automatically lose a player's spot when they
+  disconnect." The character choice at the menu waits in line over this
+  socket: its "/line" marks the connection as waiting ("/afk out" too, since
+  a game moved out for being idle waits from that moment), and "/line leave"
+  unmarks it. When a waiting connection closes and no other connection of the
+  same profile is waiting, the game server is told at once, as "/line gone"
+  under that profile with relay set, which no person can send: the gamemode
+  takes "/line gone" only with that mark. A restart of this service tells
+  nobody anything, because the sockets die with it; the gamemode sees the new
+  boot stamp on GET /commands instead and gives every waiting menu a minute to
+  ask again.
+*/
+function lineMark(me, text) {
+  if (!me) return;
+  if (/^\/line\s*$/i.test(text) || /^\/afk\s+out\b/i.test(text)) me.inLine = true;
+  else if (/^\/line\s+leave\b/i.test(text)) me.inLine = false;
+}
+function lineClosed(me) {
+  if (!me || !me.inLine || !me.profileId) return false;
+  for (const [, p] of peers) {
+    if (p !== me && p.profileId === me.profileId && p.inLine) return false;
+  }
+  commands.push({
+    id: COMMANDS_BOOT + ':' + (nextCommand++),
+    profileId: me.profileId,
+    name: me.name || '',
+    text: '/line gone',
+    at: Date.now(),
+    offers: 0,
+    proven: !!me.proven,
+    relay: true
+  });
+  console.log('[voice] profile ' + me.profileId + ' was waiting in line and its connection closed; the game server is told');
+  return true;
 }
 
 /*
@@ -1450,7 +1491,8 @@ const server = http.createServer((req, res) => {
       out = commands.splice(0, commands.length).map(commandOut);
     }
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ commands: out }));
+    // boot: a new stamp tells the gamemode this service restarted (see lineClosed).
+    res.end(JSON.stringify({ commands: out, boot: COMMANDS_BOOT }));
     return;
   }
 
@@ -1700,6 +1742,7 @@ server.on('upgrade', (req, socket, head) => {
           }
           return;
         }
+        lineMark(me, text);
         commands.push({
           id: COMMANDS_BOOT + ':' + (nextCommand++),
           profileId: me ? me.profileId : 0,
@@ -1767,7 +1810,11 @@ server.on('upgrade', (req, socket, head) => {
   };
 
   ws.onclose = () => {
-    if (myId) { peers.delete(myId); announce(); }
+    if (!myId) return;
+    const me = peers.get(myId);
+    peers.delete(myId);
+    announce();
+    lineClosed(me);
   };
 });
 

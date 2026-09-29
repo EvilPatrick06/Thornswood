@@ -82,7 +82,7 @@
   const UI_PATH = 'Data/Platform/UI/index.html';
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
-                    'thornswood-journal.js', 'thornswood-trade.js'];
+                    'thornswood-journal.js', 'thornswood-trade.js', 'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -432,6 +432,9 @@
   let menuStayAt = 0;
   let menuFgAt = 0;
   let menuFgWas = null;
+  // Back at the choice after being moved out for being idle (#1142):
+  // { id, name } of the character they were, until the world is up again.
+  let menuAgain = null;
 
   function chosenOnDisk() {
     try { return !!readText(CHOICE_FILE).trim(); } catch (e) { return false; }
@@ -660,6 +663,7 @@
     if (here) {
       log('menu: in the world as profile', menuChosenId, 'so the choice is done');
       menuChosenId = 0;
+      menuAgain = null;
       return;
     }
     if (now - menuChosenAt > MENU_SAY_FOR) {
@@ -802,7 +806,7 @@
     if (menuPhase === 0) {
       // 100 ms, was 600 (Djinn, 25 September: the still before the loop was up too long).
       if (now - loadedAt < 100) { return; }
-      if (chosenOnDisk()) { menuPhase = 9; log('menu: a choice is already on disk for this session'); return; }
+      if (!menuAgain && chosenOnDisk()) { menuPhase = 9; log('menu: a choice is already on disk for this session'); return; }
       // Read once, here, because menuWatch below needs it on every tick and
       // the page is not always the one that told us (menuWhere only reads it
       // when the page came up without the choice already drawn).
@@ -926,7 +930,10 @@
       return;
     }
     try { if (readText(INTRO_FILE).trim() === 'off') { list.intro = false; } } catch (e) { }
-    if (has !== 'list') { T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';'); }
+    // Back from being idle (#1142): no scroll and no theme, and the page
+    // starts in the place in line this game holds for the character it was.
+    if (menuAgain) { list.intro = false; list.music = ''; list.away = menuAgain; }
+    if (has !== 'list' || menuAgain) { T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';'); }
     inject('thornswood-select.js');
     menuPhase = 2; menuAt = Date.now(); menuBeatAt = Date.now();
     log('menu: the page is ours without the choice; put it in,', list.characters.length, 'character(s) listed');
@@ -982,6 +989,38 @@
       lineId = 0;
     }
     log('menu: chosen profile', id);
+    if (menuAgain) { relogAs(id); }
+  }
+
+  /*
+    BACK INTO THE WORLD FROM THE CHOICE THIS GAME CAME BACK TO (#1142).
+
+    skymp5-client takes a pick only while it waits for its first login, which
+    was long ago, and afkOut closed its connection. So the connection is
+    opened again here, to the address the client itself connected to: the
+    login it sends on connecting reads the profile from
+    storage.authGameData (AuthService.handleConnectionAccepted in the fork),
+    and the world loads as it does after any reconnect. keepSayingChoice says
+    the pick every two seconds, so this goes once while a connection is up or
+    on its way.
+  */
+  let relogAt = 0;
+  function relogAs(id) {
+    const now = Date.now();
+    if (now - relogAt < 15000) { return; }
+    let up = false;
+    try { up = !!sp.mpClientPlugin.isConnected(); } catch (e) { up = false; }
+    if (up) { return; }
+    relogAt = now;
+    try {
+      sp.storage.authGameData = { local: { profileId: id } };
+      const host = String(sp.storage.targetIp || HOST || '');
+      const port = Number(sp.storage.targetPort) || Number(client['server-port']) || 7777;
+      sp.mpClientPlugin.createClient(host, port);
+      log('menu: back into the world as profile', id, 'through', host + ':' + port);
+    } catch (e) {
+      log('menu: could not connect again as profile', id + ':', e);
+    }
   }
 
   /*
@@ -1003,8 +1042,11 @@
     for the picked character proves who is asking), sends the launcher's
     join pass, and says "/line" every LINE_EVERY_MS. The gamemode answers the
     page directly with the place and, when a seat frees and it is their turn,
-    go; the page then sends the pick and the world loads. Closing the game
-    stops the "/line" and the gamemode drops the place after its grace. The
+    go; the page then sends the pick and the world loads. Nothing is asked of
+    the person while they wait: the "/line" is this plugin's. Closing the
+    game closes the chat's connection, and the relay tells the gamemode at
+    once, which drops the place (Patrick, 29 Sep); the "/line" every
+    LINE_EVERY_MS is only how a menu asks again after the relay restarts. The
     choice file is written at once, because that is what makes the launcher
     fetch the token and the pass for this character.
 
@@ -1042,7 +1084,15 @@
 
   /* The page picked. A seat, or the line. */
   function lineWant(id) {
-    if (id === lineId || (lineAsk && lineAsk.id === id) || id === menuChosenId) { return; }
+    // The character already waiting: the page only looked at the slots
+    // (back from being idle, #1142), so it goes back to its place.
+    if (id === lineId) {
+      T.js('try{window.thornswoodSelect&&window.thornswoodSelect.line(' + JSON.stringify({ id: id }) + ');}catch(e){}');
+      return;
+    }
+    if ((lineAsk && lineAsk.id === id) || id === menuChosenId) { return; }
+    // Another of this game's characters takes the place it already holds.
+    if (lineId) { lineHand(id); return; }
     if (!lineClient()) { lineGo(id, 'no server address to ask'); return; }
     const seq = ++lineAskSeq;
     lineAsk = { id: id, at: Date.now(), seq: seq };
@@ -1079,8 +1129,29 @@
     try { require('fs').writeFileSync(CHOICE_FILE, id + ' ' + Date.now() + '\n'); }
     catch (e) { log('menu: could not write the choice for the launcher:', e); }
     T.js('try{window.thornswoodSelect&&window.thornswoodSelect.line(' + JSON.stringify({ id: id }) + ');}catch(e){}');
-    log('menu: the world is full (' + (Number(o.now) || 0) + ' in it, ' + (Number(o.max) || 0) +
-        ' seats, ' + (Number(o.line) || 0) + ' waiting), so profile', id, 'waits at the menu for a place in line');
+    if (o) {
+      log('menu: the world is full (' + (Number(o.now) || 0) + ' in it, ' + (Number(o.max) || 0) +
+          ' seats, ' + (Number(o.line) || 0) + ' waiting), so profile', id, 'waits at the menu for a place in line');
+    } else {
+      log('menu: profile', id, 'waits at the menu in the place in line this game already holds');
+    }
+  }
+
+  /*
+    Another of this game's characters takes the place in line (#1142).
+
+    Back at the choice after being moved out for being idle, the place is the
+    character they were, over the connection that was that character's in the
+    world. The connection says "/line hand <new>" while it is still the one
+    that holds the place, so nobody else can give a place away, and then
+    lineTick opens it again as the new character once the launcher has its
+    token (thornswoodNet.rejoinAs), whose first "/line" takes the place.
+  */
+  function lineHand(id) {
+    const from = lineId;
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/line hand ' + id) + ',true);}catch(e){}');
+    log('menu: profile', from, 'hands its place in line to profile', id);
+    lineStart(id, null);
   }
 
   /* Every tick at the menu. */
@@ -1129,7 +1200,9 @@
       host: HOST, port: VOICE_PORT, profileId: lineId, name: '', token: tok, base: VOICE_URL
     }) + ';}}catch(e){}');
     inject('thornswood-chat.js');
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.setToken(' + JSON.stringify(tok) + ');' +
+    // rejoinAs only takes the token while the connection is already this
+    // character's, and opens it again as this one when it is another's.
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.rejoinAs(' + lineId + ',' + JSON.stringify(tok) + ');' +
          'window.thornswoodSelect&&window.thornswoodSelect.line(' + JSON.stringify({ id: lineId }) + ');}catch(e){}');
 
     // The pass when it is new and every minute, as the world does (#937), so
@@ -1144,13 +1217,202 @@
     T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line",true);}catch(e){}');
   }
 
-  /* Close the game from the page: give the place up now rather than after the grace. */
+  /* Close the game from the page: give the place up now, before the connection closes. */
   function lineLeave() {
     if (!lineId) { return; }
     T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line leave",true);}catch(e){}');
     log('menu: profile', lineId, 'gave up their place in line');
     lineId = 0;
   }
+
+  /*
+    ------------------------------------------------- are you still here (#1142)
+
+    Patrick, 29 Sep: "we also need an AFK kick in game after 15 mins idle with
+    the opportunity for a menu to pop after that 15 minutes with the option to
+    click I am still here, if they do click I'm still here it resets, if not
+    it kicks them to the main menu where they can rechoose their character and
+    they automatically rejoin the queue with the same 1 minute to join rule".
+    The window counts down 60 seconds, and staff get it too (agreed the same
+    day).
+
+    INPUT is a key or a mouse button (buttonEvent), the mouse moving
+    (mouseMove), a gamepad stick (thumbstickEvent), a key held while a panel
+    or the chat has the keyboard (Input.getNumKeysPressed, which the browser
+    does not hide), or the character moving or turning. Somebody in the race
+    menu is never idle. While input comes this says "/afk active" every
+    AFK_ACTIVE_EVERY_MS at most, so the server's own watch (the idle block in
+    gamemode.js) knows somebody is there while the character stands still.
+
+    AFTER AFK_MS with none, thornswood-afk.js puts up "Are you still here?"
+    with its countdown and the keyboard (the 'afk' claim, so the button can be
+    clicked). "I am still here" says "/afk here" and starts the 15 minutes
+    again. No press in AFK_WINDOW_S: "/afk out", and afkOut takes the game out
+    of the world. The server can also say so over the relay (its own watch
+    moved them): chat.js hands that here as 'afk:out server'.
+
+    OUT OF THE WORLD: the connection to the game server closes
+    (mpClientPlugin.destroyClient, so skymp5-client does not reconnect as the
+    same character), the game goes to the main menu, and the character choice
+    comes back up with the place in line the server gave them. This game keeps
+    that place as the character it was (lineStart), over the same chat
+    connection; picking another character hands it over (lineHand), and their
+    turn is the same minute to press Join now. Joining opens the connection
+    again (relogAs).
+  */
+  const AFK_MS = 15 * 60000;
+  const AFK_WINDOW_S = 60;
+  const AFK_SAMPLE_MS = 500;
+  const AFK_ACTIVE_EVERY_MS = 120000;
+  const AFK_MOVE_UNITS = 8;
+  const AFK_TURN_DEGREES = 0.5;
+  let afkLastInput = Date.now();
+  let afkTouched = false;     // set by the input events between samples
+  let afkSampleAt = 0;
+  let afkWas = null;          // { x, y, z, az, ax } at the last sample
+  let afkAskAt = 0;           // the window went up, 0 while it is down
+  let afkSaidAt = 0;
+  let afkSince = false;       // input since the last "/afk active"
+  let afkHere = false;        // in the world at the last sample
+  let afkGone = false;        // taken out, until the world is up again
+  let afkOutAsked = '';       // afkOut wanted from outside update (the relay), done on the next one
+
+  function afkTouch() { afkTouched = true; }
+  try { sp.on('buttonEvent', afkTouch); } catch (e) { log('idle: no buttonEvent:', e); }
+  try { sp.on('mouseMove', afkTouch); } catch (e) { log('idle: no mouseMove:', e); }
+  try { sp.on('thumbstickEvent', afkTouch); } catch (e) { log('idle: no thumbstickEvent:', e); }
+
+  function afkTurned(a, b) {
+    const d = Math.abs((Number(a) || 0) - (Number(b) || 0)) % 360;
+    return Math.min(d, 360 - d);
+  }
+
+  /* Whether anything came from the person since the last sample. */
+  function afkInput() {
+    let any = afkTouched;
+    afkTouched = false;
+    if (keysHeldNow() > 0) { any = true; }
+    let at = null;
+    try {
+      const pc = sp.Game.getPlayer();
+      if (pc) {
+        at = { x: pc.getPositionX(), y: pc.getPositionY(), z: pc.getPositionZ(),
+               az: pc.getAngleZ(), ax: pc.getAngleX() };
+      }
+    } catch (e) { at = null; }
+    if (at && afkWas) {
+      const dx = at.x - afkWas.x, dy = at.y - afkWas.y, dz = at.z - afkWas.z;
+      if (dx * dx + dy * dy + dz * dz > AFK_MOVE_UNITS * AFK_MOVE_UNITS ||
+          afkTurned(at.az, afkWas.az) > AFK_TURN_DEGREES || afkTurned(at.ax, afkWas.ax) > AFK_TURN_DEGREES) {
+        any = true;
+      }
+    }
+    if (at) { afkWas = at; }
+    return any;
+  }
+
+  function afkAsk(now) {
+    afkAskAt = now;
+    log('idle: nothing from the keyboard, mouse or character in', AFK_MS / 60000, 'minutes, asking "Are you still here?"');
+    // For a page that has not loaded the window yet; the window reads it when it comes in.
+    T.js('try{window.THORNSWOOD_AFK_ASK=' + AFK_WINDOW_S + ';' +
+         'if(window.thornswoodAfk){window.THORNSWOOD_AFK_ASK=0;window.thornswoodAfk.ask(' + AFK_WINDOW_S + ');}}catch(e){}');
+    inject('thornswood-afk.js');
+    T.claimFocus('afk', true);
+  }
+
+  function afkClose() {
+    afkAskAt = 0;
+    T.js('try{window.THORNSWOOD_AFK_ASK=0;window.thornswoodAfk&&window.thornswoodAfk.close();}catch(e){}');
+    T.claimFocus('afk', false);
+  }
+
+  /* "I am still here" was pressed. */
+  function afkStillHere() {
+    if (!afkAskAt) { return; }
+    log('idle: "I am still here" pressed after', Math.round((Date.now() - afkAskAt) / 1000) + 's');
+    afkClose();
+    afkLastInput = Date.now();
+    afkSince = false;
+    afkSaidAt = Date.now();
+    tellServer('/afk here');
+  }
+
+  /* Out of the world, to the character choice, with the place in line. In update only (quitToMainMenu is Papyrus). */
+  function afkOut(why) {
+    if (afkGone) { return; }
+    afkGone = true;
+    const me = PROFILE;
+    const name = myName();
+    log('idle: ' + why + ', so out of the world to the character choice as profile', me, '(' + (name || 'no name') + ')');
+    tellServer('/afk out');
+    afkClose();
+    try { globalThis.__thornswoodInWorld = false; } catch (e) { }
+    try { sp.mpClientPlugin.destroyClient(); } catch (e) { log('idle: could not close the connection to the game server:', e); }
+    try { sp.Game.quitToMainMenu(); } catch (e) { log('idle: could not go to the main menu:', e); }
+    if (!chooseAtMenu || !(me > 0)) {
+      log('idle: this game does not choose its character at the menu, so it stays at the main menu');
+      return;
+    }
+    // The choice the world left behind goes, so the page asks for a fresh one
+    // (menuWhere) and the choice comes up again with the list the launcher wrote.
+    T.js('try{var o=window.thornswoodSelect;if(o&&o.close){o.close();}' +
+         'var ids=["ts-select","ts-select-css","ts-thornswood-select-js"];' +
+         'for(var i=0;i<ids.length;i++){var n=document.getElementById(ids[i]);if(n&&n.parentNode){n.parentNode.removeChild(n);}}' +
+         'window.thornswoodSelect=undefined;window.THORNSWOOD_SELECT=undefined;}catch(e){}');
+    menuAgain = { id: me, name: name };
+    menuPhase = 0; menuAt = Date.now(); menuAsked = 0; menuLoaded = false;
+    menuBeatAt = 0; menuReloads = 0; menuGaveUp = false; menuChosenId = 0;
+    relogAt = 0;
+    // The place the server keeps for them: this game waits in line as the
+    // character it was, and says "/line" as that one from now on.
+    lineStart(me, null);
+  }
+
+  sp.on('update', guard('idle check', () => {
+    const now = Date.now();
+    if (afkOutAsked) {
+      const why = afkOutAsked;
+      afkOutAsked = '';
+      afkOut(why);
+      return;
+    }
+    if (now - afkSampleAt < AFK_SAMPLE_MS) { return; }
+    afkSampleAt = now;
+    let here = false;
+    try { here = !!globalThis.__thornswoodInWorld; } catch (e) { here = false; }
+    if (here && !afkHere) {
+      // Into the world, the first time or back from the choice: the clock starts now.
+      afkGone = false;
+      afkLastInput = now;
+      afkWas = null;
+      afkTouched = false;
+    }
+    afkHere = here;
+    if (!here || afkGone) {
+      if (afkAskAt) { afkClose(); }
+      return;
+    }
+    if (afkAskAt) {
+      // The window is up: only its button counts, and the game goes when its minute does.
+      if (now - afkAskAt >= AFK_WINDOW_S * 1000) {
+        afkOut('no answer to "Are you still here?" in ' + AFK_WINDOW_S + ' seconds');
+      }
+      return;
+    }
+    let creating = false;
+    try { creating = raceMenuOpen(); } catch (e) { creating = false; }
+    if (afkInput() || creating) {
+      afkLastInput = now;
+      afkSince = true;
+    }
+    if (afkSince && now - afkSaidAt >= AFK_ACTIVE_EVERY_MS) {
+      afkSaidAt = now;
+      afkSince = false;
+      tellServer('/afk active');
+    }
+    if (now - afkLastInput >= AFK_MS) { afkAsk(now); }
+  }));
 
   /* The choice is on screen and this block is holding it up: asking the page
      where it is (1) or watching it (2). */
@@ -1675,7 +1937,8 @@
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
-    trade: 'thornswoodTrade', select: 'thornswoodSelect', wheel: 'thornswoodEmotes'
+    trade: 'thornswoodTrade', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
+    afk: 'thornswoodAfk'
   };
 
   T.claimFocus = function (who, on) {
@@ -7030,6 +7293,15 @@
       message that only arrives after somebody has said yes to leaving is not
       one to second guess.
     */
+    // Are you still here (#1142); see the idle check.
+    if (what === 'afk:here') { afkStillHere(); return; }
+    if (what.indexOf('afk:out') === 0) {
+      // From the relay (the server moved them) or the page; the move itself
+      // needs update, where quitToMainMenu can run.
+      if (!afkGone && !afkOutAsked) { afkOutAsked = 'the server moved them out for being idle'; }
+      return;
+    }
+    if (what.indexOf('afk:') === 0) { log('idle window:', what.slice(4)); return; }
     // The pick, asking for a seat first (#481); see the line block.
     if (what.indexOf('select:want ') === 0) {
       menuBeatAt = Date.now();

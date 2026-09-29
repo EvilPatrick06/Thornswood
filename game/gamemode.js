@@ -28113,9 +28113,27 @@ log('gamemode loaded:',
   The line lives here and only here, in the order each profile first asked:
   nothing a client sends moves its place. When a seat frees, the first in
   line has it held for them (GRANT_MS to arrive) and is told to come in, and
-  their menu joins by itself. Somebody not heard from for LINE_GRACE_MS has
-  closed the game or lost the server, and their place goes. A staff role with
-  a pass is given a staff seat at once, ahead of the line.
+  their menu joins by itself. A staff role with a pass is given a staff seat
+  at once, ahead of the line.
+
+  A PLACE GOES WITH THE CONNECTION. Patrick, 29 Sep: "they shouldn't need to
+  check in while waiting in the queue ... just have it automatically lose a
+  player's spot when they disconnect." The relay (voice-server.js) knows when
+  the socket that said "/line" closes, and says "/line gone" under that
+  profile at once, marked as its own; that is gone() below, and the place
+  goes then. Closing the game from the page says "/line leave" first. Two
+  backstops for a close that never arrives: a new relay (it restarted, and
+  its sockets died with it) gives every waiting menu RELAY_BACK_MS to ask
+  again, which the menus do by themselves every LINE_EVERY_MS once their chat
+  is back, so a restart keeps the line in order; and a place not heard from
+  for LINE_SILENT_MS while the relay answers goes. While the relay does not
+  answer at all, nobody's silence counts.
+
+  MOVED OUT FOR BEING IDLE (#1142, the idle block below). idleOut() frees the
+  seat at once and puts the person at the end of the line. Their menu then
+  shows the character choice, and any of their characters can take the place:
+  the menu says "/line hand <profile>" under the one that holds it, and that
+  profile's first "/line" within HAND_MS takes it over.
 
   AT THE DOOR. Everybody in the world when this starts keeps their seat, so a
   hot reload never ends a session. After that an arrival is seated when a
@@ -28132,7 +28150,10 @@ log('gamemode loaded:',
   var SWEEP_MS = 2000;
   var STAFF_WAIT_MS = 60000;   // a staff role arriving over the number: this long to show a join pass
   var KICK_AFTER_MS = 10000;   // after the line, so it is on screen first
-  var LINE_GRACE_MS = 45000;   // not heard from at the menu this long: the place in line goes
+  var LINE_SILENT_MS = 600000; // backstop: nothing from a waiting menu this long, while the relay answers, and the place goes
+  var RELAY_BACK_MS = 60000;   // after a relay restart: this long for each waiting menu to ask again
+  var HAND_MS = 120000;        // a place handed to another of the same game's characters waits this long for it
+  var OUT_FOR_MS = 15000;      // moved out for being idle: not judged as an arrival for this long while their game leaves
   var GRANT_MS = 60000;        // a seat held for the one whose turn it is, this long to arrive (Patrick, 29 Sep: a minute)
   var SAY_AGAIN_MS = 10000;    // a place is said again this often even when it has not moved
   var LINE_EVERY_MS = 10000;   // how often the menu says it is still waiting (the front's side)
@@ -28145,13 +28166,15 @@ log('gamemode loaded:',
 
   // On globalThis, so a hot reload keeps who holds a seat and the line.
   // seated: profile -> when; waiting: staff profile -> since; refused: profile -> when;
-  // line: [{ p, since, seen, said, saidAt }] in order; held: profile -> { at, staff }.
+  // line: [{ p, since, seen, said, saidAt, back?, handTo?, handAt?, closed?, idle? }] in order;
+  // held: profile -> { at, staff, handTo?, handAt? }; out: profile -> when moved out for being idle.
   if (!g.__thornswoodSeatState) {
     g.__thornswoodSeatState = { seated: {}, waiting: {}, refused: {}, primed: false };
   }
   var state = g.__thornswoodSeatState;
   if (!state.line) { state.line = []; }
   if (!state.held) { state.held = {}; }
+  if (!state.out) { state.out = {}; }
   if (!state.status) { state.status = { line: 0, full: false }; }
 
   function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
@@ -28181,7 +28204,8 @@ log('gamemode loaded:',
   /*
     Once every SWEEP_MS. online is [{ actorId, profileId }] in the engine's
     order; how is { cap, staffSeats, holdsStaffRole(pid), hasPass(pid, now),
-    tell(pid, text), line(pid, what), end(pid, actorId), log(line) }.
+    tell(pid, text), line(pid, what), end(pid, actorId), log(line), relayOk }.
+    relayOk false means the relay is not answering the command poll.
     Returns what it decided this sweep.
   */
   function sweep(now, online, how) {
@@ -28196,11 +28220,24 @@ log('gamemode loaded:',
       var p = Number(online[i] && online[i].profileId) || 0;
       if (p) { here[p] = online[i].actorId; }
     }
-    var lists = [state.seated, state.waiting, state.refused];
+    var lists = [state.seated, state.waiting, state.refused, state.out];
     for (var l = 0; l < lists.length; l++) {
       for (var k in lists[l]) {
         if (own(lists[l], k) && here[k] === undefined) { delete lists[l][k]; }
       }
+    }
+    // Moved out for being idle and still here after their game had time to
+    // leave: the session was ended (endLater), so from now on they are an
+    // arrival like anybody, and one past the line is refused.
+    for (var o in state.out) {
+      if (own(state.out, o) && now - state.out[o] > OUT_FOR_MS) { delete state.out[o]; }
+    }
+    // The same for somebody refused. The engine keeps one actor per character
+    // and skymp5-client connects again by itself after a session ends, so a
+    // way back in between two sweeps looked like never having left, and the
+    // refusal was never made again: judged afresh once the end has had its time.
+    for (var rf in state.refused) {
+      if (own(state.refused, rf) && now - state.refused[rf] > OUT_FOR_MS) { delete state.refused[rf]; }
     }
     // Everybody already in the world when this started keeps their seat.
     if (!state.primed) {
@@ -28215,21 +28252,40 @@ log('gamemode loaded:',
     // Arrivals a seat was held for go first: that seat is already counted.
     for (var a = 0; a < online.length; a++) {
       var ap = Number(online[a] && online[a].profileId) || 0;
-      if (!ap || state.seated[ap] || !state.held[ap]) { continue; }
+      if (!ap || state.seated[ap] || state.out[ap] || !state.held[ap]) { continue; }
       state.seated[ap] = now;
       delete state.held[ap];
       how.log('[thornswood] seats: profile ' + ap + ' took the seat held for them');
     }
 
-    // The line: whoever is in the world now, or has gone quiet, is off it.
+    // The line: whoever is in the world now is off it, and so is a place the
+    // backstops say has gone (a close arriving from the relay is gone() below).
+    var relayOk = how.relayOk !== false;
     var still = [];
     for (var n = 0; n < state.line.length; n++) {
       var e = state.line[n];
       if (state.seated[e.p]) { continue; }
-      if (now - e.seen > LINE_GRACE_MS) {
+      // The relay is not answering, so nothing could have been heard: silence does not count.
+      if (!relayOk) { e.seen = now; still.push(e); continue; }
+      var lost = '';
+      if (e.handTo && now - e.handAt > HAND_MS) {
+        if (e.closed) {
+          lost = 'their game closed after handing it to profile ' + e.handTo + ', who never asked for it';
+        } else {
+          how.log('[thornswood] line: profile ' + e.handTo + ' never asked for the place profile ' + e.p +
+                  ' handed it, so profile ' + e.p + ' keeps it');
+        }
+        delete e.handTo; delete e.handAt; delete e.closed;
+      }
+      if (!lost && e.back && now > e.back) {
+        lost = 'the relay restarted and their menu did not ask again within ' + Math.round(RELAY_BACK_MS / 1000) + 's';
+      } else if (!lost && !e.back && now - e.seen > LINE_SILENT_MS) {
+        lost = 'nothing from their menu in ' + Math.round((now - e.seen) / 60000) +
+               ' minutes, and the relay never said their game closed';
+      }
+      if (lost) {
         out.dropped.push(e.p);
-        how.log('[thornswood] line: profile ' + e.p + ' lost their place, not heard from at the menu in ' +
-                Math.round((now - e.seen) / 1000) + 's');
+        how.log('[thornswood] line: profile ' + e.p + ' lost their place: ' + lost);
         continue;
       }
       still.push(e);
@@ -28298,7 +28354,7 @@ log('gamemode loaded:',
     // Everybody else who has just arrived.
     for (var j = 0; j < online.length; j++) {
       var pid = Number(online[j] && online[j].profileId) || 0;
-      if (!pid || state.seated[pid] || state.refused[pid]) { continue; }
+      if (!pid || state.seated[pid] || state.refused[pid] || state.out[pid]) { continue; }
       var staff = holds(pid);
       if (!cap || (!state.line.length && publicFree() > 0)) {
         state.seated[pid] = now;
@@ -28356,7 +28412,27 @@ log('gamemode loaded:',
       return 'held';
     }
     var at = lineIndex(pid);
-    if (at >= 0) { state.line[at].seen = now; return 'waiting'; }
+    if (at >= 0) { state.line[at].seen = now; delete state.line[at].back; return 'waiting'; }
+    // A place or a held seat another of this game's characters handed to this one (#1142).
+    for (var hh in state.held) {
+      if (own(state.held, hh) && state.held[hh].handTo === pid && now - state.held[hh].handAt <= HAND_MS) {
+        state.held[pid] = { at: state.held[hh].at, staff: state.held[hh].staff };
+        delete state.held[hh];
+        how.log('[thornswood] seats: profile ' + pid + ' takes the seat held for profile ' + hh + ', which handed it over');
+        how.line(pid, { go: true, secs: Math.max(0, Math.ceil((GRANT_MS - (now - state.held[pid].at)) / 1000)) });
+        return 'held';
+      }
+    }
+    for (var hl = 0; hl < state.line.length; hl++) {
+      var he = state.line[hl];
+      if (he.handTo === pid && now - he.handAt <= HAND_MS) {
+        how.log('[thornswood] line: profile ' + pid + ' takes the place profile ' + he.p + ' handed it, ' +
+                (hl + 1) + ' of ' + state.line.length);
+        he.p = pid; he.seen = now; he.said = 0; he.saidAt = 0;
+        delete he.handTo; delete he.handAt; delete he.closed; delete he.back;
+        return 'handed';
+      }
+    }
     var hasOne = false;
     try { hasOne = !!how.hasPass(pid, now); } catch (e) { hasOne = false; }
     if (how.requirePass && !hasOne) { how.line(pid, { pass: true }); return 'no pass'; }
@@ -28377,6 +28453,89 @@ log('gamemode loaded:',
       delete state.held[pid];
       how.log('[thornswood] seats: profile ' + pid + ' let go of the seat held for them');
     }
+  }
+
+  /*
+    "/line gone", from the relay itself: the connection that asked for this
+    place has closed, so the game is closed, crashed or off the network, and
+    the place goes now (Patrick, 29 Sep). A seat already held for them is left
+    to run out its minute: pressing Join now loads the world, which can close
+    and open the page's connection on the way in, and the minute is short.
+    A place just handed to another of the same game's characters is kept for
+    that character (hand below).
+  */
+  function gone(pid, now, how) {
+    pid = Number(pid) || 0;
+    var at = lineIndex(pid);
+    if (at < 0) { return 'not waiting'; }
+    var e = state.line[at];
+    if (e.handTo && now - e.handAt <= HAND_MS) {
+      e.closed = now;
+      how.log('[thornswood] line: profile ' + pid + ' closed its connection after handing its place to profile ' +
+              e.handTo + ', so the place waits for that one');
+      return 'handed';
+    }
+    state.line.splice(at, 1);
+    how.log('[thornswood] line: profile ' + pid + ' lost their place: their game closed its connection to the relay');
+    return 'dropped';
+  }
+
+  /*
+    "/line hand <profile>": the menu this place belongs to switched to another
+    of its characters (after being moved out for being idle, the choice
+    offers any of them). The connection that holds the place says so before
+    it becomes the other character's, so only the holder can give it away,
+    and the other takes it with its first "/line" within HAND_MS.
+  */
+  function hand(pid, to, now, how) {
+    pid = Number(pid) || 0;
+    to = Number(to) || 0;
+    if (!pid || !to || pid === to) { return 'nothing'; }
+    var at = lineIndex(pid);
+    var what = at >= 0 ? state.line[at] : state.held[pid];
+    if (!what) { return 'nothing'; }
+    what.handTo = to;
+    what.handAt = now;
+    how.log('[thornswood] line: profile ' + pid + ' hands its ' + (at >= 0 ? 'place in line' : 'held seat') +
+            ' to profile ' + to + ', another character of the same game');
+    return 'handing';
+  }
+
+  /*
+    Moved out of the world for being idle (#1142): the seat frees now, the next
+    in line is told at the next sweep, and they wait at the end of the line at
+    the menu. actorId is given while they are still in the world: they are not
+    judged as an arrival for OUT_FOR_MS, and a game that has not left by then
+    has its session ended.
+  */
+  function idleOut(pid, now, how, actorId) {
+    pid = Number(pid) || 0;
+    if (!pid) { return 'nobody'; }
+    var had = !!state.seated[pid];
+    delete state.seated[pid];
+    delete state.waiting[pid];
+    delete state.refused[pid];
+    if (actorId) {
+      state.out[pid] = now;
+      how.end(pid, actorId);
+    }
+    if (lineIndex(pid) < 0 && !state.held[pid]) {
+      state.line.push({ p: pid, since: now, seen: now, said: 0, saidAt: 0, idle: true });
+      how.log('[thornswood] line: profile ' + pid + ' was moved out for being idle and waits at the menu, ' +
+              state.line.length + ' in line');
+    }
+    how.line(pid, { afk: 'out' });
+    return had ? 'seat freed' : 'in line';
+  }
+
+  /* The relay restarted: every waiting menu has RELAY_BACK_MS to ask again. */
+  function relayRestarted(now, how) {
+    for (var i = 0; i < state.line.length; i++) { state.line[i].back = now + RELAY_BACK_MS; }
+    if (state.line.length) {
+      how.log('[thornswood] line: the relay restarted; the ' + state.line.length + ' waiting keep their places ' +
+              'if their menus ask again within ' + Math.round(RELAY_BACK_MS / 1000) + 's');
+    }
+    return state.line.length;
   }
 
   function endLater(pid, actorId) {
@@ -28405,8 +28564,11 @@ log('gamemode loaded:',
   function liveHow() {
     var s = settings();
     var say = g.__thornswoodToProfile;
+    // The chat commands block's poll of the relay (pollSaid): answering unless its last try failed.
+    var poll = g.__thornswoodCommandPoll;
     return {
       cap: capOf(s), staffSeats: staffSeatsOf(s), requirePass: s.thornswoodRequirePass === true,
+      relayOk: !poll || !poll.failAt || poll.okAt >= poll.failAt,
       holdsStaffRole: holdsStaffRole, hasPass: hasPass,
       tell: function (p, text) { if (say) { say(p, text); } },
       // The chat commands block posts it to the menu page (__thornswoodSayLine).
@@ -28418,9 +28580,11 @@ log('gamemode loaded:',
 
   g.__thornswoodSeats = {
     sweep: sweep, want: want, leave: leave, liveHow: liveHow,
+    gone: gone, hand: hand, idleOut: idleOut, relayRestarted: relayRestarted,
     cap: capOf, staffSeats: staffSeatsOf, sentence: sentence,
     status: function () { return state.status; },
-    staffWait: STAFF_WAIT_MS, kickAfter: KICK_AFTER_MS, lineGrace: LINE_GRACE_MS,
+    staffWait: STAFF_WAIT_MS, kickAfter: KICK_AFTER_MS, lineSilent: LINE_SILENT_MS,
+    relayBack: RELAY_BACK_MS, handFor: HAND_MS, outFor: OUT_FOR_MS,
     grantFor: GRANT_MS, lineEvery: LINE_EVERY_MS
   };
 
@@ -28447,6 +28611,236 @@ log('gamemode loaded:',
     : 'no thornswoodMostOnline in server-settings.json, so nobody is turned away for numbers'));
 })();
 // ==== end thornswood seats ====
+
+
+// ==== thornswood idle ====
+/*
+  NOBODY IDLE KEEPS A SEAT (#1142).
+
+  Patrick, 29 Sep: "we also need an AFK kick in game after 15 mins idle with
+  the opportunity for a menu to pop after that 15 minutes with the option to
+  click I am still here, if they do click I'm still here it resets, if not it
+  kicks them to the main menu where they can rechoose their character and
+  they automatically rejoin the queue with the same 1 minute to join rule".
+  Agreed the same day: the window counts down 60 seconds, and staff get the
+  check too.
+
+  THE GAME ASKS. thornswood-front.js watches the keys, the mouse and the
+  character. After 15 minutes with none of them it puts up "Are you still
+  here?" (thornswood-afk.js) with an "I am still here" button and a 60 second
+  countdown. Pressed, it says "/afk here" and the 15 minutes start again. Not
+  pressed, it says "/afk out", leaves the world and shows the character
+  choice. While it sees input it says "/afk active", every two minutes at
+  most, so this knows somebody is there while the character stands still (a
+  crafting menu, a long talk, the camera turned in third person).
+
+  THE SERVER JUDGES. Every SAMPLE_MS this looks at everybody in the world:
+  where the character stands and which way it faces. Nothing moved and
+  nothing from their game for SERVER_IDLE_MS, which is the game's 15 minutes
+  and its 60 seconds with two minutes to spare, and this moves them out
+  itself, whether or not their game ever asked. Somebody in character
+  creation is never idle.
+
+  MOVED OUT, either way the same (out below): the seats block frees the seat
+  and puts them at the end of the line (the next in line is told at its next
+  sweep), their menu is told over the relay, and a game that has not left by
+  itself is ended KICK_AFTER_MS later. thornswood.log and moderation.log say
+  who and why, and the Discord bot says moderation.log in the staff channel.
+*/
+(function () {
+  var g = globalThis;
+
+  var SAMPLE_MS = 5000;
+  var ASK_MIN = 15;                           // the game's own numbers, for the words
+  var WINDOW_S = 60;
+  var SERVER_IDLE_MS = (ASK_MIN * 60 + WINDOW_S + 120) * 1000;
+  var MOVE_UNITS = 16;                        // a quarter of a metre
+  var TURN_DEGREES = 2;
+  var LEFT_KEEP_MS = 60000;                   // an "/afk out" can arrive just after the game has gone
+  var OUT_RESET_MS = 20000;                   // moved out and here again after this: judged afresh (the seats block's 15 s, and a sample)
+
+  // On globalThis, so a hot reload does not start everybody's clock again.
+  // by: profile -> { actorId, last, pos, rot, out }; left: profile -> when they left the world.
+  if (!g.__thornswoodIdleState) { g.__thornswoodIdleState = { by: {}, left: {} }; }
+  var state = g.__thornswoodIdleState;
+  if (!state.left) { state.left = {}; }
+
+  function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+
+  function turned(a, b) {
+    var d = Math.abs((Number(a) || 0) - (Number(b) || 0)) % 360;
+    return Math.min(d, 360 - d);
+  }
+  function changed(was, at) {
+    if (!was || !was.pos || !at || !at.pos) { return false; }
+    var dx = at.pos[0] - was.pos[0], dy = at.pos[1] - was.pos[1], dz = at.pos[2] - was.pos[2];
+    if (dx * dx + dy * dy + dz * dz > MOVE_UNITS * MOVE_UNITS) { return true; }
+    var r0 = was.rot || [0, 0, 0], r1 = at.rot || [0, 0, 0];
+    return turned(r0[0], r1[0]) > TURN_DEGREES || turned(r0[2], r1[2]) > TURN_DEGREES;
+  }
+
+  /*
+    Once every SAMPLE_MS. online is [{ actorId, profileId }]; how is
+    { place(actorId) -> { pos, rot } or null, creating(actorId),
+    out(pid, actorId, why) }. Returns the profiles moved out this time.
+  */
+  function sweep(now, online, how) {
+    var here = {};
+    var moved = [];
+    for (var i = 0; i < online.length; i++) {
+      var pid = Number(online[i] && online[i].profileId) || 0;
+      if (!pid) { continue; }
+      var actorId = online[i].actorId;
+      here[pid] = true;
+      var at = null;
+      try { at = how.place(actorId); } catch (e) { at = null; }
+      var e = state.by[pid];
+      if (!e || e.actorId !== actorId) {
+        state.by[pid] = { actorId: actorId, last: now, pos: at && at.pos, rot: at && at.rot, out: 0 };
+        delete state.left[pid];
+        continue;
+      }
+      if (e.out) {
+        // Still or again in the world well after being moved out: back in the
+        // same character (a seat of their own, or refused by the seats block),
+        // so a fresh clock. The engine keeps one actor per character, so a
+        // quick way back in looks the same as never having left.
+        if (now - e.out > OUT_RESET_MS) { state.by[pid] = { actorId: actorId, last: now, pos: at && at.pos, rot: at && at.rot, out: 0 }; }
+        continue;
+      }
+      var creating = false;
+      try { creating = !!how.creating(actorId); } catch (e2) { creating = false; }
+      if (creating || changed(e, at)) { e.last = now; }
+      if (at) { e.pos = at.pos; e.rot = at.rot; }
+      if (now - e.last >= SERVER_IDLE_MS) {
+        e.out = now;
+        moved.push(pid);
+        how.out(pid, actorId, 'nothing moved and nothing came from their game for ' +
+                Math.round((now - e.last) / 60000) + ' minutes, so the server moved them');
+      }
+    }
+    for (var k in state.by) {
+      if (own(state.by, k) && !here[k]) { delete state.by[k]; state.left[k] = now; }
+    }
+    for (var q in state.left) {
+      if (own(state.left, q) && now - state.left[q] > LEFT_KEEP_MS) { delete state.left[q]; }
+    }
+    return moved;
+  }
+
+  /*
+    One "/afk <word>" from the relay, under the profile it came from. active
+    and here are somebody at the game; out is their game taking them out
+    because nobody pressed "I am still here". Only for a profile that is in
+    the world or has just left it, so a stray line moves nobody and writes
+    nothing to the staff log.
+  */
+  function heard(pid, word, now, how) {
+    pid = Number(pid) || 0;
+    if (!pid) { return 'nobody'; }
+    var e = state.by[pid];
+    if (word === 'active' || word === 'here') {
+      if (e) { e.last = now; }
+      return e ? word : 'not in the world';
+    }
+    if (word === 'out') {
+      if (e && e.out) { return 'already'; }
+      if (!e && !state.left[pid]) { return 'not in the world'; }
+      if (e) { e.out = now; }
+      delete state.left[pid];
+      how.out(pid, e ? e.actorId : 0, 'no answer to "Are you still here?" within ' + WINDOW_S +
+              ' seconds, after ' + ASK_MIN + ' minutes with nothing from the keyboard, mouse or character');
+      return 'out';
+    }
+    return 'unknown';
+  }
+
+  function nameOf(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      var n = String((ap && ap.name) || '');
+      if (n) { return n; }
+    } catch (e) { }
+    return 'somebody';
+  }
+  function settings() {
+    try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
+  }
+
+  /* The staff log: one line in moderation.log, which the Discord bot says in the staff channel. */
+  function record(pid, name, why) {
+    var fs = null, path = null;
+    try { fs = require('fs'); path = require('path'); } catch (e) { return; }
+    var s = settings();
+    var row = { at: new Date().toISOString(), server: String(s.thornswoodServer || '').trim().toLowerCase() || 'main',
+                did: 'idle', by: pid, byName: name, who: pid, whoName: name, why: String(why || '').slice(0, 300) };
+    try {
+      fs.appendFileSync(path.join(String(s.privDir || 'private'), 'moderation.log'), JSON.stringify(row) + '\n');
+    } catch (e) {
+      console.log('[thornswood] idle: could not write moderation.log, so the staff channel will not hear of it: ' + e);
+    }
+  }
+
+  function out(pid, actorId, why) {
+    var now = Date.now();
+    var name = actorId ? nameOf(actorId) : 'somebody';
+    var seats = g.__thornswoodSeats;
+    var still = false;
+    if (actorId) {
+      try { var u = mp.getUserByActor(actorId); still = u !== undefined && u !== null && u >= 0; } catch (e) { still = false; }
+    }
+    if (seats) {
+      try { seats.idleOut(pid, now, seats.liveHow(), still ? actorId : 0); }
+      catch (e) { console.log('[thornswood] idle: the seats block would not take profile ' + pid + ': ' + e); }
+    }
+    console.log('[thornswood] idle: ' + name + ' (profile ' + pid + ') was taken out of the world to the ' +
+                'character choice and put in line: ' + why);
+    record(pid, name, why);
+  }
+
+  function liveHow() {
+    return {
+      place: function (actorId) {
+        var pos = mp.get(actorId, 'pos');
+        if (!pos) { return null; }
+        var rot = [0, 0, 0];
+        try { rot = (mp.get(actorId, 'angle') || [0, 0, 0]).slice(0, 3); } catch (e) { }
+        return { pos: [Number(pos[0]) || 0, Number(pos[1]) || 0, Number(pos[2]) || 0], rot: rot };
+      },
+      creating: function (actorId) {
+        var cg = g.__thornswoodChargen;
+        return !!(cg && cg.inCreation && cg.inCreation(actorId));
+      },
+      out: out
+    };
+  }
+
+  g.__thornswoodIdle = {
+    sweep: sweep, heard: heard, liveHow: liveHow, state: state,
+    serverIdle: SERVER_IDLE_MS, askMinutes: ASK_MIN, windowSecs: WINDOW_S
+  };
+
+  if (g.__thornswoodIdleTimer) { clearInterval(g.__thornswoodIdleTimer); }
+  g.__thornswoodIdleTimer = setInterval(function () {
+    try {
+      var list = [];
+      var online = mp.get(0, 'onlinePlayers') || [];
+      for (var i = 0; i < online.length; i++) {
+        var pid = 0;
+        try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+        if (pid) { list.push({ actorId: online[i], profileId: pid }); }
+      }
+      sweep(Date.now(), list, liveHow());
+    } catch (e) {
+      console.log('[thornswood] idle sweep failed: ' + e);
+    }
+  }, SAMPLE_MS);
+
+  console.log('[thornswood] idle: after ' + ASK_MIN + ' minutes with no input the game asks "Are you still here?" ' +
+              'for ' + WINDOW_S + ' seconds; the server moves anybody still for ' +
+              Math.round(SERVER_IDLE_MS / 60000) + ' minutes itself');
+})();
+// ==== end thornswood idle ====
 
 
 // ==== thornswood progression ====
@@ -36898,15 +37292,31 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       return;
     }
     // The line at the menu while the world is full (#481), from the front
-    // plugin: "/line" to wait or say they still are, "/line leave" to go.
+    // plugin: "/line" to wait or say they still are, "/line leave" to go,
+    // "/line hand <profile>" to give the place to another of the same game's
+    // characters. "/line gone" is the relay's own word that the connection
+    // closed, and counts only when the relay marked it so (cmd.relay).
     // Needs no character; the place is the seats block's alone.
     if (word === '/line') {
       var seatsApi = g.__thornswoodSeats;
       if (seatsApi && profileId) {
         try {
-          if (String(parts[1] || '').toLowerCase() === 'leave') { seatsApi.leave(profileId, seatsApi.liveHow()); }
+          var sub = String(parts[1] || '').toLowerCase();
+          if (sub === 'leave') { seatsApi.leave(profileId, seatsApi.liveHow()); }
+          else if (sub === 'gone') { if (cmd.relay === true) { seatsApi.gone(profileId, Date.now(), seatsApi.liveHow()); } }
+          else if (sub === 'hand') { seatsApi.hand(profileId, Number(parts[2]) || 0, Date.now(), seatsApi.liveHow()); }
           else { seatsApi.want(profileId, Date.now(), seatsApi.liveHow()); }
         } catch (eLine) { log('/line failed:', eLine); }
+      }
+      return;
+    }
+    // Are you still here (#1142), from the front plugin: "/afk active" and
+    // "/afk here" are somebody at the game, "/afk out" is nobody. See the idle block.
+    if (word === '/afk') {
+      var idleApi = g.__thornswoodIdle;
+      if (idleApi && profileId) {
+        try { idleApi.heard(profileId, String(parts[1] || '').toLowerCase(), Date.now(), idleApi.liveHow()); }
+        catch (eAfk) { log('/afk failed:', eAfk); }
       }
       return;
     }
@@ -39028,10 +39438,12 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       res.on('data', function (d) { body += d; });
       res.on('end', function () {
         var list = [];
+        var doc = null;
         // Nothing is acknowledged when this fails, so the service offers the
         // same batch again on the next poll rather than it being lost.
-        try { list = (JSON.parse(body) || {}).commands || []; } catch (e) { pollSaid(false); return; }
+        try { doc = JSON.parse(body) || {}; list = doc.commands || []; } catch (e) { pollSaid(false); return; }
         pollSaid(true);
+        relayBoot(doc.boot);
         var ran = [];
         for (var i = 0; i < list.length; i++) {
           var id = (list[i] && list[i].id) ? String(list[i].id) : '';
@@ -39060,6 +39472,25 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   function pollSaid(ok) {
     var s = g.__thornswoodCommandPoll || (g.__thornswoodCommandPoll = { okAt: 0, failAt: 0 });
     if (ok) { s.okAt = Date.now(); } else { s.failAt = Date.now(); }
+  }
+
+  /*
+    The relay's boot stamp, on every answer. A new one means the voice service
+    restarted, and every socket that was waiting in line died with it without
+    a word, so the seats block gives each waiting menu a minute to ask again
+    (#481). On globalThis, so a hot reload of this file is not taken for one.
+  */
+  function relayBoot(boot) {
+    boot = String(boot || '');
+    if (!boot) { return; }
+    var was = g.__thornswoodRelayBoot;
+    g.__thornswoodRelayBoot = boot;
+    if (!was || was === boot) { return; }
+    log('the relay restarted (' + was + ' is now ' + boot + ')');
+    var seatsApi = g.__thornswoodSeats;
+    if (seatsApi) {
+      try { seatsApi.relayRestarted(Date.now(), seatsApi.liveHow()); } catch (e) { log('relay restart for the line failed:', e); }
+    }
   }
 
   if (g.__thornswoodCommandTimer) { clearInterval(g.__thornswoodCommandTimer); }
