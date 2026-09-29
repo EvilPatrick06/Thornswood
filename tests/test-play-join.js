@@ -125,8 +125,25 @@ function grabPlain(name) {
   }
   return '';
 }
+// Play's doors answer inside PLAY_ANSWER_MS, and departed() takes that
+// deadline (#1094): the constants, within, standingLate and the body
+// failure pass-through come along.
+const lineOf = (head) => { const at = src.indexOf(head); return at < 0 ? '' : src.slice(at, src.indexOf('\n', at)); };
+const classOf = (head) => {
+  const at = src.indexOf(head);
+  if (at < 0) return '';
+  let depth = 0;
+  for (let i = src.indexOf('{', at); i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(at, i + 1); }
+  }
+  return '';
+};
 const HELPERS = grab('hasLeft') + '\n' + grab('departed') + '\n' +
-                grabPlain('banUntilText') + '\n' + grabPlain('accountBanned') + '\n';
+                grabPlain('banUntilText') + '\n' + grabPlain('accountBanned') + '\n' +
+                lineOf('const PLAY_ANSWER_MS') + '\n' + lineOf('const PLAY_BODY_MS') + '\n' +
+                classOf('class BodyFailed') + '\n' + grabPlain('passBodyFailure') + '\n' +
+                grabPlain('within') + '\n' + grabPlain('standingLate') + '\n';
 // /api/allowed asks standingsForDoor for everybody at once since issue #415;
 // lifted with the two constants above it and run over the same stand-in.
 const FOR_DOOR = src.slice(src.indexOf('const DOOR_BUDGET_MS'), src.indexOf('async function standingsForDoor(')) +

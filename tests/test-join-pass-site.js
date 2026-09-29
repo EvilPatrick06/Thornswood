@@ -59,7 +59,11 @@ const HELPERS = [
   grab('function notAcceptedYet('),
   // One character banned by itself, or killed for good by staff (#1010).
   grab('function banActive('), grab('function pkActive('), grab('function characterBar('), grab('function banUntilText('),
-  grab('function accountBanned(')
+  grab('function accountBanned('),
+  // Play's doors answer inside PLAY_ANSWER_MS (#1094).
+  src.slice(src.indexOf('const PLAY_ANSWER_MS'), src.indexOf('\n', src.indexOf('const PLAY_ANSWER_MS'))),
+  src.slice(src.indexOf('const PLAY_BODY_MS'), src.indexOf('\n', src.indexOf('const PLAY_BODY_MS'))),
+  grab('class BodyFailed'), grab('function passBodyFailure('), grab('function within('), grab('function standingLate(')
 ];
 yes('the pass helpers are in server.js where this expects them', HELPERS.every(function (h) { return h.length > 10; }));
 const ROUTE = grab("  if (p === '/api/play/pass' && req.method === 'POST') {");
