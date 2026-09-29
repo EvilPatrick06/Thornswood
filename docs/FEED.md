@@ -106,6 +106,7 @@ the VPS now, beside the feed the site already serves:
 | `C:\Thornswood-Docs\feed\version.json` | the live feed | yes, `/feed/version.json` |
 | `C:\Thornswood-Docs\feed\published.json` | the live baseline | no |
 | `C:\Thornswood-Docs\feed\launchers.txt` | every launcher version the channel has published, oldest first | no |
+| `C:\Thornswood-Docs\feed\releases.txt` | every release the feed has named, oldest first, one tab separated line each: id, channel, launcher, packs, baseline, commit, tag (#444, `Get-FeedStoreReleases`) | no |
 | `C:\Thornswood-Docs\feed\history\<utc stamp>-<name>` | each of those files as it was before it was replaced | no |
 | `C:\Thornswood-Docs\feed\assets\<sha256>` | the downloads | yes |
 
@@ -265,6 +266,7 @@ launcher.
 | `clientRuntime` | object | `Publish-Update.ps1:1236-1245`, only when the fork commit changed | `ClientRuntime.Heal` (`ClientRuntime.cs:261-269`) | Null or no `url`: a missing client file cannot be repaired from it. Same host and sha256 checks as a pack. |
 | `baseline` | object `{ id, sha256, url, entries }` | `Publish-Update.ps1` on every release that sends to the site (the release manifest block, #441); taken out by a `-NoUpload` run | No launcher. The next `Publish-Update.ps1`, through `Resolve-ReleaseBaseline` (`Release-Baseline.ps1`) | What that release left installed: every file of ours as `<bytes>:<sha256>`, at `/feed[-dev]/assets/<sha256>`, the same bytes as the store's `published.json`. The next release is diffed against it; a missing or stale store copy is replaced by it, checked by sha256. |
 | `releases` | array, newest first, at most 30, of `{ id, sha256, url, entries, lastPack, to? }` | `Publish-Update.ps1` on every release that names a `baseline` (the release list block, #442); `Rollback-Feed.ps1` adds the one a rollback makes, with `to` naming the release it went back to | No launcher. `Rollback-Feed.ps1` (`Get-FeedReleases`, `Release-Baseline.ps1`) | The record each release published, the same shape as `baseline`, plus `lastPack`, the last pack on the feed once that release was out, whose plugin list is the one it shipped. What a channel can be put back to; a release older than the newest thirty cannot be. The first release after this change starts the list with the `baseline` the feed already named. |
+| `release` | object `{ id, channel, launcherVersion, packs, baseline, commit, branch, uncommitted, tag }` | `Publish-Update.ps1` on every release (the release record block, #444) | No launcher. Ship, which tags `commit` as `tag` once the feed is out (`Add-ReleaseTag`, `Release-Name.ps1`); the store's `releases.txt` | The release's one name is `id`, the id its packs and its `baseline` carry (`20260928-1630`, dev `20260928-2324-dev`). The rest is what else it is known by: the launcher the feed offers with it (the same across Ships that keep their launcher, #921), the packs it added, its baseline id (empty on a `-NoUpload` run), the commit it was built from and how many tracked files differed from it, and the tag `release/main/<id>` or `release/dev/<id>` (empty when it was not built from a git checkout). `Get-ReleaseDisagreements` says whether they agree. After a main Ship the dev feed carries main's, `channel` main. |
 | `news` | array, newest first, at most 40 | `Publish-Update.ps1:1507-1536`; `Publish-Server.ps1:415-520` | News tab (`Shell.cs:2965-3160`); `Publish-News.ps1` copies it to the site | Cosmetic. |
 | `mainVersion` | string | `Publish-Update.ps1:1554-1599`: the main feed's `launcherVersion` on a dev ship, `""` on a main ship | Dev News tab header (`Shell.cs:2992-3002`) | Cosmetic. Stale today, see the end. |
 | `serverPassword` | string | Nobody. `Publish-Update.ps1:1405-1408` deletes it on every ship | Declared at `Config.cs:497`, read by nothing since 1.0.197 | Must never come back: the feed is public. |
@@ -385,6 +387,15 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
   store, and each send replaces it there only if it has not changed since
   (`Feed-Store.ps1`, #907). A refused send leaves the release marked NOT
   SHIPPED and resumable.
+- **Each release has one name and a tag** (#444): its id, recorded in the
+  feed's `release` with everything else it is known by, and in the store's
+  `releases.txt`. Once the publisher has sent the feed, Ship tags the commit it
+  was built from `release/main/<id>` or `release/dev/<id>` (annotated with the
+  launcher, packs, baseline and feed) and pushes the tag; never on a dry run,
+  and a tag that did not go on is a line on Ship's last screen with the command
+  that finishes it. `git tag -l 'release/dev/*'` lists dev's, `git show
+  release/main/<id>` says what one shipped. The `v<version>` tags are not
+  these: a person pushes one so CI builds a main launcher (`release.yml`).
 
 ## Putting a channel back (#442)
 

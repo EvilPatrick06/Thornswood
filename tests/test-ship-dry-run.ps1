@@ -33,6 +33,8 @@
   R is there so D and V prove something: the same stand-ins, on a real Ship,
   do write down the installer going to the site, the feed and baseline going to
   the store, dev following main through it, the news, the Discord and the restart.
+  And the release tag (#444): R pushes release/main/<id> once, after the
+  publisher said it sent the feed; D, V and E make no tag at all.
 
   R also proves the launcher that ships is the one CI built, not one compiled
   here (issue #457). A real main Ship never calls Build-Launcher.ps1: it runs
@@ -240,7 +242,7 @@ try {
     Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $tools '..\scripts\release\Ship.ps1') -Force
     # The real files Ship dot-sources, beside it, so it runs as it does for real.
     $realRel = Split-Path -Parent $ShipPath
-    foreach ($n in 'Ship-Rules.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Note-Rules.ps1', 'Where.ps1') {
+    foreach ($n in 'Ship-Rules.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1') {
         Copy-Item -LiteralPath (Join-Path $realRel $n) -Destination (Join-Path $tools ('..\scripts\release\' + $n)) -Force
     }
     Copy-Item -LiteralPath (Join-Path $realRel '..\..\layout.json') -Destination (Join-Path $tools '..\layout.json') -Force
@@ -309,7 +311,12 @@ if (-not $NoPush) { [void](Receive-FeedStore $(if ($Channel) { $Channel } else {
 $vf = Join-Path $ReleaseDir 'version.json'
 $was = [string]((Get-Content -LiteralPath $vf -Raw | ConvertFrom-Json).launcherVersion)
 $now = if ($VersionOverride) { $VersionOverride } else { $was }
-[IO.File]::WriteAllText($vf, '{"launcherVersion":"' + $now + '","packs":[{"id":"20990101-0000"}]}')
+# With the release record the real one writes (#444): one name, 20990101-0000,
+# for the pack, the launcher it offers and the commit it was built from.
+$ch = if ($Channel -eq 'dev') { 'dev' } else { 'main' }
+[IO.File]::WriteAllText($vf, '{"launcherVersion":"' + $now + '","packs":[{"id":"20990101-0000"}],' +
+    '"release":{"id":"20990101-0000","channel":"' + $ch + '","launcherVersion":"' + $now + '","packs":["20990101-0000"],' +
+    '"baseline":"","commit":"' + ('ab12' * 10) + '","branch":"main","uncommitted":0,"tag":"release/' + $ch + '/20990101-0000"}}')
 [IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"written":"by the publisher"}')
 # The send the real one makes: the feed and then the baseline, through
 # Feed-Store.ps1 into the stand-in for the VPS store.
@@ -318,6 +325,8 @@ if (-not $NoPush) {
     $ch = if ($Channel) { $Channel } else { 'main' }
     [void](Send-FeedStore $ch $ReleaseDir @('version.json'))
     [void](Send-FeedStore $ch $ReleaseDir @('published.json'))
+    # And says so, as the real one does once the feed is on the VPS.
+    $global:ThornswoodPublishedRelease = '20990101-0000'
 }
 '@
     # The real one's last step, which the static check above holds it to.
@@ -461,7 +470,23 @@ if ($dir) {
         @($gone | Where-Object { $_ -match '^gh release download' }).Count -eq 1)
     Yes 'R the feed reaches the VPS store: the site serves what the publisher wrote' (
         ([IO.File]::ReadAllText($siteFeed)) -match '20990101-0000')
-    Yes 'R nothing is pushed to any git repository' (@($gone | Where-Object { $_ -match '^git .*\bpush\b' }).Count -eq 0)
+    # The one thing pushed is the release tag (#444), on the commit the feed
+    # names, after the publisher has sent the feed.
+    $pushes = @($gone | Where-Object { $_ -match '^git .*\bpush\b' })
+    Yes ('R the only git push is the release tag, release/main/20990101-0000' + $(if ($pushes.Count) { ' (' + ($pushes -join '; ') + ')' } else { '' })) (
+        $pushes.Count -eq 1 -and $pushes[0] -match ' push origin refs/tags/release/main/20990101-0000$')
+    $tags = @($gone | Where-Object { $_ -match '^git .*\btag\b' })
+    Yes ('R the tag is made once, annotated, on the commit the feed names' + $(if ($tags.Count) { ' (' + ($tags -join '; ') + ')' } else { '' })) (
+        $tags.Count -eq 1 -and $tags[0] -match (' tag -a release/main/20990101-0000 ' + ('ab12' * 10) + ' -F '))
+    $at = @{}
+    for ($i = 0; $i -lt $r.Calls.Count; $i++) {
+        foreach ($k in 'Publish-Update', 'Request-Restart') { if (-not $at.ContainsKey($k) -and $r.Calls[$i].StartsWith($k)) { $at[$k] = $i } }
+        if (-not $at.ContainsKey('tag') -and $r.Calls[$i] -match '^git .*\btag -a\b') { $at['tag'] = $i }
+    }
+    Yes 'R and only after the publisher has sent the feed, and after the release is announced' (
+        $at.ContainsKey('tag') -and $at.ContainsKey('Publish-Update') -and $at['tag'] -gt $at['Publish-Update'] -and
+        $at.ContainsKey('Request-Restart') -and $at['tag'] -gt $at['Request-Restart'])
+    Yes 'R and it says so' ($r.Out -match 'release/main/20990101-0000 marks ab12ab12ab12, and it is on GitHub')
     $devNow = [IO.File]::ReadAllText($siteDevFeed) | ConvertFrom-Json
     Yes 'R dev follows main through the store: the site''s dev feed is main''s, dev port kept' (
         $devNow.launcherVersion -eq '1.1.93' -and [string]$devNow.serverPort -eq '7001')

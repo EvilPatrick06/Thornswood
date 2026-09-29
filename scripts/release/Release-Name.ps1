@@ -1,0 +1,223 @@
+<#
+  Release-Name.ps1
+
+  One name for each release, recorded in the feed and the store, and a git tag
+  on the commit it was built from (#444).
+
+      . (Join-Path $PSScriptRoot 'Release-Name.ps1')
+
+  WHY IT EXISTS. Measured on 28 September, a release was known by four things
+  that nothing tied together: the launcher version (1.1.102.6, which since
+  #921 stays the same across every Ship that does not change the launcher, so
+  several releases share it), the pack id Publish-Update mints
+  (20260928-2324-dev, also the name of its packs and, since #441, of its
+  baseline record), the fork commit of the client runtime, and the source
+  commit it was built from, which was written down nowhere at all. The only
+  tags in the repository were the v<version> ones a person pushes by hand so
+  CI builds a main launcher (release.yml), and a Ship that kept its launcher
+  had no tag.
+
+  So the release id is the one name. It is the only one every release has and
+  no two share: a Ship that sends no pack still mints one, and a pack, its
+  parts (<id>-2, <id>-3) and the baseline record all carry it already.
+  Everything else is recorded against it:
+
+    - the feed: "release" in version.json, { id, channel, launcherVersion,
+      packs, baseline, commit, branch, uncommitted, tag }, written by
+      Publish-Update (the release record block). No launcher reads it, and a
+      launcher ignores a field it does not know.
+    - the store: releases.txt beside launchers.txt on the VPS, one line per
+      release, the id first (Feed-Store.ps1).
+    - the repository: an annotated tag, release/main/<id> or release/dev/<id>,
+      on the commit that release was built from, made and pushed by Ship only
+      after the publisher has sent the feed (Add-ReleaseTag). Never v<...>, so
+      it cannot start the launcher build in release.yml.
+
+      git tag -l 'release/dev/*'         every dev release
+      git show release/main/<id>         what it shipped and where to find it
+
+  Get-ReleaseDisagreements says whether a feed's names for its release agree
+  with each other. tests\test-release-name.ps1 drives all of it.
+#>
+
+# The tag for a release, by its channel and id. '' when there is no id.
+function Get-ReleaseTagName([string]$Channel, [string]$Id) {
+    if (-not $Id) { return '' }
+    $ch = if ($Channel -eq 'dev') { 'dev' } else { 'main' }
+    return ('release/' + $ch + '/' + $Id)
+}
+
+# What the checkout at $RepoDir is: the commit HEAD names, its branch, and how
+# many tracked files differ from it. Commit is '' when $RepoDir is not the top
+# of a git checkout, so a folder inside some other repository never reports
+# that repository's commit.
+function Get-ReleaseSource([string]$RepoDir) {
+    $o = [pscustomobject]@{ Commit = ''; Branch = ''; Uncommitted = 0 }
+    if (-not $RepoDir -or -not (Get-Command git -ErrorAction SilentlyContinue)) { return $o }
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+        # "$(...)", not [string](...): a command that prints nothing gives
+        # $null through a cast, and '' through a string.
+        $top = "$(& git -C $RepoDir rev-parse --show-toplevel 2>$null | Select-Object -First 1)"
+        if ($LASTEXITCODE -ne 0 -or -not $top) { return $o }
+        $a = [IO.Path]::GetFullPath($top.Trim()).TrimEnd('\', '/')
+        $b = [IO.Path]::GetFullPath($RepoDir).TrimEnd('\', '/')
+        if (-not [string]::Equals($a, $b, [StringComparison]::OrdinalIgnoreCase)) { return $o }
+        $c = "$(& git -C $RepoDir rev-parse HEAD 2>$null | Select-Object -First 1)"
+        if ($LASTEXITCODE -ne 0 -or $c.Trim() -notmatch '^[0-9a-f]{40}$') { return $o }
+        $o.Commit = $c.Trim()
+        $o.Branch = "$(& git -C $RepoDir rev-parse --abbrev-ref HEAD 2>$null | Select-Object -First 1)".Trim()
+        $o.Uncommitted = @(& git -C $RepoDir status --porcelain --untracked-files=no 2>$null | Where-Object { $_ }).Count
+    } finally { $ErrorActionPreference = $old }
+    return $o
+}
+
+# The "release" object Publish-Update writes into version.json. The tag is
+# named only when there is a commit for it to go on.
+function New-ReleaseRecord([string]$Id, [string]$Channel, [string]$LauncherVersion, [string[]]$Packs,
+                           [string]$Baseline, [string]$Commit, [string]$Branch, [int]$Uncommitted) {
+    $ch = if ($Channel -eq 'dev') { 'dev' } else { 'main' }
+    $tag = if ($Commit) { Get-ReleaseTagName $ch $Id } else { '' }
+    return [pscustomobject][ordered]@{
+        id              = $Id
+        channel         = $ch
+        launcherVersion = [string]$LauncherVersion
+        packs           = @(@($Packs) | Where-Object { $_ } | ForEach-Object { [string]$_ })
+        baseline        = [string]$Baseline
+        commit          = [string]$Commit
+        branch          = [string]$Branch
+        uncommitted     = $Uncommitted
+        tag             = $tag
+    }
+}
+
+function Get-ReleaseField($o, [string]$k) {
+    if ($null -ne $o -and $o.PSObject.Properties[$k] -and $null -ne $o.$k) { return ([string]$o.$k).Trim() }
+    return ''
+}
+
+# The feed's "release" object, or $null when it has none.
+function Get-ReleaseRecord($doc) {
+    if ($null -eq $doc -or -not $doc.PSObject.Properties['release'] -or $null -eq $doc.release) { return $null }
+    return $doc.release
+}
+
+# Every way the feed's names for its release disagree with each other, one
+# sentence each. None means the release id, its packs, its baseline record,
+# the launcher it offers and its tag all name the same release.
+function Get-ReleaseDisagreements($doc) {
+    $bad = @()
+    $r = Get-ReleaseRecord $doc
+    if ($null -eq $r) { return @('the feed names no release') }
+    $id = Get-ReleaseField $r 'id'
+    if (-not $id) { return @('the feed''s release has no id') }
+    $ch = Get-ReleaseField $r 'channel'
+    if ($ch -ne 'main' -and $ch -ne 'dev') { $bad += "release $id names the channel '$ch', not main or dev" }
+    $lv = Get-ReleaseField $r 'launcherVersion'
+    $feedLv = Get-ReleaseField $doc 'launcherVersion'
+    if ($lv -ne $feedLv) { $bad += "release $id names launcher '$lv' and the feed offers '$feedLv'" }
+    $onFeed = @{}
+    if ($doc.PSObject.Properties['packs'] -and $doc.packs) {
+        foreach ($p in @($doc.packs)) { $pid0 = Get-ReleaseField $p 'id'; if ($pid0) { $onFeed[$pid0] = $true } }
+    }
+    $packs = @()
+    if ($r.PSObject.Properties['packs'] -and $null -ne $r.packs) { $packs = @($r.packs | ForEach-Object { [string]$_ }) }
+    foreach ($p in $packs) {
+        if ($p -ne $id -and $p -notmatch ('^' + [regex]::Escape($id) + '-\d+$')) { $bad += "release $id names pack $p, which is not one of its own" }
+        if (-not $onFeed.ContainsKey($p)) { $bad += "release $id names pack $p, which is not on the feed" }
+    }
+    $base = Get-ReleaseField $r 'baseline'
+    $feedBase = ''
+    if ($doc.PSObject.Properties['baseline'] -and $null -ne $doc.baseline) { $feedBase = Get-ReleaseField $doc.baseline 'id' }
+    if ($base -and $base -ne $id) { $bad += "release $id names baseline $base, which is another release's" }
+    if ($base -ne $feedBase) {
+        $said = if ($feedBase) { $feedBase } else { 'none' }
+        $bad += "release $id names baseline '$base' and the feed's baseline is $said"
+    }
+    $commit = Get-ReleaseField $r 'commit'
+    $tag = Get-ReleaseField $r 'tag'
+    if ($commit -and $commit -notmatch '^[0-9a-f]{40}$') { $bad += "release $id names commit '$commit', which is not a full commit id" }
+    $want = if ($commit) { Get-ReleaseTagName $ch $id } else { '' }
+    if ($tag -ne $want) { $bad += "release $id names tag '$tag' and its tag is '$want'" }
+    return $bad
+}
+
+# The annotated tag's message: the release, then everything it is known by.
+function Get-ReleaseTagMessage($r, [string]$FeedUrl) {
+    $lines = @()
+    $lines += ('Thornswood ' + (Get-ReleaseField $r 'channel') + ' release ' + (Get-ReleaseField $r 'id'))
+    $lines += ''
+    $lv = Get-ReleaseField $r 'launcherVersion'
+    if ($lv) { $lines += ('launcher  ' + $lv) }
+    $packs = @(); if ($r.PSObject.Properties['packs'] -and $null -ne $r.packs) { $packs = @($r.packs | ForEach-Object { [string]$_ }) }
+    $lines += ('packs     ' + $(if ($packs.Count) { $packs -join ', ' } else { 'none' }))
+    $b = Get-ReleaseField $r 'baseline'
+    $lines += ('baseline  ' + $(if ($b) { $b } else { 'none' }))
+    $br = Get-ReleaseField $r 'branch'
+    if ($br) { $lines += ('branch    ' + $br) }
+    $u = 0; [void][int]::TryParse((Get-ReleaseField $r 'uncommitted'), [ref]$u)
+    if ($u -gt 0) { $lines += ('built with ' + $u + ' uncommitted change(s) on top of this commit') }
+    if ($FeedUrl) { $lines += ('feed      ' + $FeedUrl) }
+    return ($lines -join "`n")
+}
+
+# Tags the commit the release in $VersionFile was built from and pushes the
+# tag. Ship calls it only after the publisher has sent the feed, and passes the
+# id the publisher said it sent ($PublishedId); anything else tags nothing.
+# Returns { Tag, Commit, Why, PutRight }: Why is '' when the tag is on the
+# remote, and PutRight is what a person runs to finish it, '' when there is
+# nothing to run.
+function Add-ReleaseTag([string]$RepoDir, [string]$VersionFile, [string]$PublishedId, [string]$Remote = 'origin', [string]$FeedUrl) {
+    $o = [pscustomobject]@{ Tag = ''; Commit = ''; Why = ''; PutRight = '' }
+    if (-not $PublishedId) { $o.Why = 'the publisher did not say it sent a release, so nothing is tagged'; return $o }
+    $doc = $null
+    try { $doc = (([IO.File]::ReadAllText($VersionFile)) -replace '^﻿', '') | ConvertFrom-Json }
+    catch { $o.Why = "could not read $VersionFile, so nothing is tagged: $($_.Exception.Message)"; return $o }
+    $r = Get-ReleaseRecord $doc
+    $id = Get-ReleaseField $r 'id'
+    if ($id -ne $PublishedId) {
+        $o.Why = "the publisher sent release $PublishedId and the feed here names release '$id', so nothing is tagged"
+        return $o
+    }
+    $bad = @(Get-ReleaseDisagreements $doc)
+    if ($bad.Count) { $o.Why = ('the feed''s names for release ' + $id + ' disagree, so nothing is tagged: ' + ($bad -join '; ')); return $o }
+    $o.Commit = Get-ReleaseField $r 'commit'
+    $o.Tag = Get-ReleaseField $r 'tag'
+    if (-not $o.Commit) { $o.Why = "release $id was not built from a git checkout, so there is no commit to tag"; return $o }
+    $msgFile = [IO.Path]::GetTempFileName()
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+        [IO.File]::WriteAllText($msgFile, (Get-ReleaseTagMessage $r $FeedUrl) + "`n", (New-Object Text.UTF8Encoding($false)))
+        $push = "git push $Remote refs/tags/$($o.Tag)"
+        $make = "git tag -a $($o.Tag) $($o.Commit) -m ""Thornswood $(Get-ReleaseField $r 'channel') release $id"""
+        & git -C $RepoDir rev-parse --verify --quiet ($o.Commit + '^{commit}') *> $null
+        if ($LASTEXITCODE -ne 0) {
+            $o.Why = "commit $($o.Commit) is not in this checkout, so $($o.Tag) was not made"
+            $o.PutRight = "git fetch $Remote; $make; $push"
+            return $o
+        }
+        $has = "$(& git -C $RepoDir rev-parse --verify --quiet ('refs/tags/' + $o.Tag + '^{commit}') 2>$null | Select-Object -First 1)".Trim()
+        if ($has -and $has -ne $o.Commit) {
+            $o.Why = "$($o.Tag) already names commit $has, not $($o.Commit); it was left alone"
+            return $o
+        }
+        if (-not $has) {
+            $said = @(& git -C $RepoDir tag -a $o.Tag $o.Commit -F $msgFile 2>&1 | ForEach-Object { [string]$_ })
+            if ($LASTEXITCODE -ne 0) {
+                $o.Why = "git tag stopped (exit $LASTEXITCODE): " + (($said | Select-Object -Last 2) -join ' ').Trim()
+                $o.PutRight = "$make; $push"
+                return $o
+            }
+        }
+        $said = @(& git -C $RepoDir push $Remote ('refs/tags/' + $o.Tag) 2>&1 | ForEach-Object { [string]$_ })
+        if ($LASTEXITCODE -ne 0) {
+            $o.Why = "the tag is made here but did not reach $Remote (exit $LASTEXITCODE): " + (($said | Select-Object -Last 2) -join ' ').Trim()
+            $o.PutRight = $push
+            return $o
+        }
+    } finally {
+        $ErrorActionPreference = $old
+        Remove-Item -LiteralPath $msgFile -Force -ErrorAction SilentlyContinue
+    }
+    return $o
+}
