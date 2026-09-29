@@ -46,6 +46,24 @@ Yes 'it points the toolchain at the fork''s own vcpkg' ($text.Contains('vcpkg\sc
 Yes 'it never writes a record' ($text -notmatch '&\s*\(?Join-Path[^\n]*New-(Client|Server)BuildRecord')
 Yes 'it compares the six client files with records\client-build.json' ($text.Contains('records\client-build.json') -and $text.Contains('Get-FileHash'))
 
+# Run hands back the exit code alone. It used to return the tool's output
+# with it, so a configure that printed anything and exited 0 stopped as a
+# failure (#919). The real function, run on a tool that prints and exits 0,
+# then on one that prints and exits 3.
+$runAst = [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$null, [ref]$null).Find({
+        param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Run' }, $true)
+Yes 'it has a Run function' ($null -ne $runAst)
+if ($runAst) {
+    $runOk = & ([scriptblock]::Create($runAst.Extent.Text + '; Run cmd /c "echo printed & echo also 1>&2"')) 6>$null
+    Yes 'Run returns 0, and only 0, for a tool that prints and succeeds' ((@($runOk).Count -eq 1) -and ($runOk -eq 0))
+    $runBad = & ([scriptblock]::Create($runAst.Extent.Text + '; Run cmd /c "echo printed & exit 3"')) 6>$null
+    Yes 'Run returns 3, and only 3, for a tool that prints and fails with 3' ((@($runBad).Count -eq 1) -and ($runBad -eq 3))
+}
+# A bare -- in a call to Run is eaten by PowerShell, so cmake got /m as its
+# own argument and refused it. The build line quotes it.
+$buildLine = @($text -split "`n" | Where-Object { $_ -match '^\s*\$code = Run \$cmake --build' })
+Yes 'the build passes -- through to MSBuild quoted' ($buildLine.Count -eq 1 -and $buildLine[0] -match "'--' /m")
+
 # Against the fork, when it is checked out here.
 $cm = Join-Path $root 'engine\skymp\CMakeLists.txt'
 if (Test-Path -LiteralPath $cm) {
