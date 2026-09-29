@@ -66,7 +66,7 @@ function RunGit([string]$dir) {
     finally { $ErrorActionPreference = $old }
     return [pscustomobject]@{ Code = $code; Out = ($out -join "`n").Trim() }
 }
-function Read-Json([string]$path) { return (([IO.File]::ReadAllText($path)) -replace '^﻿', '') | ConvertFrom-Json }
+function Read-Json([string]$path) { return (([IO.File]::ReadAllText($path)) -replace '^\uFEFF', '') | ConvertFrom-Json }
 
 $lib = Join-Path $repo 'scripts\release\Release-Name.ps1'
 Yes 'scripts\release\Release-Name.ps1 is there' (Test-Path -LiteralPath $lib)
@@ -286,6 +286,11 @@ try {
     Yes 'the top of a checkout reports its commit and branch' ($src.Commit -eq $cB -and $src.Branch -and $src.Uncommitted -eq 0)
     New-Item -ItemType Directory -Force -Path (Join-Path $work 'inner') | Out-Null
     Yes '  a folder inside one reports none, so it never names another repository''s commit' ((Get-ReleaseSource (Join-Path $work 'inner')).Commit -eq '')
+    # Publish-Update runs off its end, so a git exit code left behind here
+    # would be the publisher's own.
+    $global:LASTEXITCODE = 0
+    [void](Get-ReleaseSource (Join-Path $Scratch 'not-a-checkout'))
+    Yes '  and asking a folder that is no checkout leaves the exit code as it was' ($global:LASTEXITCODE -eq 0)
     Put (Join-Path $work 'a.txt') 'three'
     Yes '  and a changed tracked file is counted' ((Get-ReleaseSource $work).Uncommitted -eq 1)
     [void](RunGit $work checkout -q -- a.txt)
@@ -336,8 +341,10 @@ try {
     Yes ("a tag already on another commit is left alone ({0})" -f $tg.Why) ($tg.Why -match 'already names' -and (OnOrigin 'release/main/20260929-0100') -eq $cA)
 
     Feed-For '20260929-0300' 'main' $cB
+    $global:LASTEXITCODE = 0
     $tg = Add-ReleaseTag $work $vf '20260929-0300' (Join-Path $Scratch 'no-such-remote.git')
     Yes ("a push that fails says so ({0})" -f $tg.Why) ($tg.Why -match 'did not reach')
+    Yes '  and leaves the exit code as it was, because Ship''s own is its last one' ($global:LASTEXITCODE -eq 0)
     Yes ("  and what to run to finish it ({0})" -f $tg.PutRight) ($tg.PutRight -match '^git push .+ refs/tags/release/main/20260929-0300$')
 
     Feed-For '20260929-0400' 'main' ('d' * 40)

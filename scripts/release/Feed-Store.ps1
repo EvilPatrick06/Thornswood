@@ -201,7 +201,7 @@ if ($op -eq 'swap') {
       # then channel, launcher, packs, baseline, commit, tag, so its one name
       # finds the rest. Never a reason to fail a send that has already landed.
       try {
-        $rd = ([IO.File]::ReadAllText($p) -replace '^﻿', '') | ConvertFrom-Json
+        $rd = ([IO.File]::ReadAllText($p) -replace '^\uFEFF', '') | ConvertFrom-Json
         if ($rd.PSObject.Properties['release'] -and $rd.release -and [string]$rd.release.id) {
           $r = $rd.release
           $f = @('id', 'channel', 'launcherVersion', 'packs', 'baseline', 'commit', 'tag') | ForEach-Object {

@@ -55,25 +55,36 @@ function Get-ReleaseTagName([string]$Channel, [string]$Id) {
 # many tracked files differ from it. Commit is '' when $RepoDir is not the top
 # of a git checkout, so a folder inside some other repository never reports
 # that repository's commit.
+# One git call: its first line of output, trimmed, and its exit code. The
+# whole output is read, never cut short with Select-Object -First: Windows
+# PowerShell stops the process when the pipeline ends early and reports exit -1.
+function Invoke-ReleaseGit([string]$RepoDir, [string[]]$GitArgs) {
+    $out = @(& git -C $RepoDir @GitArgs 2>$null)
+    $rc = $LASTEXITCODE
+    $first = if ($out.Count) { ([string]$out[0]).Trim() } else { '' }
+    return [pscustomobject]@{ Code = $rc; First = $first; Lines = $out }
+}
+
 function Get-ReleaseSource([string]$RepoDir) {
     $o = [pscustomobject]@{ Commit = ''; Branch = ''; Uncommitted = 0 }
     if (-not $RepoDir -or -not (Get-Command git -ErrorAction SilentlyContinue)) { return $o }
+    # Put back afterwards: Publish-Update runs off its end, so the last native
+    # exit code is its own, and Ship reads it.
+    $rcWas = $global:LASTEXITCODE
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
-        # "$(...)", not [string](...): a command that prints nothing gives
-        # $null through a cast, and '' through a string.
         # The top of the checkout has no prefix. Asked of git rather than by
         # comparing paths, which a subst drive or a junction would fool.
-        $inside = "$(& git -C $RepoDir rev-parse --is-inside-work-tree 2>$null | Select-Object -First 1)".Trim()
-        if ($LASTEXITCODE -ne 0 -or $inside -ne 'true') { return $o }
-        $prefix = "$(& git -C $RepoDir rev-parse --show-prefix 2>$null | Select-Object -First 1)".Trim()
-        if ($LASTEXITCODE -ne 0 -or $prefix) { return $o }
-        $c = "$(& git -C $RepoDir rev-parse HEAD 2>$null | Select-Object -First 1)"
-        if ($LASTEXITCODE -ne 0 -or $c.Trim() -notmatch '^[0-9a-f]{40}$') { return $o }
-        $o.Commit = $c.Trim()
-        $o.Branch = "$(& git -C $RepoDir rev-parse --abbrev-ref HEAD 2>$null | Select-Object -First 1)".Trim()
-        $o.Uncommitted = @(& git -C $RepoDir status --porcelain --untracked-files=no 2>$null | Where-Object { $_ }).Count
-    } finally { $ErrorActionPreference = $old }
+        $g = Invoke-ReleaseGit $RepoDir @('rev-parse', '--is-inside-work-tree')
+        if ($g.Code -ne 0 -or $g.First -ne 'true') { return $o }
+        $g = Invoke-ReleaseGit $RepoDir @('rev-parse', '--show-prefix')
+        if ($g.Code -ne 0 -or $g.First) { return $o }
+        $g = Invoke-ReleaseGit $RepoDir @('rev-parse', 'HEAD')
+        if ($g.Code -ne 0 -or $g.First -notmatch '^[0-9a-f]{40}$') { return $o }
+        $o.Commit = $g.First
+        $o.Branch = (Invoke-ReleaseGit $RepoDir @('rev-parse', '--abbrev-ref', 'HEAD')).First
+        $o.Uncommitted = @((Invoke-ReleaseGit $RepoDir @('status', '--porcelain', '--untracked-files=no')).Lines | Where-Object { $_ }).Count
+    } finally { $ErrorActionPreference = $old; $global:LASTEXITCODE = $rcWas }
     return $o
 }
 
@@ -187,7 +198,7 @@ function Add-ReleaseTag([string]$RepoDir, [string]$VersionFile, [string]$Publish
     $o = [pscustomobject]@{ Tag = ''; Commit = ''; Why = ''; PutRight = '' }
     if (-not $PublishedId) { $o.Why = 'the publisher did not say it sent a release, so nothing is tagged'; return $o }
     $doc = $null
-    try { $doc = (([IO.File]::ReadAllText($VersionFile)) -replace '^﻿', '') | ConvertFrom-Json }
+    try { $doc = (([IO.File]::ReadAllText($VersionFile)) -replace '^\uFEFF', '') | ConvertFrom-Json }
     catch { $o.Why = "could not read $VersionFile, so nothing is tagged: $($_.Exception.Message)"; return $o }
     $r = Get-ReleaseRecord $doc
     $id = Get-ReleaseField $r 'id'
@@ -201,18 +212,21 @@ function Add-ReleaseTag([string]$RepoDir, [string]$VersionFile, [string]$Publish
     $o.Tag = Get-ReleaseField $r 'tag'
     if (-not $o.Commit) { $o.Why = "release $id was not built from a git checkout, so there is no commit to tag"; return $o }
     $msgFile = [IO.Path]::GetTempFileName()
+    # Put back afterwards: Ship runs off its end, so the last native exit code
+    # is Ship's own, and a refused push must not turn a release into a failure.
+    $rcWas = $global:LASTEXITCODE
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
         [IO.File]::WriteAllText($msgFile, (Get-ReleaseTagMessage $r $FeedUrl) + "`n", (New-Object Text.UTF8Encoding($false)))
         $push = "git push $Remote refs/tags/$($o.Tag)"
         $make = "git tag -a $($o.Tag) $($o.Commit) -m ""Thornswood $(Get-ReleaseField $r 'channel') release $id"""
-        & git -C $RepoDir rev-parse --verify --quiet ($o.Commit + '^{commit}') *> $null
-        if ($LASTEXITCODE -ne 0) {
+        $g = Invoke-ReleaseGit $RepoDir @('rev-parse', '--verify', '--quiet', ($o.Commit + '^{commit}'))
+        if ($g.Code -ne 0) {
             $o.Why = "commit $($o.Commit) is not in this checkout, so $($o.Tag) was not made"
             $o.PutRight = "git fetch $Remote; $make; $push"
             return $o
         }
-        $has = "$(& git -C $RepoDir rev-parse --verify --quiet ('refs/tags/' + $o.Tag + '^{commit}') 2>$null | Select-Object -First 1)".Trim()
+        $has = (Invoke-ReleaseGit $RepoDir @('rev-parse', '--verify', '--quiet', ('refs/tags/' + $o.Tag + '^{commit}'))).First
         if ($has -and $has -ne $o.Commit) {
             $o.Why = "$($o.Tag) already names commit $has, not $($o.Commit); it was left alone"
             return $o
@@ -233,6 +247,7 @@ function Add-ReleaseTag([string]$RepoDir, [string]$VersionFile, [string]$Publish
         }
     } finally {
         $ErrorActionPreference = $old
+        $global:LASTEXITCODE = $rcWas
         Remove-Item -LiteralPath $msgFile -Force -ErrorAction SilentlyContinue
     }
     return $o
