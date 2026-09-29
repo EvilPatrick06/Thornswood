@@ -5505,8 +5505,9 @@ mp.onRespawn = guard('onRespawn', function (actorId) {
 
 // No book moves anybody's rank. Patrick, 21 September: rank comes from working
 // the trade and from nothing else. The manuals are gone from the plugin and a
-// book in this world is a book. The one book event here, mp.onReadBook in THE
-// STAFF SPELLS, records a staff's spell when somebody who makes staves reads its
+// book in this world is a book. The one book event here, mp.onReadBook at the
+// end of THE STAFF SPELLS, holds a spell tome to the Mage rules (#1026) and
+// records a staff's spell when somebody who makes staves reads its
 // tome (#967), and never touches a rank.
 
 
@@ -25098,16 +25099,24 @@ function isRecipe(recipeDesc) {
 }
 
 /*
-  Everybody who has been told once that a profession will start deciding this.
+  NO PROFESSION, NOTHING MADE. Patrick, 29 September, closing issue #1037:
+  "There should be no grace at all they shouldn't be allowed to just make
+  anything because they didn't choose a profession."
 
-  In memory rather than on the character, because it is bookkeeping about what
-  has been said in this session and not a fact about the person. A restart says
-  it to them once more, which is the right side to be wrong on: the sentence
-  exists so that a new character at a forge learns why nothing is stopping them
-  yet, and saying it twice over two evenings costs nothing while never saying it
-  costs somebody the explanation.
+  Until then a character with no profession was let through every craft and
+  every held bench, which was called a first-evening allowance and never
+  ended: picking a profession only took things away. So the recipe gate
+  (craftAnswer), the bench gate (benchGate) and the brew and enchant gate
+  (recipelessCraft) all refuse somebody with no profession, with this one
+  sentence, because the answer is the same key wherever they are standing.
+
+  WHAT IS STILL NOBODY'S WORK is unchanged: a recipe no half owns (smelting
+  ore into ingots, tanning a hide into leather, the 1,679 in recipes.json that
+  every trade needs) never reaches craftAnswer, and a bench whose BENCH_ACCESS
+  row says anyone (the smelter, the tanning rack, the forge) still opens. What
+  such a bench holds that IS somebody's work is then refused here.
 */
-var toldCraftingIsComing = {};
+const NO_PROFESSION_AT_A_BENCH = 'You have not chosen a profession yet, so there is nothing you can make here. Press K and choose one.';
 
 /**
  * What the rulebook calls a profession, or the word itself when the rules do
@@ -25397,14 +25406,9 @@ function benchGate(actorId, baseDesc) {
   }
   if (!s) { return null; }
 
-  /*
-    NOBODY IS SHUT OUT ON THEIR FIRST EVENING, which is the same allowance
-    craftAnswer makes and for the same reason. Somebody who has not pressed K
-    yet has no half, so every bench in the province would refuse them with no
-    way to work out why, and creation is exactly when a person is most likely to
-    be standing at one.
-  */
-  if (!s.prof) { return null; }
+  // No profession, nothing made, and the sentence says which key fixes it
+  // (NO_PROFESSION_AT_A_BENCH, #1037).
+  if (!s.prof) { return NO_PROFESSION_AT_A_BENCH; }
 
   const halves = bench.halves || {};
   for (const half in halves) {
@@ -25566,19 +25570,13 @@ function craftAnswer(actorId, row) {
   const halfName = C.nameOf ? C.nameOf(half) : half;
 
   /*
-    NOBODY IS STRANDED AT A FORGE ON THEIR FIRST EVENING. A character with no
-    profession yet is let through and told once why that will change. The
-    alternative is somebody who has not pressed K yet standing at a workbench
-    that refuses everything with no way to work out what is wrong, and creation
-    is exactly when a person is most likely to be at one.
+    NO PROFESSION, NOTHING MADE (#1037). Every row that reaches this gate is
+    somebody's work, so a character with no profession is refused it and told
+    to press K. What is nobody's work never gets here; see
+    NO_PROFESSION_AT_A_BENCH.
   */
   if (!s.prof) {
-    if (!Object.prototype.hasOwnProperty.call(toldCraftingIsComing, actorId)) {
-      toldCraftingIsComing[actorId] = true;
-      out.note = 'You have no profession yet, so nothing is stopping you making that. ' +
-                 'Press K and pick one: from then on your half of it decides what you ' +
-                 'can make at all.';
-    }
+    out.refusal = NO_PROFESSION_AT_A_BENCH;
     return out;
   }
 
@@ -25891,9 +25889,16 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
     log('the recipeless craft gate threw reading the character, so it is open:', e);
     return;
   }
-  // Nobody is stranded on their first evening, the same rule the recipe gate
-  // keeps: a character with no profession yet is let through.
-  if (!s || !s.prof) { return; }
+  if (!s) { return; }
+  // No profession, no brewing and no enchanting, the same rule the recipe gate
+  // keeps (NO_PROFESSION_AT_A_BENCH, #1037).
+  if (!s.prof) {
+    notify(actorId, NO_PROFESSION_AT_A_BENCH);
+    say(actorId, NO_PROFESSION_AT_A_BENCH);
+    log(actorId.toString(16), 'was refused a recipeless craft with no profession at bench',
+        (workbenchId || 0).toString(16), '(' + (whatBench || 'unknown bench') + ')');
+    return false;
+  }
 
   var P = globalThis.__thornswoodProgression;
 
@@ -29470,16 +29475,23 @@ log('gamemode loaded:',
     return null;
   }
 
-  /** Does the book they already hold have anything of that rank in that school. */
+  /**
+    Does the book they already hold have anything of that rank in that school.
+    A spell a tome taught that SPELLS does not list (a mod's) counts by the
+    school and rank recorded beside it in spells.tomes when it was learned.
+  */
   function knowsRank(state, school, rank) {
     var s = state || fresh();
     var known = (s.spells && s.spells.known) || [];
     var book = own(SPELLS, school) ? SPELLS[school] : {};
     var names = (own(book, rank) && book[rank]) || [];
+    var tomes = (s.spells && s.spells.tomes) || {};
     for (var i = 0; i < known.length; i++) {
       for (var j = 0; j < names.length; j++) {
         if (known[i] === names[j]) { return true; }
       }
+      var t = own(tomes, known[i]) ? tomes[known[i]] : null;
+      if (t && t.school === school && t.rank === rank) { return true; }
     }
     return false;
   }
@@ -29552,7 +29564,15 @@ log('gamemode loaded:',
     if (below && !knowsRank(s, spell.school, below)) {
       return no('you need a ' + below + ' spell of ' + spell.school + ' first');
     }
+    return addToBook(s, spell);
+  }
 
+  /**
+    The spell into a state the caller has already cloned and checked, and the
+    point it costs: pickSpell and learnFromTome both end here, so a tome costs
+    exactly what the panel does and counts as the same hours in its school.
+  */
+  function addToBook(s, spell) {
     if (!s.spells) { s.spells = { points: 0, known: [] }; }
     if (!s.spells.known) { s.spells.known = []; }
     // A mage spends a stored point. Everybody else spends a place under the
@@ -29583,6 +29603,112 @@ log('gamemode loaded:',
     var s = state || fresh();
     var known = (s.spells && s.spells.known) || [];
     return known.indexOf(name) !== -1;
+  }
+
+  /*
+    A SPELL TOME TEACHES UNDER THE SAME RULES AS THE PANEL. Patrick, 29
+    September, on issue #1026: "No they still need the spell points, the
+    level, and a spell from the level below."
+
+    Until then the engine taught any tome's spell to anybody who read it
+    (ReadBookEvent in the fork) and none of pickSpell's rules were asked, so a
+    Smith could read Fireball and cast it. Now mp.onReadBook asks
+    learnFromTome, and the tome teaches only when all three hold:
+      points  a spell point to spend (spellPoints: a mage's stored points, or
+              what is left under the cap for somebody a Master mage taught)
+      level   their rank in the spell's school has reached the spell's rank
+      below   they already know a spell of that school one rank down; Novice
+              has nothing below it
+    Otherwise nothing is learned, the tome is kept, and every one of the
+    three that is missing is said. That is everybody, Enchanters included:
+    a staff spell is learned from its tome only through these same rules.
+
+    A tome's spell is the book's own entry when SPELL_IDS has its form id, so
+    the rulebook decides a spell it lists. A spell it does not list (the magic
+    mods' own) comes with the school and rank the tomes block read out of the
+    game's records, and is written into spells.tomes beside the name so the
+    rank below can be asked of it later.
+  */
+
+  /** Skyrim's minimum skill level to a rank: Apprentice and Adept are both Advanced, as SPELLS sorts them. */
+  function rankForLevel(level) {
+    var n = Number(level);
+    if (!isFinite(n) || n < 0) { return null; }
+    if (n >= 100) { return 'master'; }
+    if (n >= 75) { return 'expert'; }
+    if (n >= 25) { return 'advanced'; }
+    return 'novice';
+  }
+
+  /** The book's entry for a spell by its form id desc ('1c789:Skyrim.esm'), or null. */
+  function spellByDesc(desc) {
+    var want = String(desc || '').toLowerCase();
+    if (!want) { return null; }
+    for (var name in SPELL_IDS) {
+      if (own(SPELL_IDS, name) && String(SPELL_IDS[name]).toLowerCase() === want) {
+        return spellAt(name);
+      }
+    }
+    return null;
+  }
+
+  function word(key) { return String(key).charAt(0).toUpperCase() + String(key).slice(1); }
+
+  /**
+    Which of the three this character is missing for this spell, as
+    { what: 'points' | 'level' | 'below', why: '<what is needed, and what they have>' }.
+    Empty when nothing is missing. spell is { name, school, rank }.
+  */
+  function tomeMissing(state, spell) {
+    var s = state || fresh();
+    var out = [];
+    var school = word(spell.school);
+    if (spellPoints(s) <= 0) {
+      var because = s.prof === 'mage'
+        ? 'a mage earns one with every rank'
+        : (schoolsOf(s).length
+          ? 'anybody who is not a Mage holds ' + LIMITS.outsiderSpells + ' spells at most'
+          : 'magic is not yours until a Master mage takes you on');
+      out.push({ what: 'points', why: 'a spell point to spend, and you have none (' + because + ')' });
+    }
+    var have = rankOf(s, spell.school);
+    if (!have || rankIndex(have) < rankIndex(spell.rank)) {
+      out.push({ what: 'level', why: word(spell.rank) + ' rank in ' + school + ', and you ' +
+                 (have ? 'are ' + word(have) + ' in it' : 'have no rank in it') });
+    }
+    var below = RANKS[rankIndex(spell.rank) - 1];
+    if (below && !knowsRank(s, spell.school, below)) {
+      out.push({ what: 'below', why: (/^[aeiou]/.test(below) ? 'an ' : 'a ') + word(below) + ' ' + school +
+                 ' spell you already know, and you know none' });
+    }
+    return out;
+  }
+
+  /**
+    Reading a tome of spell ({ name, school, rank }). Answers what pickSpell
+    answers on a yes, or { ok: false, why, missing } with every one of the
+    three that stands in the way. A spell already in the book is a no with
+    why 'you already know that one' and nothing missing.
+  */
+  function learnFromTome(state, spell) {
+    if (!spell || !spell.name || SCHOOLS.indexOf(spell.school) === -1 || rankIndex(spell.rank) < 0) {
+      return no('that tome\'s spell has no school and rank the rules can read');
+    }
+    var s = clone(state);
+    if (knowsSpell(s, spell.name)) { return no('you already know that one'); }
+    var missing = tomeMissing(s, spell);
+    if (missing.length) {
+      var r = no('missing ' + missing.map(function (m) { return m.what; }).join(', '));
+      r.missing = missing;
+      return r;
+    }
+    var listed = spellAt(spell.name);
+    if (!listed || listed.school !== spell.school || listed.rank !== spell.rank) {
+      if (!s.spells) { s.spells = { points: 0, known: [] }; }
+      if (!s.spells.tomes) { s.spells.tomes = {}; }
+      s.spells.tomes[spell.name] = { school: spell.school, rank: spell.rank };
+    }
+    return addToBook(s, spell);
   }
 
   /** Every perk this character holds right now, from state alone. */
@@ -29632,7 +29758,9 @@ log('gamemode loaded:',
     nextRank: nextRank, rankOf: rankOf, treeApplies: treeApplies,
     placedIn: placedIn, has: own,
     pickSpell: pickSpell, spellAt: spellAt, spellPoints: spellPoints,
-    knowsSpell: knowsSpell, schoolsOf: schoolsOf
+    knowsSpell: knowsSpell, schoolsOf: schoolsOf,
+    rankForLevel: rankForLevel, spellByDesc: spellByDesc,
+    tomeMissing: tomeMissing, learnFromTome: learnFromTome
   };
 })();
 // ==== end thornswood progression ====
@@ -35225,12 +35353,242 @@ log('gamemode loaded:',
     forPanel: forPanel, mapHalf: mapHalf, migrate: migrate, command: command,
     beginCreation: beginCreation, updateOwnerScript: updateOwnerScript,
     gate: gate, gateHalf: gateHalf, credit: credit,
-    grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf,
+    grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
     rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
 })();
 // ==== end thornswood character ====
+
+// ==== thornswood spell tomes ====
+/*
+  A SPELL TOME TEACHES ONLY UNDER THE MAGE RULES. Patrick, 29 September, on
+  issue #1026: "No they still need the spell points, the level, and a spell
+  from the level below."
+
+  The engine teaches the spell of any book with the teaches-spell flag and
+  spends the book (ReadBookEvent::OnFireSuccess in the fork), unless
+  mp.onReadBook answers false: then the book is kept and the engine takes the
+  spell back off the client (OnFireBlocked). So the handler at the end of the
+  staff spells block asks read() below, which asks the rules
+  (learnFromTome in the progression block) and answers whether to refuse and
+  the line to say. Every one of the three that is missing is named.
+
+  WHICH SPELL, AND WHAT SCHOOL AND RANK, READ OUT OF THE GAME'S OWN RECORDS at
+  the moment somebody reads, through mp.lookupEspmRecordById (the same way the
+  spoils block classifies a container), so nothing is generated and a magic
+  mod's tomes are covered the day it is added:
+    BOOK  DATA byte 0 carries flag 0x04 (TeachesSpell, libespm BOOK.h) and the
+          uint32 at offset 4 is the spell, a plugin-local form id turned
+          global with the lookup's own toGlobalRecordId.
+    SPEL  a spell SPELLS lists (by its form id in SPELL_IDS) is the rulebook's,
+          school and rank and all. Anything else: the half cost perk in SPIT
+          at offset 32, whose editor id names both (DestructionAdept50,
+          AlterationNovice00), and failing that its effects.
+    MGEF  DATA int32 at offset 12 is the magic skill (actor value 18
+          Alteration, 19 Conjuration, 20 Destruction, 21 Illusion, 22
+          Restoration) and uint32 at 40 the minimum skill level. The highest
+          level among the effects of the five schools decides.
+  Skyrim's levels map to ranks as SPELLS sorts them: 0 Novice, 25 Apprentice
+  and 50 Adept are Advanced, 75 Expert, 100 Master (rankForLevel).
+
+  MEASURED 29 September, this block run against the 57 plugins of the server
+  load order read off disk: 497 books teach a spell, 84 of them a spell
+  SPELLS lists, and 492 give a school and rank. The five that do not are the
+  Oghma Infinium (a mod makes it teach Dragon Knowledge) and the four Fishing
+  in Skyrim cheat books, and refusing all five is right. For the 85 spells
+  SPELLS lists, the records alone agree with the book on 83; Odin moves
+  Invisibility to Expert and Call to Arms to Master, and the book wins.
+
+  A tome whose spell has no school or rank that can be read is refused and
+  logged: handing out a spell nobody could check would be the hole this
+  closes. A missing character block is a build fault and lets the book read
+  as Skyrim reads it, the same choice every gate in this file makes.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+
+  var TEACHES_SPELL = 0x04;
+  var AV_SCHOOL = { 18: 'alteration', 19: 'conjuration', 20: 'destruction', 21: 'illusion', 22: 'restoration' };
+  var PERK_RANK = /(alteration|conjuration|destruction|illusion|restoration)(novice|apprentice|adept|expert|master)/i;
+  var PERK_WORD = { novice: 'novice', apprentice: 'advanced', adept: 'advanced', expert: 'expert', master: 'master' };
+
+  function tlog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[tomes]');
+    console.log(a.join(' '));
+  }
+
+  function lookup(id) {
+    if (!id) { return null; }
+    try { return mp.lookupEspmRecordById(id) || null; } catch (e) { return null; }
+  }
+  function fieldsOf(res, type) {
+    var out = [];
+    var fields = (res && res.record && res.record.fields) || [];
+    for (var i = 0; i < fields.length; i++) {
+      if (String(fields[i].type) === type) { out.push(fields[i].data || []); }
+    }
+    return out;
+  }
+  function field(res, type) { return fieldsOf(res, type)[0] || null; }
+  function u32(b, at) {
+    if (!b || b.length < at + 4) { return null; }
+    return (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16)) + b[at + 3] * 0x1000000;
+  }
+  function i32(b, at) {
+    var n = u32(b, at);
+    return n === null ? null : (n | 0);
+  }
+  function globalOf(res, local) {
+    if (!res || typeof res.toGlobalRecordId !== 'function') { return 0; }
+    try { return Number(res.toGlobalRecordId(local)) || 0; } catch (e) { return 0; }
+  }
+
+  /** School and rank out of a SPEL record: its half cost perk, then its effects. */
+  function schoolAndRank(P, spellRes) {
+    var perkLocal = u32(field(spellRes, 'SPIT'), 32);
+    if (perkLocal) {
+      var perk = lookup(globalOf(spellRes, perkLocal));
+      var m = perk && perk.record ? PERK_RANK.exec(String(perk.record.editorId || '')) : null;
+      if (m) { return { school: m[1].toLowerCase(), rank: PERK_WORD[m[2].toLowerCase()] }; }
+    }
+    var best = null;
+    var efids = fieldsOf(spellRes, 'EFID');
+    for (var i = 0; i < efids.length; i++) {
+      var mgef = lookup(globalOf(spellRes, u32(efids[i], 0)));
+      var data = field(mgef, 'DATA');
+      var av = i32(data, 12);
+      var level = u32(data, 40);
+      if (!Object.prototype.hasOwnProperty.call(AV_SCHOOL, av) || level === null) { continue; }
+      if (!best || level > best.level) { best = { school: AV_SCHOOL[av], level: level }; }
+    }
+    if (!best) { return null; }
+    return { school: best.school, rank: P.rankForLevel(best.level) };
+  }
+
+  /** A name a person reads: the staff table's, else the record's FULL when it is plain text, else its editor id. */
+  function nameOf(spellRes, desc) {
+    var staff = g.__thornswoodStaffSpells;
+    var st = staff && staff.STAFF_SPELLS;
+    if (st && Object.prototype.hasOwnProperty.call(st, desc) && st[desc].name) { return st[desc].name; }
+    var full = field(spellRes, 'FULL');
+    if (full && full.length > 1) {
+      var text = '';
+      for (var i = 0; i < full.length && full[i]; i++) {
+        if (full[i] < 32 || full[i] > 126) { text = ''; break; }
+        text += String.fromCharCode(full[i]);
+      }
+      if (text) { return text; }
+    }
+    var edid = spellRes && spellRes.record && spellRes.record.editorId;
+    return edid ? String(edid) : desc;
+  }
+
+  /*
+    The spell a book teaches, as the rules want it: { desc, name, school,
+    rank }, school null when it cannot be read, or null when the book teaches
+    no spell. Memoed per book, because a record never changes under a running
+    server.
+  */
+  var byBook = {};
+  function tomeSpell(bookBaseId) {
+    var key = String(bookBaseId);
+    if (Object.prototype.hasOwnProperty.call(byBook, key)) { return byBook[key]; }
+    var P = g.__thornswoodProgression;
+    var out = null;
+    var book = lookup(bookBaseId);
+    var data = field(book, 'DATA');
+    if (book && book.record && String(book.record.type) === 'BOOK' && data && (data[0] & TEACHES_SPELL)) {
+      var spellId = globalOf(book, u32(data, 4));
+      var desc = '';
+      try { desc = String(mp.getDescFromId(spellId) || ''); } catch (e) { desc = ''; }
+      var listed = (P && desc) ? P.spellByDesc(desc) : null;
+      if (listed) {
+        out = { desc: desc, name: listed.name, school: listed.school, rank: listed.rank };
+      } else {
+        var res = lookup(spellId);
+        var sr = (P && res) ? schoolAndRank(P, res) : null;
+        out = { desc: desc, name: nameOf(res, desc), school: sr ? sr.school : null, rank: sr ? sr.rank : null };
+      }
+    }
+    byBook[key] = out;
+    return out;
+  }
+
+  function word(key) { return String(key).charAt(0).toUpperCase() + String(key).slice(1); }
+
+  /** The one line for a refusal: what the tome teaches and every one of the three that is missing. */
+  function refusalLine(spell, missing) {
+    var needs = missing.map(function (m) { return m.why; });
+    var list = needs.length === 1 ? needs[0]
+      : needs.slice(0, -1).join('; ') + '; and ' + needs[needs.length - 1];
+    return 'You cannot learn ' + spell.name + ' (' + word(spell.rank) + ' ' + word(spell.school) +
+           ') from this tome yet, so you keep it. You need ' + list + '.';
+  }
+
+  /*
+    Somebody read a book. Answers null to let it read as Skyrim reads it and
+    say nothing, or { refused, line }: refused true keeps the book and the
+    spell away from them, and line is said either way.
+  */
+  function read(actorId, bookBaseId) {
+    var spell = tomeSpell(bookBaseId);
+    if (!spell) { return null; }
+    var C = g.__thornswoodCharacter;
+    var P = g.__thornswoodProgression;
+    var S = g.__thornswoodStaffSpells;
+    if (!C || !C.stateOf || !P || !P.learnFromTome) {
+      tlog('the character block is not loaded, so', spell.name, 'is taught as Skyrim teaches it');
+      return null;
+    }
+    var s = C.stateOf(actorId);
+    if (!spell.school || !spell.rank) {
+      tlog('no school and rank readable for', spell.desc, '(' + spell.name + '), so the tome is refused to',
+           Number(actorId).toString(16));
+      return { refused: true, line: 'Nobody can learn ' + spell.name + ' from a tome here yet, because ' +
+               'its school and rank cannot be read. You keep the tome; tell staff with /helpme.' };
+    }
+
+    // Already in their book: nothing to spend, and the engine keeps a tome
+    // whose spell the character has. Only the staff record can be new (#967:
+    // a spell known before the profession opens its staves when its tome is
+    // read again).
+    if (P.knowsSpell(s, spell.name)) {
+      var again = (S && spell.desc) ? S.learn(P, s, spell.desc) : null;
+      if (again && again.ok) {
+        C.writeState(actorId, again.state);
+        return { refused: false, line: 'You know ' + spell.name + ' already, and you can bind it into a staff ' +
+                 'at a staff enchanter now.' };
+      }
+      return null;
+    }
+
+    var r = P.learnFromTome(s, spell);
+    if (!r.ok) {
+      tlog(Number(actorId).toString(16), 'was refused', spell.name, spell.desc + ':', r.why);
+      return { refused: true, line: r.missing ? refusalLine(spell, r.missing)
+               : 'You cannot learn ' + spell.name + ' from this tome: ' + r.why + '. You keep the tome.' };
+    }
+
+    var next = r.state;
+    var staffLine = '';
+    var st = (S && spell.desc) ? S.learn(P, next, spell.desc) : null;
+    if (st && st.ok) {
+      next = st.state;
+      staffLine = ' You can bind it into a staff at a staff enchanter now.';
+    }
+    C.writeState(actorId, next);
+    var raised = C.raiseLines ? C.raiseLines(actorId, r) : null;
+    tlog(Number(actorId).toString(16), 'learned', spell.name, spell.desc, 'from a tome');
+    return { refused: false, line: 'The tome teaches you ' + spell.name + ', ' + word(spell.rank) + ' ' +
+             word(spell.school) + '. It cost a spell point.' + staffLine + (raised ? ' ' + raised : '') };
+  }
+
+  g.__thornswoodTomes = { tomeSpell: tomeSpell, read: read, refusalLine: refusalLine };
+})();
+// ==== end thornswood spell tomes ====
 
 // ==== thornswood staff spells ====
 /*
@@ -35242,22 +35600,27 @@ log('gamemode loaded:',
   make one: an Enchanter starts with no spells at all.
 
   HOW IT WORKS.
-    - Reading a spell tome raises onReadBook. When the tome teaches a spell a
-      staff binds (STAFF_SPELLS, generated below) and the reader may make
-      staves at all, the spell is recorded on their character (staffSpells in
-      the character state, the thornswoodCharacter property, so it survives a
-      restart) and they are told so in chat. The handler never refuses: the
-      engine then teaches the spell and spends the tome as it does for anybody
-      (ReadBookEvent in the fork), which is also what makes the game's own
-      crafting menu list the staff, because the menu checks HasSpell itself.
-    - Somebody who may not make staves reads the tome and gets exactly that
-      normal effect, the spell, and nothing is recorded or said.
+    - Reading a spell tome raises onReadBook, and since 29 September (#1026)
+      THE SPELL TOMES block above decides it under the Mage rules, for an
+      Enchanter as for anybody: a spell point, the rank in the spell's school,
+      and a spell of that school one rank down. When one is missing the tome
+      is refused and kept, and the line says which. When they hold, the engine
+      teaches the spell and spends the tome (ReadBookEvent in the fork), which
+      is also what makes the game's own crafting menu list the staff, because
+      the menu checks HasSpell itself; and when the spell is one a staff binds
+      (STAFF_SPELLS, generated below) and the reader may make staves at all,
+      it is recorded on their character too (staffSpells in the character
+      state, the thornswoodCharacter property, so it survives a restart) and
+      the line says it can go into a staff.
+    - Somebody who may not make staves learns the spell under the same rules
+      and nothing is recorded for staves.
     - Making a staff asks craftAnswer, and craftAnswer asks refusal() below
       once rank and half have said yes: a staff whose spell is not recorded
       is refused with the sentence saying which tome to read. So a spell known
       some other way (read before this existed, or before the profession was
-      picked) does not open a staff; reading its tome again does, and the
-      engine keeps that tome when the spell is already known.
+      picked) does not open a staff; reading its tome again does, without a
+      second spell point, and the engine keeps that tome when the spell is
+      already known.
 
   WHO MAY LEARN. Anybody with standing in the Bladebinder half, which is the
   one question the craft gate asks before it lets a staff through: both
@@ -35504,47 +35867,31 @@ log('gamemode loaded:',
       return made + ' binds ' + name + ', and no spell tome here teaches it, so nobody can make one yet.';
     }
     return made + ' binds ' + name + ', and you have not learned it for staves yet. ' +
-           'Read a spell tome of ' + name + ' and you can make it.';
-  }
-
-  /**
-    A book was read. Answers the line to say, or null to say nothing. Records
-    the spell when the book is a tome of a staff spell and the reader may make
-    staves; never stops the book being read.
-  */
-  function readTome(actorId, bookBaseId) {
-    var tomeDesc = null;
-    try { tomeDesc = mp.getDescFromId(bookBaseId); } catch (e) { tomeDesc = null; }
-    var spell = tomeDesc ? spellForTome(String(tomeDesc)) : null;
-    if (!spell) { return null; }
-    var C = g.__thornswoodCharacter;
-    var P = g.__thornswoodProgression;
-    if (!C || !P) { return null; }
-    var r = learn(P, C.stateOf(actorId), spell);
-    if (!r.ok) { return null; }
-    C.writeState(actorId, r.state);
-    return 'The tome teaches you ' + spellName(spell) +
-           ', and you can now bind it into a staff at a staff enchanter.';
+           'Read a spell tome of ' + name + ' once you meet its Mage rules (a spell point, ' +
+           'the rank in its school and a spell of the rank below) and you can make it.';
   }
 
   g.__thornswoodStaffSpells = {
     STAFF_SPELLS: STAFF_SPELLS, spellForTome: spellForTome, known: known, knows: knows,
-    canLearn: canLearn, learn: learn, refusal: refusal, readTome: readTome
+    canLearn: canLearn, learn: learn, refusal: refusal
   };
 })();
 
 /*
-  Reading a book. Only a tome of a staff spell is answered, and only with a
-  line in chat: nothing here ever returns false, so every book reads exactly
-  as it does in Skyrim. See THE STAFF SPELLS above.
+  Reading a book. A book that teaches no spell reads exactly as it does in
+  Skyrim and nothing is said. A spell tome is decided by THE SPELL TOMES block
+  above under the Mage rules (#1026): false keeps the tome and the spell away
+  from the reader, and the line says which of the rules is missing, or what
+  was learned.
 */
 mp.onReadBook = guard('onReadBook', function (actorId, bookBaseId) {
-  const staff = globalThis.__thornswoodStaffSpells;
-  const line = staff ? staff.readTome(actorId, bookBaseId) : null;
-  if (line) {
-    notify(actorId, line);
-    say(actorId, line);
+  const tomes = globalThis.__thornswoodTomes;
+  const r = tomes ? tomes.read(actorId, bookBaseId) : null;
+  if (r && r.line) {
+    notify(actorId, r.line);
+    say(actorId, r.line);
   }
+  if (r && r.refused) { return false; }
 });
 // ==== end thornswood staff spells ====
 
@@ -38125,9 +38472,11 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     onEatItem     Eating or drinking something in the pack. No handler: the
                   engine applies a potion's effects. The needs block hears
                   about eating from the client's /ate line instead.
-    onReadBook    Reading a book. The engine teaches the spell a spell tome
-                  carries. mp.onReadBook never refuses: it records a staff's
-                  spell for somebody who makes staves and says so in chat
+    onReadBook    Reading a book. A spell tome teaches only under the Mage
+                  rules (a spell point, the rank, a spell of the rank below),
+                  and mp.onReadBook refuses it otherwise, keeping the tome
+                  and saying which is missing (THE SPELL TOMES, #1026); it
+                  also records a staff's spell for somebody who makes staves
                   (THE STAFF SPELLS, #967). Books stopped moving anybody's
                   rank on 21 September.
     onUpdateAppearanceAttempt
