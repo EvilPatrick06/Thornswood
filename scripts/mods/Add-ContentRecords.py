@@ -64,7 +64,7 @@ woodworkers and also have the animation script". So the records are Bethesda's
 and untouched, and the chopping block is answered server side in gamemode.js by
 chopWood instead: the Woodwright's verb, axe required, firewood out.
 
-THE EXECUTION BLOCK'S SCRIPT, TAKEN OFF (issue #400)
+THE EXECUTION BLOCK, TAKEN OUT OF SOLITUDE (issue #400)
 
 The plugin came from another server, and the last trace of that server's name
 in it was a script: FURN 0x05DF7B34, ThornswoodExecutionerChoppingBlock, the
@@ -75,22 +75,42 @@ Steam copy or any pack, measured 20 and 24 September, so it has never run for
 anybody here. It is the headsman's block, not a woodcutting one: firewood comes
 from the three vanilla chopping blocks, answered server side by chopWood.
 
-Every way Patrick can settle that block (left as scenery, playing the
-executioner's swing from the front plugin, or taken out of Solitude) starts
-with the dead attachment gone, so this drops the VMAD from that one record and
-touches no other subrecord of it. The form id, the editor id, the name, the
-mesh and the placed reference all stay, so the gamemode, the load order check
-and every other record see the same plugin with one subrecord fewer. Renaming
-the script instead would have needed a compiled Papyrus script under the new
-name shipping in a pack, for a feature that does not exist yet.
+Patrick, 28 September, given scenery, the executioner's swing, or removal:
+"3. Take it out of Solitude." So this takes the placed reference out of its
+cell and, because nothing else points at it, the block's base record as well.
+The script goes with it.
+
+WHY REMOVED AND NOT FLAGGED INITIALLY DISABLED AND DELETED. The usual way to
+take a reference out of the world is to mark it Initially Disabled, and the
+xEdit habit of "undelete and disable" exists for one case: a reference that
+belongs to a MASTER, which other plugins may point at, where removing the
+override would bring the master's copy back and deleting it outright crashes
+anything that still names it. Neither applies here. Both records belong to
+this plugin (the 05 at the front of both ids is this file, after its five
+masters), no plugin in the game folder lists this one as a master (104 read,
+28 September), and nothing in this file or the gamemode names either id. So
+the records simply stop existing, which is what Skyrim sees for a form that
+was never added, and what an editor does when it removes a record a plugin
+itself added. The server's reader (engine\\skymp, WorldState::AttachEspmRecord)
+would skip a reference flagged 0x800 or 0x20 as well; it walks groups by their
+size fields, which this rewrites, so it reads the smaller file the same way. A
+change form the server may have saved for that reference is kept aside and
+never loaded (LoadChangeForm defers a form id the plugin does not create, and
+skips one whose base is gone), so nothing has to be cleaned out of a save.
+
+If something ever does point at the base record, the tool keeps the base,
+takes only its script off as before, says what points at it, and still takes
+the placed reference out. If something points at the placed reference, it
+stops and writes nothing.
 
 WHAT IT PROVES BEFORE IT WRITES
 
 The same discipline as Rename-ContentRecords.ps1, Remove-DeadRecords.ps1 and
 Remove-DeadConditions.py, whose parser this shares. It serialises the file back
 byte for byte before it edits anything. Afterwards it checks that every record
-that was there is still there, in the same order, with the same form id, type and
-flags; that every record it was not asked to touch has the bytes it started with;
+that was there is still there, apart from the ones it was asked to take out, in
+the same order, with the same form id, type and flags; that the ones taken out
+are gone; that every record it was not asked to touch has the bytes it started with;
 that the new records parse back to exactly what was built; that no form id it
 allocates is already taken; that the header's record count matches what is
 actually in the file; and that the other server's name (Kzl, kzolivar) is in
@@ -119,8 +139,10 @@ import zlib
 
 COMPRESSED = 0x00040000
 
-# The headsman's block in Solitude, whose VMAD named KzlChop (see the top).
+# The headsman's block in Solitude, whose VMAD named KzlChop, and its one placed
+# reference. Both come out (see the top).
 EXECUTION_BLOCK = 0x5DF7B34
+EXECUTION_BLOCK_REF = 0x5DFCC75
 
 # The other server's naming, in either spelling the plugin used. Lower case,
 # because the comparison is.
@@ -330,6 +352,36 @@ def drop_script(rec):
     return True
 
 
+def plain(rec):
+    """A record's subrecord bytes, inflated when it is compressed."""
+    return zlib.decompress(rec.data[4:]) if rec.compressed else rec.data
+
+
+def pointing_at(records, fid, besides):
+    """Every record, other than those whose ids are in besides, whose bytes hold
+    fid as a form id. A byte search rather than a field by field read, so it can
+    only find too much, never too little: a false hit keeps a record in."""
+    needle = struct.pack('<I', fid)
+    return [r for r in records if r.fid not in besides and needle in plain(r)]
+
+
+def take_out(kids, fids):
+    """kids without the records whose ids are in fids. A group that held
+    records and is left with none goes as well; one that was empty already
+    stays, so nothing else in the file moves."""
+    out = []
+    for k in kids:
+        if isinstance(k, Grup):
+            had = len(k.kids)
+            k.kids = take_out(k.kids, fids)
+            if had and not k.kids:
+                continue
+        elif k.fid in fids:
+            continue
+        out.append(k)
+    return out
+
+
 def other_server_names(rec):
     """Where the other server's name is in one record: its editor id, or a
     script its VMAD attaches. A compressed record is inflated to be read, and
@@ -418,10 +470,38 @@ def main():
     cobj_pickaxe = by_edid['ThornswoodRecipeWeaponPickaxe']
     cobj_axe = by_edid['ThornswoodRecipeWeaponAxe']
     # Looked up by form id, which is what the gamemode and the load order use.
-    # Absent is not an error: taking the block out of the plugin is one of the
-    # choices, and then there is no script to take off it.
+    # Absent is not an error: once they are out, a second run finds neither.
     block = next((r for r in records if r.fid == EXECUTION_BLOCK and r.tag == b'FURN'), None)
-    block_scripted = block is not None and any(t == b'VMAD' for t, _ in subrecords(block.data))
+    block_ref = next((r for r in records
+                      if r.fid == EXECUTION_BLOCK_REF and r.tag == b'REFR'), None)
+    removing = set()
+    if block_ref is not None:
+        if (block_ref.compressed or
+                not any(t == b'NAME' and b == struct.pack('<I', EXECUTION_BLOCK)
+                        for t, b in subrecords(block_ref.data))):
+            print('')
+            print('STOP. REFR 0x%07X is not the placed Execution Block any more. '
+                  'Nothing was written.' % EXECUTION_BLOCK_REF)
+            return 1
+        on_ref = pointing_at(records, EXECUTION_BLOCK_REF, {EXECUTION_BLOCK_REF})
+        if on_ref:
+            print('')
+            for r in on_ref:
+                print('STOP. %s 0x%07X %s points at the placed block 0x%07X.'
+                      % (r.tag.decode(), r.fid, r.editor_id(), EXECUTION_BLOCK_REF))
+            print('  Nothing was written.')
+            return 1
+        removing.add(EXECUTION_BLOCK_REF)
+    # The base goes too, unless something other than its one placed reference
+    # names it. Then it stays, and only its script comes off.
+    on_block = []
+    if block is not None:
+        on_block = pointing_at(records, EXECUTION_BLOCK,
+                               {EXECUTION_BLOCK, EXECUTION_BLOCK_REF})
+        if not on_block:
+            removing.add(EXECUTION_BLOCK)
+    block_scripted = (block is not None and EXECUTION_BLOCK not in removing and
+                      any(t == b'VMAD' for t, _ in subrecords(block.data)))
 
     handle = clone(misc_src, HANDLE, 'ThornswoodMiscToolHandle', sets={
         b'FULL': zstr('Tool Handle'),
@@ -522,6 +602,17 @@ def main():
     if block_scripted:
         print('  FURN 0x%07X %s loses the script it named, which never shipped'
               % (block.fid, block.editor_id()))
+    if removing:
+        print('')
+        print('What comes out')
+    if EXECUTION_BLOCK_REF in removing:
+        print('  REFR 0x%07X the Execution Block placed in Solitude' % EXECUTION_BLOCK_REF)
+    if EXECUTION_BLOCK in removing:
+        print('  FURN 0x%07X %s, its base, named by nothing else'
+              % (EXECUTION_BLOCK, block.editor_id()))
+    for r in on_block:
+        print('  kept: FURN 0x%07X stays, because %s 0x%07X %s names it'
+              % (EXECUTION_BLOCK, r.tag.decode(), r.fid, r.editor_id()))
 
     if args.check:
         print('')
@@ -541,14 +632,16 @@ def main():
             continue
         wants_handle(rec)
         edited.add(rec.fid)
-    if block is not None and drop_script(block):
+    if block is not None and EXECUTION_BLOCK not in removing and drop_script(block):
         edited.add(block.fid)
-    if not built and not edited:
+    if not built and not edited and not removing:
         print('')
         print('  Everything this adds is already in the plugin. Nothing was written.')
         return 0
+    tree = take_out(tree, removing)
     for r in built:
         top_group(tree, r.tag).kids.append(r)
+    kept = [r for r in records if r.fid not in removing]
 
     # The header's record count, which sits in HEDR after the version float.
     #
@@ -566,21 +659,26 @@ def main():
         print('STOP. no HEDR in the header. Nothing was written.')
         return 1
     claimed = struct.unpack_from('<i', head, hedr + 6 + 4)[0]
-    struct.pack_into('<i', head, hedr + 6 + 4, len(records) + len(built))
+    struct.pack_into('<i', head, hedr + 6 + 4, len(kept) + len(built))
     if claimed != len(records):
         print('')
         print('The header record count was wrong before this ran')
         print('  it said %d and the file held %d. Setting it to %d.'
-              % (claimed, len(records), len(records) + len(built)))
+              % (claimed, len(records), len(kept) + len(built)))
 
     out = bytes(head) + b''.join(k.bytes() for k in tree)
 
     print('')
     print('Does the result verify')
     after_records = list(every_record(parse(out, 24 + header_size, len(out))))
-    if len(after_records) != len(records) + len(built):
+    if len(after_records) != len(kept) + len(built):
         print('  STOP. %d records in, %d out, expected %d. Nothing was written.'
-              % (len(records), len(after_records), len(records) + len(built)))
+              % (len(records), len(after_records), len(kept) + len(built)))
+        return 1
+    back = [r for r in after_records if r.fid in removing]
+    if back:
+        print('  STOP. 0x%07X was to come out and is still there. Nothing was written.'
+              % back[0].fid)
         return 1
     added = set(r.fid for r in built)
     seen = []
@@ -588,7 +686,7 @@ def main():
         if r.fid in added:
             continue
         seen.append(r)
-    for was_r, now in zip(records, seen):
+    for was_r, now in zip(kept, seen):
         if was_r.fid != now.fid or was_r.tag != now.tag or was_r.flags != now.flags:
             print('  STOP. 0x%07X changed identity. Nothing was written.' % was_r.fid)
             return 1
@@ -622,8 +720,8 @@ def main():
         return 1
     print('  ok    %d records in, %d out, same order, same ids, same flags'
           % (len(records), len(after_records)))
-    print('  ok    %d added, %d edited, every other byte untouched'
-          % (len(built), len(edited)))
+    print('  ok    %d added, %d edited, %d taken out, every other byte untouched'
+          % (len(built), len(edited), len(removing)))
     print('  ok    the header record count reads %d, which is what is in the file' % count)
     print('  ok    no record carries the other server\'s name, compressed ones included')
 
