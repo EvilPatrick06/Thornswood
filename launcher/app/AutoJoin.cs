@@ -8,7 +8,7 @@ namespace Thornswood
     /// <summary>
     /// Points the game at the server before it starts.
     ///
-    /// Under Skyrim Together this was a real piece of work: its join menu was a
+    /// Under the old multiplayer mod this was a real piece of work: its join menu was a
     /// Chromium page, so connecting for someone meant injecting a script beside
     /// it, wrapping the bridge object the game put on the window, fanning out
     /// listeners because the bridge allowed only one per event, and retrying.

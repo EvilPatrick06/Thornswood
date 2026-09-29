@@ -9,9 +9,9 @@
 // and when it did you had to use youyr cursor and a bunch of other bs I just
 // want to press a key while looking at them."
 //
-// THE TRADE MENU HE REMEMBERS WAS TradeTogether, a Skyrim Together mod that is
-// not in this build: the launcher still carries six key bindings for it and
-// writes them into a file that does not exist. So all of this is new, and the
+// THE TRADE MENU HE REMEMBERS WAS AN ADD-ON OF THE OLD MULTIPLAYER MOD, not in
+// this build: the launcher carried six key bindings for it and wrote them
+// into a file that does not exist. So all of this is new, and the
 // first thing checked here is the loop everything else rides on - the server
 // publishing who is near you, the client matching the crosshair against it.
 //

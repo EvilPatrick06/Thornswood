@@ -172,7 +172,7 @@ names dropped first), `profile\...` entries into `Profile\Default`, the list of
 what it wrote into `Profile\Packs\<pack id>.files`, the id into
 `Profile\applied.txt`, and every Data\Platform file it wrote into Keep.
 `Updater.cs:945 SelfUpdate()` writes `Launcher\Thornswood.exe.new` and a
-script in the temp folder, `st-update-<process id>.cmd`, that swaps it in once
+script in the temp folder, `thornswood-update-<process id>.cmd`, that swaps it in once
 this process has gone and keeps the old one until the new one has started
 (see SelfSwap below). `Version` at the top of the file is the launcher's
 version, moved by `scripts\release\Bump-Version.ps1` before a Ship. In the launcher,

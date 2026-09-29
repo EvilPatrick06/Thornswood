@@ -286,15 +286,8 @@ param(
 )
 
 
-# The launcher was SkyrimTogether.exe and is Thornswood.exe now. It replaces
-# itself in place when it updates rather than being reinstalled, so an install
-# made before the rename still carries the old name and both have to be looked
-# for, newest first.
+# The launcher, Thornswood.exe in the launcher folder.
 function Get-LauncherExe([string]$dir) {
-    foreach ($n in 'Thornswood.exe', 'SkyrimTogether.exe') {
-        $p = Join-Path $dir $n
-        if (Test-Path -LiteralPath $p) { return $p }
-    }
     return (Join-Path $dir 'Thornswood.exe')
 }
 
@@ -945,20 +938,12 @@ function Unbump([string]$why) {
 
 # ------------------------------------------------------------ build
 if (-not $ModsOnly) {
-    # Resolved twice on purpose. The install writes Thornswood.exe and removes a
-    # SkyrimTogether.exe left over from before the rename, so the path that
-    # existed going in is not necessarily the path that exists coming out.
-    # Holding on to the first answer makes a build that worked look like a
-    # build that produced nothing.
+    # The exe's time going in, so a build that put nothing in place is told
+    # from one that did.
     $launchDir = Join-Path $Root 'Launcher'
     $before = [datetime]::MinValue
-    foreach ($n in 'Thornswood.exe', 'SkyrimTogether.exe') {
-        $p = Join-Path $launchDir $n
-        if (Test-Path -LiteralPath $p) {
-            $t = (Get-Item -LiteralPath $p).LastWriteTimeUtc
-            if ($t -gt $before) { $before = $t }
-        }
-    }
+    $p = Get-LauncherExe $launchDir
+    if (Test-Path -LiteralPath $p) { $before = (Get-Item -LiteralPath $p).LastWriteTimeUtc }
 
     # The build and the install are two scripts since 24 September (To Do List
     # entry 243). The build compiles into a folder of its own, so csc never

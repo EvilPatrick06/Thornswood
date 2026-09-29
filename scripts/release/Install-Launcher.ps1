@@ -7,8 +7,7 @@
       .\scripts\release\Install-Launcher.ps1 -Root C:\Thornswood-DevBuild -From $env:TEMP\tsl -NoPause
 
   In order: closes a game and a launcher left running (Close-Launcher.ps1),
-  copies Thornswood.exe from -From into <Root>\Launcher, clears away the
-  SkyrimTogether.exe an install from before the rename still carries, writes
+  copies Thornswood.exe from -From into <Root>\Launcher, writes
   the icon file and the shortcuts, tells Explorer to redraw, and clears
   Explorer's icon cache when the artwork is new.
 
@@ -59,7 +58,6 @@ if (-not $icon) { Die 'app.ico was not found next to this script or in app' }
 
 $null = New-Item -ItemType Directory -Force -Path $outDir
 $exe = Join-Path $outDir 'Thornswood.exe'
-$oldExe = Join-Path $outDir 'SkyrimTogether.exe'
 
 # Shared with the other scripts that write into the build. Both match on the
 # full path, because the multiplayer client carries the same file name as the
@@ -94,14 +92,6 @@ if (-not $same) {
     catch { Die ("Could not put the new Thornswood.exe into $outDir, so the old one is still there. " +
                  "It is probably still open. " + $_.Exception.Message) }
     Say ('  Thornswood.exe put in place from ' + $From) 'Green'
-}
-if (Test-Path -LiteralPath $oldExe) {
-    try {
-        Remove-Item -LiteralPath $oldExe -Force
-        Say '  removed the old SkyrimTogether.exe' 'DarkGray'
-    } catch {
-        Say '  could not remove the old SkyrimTogether.exe, it is probably still running' 'Yellow'
-    }
 }
 
 # ------------------------------------------------------------ shortcut
@@ -192,11 +182,6 @@ $isScratch = -not ($isDevRoot -or $playRoot)
 $ws = New-Object -ComObject WScript.Shell
 $places = if ($isScratch) { @($Root) } else { @([Environment]::GetFolderPath('Desktop'), $Root) }
 foreach ($dest in $places) {
-    # The old name, tidied away so nobody ends up with two shortcuts to the
-    # same launcher after the rename.
-    $was = Join-Path $dest 'Skyrim Together.lnk'
-    if (Test-Path $was) { Remove-Item $was -Force -ErrorAction SilentlyContinue }
-
     # A dev build that previously wrote the play install's name here left a
     # shortcut behind pointing at the dev exe. Take it away rather than leave
     # it lying, but only when it really does point into this dev root: a
@@ -287,9 +272,6 @@ if ($lastIcon -ne $iconHash -and -not $isScratch) {
     Set-Content -Path $stamp -Value $iconHash -Encoding ASCII
     Say '  Explorer restarted, icon is the new one' 'Green'
 }
-
-$stale = Join-Path $outDir 'SkyrimTogether-Launcher.ps1'
-if (Test-Path $stale) { Remove-Item $stale -Force; Say '  Removed the old script launcher' 'DarkGray' }
 
 Head 'Done'
 Say $exe 'Green'

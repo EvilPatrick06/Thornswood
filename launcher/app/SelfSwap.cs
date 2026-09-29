@@ -57,17 +57,20 @@ namespace Thornswood
         public static string BadOf(string exe) { return exe + ".bad"; }
 
         /// <summary>
-        /// The launcher's name before the move off Skyrim Together, and its
-        /// name now. Issue #497, release 1 of 2: an install made before the
-        /// rename still runs as SkyrimTogether.exe, because every update used
-        /// to put the new build in at the path of the running one.
+        /// The launcher's file name before the rename to Thornswood, and its
+        /// name now. Issue #497: an install made before the rename still runs
+        /// as SkyrimTogether.exe, because every update used to put the new
+        /// build in at the path of the running one.
         ///
-        /// REMOVE in the second release of #497 (OldName, Target, AimsAtOld,
-        /// their use in Script and in Icons.Ensure, and every other fallback
-        /// that issue lists), no earlier than 28 October 2026 and on the date
-        /// Patrick picks. Never in the same release as this: an install still
-        /// called SkyrimTogether.exe needs one update from a launcher that
-        /// carries this before it is called Thornswood.exe.
+        /// This is the update path, and it is the one place in the repository
+        /// the old name is kept (tests\test-old-name-gone.js allows the exe
+        /// name here and in tests\test-self-update.ps1, nowhere else). Every
+        /// other fallback for it went on 28 September. It stays because an
+        /// install still under the old name is renamed by an update from a
+        /// launcher that carries this, and the launcher it becomes has to
+        /// point the old shortcuts at itself (Icons.Ensure, through AimsAtOld)
+        /// or the desktop shortcut opens nothing after the update. It goes
+        /// when Patrick says no install is left under the old name.
         /// </summary>
         public const string OldName = "SkyrimTogether.exe";
         public const string NewName = "Thornswood.exe";
@@ -87,8 +90,8 @@ namespace Thornswood
         /// <summary>
         /// True when a shortcut target is the old SkyrimTogether.exe in the
         /// running launcher's own folder, and the running launcher is not it.
-        /// Only that folder: the old Skyrim Together client carries the same file
-        /// name under Data, and a shortcut to it is not ours.
+        /// Only that folder: the old multiplayer mod's client carries the same
+        /// file name under Data, and a shortcut to it is not ours.
         /// </summary>
         public static bool AimsAtOld(string target, string exe)
         {

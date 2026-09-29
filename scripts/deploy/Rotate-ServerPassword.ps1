@@ -16,7 +16,7 @@
   settings and restart it, and that step was always a lie. SkyMP has no join
   password: there is no sPassword in server-settings.json, nothing in
   gamemode.js reads one, and the field only exists in the launcher's config
-  because Skyrim Together had a join screen and SkyMP does not.
+  because the old multiplayer mod had a join screen and SkyMP does not.
 
   So what this actually changes is which password the SITE hands out, and that
   is all it changes. The game server itself is open to anyone who knows the

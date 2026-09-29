@@ -74,8 +74,8 @@ param(
         -Npcs interior   only inside, so towns are alive and the roads are not.
         -Npcs all        the default, everything.
 
-      Off is not a downgrade to the Skyrim Together behaviour: that was
-      everybody getting their own private copy. Off is nobody getting one.
+      Off is not a downgrade to the old multiplayer mod's behaviour: that
+      was everybody getting their own private copy. Off is nobody getting one.
     #>
     [ValidateSet('all', 'interior', 'off')][string]$Npcs = 'all',
 
@@ -583,8 +583,8 @@ if ($RequirePass) {
     $s | Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue ($RequirePass -eq 'on') -Force
 }
 Write-Host ("  join pass: {0}" -f $(if ($s.thornswoodRequirePass -eq $true) { 'required' } else { 'watched only, nobody refused' })) -ForegroundColor DarkGray
-# Server-simulated NPCs. Off is SkyMP's default and it is the Skyrim Together
-# behaviour we are leaving behind: everyone gets their own private copy of every
+# Server-simulated NPCs. Off is SkyMP's default and it is the old multiplayer
+# mod's behaviour we are leaving behind: everyone gets their own private copy of every
 # bandit. On means one shared world. npcSettings stays empty, which is "no
 # per-NPC overrides", not "no NPCs".
 $s | Add-Member -NotePropertyName npcEnabled  -NotePropertyValue ($Npcs -ne 'off') -Force
