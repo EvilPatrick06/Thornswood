@@ -258,6 +258,12 @@ try {
         (Test-Path -LiteralPath (Join-Path $restored 'private\take-limit.json')) -and
         (Test-Path -LiteralPath (Join-Path $restored 'private\door.json')))
     Yes '  and data' (Test-Path -LiteralPath (Join-Path $restored 'data\keep.txt'))
+    # Red on the build runner only (issue #1120): what the restore said, and
+    # what is under data, so the log says why.
+    if (-not (Test-Path -LiteralPath (Join-Path $restored 'data\keep.txt'))) {
+        Show
+        foreach ($f in @(Get-ChildItem -LiteralPath $restored -Recurse -File -Force -EA SilentlyContinue | Where-Object { $_.FullName -match '\\data\\|keep\.txt' })) { Write-Host ('        under the restore: ' + $f.FullName) }
+    }
     $s = Get-Content -LiteralPath (Join-Path $restored 'server-settings.json') -Raw | ConvertFrom-Json
     $mine = ($restored -replace '\\', '/') + '/plugins/'
     Yes '  and the load order names this folder, not the one the backup came from' (

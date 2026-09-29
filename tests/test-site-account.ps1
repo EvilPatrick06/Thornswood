@@ -504,6 +504,8 @@ try {
         (Modifies (RulesFor $docs $meSid)) -or (Modifies (RulesFor $docs 'S-1-5-32-544')))
     Yes 'and the site account keeps Modify on its folder' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
     Yes 'it says Users was taken off' ($said -match 'BUILTIN\\Users no longer reaches')
+    # What it said instead, so a red on the build runner shows why in the log.
+    foreach ($l in @(($said -split "`n") | Where-Object { $_ -match 'COULD NOT' })) { Write-Host ('      ' + $l) }
 
     # The grants are given again at every deploy while the site is not SYSTEM,
     # so a second run has to leave the same rules, not a second copy of each.
