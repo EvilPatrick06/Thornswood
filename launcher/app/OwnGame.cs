@@ -94,6 +94,18 @@ namespace Thornswood
         static string MadeFile { get { return Path.Combine(Dir, "made.txt"); } }
         static string LeftOutFile { get { return Path.Combine(Dir, "left-out.txt"); } }
         static string DeclinedFile { get { return Path.Combine(Dir, "declined.txt"); } }
+        /// <summary>
+        /// When the Steam copy was cleaned of Thornswood's files, what came out
+        /// and what was left (OwnGameClean.cs, #1226). Its presence means done.
+        /// </summary>
+        static string CleanedFile { get { return Path.Combine(Dir, "steam-copy-cleaned.txt"); } }
+
+        /// <summary>A folder made anew has its Steam copy looked at again (Make).</summary>
+        static void ForgetCleaned()
+        {
+            try { if (File.Exists(CleanedFile)) File.Delete(CleanedFile); }
+            catch (Exception ex) { Swallow.Note("OwnGame.ForgetCleaned", ex); }
+        }
 
         /// <summary>True when the game runs from a folder this made.</summary>
         public static bool Active
@@ -292,7 +304,9 @@ namespace Thornswood
         public static string DeploysElsewhere(Config cfg)
         {
             string into = DeploysInto(cfg);
-            if (into.Length == 0 || !HasRecord(into) || SameFolder(into, Paths.Game)) return "";
+            // Before the folder exists the Skyrim it reads is the Steam copy,
+            // also when Paths.Game is Profile\Payload (#1226).
+            if (into.Length == 0 || !HasRecord(into) || SameFolder(into, Paths.Collection ? Paths.SteamCopy : Paths.Game)) return "";
             return into;
         }
 
@@ -597,6 +611,9 @@ namespace Thornswood
             // One of 1.6.1170's own files from the Downgrade's download, which
             // is removed once the folder is made, so it is always copied.
             public bool Pinned;
+            // Thornswood's own, from Profile\Payload (#1226): linked in and
+            // then the Payload name removed, so it ends as the folder's own.
+            public bool Ours;
         }
 
         class Rec
@@ -631,14 +648,14 @@ namespace Thornswood
             // the Downgrade downloaded (FirstBuild let it through only then).
             string game = GameFor(src);
             List<string> pinned = FirstBuildWrong(cfg, game) ? Downgrade.Downloaded(cfg) : null;
-            List<Found> all = Gather(src, left, pinned);
+            List<Found> all = WithPayload(Gather(src, left, pinned));
 
             long copyBytes = 0, totalBytes = 0;
             foreach (Found f in all)
             {
-                if (Skip(f.Rel) != null) continue;
+                if (SkipOf(f) != null) continue;
                 totalBytes += f.Size;
-                if (f.Pinned || MustCopy(f.Rel, deployed)) copyBytes += f.Size;
+                if (CopyOf(f, deployed)) copyBytes += f.Size;
             }
             long free = FreeSpace(Paths.Root);
             if (free >= 0 && free < copyBytes + 512L * 1024 * 1024)
@@ -646,15 +663,15 @@ namespace Thornswood
                                     Mb(copyBytes) + " and " + Mb(free) + " is free.");
 
             var lines = new List<string>();
-            int linked = 0, copied = 0, fellBack = 0;
+            int linked = 0, copied = 0, fellBack = 0, ours = 0;
             long done = 0; int shown = 0, looked = 0;
             foreach (Found f in all)
             {
                 PlayProgress.Files(Phase, looked++, all.Count);
-                string skip = Skip(f.Rel);
+                string skip = SkipOf(f);
                 if (skip != null) { left.Add(f.Rel + "  (" + skip + ")"); continue; }
 
-                bool copy = f.Pinned || MustCopy(f.Rel, deployed);
+                bool copy = CopyOf(f, deployed);
                 bool asLink;
                 try
                 {
@@ -665,8 +682,12 @@ namespace Thornswood
                     left.Add(f.Rel + "  (could not be brought over: " + ex.Message + ")");
                     continue;
                 }
-                if (asLink) linked++; else { copied++; if (!copy) fellBack++; }
-                lines.Add((asLink ? "L" : "C") + "|" + (deployed.Contains(f.Rel) ? "V" : "O") + "|" + f.Size + "|" + f.Ticks + "|" + f.Rel);
+                // Thornswood's own from Payload is linked in and its Payload
+                // name removed once the folder is in place, so on record it
+                // is what it then is: a copy of the folder's own.
+                if (f.Ours) ours++;
+                else if (asLink) linked++; else { copied++; if (!copy) fellBack++; }
+                lines.Add((asLink && !f.Ours ? "L" : "C") + "|" + (deployed.Contains(f.Rel) ? "V" : "O") + "|" + f.Size + "|" + f.Ticks + "|" + f.Rel);
 
                 done += f.Size;
                 int pct = totalBytes > 0 ? (int)(done * 100 / totalBytes) : 100;
@@ -679,14 +700,23 @@ namespace Thornswood
             // A share record left by a folder of the same name that is gone
             // speaks for files that are not there any more.
             ForgetShares();
+            // And a note that the Steam copy was cleaned speaks for an install
+            // before this one: a reinstall without the own folder put
+            // Thornswood's files back into the Steam copy (#1226).
+            ForgetCleaned();
             Directory.Move(temp, Folder);
             WriteMade(src, SumCopied(lines));
             SettleSettings(true);
+            string payloadLeft = DropPayload();
 
             string said = "Thornswood's own Skyrim folder is ready at " + Folder + ": " +
                           linked.ToString("n0") + " files linked, " + copied.ToString("n0") + " copied (" + Mb(copyBytes) + ")";
             if (fellBack > 0) said += ", " + fellBack.ToString("n0") + " of them copied because a link could not be made";
             said += ". " + left.Count.ToString("n0") + " left out, other servers' files among them; the list is in " + LeftOutFile + ".";
+            if (ours > 0)
+                said += " " + ours.ToString("n0") + " of Thornswood's own files came from " + Paths.Payload +
+                        ", where the installer and the launcher kept them so that nothing was written into the Steam copy.";
+            if (payloadLeft != null) said += " " + payloadLeft;
             if (pinned != null)
             {
                 said += " The game itself is 1.6.1170's own files, downloaded from Steam; the Steam copy in " + game + " was not changed.";
@@ -930,6 +960,16 @@ namespace Thornswood
         public static int RestoreMissingPlugins(Config cfg, Action<string> say)
         {
             if (say == null) say = delegate(string m) { };
+
+            // Chosen at install and not made yet (#1226): Paths.Game is
+            // Profile\Payload, which holds Thornswood's own files and none of
+            // Vortex's. Vortex's plugins come in with the folder (Make), and
+            // putting them into Payload now would take them in as Thornswood's.
+            if (Paths.OwnFirst)
+            {
+                say("Vortex's plugins go into Thornswood's own folder when it is made, so there is nothing to put back before then.");
+                return 0;
+            }
 
             List<string> want = ShippedPlugins();
             if (want.Count == 0) return 0;
@@ -1919,6 +1959,74 @@ namespace Thornswood
                     f.Pinned = true;
                     byRel[f.Rel] = f;
                 }
+            }
+        }
+
+        /// <summary>
+        /// <paramref name="all"/> with Thornswood's own files from
+        /// Profile\Payload over it, when the own folder was chosen at install
+        /// (#1226). The installer's payload is there instead of in the Steam
+        /// copy, and so is whatever the launcher wrote before the folder
+        /// existed (packs, Thornswood.ini, the client settings, the client
+        /// runtime), because Paths.Game was Payload until now. Each takes the
+        /// place of a file at the same path, the way the installer's copy
+        /// into the Steam copy used to, and a pack's the way a pack does.
+        /// </summary>
+        static List<Found> WithPayload(List<Found> all)
+        {
+            if (string.IsNullOrEmpty(Paths.Payload) || !Directory.Exists(Paths.Payload)) return all;
+            var byRel = new Dictionary<string, Found>(StringComparer.OrdinalIgnoreCase);
+            foreach (Found f in all) byRel[f.Rel] = f;
+            foreach (Found f in Walk(Paths.Payload))
+            {
+                f.Ours = true;
+                byRel[f.Rel] = f;
+            }
+            return new List<Found>(byRel.Values);
+        }
+
+        /// <summary>
+        /// Skip for a file Make brings in. Thornswood's own from Payload come
+        /// from the build, so the client runtime among them is taken (it is
+        /// left out only when it would come from the Steam copy), and the
+        /// rest of Skip still applies: a session note or a log is not the
+        /// folder's either way.
+        /// </summary>
+        static string SkipOf(Found f)
+        {
+            if (f.Ours && ClientFile(f.Rel)) return null;
+            return Skip(f.Rel);
+        }
+
+        /// <summary>Whether Make copies a file rather than linking it. Payload's are linked, then Payload goes.</summary>
+        static bool CopyOf(Found f, HashSet<string> deployed)
+        {
+            if (f.Ours) return false;
+            return f.Pinned || MustCopy(f.Rel, deployed);
+        }
+
+        /// <summary>
+        /// Removes Profile\Payload once the folder holds its files. Only names
+        /// go: each file in it is also in Root\Game by a hard link, or was
+        /// copied there. Null when it is gone or was never there, otherwise a
+        /// sentence; what is left is removed at the next start
+        /// (CleanSteamCopy), never read again.
+        /// </summary>
+        static string DropPayload()
+        {
+            string dir = Paths.Payload;
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return null;
+            try
+            {
+                foreach (string f in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+                    DropName(f);
+                Directory.Delete(dir, true);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("OwnGame.DropPayload", ex);
+                return "Some of " + dir + " could not be removed yet (" + ex.Message.TrimEnd('.') + "); the launcher removes the rest the next time it starts.";
             }
         }
 

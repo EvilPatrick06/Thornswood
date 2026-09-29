@@ -280,16 +280,20 @@ namespace Thornswood
         /// </summary>
         /// <summary>
         /// The Skyrim the installer wrote into. Under the collection that is the
-        /// game folder itself. With Thornswood's own folder (OwnGame) it is the
-        /// Steam copy the folder was made from: the installer put its files in
-        /// there before the folder existed, and making the folder never took
-        /// them back out. Empty for an install that never wrote into a Steam
-        /// copy at all, which is an own Game folder from an installer older
-        /// than the collection.
+        /// Steam copy. With Thornswood's own folder (OwnGame) it is the Steam
+        /// copy the folder was made from: an install that did not choose the
+        /// folder in the setup window put its files in there before the folder
+        /// existed, and the first start after the folder is made takes them
+        /// back out (OwnGame.CleanSteamCopy, #1226), which empties the list.
+        /// One that chose it wrote nothing there and has no list. Empty for an
+        /// install that never wrote into a Steam copy at all, which is an own
+        /// Game folder from an installer older than the collection. Not
+        /// Paths.Game under the collection: with the folder chosen and not
+        /// made yet that is Profile\Payload.
         /// </summary>
         static string InstalledInto(Config cfg)
         {
-            if (Paths.Collection) return Paths.Game;
+            if (Paths.Collection) return Paths.SteamCopy;
             try
             {
                 if (OwnGame.Active) return OwnGame.Source(cfg);
@@ -447,7 +451,10 @@ namespace Thornswood
             // it here would hand rmdir /s /q their entire game, so it is not
             // added, whatever the box said. Purge Mods in Vortex is what takes
             // the mods out, and the launcher says so on the uninstall page.
-            if (deleteMods && !Paths.Collection) leave.Add(Paths.Game);
+            // With the own folder chosen and not made yet, Paths.Game is
+            // Profile\Payload, Thornswood's own files under Root, and it goes
+            // with the mods even when the saves in Profile stay (#1226).
+            if (deleteMods && (!Paths.Collection || Paths.OwnFirst)) leave.Add(Paths.Game);
 
             // A collection install has no Game folder of ours, but it did write
             // our own content into the person's Steam copy. That comes back out

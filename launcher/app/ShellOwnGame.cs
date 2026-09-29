@@ -95,10 +95,7 @@ namespace Thornswood
             */
             if (collection)
             {
-                Log("Thornswood is sharing one Skyrim with every other server on this machine, " +
-                    "in " + Paths.Game + ". Saves, settings and the client's own settings file " +
-                    "are shared, so whichever launcher wrote last is the one the game believes. " +
-                    "The Play button says MAKE THORNSWOOD'S OWN FOLDER until that is put right.");
+                Log(NoOwnFolderYet() + " The Play button says MAKE THORNSWOOD'S OWN FOLDER until that is put right.");
             }
 
             ThreadPool.QueueUserWorkItem(delegate
@@ -166,6 +163,23 @@ namespace Thornswood
         /// the offer is put up here and now rather than pointing at a button in
         /// another screen.
         /// </summary>
+        /// <summary>
+        /// Where Thornswood stands before its own folder is made, for the log,
+        /// the Play button and the box. Chosen at install (Paths.OwnFirst,
+        /// #1226) nothing is shared: its files wait in Profile\Payload and the
+        /// Steam copy is not written. Otherwise it shares the Steam copy with
+        /// every other server, as it always has.
+        /// </summary>
+        static string NoOwnFolderYet()
+        {
+            if (Paths.OwnFirst)
+                return "Thornswood's own Skyrim folder was chosen when Thornswood was installed and is not made yet. " +
+                       "Until it is, Thornswood's files wait in " + Paths.Payload + " and nothing is written into the Steam copy in " + Paths.SteamCopy + ".";
+            return "Thornswood is sharing one Skyrim with every other server on this machine, in " + Paths.SteamCopy +
+                   ". Saves, settings and the client's own settings file are shared, so whichever launcher wrote last is the one the game believes, " +
+                   "which is how their menus and logins get into Thornswood and Thornswood's get into theirs.";
+        }
+
         static bool OwnGameRequired()
         {
             if (!Paths.Collection) return true;
@@ -184,16 +198,13 @@ namespace Thornswood
 
             string msg =
                 "Thornswood needs a Skyrim folder of its own before it can start.\n\n" +
-                "Right now it would run out of " + Paths.Game + ", which is shared with every " +
-                "other server on this machine. They all write the same client settings file and " +
-                "the game believes whichever wrote last, which is how their menus and logins get " +
-                "into Thornswood and Thornswood's get into theirs.\n\n" +
+                NoOwnFolderYet() + "\n\n" +
                 // Not indented any more: WhyNot's answer can be a long sentence
                 // (a drive apart names both ways out and their paths), and an
                 // indent the box only applies to the first wrapped line reads
                 // as a stray gap in the middle of it.
                 "The folder cannot be made yet:\n\n" + why;
-            Log("Not starting: Thornswood would run out of the shared Skyrim, and the own folder " +
+            Log("Not starting: Thornswood has no Skyrim folder of its own yet, and it " +
                 "cannot be made yet. " + why);
             try
             {
@@ -291,6 +302,19 @@ namespace Thornswood
                 };
                 try { said = make ? OwnGame.Make(c, say) : OwnGame.Refresh(c, say); }
                 catch (Exception ex) { fail = ex.Message; }
+
+                // Made: from here Paths name the new folder, as they will after
+                // the restart below, so the light flags and the load order are
+                // put right in Thornswood's own folder and its Profile. On the
+                // old Paths they went into the Steam copy's plugins, through
+                // Vortex's links, and Windows' own plugin list, or, with the
+                // folder chosen at install, into a Profile\Payload that is gone
+                // (#1226).
+                if (make && fail == null)
+                {
+                    try { Paths.Init(Paths.Root); }
+                    catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, pointing Paths at the new folder", ex); }
+                }
 
                 // Same light-flag and load-order steps Fix runs. Refresh can
                 // bring Vortex's unflagged staging copy of a MustBeLight
