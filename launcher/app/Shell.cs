@@ -384,8 +384,8 @@ namespace Thornswood
             try { string leak = Leaks.Clean(cfg); if (leak != null) Log(leak); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
-            // Steam's Updates setting for the Skyrim the downgrade looks after, read only (SteamUpdates).
-            try { if (!Downgrade.Needed(cfg) && !Downgrade.SourceNeeded(cfg)) { string upd = SteamUpdates.Report(Downgrade.Target(cfg)); if (upd != null) Log(upd); } } catch (Exception ex) { Swallow.Note("Shell.Run, reading Steam's Updates setting", ex); }
+            // Steam's Updates setting for the Skyrim the downgrade looks after: logged, and set when it does not hold the version (ShellSteamUpdates.cs, #493).
+            try { if (!Downgrade.Needed(cfg) && !Downgrade.SourceNeeded(cfg)) HoldSteamUpdatesOnStart(); } catch (Exception ex) { Swallow.Note("Shell.Run, Steam's Updates setting", ex); }
             {
                 int parked = playing ? 0 : Keep.Unpark();
                 if (parked > 0) Log("Put back " + parked + " parked " + (parked == 1 ? "plugin" : "plugins") + " from another server or build left behind by the last session.");

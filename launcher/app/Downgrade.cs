@@ -732,7 +732,7 @@ namespace Thornswood
         /// on 1.1.94). Keizaal Online's launcher opens the console on those
         /// machines, so it is possible, and this is how.
         /// </summary>
-        static bool AskSteam(string link, Action<string> log)
+        internal static bool AskSteam(string link, Action<string> log)
         {
             try
             {
