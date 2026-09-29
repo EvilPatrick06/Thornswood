@@ -428,6 +428,14 @@ try {
     Yes '  but not while Skyrim runs, which needs Steam' ((OnStart $true $true $true $false) -ceq $N)
     Yes '  and not again at the start once the person said No' ((OnStart $true $true $false $true) -ceq $N)
 
+    # Only before Thornswood's own folder exists (#1226, Patrick, 29 Sep):
+    # "after that, people's Steam copy is theirs to update however they like".
+    $mLooks = Method 'LooksAtStart' @([bool], [bool])
+    function Looks([bool]$own, [bool]$down) { return [bool]$mLooks.Invoke($null, [object[]]@($own, $down)) }
+    Yes 'the start looks at the setting while there is no folder of its own and no downgrade is needed' (Looks $false $false)
+    Yes '  not while a downgrade is needed first' (-not (Looks $false $true))
+    Yes '  and never once the own folder exists, whatever else is true' ((-not (Looks $true $false)) -and (-not (Looks $true $true)))
+
     $mQuestion = Method 'Question' @([string], [bool])
     function Question([string]$m, [bool]$steam) { return [string]$mQuestion.Invoke($null, [object[]]@($m, $steam)) }
     Put (Acf '0')
@@ -514,7 +522,7 @@ try {
     # there for the setting to hold afterwards, and the question does not
     # follow it (test-own-folder-alone.ps1).
     Yes 'the question does not follow a downgrade, which no longer writes the Steam copy' (($down.Length -gt 0) -and ($down -notmatch 'AskToHoldSteamUpdates') -and ($ask -notmatch 'SteamUpdatesDeclined\)'))
-    Yes 'the start calls it once no downgrade is needed' ($shell -match 'if \(!Downgrade\.Needed\(cfg\)\) HoldSteamUpdatesOnStart\(\);')
+    Yes 'the start calls it only before the own folder exists and once no downgrade is needed' ($shell -match 'if \(SteamUpdates\.LooksAtStart\(!Paths\.Collection, Downgrade\.Needed\(cfg\)\)\) HoldSteamUpdatesOnStart\(\);')
     Yes 'and reads Steam''s file for the Steam copy, never Thornswood''s folder' (($start -match 'string target = OwnGame\.Source\(cfg\);') -and ($ask -match 'SteamUpdates\.ManifestFor\(OwnGame\.Source\(cfg\)\)'))
     Yes 'the start line is read only there' ((([regex]::Matches($shell + $askSrc, 'SteamUpdates\.Report\(')).Count -eq 1) -and ($start -match 'SteamUpdates\.Report\('))
     $draw = Body $shell 'static bool DrawStatus()'
@@ -530,7 +538,11 @@ try {
     $own = Get-Content -LiteralPath (Join-Path $AppPath 'OwnGame.cs') -Raw
     Yes 'every file in the game''s root is copied into Thornswood''s folder, never linked' ($own -match "if \(rel\.IndexOf\('\\\\'\) < 0\) return true;")
     $chk = Get-Content -LiteralPath $checks -Raw
-    Yes 'the Game build check reads the exe Thornswood runs (Paths.Exe)' (($chk -match 'new FileInfo\(Paths\.Exe\)\.Length') -and ($chk -match 'new Check\("Game build", bytes == cfg\.ExpectedExeBytes'))
+    # Before a folder chosen at install is made, Paths.Game is Profile\Payload
+    # and the game is the Steam copy it will be made from (#1226).
+    Yes 'the Game build check reads the exe Thornswood runs (Paths.Game, or the Steam copy its chosen folder is made from)' (
+        ($chk -match 'string game = Paths\.OwnFirst \? Paths\.SteamCopy : Paths\.Game;') -and ($chk -match 'new FileInfo\(exe\)\.Length') -and
+        ($chk -match 'new Check\("Game build", bytes == cfg\.ExpectedExeBytes'))
     # Since #1218 a Steam copy on another build no longer stops a made folder
     # following Vortex; only a first build asks for the Downgrade, and that
     # leaves the Steam copy on its build (test-own-folder-alone.ps1).

@@ -382,10 +382,18 @@ namespace Thornswood
                 Keep.TakeNote();
             }
             try { string leak = Leaks.Clean(cfg); if (leak != null) Log(leak); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
+            // Once the own folder is made, Thornswood's files come out of the Steam copy, once (OwnGameClean.cs, #1226). Off the window's thread: it deletes.
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string cleaned = null;
+                try { cleaned = OwnGame.CleanSteamCopy(cfg); } catch (Exception ex) { Swallow.Note("Shell.Run, taking Thornswood's files out of the Steam copy", ex); }
+                if (cleaned == null) return;
+                try { win.Dispatcher.BeginInvoke((Action)delegate { Log(cleaned); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying what came out of the Steam copy", ex); }
+            });
             try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
-            // Steam's Updates setting for the Steam copy of Skyrim: logged, and set when it does not hold the version (ShellSteamUpdates.cs, #493).
-            try { if (!Downgrade.Needed(cfg)) HoldSteamUpdatesOnStart(); } catch (Exception ex) { Swallow.Note("Shell.Run, Steam's Updates setting", ex); }
+            // Steam's Updates setting for the Steam copy of Skyrim: logged, and set when it does not hold the version (ShellSteamUpdates.cs, #493), only until the own folder is made (#1226).
+            try { if (SteamUpdates.LooksAtStart(!Paths.Collection, Downgrade.Needed(cfg))) HoldSteamUpdatesOnStart(); } catch (Exception ex) { Swallow.Note("Shell.Run, Steam's Updates setting", ex); }
             {
                 int parked = playing ? 0 : Keep.Unpark();
                 if (parked > 0) Log("Put back " + parked + " parked " + (parked == 1 ? "plugin" : "plugins") + " from another server or build left behind by the last session.");
@@ -2955,11 +2963,7 @@ namespace Thornswood
             else if (Paths.Collection && !playing)
             {
                 btnPlay.Content = "MAKE THORNSWOOD'S OWN FOLDER";
-                btnPlay.ToolTip =
-                    "Thornswood is sharing one Skyrim with every other server on this machine, in " +
-                    Paths.Game + ". They all write the same client settings file and the game " +
-                    "believes whichever wrote last, which is how their menus and logins get into " +
-                    "Thornswood and Thornswood's get into theirs. This gives Thornswood a folder " +
+                btnPlay.ToolTip = NoOwnFolderYet() + " This gives Thornswood a folder " +
                     "of its own. It takes a few minutes and the launcher restarts when it is done.";
             }
             else if (!playing)

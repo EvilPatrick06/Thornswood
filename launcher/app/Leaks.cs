@@ -31,14 +31,18 @@ namespace Thornswood
         /// Removes any shipped copy found, in the folder the game runs from and,
         /// when that is Thornswood's own folder, in the Steam copy it is made
         /// from: the installer put its copy into the Steam copy, and the own
-        /// folder never takes that file in. Returns a line for the log, or null.
+        /// folder never takes that file in. The same while the own folder is
+        /// chosen and not made (Paths.OwnFirst, #1226): the game folder is then
+        /// Profile\Payload, and an earlier install may have left the file in the
+        /// Steam copy. Only ever this one exact file is deleted there.
+        /// Returns a line for the log, or null.
         /// </summary>
         public static string Clean(Config cfg)
         {
             var games = new System.Collections.Generic.List<string> { Paths.Game };
             try
             {
-                if (OwnGame.Active)
+                if (OwnGame.Active || Paths.OwnFirst)
                 {
                     string src = OwnGame.Source(cfg);
                     if (src.Length > 0) games.Add(src);

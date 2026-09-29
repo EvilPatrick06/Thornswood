@@ -93,6 +93,30 @@ namespace Thornswood
         {
             var issues = new List<Issue>();
             Expected = 0;
+
+            // The own folder was chosen at install and is not made yet
+            // (#1226): Paths.Game is Profile\Payload, Thornswood's own files
+            // and nothing else, so there is no game to hold against the
+            // server. Checking Payload would call every plugin of the
+            // collection missing while Vortex has it deployed. One line says
+            // what is next, and Fix makes the folder (OwnFolderNext).
+            if (Paths.OwnFirst)
+            {
+                string why = null;
+                if (cfg != null)
+                {
+                    try { why = OwnGame.WhyNot(cfg, OwnGame.DeploysInto(cfg)); }
+                    catch (Exception ex) { why = ex.Message; }
+                }
+                issues.Add(new Issue("Thornswood's own Skyrim folder was chosen when Thornswood was installed and is not made yet, so there is no game to check. " +
+                                     (why == null ? "Fix makes it from what Vortex has deployed." : "It cannot be made yet: " + why), false));
+                if (cfg != null || LastIssues == null)
+                {
+                    LastIssues = issues;
+                    LastUsedServer = cfg != null;
+                }
+                return issues;
+            }
             string golden = Path.Combine(Paths.Golden, "plugins.txt");
 
             // Paths.Live, not Paths.LocalAD. Under the collection those are two
@@ -810,6 +834,18 @@ namespace Thornswood
         public static int Fix(Config cfg, Action<string> say)
         {
             if (say == null) say = delegate(string m) { };
+
+            // Chosen at install and not made yet (#1226): what Fix puts right
+            // is the folder Thornswood plays from, and that folder is what is
+            // missing. Making it is the fix, the way Make it in Settings does
+            // it; nothing else is touched first, least of all the Steam copy.
+            if (Paths.OwnFirst)
+            {
+                OwnFolderNext = true;
+                say("Thornswood's own Skyrim folder is made next, from what Vortex has deployed. Nothing else needs putting right before it exists.");
+                return 1;
+            }
+
             int n = SettleLoadOrder();
 
             // Run's first issue, when Vortex deploys somewhere else: saved as

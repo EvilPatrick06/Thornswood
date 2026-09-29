@@ -305,6 +305,10 @@ namespace Thornswood
             Paths.WinLocalAD = Path.Combine(s.Dir, "windows\\LocalAppData\\Skyrim Special Edition");
             Paths.Collection = true;
             Paths.Game = s.Game;
+            // What Paths.Init sets beside Game (#1226).
+            Paths.SteamCopy = s.Game;
+            Paths.Payload = Path.Combine(Paths.ProfileDir, "Payload");
+            Paths.OwnFirst = false;
             Paths.Live = Paths.WinLocalAD;
             Paths.LiveMyGames = Paths.WinMyGames;
             Directory.CreateDirectory(Paths.ProfileDir);

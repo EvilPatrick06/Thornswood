@@ -22,6 +22,16 @@ below). Where a step behaves differently in that shape, the page says so in
 one line. Nothing here describes it as something to run, and the two shapes
 must never be mixed in one release.
 
+Until the folder is made there are two ways in (#1226), chosen in the setup
+window. With Thornswood's own folder ticked, Setup-Thornswood.ps1 puts its
+payload in `Profile\Payload` and writes nothing into the Steam copy;
+`Paths.OwnFirst` is true and `Paths.Game` is `Profile\Payload`, so every writer
+below lands there, and Make takes it into `<Root>\Game` and removes it. Not
+ticked, the payload goes into the Steam copy with `Profile\installed-into-game.txt`
+and `Paths.Game` is the Steam copy, as it always was; once the folder is made,
+the next start takes Thornswood's files back out of the Steam copy, once
+(`OwnGameClean.cs CleanSteamCopy()`).
+
 `<Root>` is the install folder and `Profile` means `<Root>\Profile`. Every file
 named below is in `launcher\app` unless the path says otherwise.
 
@@ -100,7 +110,7 @@ it says a pool thread.
 | 13 | `Shell.cs:301 Discord.SendPendingLogs` | Pool thread. A session that ended without sending its logs (`Profile\logs-pending.txt` still there) sends them now, before a new game start truncates them. |
 | 14 | `Shell.cs:307 AutoJoin.Ensure` | Makes `Game\Data\Platform\Plugins\skymp5-client-settings.txt` when there is none (`AutoJoin.cs:52 Ensure()`). |
 | 15 | `Shell.cs:316 Checks.GameRunning` | A game still running from before the launcher was restarted is taken over: `Shell.cs:326 Hold.Take` holds our files again and nothing is pulled apart under it. Otherwise `Shell.cs:331 Swap.Restore` takes off any redirect a crash left and `Shell.cs:332 Keep.TakeNote` deletes a stale session note. |
-| 16 | `Shell.cs:334 Leaks.Clean` | Deletes the one sign in file a 16 Sep installer shipped, matched by hash. Then `Shell.cs:335 ThornIni.Ensure` writes `Game\Data\SKSE\Plugins\Thornswood.ini` from the template if it is missing, and `Shell.cs:336 ThornIni.UndoShippedFov` runs once per install. When no downgrade is needed, `Shell.cs:338 HoldSteamUpdatesOnStart` logs Steam's Updates setting for the Steam copy of Skyrim and sets it when it does not hold the version (see SteamUpdates below). |
+| 16 | `Shell.cs:334 Leaks.Clean` | Deletes the one sign in file a 16 Sep installer shipped, matched by hash. Then `Shell.cs:335 ThornIni.Ensure` writes `Game\Data\SKSE\Plugins\Thornswood.ini` from the template if it is missing, and `Shell.cs:336 ThornIni.UndoShippedFov` runs once per install. A pool thread runs `OwnGame.CleanSteamCopy`, which once the folder is made takes Thornswood's files out of the Steam copy, once, and removes a leftover `Profile\Payload`. Before the folder exists and when no downgrade is needed (`SteamUpdates.LooksAtStart`), `HoldSteamUpdatesOnStart` logs Steam's Updates setting for the Steam copy of Skyrim and sets it when it does not hold the version (see SteamUpdates below). |
 | 17 | `Shell.cs:340 Keep.Unpark` | Puts back plugins a crashed session left parked. Then `Shell.cs:344 Keep.Seed` fills `Profile\Keep` from pack records for files it has no copy of yet. |
 | 18 | `Shell.cs:353 Display.MatchScreen` | Unless Lock resolution is ticked: the game's resolution and menu scale follow the screen (`Shell.cs:359 Display.ScaleMenus`). |
 | 19 | `Shell.cs:370 Icons.Ensure` | Pool thread. The shortcut icon follows the exe. `Shell.cs:393 ClearLeftovers` (pool) ends a windowless Skyrim over three minutes old. `Shell.cs:407 Uninstall.DropScratch` (pool) deletes the installer's leftover `Thornswood-setup` folder. |
@@ -150,7 +160,9 @@ menu this session. Writes `Profile\launcher.log` through Log and
 
 **Paths** (Paths.cs). Every path the launcher uses, worked out once in
 `Paths.cs:39 Init()` from where the exe is. `Collection` says which shape the
-install is. Owns no files.
+install is; `OwnFirst` that its own folder was chosen at install and is not
+made yet, when `Game` is `Profile\Payload` (#1226); `SteamCopy` is the Steam
+copy, read for the game's build before the folder exists. Owns no files.
 
 **Config** (Config.cs). `<Root>\config.json`, read by `Config.cs:289 Load()`
 and written by Save, which encrypts the update token with Windows' DPAPI and
@@ -329,8 +341,8 @@ character is being played. The join token is only asked for over https,
 because the request carries the Discord ticket; with a voice address that is
 not https there is no token.
 
-**OwnGame** (OwnGame.cs and OwnGameShare.cs, with ShellOwnGame.cs for its card
-and offer). `<Root>\Game` itself. `OwnGame.cs:477 Make()` builds it in
+**OwnGame** (OwnGame.cs, OwnGameShare.cs and OwnGameClean.cs, with
+ShellOwnGame.cs for its card and offer). `<Root>\Game` itself. `OwnGame.cs:477 Make()` builds it in
 `<Root>\Game.new` and moves it into place; `OwnGame.cs:554 Refresh()` brings it
 up to date with Vortex. Once made, the folder needs nothing from the Steam copy
 (#1218): a refresh takes only the files Vortex's record lists, the game's own
@@ -345,6 +357,16 @@ or copied, and whether Vortex deployed it, which Publish-Update reads),
 `loadorder.txt`. `OwnGame.cs:327 WhyNot()` names the one thing stopping the
 folder being made. Every writer into Game calls `OwnGame.cs:717 Unshare()` or
 Detach first, so a write never lands in Vortex's copy through a hard link.
+Make takes `Profile\Payload` in too, Thornswood's own files when the folder was
+chosen at install, and removes it (#1226). `OwnGameClean.cs CleanSteamCopy()`
+runs at every start and, the first time it finds the folder made, takes
+Thornswood's files out of the Steam copy: the installer's list and what packs
+added to it, Thornswood.ini and the thornswood- files under Data\Platform, and
+at paths other SkyMP servers write too (the client runtime, the client's page)
+only a file whose bytes are Thornswood's. Nothing Vortex deployed, nothing of
+Skyrim's own, the person's own mods and the client's shared settings file
+stay. It notes what it did in `Profile\OwnGame\steam-copy-cleaned.txt` and
+never runs again; a file it could not delete keeps it running at each start.
 
 **ClientRuntime** (ClientRuntime.cs). The six files that are the SkyMP client,
 checked by SHA-256 against `records\client-build.json`, which is compiled into
@@ -373,7 +395,9 @@ what holds the version: Thornswood runs its own folder, whose exe is its own
 copy, and Steam puts an update in by moving new files into its own copy. Since
 #1218 a made folder does not read the Steam copy's game at all, so an update
 costs it nothing; the setting only saves a download before the folder is
-made. The question no longer follows a downgrade, which never writes the Steam
+made, so it is only looked at until then (`SteamUpdates.LooksAtStart`, #1226):
+once the folder exists the Steam copy is the person's to update as they like.
+The question no longer follows a downgrade, which never writes the Steam
 copy now.
 Play is never held on it.
 
