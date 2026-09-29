@@ -450,8 +450,12 @@ namespace Thornswood
         ///    MustCopy.
         /// 7: Start On Save is left out, and taken out of a folder that
         ///    already has it, its settings file included. See Retired.
+        /// 8: SkyUI 5.2's ten loose scripts (ski_main.pex and the rest) that the
+        ///    collection installer left in the Steam copy are left out, so a
+        ///    refresh cannot link them back after a pack deletes them. See
+        ///    Foreign, issue #960.
         /// </summary>
-        const int Rules = 7;
+        const int Rules = 8;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -1297,6 +1301,19 @@ namespace Thornswood
               change the two together.
             */
             if (rel.Equals("Data\\Interface\\map.swf", StringComparison.OrdinalIgnoreCase)) return true;
+
+            // SkyUI 5.2's own scripts, loose, issue #960: "SKYUI ERROR CODE 6,
+            // menu file version mismatch, required 5.2 SE, detected 6.11 SE".
+            // The collection's SkyUI keeps its scripts and its 6.11 menus in
+            // SkyUI_SE.bsa, and its ski_main no longer compares menu versions.
+            // These ten, compiled in 2017, were left in the Steam copy by the
+            // collection installer; loose beats an archive, so the old
+            // ski_main ran against the new menus. Packs delete them, and this
+            // keeps a refresh from linking them back in. SKI_ConfigBase and
+            // SKI_ConfigManager are MCM Recorder's and are not on the list.
+            // Ship-Rules.ps1 carries the same rule ($ShipOldSkyUIScripts);
+            // change the two together.
+            if (Regex.IsMatch(rel, @"^Data\\Scripts\\ski_(activeeffectswidget|configmenu|favoritesmanager|main|playerloadgamealias|qf_configmanagerinstance|questbase|settingsmanager|widgetbase|widgetmanager)\.pex$", I)) return true;
 
             if (!rel.StartsWith("Data\\Platform\\", StringComparison.OrdinalIgnoreCase)) return false;
             if (leaf.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)) return true;

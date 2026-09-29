@@ -191,6 +191,17 @@ Yes '  whatever case it is written in' (Test-ShipOtherServer 'Data\Interface\MAP
 Yes '  and every pack deletes it from every install' ($always -contains $map)
 Yes 'the other Interface files still ship' (-not (Test-ShipOtherServer 'Data\Interface\quest_journal.swf'))
 
+# ---- SkyUI 5.2's loose scripts and SkyUI's ERROR CODE 6, issue #960 ------------
+#
+# Dev packs carried them, so every pack deletes them as well as leaving them out.
+foreach ($s in @('Data\Scripts\ski_main.pex', 'Data\Scripts\ski_widgetmanager.pex', 'Data\Scripts\ski_configmenu.pex')) {
+    Yes "$s is never shipped" (Test-ShipOtherServer $s)
+    Yes '  and every pack deletes it from every install' ($always -contains $s)
+}
+Yes 'SkyUI 5.2''s scripts match in any case' (Test-ShipOtherServer 'Data\Scripts\SKI_Main.pex')
+Yes 'MCM Recorder''s SKI_ConfigBase.pex still ships as the collection''s' (-not (Test-ShipOtherServer 'Data\Scripts\SKI_ConfigBase.pex') -and $always -notcontains 'Data\Scripts\SKI_ConfigBase.pex')
+Yes '  and so does its SKI_ConfigManager.pex' (-not (Test-ShipOtherServer 'Data\Scripts\SKI_ConfigManager.pex'))
+
 # ---- Data\Platform: ours is what we name --------------------------------------
 Yes 'our overlays in Plugins ship' (-not (Test-ShipOtherServer 'Data\Platform\Plugins\thornswood-chat.js'))
 Yes 'anybody else''s plugin script in Plugins does not' (Test-ShipOtherServer 'Data\Platform\Plugins\other-server-chat.js')
