@@ -66,6 +66,7 @@ function Run-Block([string]$value, $settings) {
     $maxOnline = 0
     $LoadOrderRefuse = ''
     $RequirePass = $value
+    $Npcs = ''
     $expanded = $ExecutionContext.InvokeCommand.ExpandString($body)
     $file = Join-Path $tmp 'block.ps1'
     [IO.File]::WriteAllText($file, $expanded, (New-Object Text.UTF8Encoding $true))
