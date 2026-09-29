@@ -2584,6 +2584,12 @@ namespace Thornswood
                 btnPlay.Content = "PLAY";
                 btnQuitGame.Visibility = Visibility.Collapsed;
                 Log("Game closed after " + (int)(DateTime.Now - playStartedAt).TotalMinutes + " minutes. Your Windows Skyrim folders are back to normal.");
+                {
+                    // Where the crash log is, and the snapshot beside it on
+                    // the dev build and staff PCs (#1191).
+                    string crashed = CrashDump.AfterSession(playStartedAt, CrashDump.Wanted(cfg));
+                    if (crashed != null) Log(crashed);
+                }
 
                 // The one failure that looks like everything else: a session
                 // that ran the wrong Skyrim. Nothing else in here can be trusted
@@ -5313,6 +5319,10 @@ namespace Thornswood
 
                 int held = Enforce.Apply();
                 if (held > 0) Log("Put back " + held + " setting" + (held == 1 ? "" : "s") + " the last session overwrote.");
+                // A full crash snapshot on the dev build and staff PCs only
+                // (#1191). Before the Said lines, which its writes add to.
+                string snapshot = CrashDump.Apply(cfg);
+                if (snapshot != null) Log(snapshot);
                 foreach (string note in Enforce.Said) Log(note);
 
                 // Written fresh every launch so the address and port the client
