@@ -559,7 +559,20 @@
   let clothesRemountCell = -1;
   let clothesRemountLast = 0;
   const CLOTHES_REMOUNT_CELL_GAP = 1200;
+  /*
+    FOUR TIMES A SECOND, NOT EVERY FRAME (#963). The dev front log of
+    28 September had this as the costliest handler in the frame: 599 ms in
+    30 s over 1274 frames, getPlayer, Actor.from, getRace and the race's name
+    on every one of them, for everybody, goblin or not. A cell change is
+    still seen within a quarter of a second, and the remount itself waits
+    0.4 s for the cell to settle anyway.
+  */
+  const CLOTHES_REMOUNT_TICK_MS = 250;
+  let clothesRemountTickAt = 0;
   function clothesRemountTick() {
+    const at = Date.now();
+    if (at - clothesRemountTickAt < CLOTHES_REMOUNT_TICK_MS) { return; }
+    clothesRemountTickAt = at;
     let pc = null;
     try { pc = sp.Game.getPlayer(); } catch (e) { return; }
     if (!pc) { return; }
