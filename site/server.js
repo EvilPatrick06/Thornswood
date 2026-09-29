@@ -1616,10 +1616,19 @@ const TROUBLE_BAD = [
   ['FATAL',               'something fatal']
 ];
 
+/* The load order lines are the game's own check, as it writes them to Skyrim
+   Platform's log (loadOrderVerificationService in the client), not the words
+   LOAD ORDER ERROR. Those words are only ever painted on the game's screen,
+   never logged by the game; the one log that carries them is the launcher's,
+   inside its own Scan sentences ("The game shows that as LOAD ORDER ERROR"),
+   which say what WOULD happen and stop Play until Fix. Matching them labelled
+   42 of the 53 sessions from 25 to 28 Sep "refused over the load order" when
+   the game's check had passed in every one it could be read for (#945). */
 const TROUBLE_WARN = [
   ['Update failed',                 'an update did not install'],
   ['being used by another process', 'an update could not write a file something else had open'],
-  ['LOAD ORDER ERROR',              'the game refused them over the load order'],
+  ['Load order check failed',       'the game showed LOAD ORDER ERROR: its plugins are not the server\'s'],
+  ['Missing some server mods',      'the game showed LOAD ORDER ERROR: it has fewer plugins than the server'],
   ['load order is not the server',  'their load order did not match the server'],
   ['does not match the server',     'their load order did not match the server'],
   ['is missing, install it in Vortex', 'a mod is not installed'],
@@ -1648,10 +1657,141 @@ function scanFor(logs, marks, level) {
   return null;
 }
 
+/*
+  ONLY THIS SESSION'S PART OF launcher.log (#945).
+
+  The launcher sends the last 256 KB of its own log, which is days of it:
+  every Scan, Fix, update and game it has run. The game's logs start afresh
+  each run, so they are this session's; launcher.log is not. Read whole, a
+  line from two days earlier coloured every session after it. Measured on
+  28 Sep: all 42 sessions labelled "refused over the load order" since 25 Sep
+  took the label from a Scan line written half an hour to 65 hours BEFORE the
+  session started, which Fix had since put right, and the Scan just before
+  each Play said 0 issues. An "Update failed" from 19 Sep did the same.
+
+  So launcher.log is read from the last "Starting the game on launcher" line,
+  which Shell writes as it starts the game for this session, to its end. A
+  log with no such line has nothing that can be placed in this session, and
+  none of it is read.
+*/
+const SESSION_START_MARK = 'Starting the game on launcher ';
+
+function thisSessionOf(name, text) {
+  const s = String(text || '');
+  if (name !== 'launcher.log') return s;
+  const at = s.lastIndexOf(SESSION_START_MARK);
+  if (at < 0) return '';
+  return s.slice(s.lastIndexOf('\n', at) + 1);
+}
+
+/*
+  What the game server said about this person's load order in this session,
+  from its own log (the load order refusal block in gamemode.js, #402 and
+  #873). serverLines is the server log sliced to the session; the profile is
+  the character's, which the lines name. A refusal outranks anything the
+  client logs say about the load order, because it is the one that ended the
+  session.
+*/
+function serverRefusal(serverLines, profile) {
+  const p = Number(profile) || 0;
+  if (!p || !Array.isArray(serverLines)) return null;
+  const refused = 'refusing profile ' + p + ':';
+  const would = 'WOULD REFUSE profile ' + p + ':';
+  let watched = null;
+  for (const raw of serverLines) {
+    const line = String(raw);
+    if (line.indexOf(refused) >= 0) {
+      return {
+        level: 'warn', file: 'server', line: line.trim().slice(0, 300),
+        why: line.indexOf('no load order report') >= 0
+          ? 'the server ended the session: their game never said which plugins it loaded'
+          : 'the server ended the session: their load order is not the server\'s'
+      };
+    }
+    if (!watched && line.indexOf(would) >= 0) {
+      watched = {
+        level: 'warn', file: 'server', line: line.trim().slice(0, 300),
+        why: 'the server found their load order is not its own and let them stay'
+      };
+    }
+  }
+  return watched;
+}
+
 /* Red before yellow: a session that crashed AND complained about its load
-   order is a crash, and the crash is the thing worth waking somebody for. */
-function readTrouble(logs) {
-  return scanFor(logs, TROUBLE_BAD, 'bad') || scanFor(logs, TROUBLE_WARN, 'warn');
+   order is a crash, and the crash is the thing worth waking somebody for.
+   Then the server's word on the load order, then the rest. */
+function readTrouble(logs, serverLines, profile) {
+  const mine = {};
+  for (const name of Object.keys(logs || {})) mine[name] = thisSessionOf(name, logs[name]);
+  return scanFor(mine, TROUBLE_BAD, 'bad') ||
+         serverRefusal(serverLines, profile) ||
+         scanFor(mine, TROUBLE_WARN, 'warn');
+}
+
+/*
+  Sets the row's trouble from what readTrouble found, or from the launcher's
+  own issues when the logs said nothing, and clears it when neither says
+  anything. Returns true when the row changed.
+*/
+function applyTrouble(row, found) {
+  const before = [row.trouble, row.troubleAt, row.troubleFile, row.troubleLine].join('\u0001');
+  delete row.trouble; delete row.troubleAt; delete row.troubleFile; delete row.troubleLine;
+  if (found) {
+    row.trouble = found.why;
+    row.troubleAt = found.level;     /* 'bad' is red, 'warn' is yellow */
+    row.troubleFile = found.file;
+    row.troubleLine = found.line;
+  } else {
+    const issues = Array.isArray(row.issues) ? row.issues : [];
+    const checks = Array.isArray(row.checks) ? row.checks : [];
+    if (issues.length || checks.length) {
+      /* No crash, but the launcher was unhappy. Yellow, and never a message
+         in Discord: these are common, understood, and have a known fix. */
+      const blocking = issues.filter(i => i && i.blocking).length;
+      row.trouble = blocking
+        ? (blocking + ' thing(s) would have stopped them connecting')
+        : (issues.length + checks.length) + ' thing(s) the launcher was unhappy about';
+      row.troubleAt = 'warn';
+    }
+  }
+  return [row.trouble, row.troubleAt, row.troubleFile, row.troubleLine].join('\u0001') !== before;
+}
+
+/*
+  Every row read again once under the rules above, because the rows written
+  before #945 keep the label the whole launcher.log gave them, and the
+  sessions page counts those. Only the stored client logs are read, not the
+  server log (a session's server lines may have rolled away by now, and the
+  old rule never read them either). TROUBLE_RULES moves when the rules do, so
+  the next change reads them again too; a row already read under these rules
+  is left alone. Nothing is said in Discord: these are old sessions.
+*/
+const TROUBLE_RULES = 2;
+function rereadTrouble() {
+  try {
+    const rows = sessionRows();
+    let changed = 0, read = 0;
+    for (const row of rows) {
+      if (!row || row.troubleRules === TROUBLE_RULES) continue;
+      const key = sessionKey(row.session);
+      if (!key) continue;
+      let logs = null;
+      try {
+        const f = slogFile(key);
+        if (fs.existsSync(f)) logs = (JSON.parse(fs.readFileSync(f, 'utf8')) || {}).logs || null;
+      } catch (e) { logs = null; }
+      row.troubleRules = TROUBLE_RULES;
+      if (!logs) continue;
+      read++;
+      if (applyTrouble(row, readTrouble(logs))) changed++;
+    }
+    if (read || changed) putSessions(rows);
+    console.log('[thornswood-docs] read ' + read + ' stored session log sets again under the current trouble rules; ' +
+                changed + ' session(s) changed colour or reason');
+  } catch (e) {
+    console.log('[thornswood-docs] could not read the stored session logs again: ' + (e && e.message || e));
+  }
 }
 
 /*
@@ -3784,23 +3924,19 @@ async function handle(req, res) {
       if (issues.length) rows[at].issues = issues;
       if (checks.length) rows[at].checks = checks;
 
-      const found = readTrouble(logs);
-      if (found) {
-        rows[at].trouble = found.why;
-        rows[at].troubleAt = found.level;     /* 'bad' is red, 'warn' is yellow */
-        rows[at].troubleFile = found.file;
-        rows[at].troubleLine = found.line;
-      } else if (issues.length || checks.length) {
-        /* No crash, but the launcher was unhappy. Yellow, and never a message
-           in Discord: these are common, understood, and have a known fix. */
-        const blocking = issues.filter(i => i.blocking).length;
-        rows[at].trouble = blocking
-          ? (blocking + ' thing(s) would have stopped them connecting')
-          : (issues.length + checks.length) + ' thing(s) the launcher was unhappy about';
-        rows[at].troubleAt = 'warn';
-      }
+      /* The server's half of this session, the same window the View more
+         button reads, for what the server said about this person's load
+         order (#945). */
+      const row = rows[at];
+      const from = (Number(row.start) || Number(row.end) || 0) - 60000;
+      const to = (Number(row.end) || Date.now()) + 60000;
+      const server = serverLogSlice(row.channel, from, to);
 
-      if (rows[at].trouble) putSessions(rows);
+      const found = readTrouble(logs, server.lines, row.profile);
+      applyTrouble(row, found);
+      row.troubleRules = TROUBLE_RULES;
+
+      putSessions(rows);
       /* Only a crash is worth saying out loud. */
       if (found && found.level === 'bad') noteTrouble(rows[at], found);
     } catch (e) { }
@@ -4350,6 +4486,7 @@ http.createServer((req, res) => {
   console.log('[thornswood-docs] writing this to ' + siteLog.file +
               ', rolled at 4 MB, five kept');
   console.log('[thornswood-docs] documents in ' + DATA);
+  rereadTrouble();
   console.log('[thornswood-docs] downloads in ' + FILES);
   console.log('[thornswood-docs] uploads in ' + UP);
   console.log('[thornswood-docs] watching the game on 127.0.0.1:' +
