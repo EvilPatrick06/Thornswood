@@ -101,7 +101,7 @@ foreach ($t in 'ssh', 'scp') {
 
 if ($Remove) {
     Head 'Removing'
-    & ssh @ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue; Remove-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContinue; Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue; 'removed'`""
+    Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue; Remove-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContinue; Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue; 'removed'`"" }
     Say 'Gone. The game server is untouched.' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
@@ -122,7 +122,7 @@ if (-not $PutBack -and -not $Remove -and -not $Restart) {
 
 if ($Restart) {
     Head 'Restarting'
-    & ssh @ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Start-Sleep -Seconds 1; Start-ScheduledTask -TaskName '$TaskName'; 'restarted'`""
+    Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Start-Sleep -Seconds 1; Start-ScheduledTask -TaskName '$TaskName'; 'restarted'`"" }
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
 }
@@ -263,7 +263,7 @@ New-Item -ItemType Directory -Force -Path '$Root\$stageName\public' | Out-Null
 "@ | ForEach-Object { "$_".Trim() })
     if ($made -notcontains 'ready') { Die "could not make $Root\$stageName up there. Voice was not touched." }
     foreach ($rel in $send.Keys) {
-        & scp @ssh $send[$rel] "${target}:$rootFar/$stageName/$rel"
+        Invoke-ThornswoodNative { & scp @ssh $send[$rel] "${target}:$rootFar/$stageName/$rel" }
         if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE for $rel. Voice was not touched." }
     }
     Say 'staged' 'Green'

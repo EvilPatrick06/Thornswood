@@ -72,7 +72,7 @@ Get-Content -LiteralPath (`$log + '.1'), `$log -Encoding UTF8 -Tail 3000 -EA Sil
 "@
 
 $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-$out = & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" 2>&1
+$out = Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" } 2>&1
 
 Head 'The VPS'
 foreach ($line in $out) {

@@ -186,7 +186,7 @@ function Send-Asset([string]$local, [string]$sha) {
     Move-Item -LiteralPath $part -Destination (Join-Path $dir $sha) -Force
     return
   }
-  & scp @ssh $local "$User@${Vps}:$Root/$prefix/assets/$sha.part"
+  Invoke-ThornswoodNative { & scp @ssh $local "$User@${Vps}:$Root/$prefix/assets/$sha.part" }
   if ($LASTEXITCODE -ne 0) { throw "scp failed: $sha ($local)" }
   $said = ((RemoteLines @"
 `$p = '$rootWin\$prefix\assets\$sha.part'
@@ -259,7 +259,7 @@ function Send-AssetBundle($items) {
       $text = $BundleUnpack.Replace('@ZIP@', $there.Replace("'", "''")).Replace('@ASSETS@', $assets.Replace("'", "''"))
       $said = @(& ([scriptblock]::Create($text)) | ForEach-Object { [string]$_ })
     } else {
-      & scp @ssh $zipPath "$User@${Vps}:$Root/$prefix/incoming-$tag.zip"
+      Invoke-ThornswoodNative { & scp @ssh $zipPath "$User@${Vps}:$Root/$prefix/incoming-$tag.zip" }
       if ($LASTEXITCODE -ne 0) { throw "scp failed: the bundle of $($items.Count) asset(s)" }
       $text = $BundleUnpack.Replace('@ZIP@', "$rootWin\$prefix\incoming-$tag.zip").Replace('@ASSETS@', "$rootWin\$prefix\assets")
       $said = @(RemoteLines $text)

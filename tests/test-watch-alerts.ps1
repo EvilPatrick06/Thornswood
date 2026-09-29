@@ -93,7 +93,8 @@ Yes 'the webhook shape -SetWebhook checks is the one the box checks' (
 Yes 'no webhook address is written in the file' (
     -not ((Get-Content -LiteralPath $WatchPath -Raw) -match 'discord(app)?\.com/api/webhooks/\d'))
 Yes '-SetWebhook sends the address on standard input, never on the command line' (
-    (Get-Content -LiteralPath $WatchPath -Raw) -match '\$url \| & ssh' -and
+    # Through Invoke-ThornswoodNative since #941, piped on to ssh the same way.
+    (Get-Content -LiteralPath $WatchPath -Raw) -match '\$url \| Invoke-ThornswoodNative \{ \$input \| & ssh' -and
     (Get-Content -LiteralPath $WatchPath -Raw) -match '\[Console\]::In\.ReadLine\(\)')
 
 # The watcher as it runs, without the probes that touch the world. The fakes

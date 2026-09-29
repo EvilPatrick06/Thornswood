@@ -78,7 +78,7 @@ function Works {
     # a real answer about the key instead of a prompt.
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    $out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 $target 'echo THORNSWOOD_OK' 2>$null
+    $out = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 $target 'echo THORNSWOOD_OK' } 2>$null
     $ErrorActionPreference = $old
     return ($out -join '') -match 'THORNSWOOD_OK'
 }
@@ -138,14 +138,14 @@ if (Test-Path -LiteralPath "$KeyPath.pub") {
         Remove-Item -LiteralPath "$KeyPath.pub" -Force -ErrorAction SilentlyContinue
         $old = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
-        & ssh-keygen -t ed25519 -N $empty -C 'thornswood' -f $KeyPath 2>&1 | Out-Null
+        Invoke-ThornswoodNative { & ssh-keygen -t ed25519 -N $empty -C 'thornswood' -f $KeyPath } 2>&1 | Out-Null
         $ErrorActionPreference = $old
         if (-not (Test-Path -LiteralPath "$KeyPath.pub")) { continue }
 
         # And prove it opens without one, because a key that needs a passphrase
         # would put the prompt back and look like this never worked.
         $ErrorActionPreference = 'Continue'
-        $null = & ssh-keygen -y -P '' -f $KeyPath 2>&1
+        $null = Invoke-ThornswoodNative { & ssh-keygen -y -P '' -f $KeyPath } 2>&1
         $ok = ($LASTEXITCODE -eq 0)
         $ErrorActionPreference = $old
         if ($ok) { $made = $true; break }
@@ -217,7 +217,7 @@ Restart-Service sshd
 "@
 
 $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-& ssh -o StrictHostKeyChecking=yes $target "powershell -NoProfile -EncodedCommand $b64"
+Invoke-ThornswoodNative { & ssh -o StrictHostKeyChecking=yes $target "powershell -NoProfile -EncodedCommand $b64" }
 if ($LASTEXITCODE -ne 0) { Die "that did not go through (ssh exited with $LASTEXITCODE). Nothing was changed here. If it said Permission denied (publickey), the box takes no password any more (Harden-VPS.ps1): run this with -KeyOnly and have Patrick add the line with Add-VpsKey.ps1." }
 
 # ----------------------------------------------------------------- config ---

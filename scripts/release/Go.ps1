@@ -480,7 +480,7 @@ if (-not $SkipServer) {
   #>
   $vsrc = Join-Path $Here '..\..\voice\voice-server.js'
   if (Test-Path -LiteralPath $vsrc) {
-    & scp -o BatchMode=yes -o StrictHostKeyChecking=yes $vsrc "$User@${Vps}:C:/Thornswood-Voice/voice-server.js" 2>&1 | Out-Null
+    Invoke-ThornswoodNative { & scp -o BatchMode=yes -o StrictHostKeyChecking=yes $vsrc "$User@${Vps}:C:/Thornswood-Voice/voice-server.js" } 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {
       $restart = @'
 $ProgressPreference = 'SilentlyContinue'
@@ -504,7 +504,7 @@ try { (Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:7778/health' -T
 catch { 'voice did not answer its own health check' }
 '@
       $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($restart))
-      $r = & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" 2>&1
+      $r = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" } 2>&1
       Note ("voice: " + (($r | Where-Object { $_ }) -join ' '))
     } else {
       Bad 'could not copy the voice service to the VPS over ssh'
@@ -521,7 +521,7 @@ if (Test-Path 'C:\Thornswood-Server\server.log') {
 }
 '@
   $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-  $out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" 2>&1
+  $out = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" } 2>&1
   $out | ForEach-Object { Note $_ }
 }
 

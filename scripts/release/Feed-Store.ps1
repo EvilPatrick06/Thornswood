@@ -239,7 +239,9 @@ function New-FeedStoreScript([string]$root, [string]$prefix, [string]$op, [strin
 # Runs the one script, up there or on -SiteDir, and hands back its lines.
 # The same ssh shape every script here that talks to the VPS uses: under the
 # length cmd.exe allows the script goes on the command line, over it it is
-# sent as a file. A word ssh writes to stderr is not an error.
+# sent as a file. A word ssh writes to stderr is not an error: ssh and scp run
+# through Invoke-ThornswoodNative (Vps.ps1, issue #941), loaded here and not
+# at the top, because -SiteDir needs nothing of the VPS.
 function Invoke-FeedStoreOp([string]$Channel, [string]$op, [string[]]$names, [hashtable]$expect, [hashtable]$sizes, [string]$SiteDir, [hashtable]$To) {
     $prefix = Get-FeedStorePrefix $Channel
     $sd = Get-FeedStoreSiteDir $SiteDir
@@ -248,26 +250,24 @@ function Invoke-FeedStoreOp([string]$Channel, [string]$op, [string[]]$names, [ha
         return @(& ([scriptblock]::Create($text)) | ForEach-Object { [string]$_ })
     }
     $v = Get-FeedStoreVps $To
+    . (Join-Path $PSScriptRoot '..\vps\Vps.ps1')
     $text = New-FeedStoreScript ($v.Root.Replace('/', '\')) $prefix $op $names $expect $sizes
     $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($text))
+    $cmd = "powershell -NoProfile -EncodedCommand $e"
+    if ($cmd.Length -le 6000) {
+        return @(Invoke-ThornswoodNative { & ssh @ssh ($v.User + '@' + $v.Vps) $cmd } 2>&1 | Where-Object { $_ -is [string] })
+    }
+    $far = 'C:/Windows/Temp/thornswood-feed-store-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.ps1'
+    $tmp = [IO.Path]::GetTempFileName()
     try {
-        $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($text))
-        $cmd = "powershell -NoProfile -EncodedCommand $e"
-        if ($cmd.Length -le 6000) {
-            return @(& ssh @ssh ($v.User + '@' + $v.Vps) $cmd 2>&1 | Where-Object { $_ -is [string] })
-        }
-        $far = 'C:/Windows/Temp/thornswood-feed-store-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.ps1'
-        $tmp = [IO.Path]::GetTempFileName()
-        try {
-            [IO.File]::WriteAllText($tmp, $text, (New-Object Text.UTF8Encoding($true)))
-            & scp @ssh $tmp ($v.User + '@' + $v.Vps + ':' + $far) 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw ('could not send a script to ' + $v.Vps) }
-            $said = @(& ssh @ssh ($v.User + '@' + $v.Vps) "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1 | Where-Object { $_ -is [string] })
-            & ssh @ssh ($v.User + '@' + $v.Vps) "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-            return $said
-        } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
-    } finally { $ErrorActionPreference = $old }
+        [IO.File]::WriteAllText($tmp, $text, (New-Object Text.UTF8Encoding($true)))
+        Invoke-ThornswoodNative { & scp @ssh $tmp ($v.User + '@' + $v.Vps + ':' + $far) } 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw ('could not send a script to ' + $v.Vps) }
+        $said = @(Invoke-ThornswoodNative { & ssh @ssh ($v.User + '@' + $v.Vps) "powershell -NoProfile -ExecutionPolicy Bypass -File $far" } 2>&1 | Where-Object { $_ -is [string] })
+        Invoke-ThornswoodNative { & ssh @ssh ($v.User + '@' + $v.Vps) "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" } 2>&1 | Out-Null
+        return $said
+    } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
 }
 
 function Copy-FeedStoreFile([string]$Channel, [string]$from, [string]$dest, [switch]$Up, [string]$SiteDir, [hashtable]$To) {
@@ -280,14 +280,12 @@ function Copy-FeedStoreFile([string]$Channel, [string]$from, [string]$dest, [swi
         return
     }
     $v = Get-FeedStoreVps $To
+    . (Join-Path $PSScriptRoot '..\vps\Vps.ps1')
     $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
     $remote = $v.User + '@' + $v.Vps + ':' + $v.Root.TrimEnd('/') + '/' + $prefix + '/'
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    try {
-        if ($Up) { & scp @ssh $from ($remote + $dest) 2>&1 | Out-Null }
-        else { & scp @ssh ($remote + $from) $dest 2>&1 | Out-Null }
-        $rc = $LASTEXITCODE
-    } finally { $ErrorActionPreference = $old }
+    if ($Up) { Invoke-ThornswoodNative { & scp @ssh $from ($remote + $dest) } 2>&1 | Out-Null }
+    else { Invoke-ThornswoodNative { & scp @ssh ($remote + $from) $dest } 2>&1 | Out-Null }
+    $rc = $LASTEXITCODE
     if ($rc -ne 0) { throw ("scp could not " + $(if ($Up) { "send $from" } else { "fetch $from" }) + " (exit $rc). Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test.") }
 }
 
