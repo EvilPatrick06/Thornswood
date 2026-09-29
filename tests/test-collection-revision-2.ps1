@@ -276,7 +276,8 @@ $dataHits = @(Get-ChildItem -LiteralPath (Join-Path $Repo 'game\data') -Filter *
               Where-Object { [IO.File]::ReadAllText($_.FullName) -match '[0-9a-fA-F]+:ElysiumEstateSSE\.esp' } | ForEach-Object Name)
 Yes ('no game\data table keys a record to ElysiumEstateSSE.esp' + $(if ($dataHits) { ' (' + ($dataHits -join ', ') + ')' })) ($dataHits.Count -eq 0)
 Yes 'the gamemode still knows Elysium Estate, by the collection''s plugin' ($gmText -match '[0-9a-fA-F]+:ElysiumEstate\.esp')
-Yes 'game\required-data no longer carries ElysiumEstateSSE.esp' (-not (Test-Path -LiteralPath (Join-Path $Repo 'game\required-data\ElysiumEstateSSE.esp')))
+$required = @(Get-ChildItem -LiteralPath (Join-Path $Repo 'game\required-data') -File | ForEach-Object Name)
+Yes 'game\required-data no longer carries ElysiumEstateSSE.esp' ($required -notcontains 'ElysiumEstateSSE.esp')
 $rulesText = RepoText 'scripts\release\Ship-Rules.ps1'
 Yes 'every pack deletes Data\ElysiumEstateSSE.esp' ($rulesText -match "(?s)\`$ShipDeleteAlways = @\(.*'Data\\ElysiumEstateSSE\.esp'")
 Yes '...and no pack carries it' ($rulesText -match "\`$rel -ieq 'Data\\ElysiumEstateSSE\.esp'")
