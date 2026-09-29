@@ -455,6 +455,11 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   yes('named Rules in the tab', rules.text.indexOf('<title>Rules · Thornswood</title>') >= 0);
   yes('and nothing on the page reaches another company',
       !/cdnjs|fonts\.googleapis|fonts\.gstatic/i.test(rules.text));
+  // Patrick, 29 September (#1010): rule 2 says staff can end a character for good.
+  const rule2 = rules.text.slice(rules.text.indexOf('Nobody dies without agreeing to'),
+                                 rules.text.indexOf('Fights start freely'));
+  yes('rule 2 is drawn saying staff can end a character for good, for serious rule breaking or in an event its owner agreed to',
+      /<strong>Staff can end a character for good\.<\/strong> They do it for serious rule breaking,\s+or in an event its owner agreed to\./.test(rule2));
 
   const world = await get(port, '/world');
   yes('/world carries the anchor the footer points at', world.text.indexOf('<a id="accord"></a>') >= 0);

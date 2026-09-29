@@ -215,6 +215,8 @@ async function roster(table, store, discordId) {
     // Nobody killed for good or banned by character here (#1010);
     // test-bans-pk.js runs those.
     characterBar: function () { return null; },
+    // Nor any PK an admin undid; jsonFile hands pk.json back empty.
+    PK: 'pk.json', pkActive: function (r) { return !!r && !r.undone; },
     sendJson: null
   });
 }

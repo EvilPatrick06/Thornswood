@@ -31,8 +31,9 @@ files and cannot be played without it.
 
 The [rules](/rules) are the substance of this agreement, not an appendix. The
 short ones that matter here: nobody's character dies without that person
-agreeing, play a person rather than a legend, keep what happens in character in
-character, and staff decide.
+agreeing, except that staff can end a character for good for serious rule
+breaking or in an event its owner agreed to; play a person rather than a
+legend, keep what happens in character in character, and staff decide.
 
 <!-- alpha -->
 Thornswood is in alpha, and the world is open by application. The application
