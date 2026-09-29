@@ -339,7 +339,7 @@ while ($null -ne ($l = [Console]::In.ReadLine())) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
   $in = @($rows | ForEach-Object { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($_)) })
   $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-  $out = @($in | & $ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new ($S.VpsUser + '@' + $S.VpsAddress) ('powershell -NoProfile -NonInteractive -EncodedCommand ' + $e) 2>&1 | ForEach-Object { "$_".Trim() })
+  $out = @($in | & $ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes ($S.VpsUser + '@' + $S.VpsAddress) ('powershell -NoProfile -NonInteractive -EncodedCommand ' + $e) 2>&1 | ForEach-Object { "$_".Trim() })
   $code = $LASTEXITCODE
   $ErrorActionPreference = $old
   if ($out -contains 'NOWATCHER') { return ('the watchdog is not installed on the VPS (no ' + $S.WatchRoot + '\watch.ps1)') }
@@ -818,7 +818,7 @@ if ($Status) {
   if ($ssh) {
     $probe = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes("if (Test-Path -LiteralPath '" + $S.WatchRoot + "\watch.ps1') { 'WATCHER' } else { 'NOWATCHER' }"))
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $said = (@(& $ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new ($S.VpsUser + '@' + $S.VpsAddress) ('powershell -NoProfile -NonInteractive -EncodedCommand ' + $probe) 2>&1) | ForEach-Object { "$_".Trim() }) -join ' '
+    $said = (@(& $ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes ($S.VpsUser + '@' + $S.VpsAddress) ('powershell -NoProfile -NonInteractive -EncodedCommand ' + $probe) 2>&1) | ForEach-Object { "$_".Trim() }) -join ' '
     $ErrorActionPreference = $old
   }
   if ($said -match '\bWATCHER\b') { Say ('  vps path  ssh reaches ' + $S.VpsAddress + ' and the watchdog''s outbox is there, so messages go through it') 'Green' }

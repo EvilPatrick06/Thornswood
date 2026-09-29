@@ -159,7 +159,8 @@ try {
     $out = Invoke-ThornswoodSecretRemote -Target 'tester@box.invalid' -SshArgs @('-o', 'BatchMode=yes') -Script $probe -Secret $secret
     Yes 'short: one ssh call and no scp' (@($ScCalls | Where-Object { $_.Tool -eq 'ssh' }).Count -eq 1 -and @($ScCalls | Where-Object { $_.Tool -eq 'scp' }).Count -eq 0)
     Yes 'short: the script went as powershell -NoProfile -EncodedCommand' ($ScCalls.Count -and $ScCalls[0].Args[-1] -match '^powershell -NoProfile -EncodedCommand \S+$')
-    Yes 'short: the ssh options and the target are passed as given' ($ScCalls.Count -and ($ScCalls[0].Args[0..2] -join ' ') -eq '-o BatchMode=yes tester@box.invalid')
+    # Send-Secret.ps1 adds host key checking after the caller's own options (#450).
+    Yes 'short: the ssh options and the target are passed as given, host key checking added' ($ScCalls.Count -and ($ScCalls[0].Args[0..4] -join ' ') -eq '-o BatchMode=yes -o StrictHostKeyChecking=yes tester@box.invalid')
     Yes 'short: the far side got the value whole, quotes, dollar, backtick, ampersand and accent included' ((Said $out 'HASH') -eq (Hash $secret))
     Yes 'short: no process command line held the value while the far side ran' ((Said $out 'SEEN') -eq '0')
     $all = AllSent

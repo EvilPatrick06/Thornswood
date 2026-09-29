@@ -93,7 +93,7 @@ icacls `$f /inheritance:r /grant 'Administrators:F' /grant 'SYSTEM:F' | Out-Null
 `$said
 "@
 $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-$out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$VpsUser@$VpsHost" "powershell -NoProfile -EncodedCommand $b64" 2>&1
+$out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$VpsUser@$VpsHost" "powershell -NoProfile -EncodedCommand $b64" 2>&1
 if ($LASTEXITCODE -ne 0) { Die "ssh did not go through (exit $LASTEXITCODE): $out" }
 Say ("  " + ($out | Where-Object { $_ -notmatch '^#< CLIXML|^<Objs' } | Out-String).Trim()) 'Green'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

@@ -73,6 +73,13 @@ function Invoke-ThornswoodSecretRemote {
         [switch]$Bypass,
         [int]$Limit = 6000
     )
+    # Host key checking on (issue #450), whatever the caller passed. ssh takes
+    # the first value it is given for an option, so a caller's own weaker
+    # StrictHostKeyChecking would win over one added here: that is refused,
+    # before the secret goes anywhere, rather than quietly overridden.
+    $weak = @($SshArgs | Where-Object { $_ -match '(?i)StrictHostKeyChecking\s*=\s*(?!yes\b)' })
+    if ($weak.Count) { throw ('ssh options with host key checking turned down (' + ($weak -join ', ') + '). A secret goes only to the box whose key is pinned. Nothing was sent.') }
+    $SshArgs = @($SshArgs) + @('-o', 'StrictHostKeyChecking=yes')
     $full = (Get-ThornswoodSecretPrelude) + "`r`n" + $Script
     $wire = ConvertTo-ThornswoodSecretWire $Secret
     $Secret = $null

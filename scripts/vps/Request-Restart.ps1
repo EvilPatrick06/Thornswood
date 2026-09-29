@@ -62,7 +62,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here 'Vps.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 
 if ($ThenRestart -and $Cancel) { throw 'Use one or the other: -Cancel calls it off, -ThenRestart sees it through.' }
 if ($ThenRestart -and $Mode -ne 'restart') {

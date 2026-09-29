@@ -35,13 +35,13 @@ function Bad($t)  { Write-Host "  $t" -ForegroundColor Yellow }
 $vsrc = Join-Path $Here 'voice-server.js'
 if (Test-Path -LiteralPath $vsrc) {
   Head 'Copying'
-  & scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new $vsrc "$User@${Vps}:C:/Thornswood-Voice/voice-server.js" 2>&1 | Out-Null
+  & scp -o BatchMode=yes -o StrictHostKeyChecking=yes $vsrc "$User@${Vps}:C:/Thornswood-Voice/voice-server.js" 2>&1 | Out-Null
   if ($LASTEXITCODE -eq 0) { Note 'voice-server.js is up to date on the server' }
   else { Bad 'scp failed'; return }
 
   $pub = Join-Path $Here 'voice\public'
   if (Test-Path -LiteralPath $pub) {
-    & scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new -r "$pub" "$User@${Vps}:C:/Thornswood-Voice/" 2>&1 | Out-Null
+    & scp -o BatchMode=yes -o StrictHostKeyChecking=yes -r "$pub" "$User@${Vps}:C:/Thornswood-Voice/" 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) { Note 'public folder copied' }
   }
 }
@@ -119,7 +119,7 @@ try {
 '@
 
 $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-$out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" 2>&1
+$out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" 2>&1
 $out | ForEach-Object { Note $_ }
 
 Head 'From here'

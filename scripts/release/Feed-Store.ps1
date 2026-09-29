@@ -249,7 +249,7 @@ function Invoke-FeedStoreOp([string]$Channel, [string]$op, [string[]]$names, [ha
     }
     $v = Get-FeedStoreVps $To
     $text = New-FeedStoreScript ($v.Root.Replace('/', '\')) $prefix $op $names $expect $sizes
-    $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+    $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
         $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($text))
@@ -280,7 +280,7 @@ function Copy-FeedStoreFile([string]$Channel, [string]$from, [string]$dest, [swi
         return
     }
     $v = Get-FeedStoreVps $To
-    $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+    $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
     $remote = $v.User + '@' + $v.Vps + ':' + $v.Root.TrimEnd('/') + '/' + $prefix + '/'
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
