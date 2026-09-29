@@ -59,8 +59,9 @@ function New-ThornswoodBuildStamp {
     [Parameter(Mandatory = $true)][string]$RepoDir,
     [string]$FeedDir,
     # The deploy artifact the gamemode came out of (Artifact.ps1, #459). Its
-    # commit and whether it carried edits are the answer, since a gamemode
-    # read out of a zip is outside the repo and git cannot say.
+    # commit is the answer, since a gamemode read out of a zip is outside the
+    # repo and git cannot say, and an artifact is always the commit's own
+    # bytes: a deploy with uncommitted changes is refused (#1121).
     $Artifact
   )
 
@@ -90,7 +91,7 @@ function New-ThornswoodBuildStamp {
   } catch { }
   if ($Artifact) {
     $commit = [string]$Artifact.Short
-    $atCommit = -not $Artifact.Edited
+    $atCommit = $true
   }
 
   $launcher = ''

@@ -39,7 +39,7 @@
   the box checks them there (each file by its hash, server.js through
   node --check), and nothing else happens if that fails. The task is set up,
   and only then is the site stopped, the files renamed in (what they replace
-  goes to $Root\.prev-<stamp>, the newest three kept), started, and asked for
+  goes to $Root\.prev-<stamp>, the newest two kept), started, and asked for
   its front page. If it does not answer, the old files go back and are
   started again, and this exits 1. It used to copy server.js and public\ over
   the running site, restart it, and print DOCS DID NOT START with nothing put

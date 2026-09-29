@@ -5,7 +5,7 @@
   tree, and what the box keeps to say which commit each part runs. Issue #459.
   Dot-sourced by Deploy-Docs.ps1 (site), Install-Voice.ps1 (voice),
   Install-Bot.ps1 (bot), Deploy-DevGamemode.ps1 and Deploy-Server.ps1
-  (gamemode).
+  (gamemode), and by Publish-Server.ps1 for the refusal below.
 
   THE ARTIFACT. New-ThornswoodArtifact reads the named paths out of the
   repository's HEAD commit (git's own bytes, so line endings and file dates on
@@ -22,11 +22,14 @@
   <same name>.json is the record: component, commit, sha256, size, and every
   file with its own size and sha256. The record has no clock in it either.
 
-  A file with uncommitted edits, or an untracked file under the named paths,
-  goes in as it is on disk, and the artifact says so: "edited" in its name,
-  edited true and the paths in the record. The box then says "commit X plus
-  edits" and keeps the exact bytes, rather than naming a commit that does not
-  hold them. Ignored files never go in.
+  A DEPLOY SENDS A COMMIT OR NOTHING. A file with uncommitted changes, staged
+  or not, deleted, or untracked, under the named paths or among the other
+  repository files a deploy sends (-AlsoSends), refuses the deploy before it
+  talks to the box, naming every such file (Assert-ThornswoodCommitted).
+  There is no switch past it: commit the change, or put it back, and run the
+  deploy again. Patrick, 29 Sep, issue #1121. Until then (#1090) such a
+  deploy went through and its record said "edited". Ignored files are never
+  sent and do not count.
 
   The zip is expanded next to itself, laid out like the repository, and the
   deploy scripts send from that folder instead of from the working tree, so
@@ -204,22 +207,69 @@ function Invoke-ThornswoodArtifactGit([string]$RepoDir, [string[]]$GitArgs) {
 }
 
 <#
+  Every file under -Paths (repository paths, files or folders, forward
+  slashes) that is not exactly what the commit holds: changed, staged,
+  deleted, renamed or untracked, as git status says it. Ignored files are not
+  listed. Each is a Path and, in plain words, How.
+#>
+function Get-ThornswoodUncommitted([string]$RepoDir, [string[]]$Paths) {
+  $Paths = @($Paths | Where-Object { $_ } | ForEach-Object { ([string]$_).Replace('\', '/').Trim('/') })
+  if (-not $Paths.Count) { return @() }
+  $found = @()
+  foreach ($line in (Invoke-ThornswoodArtifactGit $RepoDir (@('status', '--porcelain', '--untracked-files=all', '--') + $Paths))) {
+    if ($line.Length -lt 4) { continue }
+    $xy = $line.Substring(0, 2)
+    $p = $line.Substring(3)
+    if ($p -match ' -> ') { $p = ($p -split ' -> ')[-1] }
+    $how = 'changed and not committed'
+    if ($xy -eq '??') { $how = 'new and not committed' }
+    elseif ($xy.Contains('D')) { $how = 'deleted and not committed' }
+    $found += [pscustomobject]@{ Path = $p; How = $how }
+  }
+  return @($found | Sort-Object Path)
+}
+
+<#
+  Refuses, by throwing, when any file under -Paths is not what the commit
+  holds, naming each one. Every deploy that sends files out of this
+  repository calls it before it talks to the box: New-ThornswoodArtifact does,
+  and Publish-Server.ps1 does for the files it sends. No switch turns it off.
+#>
+function Assert-ThornswoodCommitted {
+  param(
+    [Parameter(Mandatory = $true)][string]$RepoDir,
+    [string[]]$Paths = @(),
+    [string]$What = 'this deploy'
+  )
+  $dirty = @(Get-ThornswoodUncommitted $RepoDir $Paths)
+  if (-not $dirty.Count) { return }
+  $nl = [Environment]::NewLine
+  $list = @($dirty | ForEach-Object { '    ' + $_.Path + '  (' + $_.How + ')' }) -join $nl
+  throw ('Refused: ' + $What + ' would send ' + $dirty.Count + ' file(s) that are not committed, so nothing was sent and the box was not touched:' + $nl +
+         $list + $nl +
+         'Commit them, or put them back, then run it again. A deploy only ever sends a commit.')
+}
+
+<#
   Builds the artifact and expands it. -Paths are repository paths, files or
-  folders, with forward slashes. -Extra maps a path in the zip to a file on
-  disk that is not the commit's (Deploy-DevGamemode.ps1 -Gamemode <file>);
-  it always counts as an edit. -OutDir defaults to out\deploys\<component>.
+  folders, with forward slashes. -AlsoSends are the other repository files
+  the deploy sends that are not in the zip (a plugin, a record, a script);
+  they are only checked. Any of either that is not committed refuses the
+  build (Assert-ThornswoodCommitted). -OutDir defaults to
+  out\deploys\<component>.
 #>
 function New-ThornswoodArtifact {
   param(
     [Parameter(Mandatory = $true)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Component,
     [Parameter(Mandatory = $true)][string]$RepoDir,
     [string[]]$Paths = @(),
-    [hashtable]$Extra = @{},
+    [string[]]$AlsoSends = @(),
     [string]$OutDir = ''
   )
   Initialize-ThornswoodArtifactType
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   $RepoDir = (Resolve-Path -LiteralPath $RepoDir).ProviderPath.TrimEnd('\')
+  Assert-ThornswoodCommitted -RepoDir $RepoDir -Paths (@($Paths) + @($AlsoSends)) -What ('the ' + $Component + ' deploy')
   if (-not $OutDir) {
     $where = Join-Path $PSScriptRoot '..\release\Where.ps1'
     $OutDir = Join-Path (Join-Path (& $where Out) 'deploys') $Component
@@ -233,8 +283,6 @@ function New-ThornswoodArtifact {
 
   $Paths = @($Paths | Where-Object { $_ } | ForEach-Object { ([string]$_).Replace('\', '/').Trim('/') })
   $blobs = @{}
-  $files = @{}
-  $edits = @()
   if ($Paths.Count) {
     foreach ($line in (Invoke-ThornswoodArtifactGit $RepoDir (@('ls-tree', '-r', '--full-tree', $commit, '--') + $Paths))) {
       $m = [regex]::Match($line, '^(\d{6}) (\w+) ([0-9a-f]{40})\t(.+)$')
@@ -248,48 +296,19 @@ function New-ThornswoodArtifact {
       $hit = @($blobs.Keys | Where-Object { $_ -eq $want -or $_.StartsWith($want + '/') })
       if (-not $hit.Count) { throw "The commit $($commit.Substring(0, 12)) has nothing at $want, so the $Component artifact would be missing it." }
     }
-    # What differs on disk, tracked or not. Ignored files never go in.
-    foreach ($line in (Invoke-ThornswoodArtifactGit $RepoDir (@('status', '--porcelain', '--untracked-files=all', '--') + $Paths))) {
-      if ($line.Length -lt 4) { continue }
-      $xy = $line.Substring(0, 2)
-      $p = $line.Substring(3)
-      if ($p -match ' -> ') { $p = ($p -split ' -> ')[-1] }
-      if ($p.StartsWith('"')) { throw "A path git had to quote cannot go into an artifact: $p" }
-      $full = Join-Path $RepoDir ($p.Replace('/', '\'))
-      $blobs.Remove($p)
-      if (Test-Path -LiteralPath $full -PathType Leaf) { $files[$p] = $full }
-      $edits += $p
-    }
-  }
-  foreach ($k in @($Extra.Keys)) {
-    $zipPath = ([string]$k).Replace('\', '/').Trim('/')
-    $full = [string]$Extra[$k]
-    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { throw "not a file: $full" }
-    $blobs.Remove($zipPath)
-    $files[$zipPath] = (Resolve-Path -LiteralPath $full).ProviderPath
-    $edits += $zipPath
   }
 
-  [string[]]$names = @($blobs.Keys) + @($files.Keys)
+  [string[]]$names = @($blobs.Keys)
   if (-not $names.Count) { throw "The $Component artifact would be empty." }
   [Array]::Sort($names, [StringComparer]::Ordinal)
-  [string[]]$ids = @($names | Where-Object { $blobs.ContainsKey($_) } | ForEach-Object { $blobs[$_] })
-  $read = @{}
-  if ($ids.Count) {
-    $got = [ThornswoodArtifactZip]::ReadBlobs($git, $RepoDir, $ids)
-    $j = 0
-    foreach ($n in $names) { if ($blobs.ContainsKey($n)) { $read[$n] = $got[$j]; $j++ } }
-  }
-  foreach ($n in $names) { if ($files.ContainsKey($n)) { $read[$n] = [IO.File]::ReadAllBytes($files[$n]) } }
-  $datas = New-Object 'byte[][]' $names.Count
-  for ($i = 0; $i -lt $names.Count; $i++) { $datas[$i] = [byte[]]$read[$names[$i]] }
+  [string[]]$ids = @($names | ForEach-Object { $blobs[$_] })
+  $datas = [ThornswoodArtifactZip]::ReadBlobs($git, $RepoDir, $ids)
 
   $building = Join-Path $OutDir ('.building-' + [Guid]::NewGuid().ToString('N') + '.zip')
   [ThornswoodArtifactZip]::WriteStored($building, $names, $datas)
   $sha = (Get-FileHash -LiteralPath $building -Algorithm SHA256).Hash.ToLowerInvariant()
-  $edited = [bool]$edits.Count
   $short = $commit.Substring(0, 12)
-  $name = $Component + '-' + $short + '-' + $(if ($edited) { 'edited-' } else { '' }) + $sha.Substring(0, 16) + '.zip'
+  $name = $Component + '-' + $short + '-' + $sha.Substring(0, 16) + '.zip'
   $zip = Join-Path $OutDir $name
   if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $building -Force }
   else { Move-Item -LiteralPath $building -Destination $zip }
@@ -298,14 +317,10 @@ function New-ThornswoodArtifact {
   for ($i = 0; $i -lt $names.Count; $i++) {
     $contents += [ordered]@{ path = $names[$i]; size = $datas[$i].Length; sha256 = (Get-ThornswoodSha256Hex $datas[$i]) }
   }
-  [string[]]$editList = @($edits | Select-Object -Unique)
-  if ($editList.Count) { [Array]::Sort($editList, [StringComparer]::Ordinal) }
   $record = [ordered]@{
     component = $Component
     name      = $name
     commit    = $commit
-    edited    = $edited
-    edits     = $editList
     sha256    = $sha
     size      = (Get-Item -LiteralPath $zip).Length
     files     = $contents
@@ -328,8 +343,6 @@ function New-ThornswoodArtifact {
     Folder     = $folder
     Commit     = $commit
     Short      = $short
-    Edited     = $edited
-    Edits      = $editList
     Sha256     = $sha
     Size       = $record.size
   }
@@ -337,9 +350,7 @@ function New-ThornswoodArtifact {
 
 # One line for a deploy to print.
 function Format-ThornswoodArtifact($Artifact) {
-  $s = '{0}, commit {1}, {2} file(s), {3:N0} bytes' -f $Artifact.Name, $Artifact.Short, @($Artifact.Record.files).Count, $Artifact.Size
-  if ($Artifact.Edited) { $s += ', PLUS ' + @($Artifact.Edits).Count + ' uncommitted edit(s): ' + (@($Artifact.Edits) -join ', ') }
-  return $s
+  return ('{0}, commit {1}, {2} file(s), {3:N0} bytes' -f $Artifact.Name, $Artifact.Short, @($Artifact.Record.files).Count, $Artifact.Size)
 }
 
 # The name the box files a part under: the folder it runs from, so the live and
@@ -433,8 +444,6 @@ function New-ThornswoodDeployRecord($Artifact, [string]$Root) {
     component   = $Artifact.Component
     name        = $Artifact.Name
     commit      = $Artifact.Commit
-    edited      = [bool]$Artifact.Edited
-    edits       = @($Artifact.Edits)
     sha256      = $Artifact.Sha256
     size        = $Artifact.Size
     files       = @($Artifact.Record.files).Count

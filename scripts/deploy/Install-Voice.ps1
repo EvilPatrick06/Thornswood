@@ -106,6 +106,19 @@ if ($Remove) {
     exit 0
 }
 
+# What goes up is the voice artifact (issue #459, Artifact.ps1): the service
+# and its page as the commit holds them, in one zip named by commit and hash.
+# Built here, before anything asks the box what it runs, because a service,
+# page or log roller with uncommitted changes is refused with the box
+# untouched (#1121). Sent under "files" below.
+. (Join-Path $Here 'Artifact.ps1')
+$artifact = $null
+if (-not $PutBack -and -not $Remove -and -not $Restart) {
+    $artifact = New-ThornswoodArtifact -Component voice -RepoDir (Join-Path $Here '..\..') -Paths 'voice/voice-server.js', 'voice/public' `
+        -AlsoSends 'scripts/vps/Roll-Log.ps1'
+    Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
+}
+
 if ($Restart) {
     Head 'Restarting'
     & ssh @ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Start-Sleep -Seconds 1; Start-ScheduledTask -TaskName '$TaskName'; 'restarted'`""
@@ -166,16 +179,10 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
 }
 
 # ---------------------------------------------------------------- files -----
-# What goes up is the voice artifact (issue #459, Artifact.ps1): the service
-# and its page as the commit holds them, in one zip named by commit and hash,
-# sent to the box's store first. The copies below are from its folder.
-# -PutBack builds and sends nothing.
-. (Join-Path $Here 'Artifact.ps1')
-$artifact = $null
+# The voice artifact built above goes to the box's store first. The copies
+# below are from its folder. -PutBack builds and sends nothing.
 $src = Join-Path $Here '..\..\voice'
 if (-not $PutBack) {
-$artifact = New-ThornswoodArtifact -Component voice -RepoDir (Join-Path $Here '..\..') -Paths 'voice/voice-server.js', 'voice/public'
-Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
 Send-ThornswoodArtifact -Artifact $artifact -Target $target -SshArgs $ssh
 $src = Join-Path $artifact.Folder 'voice'
 }

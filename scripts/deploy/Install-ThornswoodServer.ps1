@@ -34,7 +34,7 @@
        back, the new folder is renamed <root>.failed-<stamp>, the previous one
        comes back as the root and is started again: INSTALL ROLLED BACK, exit 1.
 
-  The newest three .prev folders are kept, and the last .failed one to read.
+  The newest two .prev folders are kept, and the last .failed one to read.
   -PutBack puts the newest .prev folder back the same way, keeping what it
   took out as <root>.undone-<stamp>. The renames keep every path the task and
   server-settings.json name the same, so nothing has to be rewritten.
@@ -57,7 +57,7 @@ param(
     # How long a started server has to answer before the previous one goes back.
     [int]$Wait = 60,
     # How many <root>.prev-<stamp> folders to keep.
-    [int]$Keep = 3,
+    [int]$Keep = 2,
     # Lets tests\test-install-server.ps1 run this on a machine with the game on
     # it, against a scratch root. Nothing else passes it.
     [switch]$AllowGamingPc
@@ -486,7 +486,7 @@ if (-not $NoTask) {
 
 function Tidy {
     Prune '.prev-*' $Keep
-    Prune '.undone-*' 3
+    Prune '.undone-*' 2
     Prune '.failed-*' 1
 }
 

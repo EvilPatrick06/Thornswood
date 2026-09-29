@@ -316,6 +316,25 @@ try {
                         'Vortex', 'feed', 'webhooks', 'VPS access', 'Backups', 'records\signing\signing.template.json')) {
         Yes ("6. it covers " + $item) ($sec.IndexOf($item, [StringComparison]::OrdinalIgnoreCase) -ge 0)
     }
+    # Patrick, 29 Sep (#1121): only his Azure account can sign, so a second
+    # machine signs only while signed in as him; and the domain is in his own
+    # Cloudflare login, signed in with GitHub.
+    Yes '6. it says only Patrick''s Azure account can sign, so a second machine signs only signed in as him' (
+        $sec -match "Only Patrick's Azure account has signing access" -and $sec -match 'signs only while it is signed in as him')
+    Yes '4. Setup-ShipMachine says to sign in as Patrick, and no longer to be given the role' (
+        $setupText.Contains('az login   (as Patrick: only his Azure account can sign)') -and
+        $setupText.Contains('so this machine signs only while signed in as him') -and
+        $setupText -notmatch 'Patrick gives your Azure account' -and $setupText -notmatch 'the account Patrick gave the signer role')
+    $own = [IO.File]::ReadAllText((Join-Path $Repo 'docs\OWNERSHIP.md'))
+    $signRow = [regex]::Match($own, '(?m)^\| Code signing \|.*$').Value
+    $domainRow = [regex]::Match($own, '(?m)^\| Domain \|.*$').Value
+    Yes 'OWNERSHIP.md: signing is Patrick''s Azure account alone, and a second machine signs as him' (
+        $signRow -match 'the only one with signing access' -and $signRow -match 'signed in as Patrick')
+    Yes 'OWNERSHIP.md: the domain is in Patrick''s own Cloudflare login, signed in with GitHub, with no gap left' (
+        $domainRow -match "Patrick: it is registered in his own Cloudflare login, which he signs in to with GitHub" -and $domainRow -notmatch 'fill in|is the gap')
+    Yes 'DEVELOPING.md secrets table has the domain row and signing as Patrick' (
+        $dev -match '(?m)^\| The domain, thornswood\.net \| Registered at Cloudflare, in Patrick''s own Cloudflare login, which he signs in to with GitHub' -and
+        $dev -match '(?m)^\| Code signing \|.*as Patrick, whose Azure account is the only one with signing access')
     Yes '6. it names this harness' ($sec -match 'tests\\test-ship-machine\.ps1')
     Yes '6. and the dev channel for the Ship it ends on' ($sec -match '\.\\scripts\\release\\Ship\.ps1 -Channel dev')
 

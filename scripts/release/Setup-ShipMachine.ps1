@@ -26,9 +26,12 @@
        records\signing\signing.template.json, which holds paths and "enabled": true, no key. An
        existing one is never changed: it is read, and anything wrong with it
        is said.
-    4. The az sign in. It asks the signing service, with this machine's sign
-       in, what identity the ThornswoodRelease profile carries, and checks it
-       is the one the launcher pins (launcher\app\Signature.cs). A sign in that
+    4. The az sign in. Only Patrick's Azure account has signing access (the
+       Certificate Profile Signer role on the ThornswoodRelease profile), so
+       a second machine signs only while az on it is signed in as Patrick
+       (Patrick, 29 Sep, #1121). It asks the signing service, with this
+       machine's sign in, what identity the profile carries, and checks it is
+       the one the launcher pins (launcher\app\Signature.cs). A sign in that
        cannot reach the profile says so here instead of at the end of a Ship.
     5. The client runtime records\client-build.json names. When neither the
        game folder nor the build folder holds it, the zip of that exact
@@ -246,7 +249,7 @@ function Test-SigningReach([string]$MetadataPath, [string[]]$Identities) {
     return [pscustomobject]@{ Ok = $false; Why = ('profile ' + $meta.CertificateProfileName + ' answered without the identity the launcher pins, so every installed launcher would refuse what it signs') }
   }
   if ($status -eq 401 -or $status -eq 403) {
-    return [pscustomobject]@{ Ok = $false; Why = ('the signing service refused this sign in (HTTP ' + $status + '): the account has no signer role on profile ' + $meta.CertificateProfileName) }
+    return [pscustomobject]@{ Ok = $false; Why = ('the signing service refused this sign in (HTTP ' + $status + '): it has no signer role on profile ' + $meta.CertificateProfileName + ', and only Patrick''s Azure account does') }
   }
   return [pscustomobject]@{ Ok = $false; Why = ('the signing service answered HTTP ' + $status) }
 }
@@ -440,8 +443,8 @@ if (-not (Has 'az')) {
   Row 'az can sign with the ThornswoodRelease profile' $false 'az is not installed' 'Install az (step 1), then az login'
 } else {
   $reach = Test-SigningReach $metaPath $ids
-  $fix = $(if ($reach.Why -match 'no Azure sign in') { 'az login   (the account Patrick gave the signer role)' }
-           elseif ($reach.Why -match 'signer role') { 'Patrick gives your Azure account the Certificate Profile Signer role on the ThornswoodSigning account, profile ThornswoodRelease, in the Azure portal (Access control). Then az login again' }
+  $fix = $(if ($reach.Why -match 'no Azure sign in') { 'az login   (as Patrick: only his Azure account can sign)' }
+           elseif ($reach.Why -match 'signer role') { 'Only Patrick''s Azure account has the Certificate Profile Signer role on the ThornswoodSigning account, profile ThornswoodRelease, so this machine signs only while signed in as him: az logout, then Patrick runs az login on it' }
            else { 'Run this again; if it keeps failing, the lines above say what the service answered' })
   Row 'az can sign with the ThornswoodRelease profile' $reach.Ok $reach.Why $fix $(if ($reach.Why -match 'signer role') { 'patrick' } else { 'you' })
 }
