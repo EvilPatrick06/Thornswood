@@ -137,7 +137,7 @@ if ($PruneOnly) {
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 Log "---- fetch from $VpsHost ----"
 $target = "$VpsUser@$VpsHost"
-$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 foreach ($t in 'ssh', 'scp') {
   if (-not (Get-Command $t -ErrorAction SilentlyContinue)) { Die "$t is not on PATH." }
 }

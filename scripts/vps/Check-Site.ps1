@@ -241,7 +241,7 @@ elseif (-not $Vps) { Say '  No box address in launcher\app\Config.cs, the box wa
 elseif (-not $User) { Say "  No Host entry for $Vps in ~\.ssh\config, so no ssh user. Run .\scripts\vps\Setup-SshKey.ps1 first. The box was not asked." 'DarkGray' }
 else {
   Head 'What the site holds, asked on the box'
-  $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+  $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
   $rootWin = $Root.Replace('/','\')
 
   function Remote($script) {

@@ -71,7 +71,7 @@ function PropList($obj, $name) {
   if ($null -eq $p) { return @() }
   return @($p.Value)
 }
-$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
