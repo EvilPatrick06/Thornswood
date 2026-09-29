@@ -37615,10 +37615,13 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   stopped moving anybody's rank. The engine teaches the spell a
                   spell tome carries.
     onUpdateAppearanceAttempt
-                  A face sent to the server. No handler. The engine refuses it
-                  by itself unless the server opened the race menu
+                  A face sent to the server. The engine refuses it by itself
+                  unless the server opened the race menu
                   (ActionListener::OnUpdateAppearance), and its OnFireBlocked
                   is not written, so nothing here may ever return false to it.
+                  mp.onUpdateAppearanceAttempt holds the one body value in it,
+                  weight, to 0 to 100 and drops any field the engine does not
+                  know (BODY SHAPE, below, #993). It always returns true.
     onUpdateEquipmentAttempt
                   What somebody is wearing. No handler, and the same warning
                   about false. The engine checks it itself, by
@@ -37824,6 +37827,125 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   log('drop:', auditPerson(actorId), 'dropped', Number(count) || 0, auditItem(baseId),
       'in', auditCell(actorId));
 });
+
+/*
+  BODY SHAPE: HEIGHT AND WEIGHT, NOTHING ELSE (#993).
+
+  Patrick, 28 September: "I don't want jiggle physics or the ability to change
+  boob/pussy/dick/ass/nipple related stuff during creation." For men and women
+  alike. Height and weight stay.
+
+  WHAT A CLIENT CAN SEND. The one thing a client sends about its body is the
+  appearance (UpdateAppearanceMessage), and the engine keeps eleven fields of
+  it: isFemale, raceId, weight, skinColor, hairColor, headpartIds,
+  headTextureSetId, options (the face sliders), presets (the face presets),
+  tints and name (Appearance.h). Nothing in it is a breast, a butt, a genital
+  or a nipple: RaceMenu's body sliders and body morphs are NiOverride data on
+  the person's own machine and SkyMP never sends them, so nobody else's game
+  ever draws them. Height is the same, on the person's own machine only.
+
+  WEIGHT IS THE ONE THAT CARRIES SHAPE. The game draws a body between its thin
+  and heavy meshes by weight, and the difference between those two meshes is
+  mostly chest, hips and seat. The race menu offers 0 to 100; a changed client
+  can send 300 or -200, which draws that difference three times over, and the
+  engine stores it and sends it on to everybody near (ActionListener.cpp
+  OnUpdateAppearance). So weight is held to 0 to 100 here, and anything that is
+  not one of the eleven fields is dropped, so a field some later client adds
+  cannot carry a shape through either.
+
+  WHEN. mp.onUpdateAppearanceAttempt hears every appearance the engine stored,
+  straight after it was stored and sent on. A corrected one is set back with
+  mp.set, which stores it and sends it to everybody who can see that person
+  (AppearanceBinding::Set), so the stretched body lasts one message. It always
+  returns true: its refusal is not written in the engine (see the list of
+  events above), and the engine decides the race menu question itself.
+
+  CHARACTERS MADE BEFORE THIS. thornswoodBodyReset in server-settings.json,
+  on unless it is false (Patrick, 28 September: existing characters are reset
+  to the default body shape, height and weight stay adjustable). Each
+  character is looked at once when it comes online and its stored appearance
+  is put through the same check. The person's own machine clears any body
+  slider it still holds on its own (thornswood-front.js, "body shape").
+*/
+const BODY_APPEARANCE_FIELDS = ['isFemale', 'raceId', 'weight', 'skinColor', 'hairColor',
+  'headpartIds', 'headTextureSetId', 'options', 'presets', 'tints', 'name'];
+const BODY_WEIGHT_MIN = 0;
+const BODY_WEIGHT_MAX = 100;
+// What a weight that is not a number at all becomes: the middle of the slider.
+const BODY_WEIGHT_DEFAULT = 50;
+
+function bodyResetWanted() {
+  try {
+    const s = mp.getServerSettings();
+    if (s && s.thornswoodBodyReset === false) { return false; }
+  } catch (e) {
+    // no settings object. on is the default Patrick chose.
+  }
+  return true;
+}
+
+/**
+ * The appearance with only height-and-weight body shape left in it, and what
+ * was changed. Null when there is no appearance to look at.
+ */
+function bodyShapeGuard(appearance) {
+  if (!appearance || typeof appearance !== 'object' || Array.isArray(appearance)) { return null; }
+  const out = {};
+  const changes = [];
+  for (const k of Object.keys(appearance)) {
+    if (BODY_APPEARANCE_FIELDS.indexOf(k) < 0) { changes.push('dropped ' + k); continue; }
+    out[k] = appearance[k];
+  }
+  if (Object.prototype.hasOwnProperty.call(appearance, 'weight')) {
+    const w = Number(appearance.weight);
+    let held = w;
+    if (appearance.weight === null || appearance.weight === '' || !isFinite(w)) { held = BODY_WEIGHT_DEFAULT; }
+    else if (w < BODY_WEIGHT_MIN) { held = BODY_WEIGHT_MIN; }
+    else if (w > BODY_WEIGHT_MAX) { held = BODY_WEIGHT_MAX; }
+    if (held !== appearance.weight) {
+      changes.push('weight ' + String(appearance.weight) + ' -> ' + held);
+    }
+    out.weight = held;
+  }
+  return { appearance: out, changes: changes };
+}
+
+/** Puts one character's stored appearance through bodyShapeGuard. */
+function bodyShapeCheck(actorId, appearance, why) {
+  const r = bodyShapeGuard(appearance);
+  if (!r || !r.changes.length) { return false; }
+  mp.set(actorId, 'appearance', r.appearance);
+  log('body shape:', auditPerson(actorId), why + ':', r.changes.join(', '));
+  return true;
+}
+
+mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (actorId, appearance, isAllowed) {
+  if (isAllowed) { bodyShapeCheck(actorId, appearance, 'sent'); }
+  return true;
+});
+
+(function bodyResetExisting() {
+  const g = globalThis;
+  if (g.__thornswoodBodyReset) { clearInterval(g.__thornswoodBodyReset); g.__thornswoodBodyReset = null; }
+  if (!bodyResetWanted()) {
+    log('body shape: characters made before the body sliders went are left as they are (thornswoodBodyReset is false)');
+    return;
+  }
+  const seen = new Set();
+  g.__thornswoodBodyReset = setInterval(guard('bodyResetExisting', function () {
+    let online;
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    const here = new Set(online);
+    for (const id of Array.from(seen)) { if (!here.has(id)) { seen.delete(id); } }
+    for (const id of online) {
+      if (seen.has(id)) { continue; }
+      seen.add(id);
+      let a = null;
+      try { a = mp.get(id, 'appearance'); } catch (e) { a = null; }
+      bodyShapeCheck(id, a, 'made before the body sliders went');
+    }
+  }), 5000);
+})();
 
 /*
   THE TAKE LIMIT: A FEW THINGS FROM ANOTHER PERSON, AND ONLY A SHARE OF A STACK.
