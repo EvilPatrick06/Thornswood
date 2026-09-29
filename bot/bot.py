@@ -2483,6 +2483,8 @@ _MOD_DID = {
     'ban': 'banned %s',
     'unban': 'lifted the ban on %s',
     'note': 'wrote a note on %s',
+    # Not staff: somebody's own /stuck (#414), said as its why reads.
+    'stuck': 'used /stuck',
 }
 
 
@@ -2508,6 +2510,13 @@ def moderation_text(where, row):
         if pid <= 0:
             return clean(name, 40) or 'somebody'
         return '%s (profile %d)' % (clean(name, 40) or 'somebody', pid)
+
+    # /stuck is not a staff action: the person did it to themselves, and the
+    # gamemode writes the whole sentence (from where, to where, the account).
+    if row['did'] == 'stuck':
+        why = clean(row.get('why'), 600) or 'used /stuck.'
+        return ('**/stuck on the %s server:** %s %s'
+                % (where, person(row.get('byName'), row.get('by')), why))[:1900]
 
     did = _MOD_DID[row['did']] % person(row.get('whoName'), row.get('who'))
     try:

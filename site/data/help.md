@@ -136,6 +136,13 @@ the Discord. **/report**, the person's name and what they did, reaches staff and
 nobody else. The game tells you whether it got through; if it did not, open a
 ticket in the Discord.
 
+Wedged in a wall or a rock and cannot walk out? Type **/stuck**. It takes you
+back a few steps to where you were last standing safely, or to the nearest
+temple when there is no such spot. It works once every 5 minutes, not while you
+are dead, and in a fight it waits 15 seconds first, which moving or being hit
+cancels. It is only for being truly stuck: every use is logged for staff, and
+using it to get out of a fight or to travel can mean a warning or a ban.
+
 ## When something goes wrong
 
 1. Look at [Known Issues](/known) first. A lot of what looks like a bug is a
