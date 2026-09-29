@@ -26,7 +26,7 @@
 [CmdletBinding()]
 param(
   [string]$VpsHost  = '',
-  [string]$VpsUser  = 'Administrator',
+  [string]$VpsUser  = '',
   [string]$Root     = 'C:\Thornswood-Backup',
   [string]$TaskName = 'Thornswood Backup',
   # Quarter past three in the morning, well clear of when anybody is playing.
@@ -45,6 +45,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }

@@ -47,7 +47,7 @@
 [CmdletBinding()]
 param(
   [string]$Vps      = '',
-  [string]$User     = 'Administrator',
+  [string]$User     = '',
   [string]$BotRoot  = 'C:/Thornswood-Bot',
   [string]$DocsRoot = 'C:/Thornswood-Docs',
   [string]$BotTask  = 'Thornswood Bot',
@@ -67,6 +67,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $writer = Join-Path $Here '..\vps\Write-BotToken.ps1'
 . $writer

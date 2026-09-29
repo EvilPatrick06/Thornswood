@@ -2171,6 +2171,40 @@ const SERVER_LOGS = {
   dev:  'C:\\Thornswood-Server-Dev\\server.log'
 };
 
+// ==== thornswood deploy records ====
+/* What each part on this box runs, for /api/deploys (#459). Every deploy
+   (scripts\deploy\Artifact.ps1) leaves one record per folder a part runs
+   from in DEPLOYS_DIR: which zip, which commit, whether it carried edits,
+   when. Only those fields go out; where it runs and which machine sent it
+   stay on the box. A record that will not read is named and skipped, so one
+   bad file does not hide the rest. Deploy-Docs grants the site's account
+   read on this folder. */
+const DEPLOYS_DIR = process.env.THORNSWOOD_DEPLOYS_DIR || 'C:\\Thornswood-Deploys\\current';
+function readDeploys(dir) {
+  const parts = {};
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch (e) { return parts; }
+  for (const n of names.sort()) {
+    if (!/^[a-z0-9][a-z0-9._-]*\.json$/.test(n)) continue;
+    const part = n.slice(0, -5);
+    try {
+      const r = JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8').replace(/^\uFEFF/, ''));
+      parts[part] = {
+        component: String(r.component || ''),
+        name: String(r.name || ''),
+        commit: String(r.commit || ''),
+        edited: r.edited === true,
+        sha256: String(r.sha256 || ''),
+        deployedUtc: String(r.deployedUtc || '')
+      };
+    } catch (e) {
+      parts[part] = { unreadable: true };
+    }
+  }
+  return parts;
+}
+// ==== end thornswood deploy records ====
+
 /* Where the voice service writes what people said. Its folder, not this one:
    it owns the file and this only reads it, so there is one writer and no
    question about which copy is the real one.
@@ -3099,6 +3133,12 @@ async function handle(req, res) {
       }
       return send(res, 200, html, TYPES['.html']);
     } catch (e) { return send(res, 500, 'no home.html', 'text/plain'); }
+  }
+
+  // Which commit each part on this box runs (#459). Public: a commit, a zip
+  // name and a hash say nothing that is anybody's business.
+  if (route === '/api/deploys' && req.method === 'GET') {
+    return sendJson(res, 200, { parts: readDeploys(DEPLOYS_DIR) });
   }
 
   // Two addresses people type, or paste out of an old message. Both mean the

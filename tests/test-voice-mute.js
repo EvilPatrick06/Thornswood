@@ -30,6 +30,9 @@ const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests a
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+// The box's address from the one place that holds it (#459), which is what the
+// plugin's own list is kept equal to by Set-Vps.ps1.
+const OUR_ADDRESS = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'scripts', 'vps', 'vps.json'), 'utf8')).address;
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -295,7 +298,7 @@ function mutedSent(sent) {
 function plugin() {
   const files = {};
   files['Data/Platform/Plugins/skymp5-client-settings.txt'] =
-    JSON.stringify({ 'server-ip': '192.135.112.23', gameData: { profileId: ME } });
+    JSON.stringify({ 'server-ip': OUR_ADDRESS, gameData: { profileId: ME } });
   files['Data/Platform/thornswood-session.txt'] = String(Date.now());
   const fakeFs = {
     readFileSync: function (p) {

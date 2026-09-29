@@ -53,7 +53,7 @@ param(
     # feed root, so nothing connects to the VPS. For the tests.
     [string]$SiteDir,
     [string]$Vps = '',
-    [string]$User = 'Administrator'
+    [string]$User = ''
 )
 
 Set-StrictMode -Version Latest

@@ -41,7 +41,7 @@
 param(
   [string]$Dist    = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
   [string]$Vps     = '',
-  [string]$User    = 'Administrator',
+  [string]$User    = '',
   [string]$Root    = 'C:/Thornswood-Server',
   [string]$Task    = 'Thornswood Server',
   [double]$Minutes = 1,
@@ -64,6 +64,7 @@ $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
 function Remote($script) {
@@ -584,16 +585,20 @@ if (-not (Test-Path -LiteralPath $Dist)) {
   )
 }
 
-$src = Join-Path $Here '..\..\game\gamemode.js'
+# And it goes up as the gamemode artifact (issue #459, Artifact.ps1):
+# game\gamemode.js as the commit holds it, in one zip named by commit and hash,
+# sent to the box's store before the stage. The copy in the build is made the
+# artifact's whenever the two differ, by hash and not by size as it was, since
+# an edit that kept the size used to stay behind.
+. (Join-Path $Here 'Artifact.ps1')
+$artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js'
+'{0,-22} {1}' -f 'artifact', (Format-ThornswoodArtifact $artifact) | Write-Host
+$src = Join-Path $artifact.Folder 'game\gamemode.js'
 $built = Join-Path $Dist 'gamemode.js'
-if (Test-Path -LiteralPath $src) {
-  $a = (Get-Item $src).Length
-  $b = if (Test-Path -LiteralPath $built) { (Get-Item $built).Length } else { -1 }
-  if ($a -ne $b) {
-    Copy-Item $src $built -Force
-    Write-Host ("  gamemode.js taken from game ({0:N0} bytes, build had {1})" -f `
-      $a, $(if ($b -lt 0) { 'none' } else { '{0:N0}' -f $b })) -ForegroundColor DarkGray
-  }
+if (-not (Test-Path -LiteralPath $built) -or
+    (Get-FileHash -LiteralPath $src).Hash -ne (Get-FileHash -LiteralPath $built).Hash) {
+  Copy-Item -LiteralPath $src -Destination $built -Force
+  Write-Host ("  gamemode.js taken from the artifact ({0:N0} bytes)" -f (Get-Item -LiteralPath $built).Length) -ForegroundColor DarkGray
 }
 
 # The file about to go up must parse, or the live server stops at start. The
@@ -625,7 +630,7 @@ if (-not (Test-ThornswoodBuildStamp -Path $stampPath -Gamemode $built)) {
   $stampFrom = $built
   if ((Test-Path -LiteralPath $src) -and
       (Get-FileHash -LiteralPath $src).Hash -eq (Get-FileHash -LiteralPath $built).Hash) { $stampFrom = $src }
-  $null = Save-ThornswoodBuildStamp -Gamemode $stampFrom -Channel main -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) -Path $stampPath
+  $null = Save-ThornswoodBuildStamp -Gamemode $stampFrom -Channel main -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) -Path $stampPath -Artifact $artifact
 }
 '{0,-22} {1}' -f 'thornswood-build.json', (Format-ThornswoodBuildStamp (Get-Content -LiteralPath $stampPath -Raw | ConvertFrom-Json)) | Write-Host
 
@@ -808,6 +813,10 @@ foreach ($rel in $send.Keys) {
 }
 
 Write-Host ''
+Write-Host 'The gamemode artifact, to the store on the box...'
+Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
+
+Write-Host ''
 Write-Host "Staging in $rootWin\$stageName..."
 # A stage left by a run that died part way is cleared first. It was never
 # swapped in, so nothing is lost with it.
@@ -863,6 +872,11 @@ if ($swapOut -notcontains 'SWAP OK') {
   }
   exit 1
 }
+
+# Swapped in and answering on the box: it records that the live server runs
+# this gamemode artifact, and serves the record from its data folder, so
+# http://<box>:3000/thornswood-deploy.json says which commit is live.
+$null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root -Beside "$Root/data/thornswood-deploy.json"
 
 # And from here, the shape Publish-Server.ps1 uses. The box answering itself
 # on 127.0.0.1 is not the same as it answering the rest of the world; this is

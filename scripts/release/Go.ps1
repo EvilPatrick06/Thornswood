@@ -33,7 +33,7 @@ param(
   # launcher is on another drive. -Game and -Vortex still win.
   [string] $Game   = 'C:\Thornswood\Game',
   [string] $Vps    = '',
-  [string] $User   = 'Administrator',
+  [string] $User   = '',
   [switch] $SkipServer,
   # Install into the Skyrim that Steam owns and Vortex deploys the collection
   # into, rather than into the launcher's own copy. Found the same way the
@@ -86,6 +86,7 @@ $ProgressPreference    = 'SilentlyContinue'
 
 $Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ui      = Join-Path $Game 'Data\Platform\UI'
 $plugins = Join-Path $Game 'Data\Platform\Plugins'
