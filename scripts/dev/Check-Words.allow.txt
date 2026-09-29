@@ -1,0 +1,16 @@
+# Check-Words.allow.txt
+#
+# Lines that break a rule in scripts\dev\Check-Words.ps1 on purpose. One per
+# line, four parts split by " | ":
+#
+#   file | rule | why it may | the text on the line
+#
+# The file is repository relative with forward slashes, as a hit names it.
+# The rule is the name in square brackets on the hit (em-dash, banned-word,
+# old-owner, open-alpha, placeholder, names-person). The text is compared
+# exactly, case and all, so it covers that line and nothing written later.
+# An allowance that matches nothing any more fails the check, so this list
+# cannot grow stale. A line that could be reworded is reworded instead.
+
+CONTRIBUTING.md | banned-word | the Words section names the word it bans | Never "player".
+docs/FEED.md | banned-word | quotes a news record as it was published on 26 Sep, which is the kind Note-Rules now refuses | This is what players actually got

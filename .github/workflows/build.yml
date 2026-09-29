@@ -105,11 +105,27 @@ jobs:
       - name: Check the writing rules
         shell: pwsh
         run: |
-          # The Words section of CLAUDE.md, over the files people read: no em
-          # dashes, never the word player, and the owner is Patrick. Written
-          # down since the start and never checked, and on 24 September eleven
-          # hits had gone out in those files. Each hit is marked on its line.
+          # The Words section of CONTRIBUTING.md, over every file people read
+          # (every Markdown file outside lore and the archive, the launcher's
+          # help and window, the bot's posts, the public pages, the installer's
+          # read me). Written down since the start and never checked, and on
+          # 24 September eleven hits had gone out in those files. Each hit is
+          # marked on its line with the rule it breaks.
+          #
+          # Issue #460: then the two harnesses that prove the checks catch what
+          # they should, this one and the release note check Ship runs
+          # (scripts\release\Note-Rules.ps1), by planting a break of every rule.
+          # A few seconds between them. They ran only at night before, and a
+          # name in a component README sat red there for a day (#1034).
           .\scripts\dev\Check-Words.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $failed = @()
+          foreach ($n in 'test-check-words.ps1', 'test-note-rules.ps1') {
+            Write-Host ("--- {0}" -f $n)
+            & pwsh -NoProfile -File (Join-Path 'tests' $n)
+            if ($LASTEXITCODE -ne 0) { $failed += $n; Write-Host ("::error file=tests/{0}::a writing check let a planted break through or reported an allowed line; the FAIL lines above say which" -f $n) }
+          }
+          if ($failed.Count) { exit 1 }
 
       - name: Check the ownership page
         shell: pwsh
