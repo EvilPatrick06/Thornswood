@@ -102,6 +102,14 @@ try {
     exit 1
 }
 
+# Every key read below is optional in the file, so each one missing is added
+# as $null here. Build-Launcher and Ship run this under Set-StrictMode -Version
+# Latest, where reading $cfg.enabled off a file without it throws "The property
+# 'enabled' cannot be found" instead of signing (#1072). No "enabled" is on.
+foreach ($k in 'enabled', 'method', 'dlib', 'metadata', 'thumbprint', 'timestampUrl') {
+    if ($null -eq $cfg.PSObject.Properties[$k]) { $cfg | Add-Member -NotePropertyName $k -NotePropertyValue $null }
+}
+
 # A dlib or metadata that is not a full path is the repository folder's, so the
 # same signing.json works wherever the repository is cloned.
 $repoRoot = Split-Path -Parent (Split-Path -Parent $Here)
@@ -147,7 +155,7 @@ if ($m -and (Test-Path -LiteralPath $m)) {
     try { $meta = Get-Content -LiteralPath $m -Raw | ConvertFrom-Json } catch { $meta = $null }
     # Not $profile: that is an automatic variable holding the PowerShell
     # profile path, and writing to it here would be confusing at best.
-    $profName = if ($meta -and $meta.CertificateProfileName) { [string]$meta.CertificateProfileName } else { '' }
+    $profName = if ($meta -and $meta.PSObject.Properties['CertificateProfileName']) { [string]$meta.CertificateProfileName } else { '' }
     # Anything still carrying the words from the example, or nothing at all.
     # A real profile name is 5 to 100 characters and has no spaces in it.
     if (-not $profName -or $profName -match 'FILL THIS IN|YOUR_|<|\s') {
