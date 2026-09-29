@@ -17,20 +17,21 @@
                 new run that has not written yet, a file from before this
     the run     the real watcher, top to bottom, on a fake clock: a hung bot
                 is told about once, through the webhook because the bot
-                cannot post, is never restarted for it, and is said to be
-                back once it beats again. A bot with no heartbeat file is
-                left to the process check, as before
+                cannot post, is restarted by its service's name (#465), at
+                most three times an hour, and is said to be back once it
+                beats again. A bot with no heartbeat file is left to the
+                process check, as before
     the bot     when a python with discord.py is on this machine, the real
                 bot.py writes a heartbeat and the real rule reads it
 
   HOW. The watcher is a single quoted here-string inside Watch-Services.ps1.
   This lifts it out through the AST, as test-watch-alerts.ps1 does, and
-  replaces only what touches the world: the probes, schtasks, the sleep, the
-  clock and the webhook post. The heartbeat file is a real file in a scratch
-  folder.
+  replaces only what touches the world: the probes, schtasks,
+  Restart-Service, the sleep, the clock and the webhook post. The heartbeat
+  file is a real file in a scratch folder.
 
   Read only apart from files under its own temp folder. Never connects to
-  anything, and never runs schtasks.
+  anything, never runs schtasks and never restarts a service.
 #>
 [CmdletBinding()]
 param([string]$WatchPath)
@@ -79,7 +80,7 @@ if ($script:fail) { Done }
 
 $heart = ''
 foreach ($n in @('BotProcs', 'ReadBeat', 'Mins', 'BeatProblem', 'BotSilent')) { $heart += $fns[$n].Extent.Text + "`n" }
-Yes 'nothing that reads the heartbeat restarts or stops anything' (
+Yes 'nothing that reads the heartbeat restarts or stops anything itself' (
     $heart -notmatch 'schtasks|ScheduledTask|Stop-Process|Restart-|Start-Process|taskkill|Kill\(')
 Yes 'the heartbeat is read from where the bot writes it, beside bot.py in C:\Thornswood-Bot' (
     $text -match "(?m)^\`$botBeat = 'C:\\Thornswood-Bot\\heartbeat\.json'\r?$")
@@ -160,12 +161,23 @@ function Box([string]$name) {
     $script:down = @{}
     $script:said = @()
     $script:runs = @()
+    $script:restartHelps = $true # a restart brings a bot that works
 }
 function Unix() { return ([DateTimeOffset]$script:clock).ToUnixTimeSeconds() }
 
 function Get-Date { return $script:clock }
 function Start-Sleep { }
 function schtasks { $script:runs += $args[-1]; $global:LASTEXITCODE = 0; return 'SUCCESS' }
+# The bot's service (#465). On the VPS, where the nightly run is, the real one
+# would restart the real bot, so this stands in before anything runs. A
+# restart is a new python: it starts now, and it works unless told not to.
+function Restart-Service {
+    [CmdletBinding()] param([string]$Name, [switch]$Force)
+    $script:runs += $Name
+    $script:alive = $true
+    $script:procStart = Unix
+    if ($script:restartHelps) { $script:beating = $true; $script:onDiscord = $true }
+}
 function Answers($port) { return -not $script:down.ContainsKey([int]$port) }
 function SiteAnswers($url) { return $true }
 function BotAlive() { return $script:alive }
@@ -217,7 +229,8 @@ function Step([int]$n = 1) {
 }
 function Said([string]$rx) { return @($script:said | Where-Object { $_.Text -match $rx }).Count }
 function By([string]$who) { return @($script:said | Where-Object { $_.By -eq $who }).Count }
-function BotRuns() { return @($script:runs | Where-Object { $_ -eq 'Thornswood Bot' }).Count }
+function BotRuns() { return @($script:runs | Where-Object { $_ -eq 'ThornswoodBot' }).Count }
+function TaskRuns() { return @($script:runs | Where-Object { $_ -eq 'Thornswood Bot' }).Count }
 
 try {
     # -- a bot that is fine ------------------------------------------------------
@@ -235,21 +248,30 @@ try {
     Yes 'fifteen is: said once, that the bot is down' ((Said '^\*\*The Discord bot is down\.\*\*') -eq 1 -and $script:said.Count -eq 1)
     $first = "$($script:said[0].Text)"
     Yes 'in words: running, but hung, and since when' ($first -match 'Its python process is running, but its heartbeat stopped 15 minutes ago, so it is hung\. The last thing it heard from Discord was 15 minutes ago\. First noticed <t:\d+:f>\.')
-    Yes 'and that the watchdog does not restart it for this' ($first -match 'does not restart it for this\. It may be hung\. It needs a person\.')
+    Yes 'and that the watchdog restarted it (#465)' ($first -match 'The watchdog restarted it and it answered again\.')
+    Yes 'by the service''s name, once, and never through a task' ((BotRuns) -eq 1 -and (TaskRuns) -eq 0)
     Yes 'through the webhook, at once, because a hung bot cannot post it' ((By 'hook') -eq 1 -and (By 'bot') -eq 0)
-    Step 12
-    Yes 'an hour more of it says nothing more' ($script:said.Count -eq 1)
-    Yes 'and the bot is never restarted for it' ((BotRuns) -eq 0)
-    $script:down[3000] = $true
-    Step 1
-    Yes 'something else dying while the bot is hung goes through the webhook too' ((Said 'The live game server is down') -eq 1 -and (By 'hook') -eq 2)
-    $script:down = @{}
-    $script:beating = $true
     Step 1
     Yes 'one run beating again is not yet back' ((Said 'The Discord bot is back') -eq 0)
     Step 1
     Yes 'two is back, said once, by the bot now it can' ((Said 'The Discord bot is back') -eq 1 -and @($script:said | Where-Object { $_.By -eq 'bot' -and $_.Text -match 'Discord bot is back' }).Count -eq 1)
-    Yes 'and nothing it missed is said twice' ((Said 'The Discord bot is down') -eq 1 -and (Said 'The live game server is down') -eq 1)
+    Yes 'and nothing is said twice, nor restarted again' ((Said 'The Discord bot is down') -eq 1 -and (BotRuns) -eq 1)
+
+    # -- hung, and a restart does not help ------------------------------------------
+    Box 'hung-stays'
+    $script:restartHelps = $false
+    Step 2
+    $script:beating = $false
+    Step 3
+    Yes 'hung again after its restart: said once' ((Said 'The Discord bot is down') -eq 1)
+    Step 12
+    Yes 'an hour of it is restarted three times and no more, the same rule as a service that will not stay up' ((BotRuns) -eq 3)
+    Yes 'and said no more than once' ($script:said.Count -eq 1)
+    Yes 'watch.log says it has stopped trying' (@(Get-Content -LiteralPath (Join-Path $script:boxRoot 'watch.log') | Where-Object { $_ -match 'bot is still down after 3 restarts this hour' }).Count -ge 1)
+    $script:down[3000] = $true
+    Step 1
+    Yes 'something else dying while the bot is hung goes through the webhook too' ((Said 'The live game server is down') -eq 1 -and (By 'hook') -eq 2)
+    $script:down = @{}
 
     # -- off Discord: beating, not connected --------------------------------------
     Box 'off'
@@ -260,11 +282,11 @@ try {
     Step 1
     Yes 'fifteen is down, once, saying it is off Discord' ((Said 'The Discord bot is down\.\*\* Its python process is running, but it has not been connected to Discord for 15 minutes') -eq 1 -and $script:said.Count -eq 1)
     Yes 'through the webhook' ((By 'hook') -eq 1)
-    Step 6
-    Yes 'and not again' ($script:said.Count -eq 1 -and (BotRuns) -eq 0)
-    $script:onDiscord = $true
+    Yes 'and restarted by the service''s name' ((BotRuns) -eq 1)
     Step 2
-    Yes 'back on Discord is back, once' ((Said 'The Discord bot is back') -eq 1 -and $script:said.Count -eq 2)
+    Yes 'back on Discord after the restart is back, once' ((Said 'The Discord bot is back') -eq 1 -and $script:said.Count -eq 2)
+    Step 6
+    Yes 'and nothing more' ($script:said.Count -eq 2 -and (BotRuns) -eq 1)
 
     # -- a bot from before the heartbeat --------------------------------------------
     Box 'old-bot'
@@ -278,7 +300,7 @@ try {
     Step 2
     $script:alive = $false
     Step 1
-    Yes 'the process gone is the old rule: restarted, and said once' ((BotRuns) -eq 1 -and (Said 'The Discord bot is down') -eq 1)
+    Yes 'the process gone: restarted by the service''s name, and said once' ((BotRuns) -eq 1 -and (TaskRuns) -eq 0 -and (Said 'The Discord bot is down') -eq 1)
     Yes 'in the old words, not the heartbeat''s' ((Said 'Its python process is not running') -eq 1 -and (Said 'heartbeat') -eq 0)
 
     $leak = $false

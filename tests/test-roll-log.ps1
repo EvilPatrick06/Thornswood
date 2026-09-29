@@ -5,8 +5,8 @@
   folder. Entry 220: "Nothing rotates, so last night's crash is at the end of
   a file that grows forever."
 
-  WHY THE COMMAND LINES ARE RUN AND NOT JUST READ. server.log, voice.log and
-  bot.log are written by cmd's >> from a scheduled task, and on Windows a file
+  WHY THE COMMAND LINES ARE RUN AND NOT JUST READ. server.log and voice.log
+  are written by cmd's >> from a scheduled task, and on Windows a file
   held that way cannot be renamed or truncated while the service runs. So the
   roll has to happen in front of the service, inside the same cmd line, and a
   quoting mistake in that line is a game server that does not start. Each line
@@ -25,9 +25,10 @@
     the voice task line (Install-Voice.ps1): the same, and the environment it
       sets still reaches node
     the dev voice run file (vps-dev-instance.ps1): the same
-    the bot's run.ps1 loop (Install-Bot.ps1): rolls before python, carries on
-      when the roller is missing, and the read-back of what the bot said
-      still finds this start's lines after a roll made the file shorter
+    the bot: its service rolls bot.log itself (issue #465, BotService.cs,
+      tests\test-bot-service.ps1), so Install-Bot sends no roller; the
+      read-back of what the bot said still finds this start's lines after a
+      roll made the file shorter
     the server installer keeps the logs across the folder it deletes, and
       each installer sends the roller up
 
@@ -286,34 +287,11 @@ try {
 
     # ================================================================== the bot
     $btext = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\deploy\Install-Bot.ps1') -Raw
-    $ra = $btext.IndexOf("`$run = @'")
-    $rb = if ($ra -ge 0) { $btext.IndexOf("`n'@", $ra) } else { -1 }
-    $runPs1 = if ($ra -ge 0 -and $rb -gt $ra) { $btext.Substring($ra, $rb - $ra) } else { '' }
-    $wa = $runPs1.IndexOf('while (`$true) {')
-    $wb = $runPs1.IndexOf('& cmd /c "python')
-    Yes 'run.ps1 and its loop are in Install-Bot.ps1' ($wa -ge 0 -and $wb -gt $wa)
-    if ($wa -ge 0 -and $wb -gt $wa) {
-        $ahead = $runPs1.Substring($wa + 'while (`$true) {'.Length, $wb - $wa - 'while (`$true) {'.Length)
-        Yes 'the loop rolls bot.log before it starts python' ($ahead -match 'roll-log\.ps1' -and $ahead -match 'bot\.log')
-
-        # The lines ahead of python in the loop, as run.ps1 has them once the
-        # outer here-string has been filled in, then a marker for python.
-        $bot = Join-Path $tmp 'bot'
-        New-Item -ItemType Directory -Force -Path $bot | Out-Null
-        $pre = $ahead.Replace('$rootWin', $bot).Replace('`$', '$')
-        $probe = Join-Path $bot 'probe.ps1'
-        Put $probe ("`$ErrorActionPreference = 'Continue'`n" + $pre + "`n'reached python'`n")
-        Copy-Item -LiteralPath $roller -Destination (Join-Path $bot 'roll-log.ps1')
-        $blog = Join-Path $bot 'bot.log'
-        Fill $blog (4MB + 1)
-        $o = (& $winps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probe 2>&1 | Out-String)
-        Yes 'the loop rolls a bot.log past 4 MB' ((Size ($blog + '.1')) -eq (4MB + 1) -and -not (Test-Path -LiteralPath $blog))
-        Yes 'and goes on to start python' ($o -match 'reached python')
-        Remove-Item -LiteralPath (Join-Path $bot 'roll-log.ps1') -Force
-        $o = (& $winps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probe 2>&1 | Out-String)
-        Yes 'with no roller it still starts python' ($o -match 'reached python')
-    }
-    Yes 'Install-Bot sends the roller up beside the bot' ($btext -match 'Join-Path \$Here ''\.\.\\vps\\Roll-Log\.ps1''' -and $btext -match '/roll-log\.ps1"')
+    # The bot is a Windows service since #465 and its program rolls bot.log
+    # by size while it runs, which tests\test-bot-service.ps1 drives. So there
+    # is no run.ps1 loop to roll it and no roller to send.
+    Yes 'Install-Bot writes no run.ps1 loop and sends no roller for the bot any more' (
+        $btext -notmatch '\$run = @''' -and $btext -notmatch '/roll-log\.ps1"')
 
     # What the bot said on the way up is read from a byte count taken before
     # the start. A roll makes the file shorter than that count, and without

@@ -19,10 +19,15 @@
     5. Makes a shared key, gives it to both the bot and the site, so the site
        knows a ticket really came from the bot. The site is restarted when the
        key or the token changed, since it reads its config only on starting.
-    6. Registers a scheduled task that starts it at boot and restarts it if it
-       falls over, then starts it now.
+    6. Runs it as the Windows service ThornswoodBot, under its own account,
+       NT SERVICE\ThornswoodBot, rather than as SYSTEM, and starts it by that
+       name (issue #465, scripts\vps\Bot-Service.ps1 and BotService.cs). The
+       service starts it at boot, starts python again when it exits, and
+       rolls bot.log by size while it runs. The first full run takes the old
+       scheduled task and its run.ps1 loop off the box.
 
-  Run it again any time to push a change. It stops the old one first.
+  Run it again any time to push a change. It stops the old one first, by the
+  service's name.
 #>
 [CmdletBinding()]
 param(
@@ -30,6 +35,10 @@ param(
   [string]$User = '',
   [string]$Root = 'C:/Thornswood-Bot',
   [string]$DocsRoot = 'C:/Thornswood-Docs',
+  # The service the bot runs as, stopped and started by this name.
+  [string]$Service = 'ThornswoodBot',
+  # The scheduled task the bot ran under before the service. A full run
+  # removes it.
   [string]$Task = 'Thornswood Bot',
   # The site's task, restarted when the key or the token it reads changed.
   [string]$SiteTask = 'Thornswood Docs',
@@ -213,12 +222,8 @@ foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') {
   & scp @ssh $src "${User}@${Vps}:$Root/$f" | Out-Null
   Say "  $f" 'Green'
 }
-# The roller run.ps1 calls before each start of the bot. See Roll-Log.ps1 for
-# why a log cmd holds open can only be rolled then.
-$roll = Join-Path $Here '..\vps\Roll-Log.ps1'
-if (-not (Test-Path $roll)) { Die "missing: $roll" }
-& scp @ssh $roll "${User}@${Vps}:$Root/roll-log.ps1" | Out-Null
-Say '  roll-log.ps1' 'Green'
+# No roll-log.ps1 any more: the service rolls bot.log itself, by size, while
+# the bot runs (BotService.cs).
 
 # staff-channel.txt the same way, when there is one. It holds the id of the
 # channel a session that went wrong is announced in. Unlike the file above it
@@ -254,29 +259,25 @@ $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -
 # runs unattended.
 if ($CodeOnly) {
     Head 'Restarting it'
-    Remote @"
+    $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
+    if (-not (Test-Path -LiteralPath $svcLib)) { Die "missing: $svcLib" }
+    Remote ((Get-Content -LiteralPath $svcLib -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$log = '$rootWin\bot.log'
 `$before = 0
 if (Test-Path `$log) { `$before = (Get-Item `$log).Length }
 
-# By command line rather than by task, because a bot started by hand once is
-# still a bot holding the token and answering tickets.
-Get-CimInstance Win32_Process |
-  Where-Object { `$_.Name -like 'python*' -and `$_.CommandLine -like '*Thornswood-Bot*' } |
-  ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue; 'stopped pid ' + `$_.ProcessId }
-Start-Sleep -Seconds 2
-Stop-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
-Start-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
+# By the service's name (issue #465), with one sweep in between for a copy
+# somebody started by hand, which is still a bot holding the token.
+`$did = Restart-ThornswoodBotService -Name '$Service' -Root '$rootWin'
+if (`$null -eq `$did) { 'THE BOT SERVICE IS NOT INSTALLED HERE. Run Install-Bot.ps1 once without -CodeOnly: it puts the service in place of the old loop.'; return }
+`$did
 Start-Sleep -Seconds 12
+'service ' + '$Service' + ' is ' + (Get-Service -Name '$Service').Status
 
-`$p = Get-CimInstance Win32_Process |
-      Where-Object { `$_.Name -like 'python*' -and `$_.CommandLine -like '*Thornswood-Bot*' }
-if (`$p) { 'bot up, pid ' + (`$p | Select-Object -First 1).ProcessId } else { 'BOT DID NOT START' }
-
-# Only what this start wrote. The file is held open by the bot, so it is read
-# with FileShare ReadWrite or not at all. Shorter than before means run.ps1
-# rolled it on the way up, so all of it is this start.
+# Only what this start wrote. The file is held open by the service, so it is
+# read with FileShare ReadWrite or not at all. Shorter than before means it
+# rolled, so all of it is this start.
 `$fs = `$null
 try {
   `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
@@ -289,10 +290,10 @@ try {
     `$sr.Close()
   } else { 'nothing new in the log yet' }
 } catch { 'could not read the log: ' + `$_.Exception.Message } finally { if (`$fs) { `$fs.Dispose() } }
-"@ | ForEach-Object { Say "  $_" }
+"@) | ForEach-Object { Say "  $_" }
 
     Write-Host ''
-    Say '  Code only. Python, the libraries, the token and the task were left alone.' 'DarkGray'
+    Say '  Code only. Python, the libraries, the token and the service were left alone.' 'DarkGray'
     Say '  The ticket panel updates itself on startup, so a changed panel is already up.' 'DarkGray'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -389,7 +390,7 @@ if ('$KeyMode' -eq 'new' -or -not `$env2['THORNSWOOD_KEY']) {
 # Piped, Python writes in the machine's ANSI codepage and PowerShell reads the
 # pipe as OEM. Anything outside plain ASCII, a role name or a channel name with
 # an accent in it, came out of that as a screenful of question marks. Both ends
-# are told UTF-8 instead, here and at the top of run.ps1.
+# are told UTF-8 instead, here and by the service (BotService.cs).
 `$env2['PYTHONIOENCODING'] = 'utf-8'
 
 # Where Python looks for root certificates. ssl.set_default_verify_paths reads
@@ -403,9 +404,12 @@ try {
   }
 } catch { }
 [IO.File]::WriteAllText(`$f, (`$env2 | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding(`$false)))
-# Locked down, but not so far that the thing meant to read it cannot. The
-# scheduled task runs as SYSTEM, so SYSTEM has to stay on the file. Taking it
-# off is how the bot ended up starting with no token and exiting immediately.
+# Locked down, but not so far that the thing meant to read it cannot. The bot
+# runs as NT SERVICE\ThornswoodBot now, and Bot-Service.ps1 grants that
+# account read on this file below, after this rewrites the rules, every full
+# run. SYSTEM stays for the nightly backup, which runs as SYSTEM and copies
+# this folder. A file its reader cannot open is how the bot once started with
+# no token and exited immediately.
 try {
   `$acl = Get-Acl `$f
   `$acl.SetAccessRuleProtection(`$true, `$false)
@@ -464,101 +468,26 @@ $payload = $null; $botKey = $null
 $settings | ForEach-Object { Say "  $_" }
 
 # -------------------------------------------------------------- runner ---
+# The bot as the Windows service ThornswoodBot, under its own account (issue
+# #465). BotService.cs is the program the service runs: python bot.py with
+# bot.env.json as its environment, bot.log written and rolled by size, python
+# started again when it exits, three quick exits and it stops. It is built on
+# the box by Bot-Service.ps1, which also takes off the old way: the scheduled
+# task that ran run.ps1 as SYSTEM, and run.ps1 and roll-log.ps1 with it.
+#
+# Nothing on the box is stopped until python has been checked and the program
+# has built beside the old one, so a failure there leaves the running bot as
+# it is.
 Head 'Keeping it running'
-Remote @"
-`$ErrorActionPreference = 'Stop'
-
-# A wrapper, because the scheduled task cannot set environment variables and
-# the bot wants six of them. It also restarts the bot if it exits, which is
-# what a rate limit or a dropped websocket looks like from out here.
-`$run = @'
+$svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
+$svcSrc = Join-Path $Here '..\vps\BotService.cs'
+foreach ($f in $svcLib, $svcSrc) { if (-not (Test-Path -LiteralPath $f)) { Die "missing: $f" } }
+$null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin\service' | Out-Null; 'ready'"
+& scp @ssh $svcSrc "${User}@${Vps}:$Root/service/BotService.cs" | Out-Null
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE for BotService.cs. The bot was not touched." }
+Say '  service\BotService.cs' 'Green'
+$running = @(Remote ((Get-Content -LiteralPath $svcLib -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Continue'
-Set-Location '$rootWin'
-
-[Console]::OutputEncoding = [Text.Encoding]::UTF8
-`$OutputEncoding = [Text.Encoding]::UTF8
-
-# Say so in the log rather than starting the bot with nothing and letting it
-# exit with a message that looks like the token was never set.
-`$envFile = '$rootWin\bot.env.json'
-try {
-  `$e = Get-Content `$envFile -Raw -ErrorAction Stop | ConvertFrom-Json
-} catch {
-  ('[run] cannot read ' + `$envFile + ': ' + `$_.Exception.Message) | Out-File '$rootWin\bot.log' -Append -Encoding utf8
-  ('[run] running as ' + [Security.Principal.WindowsIdentity]::GetCurrent().Name) | Out-File '$rootWin\bot.log' -Append -Encoding utf8
-  exit 1
-}
-foreach (`$p in `$e.PSObject.Properties) { [Environment]::SetEnvironmentVariable(`$p.Name, `$p.Value, 'Process') }
-if (-not `$env:DISCORD_TOKEN) {
-  '[run] bot.env.json has no DISCORD_TOKEN in it' | Out-File '$rootWin\bot.log' -Append -Encoding utf8
-  exit 1
-}
-
-# PATH came from before Python was installed on a fresh box.
-`$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')
-
-if (-not `$env:PYTHONIOENCODING) { `$env:PYTHONIOENCODING = 'utf-8' }
-
-# Three quick exits in a row and it stops trying.
-#
-# This loop used to start the bot again fifteen seconds after every exit, for
-# ever. That is right for a dropped connection. It is wrong for a rejected
-# token, Server Members Intent switched off, or a bot.py that fails on import:
-# each of those is in bot.log within seconds and the process exits, and the
-# loop tried again about four times a minute, the same way every time, until
-# somebody happened to open bot.log. A run that lasts
-# thirty seconds got far enough to be worth another go, so a long run starts
-# the count again, and only three short ones in a row give up.
-#
-# It exits 0 when it gives up. The task has RestartCount 999, and whether Task
-# Scheduler repeats a task that exits non-zero has not been measured on this
-# box; a clean exit is not a failure either way. What starts it again is the
-# watchdog, Watch-Services.ps1, which tries at most three times an hour and
-# then writes that the bot needs a look. That rule is entry 99 and stays as it
-# is. Install-Bot.ps1 starts the task again too, which is how a fix goes up.
-`$fastSeconds = 30
-`$fastRuns = 0
-while (`$true) {
-  # Rolled here, between runs, because this is the one moment nothing holds
-  # bot.log: cmd opens it for the >> below and keeps it until python exits.
-  # At 4 MB, five kept, and it never stops the bot starting. Roll-Log.ps1.
-  try { & '$rootWin\roll-log.ps1' -Path '$rootWin\bot.log' | Out-Null } catch { }
-  # Python writes the log itself, through cmd's redirection, the same way the
-  # game server and the voice server are run. Piping every line through
-  # PowerShell and Out-File, which this did until 2026-09-16, re-encoded the
-  # text and left the file unreadable past a point, and a slow pipeline could
-  # hold the bot's own print() calls, which run on its event loop.
-  `$clock = [Diagnostics.Stopwatch]::StartNew()
-  & cmd /c "python ""$rootWin\bot.py"" >> ""$rootWin\bot.log"" 2>&1"
-  `$code = `$LASTEXITCODE
-  if (`$clock.Elapsed.TotalSeconds -lt `$fastSeconds) { `$fastRuns++ } else { `$fastRuns = 0 }
-  if (`$fastRuns -ge 3) {
-    # Python has exited, so bot.log is free to append to.
-    ('[run] the bot stopped within ' + `$fastSeconds + ' seconds three times running, the last time with exit code ' + `$code + '. Not starting it again. The reason is in the lines above.') | Out-File '$rootWin\bot.log' -Append -Encoding utf8
-    exit 0
-  }
-  Start-Sleep -Seconds 15
-}
-'@
-[IO.File]::WriteAllText('$rootWin\run.ps1', `$run, (New-Object Text.UTF8Encoding(`$false)))
-
-Get-CimInstance Win32_Process |
-  Where-Object { `$_.Name -eq 'python.exe' -and `$_.CommandLine -like '*Thornswood-Bot*' } |
-  ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue }
-Get-CimInstance Win32_Process |
-  Where-Object { `$_.Name -eq 'powershell.exe' -and `$_.CommandLine -like '*Thornswood-Bot\run.ps1*' } |
-  ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue }
-Start-Sleep -Seconds 1
-
-Unregister-ScheduledTask -TaskName '$Task' -Confirm:`$false -EA SilentlyContinue
-`$a = New-ScheduledTaskAction -Execute 'powershell.exe' ``
-     -Argument '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "$rootWin\run.ps1"'
-`$t = New-ScheduledTaskTrigger -AtStartup
-`$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries ``
-     -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) ``
-     -ExecutionTimeLimit ([TimeSpan]::Zero)
-Register-ScheduledTask -TaskName '$Task' -Action `$a -Trigger `$t -Settings `$s ``
-  -User 'SYSTEM' -RunLevel Highest | Out-Null
 # Remember how long the log is, and read back only what is written past that.
 # Waiting for the words 'watching 1 server' to appear is no good on its own:
 # every previous start left that line behind, so the wait was satisfied by a
@@ -570,16 +499,13 @@ Register-ScheduledTask -TaskName '$Task' -Action `$a -Trigger `$t -Settings `$s 
 `$before = 0
 if (Test-Path `$log) { `$before = (Get-Item `$log).Length }
 
-Start-ScheduledTask -TaskName '$Task'
-Start-Sleep -Seconds 5
+`$r = Install-ThornswoodBotService -Name '$Service' -Root '$rootWin' -Source '$rootWin\service\BotService.cs' -Task '$Task'
+`$r.Lines
+if (-not `$r.Ok) { 'BOT SERVICE NOT INSTALLED'; return }
 
-`$p = Get-CimInstance Win32_Process |
-      Where-Object { `$_.Name -eq 'python.exe' -and `$_.CommandLine -like '*Thornswood-Bot*' }
-if (`$p) { 'bot up, pid ' + `$p.ProcessId } else { 'BOT DID NOT START' }
-
-# Opened with FileShare ReadWrite, because the bot has it open for writing and
-# anything less strict than that is denied while it does. Shorter than before
-# means run.ps1 rolled it on the way up, so all of it is this start.
+# Opened with FileShare ReadWrite, because the service has it open for
+# writing and anything less strict than that is denied while it does. Shorter
+# than before means it rolled, so all of it is this start.
 function Fresh {
   `$out = @()
   `$fs = `$null
@@ -612,7 +538,16 @@ if (-not `$ready) {
 '--- what the bot said this time ---'
 `$said = @(Fresh) | Where-Object { `$_ -match '^\s*\[(thornswood-bot|run)\]' }
 if (`$said) { `$said | Select-Object -Last 25 } else { 'nothing yet' }
-"@ | ForEach-Object { Say "  $_" }
+"@))
+$running | ForEach-Object { Say "  $_" }
+if ("$running" -match 'BOT SERVICE NOT INSTALLED') {
+  Write-Host ''
+  if ("$running" -match 'Nothing was stopped or changed') {
+    Say 'The bot was left running the way it was. Fix what the lines above say, then run this again.' 'Yellow'
+  } else {
+    Say 'The bot is NOT running. Fix what the lines above say, then run this again.' 'Red'
+  }
+}
 
 Write-Host ''
 if ("$settings" -match 'SITE DID NOT COME BACK|SITE CONFIG DOES NOT PARSE') {
