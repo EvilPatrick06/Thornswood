@@ -145,7 +145,9 @@ Yes ('no stop in Run goes to the log alone (found {0})' -f $silent.Count) ($sile
 $stops = [regex]::Matches($run, 'return Stop\(').Count
 Yes ('the early stops in Run go through Stop (found {0})' -f $stops) ($stops -ge 7)
 Yes 'Steam not starting says so on the card' ($wait -match 'Stop\("Steam did not start')
-Yes 'the Steam copy already on 1.6.1170 says on the card that nothing needs downloading' ($run -match 'status\("The Steam copy of Skyrim is already on 1\.6\.1170, so nothing needs downloading')
+# Since #1218 the Steam copy is never downgraded; what can already be there is
+# 1.6.1170's own download, which a first build is made from.
+Yes '1.6.1170''s files already downloaded says on the card that nothing needs downloading' ($run -match 'status\("1\.6\.1170''s files are already downloaded\. Thornswood''s own folder is made from them next\."\);')
 Yes 'TypeIntoConsole asks Steam through AskSteam' ($type -match 'AskSteam\("steam://open/console", log\);')
 $reask = $type.IndexOf('if (!reopened && (DateTime.Now - start).TotalSeconds > 8)')
 $check = $type.IndexOf('if (h == IntPtr.Zero) continue;')
@@ -164,7 +166,7 @@ Yes 'the bar is up from the moment the run starts, before Steam is even opened' 
 Yes 'the bar moves during a part, and moves without a number before Steam gives a size' ($run -match 'Progress\(total > 0 \? Percent\(i, Stages, size, total\) : -2\);')
 Yes 'a part that is already downloaded still moves the bar on' ($run -match 'Progress\(\(i \+ 1\) \* 100 / Stages\);\s*continue;')
 Yes 'and so does one that has just come down' (([regex]::Matches($run, 'Progress\(\(i \+ 1\) \* 100 / Stages\);')).Count -eq 2)
-Yes 'the copy carries the same bar on rather than starting it again' ($run -match 'Progress\(Percent\(Depots\.Length, Stages, 0, toCopy\)\);' -and $run -match 'Progress\(Percent\(Depots\.Length, Stages, copied, toCopy\)\);')
+Yes 'the copy carries the same bar on rather than starting it again' ($run -match 'Progress\(Percent\(Depots\.Length, Stages, 0, toCopy\)\);' -and $run -match 'Progress\(Percent\(Depots\.Length, Stages, copied, all\)\);')
 Yes 'nothing puts the bar back to nothing part way' ($run -notmatch 'Progress\(0\);')
 Yes 'the bar reaches 100 only when Skyrim is on 1.6.1170' ($run -match 'status\("Done\. Skyrim is on 1\.6\.1170\."\);\s*Progress\(100\);')
 

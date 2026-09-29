@@ -256,11 +256,11 @@ namespace Thornswood
         static void StartOwnGame(bool make, bool loud)
         {
             if (ownGameBusy) return;
-            // The downgrade is writing into the Steam copy this reads from. It
-            // starts the refresh itself when it is done.
+            // The downgrade puts 1.6.1170's files into this folder, or, before
+            // there is one, makes it from them itself when it is done (#1218).
             if (Downgrade.Busy)
             {
-                Log("Skyrim is being downgraded. Thornswood's own folder is brought up to date when that is done.");
+                Log("Skyrim 1.6.1170 is being fetched for Thornswood's own folder. Bring it up to date from Vortex in Settings once that is done; the launcher also does it by itself the next time it starts.");
                 return;
             }
             if (playing || Checks.GameRunning())

@@ -99,6 +99,10 @@ if (Test-Path -LiteralPath $swallow) { $real += $swallow }
 # #1145; Progress.cs needs only Swallow. Taken only where it exists, as above.
 $progress = Join-Path $AppPath 'Progress.cs'
 if (Test-Path -LiteralPath $progress) { $real += $progress }
+# OwnGame's archive sharing and the Downgrade's files are its other half since
+# #1217 and #1218. Taken only where it exists, as above.
+$ownShare = Join-Path $AppPath 'OwnGameShare.cs'
+if (Test-Path -LiteralPath $ownShare) { $real += $ownShare }
 foreach ($f in $real) {
     Yes "launcher\app\$([IO.Path]::GetFileName($f)) is there" (Test-Path -LiteralPath $f)
     if (-not (Test-Path -LiteralPath $f)) { Done }
@@ -137,7 +141,13 @@ namespace Thornswood
     }
     static class Keep { public static List<string> Held() { return new List<string>(); } }
     static class Junction { public static bool IsLink(string p) { return false; } }
-    static class Downgrade { public static string Describe(Config cfg, string exe) { return "not 1.6.1170"; } }
+    static class Downgrade
+    {
+        public static string Describe(Config cfg, string exe) { return "not 1.6.1170"; }
+        // Nothing downloaded: the Steam copy is what a folder is made from.
+        public static List<string> Downloaded(Config cfg) { return null; }
+        public static void ClearDownloads(Config cfg, Action<string> say) { }
+    }
     static class SkyMp { public static int ResourcePortFor(Config cfg) { return 0; } }
     static class Updater { public const string Version = "test"; }
 }
@@ -816,8 +826,11 @@ namespace Thornswood
             Put(Path.Combine(steam, "_Profile Switch\\Switch.ps1"), "SWITCH");
             Put(Path.Combine(steam, "Data\\_disabledByKzl\\ccParked.esm"), "PARKED-CC");
             Put(Path.Combine(steam, "Data\\_ResourcePack.esl"), "GAME-RESOURCEPACK");
+            // The animation is the collection's, deployed by Vortex. Since
+            // #1218 only Vortex's files are linked; the game's own are copies.
             Record(Path.Combine(steam, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(steam, "Data"),
-                   new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" } }, DateTime.UtcNow);
+                   new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" },
+                                    new string[] { "Meshes\\actors\\character\\animations\\walk.hkx", "ModA" } }, DateTime.UtcNow);
             Paths.Game = steam;
             string made = null;
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
@@ -1008,8 +1021,11 @@ try {
         (($own -match 'OwnGame\.PointAt\(cfg,\s*chosen') -and ($own -match 'OwnGame\.PointAt\(cfg,\s*""'))
     Yes 'Make it, the offer and the Play refusal read the folder Vortex deploys into' `
         (([regex]::Matches($own, 'string src = OwnGame\.DeploysInto\(')).Count -ge 3)
-    Yes 'Downgrade still works on the Steam copy (OwnGame.Source), never the folder Vortex deploys into' `
-        (($down -match 'OwnGame\.Source\(cfg\)') -and ($down -notmatch 'DeploysInto'))
+    # Since #1218 the Downgrade writes into Thornswood's own folder
+    # (OwnGame.TakePinned), never into the Steam copy nor the folder Vortex
+    # deploys into; test-own-folder-alone.ps1 holds the rest of that.
+    Yes 'Downgrade writes neither the Steam copy (OwnGame.Source) nor the folder Vortex deploys into' `
+        (($down -match 'OwnGame\.TakePinned\(') -and ($down -notmatch 'OwnGame\.Source') -and ($down -notmatch 'DeploysInto'))
 
     # Review, 24 September: a pack removal read Vortex's record from the
     # Steam copy, which has none when Vortex deploys elsewhere.

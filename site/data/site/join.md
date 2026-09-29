@@ -2,10 +2,12 @@
 
 ## What you need
 
-**Skyrim Special Edition** on Steam, on build **1.6.1170**. Steam moves the
-game past that build on its own, so most copies are newer. The launcher has a
-**Downgrade** button that asks Steam for the right build under your own
-account. Nothing comes from anywhere but Steam.
+**Skyrim Special Edition** on Steam, on any build. The server runs build
+**1.6.1170**, and Thornswood keeps that build in a game folder of its own. If
+your Steam copy is on another build, the launcher's **Downgrade** button asks
+Steam for 1.6.1170's files under your own account and puts them in
+Thornswood's folder. Your Steam copy stays on the build it is on. Nothing
+comes from anywhere but Steam.
 
 **Anniversary Edition is not required** and never will be. If you own it,
 nothing breaks. If you do not, nothing is missing.
@@ -13,10 +15,12 @@ nothing breaks. If you do not, nothing is missing.
 **Vortex**, with a free Nexus Mods account. The mods come from a collection on
 Nexus, and a collection is a Vortex thing: Mod Organizer cannot install it.
 
-Thornswood leaves the Skyrim you already have alone. The launcher builds a
-game folder of its own, `C:\Thornswood\Game`, out of your Steam copy and what
-Vortex put into it. Most of it is hard links to your own files, which take no
-extra space, and the few files other programs rewrite are real copies. Vortex keeps the mods in a profile of their own, so
+Thornswood leaves the Skyrim you already have alone: you can update it,
+verify it and mod it as you like. The launcher builds a game folder of its
+own, `C:\Thornswood\Game`, out of your Steam copy and what Vortex put into it,
+and after that it only takes Vortex's files from there. The mods and Skyrim's
+archives are hard links, which take no extra space, and the launcher checks
+the archives before every Play; everything else is Thornswood's own copy. Vortex keeps the mods in a profile of their own, so
 switching back to your usual profile and running Purge Mods leaves your own
 Skyrim the way it was.
 

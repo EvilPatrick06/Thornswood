@@ -35,8 +35,22 @@ namespace Thornswood
     /// Paths.Init already picks Root\Game over the Steam copy when it exists;
     /// that is the layout installs had before the collection. The difference is
     /// only where the files came from, recorded in Profile\OwnGame.
+    ///
+    /// ONCE MADE, THE FOLDER NEEDS NOTHING FROM THE STEAM COPY (#1218).
+    /// Patrick, 29 Sep: "it shouldn't be using Steam's now anyway, but this
+    /// way people can play vanilla at whatever version and their own mods".
+    /// The Steam copy is the person's: they may update it, verify it and mod
+    /// it however they like. So it is read once, when the folder is first
+    /// made (Make), and only if it is on 1.6.1170; when it is on another
+    /// build the Downgrade downloads 1.6.1170's own files from Steam and the
+    /// folder is made from those instead. From then on the folder holds the
+    /// game itself, a refresh takes nothing but Vortex's deployment (Vortex),
+    /// the game's own files are the folder's own copies, and nothing here
+    /// writes into the Steam copy. Skyrim's archives are the one thing still
+    /// kept on the disk once, and only while their bytes are the same as the
+    /// folder's own record; OwnGameShare.cs checks that before every Play.
     /// </summary>
-    static class OwnGame
+    static partial class OwnGame
     {
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
@@ -107,13 +121,15 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The Skyrim the game itself comes from: a Steam copy of Skyrim Special
-        /// Edition, the one Downgrade keeps at the server's build. When Vortex
-        /// deploys into a Steam copy it is that folder, which is the ordinary
-        /// case and every install before 24 September. When Vortex deploys into
-        /// any other folder it is still the Steam copy and never that folder
-        /// (see DeploysInto and Gather). Downgrade, Leaks, Uninstall and the
-        /// updater read this, so none of them ever writes into another server's
+        /// The Skyrim the game itself is taken from when the folder is first
+        /// made: a Steam copy of Skyrim Special Edition. When Vortex deploys
+        /// into a Steam copy it is that folder, which is the ordinary case and
+        /// every install before 24 September. When Vortex deploys into any
+        /// other folder it is still the Steam copy and never that folder (see
+        /// DeploysInto and Gather). Once the folder is made nothing reads the
+        /// game from it again (#1218); Share compares Skyrim's archives with
+        /// it, and Leaks and Uninstall take back only files Thornswood itself
+        /// once put there, so none of them ever writes into another server's
         /// copy of the game.
         /// </summary>
         public static string Source(Config cfg)
@@ -317,7 +333,7 @@ namespace Thornswood
             if (game.Length == 0)
                 return "Thornswood will take what Vortex deployed into " + f + ", but it takes the game itself only from Steam's own copy of Skyrim Special Edition, " +
                        "and this machine has none, so the folder cannot be made until Skyrim Special Edition is installed in Steam.";
-            return "Thornswood now takes what Vortex deployed into " + f + " from Vortex's own mods folder, only the files Vortex's record lists, and the game itself from " +
+            return "Thornswood now takes what Vortex deployed into " + f + " from Vortex's own mods folder, only the files Vortex's record lists, and the game itself, when its own folder is first made, from " +
                    "the Steam copy in " + game + ". Nothing else in " + f + " is used.";
         }
 
@@ -329,24 +345,28 @@ namespace Thornswood
         /// </summary>
         public static string WhyNot(Config cfg, string src)
         {
+            // A folder that is made already holds the game itself, and a
+            // refresh takes nothing but Vortex's files (#1218). So the Steam
+            // copy's build, and whether there is a Steam copy at all, matter
+            // only to Make.
+            bool made = Active;
             if (string.IsNullOrEmpty(src) || !File.Exists(Path.Combine(src, "SkyrimSE.exe")))
-                return "There is no Skyrim to make it from. Steam does not list one.";
+                return made
+                    ? "Thornswood cannot find the Skyrim folder Vortex deploys into. In Vortex, Mods, Open, Open Game Folder shows which, and Choose Vortex's folder in Settings points Thornswood at it."
+                    : "There is no Skyrim to make it from. Steam does not list one.";
             // The game itself comes from a Steam copy whatever Vortex deploys
             // into (Source). When Vortex deploys into the Steam copy the two are
             // one folder and every check below reads exactly as it always did.
             string game = GameFor(src);
             bool apart = !SameFolder(game, src);
-            if (game.Length == 0)
-                return "Vortex deploys into " + src + ", but Thornswood takes the game itself only from Steam's own copy of Skyrim Special Edition, " +
-                       "never from another folder, and this machine has none, so install Skyrim Special Edition in Steam and try again.";
-            // Steam updates the Steam copy by itself. Bringing that build in would
-            // put Thornswood on a Skyrim the server does not run, so the Steam
-            // copy is put right first and the folder follows it (Downgrade).
-            long exeBytes = -1;
-            try { exeBytes = new FileInfo(Path.Combine(game, "SkyrimSE.exe")).Length; } catch { /* unreadable: -1, and the build check is skipped as it always was */ }
-            if (exeBytes >= 0 && exeBytes != cfg.ExpectedExeBytes)
-                return "Skyrim in " + game + " is " + Downgrade.Describe(cfg, Path.Combine(game, "SkyrimSE.exe")) +
-                       ", most likely because Steam updated it. Press Downgrade on the Play page first; the folder is brought up to date from it after that.";
+            if (!made)
+            {
+                if (game.Length == 0)
+                    return "Vortex deploys into " + src + ", but Thornswood takes the game itself only from Steam's own copy of Skyrim Special Edition, " +
+                           "never from another folder, and this machine has none, so install Skyrim Special Edition in Steam and try again.";
+                string build = FirstBuild(cfg, game);
+                if (build != null) return build;
+            }
             if (SameFolder(src, Folder))
                 return "Vortex is set to deploy into Thornswood's own folder, which would make it out of itself.";
             if (!HasRecord(src))
@@ -357,20 +377,33 @@ namespace Thornswood
             List<string> want = ShippedPlugins();
             if (want.Count == 0)
                 return "This install has no reference plugin list yet, so there is no telling whether Vortex has Thornswood's collection on. Let the launcher update first.";
-            Record rec = apart ? Staged(src) : null;
+            Record rec = apart || made ? Staged(src) : null;
             HashSet<string> stale = null;
+            // Made: a plugin counts where a refresh takes it from, Vortex's
+            // files (Vortex), or the game's own that the folder already holds.
+            HashSet<string> deployedNow = made ? Deployed(src) : null;
+            Dictionary<string, Rec> ownFiles = made ? ReadFiles() : null;
             int missing = 0, unstaged = 0;
             foreach (string p in want)
             {
                 try
                 {
+                    string from;
+                    if (made)
+                    {
+                        string rel = "Data\\" + p;
+                        Rec r;
+                        if (ownFiles.TryGetValue(rel, out r) && r.Origin != 'V' && File.Exists(Path.Combine(Folder, rel))) continue;
+                        if (FromVortex(src, rel, apart, rec, deployedNow) != null) continue;
+                        if (rec.From.TryGetValue(rel, out from)) unstaged++; else missing++;
+                        continue;
+                    }
                     // Apart, a plugin counts only where Gather will take it
                     // from: Vortex's mods folder by its record, or the Steam
                     // copy's own game. One the record lists whose copy in
                     // Vortex's mods folder is gone is counted apart: the
                     // Thornswood profile is deployed, the deployment is just
                     // out of date (verification of hotfix 1.1.93).
-                    string from;
                     if (!apart) { if (!File.Exists(Path.Combine(src, "Data", p))) missing++; }
                     else if (!(rec.From.TryGetValue("Data\\" + p, out from) && File.Exists(from)))
                     {
@@ -402,11 +435,14 @@ namespace Thornswood
             // anybody who keeps Steam on a second drive, and plenty of people
             // do. It is still a refusal, because a hard link cannot cross a
             // volume, but OneDriveOnly names both ways out and the paths.
-            if (!SameVolume(game, Paths.Root))
-                return OneDriveOnly("Skyrim is in " + game, Volume(game),
-                    "move Skyrim to " + Volume(Paths.Root) + ", in Steam, Settings, Storage: choose " + Volume(game) +
+            // Made, the links a refresh makes are to Vortex's files, so it is
+            // the folder Vortex deploys into that has to share the drive.
+            string linked = made ? src : game;
+            if (!SameVolume(linked, Paths.Root))
+                return OneDriveOnly("Skyrim is in " + linked, Volume(linked),
+                    "move Skyrim to " + Volume(Paths.Root) + ", in Steam, Settings, Storage: choose " + Volume(linked) +
                     " at the top, tick Skyrim Special Edition, press Move and pick " + Volume(Paths.Root));
-            if (apart)
+            if (apart || made)
             {
                 foreach (string dir in rec.Staging)
                     if (!SameVolume(dir, Paths.Root))
@@ -414,6 +450,55 @@ namespace Thornswood
                             "move Vortex's mods to " + Volume(Paths.Root) + ", in Vortex, Settings, Mods: set the mod staging folder to one on " +
                             Volume(Paths.Root) + " and let Vortex move what is there");
             }
+            return null;
+        }
+
+        /// <summary>
+        /// Null when the first build of the folder has a 1.6.1170 game to take:
+        /// the Steam copy is on that build, or the Downgrade has downloaded that
+        /// build's own files (Downgrade.Downloaded). Otherwise what happens
+        /// next, in one sentence.
+        ///
+        /// Until #1218 this refused every refresh as well, with "most likely
+        /// because Steam updated it. Press Downgrade on the Play page first",
+        /// and the Downgrade then copied 1.6.1170 over the Steam copy. The
+        /// Steam copy is the person's to keep on any build, so it is never
+        /// written, and it is only asked about here, before the folder exists.
+        /// </summary>
+        static string FirstBuild(Config cfg, string game)
+        {
+            if (!FirstBuildWrong(cfg, game)) return null;
+            if (Downgrade.Downloaded(cfg) != null) return null;
+            return "Skyrim in " + game + " is " + Downgrade.Describe(cfg, Path.Combine(game, "SkyrimSE.exe")) + ". Thornswood never changes that copy, and it can stay on any build: " +
+                   "press Downgrade on the Play page and Steam downloads 1.6.1170's own files under your account, and Thornswood makes its own folder from them. " +
+                   "Your Steam copy stays on the build it is on.";
+        }
+
+        /// <summary>The Steam copy's exe is there, readable, and not 1.6.1170's size.</summary>
+        static bool FirstBuildWrong(Config cfg, string game)
+        {
+            if (string.IsNullOrEmpty(game)) return false;
+            long exeBytes = -1;
+            try { exeBytes = new FileInfo(Path.Combine(game, "SkyrimSE.exe")).Length; } catch { /* unreadable: -1, and the build check is skipped as it always was */ }
+            return exeBytes >= 0 && exeBytes != cfg.ExpectedExeBytes;
+        }
+
+        /// <summary>
+        /// Where a refresh takes one of Vortex's files from, or null when it
+        /// cannot: Vortex's own copy in its mods folder, by the record; when
+        /// Vortex deploys into the Steam copy, the file it deployed there,
+        /// which is the same file, as the walk of that folder always took it.
+        /// Never a file Vortex's record does not list.
+        /// </summary>
+        static string FromVortex(string src, string rel, bool apart, Record rec, HashSet<string> deployed)
+        {
+            string staged;
+            if (!apart && deployed.Contains(rel) && Tidy(rel))
+            {
+                string at = Path.Combine(src, rel);
+                if (File.Exists(at)) return at;
+            }
+            if (rec.From.TryGetValue(rel, out staged) && File.Exists(staged)) return staged;
             return null;
         }
 
@@ -464,8 +549,14 @@ namespace Thornswood
         /// 10: Bethesda's Creation Kit and copies of the game's own programs
         ///    are left out, and taken out of a folder that already has them.
         ///    See BethesdaTool, issue #1152.
+        /// 11: the folder no longer follows the Steam copy (#1218). A refresh
+        ///    takes only Vortex's files; the game's own files the folder still
+        ///    shares with the Steam copy become copies of its own, except
+        ///    Skyrim's archives, which stay shared only while their bytes are
+        ///    the ones on record and are shared where they were not (#1217).
+        ///    See Refresh and OwnGameShare.cs.
         /// </summary>
-        const int Rules = 10;
+        const int Rules = 11;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -500,6 +591,9 @@ namespace Thornswood
             // Vortex's staging copy of it (Gather).
             public string From;
             public long Size, Ticks;
+            // One of 1.6.1170's own files from the Downgrade's download, which
+            // is removed once the folder is made, so it is always copied.
+            public bool Pinned;
         }
 
         class Rec
@@ -530,14 +624,18 @@ namespace Thornswood
             HashSet<string> deployed = Deployed(src);
             wantedPlugins = new HashSet<string>(ShippedPlugins(), StringComparer.OrdinalIgnoreCase);
             var left = new List<string>();
-            List<Found> all = Gather(src, left);
+            // The Steam copy on another build: the game comes from the files
+            // the Downgrade downloaded (FirstBuild let it through only then).
+            string game = GameFor(src);
+            List<string> pinned = FirstBuildWrong(cfg, game) ? Downgrade.Downloaded(cfg) : null;
+            List<Found> all = Gather(src, left, pinned);
 
             long copyBytes = 0, totalBytes = 0;
             foreach (Found f in all)
             {
                 if (Skip(f.Rel) != null) continue;
                 totalBytes += f.Size;
-                if (MustCopy(f.Rel, deployed)) copyBytes += f.Size;
+                if (f.Pinned || MustCopy(f.Rel, deployed)) copyBytes += f.Size;
             }
             long free = FreeSpace(Paths.Root);
             if (free >= 0 && free < copyBytes + 512L * 1024 * 1024)
@@ -553,7 +651,7 @@ namespace Thornswood
                 string skip = Skip(f.Rel);
                 if (skip != null) { left.Add(f.Rel + "  (" + skip + ")"); continue; }
 
-                bool copy = MustCopy(f.Rel, deployed);
+                bool copy = f.Pinned || MustCopy(f.Rel, deployed);
                 bool asLink;
                 try
                 {
@@ -575,6 +673,9 @@ namespace Thornswood
 
             File.WriteAllLines(FilesList, lines.ToArray());
             File.WriteAllLines(LeftOutFile, left.ToArray());
+            // A share record left by a folder of the same name that is gone
+            // speaks for files that are not there any more.
+            ForgetShares();
             Directory.Move(temp, Folder);
             WriteMade(src, SumCopied(lines));
             SettleSettings(true);
@@ -583,6 +684,15 @@ namespace Thornswood
                           linked.ToString("n0") + " files linked, " + copied.ToString("n0") + " copied (" + Mb(copyBytes) + ")";
             if (fellBack > 0) said += ", " + fellBack.ToString("n0") + " of them copied because a link could not be made";
             said += ". " + left.Count.ToString("n0") + " left out, other servers' files among them; the list is in " + LeftOutFile + ".";
+            if (pinned != null)
+            {
+                said += " The game itself is 1.6.1170's own files, downloaded from Steam; the Steam copy in " + game + " was not changed.";
+                Downgrade.ClearDownloads(cfg, say);
+            }
+            // Skyrim's archives: shared with the Steam copy where the bytes
+            // are the same, and put on record either way (OwnGameShare.cs).
+            string shared = Share(game, say);
+            if (shared != null) said += " " + shared;
             return said;
         }
 
@@ -618,11 +728,13 @@ namespace Thornswood
             HashSet<string> owned = Owned(deployed);
             wantedPlugins = new HashSet<string>(ShippedPlugins(), StringComparer.OrdinalIgnoreCase);
             var left = new List<string>();
-            List<Found> all = Gather(src, left);
+            // Vortex's files and nothing else (#1218). The game itself is the
+            // folder's own since it was made; it is carried forward below.
+            List<Found> all = Vortex(src, left);
 
             var lines = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            int added = 0, changed = 0, removed = 0, kept = 0, separated = 0, relinked = 0;
+            int added = 0, changed = 0, removed = 0, kept = 0, separated = 0, relinked = 0, separatedGame = 0;
             long copyBytes = 0;
             int looked = 0;
 
@@ -704,10 +816,42 @@ namespace Thornswood
             // rules 2. Those were never Vortex's, so without this a folder that
             // already had them would keep them for good and keep showing LOAD
             // ORDER ERROR, which is the thing rules 2 is for.
+            //
+            // What stays is carried forward in the record as it is (#1218):
+            // the game's own files are not read from the Steam copy again, so
+            // this record is the only place they are listed. One the folder
+            // still shares with the Steam copy gets a copy of its own, because
+            // a file copied over the Steam copy's writes through every hard
+            // link to it (measured, OwnGameShare.cs); Skyrim's archives stay
+            // shared, and Share checks them.
             foreach (KeyValuePair<string, Rec> kv in old)
             {
-                if (seen.Contains(kv.Key) || owned.Contains(kv.Key)) continue;
-                if (kv.Value.Origin != 'V' && !UnwantedCreation(kv.Key) && !Parked(kv.Key)) continue;
+                if (seen.Contains(kv.Key)) continue;
+                bool mine = owned.Contains(kv.Key);
+                if (mine || (kv.Value.Origin != 'V' && !UnwantedCreation(kv.Key) && !Parked(kv.Key)))
+                {
+                    string at = Path.Combine(Folder, kv.Key);
+                    try
+                    {
+                        if (!File.Exists(at) || (!mine && Skip(kv.Key) != null)) continue;
+                        char kind = kv.Value.Kind;
+                        if (!mine && kv.Value.Origin != 'V' && !IsArchive(kv.Key))
+                        {
+                            if (Links(at) > 1) { Separate(at); if (Links(at) <= 1) separatedGame++; }
+                        }
+                        // What the disk holds, not what an older record said:
+                        // eighteen archives on the shipping machine were on
+                        // record as linked and were copies (#1217).
+                        kind = Links(at) > 1 ? 'L' : 'C';
+                        lines.Add(kind + "|" + kv.Value.Origin + "|" + kv.Value.Size + "|" + kv.Value.Ticks + "|" + kv.Key);
+                    }
+                    catch (Exception ex)
+                    {
+                        Swallow.Note("OwnGame.Refresh, carrying " + kv.Key + " forward", ex);
+                        lines.Add(kv.Value.Kind + "|" + kv.Value.Origin + "|" + kv.Value.Size + "|" + kv.Value.Ticks + "|" + kv.Key);
+                    }
+                    continue;
+                }
                 try
                 {
                     string dest = Path.Combine(Folder, kv.Key);
@@ -758,6 +902,9 @@ namespace Thornswood
             string own = "";
             if (separated > 0) own += " " + separated.ToString("n0") + " animation file(s) it shared with the Steam copy are its own copies now.";
             if (relinked > 0) own += " " + relinked.ToString("n0") + " Distribution redistributable(s) it held as its own copies are hard links now.";
+            if (separatedGame > 0) own += " " + separatedGame.ToString("n0") + " of the game's own file(s) it shared with the Steam copy are its own copies now, so nothing done to the Steam copy reaches them.";
+            string shared = Share(GameFor(src), say);
+            if (shared != null) own += " " + shared;
             if (added + changed + removed == 0)
                 return "Thornswood's own Skyrim folder already matches what Vortex has deployed." + own;
             return "Thornswood's own Skyrim folder is up to date with Vortex: " + added.ToString("n0") + " new, " +
@@ -859,8 +1006,12 @@ namespace Thornswood
 
             string game = GameFor(src);
             bool apart = game.Length > 0 && !SameFolder(game, src);
+            // A folder of Thornswood's own takes only Vortex's files (#1218):
+            // from Vortex's mods folder, or from where Vortex deployed them,
+            // and never a file of the same name that is only in the Steam copy.
+            bool made = Active;
             Record rec = null;
-            if (apart)
+            if (apart || made)
             {
                 try { rec = Staged(src); }
                 catch (Exception ex)
@@ -895,10 +1046,10 @@ namespace Thornswood
                 if (from == null)
                 {
                     string direct = Path.Combine(src, "Data", p);
-                    try { if (File.Exists(direct)) from = direct; }
+                    try { if (File.Exists(direct) && (!made || deployed.Contains(rel))) from = direct; }
                     catch (Exception ex) { Swallow.Note("OwnGame.RestoreMissingPlugins, looking for " + p + " under Vortex's deploy folder", ex); }
                 }
-                if (from == null && game.Length > 0 && apart)
+                if (from == null && game.Length > 0 && apart && !made)
                 {
                     string steamCopy = Path.Combine(game, "Data", p);
                     try
@@ -1571,6 +1722,13 @@ namespace Thornswood
         public static bool MustCopy(string rel, HashSet<string> deployed)
         {
             if (rel.IndexOf('\\') < 0) return true;
+            // The game's own files, whatever Vortex did not deploy, are the
+            // folder's own copies (#1218): the Steam copy is the person's to
+            // update, verify and mod, and a file copied over one there writes
+            // through every hard link to it. Skyrim's archives are the one
+            // exception, linked only while their bytes are the ones on record
+            // (IsArchive, and Share and CheckShared in OwnGameShare.cs).
+            if (deployed != null && !deployed.Contains(rel) && !IsArchive(rel)) return true;
             // Vortex redistributables under Distribution: link, even .dll/.exe.
             // The two recorded client-build files stay copied (ClientFile).
             if (rel.StartsWith("Data\\Platform\\Distribution\\", StringComparison.OrdinalIgnoreCase)
@@ -1679,10 +1837,21 @@ namespace Thornswood
         /// what Vortex deploying into the Steam copy does. The result is what
         /// somebody whose Vortex deploys into the Steam copy gets.
         /// </summary>
-        static List<Found> Gather(string src, List<string> left)
+        static List<Found> Gather(string src, List<string> left, List<string> pinned)
         {
             string game = GameFor(src);
-            if (SameFolder(game, src)) return Walk(src);
+            if (SameFolder(game, src))
+            {
+                List<Found> walked = Walk(src);
+                if (pinned == null) return walked;
+                // The Steam copy is on another build, so 1.6.1170's own files
+                // take the place of its game files. Not of what Vortex deployed
+                // there: the collection's files stay the collection's.
+                var withPinned = new Dictionary<string, Found>(StringComparer.OrdinalIgnoreCase);
+                foreach (Found f in walked) withPinned[f.Rel] = f;
+                Pin(withPinned, pinned, Deployed(src));
+                return new List<Found>(withPinned.Values);
+            }
 
             // The game, and not an older deployment Vortex left in the Steam
             // copy before it moved: those files are its record there, if any.
@@ -1693,6 +1862,7 @@ namespace Thornswood
                 if (stale.Contains(f.Rel)) { left.Add(f.Rel + "  (an older Vortex deployment in the Steam copy, not where Vortex deploys now)"); continue; }
                 byRel[f.Rel] = f;
             }
+            if (pinned != null) Pin(byRel, pinned, null);
 
             Record rec = Staged(src);
             left.AddRange(rec.Refused);
@@ -1720,6 +1890,68 @@ namespace Thornswood
                 byRel[f.Rel] = f;
             }
             return new List<Found>(byRel.Values);
+        }
+
+        /// <summary>
+        /// 1.6.1170's own files, from the folders the Downgrade downloaded
+        /// them into, over the game's files in <paramref name="byRel"/>. Each
+        /// is copied (Found.Pinned), because the download is removed once the
+        /// folder is made. A path in <paramref name="keep"/> is the
+        /// collection's and is left to it.
+        /// </summary>
+        static void Pin(Dictionary<string, Found> byRel, List<string> pinned, HashSet<string> keep)
+        {
+            foreach (string dir in pinned)
+            {
+                foreach (Found f in Walk(dir))
+                {
+                    if (f.Rel.StartsWith(".thornswood", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (keep != null && keep.Contains(f.Rel)) continue;
+                    f.Pinned = true;
+                    byRel[f.Rel] = f;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Every file Vortex's record in <paramref name="src"/> lists, each with
+        /// where a refresh takes it from (FromVortex). This is all a refresh
+        /// brings in once the folder is made (#1218): nothing of the Steam
+        /// copy's own game is read, so the Steam copy can be on any build, and
+        /// mods the person put into it by hand stay out of Thornswood.
+        /// </summary>
+        static List<Found> Vortex(string src, List<string> left)
+        {
+            bool apart = !SameFolder(GameFor(src), src);
+            Record rec = Staged(src);
+            left.AddRange(rec.Refused);
+            HashSet<string> deployed = Deployed(src);
+            var l = new List<Found>();
+            foreach (string rel in deployed)
+            {
+                string from = FromVortex(src, rel, apart, rec, deployed);
+                if (from == null)
+                {
+                    left.Add(rel + "  (Vortex's record lists it and its mods folder does not have it)");
+                    continue;
+                }
+                try
+                {
+                    var fi = new FileInfo(from);
+                    var f = new Found();
+                    f.Rel = rel;
+                    f.From = from;
+                    f.Size = fi.Length;
+                    f.Ticks = fi.LastWriteTimeUtc.Ticks;
+                    l.Add(f);
+                }
+                catch (Exception ex)
+                {
+                    Swallow.Note("OwnGame.Vortex, reading " + from, ex);
+                    left.Add(rel + "  (Vortex's copy of it could not be read)");
+                }
+            }
+            return l;
         }
 
         [DataContract]
