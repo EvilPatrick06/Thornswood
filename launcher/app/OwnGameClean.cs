@@ -59,18 +59,6 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Written by the launcher under a name that is Thornswood's alone:
-        /// Thornswood.ini, and thornswood- files directly in Data\Platform, its
-        /// Plugins or its UI folder (Keep, Chars, JoinPass, the session note,
-        /// the plugins and the overlays).
-        /// </summary>
-        static bool NamedOurs(string rel)
-        {
-            if (rel.Equals("Data\\SKSE\\Plugins\\Thornswood.ini", StringComparison.OrdinalIgnoreCase)) return true;
-            return Regex.IsMatch(rel, @"^Data\\Platform\\((Plugins|UI)\\)?thornswood-[^\\]+$", RegexOptions.IgnoreCase);
-        }
-
-        /// <summary>
         /// Takes Thornswood's files out of the Steam copy once the own folder
         /// is made (see the class notes), and removes a Profile\Payload left
         /// by a Make whose last step stopped. Runs at every start and does
@@ -80,10 +68,19 @@ namespace Thornswood
         public static string CleanSteamCopy(Config cfg)
         {
             if (Paths.Collection || !Active) return null;
+            // Not while a refresh reads the installer's list (OwnGameKinds.cs).
+            lock (folderWork) return CleanSteamCopyNow(cfg);
+        }
+
+        static string CleanSteamCopyNow(Config cfg)
+        {
             var said = new List<string>();
             string payload = DropPayload();
             if (payload != null) said.Add(payload);
             if (File.Exists(CleanedFile)) return said.Count > 0 ? string.Join(" ", said.ToArray()) : null;
+            // The installer's list is about to be emptied; what it says is
+            // Thornswood's is kept in OwnGame's own record first (#1232).
+            KeepInstalledList();
 
             string steam = Source(cfg);
             var removed = new List<string>();
@@ -231,9 +228,14 @@ namespace Thornswood
             return take;
         }
 
-        /// <summary>Skyrim's own files, never taken out whatever a record says.</summary>
+        /// <summary>
+        /// Skyrim's own files, never taken out whatever a record says: the
+        /// pinned build's own by its list (OwnGameKinds.cs), and these names
+        /// in whatever build the Steam copy is on.
+        /// </summary>
         static bool Bethesdas(string rel)
         {
+            if (SkyrimOwn(rel)) return true;
             foreach (string m in Masters)
                 if (rel.Equals(m, StringComparison.OrdinalIgnoreCase)) return true;
             if (Regex.IsMatch(rel, @"^Data\\(Skyrim - [^\\]+\.bsa|_ResourcePack\.bsa|cc[^\\]+\.(esm|esl|esp|bsa))$", RegexOptions.IgnoreCase)) return true;

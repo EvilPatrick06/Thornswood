@@ -37,6 +37,14 @@
     5. The Steam copy's files are byte for byte and time for time what they
        were around every one of those: Make, Refresh, Share, the check, and
        the Downgrade's files. And the launcher's source keeps it that way.
+    6. Only three kinds of file (#1232): Skyrim's own by the pinned build's
+       list, Vortex's by its record, Thornswood's by its records. A plugin, a
+       loose mesh and a script extender plugin put into the Steam copy by hand
+       never reach Root\Game, at Make, from a newer Steam copy with the
+       Downgrade's files, or at a refresh; Skyrim's own loose files and
+       Vortex's still come in. A folder made before this, which took them,
+       loses them at its next refresh, once, logged, with the Steam copy
+       untouched; one held open is tried again at the next start.
 
   HOW. It compiles the shipped launcher\app\OwnGame.cs, OwnGameShare.cs,
   Downgrade.cs, Steam.cs, Paths.cs and Config.cs with the .NET Framework csc
@@ -95,7 +103,7 @@ foreach ($n in 'PresentationCore.dll', 'WindowsBase.dll', 'PresentationFramework
 }
 foreach ($r in $refs) { Yes "$([IO.Path]::GetFileName($r)) is there to compile against" (Test-Path -LiteralPath $r) }
 
-$real = @('OwnGame.cs', 'OwnGameShare.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs') |
+$real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs') |
     ForEach-Object { Join-Path $AppPath $_ }
 foreach ($f in $real) {
     Yes "launcher\app\$([IO.Path]::GetFileName($f)) is there" (Test-Path -LiteralPath $f)
@@ -115,6 +123,13 @@ namespace Thornswood
         public static bool GameRunning() { return false; }
     }
     static class Keep { public static List<string> Held() { return new List<string>(); } }
+    // An install that never synced to a release record (Sync.cs): every record
+    // of Thornswood's own files is its packs', Keep's and the installer's.
+    static class Updater
+    {
+        public static bool ReleaseFilesKnown() { return true; }
+        public static List<string> ReleaseFiles() { return new List<string>(); }
+    }
     static class Junction { public static bool IsLink(string p) { return false; } }
 }
 '@
@@ -273,6 +288,22 @@ namespace Thornswood
         // A loose file of the game's own, as every Steam copy has it. It was a
         // script source until #1227 kept those out of the folder altogether.
         static readonly string Master = "Data\\Skyrim.esm", Loose = "Data\\Video\\BGS_Logo.bik";
+        static readonly string[] Hand = { "Data\\MyOwn.esp", "Data\\meshes\\mine\\sword.nif", "Data\\SKSE\\Plugins\\MyOwnPlugin.dll" };
+
+        static bool NoneIn(string folder, string[] rels)
+        {
+            foreach (string r in rels) if (File.Exists(Path.Combine(folder, r))) { Console.WriteLine("      in " + folder + ": " + r); return false; }
+            return true;
+        }
+
+        static bool AllIn(string folder, string[] rels)
+        {
+            foreach (string r in rels) if (Text(Path.Combine(folder, r)) != "PERSON " + r) { Console.WriteLine("      not as the person left it in " + folder + ": " + r); return false; }
+            return true;
+        }
+
+        static string FilesTxt() { return File.ReadAllText(Path.Combine(OwnGame.Dir, "files.txt")); }
+        static string LeftOut() { return File.ReadAllText(Path.Combine(OwnGame.Dir, "left-out.txt")); }
 
         static Scene NewScene(string name, bool newer)
         {
@@ -339,6 +370,10 @@ namespace Thornswood
             }
             Put(Path.Combine(s.Game, Loose), "GAME-LOOSE");
             Put(Path.Combine(s.Game, "bink2w64.dll"), "GAME-BINK");
+            // Mods the person put into the Steam copy by hand (#1232), for the
+            // Skyrim they play from Steam: their own plugin, a loose mesh and a
+            // script extender plugin. None of Skyrim's, Vortex's or Thornswood's.
+            foreach (string h in Hand) Put(Path.Combine(s.Game, h), "PERSON " + h);
 
             // Vortex: two files in staging, deployed into the Steam copy as hard links.
             Deploy(s, new string[][] { new string[] { "TsOne.esp", "ModA", "VORTEX-TSONE" },
@@ -399,6 +434,7 @@ namespace Thornswood
                 SteamMovesOn();
                 FirstFromNewer();
                 WrittenThrough();
+                MadeBefore();
             }
             catch (Exception ex)
             {
@@ -429,6 +465,15 @@ namespace Thornswood
             string shares = Shares();
             Yes("and both are on record with their SHA-256 for the check before Play",
                 shares.Contains("|" + Tex) && shares.Contains("|" + Mesh));
+            Yes("the mods put into the Steam copy by hand stayed out: the person's own plugin, a loose mesh and a script extender plugin", NoneIn(own, Hand));
+            Yes("and they are still in the Steam copy, as the person left them", AllIn(s.Game, Hand));
+            string leftOut = LeftOut();
+            Yes("left-out.txt names each of them and why", Array.TrueForAll(Hand, delegate(string h) { return leftOut.Contains(h + "  (not one of Skyrim 1.6.1170's own files, not deployed by Vortex and not Thornswood's"); }));
+            Yes("Make's line says mods put into the Steam copy by hand stay with it", made != null && made.Contains("3 of them are in the Steam copy and not Skyrim's own, Vortex's or Thornswood's, such as mods put there by hand"));
+            string rec = FilesTxt();
+            Yes("the record says which kind each file is: the game's own O, Vortex's V",
+                rec.Contains("|O|" + 4096 + "|") && rec.Contains("|SkyrimSE.exe") && rec.Contains("C|O|") && rec.Contains("|V|") &&
+                rec.Contains("|" + Loose) && rec.Contains("|bink2w64.dll") && !rec.Contains("MyOwn.esp"));
             MadeNowRuns(s);
             Yes("the check before Play passes on a folder just made", OwnGame.CheckShared(OwnGame.Source(s.Cfg), null) == null);
 
@@ -462,7 +507,7 @@ namespace Thornswood
                 Text(Path.Combine(own, "SkyrimSE.exe")) == "PIN-EXE" && new FileInfo(Path.Combine(own, "SkyrimSE.exe")).Length == ExeBytes &&
                 Text(Path.Combine(own, Master)) == "PIN-MASTER" && Text(Path.Combine(own, Tex)) == "PIN-TEX0" && Text(Path.Combine(own, Mesh)) == "PIN-MESH0");
             Yes("nothing of the newer build or of the person's own mods came in",
-                !File.Exists(Path.Combine(own, "Data\\PersonsOwn.esp")) && !File.Exists(Path.Combine(own, "Data\\NewBuild.bsa")));
+                !File.Exists(Path.Combine(own, "Data\\PersonsOwn.esp")) && !File.Exists(Path.Combine(own, "Data\\NewBuild.bsa")) && NoneIn(own, Hand));
             string files = File.ReadAllText(Path.Combine(OwnGame.Dir, "files.txt"));
             Yes("the game's own files are still on record after the refresh", files.Contains("|O|") && files.Contains("|" + Master) && files.Contains("|" + Loose));
             Yes("the check before Play still passes", OwnGame.CheckShared(OwnGame.Source(s.Cfg), null) == null);
@@ -499,6 +544,7 @@ namespace Thornswood
             Yes("an archive with the same bytes in both builds is shared with the Steam copy",
                 Text(Path.Combine(own, Tex)) == "PIN-TEX0" && Id(Path.Combine(own, Tex)) == Id(Path.Combine(s.Game, Tex)) && Shares().Contains("|" + Tex));
             Yes("Vortex's files are in", Id(Path.Combine(own, "Data\\TsOne.esp")) == Id(Path.Combine(s.Staging, "ModA\\TsOne.esp")));
+            Yes("the mods put into the newer Steam copy by hand stayed out of a folder made from the download", NoneIn(own, Hand) && AllIn(s.Game, Hand));
             bool gone = true;
             foreach (string d in depots) if (Directory.Exists(d)) gone = false;
             Yes("the download is cleared away once the folder has the files", gone);
@@ -553,6 +599,84 @@ namespace Thornswood
             try { OwnGame.TakePinned(s.Cfg, depots, null, null); } catch (Exception ex) { refused = ex.Message.Contains("never written"); }
             Yes("before a folder of its own exists, the Downgrade's files are never put into the Steam copy", refused && Same(steamNow, Snap(s.Game)));
         }
+
+        // ---- 6: a folder made before #1232, which took the hand placed mods -----
+        static void MadeBefore()
+        {
+            Scene s = NewScene("made-before", false);
+            string made = null;
+            try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
+            string own = OwnGame.Folder;
+            MadeNowRuns(s);
+            Yes("(made)", made != null);
+
+            // What Make used to do: the Steam copy's hand placed mods came in
+            // as hard links to its files, and everything not Vortex's went on
+            // record as O, under rules 12. A pack's file and one on the
+            // installer's list are in the folder too, on record as O.
+            var lines = new List<string>();
+            foreach (string line in File.ReadAllLines(Path.Combine(OwnGame.Dir, "files.txt"))) lines.Add(line.Replace("|T|", "|O|"));
+            foreach (string h in Hand)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(own, h)));
+                CreateHardLink(Path.Combine(own, h), Path.Combine(s.Game, h), IntPtr.Zero);
+                var fi = new FileInfo(Path.Combine(s.Game, h));
+                lines.Add("L|O|" + fi.Length + "|" + fi.LastWriteTimeUtc.Ticks + "|" + h);
+            }
+            string packFile = "Data\\textures\\thornswood\\pack.dds", installerFile = "Data\\meshes\\thornswood\\sign.nif";
+            Put(Path.Combine(own, packFile), "TS-PACK");
+            Put(Path.Combine(own, installerFile), "TS-INSTALLER");
+            lines.Add("C|O|7|1|" + packFile);
+            lines.Add("C|O|12|1|" + installerFile);
+            File.WriteAllLines(Path.Combine(OwnGame.Dir, "files.txt"), lines.ToArray());
+            Put(Path.Combine(Paths.PacksDir, "20260920-0000.files"), "abc|game\\" + packFile + "\r\n");
+            Put(Path.Combine(Paths.ProfileDir, "installed-into-game.txt"), installerFile + "\r\n");
+            string madeTxt = Path.Combine(OwnGame.Dir, "made.txt");
+            File.WriteAllText(madeTxt, File.ReadAllText(madeTxt).Replace("rules=13", "rules=12"));
+            Yes("(the folder now holds the hand placed mods, as one made before this did)", AllIn(own, Hand));
+
+            var steamNow = Snap(s.Game);
+            Yes("a folder made under the old rules asks to refresh once, though Vortex has not moved", OwnGame.NeedsRefresh(s.Cfg));
+
+            // A game started from Steam has one of them open.
+            string held = Path.Combine(own, Hand[2]);
+            string first = null;
+            using (new FileStream(held, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                try { first = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
+            }
+            Yes("the refresh takes the hand placed mods out of Thornswood's folder", first != null && !File.Exists(Path.Combine(own, Hand[0])) && !File.Exists(Path.Combine(own, Hand[1])));
+            Yes("and logs what it took out, and that the Steam copy keeps them",
+                first != null && first.Contains("Took 2 files out of Thornswood's folder") && first.Contains(Hand[0]) && first.Contains(Hand[1]) &&
+                first.Contains("still in the Steam copy, which was not touched") && Clean(first));
+            Yes("left-out.txt says each was taken out and why", LeftOut().Contains(Hand[0] + "  (taken out: not one of Skyrim 1.6.1170's own files"));
+            Yes("the one held open is left as it is, and the line says it tries again at the next start",
+                File.Exists(held) && first != null && first.Contains("could not be taken out yet") && first.Contains("tries again the next time it starts"));
+            Yes("so the folder still asks to refresh", OwnGame.NeedsRefresh(s.Cfg));
+            Yes("the Steam copy was not touched: its hand placed mods are there, byte and time", Same(steamNow, Snap(s.Game)) && AllIn(s.Game, Hand));
+
+            string second = null;
+            try { second = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
+            Yes("the next refresh takes out the one that was held", second != null && !File.Exists(held) && second.Contains("Took 1 file out") && second.Contains(Hand[2]));
+            Yes("and the folder is on the new rules, so it does not ask again", !OwnGame.NeedsRefresh(s.Cfg));
+            Yes("the Steam copy still was not touched", Same(steamNow, Snap(s.Game)) && AllIn(s.Game, Hand));
+
+            string rec = FilesTxt();
+            Yes("a pack's file and the installer's stay, on record as Thornswood's (T)",
+                Text(Path.Combine(own, packFile)) == "TS-PACK" && Text(Path.Combine(own, installerFile)) == "TS-INSTALLER" &&
+                rec.Contains("|T|7|1|" + packFile) && rec.Contains("|T|12|1|" + installerFile));
+            Yes("Skyrim's own files stay, on record as Skyrim's (O): the exe, the master, a loose file, the archives",
+                Text(Path.Combine(own, "SkyrimSE.exe")) == "PIN-EXE" && Text(Path.Combine(own, Master)) == "PIN-MASTER" && Text(Path.Combine(own, Loose)) == "GAME-LOOSE" &&
+                rec.Contains("|O|" + ExeBytes + "|") && rec.Contains("|O|10|") && rec.Contains("|" + Tex));
+            Yes("Vortex's files stay, as links to Vortex's own copies, on record as V",
+                Id(Path.Combine(own, "Data\\TsOne.esp")) == Id(Path.Combine(s.Staging, "ModA\\TsOne.esp")) && rec.Contains("|V|") && rec.Contains("|Data\\TsOne.esp"));
+            Yes("nothing of the hand placed mods is on record any more", !rec.Contains("MyOwn") && !rec.Contains("sword.nif") && !rec.Contains("MyOwnPlugin"));
+
+            string third = null;
+            try { third = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
+            Yes("a refresh after that takes nothing more out", third != null && third.Contains("already matches") && !third.Contains("Took"));
+            Yes("the check before Play still passes", OwnGame.CheckShared(OwnGame.Source(s.Cfg), null) == null);
+        }
     }
 }
 '@
@@ -566,7 +690,13 @@ try {
     [IO.File]::WriteAllText($stubFile, $stubs, $utf8)
     [IO.File]::WriteAllText($driverFile, $driver, $utf8)
     $exe = Join-Path $work 'own-alone-test.exe'
-    $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/out:$exe")
+    # The pretend build's list of Skyrim's own files, in records\skyrim-files.json's
+    # shape, embedded the way Build-Launcher embeds the real one (#1232).
+    $skyrimList = Join-Path $work 'skyrim-files.json'
+    $listed = @('SkyrimSE.exe', 'bink2w64.dll', 'Data\Skyrim.esm', 'Data\Skyrim - Textures0.bsa', 'Data\Skyrim - Meshes0.bsa', 'Data\Video\BGS_Logo.bik') |
+        ForEach-Object { '    "{0}": {{ "bytes": 1, "sha1": "0", "depot": "1" }}' -f $_.Replace('\', '\\') }
+    [IO.File]::WriteAllText($skyrimList, "{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" + ($listed -join ",`n") + "`n  }`n}`n", $utf8)
+    $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/out:$exe", "/resource:$skyrimList,skyrim-files.json")
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
     foreach ($f in $real) { $cscArgs += (Resolve-Path -LiteralPath $f).Path }
     $cscArgs += $stubFile
@@ -629,7 +759,26 @@ Yes 'after the Downgrade, the folder is made from the download, and Steam''s upd
     (($shell -match 'if \(ok && Paths\.Collection && Downgrade\.Downloaded\(cfg\) != null\) StartOwnGame\(true, true\);') -and
      ($shell -notmatch 'if \(ok\) AskToHoldSteamUpdates\(\);'))
 Yes 'the Downgrade question says the Steam copy is not changed' ($shell -match 'Your Steam copy of Skyrim is not changed and can stay on any build')
-Yes 'OwnGame.cs and OwnGameShare.cs are C# 5: no interpolated strings, no ?., no nameof' `
-    ((($own + $share) -notmatch '(?<![\w\)\]])\$"') -and (($own + $share) -notmatch '\?\.[A-Za-z]') -and (($own + $share) -notmatch '\bnameof\s*\('))
+$kinds = & $read 'OwnGameKinds.cs'
+# A $" after a regex quantifier is the end of a pattern (]+$"), not a string.
+Yes 'OwnGame.cs, OwnGameShare.cs and OwnGameKinds.cs are C# 5: no interpolated strings, no ?., no nameof' `
+    ((($own + $share + $kinds) -notmatch '(?<![\w\)\]\+\*\?\}])\$"') -and (($own + $share + $kinds) -notmatch '\?\.[A-Za-z]') -and (($own + $share + $kinds) -notmatch '\bnameof\s*\('))
+
+# ---- 6: only the three kinds, by a real list (#1232) ---------------------------
+$gather = $own.Substring($own.IndexOf('static List<Found> Gather('))
+$gather = $gather.Substring(0, $gather.IndexOf('static void Pin('))
+Yes 'Make keeps to the three kinds on both walks of the Steam copy (Gather calls OnlyThree twice)' (([regex]::Matches($gather, 'OnlyThree\(')).Count -eq 2)
+Yes 'Skyrim''s own is the embedded list of the pinned build''s files, not a guess by folder' `
+    (($kinds -match 'GetManifestResourceStream\("skyrim-files\.json"\)') -and ($kinds -match 'public static bool SkyrimOwn\(string rel\)\s*\{\s*return SkyrimFiles\(\)\.Contains\(rel\);'))
+Yes 'without the list nothing is made or refreshed (WhyNot asks NoSkyrimList first)' ($own -match 'string noList = NoSkyrimList\(\);\s*if \(noList != null\) return noList;')
+Yes 'OwnGame''s Rules is 13, so every folder made before refreshes once' ($own -match '(?m)^\s*const int Rules = 13;')
+$refreshNow = $own.Substring($own.IndexOf('static string RefreshNow('))
+Yes 'the refresh takes out what is none of the three and records the kind of the rest' `
+    ($refreshNow -match '(?s)origin = KindOf\(kv\.Key, null, ours\);\s*if \(origin == ''\\0'' && !sortNow\)\s*\{.*?else if \(origin == ''\\0''\)\s*\{\s*try\s*\{\s*DropName\(at\);')
+Yes 'and takes nothing out until every record of Thornswood''s own files is here (OursKnown, the release''s list)' `
+    (($refreshNow -match 'bool sortNow = OursKnown\(\);') -and ($refreshNow -match 'WriteMade\(src, SumCopied\(lines\), sortNow && stuck\.Count == 0 \? 1 : 0\);'))
+Yes 'Make, Refresh and the Steam copy''s clean up run one at a time' `
+    (($own -match 'lock \(folderWork\) return MakeNow\(') -and ($own -match 'lock \(folderWork\) return RefreshNow\(') -and ((& $read 'OwnGameClean.cs') -match 'lock \(folderWork\) return CleanSteamCopyNow\('))
+Yes 'the clean up keeps the installer''s list before it empties it' ((& $read 'OwnGameClean.cs') -match 'KeepInstalledList\(\);\s*\r?\n\s*\r?\n\s*string steam = Source\(cfg\);')
 
 Done

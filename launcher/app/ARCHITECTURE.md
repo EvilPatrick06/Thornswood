@@ -12,7 +12,10 @@ Thornswood's own game folder, the settled design since 18 Sep. The game runs
 from `<Root>\Game` (`C:\Thornswood\Game` on the main build,
 `C:\Thornswood-DevBuild\Game` on the dev build), which OwnGame made from what
 Vortex deployed into the Steam copy: big files as hard links, anything another
-program rewrites in place as copies. In this shape `Paths.Collection` is false
+program rewrites in place as copies. It takes three kinds of file and nothing
+else (#1232): Skyrim's own, by the pinned build's list, Vortex's, by Vortex's
+record, and Thornswood's own, by its records; a mod the person put into the
+Steam copy by hand stays there. In this shape `Paths.Collection` is false
 and `Paths.Game` is `<Root>\Game`.
 
 The older shared shape, where there is no `<Root>\Game` and the game would run
@@ -341,7 +344,7 @@ character is being played. The join token is only asked for over https,
 because the request carries the Discord ticket; with a voice address that is
 not https there is no token.
 
-**OwnGame** (OwnGame.cs, OwnGameShare.cs and OwnGameClean.cs, with
+**OwnGame** (OwnGame.cs, OwnGameShare.cs, OwnGameKinds.cs and OwnGameClean.cs, with
 ShellOwnGame.cs for its card and offer). `<Root>\Game` itself. `OwnGame.cs:477 Make()` builds it in
 `<Root>\Game.new` and moves it into place; `OwnGame.cs:554 Refresh()` brings it
 up to date with Vortex. Once made, the folder needs nothing from the Steam copy
@@ -350,8 +353,20 @@ files are the folder's own copies, and nothing writes into the Steam copy, so
 it can be on any build and modded freely. Skyrim's archives are shared with the
 Steam copy only while the bytes are the same (`OwnGameShare.cs:246 Share()`),
 and checked before every Play (`OwnGameShare.cs:354 CheckShared()`).
+Only three kinds of file go in (#1232, OwnGameKinds.cs): Skyrim's own, which
+is a file on the pinned build's list (`records\skyrim-files.json`, read out of
+the depot manifests the Downgrade asks Steam for and compiled into the
+launcher), Vortex's by its record, and Thornswood's own by its records (packs,
+Keep, the installer's list, Payload, the files it writes by name, and the game
+files of the release the install synced to, `Profile\release-files.txt`, which
+Sync.cs keeps). Make leaves anything else in the Steam copy out, and a refresh
+takes it out of a folder made before this, logged, without touching the Steam
+copy; on an install an older launcher synced, nothing is taken out until the
+check against its release has kept that list (`made.txt` kinds=1 once sorted).
 The records are in `Profile\OwnGame`: `files.txt` (every file, linked
-or copied, and whether Vortex deployed it, which Publish-Update reads),
+or copied, and which kind it is, V Vortex's, O Skyrim's own, T Thornswood's;
+Publish-Update reads the V lines), `installed-kept.txt` (the installer's list,
+kept by the clean up before it empties it),
 `shared.txt`, `differs.txt` and `changed.txt` (the archives, OwnGameShare.cs),
 `made.txt`, `left-out.txt`, `declined.txt`, and Vortex's `plugins.txt` and
 `loadorder.txt`. `OwnGame.cs:327 WhyNot()` names the one thing stopping the
