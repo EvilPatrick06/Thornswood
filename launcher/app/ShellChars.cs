@@ -118,6 +118,8 @@ namespace Thornswood
             });
 
             chosenId = 0;
+            // The last session's join pass is not this one's (#937).
+            JoinPass.Forget();
             Log("Starting. You pick your character at the game's main menu.");
             Play();
         }
@@ -239,8 +241,9 @@ namespace Thornswood
         ///
         /// The plugin writes Data\Platform\thornswood-choice.txt when they
         /// pick, and the two second tick reads it. Each new id is written down
-        /// (Chars.Chose), voice and the site are told, and the id is kept for
-        /// the play time count at close. The settings file is never touched
+        /// (Chars.Chose), voice and the site are told, a join pass is fetched
+        /// for it (JoinPass, #937), and the id is kept for the play time count
+        /// at close. The settings file is never touched
         /// here: a write to it hot reloads every plugin under the running game.
         /// </summary>
         static readonly HashSet<int> forgotten = new HashSet<int>();
@@ -261,10 +264,15 @@ namespace Thornswood
                 }
             }
 
+            // The join pass for the character picked, renewed while the game
+            // runs; nothing happens until one is picked (#937).
+            JoinPass.Tick(PresenceLog);
+
             int id = 0;
             try { id = Chars.ReadChoice(); } catch { id = 0; }
             if (id <= 0 || id == chosenId) return;
             chosenId = id;
+            JoinPass.For(id, PresenceLog);
             try { Chars.Chose(id); }
             catch (Exception ex) { Log("Could not write that choice down: " + ex.Message); }
             Log("chose character " + id);

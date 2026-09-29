@@ -63,20 +63,6 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Let Play through when nothing is able to say whether it should.
-        /// Never called on a check that answered; only when there was no
-        /// answer to be had.
-        /// </summary>
-        static void Unblock(string why)
-        {
-            if (updateAnswered) return;
-            updateAnswered = true;
-            updatePending = false;
-            Log("Playing on launcher " + Updater.Version + ", " + why + ".");
-            DrawStatus();
-        }
-
-        /// <summary>
         /// The feed's message in the bar above Play, and the hold on Play when
         /// the feed asks for one. Entry 262: until this the message was one
         /// Log line that scrolled away, so there was no way to say anything to
@@ -176,7 +162,7 @@ namespace Thornswood
             if (quiet)
             {
                 cfg.Save(Paths.CfgFile);
-                if (txtUpdateSource != null) txtUpdateSource.Text = Updater.WhyDisabled(cfg);
+                if (txtUpdateSource != null) txtUpdateSource.Text = Updater.FeedUrl(cfg);
                 DrawVoiceState();
             }
             ShowNotice(v);
@@ -282,7 +268,7 @@ namespace Thornswood
         /// </summary>
         static void CheckUpdatesInPlay()
         {
-            if (checkingInPlay || !Updater.Enabled(cfg)) return;
+            if (checkingInPlay) return;
             checkingInPlay = true;
             ThreadPool.QueueUserWorkItem(delegate
             {

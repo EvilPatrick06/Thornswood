@@ -106,7 +106,7 @@ it says a pool thread.
 | 19 | `Shell.cs:370 Icons.Ensure` | Pool thread. The shortcut icon follows the exe. `Shell.cs:393 ClearLeftovers` (pool) ends a windowless Skyrim over three minutes old. `Shell.cs:407 Uninstall.DropScratch` (pool) deletes the installer's leftover `Thornswood-setup` folder. |
 | 20 | `Shell.cs:423 RunScan` | `Verify.Run` against the server's manifest, then the Mods card. Then DrawStatus fills the checklist (on Diagnostics since #607), the Play summary and the button (see "The gate" below). |
 | 21 | `Shell.cs:429 HealClientBackground` | Pool thread, only when the six client runtime files are not the recorded build: `ClientRuntime.cs:206 Heal()` fetches them. Then `Shell.cs:430 AutoDisplayOnce` marks `config.json` so it never runs again and, on an install that has never played, matches the game's resolution to the screen; `Shell.cs:431 StartPing` asks whether the server is up. |
-| 22 | `Shell.cs:433 CheckUpdatesBackground` | Pool thread: the update check (see Updater in section 2). With no update source configured, `Shell.cs:435 Unblock` frees Play instead. |
+| 22 | `Shell.cs:433 CheckUpdatesBackground` | Pool thread: the update check (see Updater in section 2). Always: config.json cannot switch it off, and Play stays shut until it answers (#937). |
 | 23 | `Shell.cs:451 Voice.Prepare` | Installs the resolver that loads WebView2 out of the exe. `Shell.cs:453 Voice.Start` is queued until the window is idle on screen. |
 | 24 | `Shell.cs:460 win.ContentRendered` | Once the window has drawn, on a pool thread, `SelfSwap.cs:192 Settle()` deletes `Launcher\Thornswood.exe.old`, the copy of the previous launcher a self update keeps; that is how the update script knows this one started (see SelfSwap in section 2). A `Thornswood.exe.bad` left by a way back is deleted too, and the log says which version failed. Every start but the first after an update finds neither. |
 | 25 | `Shell.cs:488 Application` | A new WPF Application with `ShutdownMode.OnMainWindowClose`, because the hidden voice window would otherwise keep the process alive. `Shell.cs:490 app.Exit` stops voice and presence and releases Hold. `Shell.cs:497 DispatcherUnhandledException` logs a fault and keeps the launcher up. `Shell.cs:504 StartStallWatch` logs when the window stops answering. |
@@ -211,7 +211,9 @@ unsigned, self-signed and changed files.
 **FeedNotice** (FeedNotice.cs). What the feed says to everybody. Three
 optional fields in version.json, set by hand in the releases repository:
 `message` (a bar above Play, never a hold on its own), `maintenance` (holds
-Play) and `minLauncher` (holds Play in a launcher older than it).
+Play) and `minLauncher` (holds Play in a launcher older than it; since #937
+Publish-Update writes it on every publish as the launcher the feed offers, and
+the site refuses a join pass below it).
 `FeedNotice.cs:45 From()` turns a document into the bar's words and, when
 Play is held, the reason and the button's words. It owns no files and holds
 nothing on a check that did not answer; a value it cannot read leaves Play
@@ -506,7 +508,11 @@ empty stand-ins where parked plugins were.
 `Game\Data\Platform\thornswood-choice.txt`, which the menu plugin writes when
 the person picks (`Chars.cs:476 ReadChoice()`); a new id is written into
 `profiles.txt` (`Chars.cs:501 Chose()`), handed to voice and checked in with
-the site. Nothing in this loop writes the client settings: a write to that
+the site. The same tick keeps a join pass for the character picked
+(`JoinPass.cs:63 Tick()`, #937): fetched from the site when they pick and
+every four minutes after, and left in `Game\Data\Platform	hornswood-pass.txt`
+for the front plugin to hand the game server, which ends a session without
+one. Nothing in this loop writes the client settings: a write to that
 file reloads every plugin in the running game.
 `Shell.cs:1534 CheckUpdatesInPlay` looks for a release every thirty seconds
 and, four and a half minutes after first seeing one, closes the game so it can

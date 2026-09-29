@@ -476,10 +476,9 @@ namespace Thornswood
             AutoDisplayOnce();
             StartPing();
             StartGallery();
-            if (Updater.Enabled(cfg))
-                ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
-            else
-                Unblock("there is no update source configured");
+            // Always: config.json cannot switch the check off (#937), and Play
+            // stays shut until it has answered (Updater.FeedUrl).
+            ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
 
             /*
               Voice comes up with the launcher, not with the game.
@@ -2348,7 +2347,6 @@ namespace Thornswood
             };
             btnCheckNow.Click += delegate
             {
-                if (!Updater.Enabled(cfg)) { Log("No update source is configured in config.json."); return; }
                 Log("Checking for updates...");
                 ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(true); });
             };
@@ -4099,9 +4097,7 @@ namespace Thornswood
             if (items.Length == 0)
             {
                 var empty = new TextBlock();
-                empty.Text = Updater.Enabled(cfg)
-                    ? "Nothing posted yet. Anything Patrick writes to the update feed turns up here."
-                    : "Updates are not set up on this copy, so there is no news feed to read.";
+                empty.Text = "Nothing posted yet. Anything Patrick writes to the update feed turns up here.";
                 empty.Foreground = Res("Faint"); empty.FontSize = 12.5;
                 empty.TextWrapping = TextWrapping.Wrap;
                 newsList.Children.Add(empty);
