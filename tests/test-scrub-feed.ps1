@@ -510,4 +510,31 @@ Yes '  keeps what a feed still names, whatever it was asked' (@($res.Named) -con
 Yes '  refuses a name that is not a sha256' (@($res.Bad) -contains 'not-a-sha')
 Yes '  and deletes what nothing names' (@($res.Gone) -contains $loose -and -not (Test-Path -LiteralPath (Join-Path $da $loose)))
 
+# ---- every function it calls is loaded -------------------------------------------
+# Some lines run only against the real site (Test-SiteAsset, after the send), so
+# a run on a folder never reaches them. On 29 September the first dev run
+# stopped there because Feed-Rules.ps1, which defines it, was not loaded. So:
+# every function Scrub-Feed.ps1 calls that a script beside it defines is in a
+# file it loads.
+Write-Host ''; Write-Host 'what Scrub-Feed.ps1 loads'
+$scrubPath = Join-Path $repo 'scripts\release\Scrub-Feed.ps1'
+$tk = $null; $er = $null
+$sast = [System.Management.Automation.Language.Parser]::ParseFile($scrubPath, [ref]$tk, [ref]$er)
+$own = @($sast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
+$loaded = @([regex]::Matches([IO.File]::ReadAllText($scrubPath), "(?m)^\. \(Join-Path \`$Here '([^']+)'\)") | ForEach-Object { $_.Groups[1].Value })
+$definedIn = @{}
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $repo 'scripts\release') -Filter '*.ps1' -File)) {
+    $t2 = $null; $e2 = $null
+    $a2 = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$t2, [ref]$e2)
+    foreach ($fd in @($a2.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Parent -is [System.Management.Automation.Language.NamedBlockAst] }, $false))) {
+        if (-not $definedIn.ContainsKey($fd.Name)) { $definedIn[$fd.Name] = @() }
+        $definedIn[$fd.Name] += $f.Name
+    }
+}
+$calls = @($sast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true) | ForEach-Object { $_.GetCommandName() } | Where-Object { $_ } | Sort-Object -Unique)
+$unloaded = @($calls | Where-Object { $own -notcontains $_ -and $definedIn.ContainsKey($_) -and -not @($definedIn[$_] | Where-Object { $loaded -contains $_ }).Count })
+Yes ('every function it calls from a script beside it is loaded ({0} of them)' -f @($calls | Where-Object { $definedIn.ContainsKey($_) -and $own -notcontains $_ }).Count) ($unloaded.Count -eq 0)
+foreach ($u in $unloaded) { Write-Host ("      {0} is defined in {1}, which it does not load" -f $u, ($definedIn[$u] -join ', ')) }
+Yes '  Test-SiteAsset among them, from Feed-Rules.ps1' ($calls -contains 'Test-SiteAsset' -and $loaded -contains 'Feed-Rules.ps1')
+
 Done

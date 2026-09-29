@@ -102,6 +102,10 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Wr
 . (Join-Path $Here 'Feed-Store.ps1')
 . (Join-Path $Here 'Release-Baseline.ps1')
 . (Join-Path $Here 'Ship-Rules.ps1')
+# Test-SiteAsset, which checks each new pack answers on the real site after the
+# send. The first dev run on 29 September stopped there without it, after the
+# feed had gone out, because the tests run on a folder and never reach that line.
+. (Join-Path $Here 'Feed-Rules.ps1')
 Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
 Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
 
