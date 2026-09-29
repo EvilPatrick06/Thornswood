@@ -207,21 +207,23 @@ const modlog = () => { try { return fs.readFileSync(path.join(PRIV, 'moderation.
 
     // ------------------------------------------------ 1. the site's routes --
     console.log('\nthe site, from the game:');
+    // The whole account (#1010: the game's /ban is one character now, and
+    // /banaccount the account; test-bans-pk.js holds the two apart).
     const ban = { profileId: 2002, name: 'Bjorn', byProfileId: 1001, byName: 'Aela', why: 'spamming the market', minutes: 90 };
-    let r = await game('ban', ban, {});
+    let r = await game('banaccount', ban, {});
     yes('no key is refused 401', r.status === 401);
     r = await game('ban', ban, { 'X-Thornswood-Key': 'x' + KEY.slice(1) });
     yes('a wrong key is refused 401', r.status === 401);
-    r = await game('ban', Object.assign({}, ban, { byProfileId: 9999 }));
+    r = await game('banaccount', Object.assign({}, ban, { byProfileId: 9999 }));
     yes('a staff profile no account holds is refused 403', r.status === 403);
-    r = await game('ban', Object.assign({}, ban, { byProfileId: 3003 }));
+    r = await game('banaccount', Object.assign({}, ban, { byProfileId: 3003 }));
     yes('an account with no staff role is refused 403, whatever the game server says', r.status === 403);
-    r = await game('ban', Object.assign({}, ban, { why: '' }));
+    r = await game('banaccount', Object.assign({}, ban, { why: '' }));
     yes('a ban with no reason is refused 400', r.status === 400);
     yes('and nothing was written by any of those', !Object.keys(readData('bans.json', {})).length);
 
     const before = Date.now();
-    r = await game('ban', ban);
+    r = await game('banaccount', ban);
     yes('a ban from staff is taken', r.status === 200 && r.j && r.j.ok);
     yes('and says when it ends: ninety minutes from now',
         r.j && Math.abs(r.j.until - (before + 90 * 60000)) < 5000);
@@ -242,6 +244,8 @@ const modlog = () => { try { return fs.readFileSync(path.join(PRIV, 'moderation.
         !!sent && sent.why === 'spamming the market' && sent.until === bans[BJORN_D].until &&
         sent.profiles.indexOf(2003) >= 0);
 
+    r = await game('banaccount', { profileId: 7007, name: 'Stranger', byProfileId: 1001, byName: 'Aela', why: 'cheating', minutes: 0 });
+    yes('a profile no account holds has no account to ban, and says so', r.status === 404);
     r = await game('ban', { profileId: 7007, name: 'Stranger', byProfileId: 1001, byName: 'Aela', why: 'cheating', minutes: 0 });
     yes('a profile no account holds is banned by itself, for good',
         r.status === 200 && r.j.until === 0 && readData('bans.json', {})['p:7007'].until === 0);
@@ -296,8 +300,8 @@ const modlog = () => { try { return fs.readFileSync(path.join(PRIV, 'moderation.
     r = await allowed();
     yes('and they are back on the door\'s list', r.j.profiles.indexOf(3003) >= 0);
     const hubLog = fs.readFileSync(path.join(DATA, 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
-    yes('what the hub did is in moderation.log for the staff channel: ban, note, unban',
-        hubLog.map((l) => l.did).join(',') === 'ban,note,unban' && hubLog[0].byName === 'Aela' &&
+    yes('what the hub did is in moderation.log for the staff channel: account ban, note, account lift',
+        hubLog.map((l) => l.did).join(',') === 'banaccount,note,unbanaccount' && hubLog[0].byName === 'Aela' &&
         hubLog[0].whoName === 'Nobody' && /until .*: harassing people at the inn/.test(hubLog[0].why));
 
     // ------------------------------------------------ 2. the staff block --
@@ -319,10 +323,10 @@ const modlog = () => { try { return fs.readFileSync(path.join(PRIV, 'moderation.
 
     staffLine(w, '/ban Bjorn 3d spamming the market again');
     yes('/ban reaches the site and answers the moderator in their chat',
-        await until(() => w.to(1001).some((t) => /^Banned Bjorn until .* UTC\.$/.test(t))));
-    yes('the site holds it for three days', Math.abs(readData('bans.json', {})[BJORN_D].until - (Date.now() + 4320 * 60000)) < 20000);
+        await until(() => w.to(1001).some((t) => /^Banned the character Bjorn until .* UTC\. Their other characters can still play\.$/.test(t))));
+    yes('the site holds it for three days, on the character', Math.abs(readData('bans.json', {})['p:2002'].until - (Date.now() + 4320 * 60000)) < 20000);
     yes('Bjorn is told why and until when, in his chat',
-        w.to(2002).some((t) => /^You are banned from Thornswood until .* UTC: spamming the market again\. Your session is being ended\.$/.test(t)));
+        w.to(2002).some((t) => /^Staff have banned this character until .* UTC: spamming the market again\. Your session is being ended\./.test(t)));
     const kick = w.timeouts.find((t) => t.ms > 1000);
     yes('and nobody is disconnected until he has had time to read it', !!kick && w.kicked.length === 0);
     if (kick) kick.fn();
@@ -338,8 +342,8 @@ const modlog = () => { try { return fs.readFileSync(path.join(PRIV, 'moderation.
         readData('notes.json', {})[BJORN_D][0].text === 'keeps coming back under other names');
     staffLine(w, '/unban Bjorn');
     yes('/unban lifts it on the site and says so',
-        await until(() => w.to(1001).some((t) => t === 'Bjorn is not banned any more.')) &&
-        !readData('bans.json', {})[BJORN_D]);
+        await until(() => w.to(1001).some((t) => t === 'The ban on the character Bjorn is lifted.')) &&
+        !readData('bans.json', {})['p:2002']);
     log = modlog();
     yes('both are in moderation.log', log.slice(-2).map((l) => l.did).join(',') === 'note,unban');
 
@@ -373,7 +377,8 @@ const modlog = () => { try { return fs.readFileSync(path.join(PRIV, 'moderation.
       return null;
     }
     const escM = /var esc = function \(s\) \{[\s\S]*?\n\};/.exec(page);
-    const fns = ['banUntil', 'linkedNotes', 'linkedControls', 'looseBans'].map(grab);
+    const fns = ['banUntil', 'byLine', 'charName', 'charLine', 'linkedNotes', 'lengthPick',
+                 'linkedControls', 'looseBans'].map(grab);
     yes('the page has a Notes line and its controls', !!escM && fns.every(Boolean));
     if (escM && fns.every(Boolean)) {
       const P = new Function(escM[0] + '\n' + fns.join('\n') +
@@ -386,14 +391,15 @@ const modlog = () => { try { return fs.readFileSync(path.join(PRIV, 'moderation.
       };
       const line = P.linkedNotes({ id: BJORN_D }, rec, Date.now());
       yes('a banned account\'s Notes line says banned, for good, why and by whom',
-          /<b>Notes<\/b>/.test(line) && /Banned for good: cheating &lt;b&gt;hard&lt;\/b&gt; \(by Aela, from the live server/.test(line));
+          /<b>Notes<\/b>/.test(line) &&
+          /Account banned for good, every character on it: cheating &lt;b&gt;hard&lt;\/b&gt; \(by Aela, from the live server/.test(line));
       yes('and every note, newest first, with its author', line.indexOf('second note') < line.indexOf('first') &&
           /second note <span class="said">\(Farkas, /.test(line) && /\(Aela, /.test(line));
       yes('with nothing anybody typed let through as markup', line.indexOf('<script>') < 0 && line.indexOf('&lt;script&gt;') >= 0);
       const timed = P.linkedNotes({ id: BJORN_D }, { bans: { [BJORN_D]: { active: true, until: Date.now() + 86400000, why: 'x', by: 'A' } }, notes: {} }, Date.now());
-      yes('a timed ban says until when', /Banned until /.test(timed));
+      yes('a timed ban says until when', /Account banned until /.test(timed));
       yes('a ban that has ended says it has ended', /has ended: old/.test(P.linkedNotes({ id: NOBODY_D }, rec, Date.now())));
-      yes('an account with neither says nothing yet', /nothing yet/.test(P.linkedNotes({ id: STAFF_D }, rec, Date.now())));
+      yes('an account with neither says no notes yet', /no notes yet/.test(P.linkedNotes({ id: STAFF_D }, rec, Date.now())));
       const ctl = P.linkedControls({ id: BJORN_D }, rec, Date.now());
       yes('the controls add a note, ban for a chosen time, and lift a ban that holds',
           /data-act="note"/.test(ctl) && /data-act="ban"/.test(ctl) && /data-act="unban"/.test(ctl) &&

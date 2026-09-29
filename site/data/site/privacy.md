@@ -54,6 +54,13 @@ character stood, for as long as they are online, so /stuck has somewhere to
 send them back to; that list is gone when they leave or the server restarts.
 Only staff read these.
 
+**Staff records.** When staff ban a character or a whole account, kill a
+character for good, or write a note about somebody, the site keeps it against
+the Discord account or the character, with who did it, when and why, and the
+staff channel is told. A character killed for good is kept, not deleted. Only
+staff read these: somebody who is not staff never sees a note, even one
+about them.
+
 **The launcher's own log.** Sent to the site when a session ends. It is about
 the game: which mods are installed, what failed to start, which version you
 are on. It is how somebody who cannot play gets helped without a conversation.

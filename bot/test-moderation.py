@@ -182,21 +182,30 @@ try:
     # M8: every action the gamemode writes has words here.
     gm = open(os.path.join(HERE, '..', 'game', 'gamemode.js'), encoding='utf-8').read()
     dids = ['kick', 'freeze', 'unfreeze', 'bring', 'goto', 'silence', 'unsilence', 'warn',
-            'give', 'spawn', 'tp', 'ban', 'unban', 'note']
+            'give', 'spawn', 'tp', 'ban', 'unban', 'note',
+            # One character or the whole account, and PK (#1010).
+            'banaccount', 'unbanaccount', 'pk']
     yes('M8 every action the staff block records has a sentence here',
         all(("record('%s'" % d) in gm and d in bot._MOD_DID for d in dids))
     site = open(os.path.join(HERE, '..', 'site', 'server.js'), encoding='utf-8').read()
     yes('M8 and so does every one the hub writes',
-        all(("modLog({ did: '%s'" % d) in site and d in bot._MOD_DID for d in ('ban', 'unban', 'note')))
+        all(("modLog({ did: '%s'" % d) in site and d in bot._MOD_DID
+            for d in ('ban', 'unban', 'note', 'banaccount', 'unbanaccount', 'pk')))
 
     # M10: the hub's lines say the site, and name a person by account.
-    hub = bot.moderation_text('site', {'did': 'ban', 'byName': 'Aela', 'whoName': 'Bjorn',
+    hub = bot.moderation_text('site', {'did': 'banaccount', 'byName': 'Aela', 'whoName': 'Bjorn',
                                        'why': 'until 2026-10-01 18:00 UTC: spam'})
-    yes('M10 a ban from the hub says the site, with no profile number',
-        hub == '**Staff on the site:** Aela banned Bjorn: until 2026-10-01 18:00 UTC: spam')
+    yes('M10 an account ban from the hub says the site and the whole account, with no profile number',
+        hub == '**Staff on the site:** Aela banned the whole account of Bjorn, every character on it: '
+               'until 2026-10-01 18:00 UTC: spam')
     game = bot.moderation_text('live', json.loads(row('ban', why='for good: cheating')))
-    yes('M10 a ban from the game says the server and the profiles',
-        game == '**Staff on the live server:** Aela (profile 1001) banned Bjorn (profile 2002): for good: cheating')
+    yes('M10 a character ban from the game says the server, the character and the profiles',
+        game == '**Staff on the live server:** Aela (profile 1001) banned the character Bjorn (profile 2002): '
+                'for good: cheating')
+    pk = bot.moderation_text('dev', json.loads(row('pk', why='died in the siege')))
+    yes('M10 a PK says the character died for good, and why',
+        pk == '**Staff on the dev server:** Aela (profile 1001) killed Bjorn (profile 2002) for good (PK), '
+              'quietly: died in the siege')
     note = bot.moderation_text('dev', json.loads(row('note', why='asked twice about the bridge')))
     yes('M10 a note says what it says', 'wrote a note on Bjorn (profile 2002): asked twice' in note)
 

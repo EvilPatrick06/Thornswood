@@ -48,6 +48,43 @@ namespace Thornswood
         static HashSet<int> gone = new HashSet<int>();
         static DateTime goneAt = DateTime.MinValue;
 
+        // This account's characters staff have killed for good, and the ones
+        // under a ban of their own (#1010). The menu shows a dead one in no
+        // slot, so the account can make a new character, and neither can be
+        // picked. Empty when the site said nothing.
+        static HashSet<int> dead = new HashSet<int>();
+        static HashSet<int> barred = new HashSet<int>();
+
+        /// <summary>True when staff have killed this character for good.</summary>
+        public static bool Dead(int profileId)
+        {
+            lock (gate) { return dead.Contains(profileId); }
+        }
+
+        /// <summary>True when staff have banned this character by itself.</summary>
+        public static bool Barred(int profileId)
+        {
+            lock (gate) { return barred.Contains(profileId); }
+        }
+
+        /// <summary>
+        /// The ids in one list of a /api/play/roster answer, "pk" or "banned".
+        /// Empty when the list is not there.
+        /// </summary>
+        public static HashSet<int> ReadIds(string text, string key)
+        {
+            var ids = new HashSet<int>();
+            if (string.IsNullOrEmpty(text)) return ids;
+            Match m = Regex.Match(text, "\"" + key + "\"\\s*:\\s*\\[([^\\]]*)\\]");
+            if (!m.Success) return ids;
+            foreach (string part in m.Groups[1].Value.Split(','))
+            {
+                int id;
+                if (int.TryParse(part.Trim(), out id) && id > 0) ids.Add(id);
+            }
+            return ids;
+        }
+
         /// <summary>
         /// True when the server said it has no character under this profile,
         /// and said so after the character was last played here. Played is
@@ -157,12 +194,17 @@ namespace Thornswood
             // character the server does not hold may have no row at all.
             DateTime goneWhen;
             HashSet<int> goneNow = ReadGone(text, out goneWhen);
+            HashSet<int> deadNow = ReadIds(text, "pk");
+            HashSet<int> barredNow = ReadIds(text, "banned");
             bool goneChanged;
             lock (gate)
             {
-                goneChanged = goneWhen != goneAt || !goneNow.SetEquals(gone);
+                goneChanged = goneWhen != goneAt || !goneNow.SetEquals(gone) ||
+                              !deadNow.SetEquals(dead) || !barredNow.SetEquals(barred);
                 gone = goneNow;
                 goneAt = goneWhen;
+                dead = deadNow;
+                barred = barredNow;
             }
 
             var got = new Dictionary<int, Row>();

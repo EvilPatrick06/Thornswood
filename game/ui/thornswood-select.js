@@ -128,6 +128,8 @@
     '#ts-select .slotno .tag{color:#e9d19b}',
     '#ts-select .slotno .tag.gone{color:#f6c9b0}',
     '#ts-select .slot.gone{border-style:dashed}',
+    '#ts-select .slotno .tag.dead,#ts-select .slotno .tag.barred{color:#f0a89a}',
+    '#ts-select .slot.dead,#ts-select .slot.barred{border-style:dotted;opacity:.72}',
     '#ts-select .name{font-size:32px;color:#f6e9c8;line-height:1.1;padding-right:56px}',
     '#ts-select .name.faint{color:rgba(246,233,200,.62);font-style:italic}',
     '#ts-select .stats{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:18px;margin-top:14px}',
@@ -544,7 +546,11 @@
   function slots() {
     var held = {};
     var loose = [];
+    // Dead for good (#1010): in no slot, drawn last, never played, so the
+    // slot it held offers a new character.
+    var dead = [];
     chars.forEach(function (c) {
+      if (c.pk) { dead.push(c); return; }
       var n = Number(c.slot) || 0;
       if (n >= 1 && !held[n]) held[n] = c;
       else loose.push(c);
@@ -560,6 +566,7 @@
     beyond.sort(function (a, b) { return a - b; });
     beyond.forEach(function (m) { out.push({ n: m, id: Number(held[m].profileId) || 0, c: held[m] }); });
     loose.forEach(function (c) { out.push({ n: out.length + 1, id: Number(c.profileId) || 0, c: c }); });
+    dead.forEach(function (c) { out.push({ n: 0, id: Number(c.profileId) || 0, c: c }); });
     return out;
   }
 
@@ -599,13 +606,16 @@
     elList.textContent = '';
     var list = slots();
     if (at >= list.length) at = Math.max(0, list.length - 1);
-    var taken = list.filter(function (e) { return !!e.c; }).length;
+    var taken = list.filter(function (e) { return !!e.c && !e.c.pk; }).length;
     elCount.textContent = taken + ' of ' + SLOTS + ' slots';
     list.forEach(function (e, i) {
-      var card = el('div', 'slot' + (i === at ? ' at' : '') + (e.c ? '' : ' empty') + (e.c && e.c.gone ? ' gone' : ''));
-      var no = el('div', 'slotno', 'Slot ' + e.n);
-      if (e.c && e.id === last) no.appendChild(el('span', 'tag', 'last played'));
-      if (e.c && e.c.gone) no.appendChild(el('span', 'tag gone', 'not on this server'));
+      var card = el('div', 'slot' + (i === at ? ' at' : '') + (e.c ? '' : ' empty') + (e.c && e.c.gone ? ' gone' : '') +
+                    (e.c && e.c.pk ? ' dead' : '') + (e.c && e.c.banned ? ' barred' : ''));
+      var no = el('div', 'slotno', e.c && e.c.pk ? 'No slot' : 'Slot ' + e.n);
+      if (e.c && e.id === last && !e.c.pk) no.appendChild(el('span', 'tag', 'last played'));
+      if (e.c && e.c.pk) no.appendChild(el('span', 'tag dead', 'dead for good'));
+      else if (e.c && e.c.banned) no.appendChild(el('span', 'tag barred', 'banned'));
+      else if (e.c && e.c.gone) no.appendChild(el('span', 'tag gone', 'not on this server'));
       if (!e.c) no.appendChild(el('span', '', 'empty'));
       card.appendChild(no);
       if (e.c) {
@@ -618,12 +628,24 @@
           that in place of the stats of a character that will not come back.
           The bin stays, so the slot can be cleared.
         */
-        if (c.gone) {
+        /*
+          STAFF KILLED IT FOR GOOD, OR BANNED IT BY ITSELF (#1010). Neither
+          can be played; the join pass would refuse it and the server would
+          end the session. A dead one holds no slot, so an empty slot above
+          offers a new character. The bin stays, so it can be forgotten.
+        */
+        if (c.pk) {
+          card.appendChild(el('div', 'sub',
+            'This character has died for good and cannot be played again. Make a new character in an empty slot.'));
+        } else if (c.banned) {
+          card.appendChild(el('div', 'sub',
+            'Staff have banned this character for now. Play another character, or ask staff in the Discord.'));
+        } else if (c.gone) {
           card.appendChild(el('div', 'sub',
             'The server no longer has this character. Playing this slot makes a new character in the creation hall.'));
         }
         var stats = el('div', 'stats');
-        if (c.gone) stats.style.display = 'none';
+        if (c.gone || c.pk) stats.style.display = 'none';
         var s1 = el('div', 'stat'); s1.appendChild(el('div', 'k', 'Last location'));
         s1.appendChild(el('div', 'v' + (c.where ? '' : ' dim'), c.where || 'Not seen in the world yet'));
         var s2 = el('div', 'stat'); s2.appendChild(el('div', 'k', 'Hours played'));
@@ -718,6 +740,13 @@
     var list = slots();
     var e = list[at];
     if (!e || !e.id) return;
+    // Never a character staff killed for good or banned by itself (#1010).
+    if (e.c && (e.c.pk || e.c.banned)) {
+      elStatus.textContent = e.c.pk
+        ? 'That character has died for good. Pick another, or make a new character in an empty slot.'
+        : 'Staff have banned that character for now. Pick another.';
+      return;
+    }
     sent = true;
     picked = e.id;
     elStatus.textContent = e.c && !e.c.gone ? 'Joining as ' + (e.c.name || 'your character') + '. The world is loading.' : 'Off to the creation hall. The world is loading.';

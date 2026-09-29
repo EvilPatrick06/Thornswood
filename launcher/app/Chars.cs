@@ -237,6 +237,47 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The slot number of a character staff have killed for good (#1010).
+        /// Patrick, 28 September: the character "can never be played or
+        /// selected again" and the account can make a new one. So its row
+        /// leaves the numbered slots, which frees its number for New
+        /// character, and is kept (never minted again, shown on the menu as
+        /// dead, forgettable with the bin) rather than deleted.
+        /// </summary>
+        const int DeadSlot = -1;
+
+        /// <summary>
+        /// Every row the site says is dead for good moves to DeadSlot, and the
+        /// file is saved when any did. Returns a line for the log naming them,
+        /// or null. Roster.Refresh has run first.
+        /// </summary>
+        static string BuryDead(List<Row> rows)
+        {
+            var moved = new List<string>();
+            foreach (Row r in rows)
+            {
+                if (r.Slot <= 0 || r.Id <= 0) continue;
+                bool isDead = false;
+                try { isDead = Roster.Dead(r.Id); } catch { isDead = false; }
+                if (!isDead) continue;
+                moved.Add("profile " + r.Id + " from slot " + r.Slot);
+                r.Slot = DeadSlot;
+            }
+            if (moved.Count == 0) return null;
+            Save(rows);
+            return "Staff have killed " + (moved.Count == 1 ? "a character" : moved.Count + " characters") +
+                   " for good, so the slot is free for a new one: " + string.Join(", ", moved.ToArray()) + ".";
+        }
+
+        /// <summary>The rows staff have killed for good that were played here.</summary>
+        static List<Row> DeadRows(List<Row> rows)
+        {
+            var l = new List<Row>();
+            foreach (Row r in rows) if (r.Slot == DeadSlot && r.Id > 0) l.Add(r);
+            return l;
+        }
+
+        /// <summary>
         /// The rows that are characters, in slot order. Slot 0 is the spare
         /// and a row nobody has played is not a character either; the old
         /// two slot picker treated it as an empty slot for the same reason.
@@ -421,7 +462,8 @@ namespace Thornswood
             if (profileId <= 0) return;
             List<Row> rows = Rows();
             Row r = FindId(rows, profileId);
-            if (r == null || r.Slot <= 0) return;
+            // A dead character (DeadSlot) can be forgotten too; the spare never.
+            if (r == null || (r.Slot <= 0 && r.Slot != DeadSlot)) return;
             rows.Remove(r);
             Save(rows);
             Retire(profileId);
@@ -551,6 +593,8 @@ namespace Thornswood
             if (profileId <= 0) return;
             List<Row> rows = Rows();
             Row r = FindId(rows, profileId);
+            // A character staff killed for good is never picked again (#1010).
+            if (r != null && r.Slot == DeadSlot) return;
             if (r == null)
             {
                 r = new Row();
@@ -587,25 +631,27 @@ namespace Thornswood
         /// </summary>
         static void WriteCharacters(Config cfg, List<Row> rows, int last, int spare, int slots)
         {
-            // The roster first, so the names are as fresh as the server can
-            // make them. Its own two and a half second timeout, and a server
-            // that does not answer costs the names and nothing else.
-            try { Roster.Refresh(cfg); } catch (Exception ex) { Swallow.Note("Chars.WriteCharacters, roster", ex); }
-
+            // The roster was refreshed by Prepare, before the dead were moved
+            // out of their slots (BuryDead), so the names are as fresh as the
+            // server can make them.
             var sb = new StringBuilder();
             sb.Append("{\"v\":1,\"last\":").Append(last)
               .Append(",\"spare\":").Append(spare)
               .Append(",\"slots\":").Append(slots)
               .Append(",\"characters\":[");
             bool first = true;
-            foreach (Row r in Characters(rows))
+            // The characters in slot order, then the dead, in no slot (#1010).
+            var all = Characters(rows);
+            all.AddRange(DeadRows(rows));
+            foreach (Row r in all)
             {
                 Roster.Row who = null;
                 try { who = Roster.For(r.Id); } catch { who = null; }
+                bool isDead = r.Slot == DeadSlot;
                 if (!first) sb.Append(',');
                 first = false;
                 sb.Append("{\"profileId\":").Append(r.Id)
-                  .Append(",\"slot\":").Append(r.Slot)
+                  .Append(",\"slot\":").Append(isDead ? 0 : r.Slot)
                   .Append(",\"seconds\":").Append(r.Seconds)
                   .Append(",\"name\":\"").Append(Json(who == null ? "" : who.Name))
                   .Append("\",\"race\":\"").Append(Json(who == null ? "" : who.Race))
@@ -618,8 +664,14 @@ namespace Thornswood
                 // The server said it has no character under this id (#955):
                 // the menu marks the card, since picking it makes a new one.
                 bool isGone = false;
-                try { isGone = Roster.Gone(r.Id, r.Played); } catch { isGone = false; }
+                try { isGone = !isDead && Roster.Gone(r.Id, r.Played); } catch { isGone = false; }
                 if (isGone) sb.Append(",\"gone\":true");
+                // Staff killed it for good, or banned it by itself (#1010):
+                // the menu shows it and will not play it.
+                if (isDead) sb.Append(",\"pk\":true");
+                bool isBarred = false;
+                try { isBarred = !isDead && Roster.Barred(r.Id); } catch { isBarred = false; }
+                if (isBarred) sb.Append(",\"banned\":true");
                 sb.Append("}");
             }
             sb.Append("]}");
@@ -821,6 +873,16 @@ namespace Thornswood
             // offer first. SetChooseAtMenu reads the file back and throws when
             // it does not say what was written, which is what stops Play.
             List<Row> rows = Rows();
+
+            // The roster first, so the names are as fresh as the server can
+            // make them and a character staff killed for good (#1010) leaves
+            // its slot before the id played last is chosen or the slots are
+            // tidied. Its own two and a half second timeout, and a server that
+            // does not answer costs the names and nothing else.
+            try { Roster.Refresh(cfg); } catch (Exception ex) { Swallow.Note("Chars.Prepare, roster", ex); }
+            string buried = null;
+            try { buried = BuryDead(rows); } catch (Exception ex) { Swallow.Note("Chars.Prepare, dead", ex); }
+
             Row oldSpare = Find(rows, 0);
             int spareBefore = oldSpare != null ? oldSpare.Id : 0;
             string ownerBefore = oldSpare != null ? oldSpare.Owner : "";
@@ -884,6 +946,7 @@ namespace Thornswood
             // Shell logs the note; its Log is its own, so the tidy's line
             // rides along here rather than being written from this class.
             if (tidied != null) note = (note == null ? "" : note + " ") + tidied;
+            if (buried != null) note = (note == null ? "" : note + " ") + buried;
             if (reminted != null) note = (note == null ? "" : note + " ") + reminted;
             return note;
         }
