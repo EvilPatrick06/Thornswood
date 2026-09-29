@@ -758,6 +758,9 @@ try {
                 $r = OnTask 'LOCAL SERVICE' 2
                 Yes 'real task: -RunAs LOCAL SERVICE updates it without an error' (
                     $r.said -match 'scheduled task updated' -and $r.said -notmatch 'COULD NOT UPDATE')
+                if ($r.said -notmatch 'scheduled task updated' -or $r.said -match 'COULD NOT UPDATE') {
+                    foreach ($l in @($r.said -split "`n" | Select-Object -Last 15)) { Write-Host ('      said: ' + $l) }
+                }
                 Yes 'real task: it is now LOCAL SERVICE at Limited, SeChangeNotifyPrivilege only, token SID type Unrestricted' (IsCut $r.p)
                 Yes 'real task: the trigger and settings kept, and this deploy''s action on it' (
                     (Kept $r.task) -and (ArgsOf $r.task) -eq '/c exit 2')
