@@ -855,8 +855,10 @@ $GAMEMODE_JS = Join-Path $PSScriptRoot '..\..\game\gamemode.js'
 # worth doing once to see how far it pushes every half up.
 $PRODUCER_RANK_IS_LOWEST = $true
 
-# A CROP THAT ALSO GROWS WILD. WAITING ON PATRICK, issue #398, and a knob so his
-# answer is one line.
+# A CROP THAT ALSO GROWS WILD. Patrick, 28 September, issue #398: leave it as
+# it is. Since the food rule and #626 no crop is also picked wild, so turning
+# this on moves no recipe; ask again only if a crop is added back to the wild
+# plants.
 #
 # Lowest wins, above, means a crop that a gatherer can also pick in the wild
 # costs the gatherer's rank and never the farmer's: Tomato is gatherer novice,
@@ -901,6 +903,13 @@ $INPUT_RANK_IS_THE_DEAREST = $true
 # fell two rungs or more, Wild Hunt Heavy Helm master to novice, 14 Hearthcook
 # stews expert to novice off a Salt Pile.
 #
+# DECIDED BY PATRICK ON 28 SEPTEMBER, issue #398: keep 'floor'. The things
+# nobody gathers (Dragon Bone, Dragon Scales, Linen Wrap, Dwarven metal, Daedra
+# Hearts) are loot or bought, and a recipe that wants one stays dear. The rows
+# this holds above their gatherable makings are kept on purpose, and each says
+# so in rankFrom with UNPLACED_INPUT_KEPT_BECAUSE below, which is what
+# Check-Balance.ps1 reads to count them as kept rather than waiting.
+#
 # 'floor'    IN USE. When every input is placed, the dearest one decides, which
 #            is the rule above unchanged. When any input is not placed, the
 #            dearest placed one can only RAISE the row above what its price
@@ -913,6 +922,7 @@ $INPUT_RANK_IS_THE_DEAREST = $true
 #            and keeps the price rank. Honest, and it throws away the one thing
 #            the index does know about 301 rows.
 $UNPLACED_INPUT_RULE = 'floor'
+$UNPLACED_INPUT_KEPT_BECAUSE = 'Patrick decided on 28 September (issue #398) that a recipe wanting something nobody gathers stays dear.'
 
 # THE HOP: AN INPUT THAT IS ITSELF MADE BY A RECIPE. INVENTED, in the sense that
 # classes.md sets no numbers for it, and measured in the sense that every number
@@ -1124,6 +1134,12 @@ $HOP_THROUGH_A_TEMPER = $false
 # and a half that fails it has to be named in the knob under it with the
 # measured reason or this build does not write a table.
 #
+# SETTLED ON 28 SEPTEMBER, issue #398: Patrick made Heart Stone deposits
+# advanced mining (RANK_BY_ORE in Build-OreTable.ps1). The staves' input cost is
+# advanced now, the one rung hole fill below spreads them over all four rungs,
+# and no half on this build reaches the second rule. It stays as the last resort
+# for a future half, and the build prints by name any half that uses it.
+#
 # 'total inputs'    how many things the recipe wants in all, counting three
 #                   firewood as three. This is the one in use: it is the
 #                   closest thing the records have to how much work went into
@@ -1181,7 +1197,7 @@ $RUNGS_MUST_BE_STANDABLE = $true
 # the build, because a rung nobody can gather for is a rank that opens nothing.
 $HALVES_WITH_AN_UNSTANDABLE_RUNG = [ordered]@{
     'Cook/Confectioner' = 'every one of its 28 rows wants a Sack of Flour and a pat of Butter, counted over the whole half on 21 September, and flour is made from Wheat, which harvests.json ranks advanced for a gatherer and for a farmer alike. So the cheapest thing a Confectioner can bake is advanced work to gather for and the novice rung cannot be stood on whatever rule ranks the half: by input cost all 28 land 20 advanced and 8 expert and none novice (28 September), and filling the empty novice rung (HOLE_FILL_MOVES_ONE_RUNG) only relabels eight of the advanced ones. This appeared the day the hop was followed and it was always true; before it, flour had no producer at all and every row read as costing nothing. It closes when somebody decides where a Confectioner''s flour comes from, which is the same decision HALVES_NOBODY_CAN_START is already waiting on for this half: all 28 rows are behind two vanilla perks nobody here will ever hold, so nothing is being opened to anybody at any rank yet.'
-    'Enchanter/Bladebinder' = 'its novice, advanced and expert rungs are the second rule''s, not the input rule''s. 160 of its 161 rows want a Heart Stone and ores.json ranks all four Heart Stone deposits master, so every rung below master holds rows nobody at that rank can gather for. The second rule is argued for at SECOND_RULE_KEY and this is the price of it, stated rather than passed over: the half is ranked by how long a recipe''s shopping list is and the shopping list starts with a master miner''s stone either way. It closes when somebody decides where an Enchanter''s Heart Stones come from, which is the same decision HALVES_NOBODY_CAN_START is waiting on for this half.'
+    'Enchanter/Bladebinder' = '160 of its 161 rows want a Heart Stone, which Patrick made advanced mining on 28 September (issue #398, RANK_BY_ORE in Build-OreTable.ps1), so by input cost 160 land on advanced and the hole fill (HOLE_FILL_MOVES_ONE_RUNG) moves some of them one rung either way: novice 66, advanced 55, expert 39, master 1, none more than a rung from its stone. The 66 on novice are one rung below the stone, so a novice Bladebinder buys stones from an advanced miner rather than digging them. That is the whole cost and it is one rung, not the three the second rule left before. Nothing is opened to anybody at any rank yet either way: HALVES_NOBODY_CAN_START says why for this half.'
 }
 
 # WHERE THE GOLD VALUE SITS IN EACH KIND OF RECORD. The first five were proved
@@ -4320,7 +4336,8 @@ foreach ($p in $PROFESSIONS.Keys) {
             if (-not $inputDecides) {
                 $heldUpByPrice++
                 $owned[$d].RankFrom = ('what it sells for, held above what its placed inputs cost because ' + $unplaced +
-                                       ' of the things it asks for are produced by no class in this world and could cost anything')
+                                       ' of the things it asks for are produced by no class in this world and could cost anything. Kept on purpose: ' +
+                                       $UNPLACED_INPUT_KEPT_BECAUSE)
                 $owned[$d].RankWhy = ($owned[$d].RankWhy + '. The dearest input any class does produce is ' + $nameBest +
                                       ', ' + $RANKS[$best] + ' work for a ' + $whoBest + ', which is a floor and not the answer here')
                 continue

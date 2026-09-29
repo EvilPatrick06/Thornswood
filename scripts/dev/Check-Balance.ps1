@@ -35,7 +35,9 @@
   are when neither price nor input cost can tell its rows apart. So every rung
   is now checked for whether anybody standing on it could gather for even one
   row of it, and a half where that fails and is not written down in the table
-  with a measured reason fails this script.
+  with a measured reason fails this script. (Patrick settled the Bladebinder on
+  28 September, issue #398: Heart Stone deposits are advanced mining now, set by
+  RANK_BY_ORE in Build-OreTable.ps1, so the staves line up with their stone.)
 
   It also follows a recipe to the class that produces its inputs, which it
   could not do until 21 September. game\data\recipes.json records WHICH items each
@@ -66,7 +68,7 @@
   standing on it could gather for that the table has not already written down
   with a reason. Those are the two shapes that are always wrong. And, since
   issue #398, if a recipe sits more than one rung from what its inputs cost
-  for no reason anybody has looked at: see FarReason.
+  and is not kept on purpose: see FarReason.
 #>
 [CmdletBinding()]
 param(
@@ -373,32 +375,29 @@ Head 'The chain: what a recipe asks for against what it is ranked at'
 #
 # WHY A ROW IS MORE THAN ONE RUNG OUT, issue #398, whose done-when is that every
 # such row is one somebody looked at and kept. Every one falls under one of
-# three causes, each read off the row itself, or it is a new imbalance nobody
+# two causes, each read off the row itself, or it is a new imbalance nobody
 # has looked at and this script fails on it:
 #   kept         its rank is named outright in RECIPE_RANK, with the reason on
 #                the row. The four charcoal grades: burnCharcoal hands coke to a
 #                master charburner alone, so the menu has to say the same.
-#   bladebinder  ranked by the second rule, which is Patrick's decision one on
-#                #398: whether the half's rank means how long its shopping list
-#                is, below what its master miner's Heart Stone costs, or
-#                something else.
 #   unproduced   ranked ABOVE what its inputs cost because something on its list
 #                is produced by no class (Dragon Bone, Linen Wrap and the like),
-#                so the price holds it up. Patrick's decision three on #398: what
-#                an input nobody produces costs.
+#                so the price holds it up, and the row says it is kept on
+#                purpose: Patrick decided on 28 September that those stay dear.
+# There is no third. The Bladebinder's staves were one until 28 September,
+# ranked by the second rule below what a master miner's Heart Stone cost; Patrick
+# made the stone advanced mining (RANK_BY_ORE in Build-OreTable.ps1) and they
+# line up with it now, so a second rule row out of step is a new imbalance.
 function FarReason($row, [int]$gap) {
     $rf = [string]$row.rankFrom
     if ($rf.StartsWith('named outright in RECIPE_RANK')) { return 'kept' }
-    # The Bladebinder alone: a second half needing the second rule is a new
-    # imbalance, and one the one rung hole fill in Build-RecipeTable.ps1
-    # could not close, so it is nobody's decision yet and fails below.
-    if ($rf.StartsWith('the second rule') -and [string]$row.owner -eq 'Enchanter' -and [string]$row.half -eq 'Bladebinder') { return 'bladebinder' }
-    if ($gap -gt 0 -and [int]$row.inputsWithNoProducer -gt 0 -and $rf.Contains('held above what its placed inputs cost')) { return 'unproduced' }
+    if ($gap -gt 0 -and [int]$row.inputsWithNoProducer -gt 0 -and $rf.Contains('held above what its placed inputs cost') -and
+        $rf.Contains('Kept on purpose')) { return 'unproduced' }
     return 'nobody'
 }
 if ($recipes) {
     $inStep = 0; $outStep = 0; $noChain = 0; $far = @()
-    $farWhy = [ordered]@{ kept = 0; bladebinder = 0; unproduced = 0; nobody = 0 }
+    $farWhy = [ordered]@{ kept = 0; unproduced = 0; nobody = 0 }
     $farNobody = @()
     $perHalf = @{}
     foreach ($k in $recipes.recipes.PSObject.Properties.Name) {
@@ -480,13 +479,12 @@ if ($recipes) {
         Say ''
         Say '  Why each of them is out, read off the row (FarReason, issue #398):'
         Say ('    {0,4}  kept on purpose: a rank named in RECIPE_RANK with its reason, the charcoal grades' -f $farWhy.kept)
-        Say ('    {0,4}  waiting on Patrick: the Bladebinder''s second rule, ranked below its Heart Stone' -f $farWhy.bladebinder)
-        Say ('    {0,4}  waiting on Patrick: held above its inputs because something on its list nobody produces' -f $farWhy.unproduced)
+        Say ('    {0,4}  kept on purpose: held above its inputs because something on its list nobody gathers, Patrick 28 September' -f $farWhy.unproduced)
         if ($farWhy.nobody -gt 0) {
             Bad ("{0} recipe(s) are more than one rung out for none of those reasons, so nobody has looked at them:" -f $farWhy.nobody)
             foreach ($f in ($farNobody | Select-Object -First 10)) { Write-Host ('          ' + $f) -ForegroundColor Red }
         } else {
-            Ok 'every recipe more than one rung out is kept on purpose or waiting on a named decision'
+            Ok 'every recipe more than one rung out is kept on purpose, and none is waiting on a decision'
         }
     } else {
         Ok 'no recipe is more than one rung away from what its inputs cost'
