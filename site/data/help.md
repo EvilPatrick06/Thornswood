@@ -2,11 +2,19 @@
 
 ## Getting in
 
-Thornswood is in alpha and is eighteen and over. Anyone can install it, but
-Play stays locked until you have been let in. Come into the Discord, open a
-ticket and say a few lines about who you are. When you are accepted you are
-given the Playtester role, and that role is what unlocks Play. The
-[join](/join) page says more.
+<!-- alpha -->
+Thornswood is in alpha and is eighteen and over, and the world is open by
+application. Anyone can install it. Play unlocks once you have applied in the
+Discord and been given the Playtester role: open a ticket and pick **Apply to
+be an alpha playtester**. It asks whether you are eighteen or over and
+whether you accept the [rules](/rules). The [join](/join) page has the whole
+of it.
+<!-- /alpha -->
+<!-- open -->
+Thornswood is open and is eighteen and over. Anyone can install it, and
+anyone in the Discord can play. Being there means accepting the
+[rules](/rules). The [join](/join) page has the whole of it.
+<!-- /open -->
 
 ## Installing it the first time
 
@@ -33,9 +41,12 @@ Skyrim the way it was.
    the launcher's Add-ons page. Not optional: without it you have a launcher
    and no mods, and the server turns you away when you press Play.
 4. Press **Connect Discord** on the launcher's front page. Your browser opens,
-   you say yes, and it closes itself. You never do this again. If Play then
-   says your account has no role that lets it in yet, you have not been
-   accepted yet: ask in your ticket.
+   you say yes, and it closes itself. You never do this again.
+<!-- alpha -->
+   It works once your application has been accepted; before that it says
+   your account has not been accepted into the alpha yet, and applying is the
+   fix.
+<!-- /alpha -->
 
 <a id='defender'></a>
 

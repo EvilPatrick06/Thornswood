@@ -54,7 +54,9 @@ const HELPERS = [
   grab('function versionCompare('),
   src.slice(src.indexOf('const feedLaunchersSeen'), src.indexOf('\n', src.indexOf('const feedLaunchersSeen'))),
   grab('function feedLaunchers('),
-  grab('async function hasLeft('), grab('async function departed(')
+  grab('async function hasLeft('), grab('async function departed('),
+  // What a refusal for want of a role says, alpha or open (#428).
+  grab('function notAcceptedYet(')
 ];
 yes('the pass helpers are in server.js where this expects them', HELPERS.every(function (h) { return h.length > 10; }));
 const ROUTE = grab("  if (p === '/api/play/pass' && req.method === 'POST') {");

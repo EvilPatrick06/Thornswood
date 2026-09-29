@@ -1,6 +1,6 @@
 # Reporting something quietly
 
-Thornswood is a small modded Skyrim server in closed playtest. It holds Discord
+Thornswood is a small modded Skyrim server, in alpha and open by application. It holds Discord
 ids, the names people choose, what they said in chat, and a record of when they
 played. That is enough to be worth reporting a hole in rather than posting one.
 

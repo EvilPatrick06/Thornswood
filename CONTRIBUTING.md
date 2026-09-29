@@ -7,8 +7,8 @@ how a machine is set up. CLAUDE.md is only what applies to a Claude.
 
 ## What this is
 
-Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in closed
-playtest. This repo is the launcher (launcher\app, C# 5, WPF, built with the
+Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in alpha and
+open by application. This repo is the launcher (launcher\app, C# 5, WPF, built with the
 .NET Framework 4 csc), the game plugins (game\plugins, Skyrim Platform
 JavaScript), the site (site, node), the Discord bot (bot,
 Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06). The team is in the table below.

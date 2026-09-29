@@ -243,6 +243,9 @@ class Thornswood(discord.Client):
         a second time is not free and is not meaningful, and the two lines
         were sitting in on_ready where every reconnect did it again.
         """
+        # The one switch (#428), before the panel is built from KINDS.
+        set_open(await asyncio.get_running_loop().run_in_executor(None, site_open))
+        log('the world is %s' % ('open to everybody' if OPEN else 'in alpha, open by application'))
         self.add_view(TicketPanel())          # so it keeps working after a restart
         self.add_view(TicketTools())          # and so does Close on every old ticket
         self.add_view(HoldPanel())            # and the hold and ping buttons
@@ -257,10 +260,16 @@ def log(*a):
 
 
 # ------------------------------------------------------------------ site --
-def push(kind, title, detail, by, discord_id):
+def push(kind, title, detail, by, discord_id, rules=None):
     """Send a ticket to the site. Runs off the event loop, and a failure here
        is never allowed to lose the ticket: the thread in Discord is the
-       record, this is the convenience."""
+       record, this is the convenience.
+
+       rules is the application's answer to the rules question, as
+       {'said': their words, 'yes': whether it read as a yes}, or None on a
+       ticket that does not ask it. The site keeps the latest one against the
+       Discord id (#428), because the inbox is trimmed and the record of who
+       accepted the rules should not be."""
     if not KEY:
         # Silent for as long as this has existed, which means a bot with no key
         # set looked exactly like a working one: the thread appeared, the site
@@ -269,10 +278,13 @@ def push(kind, title, detail, by, discord_id):
             'inbox. The thread in Discord is the only copy. Install-Bot.ps1 '
             'sets the key in bot.env.json on the VPS.')
         return
-    body = json.dumps({
+    sent = {
         'key': KEY, 'kind': kind, 'title': title,
         'detail': detail, 'by': by, 'discordId': str(discord_id)
-    }).encode()
+    }
+    if rules is not None:
+        sent['rules'] = rules
+    body = json.dumps(sent).encode()
     req = urllib.request.Request(
         SITE + '/api/ticket', data=body,
         headers={'Content-Type': 'application/json'}, method='POST')
@@ -629,12 +641,15 @@ async def on_member_join(member):
 
 
 # --------------------------------------------------------------- tickets --
-# 'Apply to play' is not here on purpose. Everybody in the world right now is
-# a playtester, so that is the one application to be in it, and when the doors
-# open there will be no application to play at all. Leaving both up asked
-# people to guess which one they wanted and half of them guessed wrong.
+# 'Apply to play' is not here on purpose. Patrick, 28 Sep: "we are in alpha so
+# the world is open by application". Anyone can download it, and the one way
+# into the world is this application, which gives the Playtester role when it
+# is accepted. A second 'Apply to play' asked people to guess which one they
+# wanted and half of them guessed wrong. The key stays 'playtest' because the
+# site inbox and ROLE_FOR file it under that name.
 KINDS = [
-    ('playtest',    'Apply to playtest',    'How you get in. Break it on purpose and write down how.'),
+    ('playtest',    'Apply to be an alpha playtester',
+                    'How you get into the world. Anyone can apply. Break it and write down how.'),
     ('jarl',        'Apply: Jarl',          'A seat in a hold. In character, and the first ones come out of these.'),
     ('gamemaster',  'Apply: Gamemaster',    'Run events, settle disputes, hold the line in character.'),
     ('loremaster',  'Apply: Loremaster',    'Keep the history straight and write the rest of it.'),
@@ -679,6 +694,39 @@ def _job(what, examples):
 # Discord id, at a time, kept in the thread and in the site inbox.
 AGE_Q = ('Are you 18 or over?', 'Thornswood is an adult server. Yes or no.', False)
 AGE_KINDS = ('playtest',)
+
+# #428: before this, nobody ever accepted the rules. Somebody could join for the
+# invite, be let in, press Play and have agreed to nothing. Asked on the same
+# tickets as the age question, for the same reason and in the same way: their
+# own words against their Discord id, at a time, in the thread, the site inbox
+# and the site's record of who accepted (push, then /api/ticket on the site).
+# Anything that does not read as a yes goes at the top of the thread for staff,
+# and nobody is given the role without somebody reading it.
+RULES_Q = ('Do you accept the rules in #rules?',
+           'Read #rules and thornswood.net/rules first. Yes or no.', False)
+RULES_KINDS = AGE_KINDS
+
+_ACCEPT = ('yes', 'yep', 'yeah', 'yup', 'y ', 'ye', 'i do', 'i accept', 'accept',
+           'i agree', 'agree', 'i have', "i've", 'sure', 'of course', 'ok',
+           'okay', 'absolutely', 'definitely', 'read and', 'correct', 'affirmative')
+
+
+def accepted_rules(text):
+    """
+    Whether an answer to the rules question reads as a yes.
+
+    Generous, like said_yes, and it never refuses anybody by itself: a no only
+    puts a line at the top of the thread for a person to read. A no word
+    anywhere at the start wins, so "no, not yet" is never taken for a yes.
+    """
+    t = (text or '').strip().lower()
+    if not t:
+        return False
+    if t == 'n' or t.startswith(_NO) or t.startswith(("don't", 'dont', 'do not',
+                                                     'i do not', "i don't", 'i dont',
+                                                     'haven', 'have not', 'not yet')):
+        return False
+    return t == 'y' or t.startswith(_ACCEPT)
 
 _NO  = ('no', 'nope', 'nah', 'not ', 'under', 'minor')
 _YES = ('yes', 'yep', 'yeah', 'yup', 'y ', 'ye', 'i am', 'im ', "i'm ", 'sure',
@@ -746,10 +794,15 @@ QUESTIONS = {
     # because that is what somebody is here for, and about testing, because
     # that is what being in it means today. It does not ask who they are
     # outside the game: that is answered by them being in the Discord.
+    #
+    # Discord takes five questions on a form and no more, so the rules
+    # question (#428) took the place of "Have you roleplayed before", which
+    # now rides along in the character question's hint.
     'playtest': [
         AGE_Q,
-        ('Have you roleplayed before, and where?', 'No is a perfectly good answer.', True),
-        ('Who do you want to play?', 'A sentence about the character, not a biography.', True),
+        RULES_Q,
+        ('Who do you want to play?',
+         'A sentence about the character, and where you have roleplayed before, if anywhere.', True),
         ('How much time can you give it?', 'Hours a week, and which days.', True),
         ('Describe a bug you have run into', 'What you did, what happened, what should have happened. Short.', True),
     ],
@@ -847,7 +900,21 @@ class TicketModal(discord.ui.Modal):
                 detail = ('**CHECK THIS ONE.** Asked if they are 18 or over they '
                           'said "%s".\n\n' % (gave or 'nothing')) + detail
 
-        title = ('%s, %s' % (self.label_text, who.display_name))[:96]
+        # The rules answer, flagged the same way, and kept for the site's
+        # record of who accepted them.
+        rules = None
+        if self.kind in RULES_KINDS:
+            said = ''
+            for item, (q, _, _) in zip(self.fields, QUESTIONS[self.kind]):
+                if q == RULES_Q[0]:
+                    said = (item.value or '').strip()
+                    break
+            rules = {'said': said[:200], 'yes': accepted_rules(said)}
+            if not rules['yes']:
+                detail = ('**CHECK THIS ONE.** Asked if they accept the rules they '
+                          'said "%s".\n\n' % (said or 'nothing')) + detail
+
+        title =('%s, %s' % (self.label_text, who.display_name))[:96]
 
         # Mentioning a role does not put anybody in a private thread. Only
         # people who have been added to one can see it, so a ticket opened
@@ -993,7 +1060,7 @@ class TicketModal(discord.ui.Modal):
         # push_async logs its own failure, so nothing is lost by not awaiting.
         task = asyncio.create_task(push_async(
             self.kind, '%s: %s' % (self.label_text, who.display_name),
-            detail, str(who), who.id))
+            detail, str(who), who.id, rules))
         _pushes.add(task)
         task.add_done_callback(_pushes.discard)
 
@@ -1261,18 +1328,70 @@ class TicketPicker(discord.ui.Select):
         await interaction.response.send_modal(TicketModal(k, lab))
 
 
-PANEL = ('**Open a ticket**\n\n'
-         'Pick the one that fits. It asks a few questions, then opens a thread '
-         'only you and staff can see. Nothing here is public and nobody else in '
-         'the server can read it.\n\n'
-         '**Apply to playtest** is the one everybody starts with, and it is how '
-         'you get into the world. **Apply: Jarl** is '
-         'answered in character: the seats are empty, and the first people to '
-         'hold them are picked out of what is written there.\n\n'
-         'The jobs below that are open to anybody already in, and they are jobs '
-         'rather than titles: each one is work somebody is currently doing '
-         'instead of you.\n\n'
-         'Applying for one does not give you it. Somebody reads it and answers.')
+_PANEL_TOP = ('**Open a ticket**\n\n'
+              'Pick the one that fits. It asks a few questions, then opens a thread '
+              'only you and staff can see. Nothing here is public and nobody else in '
+              'the server can read it.\n\n')
+_PANEL_JOBS = ('**Apply: Jarl** is '
+               'answered in character: the seats are empty, and the first people to '
+               'hold them are picked out of what is written there.\n\n'
+               'The jobs below that are open to anybody already in, and they are jobs '
+               'rather than titles: each one is work somebody is currently doing '
+               'instead of you.\n\n'
+               'Applying for one does not give you it. Somebody reads it and answers.')
+PANEL_ALPHA = (_PANEL_TOP +
+               'Thornswood is in alpha, and the world is open by application. Anyone '
+               'can download it. **Apply to be an alpha playtester** is the one '
+               'everybody starts with: once it is accepted you get the Playtester '
+               'role, and that is what lets you press Play. It asks whether you are '
+               '18 or over and whether you accept the rules, so read #rules first. '
+               'Your answers are kept against your Discord account.\n\n' +
+               _PANEL_JOBS)
+PANEL_OPEN = (_PANEL_TOP +
+              'Thornswood is open: anyone in the Discord can play, so there is '
+              'nothing to apply for to get in. Read #rules, because being here '
+              'and in the world means accepting them.\n\n' +
+              _PANEL_JOBS)
+PANEL = PANEL_ALPHA
+
+# THE ONE SWITCH (#428), read off the site so there is one copy of it: the
+# site's config.json "open", which /api/public hands out. Off, which is today,
+# the panel is the alpha one above and the application asks the age and rules
+# questions. On, anybody in the Discord can play, so the application goes from
+# the panel, and with it the age and rules questions, which were only ever
+# asked on the way in. THORNSWOOD_OPEN in bot.env.json overrides the site, for
+# a dev bot or a site that is down. Read once, in setup_hook, before the panel
+# view is registered; flipping it means restarting the bot.
+KINDS_ALPHA = list(KINDS)
+OPEN = False
+
+
+def site_open():
+    """Whether the world is open to everybody, from THORNSWOOD_OPEN when it is
+       set and otherwise from the site. Anything that goes wrong answers no,
+       the alpha, which is what is true until somebody flips the switch."""
+    env = os.environ.get('THORNSWOOD_OPEN', '').strip().lower()
+    if env in ('1', 'true', 'yes', 'open'):
+        return True
+    if env in ('0', 'false', 'no', 'alpha', 'closed'):
+        return False
+    try:
+        with urllib.request.urlopen(SITE + '/api/public', timeout=8) as r:
+            return json.loads(r.read().decode('utf-8')).get('open') is True
+    except Exception as e:
+        log('could not ask the site whether the world is open, so the panel is '
+            'the alpha one:', e)
+        return False
+
+
+def set_open(on):
+    """Point the panel, its kinds and the age and rules questions at one mode."""
+    global OPEN, KINDS, AGE_KINDS, RULES_KINDS, PANEL
+    OPEN = on is True
+    KINDS = [k for k in KINDS_ALPHA if not (OPEN and k[0] == 'playtest')]
+    AGE_KINDS = () if OPEN else ('playtest',)
+    RULES_KINDS = AGE_KINDS
+    PANEL = PANEL_OPEN if OPEN else PANEL_ALPHA
 
 
 def _panel_options(msg):

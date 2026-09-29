@@ -50,9 +50,13 @@ if (-not $Root) { $Root = Split-Path -Parent (Split-Path -Parent $Here) }
 $Paths = @(
     'README.md', 'SECURITY.md', 'launcher/app/Help.cs', 'launcher/ui.xaml', 'bot/content.py',
     'site/data/site/*.md', 'site/data/known.md', 'site/data/help.md',
-    'site/public/home.html'
+    'site/public/home.html', 'installer/READ ME FIRST.txt'
 )
 $Rules = @(
+    # Issue #428. Patrick, 28 Sep: "we are in alpha so the world is open by
+    # application". Anybody can download it, so nothing people read may call
+    # it a closed playtest any more.
+    @{ Re = '\bclosed[\s-]+playtest'; Say = 'closed playtest. It is an alpha, open by application.' },
     @{ Re = ([string][char]0x2014) + '|&mdash;|&#0*8212;|&#x0*2014;'; Say = 'an em dash. Use a comma, a colon or a full stop.' },
     @{ Re = '\bplayers?\b'; Say = 'the word player. Say customers, clients, people, testers or partners.' },
     # "Gavin Knotts" is the Authenticode certificate subject (Azure Artifact

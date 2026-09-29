@@ -23,9 +23,15 @@ this is how the server knows who you are and whether you are allowed in. It is
 the only identity Thornswood has: there are no passwords here and no email
 addresses.
 
+**Your application.** Applying in the Discord keeps what you wrote in a
+private ticket only you and staff can read, and on the site for staff. Your
+answer to whether you accept the rules is also kept on the site against your
+Discord id, with the time you gave it, so there is a record that you agreed to
+them.
+
 **When you played.** Each session records who, when it started and when it
-ended, so a closed playtest has a record of what was tested and by whom
-instead of somebody's memory.
+ended, so an alpha has a record of what was tested and by whom instead of
+somebody's memory.
 
 **Your character.** Name, appearance, what you carry, where you are standing,
 what you have built and claimed, and the ranks you have earned. That is the

@@ -68,7 +68,13 @@ WELCOME = getattr(C, 'WELCOME', '')
 START = getattr(C, 'START', '')
 FAQ = getattr(C, 'FAQ', '')
 ALL3 = {'#welcome': WELCOME, '#start-here': START, '#faq': FAQ}
-join_raw = open(JOIN_MD, encoding='utf-8').read()
+join_file = open(JOIN_MD, encoding='utf-8').read()
+# #428: join.md marks its alpha and its open wording, and only the one the
+# switch is on goes out, on the site and here. Compared through the same
+# reading, so a paragraph of the other mode is not wanted in #start-here.
+join_raw = C.for_mode(join_file) if hasattr(C, 'for_mode') else join_file
+yes('join.md is read through its alpha and open markers, and none is left over',
+    '<!--' not in START and (C.OPEN or '## 1. Come into the Discord' not in START))
 
 # ------------------------------------------------------------ the words --
 for word in ('Vortex', 'Nexus', 'collection', 'Downgrade', 'half a gigabyte'):
