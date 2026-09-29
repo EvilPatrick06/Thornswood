@@ -1581,11 +1581,30 @@ if (AGE_PATHS[here] && !ageOk()) {
     e.preventDefault();
     var said = document.getElementById('rSaid');
     var btn = form.querySelector('button');
+    if (btn.disabled) return;
+    // Said at once, on the button and under it, so a press never looks like
+    // nothing happened (#467). The site answers inside a second; if nothing
+    // has come back in fifteen, the page stops waiting and says so rather
+    // than leaving the button grey.
     btn.disabled = true;
+    btn.textContent = 'Sending';
+    said.hidden = false;
+    said.textContent = 'Sending it.';
+    var ctl = window.AbortController ? new AbortController() : null;
+    var gaveUp = false;
+    var timer = setTimeout(function () { gaveUp = true; if (ctl) ctl.abort(); }, 15000);
+    function finish(text) {
+      clearTimeout(timer);
+      said.hidden = false;
+      said.textContent = text;
+      btn.textContent = 'Send it';
+      btn.disabled = false;
+      personBox();
+    }
     var aboutPerson = document.getElementById('rPerson').checked;
     fetch('/api/report', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
+      credentials: 'same-origin', signal: ctl ? ctl.signal : undefined,
       body: JSON.stringify({
         title:  document.getElementById('rTitle').value,
         detail: document.getElementById('rDetail').value,
@@ -1595,25 +1614,27 @@ if (AGE_PATHS[here] && !ageOk()) {
         kind:   aboutPerson ? 'report'
               : (document.getElementById('rIdea').checked ? 'idea' : 'bug')
       })
-    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    }).then(function (r) {
+        // An answer that is not JSON (a proxy's error page) still ends here
+        // with a message, not in the catch with the button left waiting.
+        return r.json().catch(function () { return {}; })
+          .then(function (j) { return { ok: r.ok, j: j || {} }; });
+      })
       .then(function (res) {
-        said.hidden = false;
         if (res.ok) {
           form.querySelectorAll('input, textarea').forEach(function (i) {
             if (i.type === 'checkbox') { i.checked = false; } else { i.value = ''; }
           });
-          said.textContent = aboutPerson
+          finish(aboutPerson
             ? 'Sent to staff, and to nobody else. Somebody will read it.'
-            : 'Sent. Somebody will read it.';
-          personBox();
+            : 'Sent. Somebody will read it.');
         } else {
-          said.textContent = res.j.error || 'That did not send. Try again in a minute.';
+          finish(res.j.error || 'That did not send. Try again in a minute.');
         }
-        btn.disabled = false;
       }).catch(function () {
-        said.hidden = false;
-        said.textContent = 'That did not send. Try again in a minute.';
-        btn.disabled = false;
+        finish(gaveUp
+          ? 'No answer from the site after fifteen seconds, so it may not have gone. Try again in a minute.'
+          : 'That did not send. Try again in a minute.');
       });
   });
 }
