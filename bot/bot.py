@@ -16,6 +16,9 @@ What it does:
            staff channel, the day it arrives
   Holds    a panel in #choose-your-hold where a Member picks their hold
            and which announcements ping them
+  Heartbeat writes heartbeat.json beside this file every minute, so the
+           watchdog can tell a bot that is running from one that is on
+           Discord (issue #449)
 
 Everything it needs is in env:
 
@@ -37,6 +40,9 @@ Everything it needs is in env:
   WATCH_READ_EVERY seconds between reads of its outbox, default 60
   HOLD_CHANNEL     channel the hold panel lives in, default choose-your-hold
   MEMBER_ROLE      role that may pick a hold, default Member
+  HEARTBEAT_FILE   where the heartbeat goes, default heartbeat.json beside this
+                   file, which is where the watchdog reads it
+  HEARTBEAT_EVERY  seconds between heartbeats, default 60
 
 It is written to keep going when a piece of it fails. A card that will not
 draw still gets a greeting, a site that is down still gets a thread, and a
@@ -231,6 +237,8 @@ class Thornswood(discord.Client):
         a second time is not free and is not meaningful, and the two lines
         were sitting in on_ready where every reconnect did it again.
         """
+        # First, so a site that is slow to answer below cannot delay it.
+        asyncio.create_task(heartbeat())      # for the watchdog, #449
         # The one switch (#428), before the panel is built from KINDS.
         set_open(await asyncio.get_running_loop().run_in_executor(None, site_open))
         log('the world is %s' % ('open to everybody' if OPEN else 'in alpha, open by application'))
@@ -2388,6 +2396,111 @@ async def watch_moderation():
         await asyncio.sleep(MODERATION_EVERY)
 
 
+# ------------------------------------------------------------- heartbeat --
+# How the watchdog tells a running bot from a working one (issue #449).
+#
+# The watchdog on the VPS used to know one thing about the bot: whether a
+# python process with Thornswood-Bot in its command line was alive. A bot
+# stuck logging in, hung, or cut off from Discord and never getting back is
+# still that process, so the one outage the bot exists to tell staff about,
+# itself, looked fine. So this writes heartbeat.json beside this file every
+# HEARTBEAT_EVERY seconds: its pid, when it started, when it wrote it,
+# whether it is connected to Discord, when it last was, and when it last
+# handled something Discord sent it and what. The watchdog reads it
+# (BeatProblem in scripts\vps\Watch-Services.ps1) and treats ten quiet
+# minutes of any of those as the bot being down while its process runs.
+#
+# It is written from its own loop, so a hung event loop stops it, which is
+# the point. Written to a temporary file and renamed over the old one, so
+# the watchdog never reads half of one.
+HEARTBEAT_FILE = os.environ.get(
+    'HEARTBEAT_FILE',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'heartbeat.json'))
+HEARTBEAT_EVERY = _int_env('HEARTBEAT_EVERY', 60)
+
+# The fields the watchdog reads. test-heartbeat.py checks the two agree.
+_beat = {
+    'pid': os.getpid(),
+    'started': int(time.time()),
+    'connected': False,
+    'connected_at': 0,
+    'last_event': 0,
+    'last_event_type': '',
+}
+_beat_failed = False
+
+
+def beat_record(now, closed=False):
+    """What heartbeat.json says at unix time now. closed is the client having
+       been closed, which no event says."""
+    if closed:
+        _beat['connected'] = False
+    if _beat['connected']:
+        _beat['connected_at'] = int(now)
+    rec = dict(_beat)
+    rec['written'] = int(now)
+    return rec
+
+
+def beat_write(rec, path=None):
+    """Put rec in heartbeat.json. True when it is there. A failure is said in
+       bot.log once, not every minute, and never stops the bot."""
+    global _beat_failed
+    path = path or HEARTBEAT_FILE
+    tmp = path + '.tmp'
+    try:
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(rec, f)
+        os.replace(tmp, path)
+        _beat_failed = False
+        return True
+    except Exception:
+        if not _beat_failed:
+            log('could not write ' + path + ', so the watchdog cannot tell '
+                'whether this bot is on Discord:\n' + traceback.format_exc())
+        _beat_failed = True
+        return False
+
+
+def beat_now():
+    return beat_write(beat_record(time.time(), client.is_closed()))
+
+
+async def heartbeat():
+    """Started once, in setup_hook. Runs until the process ends."""
+    while True:
+        beat_now()
+        await asyncio.sleep(HEARTBEAT_EVERY)
+
+
+def beat_connected(on):
+    _beat['connected'] = bool(on)
+    beat_now()
+
+
+@client.event
+async def on_connect():
+    beat_connected(True)
+
+
+@client.event
+async def on_resumed():
+    beat_connected(True)
+
+
+@client.event
+async def on_disconnect():
+    beat_connected(False)
+
+
+@client.event
+async def on_socket_event_type(event_type):
+    # Every event Discord sends, whether or not anything here handles it.
+    # Kept in memory only; the loop above writes it.
+    _beat['last_event'] = int(time.time())
+    _beat['last_event_type'] = str(event_type)
+
+
 # on_ready fires again on every reconnect, and a second loop would double every
 # message this ever sends.
 _watching = False
@@ -2543,6 +2656,9 @@ async def on_ready():
 # `python bot.py`, where __name__ is __main__, so this changes nothing about
 # how it runs on the VPS.
 if __name__ == '__main__':
+    # One heartbeat before anything can hang, so a bot stuck logging in has
+    # this run's pid in the file and the watchdog can say how long it has sat.
+    beat_now()
     try:
         client.run(TOKEN)
     except discord.PrivilegedIntentsRequired:
