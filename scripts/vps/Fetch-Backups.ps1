@@ -40,7 +40,7 @@
 [CmdletBinding()]
 param(
   [string]$VpsHost = '',
-  [string]$VpsUser = 'Administrator',
+  [string]$VpsUser = '',
   [string]$Remote  = 'C:/Thornswood-Backup',
   [string]$To      = "$env:USERPROFILE\Downloads\Thornswood-Backups",
   [string]$KeyFile = "$env:USERPROFILE\Documents\thornswood-backup-key.txt",
@@ -134,6 +134,7 @@ if ($PruneOnly) {
   exit 0
 }
 
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 Log "---- fetch from $VpsHost ----"
 $target = "$VpsUser@$VpsHost"

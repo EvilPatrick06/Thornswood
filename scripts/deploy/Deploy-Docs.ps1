@@ -39,7 +39,7 @@
 [CmdletBinding()]
 param(
   [string]$Vps      = '',
-  [string]$User     = 'Administrator',
+  [string]$User     = '',
   [string]$Root     = 'C:/Thornswood-Docs',
   [string]$Task     = 'Thornswood Docs',
   [int]$Port        = 3001,
@@ -80,6 +80,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $App  = Join-Path $Here '..\..\site'
 
@@ -94,6 +95,17 @@ foreach ($d in @($Docs)) {
   if (-not (Test-Path -LiteralPath (Join-Path $App "data/$n"))) { throw "no such document in the repo: data/$n" }
   $docNames += $n
 }
+
+# What goes up is the site artifact (issue #459, Artifact.ps1): server.js,
+# public and data as the commit holds them, in one zip named by commit and
+# hash. Everything below sends from its folder, not from the working tree, and
+# the zip itself goes to the box's store first. The box is told the site runs
+# it at the end, once the files are in place.
+. (Join-Path $Here 'Artifact.ps1')
+$artifact = New-ThornswoodArtifact -Component site -RepoDir (Join-Path $Here '..\..') -Paths 'site/server.js', 'site/public', 'site/data'
+Write-Host ('Artifact ' + (Format-ThornswoodArtifact $artifact))
+$App = Join-Path $artifact.Folder 'site'
+Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 
 # Runs a command up there and hands back what it said.
 #
@@ -364,7 +376,8 @@ elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
 # It is also given what the site touches and no more: Modify on its own
 # folder, where it writes config.json, data, uploads and site.log, and Read
 # on the five places outside it that server.js reads, measured on 24 Sep:
-# onlineFile, the main and dev SERVER_LOGS, and the main and dev CHAT_DIRS.
+# onlineFile, the main and dev SERVER_LOGS, and the main and dev CHAT_DIRS;
+# and since #459 the deploy records /api/deploys lists, DEPLOYS_DIR.
 # Granted on the folder rather than the file, because server.log is deleted
 # and made again at every server start and a grant on the file would go with
 # it. (NP) keeps each one to the files directly in that folder and out of the
@@ -402,7 +415,8 @@ if (`$principal) {
       @('C:\Thornswood-Server', '(OI)(NP)R'),
       @('C:\Thornswood-Server-Dev', '(OI)(NP)R'),
       @('C:\Thornswood-Voice\chat', '(OI)(NP)R'),
-      @('C:\Thornswood-Voice-Dev\chat', '(OI)(NP)R'))) {
+      @('C:\Thornswood-Voice-Dev\chat', '(OI)(NP)R'),
+      @('C:\Thornswood-Deploys\current', '(OI)(NP)R'))) {
     if (-not (Test-Path -LiteralPath `$g[0])) { 'not here, nothing granted: ' + `$g[0]; continue }
     `$said = & icacls `$g[0] /grant ('*' + `$sid + ':' + `$g[1]) 2>&1
     if (`$LASTEXITCODE -eq 0) { 'granted ' + `$runAs + ' ' + `$g[1] + ' on ' + `$g[0] }
@@ -580,6 +594,10 @@ if (`$listen) {
     ForEach-Object { 'task last result: ' + `$_ }
 }
 "@ | ForEach-Object { "  $_" }
+
+# The site's files are in place: the box records that it runs this artifact,
+# read back at /api/deploys (Artifact.ps1).
+$null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root
 
 Write-Host ''
 Write-Host "  http://${Vps}:$Port" -ForegroundColor Green

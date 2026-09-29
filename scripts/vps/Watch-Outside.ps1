@@ -36,7 +36,7 @@
     dns       thornswood.net resolves to the VPS in scripts\vps\vps.json and
               nothing else. The name servers are Cloudflare's (brenna and
               robert.ns.cloudflare.com) and the A record points straight at
-              the VPS, 192.135.112.23, not through Cloudflare's proxy. If
+              the VPS itself, not through Cloudflare's proxy. If
               the proxy is ever switched on, this is the line to change.
     domain    the registration has more than 30 days left, once a day.
               Registered 15 September 2026 through Cloudflare, runs out 15
@@ -154,9 +154,10 @@ function Read-Settings([string]$repo, [string]$saved) {
     $s.NexusGame = $m.Groups[1].Value; $s.NexusSlug = $m.Groups[2].Value
     $meta = Get-Content -LiteralPath (Join-Path $repo 'records\signing\metadata.json') -Raw | ConvertFrom-Json
     $s.SignEndpoint = ('' + $meta.Endpoint).TrimEnd('/'); $s.SignAccount = '' + $meta.CodeSigningAccountName; $s.SignProfile = '' + $meta.CertificateProfileName
-    $vps = Get-Content -LiteralPath (Join-Path $repo 'scripts\vps\vps.json') -Raw | ConvertFrom-Json
-    $s.VpsAddress = '' + $vps.address
-    $s.VpsUser = $(if ($vps.user) { '' + $vps.user } else { 'Administrator' })
+    # Through Vps.ps1, so this machine's own VPS file and THORNSWOOD_VPS count (#459).
+    . (Join-Path $repo 'scripts\vps\Vps.ps1')
+    $s.VpsAddress = Get-ThornswoodVpsAddress
+    $s.VpsUser = Get-ThornswoodVpsUser
     # The watchdog's folder on the VPS, where its outbox is: Watch-Services.ps1's own -Root.
     $ws = Get-Content -LiteralPath (Join-Path $repo 'scripts\vps\Watch-Services.ps1') -Raw
     $s.WatchRoot = [regex]::Match($ws, '\[string\]\$Root\s*=\s*''([^'']+)''').Groups[1].Value

@@ -48,7 +48,7 @@
 param(
   [Parameter(Mandatory = $true)][string]$Backup,
   [string]$VpsHost = '',
-  [string]$VpsUser = 'Administrator',
+  [string]$VpsUser = '',
   [string]$KeyFile = "$env:USERPROFILE\Documents\thornswood-backup-key.txt",
   # A live profile id that must come back, the number the launcher and the
   # site show. Passed to the live restore only.
@@ -62,6 +62,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }

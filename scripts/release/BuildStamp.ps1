@@ -57,7 +57,11 @@ function New-ThornswoodBuildStamp {
     [Parameter(Mandatory = $true)][string]$Gamemode,
     [Parameter(Mandatory = $true)][ValidateSet('main', 'dev')][string]$Channel,
     [Parameter(Mandatory = $true)][string]$RepoDir,
-    [string]$FeedDir
+    [string]$FeedDir,
+    # The deploy artifact the gamemode came out of (Artifact.ps1, #459). Its
+    # commit and whether it carried edits are the answer, since a gamemode
+    # read out of a zip is outside the repo and git cannot say.
+    $Artifact
   )
 
   # git writes to stderr in normal operation and the deploy scripts run with
@@ -84,6 +88,10 @@ function New-ThornswoodBuildStamp {
       elseif ($LASTEXITCODE -eq 1) { $atCommit = $false }
     }
   } catch { }
+  if ($Artifact) {
+    $commit = [string]$Artifact.Short
+    $atCommit = -not $Artifact.Edited
+  }
 
   $launcher = ''
   $updater = Join-Path $RepoDir 'launcher\app\Updater.cs'
@@ -128,9 +136,10 @@ function Save-ThornswoodBuildStamp {
     [Parameter(Mandatory = $true)][ValidateSet('main', 'dev')][string]$Channel,
     [Parameter(Mandatory = $true)][string]$RepoDir,
     [Parameter(Mandatory = $true)][string]$Path,
-    [string]$FeedDir
+    [string]$FeedDir,
+    $Artifact
   )
-  $stamp = New-ThornswoodBuildStamp -Gamemode $Gamemode -Channel $Channel -RepoDir $RepoDir -FeedDir $FeedDir
+  $stamp = New-ThornswoodBuildStamp -Gamemode $Gamemode -Channel $Channel -RepoDir $RepoDir -FeedDir $FeedDir -Artifact $Artifact
   [IO.File]::WriteAllText($Path, ($stamp | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
   return $stamp
 }

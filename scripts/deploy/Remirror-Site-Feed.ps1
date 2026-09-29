@@ -88,7 +88,7 @@ param(
   # hashed to find out what it is.
   [string[]]$AssetDir,
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Root = 'C:/Thornswood-Docs',
   # Says what it would send and sends nothing. It still asks the VPS what is
   # already up there when it can, and says so when it cannot.
@@ -112,6 +112,7 @@ $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User -and -not $SiteDir) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps -and -not $SiteDir) { $Vps = Get-ThornswoodVpsAddress }
 $rootWin = $Root.Replace('/','\')
 $prefix  = if ($Dev) { 'feed-dev' } else { 'feed' }

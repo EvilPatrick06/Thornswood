@@ -33,7 +33,7 @@ param(
   [ValidateSet('game', 'dev', 'docs', 'voice', 'bot')]
   [string]$Service = 'game',
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [switch]$Now,
   [switch]$NoPause
 )
@@ -42,6 +42,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')

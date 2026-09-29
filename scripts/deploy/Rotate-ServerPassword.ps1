@@ -46,7 +46,7 @@ param(
   [string]$Why = 'a password change',
   [switch]$Now,
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$DocsRoot   = 'C:/Thornswood-Docs',
   [string]$ServerRoot = 'C:/Thornswood-Server',
   [switch]$Yes
@@ -58,6 +58,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
 function Remote($script) {

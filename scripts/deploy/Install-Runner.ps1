@@ -46,7 +46,7 @@
 [CmdletBinding()]
 param(
   [string]$VpsHost    = '',
-  [string]$VpsUser    = 'Administrator',
+  [string]$VpsUser    = '',
   [string]$Repo       = 'EvilPatrick06/Thornswood',
   [string]$Root       = 'C:\Thornswood-Runner',
   [string]$Account    = 'thornswood-runner',
@@ -64,6 +64,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }

@@ -58,7 +58,21 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1';
+
+// ==== thornswood deploy record ====
+// Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
+// artifact's record beside this file as thornswood-deploy.json once the files
+// are in place, and /health hands back its commit, zip and hash. null when no
+// deploy has written one, which is every copy sent before the artifacts.
+function deployRecord(dir) {
+  try {
+    const r = JSON.parse(fs.readFileSync(path.join(dir, 'thornswood-deploy.json'), 'utf8').replace(/^﻿/, ''));
+    return { name: String(r.name || ''), commit: String(r.commit || ''), edited: r.edited === true,
+             sha256: String(r.sha256 || ''), deployedUtc: String(r.deployedUtc || '') };
+  } catch (e) { return null; }
+}
+// ==== end thornswood deploy record ====
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -1549,7 +1563,7 @@ const server = http.createServer((req, res) => {
       if (s.socket.writableLength > largestQueue) largestQueue = s.socket.writableLength;
     }
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, build: BUILD, auth: AUTH,
+    res.end(JSON.stringify({ ok: true, build: BUILD, deploy: deployRecord(HERE), auth: AUTH,
                             uptimeSeconds: Math.round(process.uptime()),
                             startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
                             bind: BIND,

@@ -118,7 +118,7 @@
 [CmdletBinding()]
 param(
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Root = 'C:/Thornswood-Server-Dev',
   [string]$Task = 'Thornswood Dev Server',
   # The dev voice service. gamemode.js reads this out of the dev server's
@@ -171,9 +171,26 @@ $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $Gamemode) { $Gamemode = Join-Path $Here '..\..\game\gamemode.js' }
 if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $Gamemode" }
+
+# What goes up is the gamemode artifact (issue #459, Artifact.ps1):
+# game\gamemode.js as the commit holds it, in one zip named by commit and hash,
+# sent to the box's store first. A -Gamemode from anywhere else goes in as an
+# edit and the artifact says so. From here $Gamemode is the artifact's copy,
+# so the check, the stamp and the send are all of what the zip holds.
+. (Join-Path $Here 'Artifact.ps1')
+$fromRepo = (Resolve-Path -LiteralPath (Join-Path $Here '..\..\game\gamemode.js')).ProviderPath
+if ((Resolve-Path -LiteralPath $Gamemode).ProviderPath -eq $fromRepo) {
+  $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js'
+} else {
+  $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Extra @{ 'game/gamemode.js' = $Gamemode }
+}
+Write-Host ('  artifact ' + (Format-ThornswoodArtifact $artifact))
+Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
+$Gamemode = Join-Path $artifact.Folder 'game\gamemode.js'
 
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
@@ -237,7 +254,7 @@ if (Get-Command node -ErrorAction SilentlyContinue) {
 # tried, and the dev feed is where the four part number lives.
 . (Join-Path $Here '..\release\BuildStamp.ps1')
 $stampFile = Join-Path $env:TEMP 'thornswood-dev-build.json'
-$buildStamp = Save-ThornswoodBuildStamp -Gamemode $Gamemode -Channel dev -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) -Path $stampFile
+$buildStamp = Save-ThornswoodBuildStamp -Gamemode $Gamemode -Channel dev -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) -Path $stampFile -Artifact $artifact
 Write-Host ('  build stamp: ' + (Format-ThornswoodBuildStamp $buildStamp))
 
 # How many the dev server seats, read here so a number the engine would refuse
@@ -857,3 +874,8 @@ if (Test-Path '$rootWin\server.log') {
   Get-Content '$rootWin\server.log' -Tail 15
 }
 "@ | ForEach-Object { "  $_" }
+
+# The new gamemode is in place: the box records that the dev server runs this
+# artifact, and the dev server serves the record from its data folder, so
+# http://<box>:7788/thornswood-deploy.json says which commit it runs.
+$null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root -Beside "$Root/data/thornswood-deploy.json"
