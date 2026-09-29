@@ -345,7 +345,15 @@ jobs:
           $line = "The nightly checks failed on $((Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')): $env:RUN. The failed step says which check; the harness step's last lines name every harness that failed."
           # In brackets for the reason in the step above: without them $_ is
           # the whole list, and the test matched on any one issue in it.
-          $mine = @((Invoke-RestMethod -Headers $h -Uri "$api/issues?state=open&per_page=100") | Where-Object { $_.title -eq $title -and -not $_.pull_request })
+          # Every page, oldest first. One page of the newest hundred missed #905
+          # once more than a hundred issues were open, and 29 September's run
+          # opened #1120 beside it; the oldest open one is the one to add to.
+          $mine = @()
+          for ($pg = 1; $pg -le 20; $pg++) {
+            $page = @((Invoke-RestMethod -Headers $h -Uri "$api/issues?state=open&sort=created&direction=asc&per_page=100&page=$pg"))
+            $mine += @($page | Where-Object { $_.title -eq $title -and -not $_.pull_request })
+            if ($mine.Count -or $page.Count -lt 100) { break }
+          }
           if ($mine.Count) {
             Invoke-RestMethod -Method Post -Headers $h -Uri "$api/issues/$($mine[0].number)/comments" -Body (@{ body = $line } | ConvertTo-Json) -ContentType 'application/json' | Out-Null
             Write-Host "added to #$($mine[0].number)"
