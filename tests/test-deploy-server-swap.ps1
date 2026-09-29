@@ -25,8 +25,9 @@
   It proves:
     - a load order naming a plugin that is nowhere leaves the live files as
       they were and the server answering, and so does a port that moves, a
-      file that arrived different, a byte order mark, and a binary that is not
-      the recorded build
+      file that arrived different, a byte order mark, a binary that is not
+      the recorded build, a JavaScript half that is not, and server files
+      sent with no record (#1214)
     - a new server that hangs on its game port, or that dies on start, gets
       the old files back, the old server started again, and SWAP ROLLED BACK
     - a good deploy swaps every file in, keeps what it replaced, answers,
@@ -76,6 +77,13 @@ $putBackPick = $null
 if ($c -ge 0 -and $d -gt $c) { Invoke-Expression $lib.Substring($c, $d - $c) }
 Yes 'the stage check, the swap, the put-back pick and SwapVars are all there' (
     [bool]$checkBlock -and [bool]$swapBlock -and [bool]$putBackPick -and [bool](Get-Command SwapVars -EA SilentlyContinue))
+# The check holds the server files to their record with ServerBuild.ps1
+# (#1214), which Swap.ps1 puts in front of it below its end marker; the same
+# here, since the blocks were taken from between the markers.
+$serverBuildPath = Join-Path $Here 'scripts\deploy\ServerBuild.ps1'
+Yes 'Swap.ps1 puts ServerBuild.ps1 in front of the stage check' (
+    $lib.Substring($b).Contains('$checkBlock = [IO.File]::ReadAllText((Join-Path $PSScriptRoot ''ServerBuild.ps1'')) + "`r`n" + $checkBlock'))
+$checkBlock = [IO.File]::ReadAllText($serverBuildPath) + "`r`n" + $checkBlock
 Yes 'Deploy-Server.ps1 loads Swap.ps1' ($src -match "\. \(Join-Path \`$Here 'Swap\.ps1'\)")
 # Which settings Deploy-Server takes from the build and which stay the live
 # server's (#1222), and the carry it runs on the box: ServerSettings.ps1.
@@ -208,15 +216,30 @@ function StartStub([string]$dir) {
 function MakeStage {
     param([string]$Name, [string]$Gamemode = '// new gamemode', [int]$Port = $P,
           [string[]]$Order = @('Skyrim.esm', $bob, 'New Plugin.esp'),
-          [switch]$Bom, [string]$RecordFor = 'new binary', [string]$SentGamemode = '', [hashtable]$Settings = @{})
+          [switch]$Bom, [string]$RecordFor = 'new binary', [string]$RecordJs = 'new server js', [string]$SentGamemode = '', [hashtable]$Settings = @{},
+          [switch]$NoRecord)
     $dir = Join-Path $root $Name
     $files = [ordered]@{}
     $files['plugins/' + $bob]        = 'bob v2'
     $files['plugins/New Plugin.esp'] = 'brand new'
-    $files['scam_native.node']       = 'new binary'
     $files['gamemode.js']            = $Gamemode
     $files['server-settings.json']   = SettingsJson $root $Port $Order $Settings
-    $files['server-build.json']      = '{ "sha256": "' + (Sha $RecordFor) + '" }'
+    # Every server file the fork builds goes up together, held to the record
+    # sent with them (#1214, ServerBuild.ps1).
+    $server = [ordered]@{ 'scam_native.node' = 'new binary'; 'dist_back/skymp5-server.js' = 'new server js'; 'dist_back/skymp5-server.js.map' = 'new map'
+                          'package.json' = 'new package'; 'yarn.lock' = 'new lock'; 'launch_server.bat' = 'new bat'; 'data/scripts/ActiveMagicEffect.pex' = 'new pex' }
+    $c = 'abcdef0123456789abcdef0123456789abcdef01'
+    $recFiles = [ordered]@{}
+    foreach ($k in $server.Keys) {
+        $files[$k] = $server[$k]
+        $said = $server[$k]
+        if ($k -eq 'scam_native.node') { $said = $RecordFor }
+        if ($k -eq 'dist_back/skymp5-server.js') { $said = $RecordJs }
+        $recFiles[$k] = [ordered]@{ sha256 = (Sha $said); bytes = 1; commit = $c }
+    }
+    if (-not $NoRecord) {
+        $files['server-build.json'] = ([ordered]@{ binary = 'scam_native.node'; sha256 = (Sha $RecordFor); source = [ordered]@{ commit = $c }; files = $recFiles } | ConvertTo-Json -Depth 5)
+    }
     # The build stamp Deploy-Gamemode leaves beside gamemode.js goes up in the
     # stage with it, so a rollback cannot leave a new stamp describing the old
     # gamemode. tests\test-build-stamp.ps1 leans on this harness for that.
@@ -325,6 +348,10 @@ try {
            Args = @{ Bom = $true } },
         @{ Label = 'a binary that is not the recorded build'; Why = 'not the build server-build\.json records';
            Args = @{ RecordFor = 'some other binary' } },
+        @{ Label = 'a JavaScript half that is not the recorded build (#1214)'; Why = 'dist_back/skymp5-server\.js in the stage is not the build server-build\.json records';
+           Args = @{ RecordJs = 'the 24 Sep JavaScript half' } },
+        @{ Label = 'server files with no record sent beside them (#1214)'; Why = 'server files came with no server-build\.json to hold them to: .*scam_native\.node';
+           Args = @{ NoRecord = $true } },
         @{ Label = 'a gamemode that does not parse'; Why = 'gamemode\.js does not parse';
            Args = @{ Gamemode = 'function ( { this is not javascript' } }
     )) {
@@ -543,6 +570,23 @@ try {
             Yes '  before anything went to the box: no ssh, no scp' (-not (Test-Path -LiteralPath $dsCalls))
             if ($script:fail -gt $failed) { Write-Host (($o -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 12) -join "`n") }
         }
+        # The live server's settings and a JavaScript half that is not the
+        # one records\server-build.json names (#1214): refused, nothing sent.
+        Put (Join-Path $dsDist 'server-settings.json') (([ordered]@{ port = 7777; name = 'Thornswood'; thornswoodVoicePort = 7778; loadOrder = @('c:/x/Skyrim.esm') }) | ConvertTo-Json -Depth 6)
+        Put (Join-Path $dsDist 'dist_back\skymp5-server.js') '// a JavaScript half from 24 Sep'
+        if (Test-Path -LiteralPath $dsCalls) { Remove-Item -LiteralPath $dsCalls -Force }
+        $eap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $o = (& $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $Here 'scripts\deploy\Deploy-Server.ps1') `
+                    -Dist $dsDist -Vps 127.0.0.1 -User test -Root 'C:/Thornswood-Server' -Now 2>&1 | Out-String)
+            $code = $LASTEXITCODE
+        } finally { $ErrorActionPreference = $eap }
+        $failed = $script:fail
+        Yes ("Deploy-Server with a JavaScript half that is not the recorded build is refused (exit $code, #1214)") (
+            $code -ne 0 -and $o -match 'not the build this release recorded' -and $o -match 'dist_back/skymp5-server\.js in .* is not the build')
+        Yes '  before anything went to the box: no ssh, no scp' (-not (Test-Path -LiteralPath $dsCalls))
+        if ($script:fail -gt $failed) { Write-Host (($o -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 12) -join "`n") }
     } finally {
         $env:PATH = $oldPath
         Remove-Item Env:\TS_DS_CALLS -ErrorAction SilentlyContinue

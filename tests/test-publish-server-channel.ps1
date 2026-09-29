@@ -28,6 +28,12 @@
        before anything is sent, by a publish on either channel, by -SkipBuild
        with a zip made from it, and by Export-ServerPayload by itself; a good
        zip carries the record, for the installer to hold it again
+    6b. every other server file the same way (#1214): a JavaScript half from
+       another build beside the recorded binary, a -SkipBuild zip carrying
+       one, a server file the record does not list, and a record that lists
+       only the binary are each refused before anything is sent; a good zip
+       carries every recorded file and nothing the build folder holds that
+       is not part of a release
     7. a build whose npcSettings has a "default" key, which refuses every NPC
        (#1222): refused on either channel before anything is sent; a dev zip
        says thornswoodServer dev, and a live export of one that says dev is
@@ -81,14 +87,32 @@ function Write-Live {
     [IO.File]::WriteAllText((Join-Path $dist 'server-settings.json'), ($s | ConvertTo-Json -Depth 6), $utf8)
 }
 function Hash([string]$p) { return (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash }
-# The binary in the build, and a record naming a build: -For says which.
+# The binary in the build, the other server files the fork builds beside it
+# (ServerBuild.ps1), and a record of the build as it is now.
 function Write-Binary([string]$text) { [IO.File]::WriteAllText((Join-Path $dist 'scam_native.node'), $text, $utf8) }
-function Write-Record([string]$for, [string]$path = $record) {
-    $h = [Security.Cryptography.SHA256]::Create()
-    $sum = (-join ($h.ComputeHash($utf8.GetBytes($for)) | ForEach-Object { $_.ToString('x2') }))
-    $h.Dispose()
-    [IO.File]::WriteAllText($path, ('{ "binary": "scam_native.node", "sha256": "' + $sum + '" }'), $utf8)
-    return $sum
+function Write-ServerFile([string]$rel, [string]$text) {
+    $p = Join-Path $dist ($rel -replace '/', '\')
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $p) | Out-Null
+    [IO.File]::WriteAllText($p, $text, $utf8)
+}
+$serverRels = @('dist_back/skymp5-server.js', 'dist_back/skymp5-server.js.map', 'package.json', 'yarn.lock', 'launch_server.bat', 'data/scripts/ActiveMagicEffect.pex')
+$forkCommit = 'abcdef0123456789abcdef0123456789abcdef01'
+function Write-Record([string]$path = $record, [switch]$BinaryOnly) {
+    $files = [ordered]@{}
+    foreach ($rel in @('scam_native.node') + $serverRels) {
+        $p = Join-Path $dist ($rel -replace '/', '\')
+        $files[$rel] = [ordered]@{ sha256 = (Hash $p).ToLowerInvariant(); bytes = (Get-Item -LiteralPath $p).Length; commit = $forkCommit }
+    }
+    $rec = [ordered]@{ binary = 'scam_native.node'; sha256 = $files['scam_native.node'].sha256; source = [ordered]@{ commit = $forkCommit } }
+    if (-not $BinaryOnly) { $rec.files = $files }
+    [IO.File]::WriteAllText($path, ($rec | ConvertTo-Json -Depth 5), $utf8)
+    return $rec.sha256
+}
+# The entries in a zip, by their path with forward slashes.
+function Zip-Entries([string]$path) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $z = [IO.Compression.ZipFile]::OpenRead($path)
+    try { return @($z.Entries | Where-Object { $_.Name } | ForEach-Object { $_.FullName.Replace('\', '/') }) } finally { $z.Dispose() }
 }
 # What the zip starts the server with, and whether its settings start with a BOM.
 function Read-Zip([string]$path) {
@@ -135,9 +159,12 @@ function Sent($r) { return @($r.Calls | Where-Object { $_ -match '^scp .*thornsw
 try {
     foreach ($d in $dist, $bin, (Join-Path $T 'plugins'), (Split-Path -Parent $zip)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
     [IO.File]::WriteAllText((Join-Path $T 'plugins\ours.esp'), 'a plugin', $utf8)
-    [IO.File]::WriteAllText((Join-Path $dist 'skymp5-server.js'), '// the server', $utf8)
+    foreach ($rel in $serverRels) { Write-ServerFile $rel ('the recorded ' + $rel) }
+    # What a build folder holds that is not part of a release (#1214).
+    Write-ServerFile 'gamemode.js.progression-20260921' '// a gamemode backup'
+    Write-ServerFile 'data/manifest.json' '{ "written": "by the server, while it ran here" }'
     Write-Binary 'the recorded binary'
-    $recSum = Write-Record 'the recorded binary'
+    $recSum = Write-Record
     # PowerShell scripts rather than .cmd files: a .cmd runs through cmd.exe,
     # which splits an unquoted argument at an ampersand, and a temp folder can
     # have one in its path. The real ssh and scp are programs and take it whole.
@@ -165,6 +192,10 @@ try {
     Yes '  its settings have no byte order mark' (-not $z.Bom)
     Yes ("  it says thornswoodServer {0}, for a first install into an empty dev root" -f $z.Server) ($z.Server -eq 'dev')
     Yes '  and it carries the build record, for the installer to hold the binary to (#1214)' ($z.Rec -eq $recSum)
+    $ents = Zip-Entries $zip
+    Yes '  and every recorded server file, the JavaScript half with the binary (#1214)' (@(@('scam_native.node') + $serverRels | Where-Object { $ents -notcontains $_ }).Count -eq 0)
+    Yes '  and not what the build folder holds that is no part of a release' ($ents -notcontains 'gamemode.js.progression-20260921' -and $ents -notcontains 'data/manifest.json')
+    Yes '  and ServerBuild.ps1 went up beside the installer, which holds them again with it' (@($r.Calls | Where-Object { $_ -match '^scp .*ServerBuild\.ps1 .*C:/ServerBuild\.ps1' }).Count -eq 1)
     Yes '  and ServerSettings.ps1 went up beside the installer (#1222)' (@($r.Calls | Where-Object { $_ -match '^scp .*ServerSettings\.ps1 .*C:/ServerSettings\.ps1' }).Count -eq 1)
     $local = Get-Content -LiteralPath $settings -Raw | ConvertFrom-Json
     Yes ("  and the build's own settings are the live ones still (port {0}, name {1})" -f $local.port, $local.name) ([int]$local.port -eq 7777 -and $local.name -eq 'Thornswood' -and [int]$local.thornswoodVoicePort -eq 7778)
@@ -235,7 +266,7 @@ try {
     # A zip made from it against a record that names it, sent with -SkipBuild
     # against the real record: refused from what is in the zip.
     $other = Join-Path $T 'other-record.json'
-    [void](Write-Record 'some other binary' $other)
+    [void](Write-Record $other)
     $x = Run $export @('-Dist', $dist, '-Zip', $zip, '-OutDir', (Join-Path $T 'out\_payload'), '-Record', $other, '-Channel', 'dev')
     Yes ("  (a zip made from it, against a record naming it, exit {0})" -f $x.Code) ($x.Code -eq 0)
     $r = Publish @('-Channel', 'dev', '-SkipBuild')
@@ -243,8 +274,48 @@ try {
     Yes ("-SkipBuild with that zip is refused before it is sent (exit {0})" -f $r.Code) $ok; Tail $r $ok
     Write-Binary 'the recorded binary'
     $r = Publish @('-Channel', 'dev')
-    $ok = $r.Code -eq 0 -and (Sent $r) -eq 1 -and $r.Out -match 'payload binary is the recorded build'
+    $ok = $r.Code -eq 0 -and (Sent $r) -eq 1 -and $r.Out -match 'payload server files are the recorded build'
     Yes ("  and the recorded binary goes again (exit {0})" -f $r.Code) $ok; Tail $r $ok
+
+    # ---- 6b. every other server file (#1214) ----------------------------------------
+    Write-Host ''; Write-Host 'a JavaScript half that is not the recorded build'
+    # The shape of 29 September: the recorded binary, and a JavaScript half
+    # from another build beside it.
+    Write-ServerFile 'dist_back/skymp5-server.js' '// a JavaScript half from 24 Sep'
+    foreach ($ch in 'dev', 'main') {
+        $r = Publish @('-Channel', $ch)
+        $ok = $r.Code -ne 0 -and @($r.Calls | Where-Object { $_ -match '^(ssh|scp) ' }).Count -eq 0 -and $r.Out -match 'dist_back/skymp5-server\.js in .* is not the build'
+        Yes ("a $ch publish of it is refused before anything is sent, naming the file (exit {0})" -f $r.Code) $ok; Tail $r $ok
+    }
+    $x = Run $export $ex
+    Yes ("Export-ServerPayload by itself refuses it too (exit {0})" -f $x.Code) ($x.Code -ne 0 -and $x.Out -match 'skymp5-server\.js in .* is not the build' -and $x.Out -match 'Nothing was packed')
+    # A zip made from it against a record naming it, sent with -SkipBuild
+    # against the real record: refused from what is in the zip.
+    [void](Write-Record $other)
+    $x = Run $export @('-Dist', $dist, '-Zip', $zip, '-OutDir', (Join-Path $T 'out\_payload'), '-Record', $other, '-Channel', 'dev')
+    Yes ("  (a zip made from it, against a record naming it, exit {0})" -f $x.Code) ($x.Code -eq 0)
+    $r = Publish @('-Channel', 'dev', '-SkipBuild')
+    $ok = $r.Code -ne 0 -and (Sent $r) -eq 0 -and $r.Out -match 'skymp5-server\.js in the payload is not the build' -and $r.Out -match 'not the recorded build'
+    Yes ("-SkipBuild with that zip is refused before it is sent (exit {0})" -f $r.Code) $ok; Tail $r $ok
+    Write-ServerFile 'dist_back/skymp5-server.js' 'the recorded dist_back/skymp5-server.js'
+
+    Write-Host ''; Write-Host 'a server file the record does not list'
+    Write-ServerFile 'dist_back/old-bundle.js' '// left by another build'
+    $r = Publish @('-Channel', 'dev')
+    $ok = $r.Code -ne 0 -and @($r.Calls | Where-Object { $_ -match '^(ssh|scp) ' }).Count -eq 0 -and $r.Out -match 'old-bundle\.js in .* does not list'
+    Yes ("a publish with one is refused before anything is sent (exit {0})" -f $r.Code) $ok; Tail $r $ok
+    Remove-Item -LiteralPath (Join-Path $dist 'dist_back\old-bundle.js') -Force
+
+    Write-Host ''; Write-Host 'a record of the binary alone'
+    $saved = [IO.File]::ReadAllText($record)
+    [void](Write-Record $record -BinaryOnly)
+    $r = Publish @('-Channel', 'dev')
+    $ok = $r.Code -ne 0 -and @($r.Calls | Where-Object { $_ -match '^(ssh|scp) ' }).Count -eq 0 -and $r.Out -match 'lists no server files'
+    Yes ("a publish held to a record that lists only the binary is refused (exit {0})" -f $r.Code) $ok; Tail $r $ok
+    [IO.File]::WriteAllText($record, $saved, $utf8)
+    $r = Publish @('-Channel', 'dev')
+    $ok = $r.Code -eq 0 -and (Sent $r) -eq 1
+    Yes ("  and the recorded build goes again (exit {0})" -f $r.Code) $ok; Tail $r $ok
 
     # ---- 7. an npcSettings "default" key (#1222) -----------------------------------------
     Write-Host ''; Write-Host 'an npcSettings default key'

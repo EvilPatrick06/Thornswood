@@ -7,6 +7,19 @@
   goes across is the built server plus the plugin files its load order names,
   with the absolute paths rewritten for where they will live on the VPS.
 
+  What goes, and nothing else (#1214):
+    every server file records\server-build.json lists, each held to its hash
+    first: scam_native.node, dist_back\skymp5-server.js and its map,
+    package.json, yarn.lock, launch_server.bat and data\scripts
+    (scripts\deploy\ServerBuild.ps1 says which and why)
+    gamemode.js and thornswood-build.json, ours
+    server-settings.json, rewritten below
+    server-build.json, the record itself, for the installer to hold them again
+  Whatever else sits in the build folder stays there and is named: an old
+  settings copy, a gamemode backup, a manifest the server wrote while it ran
+  here. Until #1214 everything in the folder went, so a binary or a
+  JavaScript half from any build went with it.
+
   Deliberately left out:
     scam_native.pdb        73 MB of debug symbols, useless on the VPS
     world/                 the save. The VPS starts with a fresh world; copying
@@ -37,6 +50,7 @@ param(
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $Dist)) { throw "server dist not found: $Dist" }
 . (Join-Path $PSScriptRoot '..\deploy\ServerSettings.ps1')
+. (Join-Path $PSScriptRoot '..\deploy\ServerBuild.ps1')
 
 # ---- settings no server should get, and the dev ones for live ----------------
 # Until #1114 a dev Publish-Server rewrote the build's own settings to port
@@ -54,39 +68,48 @@ if ($liveWhy.Count) {
            '. Run .\scripts\deploy\Deploy-Gamemode.ps1, which writes the live ones, then publish again. Nothing was packed.')
 }
 
-# ---- the binary is the recorded build (#1214) -------------------------------
+# ---- every server file is the recorded build (#1214) -------------------------
 # Deploy-Server refused a scam_native.node that is not the one
 # records\server-build.json names, and the installer on the box refused one
 # that is not its payload's record, but a payload carried no record, so a
-# publish sent whatever binary sat in the build. Held here, before anything is
-# copied, and the record goes into the payload.
-if (-not (Test-Path -LiteralPath $Record)) { throw "there is no build record at $Record, so nothing says which build this binary is. Nothing was packed." }
-$recWant = ''
-try { $recWant = ([string]([IO.File]::ReadAllText($Record) | ConvertFrom-Json).sha256).ToLowerInvariant() } catch { throw "$Record does not parse: $($_.Exception.Message). Nothing was packed." }
-if (-not $recWant) { throw "$Record names no sha256. Nothing was packed." }
-$binPath = Join-Path $Dist 'scam_native.node'
-if (-not (Test-Path -LiteralPath $binPath)) { throw "not built: $binPath. Nothing was packed." }
-$binHave = (Get-FileHash -LiteralPath $binPath -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($binHave -ne $recWant) {
-    throw ("scam_native.node in $Dist is not the build $Record names (it is $binHave, the record says $recWant). " +
+# publish sent whatever binary sat in the build, and whatever JavaScript half
+# beside it, which nothing recorded at all. Every file the record lists is
+# held here, and any server file it does not list refuses the payload, before
+# anything is copied; the record goes into the payload.
+if (-not (Test-Path -LiteralPath $Record)) { throw "there is no build record at $Record, so nothing says which build these server files are. Nothing was packed." }
+$rec = $null
+try { $rec = [IO.File]::ReadAllText($Record) | ConvertFrom-Json } catch { throw "$Record does not parse: $($_.Exception.Message). Nothing was packed." }
+$why = @(Get-ThornswoodServerBuildProblems $rec (Get-ThornswoodServerFolderSums $Dist) $Dist $Record)
+if ($why.Count) {
+    throw ("the server files in $Dist are not the build $Record names: " + ($why -join '; ') + '. ' +
            'If it was rebuilt on purpose, record it with .\scripts\release\New-ServerBuildRecord.ps1 and commit that; if not, find out what changed. Nothing was packed.')
 }
-Write-Host ('scam_native.node is the recorded build, ' + $recWant.Substring(0, 12)) -ForegroundColor Cyan
+$recFiles = Get-ThornswoodServerRecordFiles $rec
+Write-Host ('every server file is the recorded build of ' + ([string]$rec.source.commit).Substring(0, 8) + ': ' + $recFiles.Count + ' files, scam_native.node ' + ([string]$rec.sha256).Substring(0, 12)) -ForegroundColor Cyan
 
 if (Test-Path -LiteralPath $OutDir) { Remove-Item -LiteralPath $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $OutDir 'plugins') -Force | Out-Null
 
 # ---- the server itself -----------------------------------------------------
-$skip = 'scam_native.pdb'
-foreach ($item in (Get-ChildItem -LiteralPath $Dist)) {
-    if ($item.Name -eq 'world')      { continue }
-    if ($skip -contains $item.Name)  { continue }
-    Copy-Item -LiteralPath $item.FullName -Destination $OutDir -Recurse -Force
+# The recorded files, then ours. server-settings.json is written below.
+$own = @('gamemode.js', 'thornswood-build.json')
+$taken = @{}
+foreach ($rel in @($recFiles.Keys) + $own) {
+    $from = Join-Path $Dist ($rel -replace '/', '\')
+    if (-not (Test-Path -LiteralPath $from)) { continue }
+    $to = Join-Path $OutDir ($rel -replace '/', '\')
+    New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
+    Copy-Item -LiteralPath $from -Destination $to -Force
+    $taken[$rel] = $true
 }
-# The record the binary was just held to, for the installer to hold it again.
+# The record the files were just held to, for the installer to hold them again.
 Copy-Item -LiteralPath $Record -Destination (Join-Path $OutDir 'server-build.json') -Force
-Write-Host "server files copied, with the build record" -ForegroundColor Cyan
+$distFull = (Get-Item -LiteralPath $Dist).FullName.TrimEnd('\')
+$left = @(Get-ChildItem -LiteralPath $distFull -Recurse -File -Force | ForEach-Object { ConvertTo-ThornswoodServerRel ($_.FullName.Substring($distFull.Length)) } |
+          Where-Object { -not $taken.ContainsKey($_) -and $_ -ne 'server-settings.json' -and $_ -ne 'scam_native.pdb' -and $_ -notlike 'world/*' })
+Write-Host ("server files copied: the {0} recorded, gamemode.js, the build stamp and the record" -f $recFiles.Count) -ForegroundColor Cyan
+if ($left.Count) { Write-Host ('  left in the build, not part of a server release: ' + ($left -join ', ')) -ForegroundColor DarkGray }
 
 # ---- the plugins its load order names --------------------------------------
 $settingsPath = Join-Path $Dist 'server-settings.json'

@@ -21,12 +21,30 @@
 
   WHAT IT BUILDS
 
-  skymp5-server, the Node addon, which comes out as scam_native.node. That is
-  the one file records\server-build.json fingerprints and the one file
-  Deploy-Server.ps1 refuses to ship when its sha256 is not the recorded one.
-  Everything else in the solution is built as a dependency of it and nothing
-  else is asked for, because the client runtime is a separate build with its
-  own record (records\client-build.json, Sync-Client.ps1).
+  Every file the fork puts in the server (scripts\deploy\ServerBuild.ps1 names
+  them), from the fork as it is checked out:
+    skymp5-server      the Node addon, scam_native.node, and through it
+                       skymp5-server-ts, the JavaScript half the server runs
+                       (dist_back\skymp5-server.js and its map), and the
+                       post-build copies of package.json, yarn.lock and
+                       launch_server.bat
+    skymp5-scripts     the compiled Papyrus in data\scripts
+  Before that, skymp5-server's packages are installed from its yarn.lock
+  (yarn install --frozen-lockfile), because the bundle carries them.
+  Everything else in the solution is built as a dependency of those and
+  nothing else is asked for, because the client runtime is a separate build
+  with its own record (records\client-build.json, Sync-Client.ps1).
+
+  THE JAVASCRIPT HALF IS ALWAYS BUILT AGAIN (#1214). The fork's CMake runs
+  build-ts only when a .ts file under skymp5-server\ts is newer than the
+  bundle. It does not look at yarn.lock, package.json or the TypeScript settings, so a
+  package bump never reached the bundle, and a bundle copied in from another
+  build with a newer date was taken as current. So the bundle and its map are
+  removed before the build, and the build has to write them from what is
+  checked out. esbuild writes the same bytes for the same sources, so this
+  costs about ten seconds and changes nothing when nothing changed.
+  New-ServerBuildRecord.ps1 then ties every file to the clone before it
+  records any of them.
 
   WHAT IT DOES NOT DO
 
@@ -36,16 +54,21 @@
   guessing at a configure line.
 
   It does not deploy, it does not talk to the VPS, and it does not touch the
-  game folder. It compiles and, unless told not to, updates the build record.
+  game folder. It installs the server's packages, compiles and, unless told
+  not to, updates the build record.
+
+  A fork under a path with an & in it (every worktree here) is built through
+  the drive letter it was configured through, the way Build-Engine.ps1 does
+  it: -Fork K:\<fork>. MSBuild refuses a cache configured through another path.
 
   Usage:
     .\scripts\release\Build-Server.ps1
     .\scripts\release\Build-Server.ps1 -Configuration Debug
     .\scripts\release\Build-Server.ps1 -NoRecord      compile only, leave the record alone
 
-  Exit code 1 if Visual Studio is not installed, if the build folder has not
-  been configured, if the compile fails, or if the binary it was supposed to
-  produce is not there afterwards.
+  Exit code 1 if Visual Studio or yarn is not installed, if the build folder
+  has not been configured, if the packages or the compile fail, or if a file
+  it was supposed to produce is not there afterwards.
 #>
 [CmdletBinding()]
 param(
@@ -64,6 +87,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\deploy\ServerBuild.ps1')
 
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -87,9 +111,16 @@ $commit = ''
 try { $commit = (& git -C $Fork rev-parse --short HEAD 2>$null | Select-Object -First 1) } catch { }
 if ($branch) {
     Say ("  branch      " + $branch + '  ' + $commit)
-    if ($branch -ne 'thornswood/engine-changes') {
+    if ($branch -ne 'thornswood/engine-changes' -and $branch -ne 'HEAD') {
         Say '  NOTE: that is not thornswood/engine-changes, which is the branch our engine changes live on.' 'Yellow'
     }
+}
+# The commit this repository pins. The record names the commit built, and
+# tests\test-one-engine.js holds the two to each other.
+$pinned = ''
+try { $pinned = [string](((& git -C (Join-Path $Here '..\..') ls-tree HEAD engine/skymp 2>$null | Select-Object -First 1) -split '\s+')[2]) } catch { }
+if ($pinned -and $commit -and -not $pinned.StartsWith($commit)) {
+    Say ("  NOTE: this repository pins {0}. A record of this build names {1}, and the build check fails until the pin moves to it (engine\README.md, One engine)." -f $pinned.Substring(0, 8), $commit) 'Yellow'
 }
 $dirty = @()
 try { $dirty = @(& git -C $Fork status --porcelain 2>$null | Where-Object { $_ }) } catch { }
@@ -120,77 +151,118 @@ if (-not (Test-Path -LiteralPath $msbuild)) {
     Die "MSBuild is not at $msbuild even though vswhere pointed at $vsPath."
 }
 Ok ("MSBuild from " + $vsPath)
+if (-not (Get-Command yarn -ErrorAction SilentlyContinue)) {
+    Die 'yarn is not on PATH, and the JavaScript half of the server is built with it. Run  corepack enable  in an administrator PowerShell once Node is in.'
+}
+Ok 'yarn'
+
+# skymp5-server is the Node addon, and building it builds skymp5-server-ts,
+# the JavaScript half, first (the fork's add_dependencies). skymp5-scripts is
+# the compiled Papyrus the server loads, which nothing else asks for.
+$projects = @(
+    (Join-Path $BuildDir 'skymp5-server\skymp5-server.vcxproj'),
+    (Join-Path $BuildDir 'skymp5-scripts\skymp5-scripts.vcxproj')
+)
+foreach ($project in $projects) {
+    if (-not (Test-Path -LiteralPath $project)) {
+        Die "the project is not at $project. Either the build folder was configured for something else or the fork has moved it."
+    }
+}
+
+Head 'The packages the JavaScript half bundles'
+# Exactly the ones skymp5-server\yarn.lock names. The fork's configure
+# installs them once; a lockfile that moved since then would bundle old ones.
+# Run in the folder rather than given it: yarn is a .cmd, and cmd.exe splits
+# a path argument at an &.
+$serverSrc = Join-Path $Fork 'skymp5-server'
+Push-Location -LiteralPath $serverSrc
+try {
+    $ErrorActionPreference = 'Continue'
+    & yarn install --frozen-lockfile --non-interactive 2>&1 | ForEach-Object { Say ('  ' + $_) 'DarkGray' }
+    $code = $LASTEXITCODE
+} finally { $ErrorActionPreference = 'Stop'; Pop-Location }
+if ($code -ne 0) { Die "yarn install --frozen-lockfile in $serverSrc exited with $code. The lines above say why." }
+Ok 'installed from yarn.lock'
 
 Head 'Building'
 
-# skymp5-server is the Node addon and the only thing asked for. Everything it
-# needs is built as a dependency; the client runtime is a separate build with
-# its own record, so building the whole solution here would be slower and
-# would produce files nothing in this repository ships.
-$project = Join-Path $BuildDir 'skymp5-server\skymp5-server.vcxproj'
-if (-not (Test-Path -LiteralPath $project)) {
-    Die "the project is not at $project. Either the build folder was configured for something else or the fork has moved it."
+$dist = Join-Path $BuildDir 'dist\server'
+$binary = Join-Path $dist 'scam_native.node'
+$before = @{}
+foreach ($n in $ThornswoodServerForkFiles) {
+    $p = Join-Path $dist ($n -replace '/', '\')
+    if (Test-Path -LiteralPath $p) { $before[$n] = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash }
 }
 
-$binary = Join-Path $BuildDir ('dist\server\scam_native.node')
-$before = ''
-if (Test-Path -LiteralPath $binary) {
-    $before = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash
+# See the header: the bundle is written by the build or not at all.
+foreach ($n in 'dist_back\skymp5-server.js', 'dist_back\skymp5-server.js.map') {
+    $p = Join-Path $dist $n
+    if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
 }
 
-Say ("  " + $Configuration + ', skymp5-server, parallel')
-Say ''
-& $msbuild $project "/p:Configuration=$Configuration" /m /v:minimal /nologo
-$code = $LASTEXITCODE
-Say ''
-if ($code -ne 0) {
-    Die "MSBuild exited with $code. The errors are above, in the order the compiler found them; the first one is usually the only real one."
+foreach ($project in $projects) {
+    Say ("  " + $Configuration + ', ' + [IO.Path]::GetFileNameWithoutExtension($project) + ', parallel')
+    Say ''
+    & $msbuild $project "/p:Configuration=$Configuration" /m /v:minimal /nologo
+    $code = $LASTEXITCODE
+    Say ''
+    if ($code -ne 0) {
+        Die "MSBuild exited with $code. The errors are above, in the order the compiler found them; the first one is usually the only real one."
+    }
 }
 Ok 'compiled'
 
 Head 'What came out'
 
-if (-not (Test-Path -LiteralPath $binary)) {
-    Die ("the build said it succeeded and $binary is not there. " +
-         "That usually means the project built something else, so check what the solution calls the addon target.")
+$missing = @()
+foreach ($n in $ThornswoodServerForkFiles) {
+    $p = Join-Path $dist ($n -replace '/', '\')
+    if (-not (Test-Path -LiteralPath $p)) { $missing += $n; continue }
+    $h = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash
+    $said = ''
+    if (-not $before.ContainsKey($n)) { $said = 'new' }
+    elseif ($before[$n] -eq $h) { $said = 'the same as before this run' }
+    else { $said = 'changed' }
+    Say ("  {0}  {1,-32} {2:N0} bytes, {3}" -f $h.Substring(0, 12).ToLowerInvariant(), $n, (Get-Item -LiteralPath $p).Length, $said)
 }
-$item  = Get-Item -LiteralPath $binary
-$after = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash
-Say ("  " + $binary)
-Say ("  {0:N0} bytes, written {1}" -f $item.Length, $item.LastWriteTimeUtc.ToString('yyyy-MM-ddTHH:mm:ssZ'))
-Say ("  sha256 " + $after.ToLowerInvariant())
-if ($before -and $before -eq $after) {
-    Say '  IDENTICAL to what was there before this run. Nothing you changed reached this binary.' 'Yellow'
-} elseif ($before) {
-    Ok 'different from the binary that was there before, so the change is in it'
+$scripts = Join-Path $dist 'data\scripts'
+$pex = @(if (Test-Path -LiteralPath $scripts) { Get-ChildItem -LiteralPath $scripts -Recurse -File })
+foreach ($f in $pex) {
+    Say ("  {0}  data/scripts/{1}" -f (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.Substring(0, 12).ToLowerInvariant(), $f.Name)
+}
+if (-not $pex.Count) { $missing += 'data/scripts (skymp5-scripts wrote nothing; is BUILD_SCRIPTS on in the cache?)' }
+if ($missing.Count) {
+    Die ("the build said it succeeded and these are not in $($dist): " + ($missing -join ', ') +
+         '. That usually means a project built something else, so check what the solution calls it.')
+}
+if ($before.ContainsKey('scam_native.node') -and $before['scam_native.node'] -eq (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash) {
+    Say '  scam_native.node is IDENTICAL to what was there before this run: no C++ change reached it.' 'Yellow'
 }
 
 if ($NoRecord) {
     Head 'The record'
     Say '  -NoRecord, so records\server-build.json was left alone.'
-    Say '  Deploy-Server.ps1 refuses a binary whose sha256 is not the recorded one, so it will refuse this until the record is updated.'
+    Say '  Every publish and deploy refuses a server file whose sha256 is not the recorded one, so they will refuse this until the record is updated.'
 } else {
     Head 'The record'
     $rec = Join-Path $Here 'New-ServerBuildRecord.ps1'
-    if (-not (Test-Path -LiteralPath $rec)) {
-        Say "  not found: $rec, so the record was not updated." 'Yellow'
-    } else {
-        # The same PowerShell that is running this, for the same reason
-        # Publish-Server.ps1 does it: handing the job to 5.1 out of a 7 session
-        # changes how the file gets written underneath it.
-        $ps = (Get-Process -Id $PID).Path
-        if (-not $ps) { $ps = 'powershell' }
-        & $ps -NoProfile -ExecutionPolicy Bypass -File $rec -NoPause
-        if ($LASTEXITCODE -ne 0) {
-            Die "New-ServerBuildRecord.ps1 exited with $LASTEXITCODE, so records\server-build.json does not match what was just built."
-        }
-        Ok 'records\server-build.json now names this binary'
+    if (-not (Test-Path -LiteralPath $rec)) { Die "not found: $rec, so the record was not updated." }
+    # The same PowerShell that is running this, for the same reason
+    # Publish-Server.ps1 does it: handing the job to 5.1 out of a 7 session
+    # changes how the file gets written underneath it. The build and the
+    # clone just built, not Where.ps1's, or a -Fork build recorded another.
+    $ps = (Get-Process -Id $PID).Path
+    if (-not $ps) { $ps = 'powershell' }
+    & $ps -NoProfile -ExecutionPolicy Bypass -File $rec -Dist $dist -Clone $Fork
+    if ($LASTEXITCODE -ne 0) {
+        Die "New-ServerBuildRecord.ps1 exited with $LASTEXITCODE, so records\server-build.json does not match what was just built."
     }
+    Ok 'records\server-build.json now names every server file of this build'
 }
 
 Head 'Next'
-Say '  Nothing has left this machine. To put it on the live server, as engine\README.md says:'
-Say '      .\scripts\deploy\Deploy-Server.ps1' 'White'
-Say '  That is the one that goes outside, and it is Patrick''s to run.'
+Say '  Nothing has left this machine. The dev server first, as engine\README.md says:'
+Say '      .\scripts\release\Publish-Server.ps1 -Channel dev' 'White'
+Say '  That one goes outside. The live server only when Patrick says.'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

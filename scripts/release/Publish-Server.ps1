@@ -8,15 +8,18 @@
   What it does, in order:
     0. refuses, naming each file, when anything it would send out of this
        repository has uncommitted changes (#1121)
-    1. builds the payload zip from your local dist\server, refusing a binary
-       that is not the build records\server-build.json names, and puts that
-       record in the zip (#1214)
+    1. builds the payload zip from your local dist\server, refusing any
+       server file (the binary, the JavaScript half, the rest the fork
+       builds) that is not the build records\server-build.json names, and
+       puts that record in the zip; the zip is read back and held the same
+       way before it is sent (#1214)
     2. copies the zip across, with the server still running
     3. the installer unpacks it BESIDE the running server, gives it the
        running server's own settings with only the release's keys from the
        zip (ServerSettings.ps1, #1222), checks it there (the zip's hash, every
-       plugin in the load order, gamemode.js parsing, the binary against its
-       record) and stops nothing if any of it fails
+       plugin in the load order, gamemode.js parsing, every server file
+       against its record, ServerBuild.ps1) and stops nothing if any of it
+       fails
     4. only then stops the server, swaps the new folder in, registers the
        boot task and starts it; if it does not answer on its ports, the
        previous folder goes back and is started again (issue #446)
@@ -136,7 +139,7 @@ foreach ($t in 'ssh', 'scp') {
 # with uncommitted changes, or untracked, refuses it here, naming each, before
 # anything is built or the box is asked anything. There is no switch past it.
 . (Join-Path $Here '..\deploy\Artifact.ps1')
-$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/vps/Roll-Log.ps1')
+$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/vps/Roll-Log.ps1')
 if (-not $PutBack) { $committedOnly += 'game/gamemode.js', 'records/most-online.json', 'records/server-build.json' }
 try { Assert-ThornswoodCommitted -RepoDir (Join-Path $Here '..\..') -Paths $committedOnly -What 'this publish' }
 catch { Die $_.Exception.Message }
@@ -156,6 +159,11 @@ if (-not (Test-Path -LiteralPath $rollLog)) { Die "not found: $rollLog" }
 # without it rather than put the build's settings over the server's.
 $settingsLib = Join-Path $Here '..\deploy\ServerSettings.ps1'
 if (-not (Test-Path -LiteralPath $settingsLib)) { Die "not found: $settingsLib" }
+# And ServerBuild.ps1, which says which server files the record holds and
+# holds them (#1214), here to the zip and there to the stage.
+$buildLib = Join-Path $Here '..\deploy\ServerBuild.ps1'
+if (-not (Test-Path -LiteralPath $buildLib)) { Die "not found: $buildLib" }
+. $buildLib
 
 # What the installer said, printed as it comes, and its last line read: it
 # ends with INSTALL OK, INSTALL REFUSED, INSTALL ROLLED BACK or INSTALL FAILED.
@@ -181,6 +189,8 @@ if ($PutBack) {
     Invoke-ThornswoodNative { & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Invoke-ThornswoodNative { & scp @ssh $settingsLib "${target}:C:/ServerSettings.ps1" }
+    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
+    Invoke-ThornswoodNative { & scp @ssh $buildLib "${target}:C:/ServerBuild.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Invoke-Installer "-Root '$VpsRoot' -TaskName '$TaskName' -StartNow -PutBack -Wait $Wait"
     Say 'the previous server is back and answering up there' 'Green'
@@ -352,32 +362,34 @@ Say ("payload {0:N1} MB" -f ((Get-Item -LiteralPath $Zip).Length / 1MB)) 'Green'
 # -SkipBuild zip packed for the other channel cannot go to this one either.
 $wantPort = if ($IsDev) { 7787 } else { 7777 }
 $zipPort = ''
-# And the binary in it is the recorded build, with the record beside it for the
-# installer (#1214), read out of the zip too, so a -SkipBuild zip made from
-# another build cannot go either.
-$zipBin = ''
-$zipRec = ''
+# And every server file in it is the recorded build, with the record beside
+# them for the installer (#1214), read out of the zip too, so a -SkipBuild zip
+# made from another build cannot go either. The record in the zip is this
+# repository's own, byte for byte.
+$zipSums = @{}
+$zipRecSum = ''
 $zipWhy = ''
+function Get-EntrySum($entry) {
+    $zs = $entry.Open()
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return (-join ($sha.ComputeHash($zs) | ForEach-Object { $_.ToString('x2') })) } finally { $zs.Dispose(); $sha.Dispose() }
+}
 try {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $za = [IO.Compression.ZipFile]::OpenRead($Zip)
     try {
-        $ze = $za.GetEntry('server-settings.json')
-        if ($ze) {
-            $zr = New-Object IO.StreamReader($ze.Open())
-            try { $zj = $zr.ReadToEnd() | ConvertFrom-Json } finally { $zr.Dispose() }
-            if ($zj.PSObject.Properties['port']) { $zipPort = [string]$zj.port }
-        }
-        $ze = $za.GetEntry('scam_native.node')
-        if ($ze) {
-            $zs = $ze.Open()
-            $sha = [Security.Cryptography.SHA256]::Create()
-            try { $zipBin = (-join ($sha.ComputeHash($zs) | ForEach-Object { $_.ToString('x2') })) } finally { $zs.Dispose(); $sha.Dispose() }
-        }
-        $ze = $za.GetEntry('server-build.json')
-        if ($ze) {
-            $zr = New-Object IO.StreamReader($ze.Open())
-            try { $zipRec = ([string]($zr.ReadToEnd() | ConvertFrom-Json).sha256).ToLowerInvariant() } finally { $zr.Dispose() }
+        foreach ($ze in $za.Entries) {
+            # Compress-Archive under Windows PowerShell 5.1 writes the
+            # separators as \, under 7 as /.
+            $rel = ConvertTo-ThornswoodServerRel $ze.FullName
+            if (-not $ze.Name) { continue }
+            if ($rel -eq 'server-settings.json') {
+                $zr = New-Object IO.StreamReader($ze.Open())
+                try { $zj = $zr.ReadToEnd() | ConvertFrom-Json } finally { $zr.Dispose() }
+                if ($zj.PSObject.Properties['port']) { $zipPort = [string]$zj.port }
+            }
+            elseif ($rel -eq 'server-build.json') { $zipRecSum = Get-EntrySum $ze }
+            elseif (Test-ThornswoodServerForkFile $rel) { $zipSums[$rel] = Get-EntrySum $ze }
         }
     } finally { $za.Dispose() }
 } catch { $zipWhy = $_.Exception.Message }
@@ -386,18 +398,21 @@ if ($zipPort -ne [string]$wantPort) {
          ", and the $Channel server is $wantPort. Nothing was sent. Run it again without -SkipBuild." + $(if ($zipWhy) { " ($zipWhy)" } else { '' }))
 }
 Say ("payload starts the $Channel server on port $wantPort") 'Green'
-$recWant = ''
-try { $recWant = ([string]([IO.File]::ReadAllText($Record) | ConvertFrom-Json).sha256).ToLowerInvariant() } catch { }
-if (-not $recWant) { Die "$Record cannot be read or names no sha256, so nothing says which build is to go. Nothing was sent." }
-if ($zipBin -ne $recWant) {
-    Die ("the payload's scam_native.node is " + $(if ($zipBin) { $zipBin } else { 'not there' }) + ", and $Record names $recWant. " +
-         'It is not the recorded build, so nothing was sent. Rebuild the payload from the recorded build, or record this one with .\scripts\release\New-ServerBuildRecord.ps1 and commit that.')
+$recObj = $null
+try { $recObj = [IO.File]::ReadAllText($Record) | ConvertFrom-Json } catch { }
+if (-not $recObj -or -not $recObj.sha256) { Die "$Record cannot be read or names no sha256, so nothing says which build is to go. Nothing was sent." }
+$zipBuild = @(Get-ThornswoodServerBuildProblems $recObj $zipSums 'the payload' $Record)
+if ($zipBuild.Count) {
+    Say 'the payload''s server files are not the recorded build:' 'Red'
+    foreach ($w in $zipBuild) { Say "  $w" 'Red' }
+    Die ('It is not the recorded build, so nothing was sent. Rebuild the payload from the recorded build, or record this one with .\scripts\release\New-ServerBuildRecord.ps1 and commit that.' +
+         $(if ($zipWhy) { " ($zipWhy)" } else { '' }))
 }
-if ($zipRec -ne $recWant) {
-    Die ("the payload carries " + $(if ($zipRec) { "a server-build.json naming $zipRec" } else { 'no server-build.json' }) +
-         ", so the installer could not hold the binary to the record. Nothing was sent. Run it again without -SkipBuild.")
+if ($zipRecSum -ne (Get-FileHash -LiteralPath $Record -Algorithm SHA256).Hash.ToLowerInvariant()) {
+    Die ("the payload carries " + $(if ($zipRecSum) { "a server-build.json that is not $Record" } else { 'no server-build.json' }) +
+         ", so the installer could not hold the server files to the record. Nothing was sent. Run it again without -SkipBuild.")
 }
-Say ("payload binary is the recorded build, " + $recWant.Substring(0, 12) + ", and carries its record") 'Green'
+Say ("payload server files are the recorded build of " + ([string]$recObj.source.commit).Substring(0, 8) + ", " + $zipSums.Count + " files, and it carries the record") 'Green'
 
 # ------------------------------------------------------------ no stop here ---
 # This used to stop the server here, before anything was copied, so a copy
@@ -414,6 +429,8 @@ if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up the
 Invoke-ThornswoodNative { & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Invoke-ThornswoodNative { & scp @ssh $settingsLib "${target}:C:/ServerSettings.ps1" }
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
+Invoke-ThornswoodNative { & scp @ssh $buildLib "${target}:C:/ServerBuild.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Say 'copied' 'Green'
 

@@ -23,9 +23,11 @@
     1. The zip is held to the hash it left the laptop with (-ZipSha256) and
        unpacked into <root>.stage-<stamp>, beside the root. The load order is
        resolved there, with the root's own prefix mapped onto the stage,
-       gamemode.js is parsed, and the binary is held to server-build.json.
-       Anything wrong clears the stage, says INSTALL REFUSED and exits 1,
-       with nothing stopped.
+       gamemode.js is parsed, and every server file the fork builds (the
+       binary, the JavaScript half and the rest ServerBuild.ps1 names, beside
+       this script) is held to server-build.json (#1214). Anything wrong
+       clears the stage, says INSTALL REFUSED and exits 1, with nothing
+       stopped.
     2. The server is stopped, the root is renamed to <root>.prev-<stamp> and
        the stage to the root, and the world, the roster, the runtime data and
        the logs are carried across (below).
@@ -117,6 +119,14 @@ if (-not (Test-Path -LiteralPath $settingsLib)) {
     Finish 'INSTALL REFUSED' 1
 }
 . $settingsLib
+# Which server files the record holds, and holding them (#1214): beside this
+# script too, sent with it.
+$buildLib = Join-Path $here 'ServerBuild.ps1'
+if (-not (Test-Path -LiteralPath $buildLib)) {
+    Say "ServerBuild.ps1 is not beside this installer, so the payload's server files could not be held to their record. Nothing was changed." 'Red'
+    Finish 'INSTALL REFUSED' 1
+}
+. $buildLib
 $script:running = $null
 
 # The game port a root's settings name, and the resources port that follows
@@ -392,22 +402,18 @@ if (-not $PutBack) {
         try { $said = @(& $node.Source --check $gm 2>&1) } finally { $ErrorActionPreference = $eap }
         if ($LASTEXITCODE -ne 0) { $bad += ('gamemode.js does not parse: ' + ((@($said | ForEach-Object { "$_".Trim() } | Where-Object { $_ }) | Select-Object -First 6) -join ' | ')) }
     }
-    # The binary is the build the payload's own record names. A payload with
-    # no record, or a record naming no build, is a binary nobody recorded
-    # (#1214): Export-ServerPayload puts records\server-build.json in every one.
-    $bin = Join-Path $stageDir 'scam_native.node'
+    # Every server file is the build the payload's own record names: the
+    # binary, the JavaScript half the task starts, and the rest the fork
+    # builds, and no server file the record does not list (#1214). A payload
+    # with no record is server files nobody recorded: Export-ServerPayload
+    # puts records\server-build.json in every one.
     $rec = Join-Path $stageDir 'server-build.json'
     if (-not (Test-Path -LiteralPath $rec)) {
-        $bad += 'the payload carries no server-build.json, so nothing says its scam_native.node is a recorded build'
-    } elseif (-not (Test-Path -LiteralPath $bin)) {
-        $bad += 'the payload has no scam_native.node'
+        $bad += 'the payload carries no server-build.json, so nothing says its server files are a recorded build'
     } else {
         try {
-            $want = ([string]([IO.File]::ReadAllText($rec) | ConvertFrom-Json).sha256).ToLowerInvariant()
-            if (-not $want) { $bad += 'server-build.json names no sha256 for scam_native.node' }
-            elseif ($want -ne (Get-FileHash -LiteralPath $bin -Algorithm SHA256).Hash.ToLowerInvariant()) {
-                $bad += 'scam_native.node is not the build server-build.json records'
-            }
+            $recObj = [IO.File]::ReadAllText($rec) | ConvertFrom-Json
+            $bad += @(Get-ThornswoodServerBuildProblems $recObj (Get-ThornswoodServerFolderSums $stageDir) 'the payload' 'server-build.json')
         } catch { $bad += "server-build.json does not parse: $($_.Exception.Message)" }
     }
     if ($bad.Count) { Refuse $bad }
