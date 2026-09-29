@@ -35,6 +35,12 @@ character, and without it there is nothing to log back into.
 something behind it other than one person's word. If you would not want a
 moderator to read it, do not type it in a shared channel.
 
+**Reports and calls for help.** /helpme and /report in the game, and a report
+about a person on the site's report page, keep who sent it, who it is about,
+what they wrote and where they were standing, so staff can act on it. Only
+staff read them, the person reported is not told, and nothing else from
+the chat is copied into them.
+
 **The launcher's own log.** Sent to the site when a session ends. It is about
 the game: which mods are installed, what failed to start, which version you
 are on. It is how somebody who cannot play gets helped without a conversation.
