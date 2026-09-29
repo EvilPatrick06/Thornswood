@@ -94,6 +94,18 @@ namespace Thornswood
         static string MadeFile { get { return Path.Combine(Dir, "made.txt"); } }
         static string LeftOutFile { get { return Path.Combine(Dir, "left-out.txt"); } }
         static string DeclinedFile { get { return Path.Combine(Dir, "declined.txt"); } }
+        /// <summary>
+        /// When the Steam copy was cleaned of Thornswood's files, what came out
+        /// and what was left (OwnGameClean.cs, #1226). Its presence means done.
+        /// </summary>
+        static string CleanedFile { get { return Path.Combine(Dir, "steam-copy-cleaned.txt"); } }
+
+        /// <summary>A folder made anew has its Steam copy looked at again (Make).</summary>
+        static void ForgetCleaned()
+        {
+            try { if (File.Exists(CleanedFile)) File.Delete(CleanedFile); }
+            catch (Exception ex) { Swallow.Note("OwnGame.ForgetCleaned", ex); }
+        }
 
         /// <summary>True when the game runs from a folder this made.</summary>
         public static bool Active

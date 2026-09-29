@@ -38,9 +38,6 @@ namespace Thornswood
     /// </summary>
     static partial class OwnGame
     {
-        /// <summary>When the Steam copy was cleaned, what came out and what was left. Its presence means done.</summary>
-        static string CleanedFile { get { return Path.Combine(Dir, "steam-copy-cleaned.txt"); } }
-
         /// <summary>The list the installer and packs keep of what they put into the Steam copy.</summary>
         static string InstalledList { get { return Path.Combine(Paths.ProfileDir, "installed-into-game.txt"); } }
 
@@ -52,13 +49,6 @@ namespace Thornswood
             "Data\\Platform\\UI\\index.html",
             "Data\\Platform\\UI\\build.js",
         };
-
-        /// <summary>A folder made anew has its Steam copy looked at again (Make).</summary>
-        static void ForgetCleaned()
-        {
-            try { if (File.Exists(CleanedFile)) File.Delete(CleanedFile); }
-            catch (Exception ex) { Swallow.Note("OwnGame.ForgetCleaned", ex); }
-        }
 
         static bool SharedWithOthers(string rel)
         {
