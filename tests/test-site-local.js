@@ -21,7 +21,8 @@
   So this starts real copies of server.js and asks them over HTTP.
 
     With no config.json, what server.js writes for itself is its defaults, and
-    config.example.json has to be exactly that with the cookie secret empty, so
+    config.example.json has to be exactly that with the cookie secret and the
+    join pass key empty, so
     the sample cannot drift from what the code reads.
 
     With config.example.json as config.json, as the README says, the door check
@@ -385,15 +386,19 @@ function breakPages(src) {
     try { wrote = JSON.parse(fs.readFileSync(path.join(dA, 'config.json'), 'utf8')); } catch (e) { wrote = null; }
     yes('and writes its own config.json, with a cookie secret it made',
         !!wrote && typeof wrote.secret === 'string' && wrote.secret.length >= 32);
+    // Since #937 server.js makes the join pass key the same way, once, on a
+    // first start, so the sample leaves it empty like the cookie secret.
+    yes('and a join pass key it made',
+        !!wrote && typeof wrote.passKey === 'string' && wrote.passKey.length >= 32);
     if (wrote && sample) {
-      const bare = Object.assign({}, wrote, { secret: '' });
+      const bare = Object.assign({}, wrote, { secret: '', passKey: '' });
       const off = uniq(Object.keys(bare).concat(Object.keys(sample))).filter(function (k) {
         return canon(bare[k]) !== canon(sample[k]);
       });
-      yes('config.example.json is exactly those defaults with the cookie secret left empty' +
+      yes('config.example.json is exactly those defaults with the cookie secret and pass key left empty' +
           (off.length ? ', differs in ' + off.join(', ') : ''), off.length === 0);
     } else {
-      yes('config.example.json is exactly those defaults with the cookie secret left empty', false);
+      yes('config.example.json is exactly those defaults with the cookie secret and pass key left empty', false);
     }
     await stop(a);
 
