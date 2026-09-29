@@ -44,6 +44,10 @@
            only send too much, never too little.
       The feed is what launchers install, so it wins over any copy on a disk.
 
+  Every release's record also stays named in the feed, newest first, as
+  "releases" (Add-FeedRelease), so Rollback-Feed.ps1 can put a channel back to
+  one of them (#442).
+
   -SiteDir <folder> stands in for C:\Thornswood-Docs (the folder holding feed\
   and feed-dev\): assets are read from <folder>\<feed>\assets\<sha256> and
   nothing connects anywhere. Otherwise they are fetched from -SiteUrl over
@@ -150,6 +154,71 @@ function Get-FeedBaselinePointer($doc) {
 
 function New-FeedBaselinePointer([string]$Id, [string]$Sha, [string]$Url, [int]$Entries) {
     return [pscustomobject][ordered]@{ id = $Id; sha256 = $Sha.ToLowerInvariant(); url = $Url; entries = $Entries }
+}
+
+# ---- every release's record, so a channel can be put back (#442) -------------
+#
+# "releases" in the feed is the record each release published, newest first,
+# each with lastPack: the id of the last pack on the feed once that release was
+# out, which is the pack holding the plugin list it shipped. Publish-Update adds
+# one per release (the release list block); Rollback-Feed.ps1 reads them to put
+# the channel back to one of them. No launcher reads it, and a launcher ignores
+# a field it does not know. The newest $FeedReleasesKeep are kept: about 200
+# bytes each.
+$FeedReleasesKeep = 30
+
+# The id of the last pack on the feed, or '' when it lists none.
+function Get-FeedLastPackId($doc) {
+    if ($null -eq $doc -or -not $doc.PSObject.Properties['packs'] -or -not $doc.packs) { return '' }
+    $all = @($doc.packs)
+    for ($i = $all.Count - 1; $i -ge 0; $i--) {
+        $p = $all[$i]
+        if ($null -ne $p -and $p.PSObject.Properties['id'] -and [string]$p.id) { return [string]$p.id }
+    }
+    return ''
+}
+
+# The records the feed lists, newest first. An entry without an id, a sha256
+# and a url is not one this script wrote and is left out.
+function Get-FeedReleases($doc) {
+    $out = New-Object System.Collections.Generic.List[object]
+    if ($null -eq $doc -or -not $doc.PSObject.Properties['releases'] -or $null -eq $doc.releases) { return $out.ToArray() }
+    foreach ($r in @($doc.releases)) {
+        if ($null -eq $r) { continue }
+        $id  = if ($r.PSObject.Properties['id']) { [string]$r.id } else { '' }
+        $sha = if ($r.PSObject.Properties['sha256']) { ([string]$r.sha256).ToLowerInvariant() } else { '' }
+        $url = if ($r.PSObject.Properties['url']) { [string]$r.url } else { '' }
+        if (-not $id -or $sha -notmatch '^[0-9a-f]{64}$' -or -not $url) { continue }
+        $out.Add($r)
+    }
+    return $out.ToArray()
+}
+
+function New-FeedReleaseEntry($Pointer, [string]$LastPack, [string]$To) {
+    $o = [ordered]@{ id = [string]$Pointer.id; sha256 = ([string]$Pointer.sha256).ToLowerInvariant(); url = [string]$Pointer.url
+                     entries = [int]$Pointer.entries; lastPack = $LastPack }
+    if ($To) { $o['to'] = $To }
+    return [pscustomobject]$o
+}
+
+# Puts this release's record at the front of the list and keeps the newest
+# $Keep. Called BEFORE the feed's "baseline" is replaced: a feed that names a
+# baseline and no list yet (the first release after #442) starts the list with
+# that baseline, whose release ended at $LastPackBefore, the last pack on the
+# feed before this release added its own. $To names the release a rollback put
+# the channel back to.
+function Add-FeedRelease($doc, $Pointer, [string]$LastPack, [string]$LastPackBefore, [string]$To, [int]$Keep = $FeedReleasesKeep) {
+    $list = @(Get-FeedReleases $doc)
+    if (-not $list.Count) {
+        $old = $null
+        try { $old = Get-FeedBaselinePointer $doc } catch { $old = $null }
+        if ($null -ne $old -and [string]$old.id -ne [string]$Pointer.id) { $list = @(New-FeedReleaseEntry $old $LastPackBefore '') }
+    }
+    $list = @(New-FeedReleaseEntry $Pointer $LastPack $To) + @($list | Where-Object { [string]$_.id -ne [string]$Pointer.id })
+    if ($Keep -gt 0 -and $list.Count -gt $Keep) { $list = @($list[0..($Keep - 1)]) }
+    if ($doc.PSObject.Properties['releases']) { $doc.releases = $list }
+    else { $doc | Add-Member -NotePropertyName 'releases' -NotePropertyValue $list }
+    return $list
 }
 
 # Fetches one asset by the url the feed gives it, from the site or from
