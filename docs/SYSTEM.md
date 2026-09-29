@@ -165,7 +165,11 @@ command line for the bot (`Watch-Services.ps1:595-679`). The bot writes
 `heartbeat.json` beside itself every minute, and a bot whose process runs but
 which is hung or off Discord for ten minutes is down too; that is told about
 and not restarted for (issue #449, `Watch-Services.ps1:217-300`,
-`bot/bot.py:2399-2501`). It also asks the site,
+`bot/bot.py:2408-2510`). From outside the box, the bot also pings an uptime
+monitor every minute while it is on Discord, so a bot or a whole VPS that
+stops is noticed when One is off too: the address is `PING_URL` in
+`bot.env.json`, set by `Install-Bot.ps1 -SetPing`, and `bot/README.md` says
+how to make the check (issue #449, `bot/bot.py:2513-2618`). It also asks the site,
 both game servers and both voice servers over HTTP, which it tells about and
 never restarts for, and checks the `Thornswood Backup` task's last result with
 a backup under 26 hours old, the build runner's service, and writes DISK LOW

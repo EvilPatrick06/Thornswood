@@ -176,6 +176,54 @@ shipped.
 password and it cannot read anything, but anybody holding it can post as
 Thornswood, so do not put it in the repository or paste it anywhere.
 
+## Being told when the bot or the VPS stops, from outside
+
+The watchdog on the VPS tells the staff channel when something there dies,
+and One watches the site from outside (issue #448). Neither can say anything
+when the whole VPS is off or cut off while One is off too. So the bot pings an
+outside uptime monitor once a minute while it is on Discord, and when the
+pings stop for five minutes the monitor emails you (issue #449). That covers
+a bot that stopped, hung or lost Discord, and a VPS that went down.
+
+The monitor is **Cronitor** (cronitor.io): its free plan needs no card, keeps
+five checks, and you sign in with GitHub. The bot only needs a web address to
+ping, so healthchecks.io (free, no card, signs in by an emailed link) works the
+same way if Cronitor ever does not suit.
+
+Once, on One:
+
+1. Go to cronitor.io, Sign up, **Sign up with GitHub**, and sign in as
+   EvilPatrick06. If it offers a trial that asks for a card, pick the free
+   plan instead; it needs none.
+2. Make a new monitor of the kind **Heartbeat**. Name it `Thornswood bot`.
+   Expected every **1 minute**, grace period **5 minutes**.
+3. Alerts: leave the default notification list, which emails the address on
+   the account. To hear it in Discord as well, add a Discord webhook to that
+   list; the monitor posts it itself, so it arrives even when the VPS is
+   down.
+4. Save, then copy the monitor's ping address (its telemetry URL, starting
+   `https://cronitor.link/p/`). It is a secret: whoever has it can keep the
+   monitor quiet. Do not paste it anywhere but the prompt below.
+5. From the repository folder, once the pull request that added this is
+   merged and pulled:
+
+   ```
+   .\scripts\deploy\Install-Bot.ps1 -CodeOnly
+   .\scripts\deploy\Install-Bot.ps1 -SetPing
+   ```
+
+   The first puts the bot code that pings on the VPS. The second asks for the
+   address hidden, puts it in `C:\Thornswood-Bot\bot.env.json` as `PING_URL`
+   over ssh's standard input, restarts the bot by name, and prints the bot's
+   first line about it: `reached the outside monitor` is right. The
+   monitor's page then shows a ping a minute.
+
+To stop it, run `-SetPing` again and type `off`, then pause or delete the
+check on the monitor, or it emails you that the bot went quiet. A full
+`Install-Bot.ps1` run keeps the address. The bot says in `bot.log` once when a
+ping fails and once when they work again, never the address; a slow or dead
+monitor never holds up anything the bot does on Discord.
+
 ## Community setup, field by field
 
 These three are on the Enable Community screen and none of them can be set by
