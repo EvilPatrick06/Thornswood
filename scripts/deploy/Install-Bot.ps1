@@ -328,7 +328,7 @@ if (`$p) { 'FOUND ' + (& `$p.Source --version 2>&1) } else { 'MISSING' }
   checks the stage (each file by its hash, bot.py and card.py through Python's
   own parser). Nothing is stopped if that fails. The swap then stops the
   service by name, renames the files in (what they replace goes to
-  $Root\.prev-<stamp>, the newest three kept), starts it by name, and waits
+  $Root\.prev-<stamp>, the newest two kept), starts it by name, and waits
   for this start to say it is watching its server. If it does not, the old
   files go back and the service is started again on them. -PutBack puts the
   newest .prev folder back the same way.

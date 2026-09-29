@@ -52,7 +52,7 @@
   settings go into $Root\.stage-<stamp> while it runs, the box checks them
   there, and only then is anybody warned and the server stopped. If it does
   not answer on its ports afterwards, the old files go back and this exits 1.
-  What a run replaced is kept in $Root\.prev-<stamp>, the newest three, and
+  What a run replaced is kept in $Root\.prev-<stamp>, the newest two, and
   -PutBack puts the newest back. See THE STAGE below and Swap.ps1.
 
   A gamemode change that also changes the CHARGEN records needs
@@ -138,7 +138,6 @@ param(
   # voice service on 7778, pushes its positions over the live ones and
   # drains the live command and choice queues.
   [int]$VoicePort = 7789,
-  [string]$Gamemode,
   # Bring the dev server's load order and plugins up to what the built server
   # has. Off by default: a code-only gamemode change does not need it, and the
   # plugin sizes are one extra call to the box.
@@ -189,24 +188,25 @@ if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
 if ($PutBack -and $LoadOrder) { throw '-PutBack puts the last files back and sends nothing, so it does not take -LoadOrder.' }
-if (-not $Gamemode) { $Gamemode = Join-Path $Here '..\..\game\gamemode.js' }
+$Gamemode = Join-Path $Here '..\..\game\gamemode.js'
 if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $Gamemode" }
 
 # What goes up is the gamemode artifact (issue #459, Artifact.ps1):
 # game\gamemode.js as the commit holds it, in one zip named by commit and hash,
-# sent to the box's store first. A -Gamemode from anywhere else goes in as an
-# edit and the artifact says so. From here $Gamemode is the artifact's copy,
+# sent to the box's store first. From here $Gamemode is the artifact's copy,
 # so the check, the stamp and the send are all of what the zip holds.
+# A gamemode with uncommitted changes is refused before the box is touched,
+# and so are the other files this sends out of the repository: the number
+# of people it holds (records\most-online.json) and, with -LoadOrder, our
+# plugin (#1121). There used to be a -Gamemode to send a file from anywhere;
+# that was a way round the commit, so it is gone.
 # -PutBack builds and sends nothing.
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack) {
-$fromRepo = (Resolve-Path -LiteralPath (Join-Path $Here '..\..\game\gamemode.js')).ProviderPath
-if ((Resolve-Path -LiteralPath $Gamemode).ProviderPath -eq $fromRepo) {
-  $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js'
-} else {
-  $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Extra @{ 'game/gamemode.js' = $Gamemode }
-}
+$alsoSends = @('records/most-online.json')
+if ($LoadOrder) { $alsoSends += 'game/content/Thornswood-Content.esp' }
+$artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' -AlsoSends $alsoSends
 Write-Host ('  artifact ' + (Format-ThornswoodArtifact $artifact))
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 $Gamemode = Join-Path $artifact.Folder 'game\gamemode.js'

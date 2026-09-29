@@ -6,6 +6,8 @@
 
 
   What it does, in order:
+    0. refuses, naming each file, when anything it would send out of this
+       repository has uncommitted changes (#1121)
     1. builds the payload zip from your local dist\server
     2. copies the zip across, with the server still running
     3. the installer unpacks it BESIDE the running server, checks it there
@@ -20,7 +22,7 @@
   so characters made on the server survive an update. -FreshWorld starts the
   server with none, and leaves the old one in the previous folder.
 
-  The previous folder is kept beside the root, the newest three, and
+  The previous folder is kept beside the root, the newest two, and
       .\scripts\release\Publish-Server.ps1 -PutBack
   puts the newest back the same checked way (-Channel dev for the dev server).
 
@@ -117,6 +119,19 @@ foreach ($t in 'ssh', 'scp') {
         Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client."
     }
 }
+
+# -------------------------------------------------------- committed only ----
+# A publish sends a commit or nothing (Patrick, 29 Sep, #1121). The files it
+# takes out of this repository are the installer and the log roller, sent
+# every time, and for a publish the gamemode it copies into the build and the
+# number of people records\most-online.json puts in the settings. Any of them
+# with uncommitted changes, or untracked, refuses it here, naming each, before
+# anything is built or the box is asked anything. There is no switch past it.
+. (Join-Path $Here '..\deploy\Artifact.ps1')
+$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/vps/Roll-Log.ps1')
+if (-not $PutBack) { $committedOnly += 'game/gamemode.js', 'records/most-online.json' }
+try { Assert-ThornswoodCommitted -RepoDir (Join-Path $Here '..\..') -Paths $committedOnly -What 'this publish' }
+catch { Die $_.Exception.Message }
 
 # ------------------------------------------------------------- installer ----
 # Sent every time rather than trusting whatever copy is up there, so the VPS

@@ -39,7 +39,7 @@
     .\Deploy-Server.ps1 -PutBack         the files the last deploy replaced go
                                          back in, checked the same way
 
-  The files a deploy replaced stay in $Root\.prev-<stamp>, the newest three.
+  The files a deploy replaced stay in $Root\.prev-<stamp>, the newest two.
   -PutBack is the one command that puts the newest back: the same stop, renames,
   start and check, and if the old files do not answer either, what was running
   goes back in again. What it took out is kept in $Root\.undone-<stamp>.
@@ -354,8 +354,12 @@ if (-not (Test-Path -LiteralPath $Dist)) {
 # sent to the box's store before the stage. The copy in the build is made the
 # artifact's whenever the two differ, by hash and not by size as it was, since
 # an edit that kept the size used to stay behind.
+# Refused before the box is touched when gamemode.js, or anything else this
+# sends out of the repository (our plugin, the server build's record), has
+# uncommitted changes (#1121).
 . (Join-Path $Here 'Artifact.ps1')
-$artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js'
+$artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' `
+  -AlsoSends 'game/content/Thornswood-Content.esp', 'records/server-build.json'
 '{0,-22} {1}' -f 'artifact', (Format-ThornswoodArtifact $artifact) | Write-Host
 $src = Join-Path $artifact.Folder 'game\gamemode.js'
 $built = Join-Path $Dist 'gamemode.js'

@@ -30,7 +30,7 @@
     - a new server that hangs on its game port, or that dies on start, gets
       the old files back, the old server started again, and SWAP ROLLED BACK
     - a good deploy swaps every file in, keeps what it replaced, answers,
-      keeps the newest three .prev folders, and never touches the other server
+      keeps the newest two .prev folders, and never touches the other server
     - the build stamp is one of the staged files, so it goes in beside
       gamemode.js on a good deploy and goes back with it on a rollback
 
@@ -388,8 +388,8 @@ try {
     Yes '  and the stage is gone' (-not (Test-Path -LiteralPath (Join-Path $root '.stage-20260924-000401')))
     $kept = @(Get-ChildItem -LiteralPath $root -Directory -Force | Where-Object { $_.Name -like '.prev-*' } |
               Sort-Object Name | ForEach-Object { $_.Name })
-    Yes '  and the newest three .prev folders are kept' (
-        ($kept -join ',') -eq '.prev-20000101-000003,.prev-20000101-000004,.prev-20260924-000401')
+    Yes '  and the newest two .prev folders are kept, not three (#1121)' (
+        ($kept -join ',') -eq '.prev-20000101-000004,.prev-20260924-000401')
     Yes '  and the world and the data folder are untouched' (
         ([IO.File]::ReadAllText((Join-Path $root 'data\keep.txt')) -eq 'the character book') -and
         ([IO.File]::ReadAllText((Join-Path $root 'world\w.txt')) -eq 'every character'))
@@ -417,7 +417,7 @@ try {
     Yes '  and what it took out is kept in one .undone folder' (
         $undone.Count -eq 1 -and
         ([IO.File]::ReadAllText((Join-Path $undone[0].FullName 'gamemode.js')) -eq '// new gamemode'))
-    Yes '  and the .prev folder it emptied is gone, the two older ones kept' (
+    Yes '  and the .prev folder it emptied is gone, the older one kept' (
         -not (Test-Path -LiteralPath (Join-Path $root '.prev-20260924-000401')) -and
         (Test-Path -LiteralPath (Join-Path $root '.prev-20000101-000004')))
     Yes '  and a plugin the deploy added stays, since nothing came before it' (

@@ -15,9 +15,12 @@
        HEAD, and its file list is the zip's entries, each with the size and
        sha256 of the commit's own bytes. The name carries the component, the
        commit and the hash.
-    3. Edits are said, not hidden: an edited or untracked file goes in as it
-       is on disk and the name and record say "edited"; an ignored file never
-       goes in; a path the commit lacks stops the build.
+    3. A deploy sends a commit or nothing (#1121, Patrick 29 Sep): a file
+       under the named paths that is changed, staged, deleted or untracked,
+       or one of the other files the deploy sends (-AlsoSends), refuses the
+       build, naming every such file; an ignored file does not count and
+       never goes in; there is no way to hand it a file from elsewhere; a
+       path the commit lacks stops the build.
     4. Sending and recording, against a stand-in box (ssh and scp replaced by
        functions that act on a temp folder): the store gets the zip and its
        record, a zip the store already holds is not sent again, and
@@ -25,8 +28,11 @@
        the artifact.
     5. The five deploy scripts, read and never run: each builds its
        component's artifact, sends it before anything is swapped, sends from
-       its folder, and records it once the files are in place; and the site's
-       reader, Deploy-Docs' grant and Artifact.ps1 name one store.
+       its folder, and records it once the files are in place; each names
+       the other repository files it sends so they are checked too, and
+       Publish-Server refuses before its first scp; and the site's reader,
+       Deploy-Docs' grant and Artifact.ps1 name one store.
+       tests\test-deploy-swaps.ps1 runs each of them against a dirty tree.
 
   Read only apart from files under its own temp folder.
 #>
@@ -118,7 +124,7 @@ try {
     Yes 'the second clone has CRLF on disk' ($onDisk.Contains("`r`n"))
     $a3 = New-ThornswoodArtifact -Component site -RepoDir $crlf -Paths $paths -OutDir (Join-Path $tmp 'out3')
     Yes 'a CRLF checkout of the same commit builds the same bytes' ($a3.Sha256 -eq $a1.Sha256 -and $a3.Name -eq $a1.Name)
-    Yes 'and does not count line endings as edits' (-not $a3.Edited)
+    Yes 'and does not count line endings as uncommitted changes' ($a3.Sha256 -eq $a1.Sha256)
 
     # The other PowerShell, whichever this is not.
     $other = $(if ($PSVersionTable.PSEdition -eq 'Core') { 'powershell.exe' } else { 'pwsh' })
@@ -143,7 +149,7 @@ try {
     Yes "the record's sha256 is the zip's" ($r.sha256 -eq (Get-FileHash -LiteralPath $a1.Zip -Algorithm SHA256).Hash.ToLowerInvariant())
     Yes "the record's size is the zip's" ([long]$r.size -eq (Get-Item -LiteralPath $a1.Zip).Length)
     Yes "the record's commit is HEAD, in full" ($r.commit -eq $head)
-    Yes 'the record says component site, not edited, no edits' ($r.component -eq 'site' -and $r.edited -eq $false -and @($r.edits).Count -eq 0)
+    Yes 'the record says component site, and nothing about edits, since there can be none' ($r.component -eq 'site' -and -not ($r.PSObject.Properties.Name -contains 'edited'))
     Yes 'the record names the zip' ($r.name -eq $a1.Name)
 
     $z = [IO.Compression.ZipFile]::OpenRead($a1.Zip)
@@ -172,31 +178,54 @@ try {
     Yes 'the folder the scripts send from is the zip expanded, laid out like the repository' (
         (Test-Path -LiteralPath $folder) -and (Hex ([IO.File]::ReadAllBytes($folder))) -eq (Hex ([byte[]]$bytes['site/server.js'])))
 
-    # ---- 3. edits, untracked, ignored, missing -----------------------------
+    # ---- 3. uncommitted is refused, ignored does not count, missing stops ---
+    # What a refused build said, or '' when it built.
+    function Refusal([scriptblock]$build) {
+        try { $null = & $build; return '' } catch { return $_.Exception.Message }
+    }
+    $out5 = Join-Path $tmp 'out5'
     Put (Join-Path $src 'site\public\b.css') "p { color: blue; }`n"
-    Put (Join-Path $src 'site\public\new.svg') "<svg/>`n"
-    Put (Join-Path $src 'site\public\scratch.tmp') "ignored`n"
-    $e = New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir (Join-Path $tmp 'out5')
-    Yes 'an edit is in the name' ($e.Name -like ('site-' + $head.Substring(0, 12) + '-edited-*.zip'))
-    Yes 'and in the record, with each path' ($e.Record.edited -eq $true -and (@($e.Record.edits) -join '|') -eq 'site/public/b.css|site/public/new.svg')
-    $eb = [IO.File]::ReadAllBytes((Join-Path $e.Folder 'site\public\b.css'))
-    Yes 'the edited file goes in as it is on disk' ([Text.Encoding]::UTF8.GetString($eb) -eq "p { color: blue; }`n")
-    Yes 'an untracked file goes in as an edit' (Test-Path -LiteralPath (Join-Path $e.Folder 'site\public\new.svg'))
-    Yes 'an ignored file never goes in' (-not (Test-Path -LiteralPath (Join-Path $e.Folder 'site\public\scratch.tmp')))
-    Yes 'an edited build is a different artifact' ($e.Sha256 -ne $a1.Sha256)
+    $why = Refusal { New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir $out5 }
+    Yes 'a changed file refuses the build' ($why -match '^Refused: the site deploy would send 1 file')
+    Yes '  naming the file and how, and saying the box was not touched' (
+        $why.Contains('site/public/b.css  (changed and not committed)') -and $why -match 'the box was not touched')
+    Yes '  and nothing is built' (-not (Test-Path -LiteralPath $out5) -or -not @(Get-ChildItem -LiteralPath $out5 -Filter '*.zip').Count)
+    Run-Git -C $src add -- site/public/b.css
+    $why = Refusal { New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir $out5 }
+    Yes 'a staged change refuses it too' ($why.Contains('site/public/b.css  (changed and not committed)'))
+    Run-Git -C $src reset -q -- site/public/b.css
     Run-Git -C $src checkout -q -- site/public/b.css
+    Put (Join-Path $src 'site\public\new.svg') "<svg/>`n"
+    Remove-Item -LiteralPath (Join-Path $src 'site\data\help.md') -Force
+    $why = Refusal { New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir $out5 }
+    Yes 'an untracked file and a deleted one refuse it, each named' (
+        $why -match 'would send 2 file' -and $why.Contains('site/public/new.svg  (new and not committed)') -and
+        $why.Contains('site/data/help.md  (deleted and not committed)'))
     Remove-Item -LiteralPath (Join-Path $src 'site\public\new.svg') -Force
+    Run-Git -C $src checkout -q -- site/data/help.md
+    Put (Join-Path $src 'site\public\scratch.tmp') "ignored`n"
     $back = New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir (Join-Path $tmp 'out6')
-    Yes 'with the edits gone it is the clean artifact again, byte for byte' ($back.Sha256 -eq $a1.Sha256)
+    Yes 'an ignored file does not count, and never goes in' ($back.Sha256 -eq $a1.Sha256 -and -not (Test-Path -LiteralPath (Join-Path $back.Folder 'site\public\scratch.tmp')))
+    Yes 'with the changes gone it is the clean artifact again, byte for byte' ($back.Sha256 -eq $a1.Sha256)
+    Put (Join-Path $src 'site\README.md') "changed, and not sent`n"
+    Yes 'a change outside what the deploy sends does not stop it' ((Refusal { New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir (Join-Path $tmp 'out6b') }) -eq '')
+    $why = Refusal { New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -AlsoSends 'site/README.md' -OutDir (Join-Path $tmp 'out6c') }
+    Yes 'but one of the other files it sends (-AlsoSends) refuses it, named' ($why.Contains('site/README.md  (changed and not committed)'))
+    Run-Git -C $src checkout -q -- site/README.md
+    $why = Refusal { Assert-ThornswoodCommitted -RepoDir $src -Paths 'game/gamemode.js', 'site' -What 'this publish' }
+    Yes 'Assert-ThornswoodCommitted on its own passes a clean tree' ($why -eq '')
+    Put (Join-Path $src 'game\gamemode.js') "'use strict';`nconsole.log('changed');`n"
+    $why = Refusal { Assert-ThornswoodCommitted -RepoDir $src -Paths 'game/gamemode.js', 'site' -What 'this publish' }
+    Yes '  and refuses a dirty one, in the words the caller gave' ($why -match '^Refused: this publish would send 1 file' -and $why.Contains('game/gamemode.js'))
+    Run-Git -C $src checkout -q -- game/gamemode.js
 
     $threw = $false
     try { $null = New-ThornswoodArtifact -Component site -RepoDir $src -Paths 'site/nothing-here' -OutDir (Join-Path $tmp 'out7') } catch { $threw = $true }
     Yes 'a path the commit lacks stops the build' $threw
 
-    $outside = Join-Path $tmp 'elsewhere.js'
-    Put $outside "console.log('from elsewhere');`n"
-    $x = New-ThornswoodArtifact -Component gamemode -RepoDir $src -Extra @{ 'game/gamemode.js' = $outside } -OutDir (Join-Path $tmp 'out8')
-    Yes 'a file from outside the repository is an edit' ($x.Edited -and (@($x.Edits) -join '|') -eq 'game/gamemode.js' -and $x.Name -like 'gamemode-*-edited-*.zip')
+    $params = @((Get-Command New-ThornswoodArtifact).Parameters.Keys | Where-Object { [System.Management.Automation.PSCmdlet]::CommonParameters -notcontains $_ })
+    Yes 'New-ThornswoodArtifact takes no file from elsewhere and no switch past the refusal' (
+        ((($params | Sort-Object) -join ',') -eq 'AlsoSends,Component,OutDir,Paths,RepoDir'))
 
     # A second commit is a second name.
     Put (Join-Path $src 'site\server.js') "'use strict';`nconsole.log('site two');`n"
@@ -210,8 +239,6 @@ try {
     $g = New-ThornswoodArtifact -Component gamemode -RepoDir $src -Paths 'game/gamemode.js' -OutDir (Join-Path $tmp 'out10')
     $stamp = New-ThornswoodBuildStamp -Gamemode (Join-Path $g.Folder 'game\gamemode.js') -Channel dev -RepoDir $src -Artifact $g
     Yes "the build stamp names the artifact's commit, and that the commit holds it" ($stamp.commit -eq $g.Short -and $stamp.gamemodeMatchesCommit -eq $true)
-    $stampX = New-ThornswoodBuildStamp -Gamemode (Join-Path $x.Folder 'game\gamemode.js') -Channel dev -RepoDir $src -Artifact $x
-    Yes 'and that it does not, for an edited one' ($stampX.gamemodeMatchesCommit -eq $false)
 
     # ---- 4. sending and recording, against a stand-in box ------------------
     $box = Join-Path $tmp 'box'
@@ -250,7 +277,7 @@ try {
         Yes 'the part is named after the folder it runs from' ($rec.part -eq 'thornswood-server-dev')
         Yes 'current\<part>.json is on the box' (Test-Path -LiteralPath $cur)
         $c = Get-Content -LiteralPath $cur -Raw | ConvertFrom-Json
-        Yes 'and says the commit, the zip and its hash' ($c.commit -eq $g.Commit -and $c.name -eq $g.Name -and $c.sha256 -eq $g.Sha256 -and $c.component -eq 'gamemode' -and $c.edited -eq $false)
+        Yes 'and says the commit, the zip and its hash' ($c.commit -eq $g.Commit -and $c.name -eq $g.Name -and $c.sha256 -eq $g.Sha256 -and $c.component -eq 'gamemode' -and -not ($c.PSObject.Properties.Name -contains 'edited'))
         # Read as text: PowerShell 7's ConvertFrom-Json turns a date into a DateTime.
         Yes 'and when, and from which machine' ((Get-Content -LiteralPath $cur -Raw) -match '"deployedUtc":\s*"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"' -and $c.from -eq $env:COMPUTERNAME)
         $beside = Join-Path $partRoot 'data/thornswood-deploy.json'
@@ -331,6 +358,38 @@ foreach ($w in $wiring) {
         Yes "$n builds, then sends, then records" (
             $builds[0].Extent.StartOffset -lt $sends[0].Extent.StartOffset -and $sends[0].Extent.StartOffset -lt $sets[0].Extent.StartOffset)
     }
+}
+
+# The other repository files each sends, beside its artifact, are checked too.
+$also = @(
+    @{ File = 'scripts\deploy\Install-Voice.ps1';      Want = @('scripts/vps/Roll-Log.ps1') },
+    @{ File = 'scripts\deploy\Deploy-DevGamemode.ps1'; Want = @('records/most-online.json', 'game/content/Thornswood-Content.esp') },
+    @{ File = 'scripts\deploy\Deploy-Server.ps1';      Want = @('game/content/Thornswood-Content.esp', 'records/server-build.json') }
+)
+foreach ($w in $also) {
+    $t = Get-Content -LiteralPath (Join-Path $Repo $w.File) -Raw
+    $missing = @($w.Want | Where-Object { -not $t.Contains("'" + $_ + "'") })
+    Yes ((Split-Path -Leaf $w.File) + ' has the files it sends beside its artifact checked: ' + ($w.Want -join ', ')) (
+        $missing.Count -eq 0 -and $t -match '-AlsoSends')
+}
+$iv = Read-Ast 'scripts\deploy\Install-Voice.ps1'
+if ($iv) {
+    $build = @(Commands $iv 'New-ThornswoodArtifact')
+    Yes 'Install-Voice builds, so refuses, before it asks the box what is running' (
+        $build.Count -eq 1 -and $build[0].Extent.StartOffset -lt (At $iv "`$current = & (Join-Path `$Here '..\vps\Remote.ps1')"))
+}
+$ps = Read-Ast 'scripts\release\Publish-Server.ps1'
+Yes 'Publish-Server.ps1 parses' ($null -ne $ps)
+if ($ps) {
+    Yes 'Publish-Server loads Artifact.ps1' (DotSources $ps 'Artifact.ps1')
+    $as = @(Commands $ps 'Assert-ThornswoodCommitted')
+    $firstScp = @(Commands $ps 'scp' | Sort-Object { $_.Extent.StartOffset })
+    Yes 'Publish-Server refuses uncommitted files before its first scp' (
+        $as.Count -eq 1 -and $firstScp.Count -ge 1 -and $as[0].Extent.StartOffset -lt $firstScp[0].Extent.StartOffset)
+    $pt = $ps.Extent.Text
+    Yes '  and checks the installer, the log roller, the gamemode and the most online record' (
+        $pt.Contains("'scripts/deploy/Install-ThornswoodServer.ps1'") -and $pt.Contains("'scripts/vps/Roll-Log.ps1'") -and
+        $pt.Contains("'game/gamemode.js'") -and $pt.Contains("'records/most-online.json'"))
 }
 
 $ds = Read-Ast 'scripts\deploy\Deploy-Server.ps1'

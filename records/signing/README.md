@@ -38,8 +38,10 @@ On a new machine `.\scripts\release\Setup-ShipMachine.ps1` fetches the client
 at the pinned version (refusing any other bytes), writes `tools\signing.json`
 from the template when there is none, and asks the signing service whether
 this machine's `az login` can sign with the profile. The sign in is the
-credential: an Azure account Patrick has given the Certificate Profile Signer
-role on the ThornswoodSigning account. Never copy another machine's
+credential, and only Patrick's Azure account has signing access (the
+Certificate Profile Signer role on the ThornswoodSigning account), so a second
+machine signs only while `az` on it is signed in as Patrick (Patrick,
+29 Sep). Never copy another machine's
 `tools\signing.json`: One's names `C:\tools\metadata.json`, which no other
 machine has.
 
