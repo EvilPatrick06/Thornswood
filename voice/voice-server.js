@@ -58,7 +58,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2';
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -482,8 +482,37 @@ const live = new Set();
 // Settable so a harness can watch one arrive without waiting half a minute.
 const PING_EVERY = Number(process.env.THORNSWOOD_VOICE_PING_MS) || 25000;
 
+/*
+  AND A SOCKET THAT ANSWERS NOTHING IS LET GO. Issue #519.
+
+  The ping kept whatever sits in between from closing a quiet socket, and did
+  nothing about a socket whose other end had gone. A browser answers every
+  ping with a pong without being asked, so anything still there says
+  something at least once a ping. A laptop that sleeps, or a Wi-Fi link that
+  drops, says nothing at all, and its socket sat in the room as a peer until
+  TCP gave up on it, which can be many minutes: everybody near that person
+  kept a connection open to nobody. Measured on 21 September, the launcher's
+  own log: the machine slept at 19:39 and woke at 20:06 with its socket long
+  dead at this end.
+
+  Three pings unanswered is gone. The Caddyfile in scripts\deploy sets no
+  stream_timeout and Caddy has none by default, so what closes a quiet socket
+  is a router or a mobile network, and those wait longer than the twenty five
+  seconds between pings.
+*/
+const SILENT_AFTER = Number(process.env.THORNSWOOD_VOICE_SILENT_MS) || PING_EVERY * 3;
+let closedSilent = 0;         // sockets closed for answering nothing, for /health
+
 setInterval(() => {
+  const now = Date.now();
   for (const s of live) {
+    if (now - s.heard > SILENT_AFTER) {
+      closedSilent++;
+      console.log('[voice] closed a connection that answered nothing for ' +
+                  Math.round((now - s.heard) / 1000) + ' s. It can reconnect.');
+      s.close();
+      continue;
+    }
     try { s.ping(); } catch (e) { }
   }
 }, PING_EVERY);
@@ -547,10 +576,13 @@ class Sock {
     this.backed = false;
     // The newest roster not yet written, while backed. See sendLatest.
     this.latest = null;
+    // When anything last arrived from the other end: a pong, a message, a
+    // ping of its own. See SILENT_AFTER.
+    this.heard = Date.now();
     live.add(this);
 
     socket.on('drain', () => { this.backed = false; this.flushLatest(); });
-    socket.on('data', (d) => this.feed(d));
+    socket.on('data', (d) => { this.heard = Date.now(); this.feed(d); });
     socket.on('error', () => this.close());
     socket.on('close', () => {
       live.delete(this);
@@ -1406,7 +1438,8 @@ const server = http.createServer((req, res) => {
                             backed: backed, largestQueueBytes: largestQueue,
                             droppedPositions: droppedPositions,
                             skippedRosters: skippedRosters,
-                            closedBacklogged: closedBacklogged }));
+                            closedBacklogged: closedBacklogged,
+                            closedSilent: closedSilent }));
     return;
   }
 
@@ -1437,6 +1470,19 @@ server.on('upgrade', (req, socket, head) => {
   ws.onmessage = (msg) => {
     if (msg.t === 'join') { myId = onJoin(ws, msg); return; }
     if (!myId) return;
+
+    /*
+      A page's own keepalive, answered. Issue #519.
+
+      The ping above is a control frame, and a browser answers it without the
+      page ever hearing of it, so a page cannot tell from it whether this end
+      is still there. A socket that has gone half open, after a sleep or a
+      change of network, looks exactly like a quiet room. So the launcher's
+      voice page and the chat overlay send this every twenty five seconds and
+      go looking for the server again when nothing at all has come back for
+      seventy. The answer is the whole of it.
+    */
+    if (msg.t === 'ping') { ws.send({ t: 'pong' }); return; }
 
     // Signalling is passed through untouched. The server never inspects an
     // offer or a candidate, it only decides who is allowed to hear it.
