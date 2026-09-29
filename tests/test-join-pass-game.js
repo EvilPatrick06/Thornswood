@@ -96,6 +96,7 @@ door({ site: 'https://thornswood.net/dev', key: 'door-key', passKey: KEY });
   yes('the grace is three minutes', r.jp.grace === 180000);
   const v = r.jp.readPass(VECTOR_PASS, KEY, VECTOR_AT + 1000, 'dev');
   yes('the pass the site test holds in common is read: profile 700, launcher 1.1.102.3', v.ok === true && v.p === 700 && v.v === '1.1.102.3');
+  yes('and the Discord account it was signed for, which /stuck\'s staff record names (#414)', v.d === '111');
   yes('the startup line says required, the server and that the key is there',
       r.logged.some(function (s) { return /join pass REQUIRED on the dev server, key present/.test(s); }));
 }
@@ -109,6 +110,8 @@ function online(r, list) { r.online = list.map(function (x) { return { actorId: 
   r.sweep(T0);
   const got = r.jp.take(700, mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 }), T0 + 10000);
   yes('a valid pass sent under its own profile is taken', got.ok === true);
+  yes('and kept with its Discord account, for the staff record of a /stuck (#414)',
+      r.box.__thornswoodPassSeen.passes[700].d === '111');
   r.sweep(T0 + 15000);
   r.sweep(T0 + 400000);
   r.fire();
