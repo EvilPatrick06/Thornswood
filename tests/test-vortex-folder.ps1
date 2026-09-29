@@ -95,6 +95,10 @@ $real = @('Steam.cs', 'OwnGame.cs', 'Verify.cs', 'Paths.cs', 'Config.cs', 'Secre
 # cut from a live release.
 $swallow = Join-Path $AppPath 'Swallow.cs'
 if (Test-Path -LiteralPath $swallow) { $real += $swallow }
+# OwnGame and Verify report how far they have got to the Play button since
+# #1145; Progress.cs needs only Swallow. Taken only where it exists, as above.
+$progress = Join-Path $AppPath 'Progress.cs'
+if (Test-Path -LiteralPath $progress) { $real += $progress }
 foreach ($f in $real) {
     Yes "launcher\app\$([IO.Path]::GetFileName($f)) is there" (Test-Path -LiteralPath $f)
     if (-not (Test-Path -LiteralPath $f)) { Done }

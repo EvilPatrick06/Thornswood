@@ -67,6 +67,9 @@ namespace Thornswood
         /// <summary>The records: what came from where, and when.</summary>
         public static string Dir { get { return Path.Combine(Paths.ProfileDir, "OwnGame"); } }
 
+        /// <summary>What the Play button says while Make or Refresh works (#1145).</summary>
+        public const string Phase = "Preparing the game folder";
+
         /// <summary>
         /// One line per file brought in: kind (L linked, C copied), origin (V
         /// deployed by Vortex, O anything else), size and write time of the
@@ -540,9 +543,10 @@ namespace Thornswood
 
             var lines = new List<string>();
             int linked = 0, copied = 0, fellBack = 0;
-            long done = 0; int shown = 0;
+            long done = 0; int shown = 0, looked = 0;
             foreach (Found f in all)
             {
+                PlayProgress.Files(Phase, looked++, all.Count);
                 string skip = Skip(f.Rel);
                 if (skip != null) { left.Add(f.Rel + "  (" + skip + ")"); continue; }
 
@@ -564,6 +568,7 @@ namespace Thornswood
                 int pct = totalBytes > 0 ? (int)(done * 100 / totalBytes) : 100;
                 if (say != null && pct >= shown + 10) { shown = pct - pct % 10; say("Making Thornswood's own Skyrim folder: " + shown + "%"); }
             }
+            PlayProgress.Files(Phase, all.Count, all.Count);
 
             File.WriteAllLines(FilesList, lines.ToArray());
             File.WriteAllLines(LeftOutFile, left.ToArray());
@@ -616,9 +621,11 @@ namespace Thornswood
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             int added = 0, changed = 0, removed = 0, kept = 0, separated = 0, relinked = 0;
             long copyBytes = 0;
+            int looked = 0;
 
             foreach (Found f in all)
             {
+                PlayProgress.Files(Phase, looked++, all.Count);
                 string skip = Skip(f.Rel);
                 if (skip != null) { left.Add(f.Rel + "  (" + skip + ")"); continue; }
                 seen.Add(f.Rel);
@@ -684,6 +691,8 @@ namespace Thornswood
                 lines.Add((asLink ? "L" : "C") + "|" + origin + "|" + f.Size + "|" + f.Ticks + "|" + f.Rel);
                 if (exists) changed++; else added++;
             }
+
+            PlayProgress.Files(Phase, all.Count, all.Count);
 
             // The collection dropped these. Only Vortex's files are taken out;
             // anything else in the folder is not this refresh's to judge.

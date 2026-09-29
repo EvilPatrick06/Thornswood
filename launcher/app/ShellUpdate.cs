@@ -377,6 +377,14 @@ namespace Thornswood
             txtUpdateTitle.Text = "Updating";
             var doc = pendingDoc;
             var packs = pendingPacks;
+            // The Play button shows how far it has got (#1145). One download
+            // per pack with a link; a release synced to its record says its
+            // own counts from Sync.cs.
+            int downloads = 0;
+            foreach (Pack p in packs)
+                if (p != null && !string.IsNullOrEmpty(p.url) && p.url.Trim().Length > 0) downloads++;
+            PlayProgress.Begin("Updating", downloads);
+            DrawStatus();
 
             ThreadPool.QueueUserWorkItem(delegate
             {
@@ -412,6 +420,7 @@ namespace Thornswood
                     if (selfUpdateOffered)
                     {
                         log("Updating the launcher. It will restart.");
+                        PlayProgress.Plan("Updating the launcher", 1, "updates");
                         Updater.SelfUpdate(cfg, doc, log);
                         win.Dispatcher.BeginInvoke(new Action(delegate { win.Close(); }));
                         return;
@@ -425,6 +434,7 @@ namespace Thornswood
                         Stats.Save();
                         BuildStatRow();
                         btnUpdate.IsEnabled = true;
+                        PlayProgress.End();
                         updatePending = false;
                         DrawStatus(); BuildModList();
                         Log("Update finished.");
@@ -444,6 +454,7 @@ namespace Thornswood
                         txtUpdateTitle.Text = "Update failed";
                         btnUpdate.IsEnabled = true;
                         btnInstallNow.IsEnabled = true;
+                        PlayProgress.End();
                         DrawStatus();
                         Log("Play stays off until the update goes through, because the server is expecting the newer mod list.");
                     }));
