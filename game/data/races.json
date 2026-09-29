@@ -1019,6 +1019,24 @@
    "p": false,
    "from": "aaaGraniteHill.esp"
   },
+  "375ac:ElysiumEstate.esp": {
+   "e": "EE_GoatAnimalRace01",
+   "n": "Goat",
+   "p": false,
+   "from": "ElysiumEstate.esp"
+  },
+  "59c1:ElysiumEstate.esp": {
+   "e": "EE_ChickenAnimalRace01",
+   "n": "Chicken",
+   "p": false,
+   "from": "ElysiumEstate.esp"
+  },
+  "f0d3:ElysiumEstate.esp": {
+   "e": "EE_CowAnimalRace01",
+   "n": "Cow",
+   "p": false,
+   "from": "ElysiumEstate.esp"
+  },
   "169215:ZIA_Complete Pack.esp": {
    "e": "ZWJ_Polymorph68_GiantMudcrabRace",
    "n": "MudCrab",
@@ -1030,24 +1048,6 @@
    "n": "Chicken",
    "p": false,
    "from": "OarsRest.esp"
-  },
-  "f0d3:ElysiumEstateSSE.esp": {
-   "e": "EE_CowAnimalRace01",
-   "n": "Cow",
-   "p": false,
-   "from": "ElysiumEstateSSE.esp"
-  },
-  "375ac:ElysiumEstateSSE.esp": {
-   "e": "EE_GoatAnimalRace01",
-   "n": "Goat",
-   "p": false,
-   "from": "ElysiumEstateSSE.esp"
-  },
-  "59c1:ElysiumEstateSSE.esp": {
-   "e": "EE_ChickenAnimalRace01",
-   "n": "Chicken",
-   "p": false,
-   "from": "ElysiumEstateSSE.esp"
   },
   "14520f:Triumvirate - Mage Archetypes.esp": {
    "e": "TVR_Primal_Race_CallSnakes",

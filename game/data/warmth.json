@@ -21373,6 +21373,24 @@
       "w": 2,
       "e": "MCEIldariRobes"
     },
+    "f0cf:ElysiumEstate.esp": {
+      "m": "cloth",
+      "c": "body",
+      "w": 0,
+      "e": "EE_CowAnimalSkin01"
+    },
+    "375ae:ElysiumEstate.esp": {
+      "m": "cloth",
+      "c": "body",
+      "w": 0,
+      "e": "EE_GoatAnimalSkin01"
+    },
+    "59c2:ElysiumEstate.esp": {
+      "m": "cloth",
+      "c": "body",
+      "w": 0,
+      "e": "EE_ChickenAnimalSkin01"
+    },
     "32528:SkyrimSewers.esp": {
       "m": "cloth",
       "c": "body",
@@ -21666,24 +21684,6 @@
       "c": "body",
       "w": 0,
       "e": "OR_SkinChicken"
-    },
-    "59c2:ElysiumEstateSSE.esp": {
-      "m": "cloth",
-      "c": "body",
-      "w": 0,
-      "e": "EE_ChickenAnimalSkin01"
-    },
-    "375ae:ElysiumEstateSSE.esp": {
-      "m": "cloth",
-      "c": "body",
-      "w": 0,
-      "e": "EE_GoatAnimalSkin01"
-    },
-    "f0cf:ElysiumEstateSSE.esp": {
-      "m": "cloth",
-      "c": "body",
-      "w": 0,
-      "e": "EE_CowAnimalSkin01"
     },
     "2cb369:Triumvirate - Mage Archetypes.esp": {
       "m": "cloth",
