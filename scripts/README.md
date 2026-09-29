@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 136 of them, by area: `release` builds and
+Every `.ps1` under this folder, 137 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -71,6 +71,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [mods/Audit-Leftovers.ps1](mods/Audit-Leftovers.ps1) | Measures. Deletes nothing, moves nothing, renames nothing. |
 | [mods/Audit-Mods.ps1](mods/Audit-Mods.ps1) | Measures the build and says which parts carry a plugin and which are pure assets, because only the second kind can ever be optional. |
 | [mods/Check-CollectionRules.ps1](mods/Check-CollectionRules.ps1) | Whether the plugin rules the Nexus collection carries hold a clean install to a plugin list's order. |
+| [mods/Check-CoveredBodies.ps1](mods/Check-CoveredBodies.ps1) | Says whether every body the game folder shows people is covered by underwear, men and women alike, and exits 2 when one is not. |
 | [mods/Check-Editions.ps1](mods/Check-Editions.ps1) | Does anything in the load order need the paid Anniversary upgrade? |
 | [mods/Check-Manifest.ps1](mods/Check-Manifest.ps1) | Says what load order the game server is actually handing out, and how it compares to the one you play with. |
 | [mods/Check-Plugins.ps1](mods/Check-Plugins.ps1) | What is enabled that should not be, and what is missing that should be there. |

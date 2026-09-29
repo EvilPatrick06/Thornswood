@@ -165,14 +165,20 @@ Yes 'scripts\README.md lists it as RETIRED' ($row.Count -eq 1 -and $row[0] -matc
 
 # ======================================================== this machine
 
+# Through Check-CoveredBodies.ps1, which reads the mesh's shape names. The
+# byte search this used to do was wrong both ways: "Bra" is in malebody_1.nif
+# by chance, and bone names carry the anatomy words on covered bodies too.
 $live = Join-Path $GameRoot 'Game\Data\meshes\actors\character\character assets\femalebody_1.nif'
 if (Test-Path -LiteralPath $live) {
-    $s = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($live))
-    $has = @('Bra', 'Panty', '3BA_Vagina', '3BA_Anus' | ForEach-Object { '{0}: {1}' -f $_, $s.Contains($_) }) -join ', '
-    if ($s.Contains('Bra') -and $s.Contains('Panty')) {
-        Yes ('the female body in the game folder is the covered one (' + $has + ')') $true
+    $check = Join-Path $Repo 'scripts\mods\Check-CoveredBodies.ps1'
+    $out = & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $check `
+               -Game (Join-Path $GameRoot 'Game') 2>&1 | Out-String
+    $code = $LASTEXITCODE
+    $line = @($out -split "\r?\n" | Where-Object { $_ -match '^\s+\S+\s+femalebody_1\.nif' } | ForEach-Object { $_.Trim() }) -join ''
+    if ($code -eq 0) {
+        Yes ('the female body in the game folder is the covered one (' + $line + ')') $true
     } else {
-        Skip ('the female body in the game folder is still the nude one (' + $has +
+        Skip ('the female body in the game folder is still the nude one (' + $line +
               '). That changes with a collection revision, which is Patrick''s, not with code.')
     }
 } else {
