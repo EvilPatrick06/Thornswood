@@ -1285,6 +1285,8 @@ if (-not $NoUpload) {
 }
 # ==== end thornswood move feed urls ====
 Head 'version.json'
+# Where the last release's packs end, for the release list block below.
+$lastPackBefore = Get-FeedLastPackId $doc
 # ==== thornswood feed append ====
 # tests\test-feed-rules.ps1 runs this block on its own. If the markers move,
 # it stops rather than quietly testing nothing.
@@ -1338,6 +1340,21 @@ if ($clientRel -and $clientRel.url) {
     })
     Say "  client runtime $($clientRel.forkCommit) recorded" 'Green'
 }
+# ==== thornswood release list ====
+# tests\test-feed-rollback.ps1 runs this block on its own.
+#
+# EVERY RELEASE'S RECORD STAYS NAMED (#442). "baseline" below names only the
+# last one, so on its own the feed could never say what an earlier release
+# left installed, and the only way back from a bad release was another one
+# written by hand. This keeps each release's record in "releases", newest
+# first, with the last pack on the feed once it was out, and
+# Rollback-Feed.ps1 puts the channel back to any of them. Before "baseline"
+# moves, so a feed that names one and no list yet starts the list with it.
+if ($releaseBaseline) {
+    $releaseList = @(Add-FeedRelease $doc $releaseBaseline (Get-FeedLastPackId $doc) $lastPackBefore '')
+    Say ("  the feed names {0} release(s) this channel can be put back to (Rollback-Feed.ps1 -List)" -f $releaseList.Count) 'DarkGray'
+}
+# ==== end thornswood release list ====
 # What this release leaves installed (the release manifest block), which the
 # next release is diffed against. Taken out when it was not sent, so the feed
 # never names a record the site does not hold.

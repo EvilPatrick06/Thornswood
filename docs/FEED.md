@@ -264,6 +264,7 @@ launcher.
 | `optional` | array | `Publish-Pack.ps1:197-213` | Add-ons tab (`Shell.cs:2310`) | Absent in both feeds today; `scripts/release/optional-packs.txt` lists none. |
 | `clientRuntime` | object | `Publish-Update.ps1:1236-1245`, only when the fork commit changed | `ClientRuntime.Heal` (`ClientRuntime.cs:261-269`) | Null or no `url`: a missing client file cannot be repaired from it. Same host and sha256 checks as a pack. |
 | `baseline` | object `{ id, sha256, url, entries }` | `Publish-Update.ps1` on every release that sends to the site (the release manifest block, #441); taken out by a `-NoUpload` run | No launcher. The next `Publish-Update.ps1`, through `Resolve-ReleaseBaseline` (`Release-Baseline.ps1`) | What that release left installed: every file of ours as `<bytes>:<sha256>`, at `/feed[-dev]/assets/<sha256>`, the same bytes as the store's `published.json`. The next release is diffed against it; a missing or stale store copy is replaced by it, checked by sha256. |
+| `releases` | array, newest first, at most 30, of `{ id, sha256, url, entries, lastPack, to? }` | `Publish-Update.ps1` on every release that names a `baseline` (the release list block, #442); `Rollback-Feed.ps1` adds the one a rollback makes, with `to` naming the release it went back to | No launcher. `Rollback-Feed.ps1` (`Get-FeedReleases`, `Release-Baseline.ps1`) | The record each release published, the same shape as `baseline`, plus `lastPack`, the last pack on the feed once that release was out, whose plugin list is the one it shipped. What a channel can be put back to; a release older than the newest thirty cannot be. The first release after this change starts the list with the `baseline` the feed already named. |
 | `news` | array, newest first, at most 40 | `Publish-Update.ps1:1507-1536`; `Publish-Server.ps1:415-520` | News tab (`Shell.cs:2965-3160`); `Publish-News.ps1` copies it to the site | Cosmetic. |
 | `mainVersion` | string | `Publish-Update.ps1:1554-1599`: the main feed's `launcherVersion` on a dev ship, `""` on a main ship | Dev News tab header (`Shell.cs:2992-3002`) | Cosmetic. Stale today, see the end. |
 | `serverPassword` | string | Nobody. `Publish-Update.ps1:1405-1408` deletes it on every ship | Declared at `Config.cs:497`, read by nothing since 1.0.197 | Must never come back: the feed is public. |
@@ -385,16 +386,65 @@ A machine that loses `applied.txt` asks for every pack on the feed again.
   (`Feed-Store.ps1`, #907). A refused send leaves the release marked NOT
   SHIPPED and resumable.
 
-## There is no rollback
+## Putting a channel back (#442)
 
-Nothing takes a pack back off a machine that applied it, and a launcher never
-moves to a lower number. `IsNewer` only goes up (`Updater.cs:77-108`), and a
-required pack id stays in `applied.txt`. Removing a pack from `packs` only
-stops machines that have not taken it yet. To undo a bad release, ship a new
-one with a higher launcher version and a pack that puts the files back. That
-is what happened on 21 September, when 1.1.76 was undone by 1.1.77
-(`Ship.ps1:497-503`). Optional packs are the one thing a person can remove
-(`Updater.cs:717-879`).
+A launcher never takes a pack back off: a required pack id stays in
+`applied.txt`, and `IsNewer` only goes up (`Updater.cs`). Until #442 the only
+way back from a bad release was to ship another one by hand with a higher
+launcher version and a pack that put the files back, which is what 1.1.77 did
+for 1.1.76 on 21 September.
+
+Now it is one command, and it goes the same way as every other update:
+
+```
+.\scripts\release\Rollback-Feed.ps1 -Channel dev -List      what the feed can go back to
+.\scripts\release\Rollback-Feed.ps1 -Channel dev -Back 1    back to the release before this one
+.\scripts\release\Rollback-Feed.ps1 -Channel dev -To <id>   back, or forward again, to that one
+```
+
+- **What it builds.** The records of two releases (`baseline` now and the one
+  asked for in `releases`) are compared file by file, and the difference goes
+  out as ONE ordinary pack on the end of `packs`: every file whose bytes differ
+  at the older release's bytes, every file added since in `delete.txt`, and
+  the plugin list out of the pack that release ended on (`lastPack`). The
+  feed's `baseline` then names the record of what that pack leaves installed,
+  sent to the site like any other, and the store's `published.json` is the
+  same bytes, so the next Ship is diffed against the rolled back state.
+- **Why every installed launcher follows.** Nothing in the launcher changed:
+  the rollback is a pack like any other, at `/feed[-dev]/assets/<sha256>`,
+  with its sha256 on the feed. A launcher that took every release applies it
+  and lands on the older files; one several releases behind applies those and
+  then this, and lands on the same files; a fresh install seeded with every
+  pack id applies only this. `tests\test-feed-rollback.ps1` proves all three
+  with the launcher's own `Updater` compiled, back, further back and forward.
+- **Where the bytes come from.** The packs already on the site, found by size
+  and sha256 and checked again as they are read. A file no pack ever carried
+  (it came with the installer and nothing changed it before the release being
+  undone) is not on the site; the rollback stops, names it, and sends nothing.
+  `-FilesFrom <folder>` points at a folder holding such files at their game
+  paths, and only a file of the right size and sha256 is taken.
+- **What does not go back.** The launcher, `launcherVersion`, `minLauncher`
+  and `clientRuntime`, and the six client runtime files: a launcher never
+  moves to a lower number, signed launchers refuse an update not signed by us,
+  the site refuses a join pass above `launcherVersion`, and the launcher
+  carries the record of which client belongs beside it and puts back any
+  other. A bad launcher is fixed forward by a Ship. The server is not in the
+  feed either: if the release being undone changed the gamemode or the
+  plugins the server loads, the server goes back too. And if that release
+  changed how the launcher and the game's own plugins talk to each other,
+  putting the files back without the launcher is not enough; ship a fix
+  instead.
+- **How far back.** To any release in `releases`, which starts with the first
+  Ship after #442 on each channel and holds the newest thirty. A release that
+  named no record (every one before #441, and a `-NoUpload` run) is not one.
+- **Safety.** `-DryRun` builds the pack and sends nothing. The pack is checked
+  by `Check-Secrets.ps1` like a Ship's, the note by `Note-Rules.ps1`, and the
+  pack and its record are on the site before `version.json` names them. The
+  feed and the baseline go back through `Feed-Store.ps1` in one send, which
+  replaces nothing if another Ship or feed edit went out meanwhile.
+
+Optional packs are the one thing a person can remove themselves
+(`Updater.RemovePack`).
 
 ## What looks wrong in the feeds today
 
