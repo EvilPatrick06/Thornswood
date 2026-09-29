@@ -315,10 +315,12 @@ const BOARDS = {
    it calls asks for w.dev, so a Gamemaster, Moderator or Loremaster could
    approve and delete by API while the page that does it sent them back to the
    hub home, and the launcher's Manage on the site button opens this address.
-   The page now matches the doors behind it. The other three stay 'admin':
-   they are the linked accounts, the play sessions and the report inbox. */
+   The page now matches the doors behind it. The linked accounts are 'staff'
+   since #1010, because that page is where staff ban, PK and write notes, and
+   every staff role may. The other two stay 'admin': the play sessions and
+   the report inbox. */
 const LEVEL = {
-  uploads: 'staff', linked: 'admin', sessions: 'admin', inbox: 'admin'
+  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin'
 };
 
 /* The public front lives at / and needs no password. The working area moved
@@ -1400,8 +1402,28 @@ const LINKED = path.join(DATA, 'linked.json');
   made in the game against a profile no Discord account holds is kept under
   "p:<profile>" instead of an id. An old row with no until is a ban for good,
   as it always was.
+
+  ONE CHARACTER OR THE WHOLE ACCOUNT (#1010, Patrick, 28 September: "staff
+  can ban either one character or a whole account"). The key says which: a
+  Discord id is the account (every character on it, and any new one, because
+  standing() reads it and /api/play/join and /api/play/pass refuse the
+  account), and "p:<profile>" is that one character and nothing else. scope
+  on the row says the same in words. The game's /ban is a character now and
+  /banaccount the account; the hub offers both.
 */
 const BANS = path.join(DATA, 'bans.json');
+/*
+  Characters staff have killed for good (#1010, PK). Keyed by profile id:
+  {"<profile>": {"at", "by", "byId", "why", "name", "account", "from"}}.
+  Patrick, 28 September: the character "can never be played or selected
+  again, but it is kept, not deleted, so staff can run events with PKed
+  characters", it is quiet, and the account can make a new character. So
+  nothing here or in the game server deletes anything: the join pass refuses
+  the character, the door's lists leave it out, the launcher's menu shows it
+  as dead in no slot, and staff read the row. There is no way to undo one
+  from the site or the game; a mistake is an edit of this file on the VPS.
+*/
+const PK = path.join(DATA, 'pk.json');
 // Staff notes against a person, keyed the same way as bans. Staff read them.
 const NOTES = path.join(DATA, 'notes.json');
 // What staff did on the hub, one JSON line each, for the bot's staff channel.
@@ -1421,10 +1443,44 @@ function accountOf(pid) {
   }
   return '';
 }
-/* Where a ban or note about this profile is kept: the account, or the profile. */
+/* Where a note about this profile is kept: the account, or the profile. */
 function recordKey(pid) { return accountOf(pid) || ('p:' + (Number(pid) || 0)); }
 function banActive(b, now) {
   return !!b && typeof b === 'object' && (!(Number(b.until) > 0) || Number(b.until) > now);
+}
+/*
+  Why this one character may not be played, or null (#1010): killed for good
+  by staff (pk), or under a ban on the character itself. A ban on the whole
+  account is standing()'s, asked before this. Read from the files every time,
+  so a ban that runs out lets the character back at once.
+*/
+function characterBar(pid, now) {
+  const n = Number(pid) || 0;
+  if (!(n > 0)) return null;
+  const pk = jsonFile(PK, {});
+  if (pk && Object.prototype.hasOwnProperty.call(pk, String(n))) {
+    return { pk: true, at: Number((pk[String(n)] || {}).at) || 0 };
+  }
+  const byChar = jsonFile(BANS, {});
+  const b = byChar && byChar['p:' + n];
+  if (banActive(b, now)) return { pk: false, why: String(b.why || ''), until: Number(b.until) || 0 };
+  return null;
+}
+/* Every profile staff have killed for good, as numbers. */
+function pkProfiles() {
+  return Object.keys(jsonFile(PK, {}) || {}).map(Number).filter((n) => n > 0);
+}
+/* A ban's end in words, for the people told about it. */
+function banUntilText(until) {
+  return Number(until) > 0
+    ? 'until ' + new Date(Number(until)).toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
+    : 'for good';
+}
+/* What a banned account is told at Play: until when and why for a staff ban
+   (the file), the plain sentence for the Banned role. */
+function accountBanned(st) {
+  return 'That Discord account is banned from Thornswood' +
+    (st && st.byFile ? ' ' + banUntilText(st.until) + (st.reason ? ': ' + st.reason : '') : '') + '.';
 }
 /* Every profile an active ban covers, with why and until, for the door. */
 function activeBans(now) {
@@ -1438,7 +1494,10 @@ function activeBans(now) {
     if (k.indexOf('p:') === 0) set.add(Number(k.slice(2)));
     else for (const n of ((linked[k] || {}).profiles || [])) if (Number(n) > 0) set.add(Number(n));
     set.delete(0);
-    if (set.size) out.push({ profiles: Array.from(set), why: String(b.why || ''), until: Number(b.until) || 0 });
+    // scope tells the game server what to say to them: one character, or the
+    // whole account (#1010).
+    if (set.size) out.push({ profiles: Array.from(set), why: String(b.why || ''), until: Number(b.until) || 0,
+                             scope: k.indexOf('p:') === 0 ? 'character' : 'account' });
   }
   return out;
 }
@@ -1471,14 +1530,33 @@ function modLog(row) {
   try { fs.appendFileSync(MODLOG, JSON.stringify(Object.assign({ at: new Date().toISOString(), server: 'site' }, row)) + '\n'); }
   catch (e) { console.log('[thornswood-docs] could not write moderation.log: ' + e.message); }
 }
-/* Every ban (with whether it still holds) and every note, for staff. */
+/* A PK, kept for good. */
+function putPk(pid, row) {
+  const table = jsonFile(PK, {});
+  table[String(Number(pid))] = row;
+  return putJson(PK, table);
+}
+/*
+  Every ban (with whether it still holds), every note and every PK, for staff,
+  and the character names the game server's roster has for every linked
+  profile, so the Linked accounts page can say which character is which.
+*/
 function staffRecords(now) {
   const table = jsonFile(BANS, {});
   const out = {};
   for (const k of Object.keys(table || {})) {
     out[k] = Object.assign({}, table[k] || {}, { active: banActive(table[k] || {}, now) });
   }
-  return { bans: out, notes: jsonFile(NOTES, {}) };
+  const roster = (jsonFile(ROSTER, { who: {} }) || {}).who || {};
+  const names = {};
+  const linked = jsonFile(LINKED, {});
+  for (const d of Object.keys(linked || {})) {
+    for (const n of ((linked[d] || {}).profiles || [])) {
+      const r = roster[String(Number(n))];
+      if (r && r.name) names[String(Number(n))] = String(r.name);
+    }
+  }
+  return { bans: out, notes: jsonFile(NOTES, {}), pk: jsonFile(PK, {}), names };
 }
 /* Minutes as a ban length: 0 is for good, anything else is capped. */
 function banMinutes(v) {
@@ -3184,11 +3262,15 @@ async function handle(req, res) {
     role again here, on the Discord account that holds their profile, so a
     game server cannot make somebody staff by saying so.
 
-    A ban is kept against the Discord account holding the profile, so every
-    character on it is covered and the door leaves them all out; a profile no
-    account holds is banned by itself. minutes 0 is for good.
+    One character or the whole account (#1010): ban and unban are the one
+    character, kept under "p:<profile>"; banaccount and unbanaccount are the
+    Discord account holding the profile, so every character on it is covered,
+    and a new one too, and the door leaves them all out. A profile no account
+    holds has no account to ban, and says so. minutes 0 is for good. pk kills
+    the character for good (see PK): it is kept, never played again. Staff
+    may do any of these to staff; the game refuses only doing it to yourself.
   */
-  const staffGame = /^(\/dev)?\/api\/staff\/game\/(ban|unban|note)$/.exec(route);
+  const staffGame = /^(\/dev)?\/api\/staff\/game\/(ban|unban|banaccount|unbanaccount|pk|note)$/.exec(route);
   if (staffGame && req.method === 'POST') {
     if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
     if (!sameSecret(String(req.headers['x-thornswood-key'] || ''), String(cfg.botKey))) {
@@ -3209,22 +3291,53 @@ async function handle(req, res) {
     const byName = String(o.byName || st.name || '').slice(0, 60);
     const name = String(o.name || '').slice(0, 60);
     const key = recordKey(pid);
+    const account = accountOf(pid);
     const now = Date.now();
+    const what = staffGame[2];
 
-    if (staffGame[2] === 'ban') {
+    if (what === 'ban' || what === 'banaccount') {
       const why = String(o.why || '').trim().slice(0, 500);
       if (!why) return sendJson(res, 400, { error: 'a ban says why' });
+      if (what === 'banaccount' && !account) {
+        return sendJson(res, 404, { error: 'no Discord account holds that character, so ban the character' });
+      }
       const minutes = banMinutes(o.minutes);
       const until = minutes ? now + minutes * 60000 : 0;
-      if (!putBan(key, { at: now, until, why, by: byName, byId, name, profiles: [pid], from })) {
+      const whole = what === 'banaccount';
+      const banKey = whole ? account : 'p:' + pid;
+      if (!putBan(banKey, { at: now, until, why, by: byName, byId, name, profiles: [pid], from,
+                            scope: whole ? 'account' : 'character', account })) {
         return sendJson(res, 500, { error: 'could not save' });
       }
-      return sendJson(res, 200, { ok: true, until, account: key.indexOf('p:') !== 0 });
+      // Every character the ban covers, so the game server can end each one
+      // that is online now rather than at its next list.
+      const covers = whole
+        ? Array.from(new Set([pid].concat(((jsonFile(LINKED, {})[account] || {}).profiles || [])
+                                            .map(Number).filter((n) => n > 0))))
+        : [pid];
+      return sendJson(res, 200, { ok: true, until, account: whole, profiles: covers });
     }
-    if (staffGame[2] === 'unban') {
-      const r = dropBan([key, 'p:' + pid]);
+    if (what === 'unban' || what === 'unbanaccount') {
+      if (what === 'unbanaccount' && !account) {
+        return sendJson(res, 404, { error: 'no Discord account holds that character' });
+      }
+      const r = dropBan([what === 'unbanaccount' ? account : 'p:' + pid]);
       if (!r.ok) return sendJson(res, 500, { error: 'could not save' });
-      return sendJson(res, 200, { ok: true, was: r.was });
+      const freed = what === 'unbanaccount'
+        ? Array.from(new Set([pid].concat(((jsonFile(LINKED, {})[account] || {}).profiles || [])
+                                            .map(Number).filter((n) => n > 0))))
+        : [pid];
+      return sendJson(res, 200, { ok: true, was: r.was, profiles: freed });
+    }
+    if (what === 'pk') {
+      const why = String(o.why || '').trim().slice(0, 500);
+      if (!why) return sendJson(res, 400, { error: 'a PK says why' });
+      const had = jsonFile(PK, {})[String(pid)];
+      if (had) return sendJson(res, 200, { ok: true, was: true, at: Number(had.at) || 0 });
+      if (!putPk(pid, { at: now, by: byName, byId, why, name, account, from })) {
+        return sendJson(res, 500, { error: 'could not save' });
+      }
+      return sendJson(res, 200, { ok: true, was: false, at: now });
     }
     const text = String(o.text || '').trim().slice(0, 1000);
     if (!text) return sendJson(res, 400, { error: 'a note says something' });
@@ -3866,11 +3979,13 @@ async function handle(req, res) {
     */
     if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok:false, why:'could not ask Discord', message:
       'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
+    // Banned before the guild (#1010): a staff ban answers from the file and
+    // says nothing about the guild, so asked the other way round a banned
+    // account was told it was not in the Discord.
+    if (st.banned) return sendJson(res, 403, { ok:false, why:'banned', message: accountBanned(st) });
     if (!st.inGuild) return sendJson(res, 403, { ok:false, why:'guild', message:
       'That Discord account is not in the Thornswood Discord.',
       invite: cfg.discord.invite || '' });
-    if (st.banned) return sendJson(res, 403, { ok:false, why:'banned', message:
-      'That Discord account is banned from Thornswood.' });
     if (!st.play) return sendJson(res, 403, { ok:false, why:'role', message:
       notAcceptedYet(),
       invite: cfg.discord.invite || '' });
@@ -4283,7 +4398,18 @@ async function handle(req, res) {
       gone = mine.filter((pid) => looked.has(pid) && !held.has(pid));
       goneAt = Number(rep.at) || 0;
     }
-    return sendJson(res, 200, { ok: true, rows, gone, goneAt });
+    /* This account's characters staff have killed for good, and the ones
+       under a ban of their own (#1010). The launcher's menu shows a dead one
+       in no slot, so the account can make a new character, and neither can
+       be picked. Only the ids: why and who are staff's. */
+    const now = Date.now();
+    const pk = [], barred = [];
+    for (const pid of mine) {
+      const bar = characterBar(pid, now);
+      if (bar && bar.pk) pk.push(pid);
+      else if (bar) barred.push(pid);
+    }
+    return sendJson(res, 200, { ok: true, rows, gone, goneAt, pk, banned: barred });
   }
 
   /*
@@ -4386,7 +4512,11 @@ async function handle(req, res) {
        and the bans go to the door with why and until, so the game server can
        end the session of anybody banned who is online and tell them both. */
     out.bans = activeBans(Date.now());
-    const barred = new Set();
+    /* And every character staff have killed for good (#1010), left out the
+       same way and sent as pk, so the game server ends it quietly if it is
+       in the world. */
+    out.pk = pkProfiles();
+    const barred = new Set(out.pk);
     for (const b of out.bans) for (const n of b.profiles) barred.add(Number(n));
     if (barred.size) {
       for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'failedProfiles']) {
@@ -4530,10 +4660,10 @@ async function handle(req, res) {
     const st = await standingCached(t.d);
     if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', message:
       'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
+    // Banned before the guild, as at /api/play/join (#1010).
+    if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', message: accountBanned(st) });
     if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', message:
       'That Discord account is not in the Thornswood Discord.' });
-    if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', message:
-      'That Discord account is banned from Thornswood.' });
     if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', message:
       notAcceptedYet() });
     if (server === 'dev' && !st.dev) return sendJson(res, 403, { ok: false, why: 'dev', message:
@@ -4557,6 +4687,15 @@ async function handle(req, res) {
     }
 
     const now = Date.now();
+    /* This one character (#1010): killed for good by staff, or banned by
+       itself. The account is fine, so the answer says to pick another. */
+    const bar = characterBar(pid, now);
+    if (bar && bar.pk) return sendJson(res, 403, { ok: false, why: 'pk', message:
+      'That character has died for good and cannot be played again. ' +
+      'Pick another character at the menu, or make a new one.' });
+    if (bar) return sendJson(res, 403, { ok: false, why: 'banned character', until: bar.until, message:
+      'Staff have banned that character ' + banUntilText(bar.until) +
+      (bar.why ? ': ' + bar.why : '') + '. Pick another character at the menu.' });
     const pass = makePass(cfg.passKey, { p: pid, s: server, v: said, d: String(t.d), i: now, x: now + PASS_MS });
     return sendJson(res, 200, { ok: true, pass: pass, until: now + PASS_MS, server: server });
   }
@@ -4600,10 +4739,13 @@ async function handle(req, res) {
         uploads: w.member ? listUploads() : [],
         news: jsonFile(NEWS, { launcher:'', news: [] }),
         invite: cfg.discord.invite || '',
-        linked: w.admin ? Object.values(jsonFile(LINKED, {})) : [],
-        // Bans and staff notes for the Linked accounts page (#412), which is
-        // an admin page; the notes are staff's to read and nobody else's.
-        records: w.admin ? staffRecords(Date.now()) : { bans: {}, notes: {} },
+        // The Linked accounts page is every staff role's since #1010 (Patrick,
+        // 28 September: all staff can ban and PK, and the site's staff pages
+        // can do it), so the accounts and the records go to staff (w.dev,
+        // which folds admin in). Notes, bans and PKs are staff's to read and
+        // nobody else's: a hub member without a staff role gets none.
+        linked: w.dev ? Object.values(jsonFile(LINKED, {})) : [],
+        records: w.dev ? staffRecords(Date.now()) : { bans: {}, notes: {}, pk: {}, names: {} },
         sessions: w.admin ? sessionRows() : [],
         inbox: w.admin ? jsonFile(INBOX, []) : []
       });
@@ -4631,7 +4773,15 @@ async function handle(req, res) {
       if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
       return sendJson(res, 200, staffRecords(Date.now()));
     }
-    const staffHub = /^\/api\/staff\/(ban|unban|note)$/.exec(p);
+    /*
+      One character or the whole account (#1010). With a profileId (one of
+      this account's characters) ban and unban are that character alone and
+      pk kills it for good; without one, ban and unban are the account, every
+      character on it and any new one. Staff may do these to staff, but not
+      to their own account: a ban would lock them out of the page that lifts
+      it.
+    */
+    const staffHub = /^\/api\/staff\/(ban|unban|note|pk)$/.exec(p);
     if (staffHub && req.method === 'POST') {
       if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
       let o;
@@ -4643,24 +4793,47 @@ async function handle(req, res) {
       const whoName = String(linked[id].name || linked[id].handle || '').slice(0, 60);
       const profiles = (Array.isArray(linked[id].profiles) ? linked[id].profiles : []).map(Number).filter((n) => n > 0);
       const now = Date.now();
-      if (staffHub[1] === 'ban') {
+      const act = staffHub[1];
+      const pid = Number(o.profileId) || 0;
+      if (pid && profiles.indexOf(pid) < 0) return sendJson(res, 404, { error: 'that character is not on this account' });
+      if (act === 'pk' && !pid) return sendJson(res, 400, { error: 'a PK names the character' });
+      if ((act === 'ban' || act === 'pk') && String(w.id) === id) {
+        return sendJson(res, 400, { error: 'that is your own account' });
+      }
+      const charName = pid ? String(((jsonFile(ROSTER, { who: {} }).who || {})[String(pid)] || {}).name || '').slice(0, 60) : '';
+      const whoChar = pid ? (charName ? charName + ' (' + whoName + ')' : whoName) : whoName;
+      if (act === 'ban') {
         const why = String(o.why || '').trim().slice(0, 500);
         if (!why) return sendJson(res, 400, { error: 'a ban says why' });
         const minutes = banMinutes(o.minutes);
         const until = minutes ? now + minutes * 60000 : 0;
-        if (!putBan(id, { at: now, until, why, by: w.name, byId: w.id, name: whoName, profiles, from: 'the hub' })) {
+        const row = { at: now, until, why, by: w.name, byId: w.id, from: 'the hub', account: id };
+        const ok = pid
+          ? putBan('p:' + pid, Object.assign(row, { name: charName || whoName, profiles: [pid], scope: 'character' }))
+          : putBan(id, Object.assign(row, { name: whoName, profiles, scope: 'account' }));
+        if (!ok) return sendJson(res, 500, { error: 'could not save' });
+        const said = banUntilText(until) + ': ' + why;
+        if (pid) modLog({ did: 'ban', byName: w.name, whoName: whoChar, who: pid, why: said });
+        else modLog({ did: 'banaccount', byName: w.name, whoName: whoChar, why: said });
+        return sendJson(res, 200, { ok: true, until, account: !pid });
+      }
+      if (act === 'unban') {
+        const r = dropBan([pid ? 'p:' + pid : id]);
+        if (!r.ok) return sendJson(res, 500, { error: 'could not save' });
+        if (r.was && pid) modLog({ did: 'unban', byName: w.name, whoName: whoChar, who: pid });
+        else if (r.was) modLog({ did: 'unbanaccount', byName: w.name, whoName: whoChar });
+        return sendJson(res, 200, { ok: true, was: r.was });
+      }
+      if (act === 'pk') {
+        const why = String(o.why || '').trim().slice(0, 500);
+        if (!why) return sendJson(res, 400, { error: 'a PK says why' });
+        const had = jsonFile(PK, {})[String(pid)];
+        if (had) return sendJson(res, 200, { ok: true, was: true, at: Number(had.at) || 0 });
+        if (!putPk(pid, { at: now, by: w.name, byId: w.id, why, name: charName, account: id, from: 'the hub' })) {
           return sendJson(res, 500, { error: 'could not save' });
         }
-        modLog({ did: 'ban', byName: w.name, whoName,
-                 why: (until ? 'until ' + new Date(until).toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
-                             : 'for good') + ': ' + why });
-        return sendJson(res, 200, { ok: true, until });
-      }
-      if (staffHub[1] === 'unban') {
-        const r = dropBan([id].concat(profiles.map((n) => 'p:' + n)));
-        if (!r.ok) return sendJson(res, 500, { error: 'could not save' });
-        if (r.was) modLog({ did: 'unban', byName: w.name, whoName });
-        return sendJson(res, 200, { ok: true, was: r.was });
+        modLog({ did: 'pk', byName: w.name, whoName: whoChar, who: pid, why });
+        return sendJson(res, 200, { ok: true, was: false, at: now });
       }
       const text = String(o.text || '').trim().slice(0, 1000);
       if (!text) return sendJson(res, 400, { error: 'a note says something' });

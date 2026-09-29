@@ -2480,8 +2480,12 @@ _MOD_DID = {
     'give': 'gave %s',
     'spawn': 'spawned beside %s',
     'tp': 'sent %s',
-    'ban': 'banned %s',
-    'unban': 'lifted the ban on %s',
+    # One character, or the whole account, and a character killed for good (#1010).
+    'ban': 'banned the character %s',
+    'unban': 'lifted the ban on the character %s',
+    'banaccount': 'banned the whole account of %s, every character on it',
+    'unbanaccount': 'lifted the ban on the account of %s',
+    'pk': 'killed %s for good (PK), quietly',
     'note': 'wrote a note on %s',
     # Not staff: somebody's own /stuck (#414), said as its why reads.
     'stuck': 'used /stuck',

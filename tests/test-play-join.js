@@ -113,7 +113,20 @@ function grab(name) {
   }
   return '';
 }
-const HELPERS = grab('hasLeft') + '\n' + grab('departed') + '\n';
+// What a banned account is told at Play (#1010), lifted the same way.
+function grabPlain(name) {
+  const at = src.indexOf('\nfunction ' + name + '(');
+  if (at < 0) return '';
+  const b = src.indexOf('{', at);
+  let depth = 0;
+  for (let i = b; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(at + 1, i + 1); }
+  }
+  return '';
+}
+const HELPERS = grab('hasLeft') + '\n' + grab('departed') + '\n' +
+                grabPlain('banUntilText') + '\n' + grabPlain('accountBanned') + '\n';
 // /api/allowed asks standingsForDoor for everybody at once since issue #415;
 // lifted with the two constants above it and run over the same stand-in.
 const FOR_DOOR = src.slice(src.indexOf('const DOOR_BUDGET_MS'), src.indexOf('async function standingsForDoor(')) +
@@ -199,6 +212,9 @@ async function roster(table, store, discordId) {
       return fallback;
     },
     LINKED: 'linked.json', ROSTER: 'roster.json',
+    // Nobody killed for good or banned by character here (#1010);
+    // test-bans-pk.js runs those.
+    characterBar: function () { return null; },
     sendJson: null
   });
 }
@@ -219,6 +235,7 @@ async function allowed(table, over) {
     LINKED: 'linked.json',
     // Staff bans kept on the site (#412); none here. test-staff-bans.js runs them.
     activeBans: function () { return []; },
+    pkProfiles: function () { return []; },
     sendJson: null
   });
 }

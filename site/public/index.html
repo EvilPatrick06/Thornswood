@@ -580,7 +580,7 @@ tr.adder .plus{color:var(--faint);font-size:16px;line-height:38px}
 var S = {
   me:{member:false,admin:false,dev:false,name:''}, titles:{}, level:{},
   docs:{}, boards:{}, results:{}, files:[], uploads:[], inbox:[], linked:[],
-  sessions:[], records:{bans:{}, notes:{}},
+  sessions:[], records:{bans:{}, notes:{}, pk:{}, names:{}},
   news:{news:[]}, invite:'', at:'home', editing:false, discord:false
 };
 
@@ -842,13 +842,18 @@ function drawLinked() {
     });
     out += '</tbody></table></div>';
   }
-  var loose = looseBans(S.records, Date.now());
+  var loose = looseBans(S.records, Date.now(), S.linked);
   if (loose) out += '<h3 style="margin-top:22px">Banned by profile</h3>' + loose;
-  out += '<p class="lede" style="margin-top:20px">A ban from here or from /ban in ' +
-    'the game keeps every character on that account out of both worlds until it ' +
-    'ends, and ends the session of anybody banned who is in the world. The ' +
-    '<b>Banned</b> role in Discord still works too, for good. Notes are for staff ' +
-    'and nobody else sees them.</p>';
+  var dead = deadList(S.records);
+  if (dead) out += '<h3 style="margin-top:22px">Dead for good</h3>' + dead;
+  out += '<p class="lede" style="margin-top:20px">Every staff role can do these, from here or in ' +
+    'the game. <b>Ban account</b> (/banaccount) keeps every character on that account out of both ' +
+    'worlds, and stops it making new ones, until it ends. <b>Ban character</b> (/ban) keeps that ' +
+    'one character out and leaves the rest. <b>PK</b> (/pk) kills a character for good: it can ' +
+    'never be played or picked again, it is kept here for staff, the account can make a new ' +
+    'character, and nobody but its owner is told. Anybody banned or dead for good who is in the ' +
+    'world has their session ended. The <b>Banned</b> role in Discord still works too, for good. ' +
+    'Notes are for staff and nobody else sees them.</p>';
   el('page').innerHTML = out;
   wireLinked();
 }
@@ -858,23 +863,62 @@ function banUntil(b) {
   return Number(b && b.until) > 0 ? 'until ' + new Date(Number(b.until)).toLocaleString() : 'for good';
 }
 
-/* The Notes line under one account (#412): the ban if there is one, then
-   every staff note, newest first, each with who wrote it and when. */
+/* Who did it, from where and when, in brackets after a record. */
+function byLine(r) {
+  return ' (by ' + esc(r.by || 'staff') + (r.from ? ', from ' + esc(r.from) : '') +
+    (r.at ? ', ' + esc(new Date(Number(r.at)).toLocaleString()) : '') + ')';
+}
+
+/* A character's name, from the game server's roster or the record, or ''. */
+function charName(pid, rec) {
+  rec = rec || {};
+  var n = (rec.names || {})[String(pid)];
+  if (n) return n;
+  var pk = (rec.pk || {})[String(pid)];
+  if (pk && pk.name) return pk.name;
+  var b = (rec.bans || {})['p:' + pid];
+  return (b && b.name) || '';
+}
+
+/* One character under an account (#1010): its name and profile, and whether
+   it is dead for good or banned by itself, with why, who and when. */
+function charLine(pid, rec, now) {
+  rec = rec || {};
+  var name = charName(pid, rec);
+  var out = '<div class="char">' + (name ? esc(name) : 'Unnamed character') +
+    ' <span class="said">profile ' + esc(pid) + '</span> ';
+  var pk = (rec.pk || {})[String(pid)];
+  var b = (rec.bans || {})['p:' + pid];
+  if (pk) {
+    out += '<span class="pill fail">Dead for good (PK)</span> ' + esc(pk.why || '') + byLine(pk);
+  } else if (b && b.active) {
+    out += '<span class="pill fail">Character banned ' + esc(banUntil(b)) + '</span> ' +
+      esc(b.why || '') + byLine(b);
+  } else if (b) {
+    out += '<span class="said">A character ban ' + esc(banUntil(b)) + ' has ended: ' + esc(b.why || '') + '</span>';
+  }
+  return out + '</div>';
+}
+
+/* The Notes line under one account (#412, #1010): the account's ban if there
+   is one, each of its characters with a PK or a ban of its own, then every
+   staff note, newest first, each with who wrote it and when. */
 function linkedNotes(u, rec, now) {
   rec = rec || { bans: {}, notes: {} };
   var id = String(u && u.id || '');
   var b = (rec.bans || {})[id];
   var notes = (rec.notes || {})[id] || [];
+  var chars = (u && u.profiles) || [];
   var out = '<div class="notes"><b>Notes</b>';
   if (b && b.active) {
-    out += '<div class="ban pill fail">Banned ' + esc(banUntil(b)) + ': ' + esc(b.why || '') +
-      ' (by ' + esc(b.by || 'staff') + (b.from ? ', from ' + esc(b.from) : '') +
-      (b.at ? ', ' + esc(new Date(Number(b.at)).toLocaleString()) : '') + ')</div>';
+    out += '<div class="ban pill fail">Account banned ' + esc(banUntil(b)) + ', every character on it: ' +
+      esc(b.why || '') + byLine(b) + '</div>';
   } else if (b) {
-    out += '<div class="said">A ban ' + esc(banUntil(b)) + ' has ended: ' + esc(b.why || '') +
+    out += '<div class="said">An account ban ' + esc(banUntil(b)) + ' has ended: ' + esc(b.why || '') +
       ' (by ' + esc(b.by || 'staff') + ')</div>';
   }
-  if (!notes.length && !b) out += ' <span class="said">nothing yet</span>';
+  chars.forEach(function (pid) { out += charLine(pid, rec, now); });
+  if (!notes.length && !b) out += ' <span class="said">no notes yet</span>';
   notes.forEach(function (n) {
     out += '<div class="note">' + esc(n.text || '') + ' <span class="said">(' +
       esc(n.by || 'staff') + ', ' + esc(new Date(Number(n.at) || 0).toLocaleString()) +
@@ -883,34 +927,73 @@ function linkedNotes(u, rec, now) {
   return out + '</div>';
 }
 
-/* Ban, lift the ban, and add a note, for one account. */
-function linkedControls(u, rec, now) {
-  var id = esc(String(u && u.id || ''));
-  var b = ((rec || {}).bans || {})[String(u && u.id || '')];
+/* How long a ban lasts, staff's choice, for good included. */
+function lengthPick(key) {
   var lengths = [['30', '30 minutes'], ['120', '2 hours'], ['1440', '1 day'], ['4320', '3 days'],
                  ['10080', '1 week'], ['43200', '30 days'], ['0', 'for good']];
-  return '<div class="bar notesbar">' +
-    '<input class="notetext" data-id="' + id + '" placeholder="A note for staff">' +
-    '<button class="btn small" data-act="note" data-id="' + id + '">Add note</button>' +
-    '<select class="banlen" data-id="' + id + '">' +
-      lengths.map(function (l) { return '<option value="' + l[0] + '">' + l[1] + '</option>'; }).join('') +
-    '</select>' +
-    '<input class="banwhy" data-id="' + id + '" placeholder="Why they are banned">' +
-    '<button class="btn small" data-act="ban" data-id="' + id + '">Ban</button>' +
-    (b && b.active ? '<button class="btn small" data-act="unban" data-id="' + id + '">Lift ban</button>' : '') +
-    '</div>';
+  return '<select class="banlen" data-id="' + key + '">' +
+    lengths.map(function (l) { return '<option value="' + l[0] + '">' + l[1] + '</option>'; }).join('') +
+    '</select>';
 }
 
-/* Bans held against a profile no Discord account holds (made in the game). */
-function looseBans(rec, now) {
+/* A note and the account's ban for one account, then for each of its
+   characters a ban of its own and PK (#1010). */
+function linkedControls(u, rec, now) {
+  rec = rec || {};
+  var raw = String(u && u.id || '');
+  var id = esc(raw);
+  var b = (rec.bans || {})[raw];
+  var out = '<div class="bar notesbar">' +
+    '<input class="notetext" data-id="' + id + '" placeholder="A note for staff">' +
+    '<button class="btn small" data-act="note" data-id="' + id + '">Add note</button>' +
+    lengthPick(id) +
+    '<input class="banwhy" data-id="' + id + '" placeholder="Why the account is banned">' +
+    '<button class="btn small" data-act="ban" data-id="' + id + '">Ban account</button>' +
+    (b && b.active ? '<button class="btn small" data-act="unban" data-id="' + id + '">Lift account ban</button>' : '') +
+    '</div>';
+  ((u && u.profiles) || []).forEach(function (pid) {
+    var key = id + ':' + esc(pid);
+    var name = charName(pid, rec) || ('profile ' + pid);
+    var pk = (rec.pk || {})[String(pid)];
+    var cb = (rec.bans || {})['p:' + pid];
+    if (pk) return;
+    out += '<div class="bar notesbar charbar"><span class="said">' + esc(name) + '</span>' +
+      lengthPick(key) +
+      '<input class="banwhy" data-id="' + key + '" placeholder="Why, for a ban or a PK">' +
+      '<button class="btn small" data-act="ban" data-id="' + id + '" data-pid="' + esc(pid) + '">Ban character</button>' +
+      (cb && cb.active ? '<button class="btn small" data-act="unban" data-id="' + id + '" data-pid="' + esc(pid) + '">Lift character ban</button>' : '') +
+      '<button class="btn small" data-act="pk" data-id="' + id + '" data-pid="' + esc(pid) + '" data-name="' + esc(name) + '">PK</button>' +
+      '</div>';
+  });
+  return out;
+}
+
+/* Bans held against a profile no linked account holds (made in the game). */
+function looseBans(rec, now, linked) {
   var bans = (rec || {}).bans || {};
+  var held = {};
+  (linked || []).forEach(function (u) { ((u && u.profiles) || []).forEach(function (n) { held[String(n)] = true; }); });
   var out = '';
   Object.keys(bans).forEach(function (k) {
     var b = bans[k];
-    if (k.indexOf('p:') !== 0 || !b || !b.active) return;
+    if (k.indexOf('p:') !== 0 || !b || !b.active || held[k.slice(2)]) return;
     out += '<div class="note">Profile ' + esc(k.slice(2)) + (b.name ? ' (' + esc(b.name) + ')' : '') +
       ': banned ' + esc(banUntil(b)) + ': ' + esc(b.why || '') + ' <span class="said">(by ' +
       esc(b.by || 'staff') + ')</span></div>';
+  });
+  return out;
+}
+
+/* Every character dead for good, newest first, so staff can find them for an event. */
+function deadList(rec) {
+  var pk = (rec || {}).pk || {};
+  var keys = Object.keys(pk).sort(function (a, b) { return (Number(pk[b].at) || 0) - (Number(pk[a].at) || 0); });
+  var out = '';
+  keys.forEach(function (k) {
+    var r = pk[k] || {};
+    out += '<div class="note">' + esc(charName(k, rec) || 'Unnamed character') +
+      ' <span class="said">profile ' + esc(k) + (r.account ? ', Discord ' + esc(r.account) : '') + '</span>: ' +
+      esc(r.why || '') + ' <span class="said">' + byLine(r) + '</span></div>';
   });
   return out;
 }
@@ -927,12 +1010,21 @@ function wireLinked() {
   for (var i = 0; i < bs.length; i++) {
     bs[i].onclick = function () {
       var act = this.getAttribute('data-act'), id = this.getAttribute('data-id');
+      var pid = this.getAttribute('data-pid') || '';
+      var key = pid ? id + ':' + pid : id;
       var bodyOf = { id: id };
+      if (pid) bodyOf.profileId = Number(pid);
       if (act === 'note') bodyOf.text = (pick('notetext', id) || {}).value || '';
       if (act === 'ban') {
-        bodyOf.minutes = Number((pick('banlen', id) || {}).value || 0);
-        bodyOf.why = (pick('banwhy', id) || {}).value || '';
+        bodyOf.minutes = Number((pick('banlen', key) || {}).value || 0);
+        bodyOf.why = (pick('banwhy', key) || {}).value || '';
         if (!bodyOf.why.trim()) { alert('Say why they are banned.'); return; }
+      }
+      if (act === 'pk') {
+        bodyOf.why = (pick('banwhy', key) || {}).value || '';
+        if (!bodyOf.why.trim()) { alert('Say why the character dies.'); return; }
+        if (!confirm('PK ' + (this.getAttribute('data-name') || 'this character') + '? It dies for good and ' +
+                     'can never be played again. It is kept for staff, and it cannot be undone here.')) return;
       }
       if (act === 'note' && !bodyOf.text.trim()) return;
       api('/api/staff/' + act, { method: 'POST', headers: { 'Content-Type': 'application/json' },
