@@ -340,7 +340,7 @@ try {
 
     # ===================================================== the server installer
     Yes 'Publish-Server sends the roller beside the installer' (
-        (Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\release\Publish-Server.ps1') -Raw) -match 'scp \$rollLog "\$\{target\}:C:/Roll-Log\.ps1"')
+        (Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\release\Publish-Server.ps1') -Raw) -match 'scp (@ssh )?\$rollLog "\$\{target\}:C:/Roll-Log\.ps1"')
     # Same folder first (Publish layout on C:\), then scripts\vps (repo layout).
     $besideAt = $inst.IndexOf("Join-Path `$here 'Roll-Log.ps1'")
     $vpsAt = $inst.IndexOf("Join-Path `$here '..\vps\Roll-Log.ps1'")

@@ -90,7 +90,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $rootWin = $Root.Replace('/','\')
 $botWin  = $BotRoot.Replace('/','\')
 $writer  = Join-Path $Here '..\vps\Write-BotToken.ps1'

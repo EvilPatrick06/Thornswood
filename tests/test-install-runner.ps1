@@ -89,7 +89,7 @@ Yes 'Defender skips the runner''s own folder and nothing else' ($text -match 'Ad
 Yes '  by a task that runs at start and every five minutes' ($text -match 'AtStartup' -and $text -match 'RepetitionInterval \(New-TimeSpan -Minutes 5\)')
 
 # ---- ssh ---------------------------------------------------------------------------
-Yes 'it checks the VPS host key' ($text -match 'StrictHostKeyChecking=accept-new')
+Yes 'it checks the VPS host key' ($text -match 'StrictHostKeyChecking=yes')
 
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)

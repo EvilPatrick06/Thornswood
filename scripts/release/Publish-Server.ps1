@@ -92,6 +92,9 @@ function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
 $target = "$VpsUser@$VpsHost"
+# Host key checking on (issue #450): ssh talks only to the box whose key
+# Setup-SshKey.ps1 wrote into known_hosts, checked against vps.json.
+$ssh = @('-o', 'StrictHostKeyChecking=yes')
 
 # ---------------------------------------------------------------- tools ------
 foreach ($t in 'ssh', 'scp') {
@@ -290,15 +293,15 @@ Get-CimInstance Win32_Process -EA SilentlyContinue |
 '@ -replace '@@TASK@@', $TaskName -replace '@@ROOT@@', $VpsRoot.TrimEnd('\')
 
 $stopEnc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($stopRemote))
-& ssh $target "powershell -NoProfile -EncodedCommand $stopEnc"
+& ssh @ssh $target "powershell -NoProfile -EncodedCommand $stopEnc"
 
 Head 'Copying'
 Say 'this is the slow part, a few minutes on a first run' 'DarkGray'
-& scp $Zip "${target}:C:/thornswood-server.zip"
+& scp @ssh $Zip "${target}:C:/thornswood-server.zip"
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
-& scp $installer "${target}:C:/Install-ThornswoodServer.ps1"
+& scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1"
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
-& scp $rollLog "${target}:C:/Roll-Log.ps1"
+& scp @ssh $rollLog "${target}:C:/Roll-Log.ps1"
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
 Say 'copied' 'Green'
 
@@ -306,9 +309,9 @@ Head 'Installing'
 $instArgs = "-Zip C:\thornswood-server.zip -Root '$VpsRoot' -TaskName '$TaskName' -StartNow"
 if ($FreshWorld) {
     Say 'throwing away the world on the VPS as asked' 'Yellow'
-    & ssh $target "powershell -NoProfile -Command `"Remove-Item -LiteralPath '$VpsRoot\world' -Recurse -Force -ErrorAction SilentlyContinue; 'world cleared'`""
+    & ssh @ssh $target "powershell -NoProfile -Command `"Remove-Item -LiteralPath '$VpsRoot\world' -Recurse -Force -ErrorAction SilentlyContinue; 'world cleared'`""
 }
-& ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 $instArgs"
+& ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 $instArgs"
 if ($LASTEXITCODE -ne 0) { Die "the installer on the VPS exited with $LASTEXITCODE. Nothing local was changed." }
 
 <#
@@ -392,7 +395,7 @@ if (-not (Test-Path -LiteralPath $live)) {
 '@
     $seed = $seed.Replace('@@DEVROOT@@', $VpsRoot.TrimEnd('\'))
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($seed))
-    $out = & ssh $target "powershell -NoProfile -EncodedCommand $enc"
+    $out = & ssh @ssh $target "powershell -NoProfile -EncodedCommand $enc"
     foreach ($line in @($out)) { Say "  $line" 'Green' }
 }
 
@@ -440,7 +443,7 @@ if ($up) {
     # Rather than list what it might be, fetch what it actually said. The task
     # redirects everything the server prints into this file for exactly this.
     Head 'What the server printed up there'
-    & ssh $target "powershell -NoProfile -Command `"if (Test-Path '$VpsRoot\server.log') { Get-Content '$VpsRoot\server.log' -Tail 40 } else { 'server.log is not there, so node never started. Check that node is on the machine PATH up there.' }`""
+    & ssh @ssh $target "powershell -NoProfile -Command `"if (Test-Path '$VpsRoot\server.log') { Get-Content '$VpsRoot\server.log' -Tail 40 } else { 'server.log is not there, so node never started. Check that node is on the machine PATH up there.' }`""
 
     Write-Host ''
     Say 'If that log is empty or says nothing useful, the other candidate is the' 'Yellow'

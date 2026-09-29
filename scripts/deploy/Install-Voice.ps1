@@ -80,6 +80,9 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
 $target = "$VpsUser@$VpsHost"
+# Host key checking on (issue #450): ssh talks only to the box whose key
+# Setup-SshKey.ps1 wrote into known_hosts, checked against vps.json.
+$ssh = @('-o', 'StrictHostKeyChecking=yes')
 foreach ($t in 'ssh', 'scp') {
     if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
         Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client."
@@ -88,7 +91,7 @@ foreach ($t in 'ssh', 'scp') {
 
 if ($Remove) {
     Head 'Removing'
-    & ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue; Remove-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContinue; Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue; 'removed'`""
+    & ssh @ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue; Remove-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContinue; Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue; 'removed'`""
     Say 'Gone. The game server is untouched.' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
@@ -96,7 +99,7 @@ if ($Remove) {
 
 if ($Restart) {
     Head 'Restarting'
-    & ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Start-Sleep -Seconds 1; Start-ScheduledTask -TaskName '$TaskName'; 'restarted'`""
+    & ssh @ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Start-Sleep -Seconds 1; Start-ScheduledTask -TaskName '$TaskName'; 'restarted'`""
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
 }
@@ -160,15 +163,15 @@ foreach ($f in 'voice-server.js', 'public\index.html', 'public\voice.js') {
 }
 
 Head 'Copying'
-& ssh $target "powershell -NoProfile -Command `"New-Item -ItemType Directory -Force -Path '$Root\public' | Out-Null; 'ready'`""
+& ssh @ssh $target "powershell -NoProfile -Command `"New-Item -ItemType Directory -Force -Path '$Root\public' | Out-Null; 'ready'`""
 if ($LASTEXITCODE -ne 0) { Die "ssh exited with $LASTEXITCODE" }
 
-& scp (Join-Path $src 'voice-server.js') "${target}:$($Root -replace '\\','/')/voice-server.js"
+& scp @ssh (Join-Path $src 'voice-server.js') "${target}:$($Root -replace '\\','/')/voice-server.js"
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
 
 # The roller the task runs in front of the service. See Roll-Log.ps1 for why a
 # log cmd holds open can only be rolled at start.
-& scp (Join-Path $Here '..\vps\Roll-Log.ps1') "${target}:$($Root -replace '\\','/')/roll-log.ps1"
+& scp @ssh (Join-Path $Here '..\vps\Roll-Log.ps1') "${target}:$($Root -replace '\\','/')/roll-log.ps1"
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
 
 # THE CHARACTER REGISTER IS GONE, 23 September, and so is the secret it used.
@@ -184,8 +187,8 @@ if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
 # step is gone too. The service's own join tokens are signed with a key it
 # makes for itself in token-key.txt and have nothing to do with this.
 
-& scp (Join-Path $src 'public\index.html') "${target}:$($Root -replace '\\','/')/public/index.html"
-& scp (Join-Path $src 'public\voice.js') "${target}:$($Root -replace '\\','/')/public/voice.js"
+& scp @ssh (Join-Path $src 'public\index.html') "${target}:$($Root -replace '\\','/')/public/index.html"
+& scp @ssh (Join-Path $src 'public\voice.js') "${target}:$($Root -replace '\\','/')/public/voice.js"
 Say 'copied' 'Green'
 
 <#
@@ -408,14 +411,14 @@ if (-not `$up) {
 $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
 $cmd = "powershell -NoProfile -EncodedCommand $b64"
 if ($cmd.Length -le 6000) {
-    & ssh $target $cmd
+    & ssh @ssh $target $cmd
 }
 else {
     $far = 'C:/Windows/Temp/thornswood-install-voice.ps1'
     $tmp = [IO.Path]::GetTempFileName()
     try {
         Set-Content -LiteralPath $tmp -Value $remote -Encoding UTF8
-        & scp $tmp "${target}:$far"
+        & scp @ssh $tmp "${target}:$far"
         if ($LASTEXITCODE -ne 0) { Die "could not send the install script to $VpsHost" }
         # The path goes across as it is: Windows PowerShell takes forward
         # slashes, and converting them is how a sister script once shipped
@@ -426,9 +429,9 @@ else {
         # in single quotes, fails under cmd.exe. The old form did run on the
         # VPS on 20 and 21 September, so which shell sshd uses there is not
         # known, and bare is the form that works under either.
-        & ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File $far"
+        & ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File $far"
         $rc = $LASTEXITCODE
-        & ssh $target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" | Out-Null
+        & ssh @ssh $target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" | Out-Null
         $global:LASTEXITCODE = $rc
     }
     finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }

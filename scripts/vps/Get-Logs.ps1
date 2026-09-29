@@ -140,7 +140,7 @@ foreach ($l in $logs) {
     $remote = "if (Test-Path -LiteralPath '$($l.Path)') { Get-Content -LiteralPath '$($l.Path)'$tail } else { 'MISSING: $($l.Path)' }"
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
 
-    $text = & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new $target "powershell -NoProfile -EncodedCommand $enc" 2>&1
+    $text = & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes $target "powershell -NoProfile -EncodedCommand $enc" 2>&1
 
     if ($LASTEXITCODE -ne 0 -and -not $text) {
         Say ("  {0,-12} could not be read. ssh exit {1}" -f $l.Name, $LASTEXITCODE) 'Red'

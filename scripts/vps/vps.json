@@ -2,5 +2,10 @@
   "address": "192.135.112.23",
   "user": "Administrator",
   "livePort": 7777,
-  "devPort": 7787
+  "devPort": 7787,
+  "hostKeys": [
+    "SHA256:aC85Oem9TJgw8L6QbHzxL8w1xcGJz7uJNnqpPKCGZ94",
+    "SHA256:6CefSkhvTdDDENb3B3ypF55pJnO0YdEPU5WEBl8FE1U",
+    "SHA256:gtwjZ17NIbxqvqIsKlnZ2EIpe+6YSDwpxv8+fbAsCuY"
+  ]
 }
