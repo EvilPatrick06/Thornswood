@@ -19,10 +19,21 @@
     the bot's join record joins.json, which arrival each person was
     the Caddyfile         whatever is answering on 443 for thornswood.net
 
+    the dev server        its world, private, data, server-settings.json and
+                          gamemode.js, under game-dev. Since issue #401: dev
+                          is where new work is tested before it goes live, so
+                          the characters there are somebody's afternoon too,
+                          and it is a few MB.
+
   What it leaves: node_modules, the installer under the site's public folder,
-  and anything over the size cap. All of those come back from the repo. It
-  also leaves the dev server and the dev voice service on purpose: the dev
-  world is thrown away, and docs\RESTORING.md says so.
+  the dev voice service, and anything over the size cap. All of those come
+  back from the repo.
+
+  The server writes world while this runs, so a file can be caught half
+  written. Every .json taken from a world folder is read back, and one that
+  does not parse is copied again a moment later; one that still does not is
+  counted as torn in the log and in NOTES.txt, so a backup that caught the
+  server mid-save says so instead of looking whole.
 
   Encrypted, because the point of a backup is that it lives somewhere other
   than the box, and everything above is either somebody's account or a
@@ -41,7 +52,8 @@
 [CmdletBinding()]
 param(
   [string]$GameRoot   = 'C:\Thornswood-Server',
-  [string]$SiteRoot   = 'C:\Thornswood-Docs',
+  [string]$DevGameRoot = 'C:\Thornswood-Server-Dev',
+  [string]$SiteRoot  = 'C:\Thornswood-Docs',
   [string]$BotRoot    = 'C:\Thornswood-Bot',
   [string]$CaddyRoot  = 'C:\Thornswood-Caddy',
   [string]$VoiceRoot  = 'C:\Thornswood-Voice',
@@ -109,11 +121,50 @@ function Grab($from, $to) {
   Note ("  {0,-42} {1} files" -f $to, $n)
 }
 
-Grab (Join-Path $GameRoot 'world')                'game\world'
-Grab (Join-Path $GameRoot 'private')              'game\private'
-Grab (Join-Path $GameRoot 'data')                 'game\data'
-Grab (Join-Path $GameRoot 'server-settings.json') 'game\server-settings.json'
-Grab (Join-Path $GameRoot 'gamemode.js')          'game\gamemode.js'
+# A world file the server was halfway through writing when it was copied.
+# Read back every .json taken from a world folder; one that does not parse
+# is copied again after a moment, and one that still does not is counted.
+$torn = @{}
+function Mend($from, $to) {
+  $dest = Join-Path $stage $to
+  if (-not (Test-Path -LiteralPath $dest)) { return }
+  $bad = 0
+  foreach ($f in (Get-ChildItem -LiteralPath $dest -Recurse -File -Filter *.json -EA SilentlyContinue)) {
+    $ok = $false
+    for ($try = 0; $try -lt 3 -and -not $ok; $try++) {
+      try { [void]((Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8) | ConvertFrom-Json); $ok = $true }
+      catch {
+        Start-Sleep -Milliseconds 400
+        $src = Join-Path $from $f.FullName.Substring($dest.Length).TrimStart('\')
+        try { Copy-Item -LiteralPath $src -Destination $f.FullName -Force } catch { }
+      }
+    }
+    if (-not $ok) { $bad++ }
+  }
+  $script:torn[$to] = $bad
+  if ($bad) { Note ("  TORN      {0}: {1} file(s) would not parse after three copies" -f $to, $bad) }
+}
+
+# How many people a world folder holds: the change forms named with a bare
+# number are characters (scripts\ops\Reset-Character.ps1 reads them the same
+# way), everything else in there describes the world.
+function People($to) {
+  $forms = Join-Path $stage ($to + '\changeForms')
+  if (-not (Test-Path -LiteralPath $forms)) { return 0 }
+  return @(Get-ChildItem -LiteralPath $forms -File -Filter *.json -EA SilentlyContinue |
+           Where-Object { $_.BaseName -match '^[0-9]+$' }).Count
+}
+
+# The live server, then the dev one, the same five things from each.
+$servers = @(@{ Root = $GameRoot; Tag = 'game' }, @{ Root = $DevGameRoot; Tag = 'game-dev' })
+foreach ($sv in $servers) {
+  Grab (Join-Path $sv.Root 'world')                ($sv.Tag + '\world')
+  Mend (Join-Path $sv.Root 'world')                ($sv.Tag + '\world')
+  Grab (Join-Path $sv.Root 'private')              ($sv.Tag + '\private')
+  Grab (Join-Path $sv.Root 'data')                 ($sv.Tag + '\data')
+  Grab (Join-Path $sv.Root 'server-settings.json') ($sv.Tag + '\server-settings.json')
+  Grab (Join-Path $sv.Root 'gamemode.js')          ($sv.Tag + '\gamemode.js')
+}
 Grab (Join-Path $SiteRoot 'data')                 'site\data'
 Grab (Join-Path $SiteRoot 'config.json')          'site\config.json'
 # bot.env.json, not config.json. The first nightly run reported the bot config
@@ -144,6 +195,22 @@ Grab (Join-Path $VoiceRoot 'choices.json')        'voice\choices.json'
 $notes = @("taken    $stamp", "host     $env:COMPUTERNAME", "windows  $([Environment]::OSVersion.Version)", '', 'scheduled tasks:')
 foreach ($t in (Get-ScheduledTask -EA SilentlyContinue | Where-Object { $_.TaskName -match 'Thornswood' } | Sort-Object TaskName)) {
   $notes += ("  {0,-30} {1}" -f $t.TaskName, $t.State)
+}
+# What is in it, said where Restore-Backup.ps1 prints it. The private files
+# are named one by one because each is a different thing lost: the character
+# cards, the mod menu choices, the take limits, and the door and its list.
+$notes += ''
+foreach ($sv in $servers) {
+  $n = People ($sv.Tag + '\world')
+  $t = 0; if ($torn.ContainsKey($sv.Tag + '\world')) { $t = $torn[$sv.Tag + '\world'] }
+  $notes += ("{0,-9}{1} character(s), {2} torn world file(s), from {3}" -f $sv.Tag, $n, $t, $sv.Root)
+  Note ("  {0,-42} {1} character(s)" -f ($sv.Tag + '\world'), $n)
+  $have = @(); $lack = @()
+  foreach ($p in 'characters.json', 'mod-settings.json', 'take-limit.json', 'door.json', 'allowed.json') {
+    if (Test-Path -LiteralPath (Join-Path $stage ($sv.Tag + '\private\' + $p))) { $have += $p } else { $lack += $p }
+  }
+  $notes += ('         private has: ' + $(if ($have.Count) { $have -join ', ' } else { 'none of them' }))
+  if ($lack.Count) { $notes += ('         private lacks: ' + ($lack -join ', ')) }
 }
 $notes += ''
 $notes += 'this backup does NOT contain: node_modules, the installer, the'
