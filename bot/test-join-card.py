@@ -302,18 +302,33 @@ for ln in lines:
 # the record, and I4 below still refuses any write that names joins.json.
 allowed = ['$Root/$f', '$Root/staff-channel.txt', '$Root/assets/join-card.png',
            '$Root/service/BotService.cs', '$far']
+# Since #1093 the code goes up into a stage folder first ($Root/$stageName/$rel,
+# stage, check, swap), each file under its key in $send. So that destination is
+# a name Install-Bot chose only while every key it puts in $send is one of the
+# names above.
+send_keys = re.findall(r"\$send\[(?:'([^']+)'|\$f)\]\s*=", install)
+send_names = [k or '$f' for k in send_keys]
+staged_ok = bool(send_names) and all(
+    k == '$f' or ('$Root/' + k) in allowed for k in send_names)
+if staged_ok:
+    allowed.append('$Root/$stageName/$rel')
 yes('I2 every file Install-Bot copies up lands on a name it chose, none of '
-    'them joins.json (got %r)' % (dests,),
+    'them joins.json (got %r, staged under %r)' % (dests, send_names),
     bool(dests) and all(d in allowed for d in dests))
 
 gone = []
-for ln in lines:
+for i, ln in enumerate(lines):
     if re.search(r'Remove-Item', ln, re.I):
         m = re.search(r"Remove-Item\s+(?:-LiteralPath\s+)?(\S+)", ln, re.I)
-        gone.append(m.group(1).strip("'`") if m else ln.strip())
+        g = m.group(1).strip("'`") if m else ln.strip()
+        # The clearing of a stage an earlier run left behind: folders named
+        # .stage-* and nothing else, filtered on the line above.
+        if g.lstrip('`') == '$_.FullName' and ".Name -like '.stage-*'" in lines[i - 1]:
+            g = 'an old .stage-* folder'
+        gone.append(g)
 yes('I3 the only files Install-Bot deletes are its own temporary ones '
     '(got %r)' % (gone,),
-    bool(gone) and all(g.lstrip('`') in ('$far', '$tmp', '$exe') for g in gone))
+    bool(gone) and all(g.lstrip('`') in ('$far', '$tmp', '$exe', 'an old .stage-* folder') for g in gone))
 
 writes = [ln for ln in lines
           if re.search(r'scp|Remove-Item|WriteAllText|Set-Content|Out-File|'
