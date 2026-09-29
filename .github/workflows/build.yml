@@ -135,6 +135,23 @@ jobs:
             exit 1
           }
 
+      - name: Check the old mod's name stays out
+        shell: pwsh
+        run: |
+          # Issue #497. The multiplayer mod this build replaced was taken out
+          # of the whole tree on 28 September, after weeks of clean ups that
+          # each found more because nothing failed when one came back. One
+          # read of every tracked file, a second or two, so it runs here.
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=tests/test-old-name-gone.js::no node on this runner, so the old name was not checked'
+            exit 1
+          }
+          node tests\test-old-name-gone.js
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=tests/test-old-name-gone.js::the old multiplayer mod is named again; the lines above say where'
+            exit 1
+          }
+
       - name: Run the harnesses that went red unseen
         shell: pwsh
         run: |

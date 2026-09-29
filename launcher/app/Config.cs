@@ -11,7 +11,7 @@ namespace Thornswood
     public class Config
     {
         [DataMember] public string ServerAddress = "192.135.112.23";
-        // SkyMP's default. 25565 was Skyrim Together's, on the old box.
+        // SkyMP's default. 25565 was the old build's, on the old box.
         [DataMember] public string ServerPort = "7777";
 
         /*
@@ -300,7 +300,7 @@ namespace Thornswood
             VoiceUrl = VoiceUrl.Trim();
             while (VoiceUrl.EndsWith("/")) { VoiceUrl = VoiceUrl.Substring(0, VoiceUrl.Length - 1); }
 
-            // The old build ran Skyrim Together Reborn on 25565, on a different
+            // The old build ran the old multiplayer mod on 25565, on a different
             // box. SkyMP does not listen there and that machine is not running
             // anything, so a config carried over from then points everyone at
             // nothing and the launcher would report "not answering" forever

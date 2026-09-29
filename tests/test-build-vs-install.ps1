@@ -266,10 +266,7 @@ try {
         Set-Content -LiteralPath $staleExe -Value 'old' -Encoding ASCII -NoNewline
         $staleTime = [datetime]::new(2020, 1, 1, 0, 0, 0, [DateTimeKind]::Utc)
         (Get-Item -LiteralPath $staleExe).LastWriteTimeUtc = $staleTime
-        Set-Content -LiteralPath (Join-Path $l3 'SkyrimTogether.exe') -Value 'older' -Encoding ASCII
-        Set-Content -LiteralPath (Join-Path $l3 'SkyrimTogether-Launcher.ps1') -Value '# old' -Encoding ASCII
         Set-Content -LiteralPath (Join-Path $l3 'icon-00000000.ico') -Value 'x' -Encoding ASCII
-        Set-Content -LiteralPath (Join-Path $root3 'Skyrim Together.lnk') -Value 'x' -Encoding ASCII
 
         $in = Invoke-Child $ps $inst @('-Root', $root3, '-From', $stage, '-NoPause')
         Yes "I1 the install passes (exit $($in.Code))" ($in.Code -eq 0)
@@ -283,8 +280,6 @@ try {
         $same = (Get-FileHash -LiteralPath $staleExe).Hash -eq (Get-FileHash -LiteralPath (Join-Path $stage 'Thornswood.exe')).Hash
         Yes 'I5 the exe in the root is the one the build made' $same
         Yes 'I6 and it is newer than the one it replaced, which is what Ship checks' ((Get-Item -LiteralPath $staleExe).LastWriteTimeUtc -gt $staleTime)
-        Yes 'I7 the SkyrimTogether.exe from before the rename is gone' (-not (Test-Path -LiteralPath (Join-Path $l3 'SkyrimTogether.exe')))
-        Yes 'I8 and so is the old script launcher' (-not (Test-Path -LiteralPath (Join-Path $l3 'SkyrimTogether-Launcher.ps1')))
         $hash = (Get-FileHash -LiteralPath (Join-Path $Here '..\launcher\app.ico') -Algorithm SHA256).Hash.Substring(0, 8).ToLower()
         Yes "I9 the icon file named after the artwork is there (icon-$hash.ico)" (Test-Path -LiteralPath (Join-Path $l3 "icon-$hash.ico"))
         Yes 'I10 and an old one is cleared away' (-not (Test-Path -LiteralPath (Join-Path $l3 'icon-00000000.ico')))
@@ -296,7 +291,6 @@ try {
         Yes 'I11 a scratch root gets its shortcut inside its own folder, pointing at its own exe' (
             ($target -like '*\root3\Launcher\Thornswood.exe') -and (Test-Path -LiteralPath $target) -and
             ((Get-FileHash -LiteralPath $target).Hash -eq (Get-FileHash -LiteralPath $staleExe).Hash))
-        Yes 'I12 the Skyrim Together.lnk from before the rename is gone' (-not (Test-Path -LiteralPath (Join-Path $root3 'Skyrim Together.lnk')))
         Yes 'I13 a scratch install never clears the icon cache or restarts Explorer (no .iconstamp)' (-not (Test-Path -LiteralPath (Join-Path $l3 '.iconstamp')))
         Yes 'I14 and does not ask Explorer to redraw either' ($in.Out -notmatch 'Explorer told to redraw' -and $in.Out -notmatch 'Icon cache asked to refresh')
 
@@ -344,8 +338,7 @@ try {
     if ($haveInstall) {
         $iText = Get-Content -LiteralPath (Join-Path $Here '..\scripts\release\Install-Launcher.ps1') -Raw
         foreach ($s in 'Stop-Game -Root $Root', 'Stop-Launcher -Root $Root', 'CreateShortcut', 'SHChangeNotify', 'ie4uinit',
-                       "'Skyrim Together.lnk'", 'taskkill /f /im explorer.exe', 'if ($lastIcon -ne $iconHash -and -not $isScratch) {',
-                       "'SkyrimTogether-Launcher.ps1'") {
+                       'taskkill /f /im explorer.exe', 'if ($lastIcon -ne $iconHash -and -not $isScratch) {') {
             Yes "M1 the install half carries $s, moved rather than lost" ($iText.Contains($s))
         }
     }

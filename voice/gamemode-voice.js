@@ -80,8 +80,8 @@
   // How many people are awake, written where the launcher can read it.
   //
   // There is no way to ask a SkyMP server how busy it is: its networking has
-  // no status packet, and the public list the old build used belongs to Skyrim
-  // Together and this server never reports to it. But the server already
+  // no status packet, and the public list the old build used belongs to the
+  // old multiplayer mod and this server never reports to it. But the server already
   // serves its resources folder over HTTP, so a small file dropped in there is
   // readable by every launcher without opening anything new or inventing a
   // protocol.

@@ -5,10 +5,10 @@
   lying about.
 
   25 September: a new tester ran the installer from the site and got the new
-  setup window with an old Skyrim Together setup and a very old launcher
+  setup window with an old multiplayer mod's setup and a very old launcher
   inside it. He had old installer zips in his Downloads folder. Bootstrap.cs
-  looked for SkyrimTogether-Setup.zip, payload.zip, Thornswood-Setup.zip and
-  the biggest Thornswood-Setup*.zip or SkyrimTogether-Setup*.zip beside itself
+  looked for the old setup zip, payload.zip, Thornswood-Setup.zip and
+  the biggest Thornswood-Setup*.zip or old setup zip beside itself
   and then in Downloads, took the first it found before the payload attached
   to it and before asking the site, and unpacked it with no check. The site's
   download is checked against its SHA-256 (test-payload-hash.ps1); a loose zip
@@ -94,7 +94,7 @@ $code = Get-Code $bs
 Yes 'nothing in the installer reads the Downloads folder' (
     $code.IndexOf('Downloads') -lt 0 -and $code.IndexOf('SpecialFolder.UserProfile') -lt 0)
 Yes 'and nothing looks for a zip by name' (
-    $code.IndexOf('SkyrimTogether-Setup') -lt 0 -and $code.IndexOf('"payload.zip"') -lt 0 -and
+    $code.IndexOf('-Setup.zip"') -lt 0 -and $code.IndexOf('"payload.zip"') -lt 0 -and
     $code.IndexOf('Thornswood-Setup*.zip') -lt 0 -and $code.IndexOf('"Thornswood-Setup.zip"') -lt 0)
 
 # Work unpacks what Locate found in this program or what Download fetched and
@@ -202,7 +202,7 @@ try {
                 $zb = [IO.File]::ReadAllBytes($attach)
                 $fs.Write($zb, 0, $zb.Length)
                 $bw = New-Object IO.BinaryWriter($fs)
-                $bw.Write([Text.Encoding]::ASCII.GetBytes('STSFX001'))
+                $bw.Write([Text.Encoding]::ASCII.GetBytes('TWSFX001'))
                 $bw.Write([long]$off)
                 $bw.Write([long]$zb.Length)
                 if ($signature) { $bw.Write((New-Object byte[] $signature)) }
@@ -211,9 +211,9 @@ try {
         }
 
         $T = [ThornswoodOwnPayload]
-        $old = @('SkyrimTogether-Setup.zip', 'payload.zip', 'Thornswood-Setup.zip',
+        $old = @('OldMod-Setup.zip', 'payload.zip', 'Thornswood-Setup.zip',
                  'Thornswood-Setup-20260915-1639.zip', 'Thornswood-Setup-20260915-1639 (1).zip',
-                 'SkyrimTogether-Setup-20260901.zip')
+                 'OldMod-Setup-20260901.zip')
 
         # 1. The small installer the site hands out, run from a folder with
         #    every old zip in it.

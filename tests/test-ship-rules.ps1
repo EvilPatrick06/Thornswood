@@ -165,15 +165,6 @@ foreach ($rel in @(
 Yes 'a folder whose name only ends the same way is not taken for it' (-not (Test-ShipRuntime 'Data\NotClaude outputs\x.txt'))
 
 # ---- another server's folders ------------------------------------------------
-#
-# Skyrim Together Reborn's folder moved out of the runtime list on 23
-# September. A runtime path is swept off every install that has it, and this
-# is somebody else's install; the rule is never shipped, never removed.
-$str = 'Data\SkyrimTogetherReborn\logs\client.log'
-Yes "$str is another server's" (Test-ShipOtherServer $str)
-Yes '  and is not swept off anybody as a runtime file' (-not (Test-ShipRuntime $str))
-Yes '  and the folder itself counts' (Test-ShipOtherServer 'Data\SkyrimTogetherReborn')
-Yes 'a sibling folder whose name only starts the same way is not caught' (-not (Test-ShipOtherServer 'Data\SkyrimTogetherRebornExtras\x.esp'))
 Yes 'NirnLab UI Platform is kept out' (Test-ShipOtherServer 'Data\NirnLabUIPlatform\CEFSubprocess.exe')
 Yes '  and its plugin' (Test-ShipOtherServer 'Data\SKSE\Plugins\NirnLabUIPlugin.dll')
 Yes "Keizaal's parked Creation Club archives are kept out" (Test-ShipOtherServer 'Data\_disabledByKzl\ccBGSSSE001-Fish.bsa')

@@ -41,7 +41,7 @@ using Microsoft.Win32;
 [assembly: AssemblyCopyright("Copyright (c) Thornswood")]
 [assembly: ComVisible(false)]
 
-namespace SkyrimTogetherSetup
+namespace ThornswoodSetup
 {
     /// <summary>Presents a slice of a bigger file as if it were the whole thing.</summary>
     class SliceStream : Stream
@@ -89,22 +89,24 @@ namespace SkyrimTogetherSetup
 
     static class Setup
     {
-        const string Magic = "STSFX001";
+        // TW for Thornswood. Written by Package-Thornswood.ps1 -OneFile from
+        // the stub built out of this same file, so the two always agree.
+        const string Magic = "TWSFX001";
         const int TrailerLen = 24;          // 8 magic + 8 offset + 8 length
 
         // Two shapes: the payload attached to the end of this program, or
         // nothing, in which case the published one is fetched from the site
         // and checked against the SHA-256 the site gives for it.
         //
-        // A zip lying about is never used. This took the first
-        // SkyrimTogether-Setup.zip, payload.zip or Thornswood-Setup*.zip it
-        // found beside itself or anywhere in the Downloads folder, before the
-        // payload attached to it and before asking the site, unpacked it with
-        // no check at all and ran whatever Setup.bat was inside. Anybody with a
-        // zip left over from an earlier download, the Skyrim Together ones
-        // included, got that old install from a new looking window. Nobody is
-        // told to put a zip beside this any more: Publish-Installer publishes
-        // the payload hidden and the Downloads page has one button.
+        // A zip lying about is never used. This took the first setup zip or
+        // payload.zip it found beside itself or anywhere in the Downloads
+        // folder, before the payload attached to it and before asking the
+        // site, unpacked it with no check at all and ran whatever Setup.bat
+        // was inside. Anybody with a zip left over from an earlier download,
+        // the old multiplayer mod's included, got that old install from a new
+        // looking window. Nobody is told to put a zip beside this any more:
+        // Publish-Installer publishes the payload hidden and the Downloads
+        // page has one button.
 
         // Where to get it when there is none either way.
         //
@@ -1075,7 +1077,7 @@ namespace SkyrimTogetherSetup
             //
             // So scan back for the magic instead. A megabyte is far more than
             // any Authenticode blob, and the run of bytes that happens to
-            // spell STSFX001 by accident is caught by checking that what it
+            // spell TWSFX001 by accident is caught by checking that what it
             // points at actually starts like a zip.
             try
             {
@@ -1401,7 +1403,7 @@ namespace SkyrimTogetherSetup
         static int StopSkyrim()
         {
             var found = new List<Process>();
-            foreach (string n in new string[] { "SkyrimSE", "skse64_loader", "SkyrimTogether" })
+            foreach (string n in new string[] { "SkyrimSE", "skse64_loader" })
             {
                 try { found.AddRange(Process.GetProcessesByName(n)); } catch { }
             }

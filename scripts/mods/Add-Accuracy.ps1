@@ -8,7 +8,7 @@
   order does not move and nobody has to start a new character.
 
   The one thing that matters in co-op: this is entirely client side, and
-  Skyrim Together works out damage on the machine of whoever swung. If one
+  damage is worked out on the machine of whoever swung. If one
   person has different numbers to everyone else, health bars disagree across
   screens and kills land at different times. So the config files ship with
   the build rather than being left to each person's MCM, and the optional

@@ -39,7 +39,6 @@ function MB($b) { '{0,9:n2} MB' -f ($b / 1MB) }
 
 # The same folders the audit walks.
 $roots = @(
-    'C:\SkyrimTogether'
     'C:\Thornswood'
     (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Engine)
     'C:\SkyrimRP'
@@ -47,32 +46,23 @@ $roots = @(
     (Join-Path $env:USERPROFILE 'AppData\Roaming\skyrim-rp-launcher')
     (Join-Path $env:USERPROFILE 'AppData\Roaming\com.bstar.skymp-launcher')
     (Join-Path $env:LOCALAPPDATA 'Temp\Skyrim Platform')
-    'C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition'
 )
-
-# Anything whose path says Skyrim Together, or the projects it was built on.
-$togetherRx = '(?i)(skyrimtogether|skyrim[_ -]together|tiltedonline|tiltedphoques|\bSTServer\b)'
 
 # Backups, previous copies and scratch.
 $cruftRx = '(?i)(\.bak$|\.old$|\.tmp$|\.temp$|\.orig$|\.backup$|~$)'
 
 <#
-  Paths that match the patterns above and must survive anyway.
-
-  Omega's Emotes for Skyrim Together is the one that matters. It has Skyrim
-  Together in its name because of who it was published for, but it is an
-  animation mod: a folder of meshes and behaviour files with no plugin, and
-  removing it would take idles out of the game. The emote wheel plays names
-  read out of Skyrim.esm and Dragonborn.esm so it would survive, but anything
-  pointed at those animations would not, and a swept folder is not something
-  you notice until something silently stops moving.
+  Paths that match the pattern above and must survive anyway.
 
   The saves and ini folders are excluded outright rather than filtered. There
   is nothing in them worth this script's attention and a mistake there costs
   somebody their character.
+
+  The Steam copy is not walked at all: that folder is where the vanilla game
+  comes from and the installer fingerprints three files in it, and a .bak in
+  a vanilla Data folder might be somebody's only copy of something.
 #>
 $keepRx = @(
-    "(?i)omega's emotes"
     '(?i)\\My Games\\Skyrim Special Edition\\'
     '(?i)\\OneDrive\\'
     # The repo's own working tree. Its .orig and .bak files belong to vcpkg and
@@ -81,16 +71,6 @@ $keepRx = @(
     # engine\skymp submodule of this repository after it (scripts\release\Where.ps1).
     '(?i)\\(Thornswood-Dev|engine)\\skymp\\(vcpkg|.*node_modules)\\'
 ) -join '|'
-
-<#
-  Inside the Steam copy, only Skyrim Together's own files may be removed.
-
-  That folder is where the vanilla game comes from and the installer
-  fingerprints three files in it. The cruft pattern is not allowed to run
-  there at all: a .bak in a vanilla Data folder might be somebody's only
-  copy of something, and a saved 40 KB is not worth finding out.
-#>
-$steam = 'C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition'
 
 Head 'Looking'
 
@@ -103,45 +83,11 @@ foreach ($root in $roots) {
     }
     Say "  $root" 'DarkGray'
 
-    $inSteam = $root -eq $steam
-
-    # Directories first, so that a whole Skyrim Together tree is one entry in
-    # the list rather than nine hundred.
-    $dirs = @(Get-ChildItem -LiteralPath $root -Recurse -Directory -Force -EA SilentlyContinue |
-              Where-Object { $_.FullName -match $togetherRx -and $_.FullName -notmatch $keepRx })
-
-    # A directory inside a directory already on the list adds nothing.
-    $topDirs = @()
-    foreach ($d in ($dirs | Sort-Object { $_.FullName.Length })) {
-        $under = $false
-        foreach ($t in $topDirs) {
-            if ($d.FullName.StartsWith($t.FullName + '\', 'OrdinalIgnoreCase')) { $under = $true; break }
-        }
-        if (-not $under) { $topDirs += $d }
-    }
-
-    foreach ($d in $topDirs) {
-        $bytes = (Get-ChildItem -LiteralPath $d.FullName -Recurse -File -Force -EA SilentlyContinue |
-                  Measure-Object -Property Length -Sum).Sum
-        if (-not $bytes) { $bytes = 0 }
-        $hits.Add([pscustomobject]@{ Path = $d.FullName; Bytes = $bytes; Kind = 'folder'; Why = 'Skyrim Together' })
-    }
-
-    # Then loose files, skipping anything already inside a folder on the list.
     $files = @(Get-ChildItem -LiteralPath $root -Recurse -File -Force -EA SilentlyContinue)
     foreach ($f in $files) {
-        $under = $false
-        foreach ($t in $topDirs) {
-            if ($f.FullName.StartsWith($t.FullName + '\', 'OrdinalIgnoreCase')) { $under = $true; break }
-        }
-        if ($under) { continue }
         if ($f.FullName -match $keepRx) { continue }
 
-        if ($f.FullName -match $togetherRx) {
-            $hits.Add([pscustomobject]@{ Path = $f.FullName; Bytes = $f.Length; Kind = 'file'; Why = 'Skyrim Together' })
-            continue
-        }
-        if (-not $inSteam -and $f.Name -match $cruftRx) {
+        if ($f.Name -match $cruftRx) {
             $hits.Add([pscustomobject]@{ Path = $f.FullName; Bytes = $f.Length; Kind = 'file'; Why = 'backup or temp' })
         }
     }
@@ -149,7 +95,7 @@ foreach ($root in $roots) {
 
 if ($hits.Count -eq 0) {
     Write-Host ''
-    Say 'Nothing to clean. Both patterns came back empty.' 'Green'
+    Say 'Nothing to clean. The pattern came back empty.' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
 }

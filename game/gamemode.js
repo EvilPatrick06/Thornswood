@@ -26242,8 +26242,8 @@ log('gamemode loaded:',
   // How many people are awake, written where the launcher can read it.
   //
   // There is no way to ask a SkyMP server how busy it is: its networking has
-  // no status packet, and the public list the old build used belongs to Skyrim
-  // Together and this server never reports to it. But the server already
+  // no status packet, and the public list the old build used belongs to the
+  // old multiplayer mod and this server never reports to it. But the server already
   // serves its resources folder over HTTP, so a small file dropped in there is
   // readable by every launcher without opening anything new or inventing a
   // protocol.
@@ -40049,10 +40049,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
      use youyr cursor and a bunch of other bs I just want to press a key while
      looking at them."
 
-  THE TRADE MENU HE REMEMBERS IS GONE AND IS NOT COMING BACK. It was
-  TradeTogether, a Skyrim Together mod: the launcher still carries six key
-  bindings for it (Keys.cs, "Start a trade", "Offer the selected item") and
-  writes them into Data\SKSE\Plugins\TradeTogether.ini. That file does not
+  THE TRADE MENU HE REMEMBERS IS GONE AND IS NOT COMING BACK. It was an
+  add-on of the old multiplayer mod: the launcher carried six key bindings
+  for it (Keys.cs, "Start a trade", "Offer the selected item") and wrote
+  them into that add-on's ini under Data\SKSE\Plugins. That file does not
   exist in this build and neither does the DLL, checked on 23 September. So
   every one of those rows on the controls page has been setting a key in a
   file nobody reads, which is why looking at somebody does nothing, and it is
@@ -40912,9 +40912,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   trade menu and when it did you had to use youyr cursor and a bunch of other
   bs I just want to press a key while looking at them."
 
-  The menu he remembers was TradeTogether, a Skyrim Together mod. The launcher
-  still carries six key bindings for it in Keys.cs, writing into
-  Data\SKSE\Plugins\TradeTogether.ini, and neither that file nor the DLL is
+  The menu he remembers was an add-on of the old multiplayer mod. The launcher
+  carried six key bindings for it in Keys.cs, writing into that add-on's ini
+  under Data\SKSE\Plugins, and neither that file nor the DLL is
   anywhere in this build; checked 23 September. So those rows have been
   setting keys in a file nobody reads, which is why looking at somebody does
   nothing, and the cursor he remembers was that mod's mouse menu.

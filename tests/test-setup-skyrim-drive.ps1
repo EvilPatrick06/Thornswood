@@ -119,14 +119,14 @@ if ($intro.Success) {
 }
 
 # ---- 5. the folder the picker says is the folder it makes (#852) -----------
-# Measured under #497: an older Bootstrap told the customer "a folder called
-# SkyrimTogether is made" while Path.Combine actually made Thornswood. The
+# Measured under #497: an older Bootstrap told the customer a folder of the
+# old name is made while Path.Combine actually made Thornswood. The
 # rename on main already fixed the string; this holds the two sides together
 # so they cannot drift apart again.
 Yes 'the folder picker says a folder called Thornswood is made' (
     $bs.Contains('A folder called Thornswood is made inside whatever you pick.'))
-Yes 'and does not still say SkyrimTogether for that folder' (
-    -not ($bs -match 'folder called SkyrimTogether'))
+Yes 'and does not still give the old name for that folder' (
+    -not ($bs -match 'folder called Skyrim\s*Together'))
 Yes 'drive buttons Path.Combine the chosen drive with Thornswood' (
     $bs.Contains('Path.Combine(captured.Name, "Thornswood")'))
 Yes 'Browse appends Thornswood when the pick is not already that folder' (
