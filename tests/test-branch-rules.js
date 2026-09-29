@@ -130,11 +130,17 @@ yes('the check flags the three source writes Ship used to end with, and not the 
 const shipSrc = read('scripts/release/Ship.ps1');
 const ship = gitCalls(shipSrc);
 const shipReads = ship.filter(function (c) { return c.repo === '$RepoDir' && !WRITES.test(c.sub); });
-const shipFeed = ship.filter(function (c) { return WRITES.test(c.sub) && c.repo === '$devRel'; });
+const shipAnyWrite = ship.filter(function (c) { return WRITES.test(c.sub); });
 yes('Ship.ps1 reads the source repository before a main release (' + shipReads.length + ' git calls: branch, status, fetch, ahead and behind)',
     shipReads.length >= 4);
-yes('Ship.ps1 still writes the dev feed in the releases clone, so the check can see a write when there is one (' + shipFeed.length + ')',
-    shipFeed.length >= 3);
+// Until 28 September Ship also pushed the dev feed in a clone of the releases
+// repository, which this counted to show the parser sees a write when there is
+// one. That repository is gone and Ship records a release on the VPS
+// (Feed-Store.ps1), so Ship has no git write anywhere; the parser is shown the
+// old lines above instead.
+shipAnyWrite.forEach(function (c) { console.log('      Ship.ps1:' + c.line + '  ' + c.text); });
+yes('Ship.ps1 makes no git write in any repository, now that the releases clone is gone (' + shipAnyWrite.length + ')',
+    shipAnyWrite.length === 0);
 const shipBad = sourceWrites(ship);
 shipBad.forEach(function (c) { console.log('      Ship.ps1:' + c.line + '  ' + c.text); });
 yes('Ship.ps1 never adds, commits, pushes or moves a branch in the source repository', shipBad.length === 0);
