@@ -533,23 +533,50 @@ try {
 
     # Two restores inside one second (#1107). What an earlier run kept under
     # this second's name is not in the way: stand-ins for it are put there for
-    # the next minute, and the run keeps its own copies beside them as -2.
-    # Counted from what is there now, not from nothing (#1117): the two runs
-    # above can land in one second on a fast runner, and then the second has
-    # already kept its copies as -2.
-    $was2File = @(Get-ChildItem -LiteralPath $nSite -File -Filter 'config.json-before-restore-*-2').Count
-    $was2Dir = @(Get-ChildItem -LiteralPath $nSite -Directory -Filter 'data-before-restore-*-2').Count
+    # the next minute, and the run keeps its own copies beside them, under
+    # that second's name with a number after it.
+    # Judged by what the run added, never by which number it took (#1117): on
+    # a fast runner all three runs here land in one second (the VPS runner
+    # takes about 0.4 s a run), the second run has already taken -2, and this
+    # one rightly takes -3. So the check reads the same whichever second each
+    # run lands in: exactly one new config copy and one new data copy, both
+    # under a numbered name and holding what was in place, and everything
+    # kept before the run left exactly as it was. The stand-ins take each
+    # second's plain name and its -2 as well, so this run always meets the
+    # case that went red: it has to go to -3, whatever the clock says.
     $at = Get-Date
     foreach ($s in 0..60) {
         $st = $at.AddSeconds($s).ToString('yyyyMMdd-HHmmss')
-        Put (Join-Path $nSite ('config.json-before-restore-' + $st)) '{"kept":"earlier"}'
-        [void](New-Item -ItemType Directory -Force -Path (Join-Path $nSite ('data-before-restore-' + $st)))
+        foreach ($tail in '', '-2') {
+            $cf = Join-Path $nSite ('config.json-before-restore-' + $st + $tail)
+            if (-not (Test-Path -LiteralPath $cf)) { Put $cf '{"kept":"earlier"}' }
+            [void](New-Item -ItemType Directory -Force -Path (Join-Path $nSite ('data-before-restore-' + $st + $tail)))
+        }
     }
+    function Kept {
+        $h = @{}
+        foreach ($i in @(Get-ChildItem -LiteralPath $nSite -Filter '*-before-restore-*' -Force)) {
+            $h[$i.Name] = if ($i.PSIsContainer) { 'dir:' + ((@(Get-ChildItem -LiteralPath $i.FullName -Force -Recurse | ForEach-Object { $_.Name }) | Sort-Object) -join '|') }
+                          else { 'file:' + [IO.File]::ReadAllText($i.FullName) }
+        }
+        return $h
+    }
+    $before = Kept
     $code = Run $ps51 $svc (@('-From', $unpacked) + $roots)
+    $after = Kept
+    $added = @($after.Keys | Where-Object { -not $before.ContainsKey($_) })
+    $changed = @($before.Keys | Where-Object { $after[$_] -ne $before[$_] })
+    $newFile = @($added | Where-Object { $_ -like 'config.json-before-restore-*' })
+    $newDir = @($added | Where-Object { $_ -like 'data-before-restore-*' })
+    $numbered = '-before-restore-\d{8}-\d{6}-\d+$'
     Yes "a run in the same second as the last keeps its copies beside that one's, not over or inside them (exit $code)" (
-        $code -eq 0 -and @(Get-ChildItem -LiteralPath $nSite -File -Filter 'config.json-before-restore-*-2').Count -eq ($was2File + 1) -and
-        @(Get-ChildItem -LiteralPath $nSite -Directory -Filter 'data-before-restore-*-2').Count -eq ($was2Dir + 1) -and
+        $code -eq 0 -and $changed.Count -eq 0 -and $newFile.Count -eq 1 -and $newDir.Count -eq 1 -and
+        $newFile[0] -match $numbered -and $newDir[0] -match $numbered -and
+        $after[$newFile[0]] -match 'stand-in' -and $after[$newDir[0]] -match '(^dir:|\|)board\.json(\||$)' -and
         @(Get-ChildItem -LiteralPath $nSite -Directory -Filter 'data-before-restore-*' | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'data') }).Count -eq 0)
+    if (-not ($changed.Count -eq 0 -and $newFile.Count -eq 1 -and $newDir.Count -eq 1)) {
+        Write-Host ('        added: {0}; changed: {1}' -f ($added -join ', '), ($changed -join ', '))
+    }
 
     $thin = Join-Path $work 'thin'
     Copy-Item -LiteralPath $unpacked -Destination $thin -Recurse
