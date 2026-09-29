@@ -26,26 +26,82 @@ the artist's deliverable is 4466 x 3016, and what is in the repo today is
 1535 x 1024, so this is a soft build of the right picture until that
 arrives.
 
+The second plate. Skyrim's Anniversary Edition menu draws logo01ae.nif as
+well as logo.nif, and both used to be the same plate, so the backdrop was
+drawn twice. Deleting logo01ae.nif is no cure: the game then draws the
+vanilla plate from Skyrim - Meshes1.bsa, a Bethesda logo over the backdrop.
+So game\\menu\\logo01ae.nif is an empty node (issue #425): the same header
+as logo.nif, one BSFadeNode with no children, and nothing to draw. It used
+to be a copy of the plate with its root scale set to 0, which hid the plate
+but left the shape in the scene for the engine to walk every frame.
+
 Usage:
-  py Build-Backdrop.py [<picture.png>] [<out.dds>]
+  python Build-Backdrop.py [<picture.png>] [<out.dds>]
+  python Build-Backdrop.py --blank-logo [<out.nif>]
 
 Defaults: launcher\\art\\thornswood-mainmenu-1535.png in, game\\menu\\
-Mainmenuwallpaper.dds out.
+Mainmenuwallpaper.dds out; --blank-logo reads game\\menu\\logo.nif and writes
+game\\menu\\logo01ae.nif.
 
-Needs Pillow 11 or newer for the DXT1 encoder:  py -m pip install pillow
+Needs Pillow 11 or newer for the DXT1 encoder:  python -m pip install pillow
+(--blank-logo needs nothing but Python.)
 """
 import struct
 import sys
 from pathlib import Path
 
-from PIL import Image
-
 TEX = 4096
 ROWS = 3005                      # V 0 .. 751/1024 on 4096, inclusive
 ASPECT = 1.4807558229            # the plane as drawn, from logo.nif
 HERE = Path(__file__).resolve().parent
-DEFAULT_SRC = HERE / "art" / "thornswood-mainmenu-1535.png"
-DEFAULT_OUT = HERE / "art" / "menu" / "Mainmenuwallpaper.dds"
+REPO = HERE.parent.parent
+MENU = REPO / "game" / "menu"
+DEFAULT_SRC = REPO / "launcher" / "art" / "thornswood-mainmenu-1535.png"
+DEFAULT_OUT = MENU / "Mainmenuwallpaper.dds"
+
+
+def blank_logo(plate):
+    """An empty copy of the menu plate: logo.nif's header, one BSFadeNode
+    with the same name and no children, root scale 0. Nothing to draw, and
+    the file still stops the game falling back to the vanilla plate."""
+    b = plate
+    o = b.index(b"\n") + 1
+    version, endian, user, blocks, bsver = struct.unpack_from("<IBIII", b, o)
+    if version != 0x14020007 or user != 12 or bsver != 100:
+        raise SystemExit("logo.nif is not a Skyrim SE nif (20.2.0.7, 12, 100)")
+    head_start = o
+    o += 17
+    for _ in range(3):                                  # author, process, export
+        o += 1 + b[o]
+    export_info = b[head_start + 17:o]
+    ntypes = struct.unpack_from("<H", b, o)[0]; o += 2
+    types = []
+    for _ in range(ntypes):
+        n = struct.unpack_from("<I", b, o)[0]; o += 4
+        types.append(b[o:o + n].decode("latin-1")); o += n
+    first = struct.unpack_from("<H", b, o)[0]
+    o += 2 * blocks + 4 * blocks
+    nstr = struct.unpack_from("<I", b, o)[0]; o += 8
+    n = struct.unpack_from("<I", b, o)[0]
+    name = b[o + 4:o + 4 + n] if nstr else b""
+    if types[first] != "BSFadeNode":
+        raise SystemExit("logo.nif's root is %s, not BSFadeNode" % types[first])
+
+    out = bytearray(b[:head_start])
+    out += struct.pack("<IBIII", version, endian, user, 1, bsver) + export_info
+    out += struct.pack("<HI", 1, 10) + b"BSFadeNode"
+    node = struct.pack("<iIiI3f9ffiII",
+                       0, 0, -1, 0x8000E,                # name, extra data, controller, flags
+                       0.0, 0.0, 0.0,                    # translation
+                       1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+                       0.0,                              # scale
+                       -1, 0, 0)                         # collision, children, effects
+    out += struct.pack("<HI", 0, len(node))
+    out += struct.pack("<III", 1, len(name), len(name)) + name
+    out += struct.pack("<I", 0)                         # groups
+    out += node
+    out += struct.pack("<Ii", 1, 0)                     # one root, block 0
+    return bytes(out)
 
 
 def fill(src, aspect):
@@ -75,6 +131,16 @@ def dxt1_payload(im):
 
 
 def main(argv):
+    if len(argv) > 1 and argv[1] == "--blank-logo":
+        out = Path(argv[2]) if len(argv) > 2 else MENU / "logo01ae.nif"
+        data = blank_logo((MENU / "logo.nif").read_bytes())
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(data)
+        print("wrote %s: one empty BSFadeNode, no shape, %d bytes" % (out, len(data)))
+        return 0
+
+    from PIL import Image
+
     src_path = Path(argv[1]) if len(argv) > 1 else DEFAULT_SRC
     out = Path(argv[2]) if len(argv) > 2 else DEFAULT_OUT
     src = Image.open(src_path).convert("RGB")
