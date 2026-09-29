@@ -83,6 +83,10 @@ const readTicket = (t) => (String(t || '').startsWith('tk:') ? { d: String(t).sl
 const body = async (req) => req.body;
 const sendJson = (res, code, obj) => { res.code = code; res.obj = obj; return res; };
 const slotsFor = () => 2;
+// The world is never full here (#481); test-seats.js runs that refusal.
+const gameStatus = { up: false, online: 0, max: 0 };
+const seatsFull = () => false;
+const worldFull = () => '';
 
 // standingCached, hasLeft and departed because the join route asks whether an
 // account holding the id has left the Discord before it reads the file it

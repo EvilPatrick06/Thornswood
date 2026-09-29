@@ -26283,6 +26283,7 @@ log('gamemode loaded:',
       try { clearInterval(globalThis.__thornswoodOnlineWriter); } catch (e) { }
     }
     var lastRestarting = false;
+    var lastMax = -1;
 
     globalThis.__thornswoodOnlineWriter = setInterval(function () {
       var n = 0;
@@ -26344,12 +26345,17 @@ log('gamemode loaded:',
       // Only when something moves. This file sits in a folder the server
       // serves, and rewriting it twice a second for no reason is churn nobody
       // asked for.
-      if (n === lastWritten && restarting === lastRestarting) return;
+      // And the most the world holds at once (#481), so the launcher and the
+      // site say "N of 25" from the server's own number.
+      var max = 0;
+      try { max = Number((mp.getServerSettings() || {}).thornswoodMostOnline) || 0; } catch (e) { max = 0; }
+      if (n === lastWritten && restarting === lastRestarting && max === lastMax) return;
       lastWritten = n;
       lastRestarting = restarting;
+      lastMax = max;
       try {
         fs.writeFileSync(onlineFile, JSON.stringify({
-          now: n, at: Date.now(), restarting: restarting
+          now: n, at: Date.now(), restarting: restarting, max: max
         }));
       } catch (e) { }
     }, 2000);
@@ -28035,6 +28041,187 @@ log('gamemode loaded:',
               ' on the ' + serverName() + ' server, key ' + (passKey(Date.now()) ? 'present' : 'MISSING'));
 })();
 // ==== end thornswood join pass ====
+
+
+// ==== thornswood seats ====
+/*
+  HOW MANY ARE IN THE WORLD AT ONCE (#481).
+
+  Patrick, 28 Sep: at most 25 people at once for the alpha, raised later.
+  Before this the engine's slot count (maxPlayers) was the only limit, and it
+  refuses at the network with nothing said and no way past it for staff.
+
+  THE NUMBER is thornswoodMostOnline in server-settings.json, written by the
+  deploy scripts from records\most-online.json, the one place it lives. The
+  engine's maxPlayers is set a few seats above it (staffSeats in that record)
+  so staff still reach this check when the world is full. No number here
+  means nobody is turned away for numbers.
+
+  WHO GETS A SEAT. Everybody in the world when this starts keeps theirs, so a
+  hot reload never ends a session. After that, each arrival takes a seat while
+  fewer than the number are seated. Past it, a staff role (isStaff in the chat
+  commands block: the admins, the written thornswoodDevs list and the site's
+  staff roles by way of allowed.json) is seated over the number, once a valid
+  join pass for that profile is on hand, because a profile id on its own is a
+  claim (#937). Staff get STAFF_WAIT_MS to show one. Anybody else past the
+  number is told one plain line, the log says "door: full", and the session
+  ends KICK_AFTER_MS later.
+
+  The site refuses Play first (/api/play/join, why "full") when it can see the
+  world is full, so most people are told before the game starts. This is the
+  check that holds when two people press Play at once.
+*/
+(function () {
+  var g = globalThis;
+
+  var SWEEP_MS = 2000;
+  var STAFF_WAIT_MS = 60000;   // staff over the number: this long to show a join pass
+  var KICK_AFTER_MS = 10000;   // after the line, so it is on screen first
+
+  function sentence(cap) {
+    return 'Thornswood is full: ' + cap + ' people are in the world, the most it holds at ' +
+           'once during the alpha. Try again in a few minutes.';
+  }
+
+  // On globalThis, so a hot reload keeps who holds a seat.
+  // seated: profile -> when; waiting: staff profile -> since; refused: profile -> when.
+  if (!g.__thornswoodSeatState) {
+    g.__thornswoodSeatState = { seated: {}, waiting: {}, refused: {}, primed: false };
+  }
+  var state = g.__thornswoodSeatState;
+
+  function settings() {
+    try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
+  }
+  /* The number, or 0 for none. */
+  function capOf(s) {
+    var n = Number((s || settings()).thornswoodMostOnline);
+    return (n > 0 && Math.floor(n) === n) ? n : 0;
+  }
+
+  /*
+    Once every SWEEP_MS. online is [{ actorId, profileId }] in the engine's
+    order; how is { cap, isStaff(pid), hasPass(pid, now), tell(pid, text),
+    end(pid, actorId), log(line) }. Returns what it decided this sweep.
+  */
+  function sweep(now, online, how) {
+    var cap = how.cap;
+    var out = { seated: 0, refused: [], staffOver: [], waiting: [] };
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      var p = Number(online[i] && online[i].profileId) || 0;
+      if (p) { here[p] = online[i].actorId; }
+    }
+    var lists = [state.seated, state.waiting, state.refused];
+    for (var l = 0; l < lists.length; l++) {
+      for (var k in lists[l]) {
+        if (Object.prototype.hasOwnProperty.call(lists[l], k) && here[k] === undefined) { delete lists[l][k]; }
+      }
+    }
+    // Everybody already in the world when this started keeps their seat.
+    if (!state.primed) {
+      state.primed = true;
+      var kept = 0;
+      for (var q in here) {
+        if (Object.prototype.hasOwnProperty.call(here, q)) { state.seated[q] = now; kept++; }
+      }
+      if (kept) { how.log('[thornswood] seats: ' + kept + ' already in the world keep their seats'); }
+    }
+    var count = 0;
+    for (var s in state.seated) {
+      if (Object.prototype.hasOwnProperty.call(state.seated, s)) { count++; }
+    }
+    for (var j = 0; j < online.length; j++) {
+      var pid = Number(online[j] && online[j].profileId) || 0;
+      if (!pid || state.seated[pid] || state.refused[pid]) { continue; }
+      if (!cap || count < cap) {
+        state.seated[pid] = now;
+        delete state.waiting[pid];
+        count++;
+        continue;
+      }
+      var staff = false;
+      try { staff = !!how.isStaff(pid); } catch (e) { staff = false; }
+      if (staff) {
+        var proven = false;
+        try { proven = !!how.hasPass(pid, now); } catch (e) { proven = false; }
+        if (proven) {
+          state.seated[pid] = now;
+          delete state.waiting[pid];
+          count++;
+          out.staffOver.push(pid);
+          how.log('[thornswood] seats: profile ' + pid + ' holds a staff role, seated over the number (' +
+                  count + ' in the world, the number is ' + cap + ')');
+          continue;
+        }
+        if (!state.waiting[pid]) { state.waiting[pid] = now; }
+        if (now - state.waiting[pid] < STAFF_WAIT_MS) { out.waiting.push(pid); continue; }
+      }
+      state.refused[pid] = now;
+      delete state.waiting[pid];
+      out.refused.push(pid);
+      how.log('[thornswood] door: full, refusing profile ' + pid + ': ' + count + ' of ' + cap +
+              ' already in the world' + (staff ? ' (a staff role, but no join pass was shown)' : ''));
+      how.tell(pid, sentence(cap));
+      how.end(pid, online[j].actorId);
+    }
+    out.seated = count;
+    return out;
+  }
+
+  function endLater(pid, actorId) {
+    setTimeout(function () {
+      var userId = -1;
+      try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
+      if (userId === undefined || userId === null || userId < 0) {
+        console.log('[thornswood] seats: profile ' + pid + ' left before the session was ended');
+        return;
+      }
+      try { mp.kick(userId); } catch (e) { console.log('[thornswood] seats: could not end profile ' + pid + ': ' + e); }
+    }, KICK_AFTER_MS);
+  }
+
+  function isStaff(pid) {
+    var f = g.__thornswoodIsStaff;
+    return typeof f === 'function' ? !!f(pid) : false;
+  }
+  function hasPass(pid, now) {
+    var seen = g.__thornswoodPassSeen;
+    var p = seen && seen.passes ? seen.passes[pid] : null;
+    return !!(p && Number(p.x) > now);
+  }
+
+  g.__thornswoodSeats = { sweep: sweep, cap: capOf, sentence: sentence,
+                          staffWait: STAFF_WAIT_MS, kickAfter: KICK_AFTER_MS };
+
+  if (g.__thornswoodSeatTimer) { clearInterval(g.__thornswoodSeatTimer); }
+  g.__thornswoodSeatTimer = setInterval(function () {
+    try {
+      var list = [];
+      var online = mp.get(0, 'onlinePlayers') || [];
+      for (var i = 0; i < online.length; i++) {
+        var pid = 0;
+        try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+        if (pid) { list.push({ actorId: online[i], profileId: pid }); }
+      }
+      var say = g.__thornswoodToProfile;
+      sweep(Date.now(), list, {
+        cap: capOf(), isStaff: isStaff, hasPass: hasPass,
+        tell: function (p, text) { if (say) { say(p, text); } },
+        end: endLater,
+        log: function (line) { console.log(line); }
+      });
+    } catch (e) {
+      console.log('[thornswood] seats sweep failed: ' + e);
+    }
+  }, SWEEP_MS);
+
+  var capNow = capOf();
+  console.log('[thornswood] seats: ' + (capNow
+    ? 'at most ' + capNow + ' in the world at once, staff roles may go over'
+    : 'no thornswoodMostOnline in server-settings.json, so nobody is turned away for numbers'));
+})();
+// ==== end thornswood seats ====
 
 
 // ==== thornswood progression ====
@@ -37409,6 +37596,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   function isStaff(profileId) {
     return isDev(profileId);
   }
+  // For the seats block, which seats staff over the number (#481).
+  g.__thornswoodIsStaff = isStaff;
 
   function isPlaytester(profileId) {
     if (isDev(profileId)) { return true; }

@@ -1500,12 +1500,13 @@ if (Test-Path $cfgPath) {
         # How many the room holds. A number, not a string, because the launcher
         # reads it as one and a quoted "25" comes back as zero, which reads as
         # no limit at all. It rides along for the same reason the address does:
-        # raising the cap should not need everybody to reinstall.
-        if ($cfg.PSObject.Properties.Name -contains 'MaxOnline') {
-            $mo = 0
-            [void][int]::TryParse([string]$cfg.MaxOnline, [ref]$mo)
-            if ($mo -gt 0) { Set-Prop $doc 'maxOnline' $mo }
-        }
+        # raising the cap should not need everybody to reinstall. From
+        # records\most-online.json, the one place the number lives, which the
+        # deploy scripts write into the servers too (#481); it used to be this
+        # machine's launcher config.json, which the launcher rewrites itself.
+        . (Join-Path $PSScriptRoot '..\deploy\MaxOnline.ps1')
+        $mo = (Get-MostOnline).Value
+        if ($mo -gt 0) { Set-Prop $doc 'maxOnline' $mo }
 
         # Which collection revision this release agrees with.
         #

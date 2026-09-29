@@ -581,7 +581,12 @@ const PAGES = {
   Checked every ten seconds rather than per request, because the front page is
   the most requested thing here and none of this changes that fast.
 */
-let gameStatus = { up: false, online: 0, at: 0 };
+/*
+  And the most the world holds at once (#481): the gamemode writes the
+  server's own number into the same file as max, so the page says "3 of 25"
+  and /api/play/join can say the world is full before the game starts.
+*/
+let gameStatus = { up: false, online: 0, max: 0, at: 0 };
 function pollGame() {
   const sock = new net.Socket();
   let done = false;
@@ -589,12 +594,13 @@ function pollGame() {
     if (done) return;
     done = true;
     try { sock.destroy(); } catch (e) { }
-    let online = 0;
+    let online = 0, max = 0;
     try {
       const o = JSON.parse(fs.readFileSync(cfg.onlineFile, 'utf8'));
       if (o && typeof o.now === 'number') online = o.now;
+      if (o && typeof o.max === 'number' && o.max > 0) max = o.max;
     } catch (e) { }
-    gameStatus = { up, online: up ? online : 0, at: Date.now() };
+    gameStatus = { up, online: up ? online : 0, max: up ? max : 0, at: Date.now() };
   };
   sock.setTimeout(1500);
   sock.once('connect', () => finish(true));
@@ -605,6 +611,15 @@ function pollGame() {
 }
 pollGame();
 setInterval(pollGame, 10000).unref?.();
+
+/* Whether the world is at its number, and what a person is told then (#481). */
+function seatsFull(st) {
+  return !!(st && st.up && st.max > 0 && st.online >= st.max);
+}
+function worldFull(max) {
+  return 'Thornswood is full: ' + max + ' people are in the world, the most it holds at once ' +
+    'during the alpha. Try again in a few minutes.';
+}
 
 const jsonFile = (p, fallback) => {
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fallback; }
@@ -3155,7 +3170,7 @@ async function handle(req, res) {
       open: cfg.open === true,
       invite: cfg.discord.invite || '',
       patreon: cfg.patreon || '',
-      status: { up: gameStatus.up, online: gameStatus.online },
+      status: { up: gameStatus.up, online: gameStatus.online, max: gameStatus.max },
       gallery: jsonFile(GALLERY, []),
       launcher: feed.launcher || '',
       collection: feed.collection || '',
@@ -4103,6 +4118,17 @@ async function handle(req, res) {
     const wantsDev = String(o.channel || '') === 'dev';
     if (wantsDev && !st.dev) return sendJson(res, 403, { ok:false, why:'dev', dev: false, message:
       'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
+    /*
+      The world is full (#481). The main server's own number, from online.json
+      (the dev build is staff only, and staff may go over it). Said here so the
+      person is told before the game starts; the gamemode's seats block is
+      what holds when two people press Play at once. Not remembered by the
+      launcher as a no, since a seat can free up a minute later.
+    */
+    if (!wantsDev && seatsFull(gameStatus) && !st.dev && !st.admin) {
+      return sendJson(res, 403, { ok:false, why:'full', online: gameStatus.online, max: gameStatus.max,
+        message: worldFull(gameStatus.max) });
+    }
 
     // The launcher sends the profile id it is about to play as. The game
     // server never sees a Discord account, only this number, so this is the
