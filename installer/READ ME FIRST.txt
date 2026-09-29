@@ -37,7 +37,9 @@ Installing
 2. Open Thornswood from the desktop shortcut. The server runs Skyrim build
    1.6.1170 and most copies are newer. If yours is, a card on the launcher's
    front page says so. Press Downgrade and Steam downloads that build under
-   your own account. It is a few gigabytes, so give it a while.
+   your own account, for Thornswood's own game folder. Your Steam copy is
+   not changed, so you can keep it on any build and mod it as you like. It
+   is a few gigabytes, so give it a while.
 
 3. Install the collection in Vortex. The link is on
    https://thornswood.net/downloads and on the launcher's Add-ons page. This

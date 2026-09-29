@@ -217,10 +217,16 @@ jobs:
           # its record matching, and the site and voice handing those records
           # back. Each reads only the checkout and a temp folder, a few
           # seconds to half a minute.
+          # Issues #1218 and #1217 added one: Thornswood's own folder follows
+          # Vortex whatever build the Steam copy is on, the Steam copy is never
+          # written, and a shared archive written over there is caught before
+          # Play. It compiles the launcher's OwnGame and Downgrade code and runs
+          # it on a pretend machine in a temp folder, a few seconds.
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1',
-                 'test-vps-defaults.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js'
+                 'test-vps-defaults.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
+                 'test-own-folder-alone.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n

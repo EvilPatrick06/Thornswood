@@ -279,15 +279,16 @@ if ($Collection) {
     }
 
     # No downgrade in this shape: the exe belongs to Steam and is not ours to
-    # replace. Say so now rather than at the end, after twenty minutes.
+    # replace, and the launcher never replaces it either (#1218). Say so now
+    # rather than at the end, after twenty minutes.
     $exeNow = Join-Path $SteamGamePath 'SkyrimSE.exe'
     $bytesNow = if (Test-Path $exeNow) { (Get-Item $exeNow).Length } else { 0 }
     if ($bytesNow -ne $TARGET_EXE_BYTES) {
         Write-Host ''
         Say '  This Skyrim is not build 1.6.1170, which is the one the server runs.' 'Yellow'
-        Say '  Thornswood installs anyway. Open the launcher and press Downgrade;' 'Yellow'
-        Say '  it puts your Steam copy back on 1.6.1170 for you. Play stays held' 'Yellow'
-        Say '  until the build matches.' 'Yellow'
+        Say '  Thornswood installs anyway. Open the launcher and press Downgrade:' 'Yellow'
+        Say '  Steam downloads 1.6.1170''s files and Thornswood makes its own game' 'Yellow'
+        Say '  folder from them. Your Steam copy stays on the build it is on.' 'Yellow'
         Write-Host ''
     }
 } else {
@@ -755,7 +756,8 @@ foreach ($k in $checks.Keys) {
         $later++
     } elseif ($Collection -and $k -eq 'Game 1.6.1170') {
         # A wrong build is not a failed install: the launcher's Downgrade
-        # button puts the Steam copy back on 1.6.1170. Counting it as a miss
+        # button fetches 1.6.1170 for Thornswood's own folder and leaves the
+        # Steam copy as it is (#1218). Counting it as a miss
         # kept the window shut on a screenshot and never opened the launcher
         # that fixes it. So count it as next and let the launcher open.
         Say "  [next] $k  the launcher's Downgrade button fixes this" 'Yellow'

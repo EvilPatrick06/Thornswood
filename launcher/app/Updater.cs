@@ -1078,37 +1078,18 @@ namespace Thornswood
             // the pack was in the game again at the next press of Play.
             Keep.Forget(removed);
 
-            // On a folder of Thornswood's own the same file can still be in
-            // the Steam copy the folder is made from, because the pack went in
-            // while this was a collection install and the folder took its copy
-            // from there. Refresh brings anything the source has and the folder
-            // does not straight back over. Only the paths this pack created are
-            // touched, the ones deleted above.
-            int fromSteam = 0;
-            string src = "";
-            try { if (OwnGame.Active) src = OwnGame.Source(cfg); }
-            catch (Exception ex) { Swallow.Note("Updater.RemovePack, own game source", ex); }
-            if (!string.IsNullOrEmpty(src))
-            {
-                foreach (string r in removed)
-                {
-                    string at;
-                    try { at = Path.GetFullPath(Path.Combine(src, r)); }
-                    catch { continue; }
-                    if (!Inside(at, src)) continue;
-                    try { if (File.Exists(at)) { File.Delete(at); fromSteam++; } } catch (Exception ex) { Swallow.Note("Updater.RemovePack, delete", ex); }
-                }
-            }
+            // Nothing is taken out of the Steam copy. A pack that went in while
+            // this was a collection install can still have a copy there, and
+            // this used to delete it, because a refresh brought back anything
+            // the Steam copy had and the folder did not. A refresh takes only
+            // Vortex's files now (#1218), so that copy never comes back, and
+            // the Steam copy is the person's and is not written.
 
             try { File.Delete(list); } catch (Exception ex) { Swallow.Note("Updater.RemovePack, delete", ex); }
             Unapply(p.id);
             Swap.RepairConfigs();
 
             string msg = p.Title + " removed, " + gone + " file" + (gone == 1 ? "" : "s") + " deleted.";
-            if (fromSteam > 0)
-                msg += "  " + fromSteam + " file" + (fromSteam == 1 ? "" : "s") +
-                       " also went from the Skyrim on Steam that Thornswood's own folder is made from, " +
-                       "or the next refresh would bring " + (fromSteam == 1 ? "it" : "them") + " back.";
             if (stuck > 0)
                 msg += "  " + stuck + " would not delete, usually because Skyrim is still open.";
             if (kept > 0)

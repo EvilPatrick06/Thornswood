@@ -25,7 +25,7 @@ namespace Thornswood
         /// </summary>
         static void HoldSteamUpdatesOnStart()
         {
-            string target = Downgrade.Target(cfg);
+            string target = OwnGame.Source(cfg);
             string manifest = SteamUpdates.ManifestFor(target);
             string what = SteamUpdates.OnStart(SteamUpdates.NeedsHolding(manifest), SteamUpdates.SteamRunning(), playing, cfg.SteamUpdatesDeclined);
             if (what == SteamUpdates.Write) { Log(SteamUpdates.Hold(manifest)); return; }
@@ -42,12 +42,14 @@ namespace Thornswood
         /// <summary>
         /// The question: whether the launcher should set Steam's Updates
         /// setting for Skyrim to "Wait until I launch the game"
-        /// (SteamUpdates). Asked on the way in (above) and after every
-        /// downgrade that worked. Nothing is written unless the person presses
-        /// Yes, and the question says what Yes changes and where.
+        /// (SteamUpdates). Asked on the way in (above). It used to follow every
+        /// downgrade as well, when the downgrade put the Steam copy on
+        /// 1.6.1170; the downgrade never writes the Steam copy now (#1218), so
+        /// there is nothing there for the setting to hold. Nothing is written
+        /// unless the person presses Yes, and the question says what Yes
+        /// changes and where.
         ///
-        /// Steam is usually running, and the downgrade always leaves it
-        /// running, because it needs Steam's console. A change made to the
+        /// Steam is usually running. A change made to the
         /// file while Steam runs is undone when Steam closes, so Yes closes
         /// Steam itself (steam://exit, the same as Steam, Exit), waits for it
         /// to go, makes the change, and starts Steam again in the tray, on a
@@ -59,7 +61,7 @@ namespace Thornswood
         static void AskToHoldSteamUpdates()
         {
             string manifest = "";
-            try { manifest = SteamUpdates.ManifestFor(Downgrade.Target(cfg)); } catch (Exception ex) { Swallow.Note("Shell.AskToHoldSteamUpdates, finding Steam's file for Skyrim", ex); }
+            try { manifest = SteamUpdates.ManifestFor(OwnGame.Source(cfg)); } catch (Exception ex) { Swallow.Note("Shell.AskToHoldSteamUpdates, finding Steam's file for Skyrim", ex); }
             if (!SteamUpdates.NeedsHolding(manifest)) return;
             if (playing || Checks.GameRunning()) return;
 
