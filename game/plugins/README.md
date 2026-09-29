@@ -20,7 +20,7 @@ a fresh session note, `Data\Platform\thornswood-session.txt`.
 From the repo folder, with the game closed:
 
 ```
-.\tools\Go.ps1 -SkipServer
+.\scripts\release\Go.ps1 -SkipServer
 ```
 
 copies every `.js` here into `C:\Thornswood\Game\Data\Platform\Plugins`
@@ -45,4 +45,4 @@ shipping machine's game folder and stops if a plugin there is not byte for
 byte the one in this folder, Publish-Update packs the ones that changed, and
 each launcher unpacks the pack into its game folder, keeps a copy of our files
 (Keep) and holds them read only while the game runs (Hold). Every change goes
-to the dev build first, with `.\tools\Ship.ps1 -Channel dev "what changed"`.
+to the dev build first, with `.\scripts\release\Ship.ps1 -Channel dev "what changed"`.

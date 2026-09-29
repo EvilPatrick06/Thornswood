@@ -74,13 +74,15 @@ def active_plugins(plugins_txt):
 
 
 def default_settings():
-    # The fork is the engine\skymp submodule of this repository once it has
-    # files in it, and C:\Thornswood-Dev\skymp until then: the same rule as
-    # scripts\release\Where.ps1, which the PowerShell scripts ask.
-    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # The fork is the engine\skymp submodule of this repository: the same
+    # rule as scripts\release\Where.ps1, which the PowerShell scripts ask.
+    # This file is in scripts\mods, so the repository is three folders up.
+    # It was two until 28 September, which since phase 8 of issue #440 found
+    # scripts\engine\skymp, missed, and fell back to the old folder no
+    # machine has any more (that fallback went the same day).
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo = os.path.dirname(os.path.dirname(here))
     fork = os.path.join(repo, "engine", "skymp")
-    if not os.path.exists(os.path.join(fork, "CMakeLists.txt")):
-        fork = r"C:\Thornswood-Dev\skymp"
     return os.path.join(fork, "build", "dist", "server", "server-settings.json")
 
 

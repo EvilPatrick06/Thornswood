@@ -37,7 +37,7 @@ $VpsPs1 = Join-Path $Repo 'scripts\vps\Vps.ps1'
 $VpsJson = Join-Path $Repo 'scripts\vps\vps.json'
 Yes 'scripts\vps\Vps.ps1 exists' (Test-Path -LiteralPath $VpsPs1)
 Yes 'scripts\vps\vps.json exists' (Test-Path -LiteralPath $VpsJson)
-Yes 'tools\Vps.ps1 shim exists' (Test-Path -LiteralPath (Join-Path $Repo 'tools\Vps.ps1'))
+Yes 'the tools\Vps.ps1 forwarding copy is gone (issue #440)' (-not (Test-Path -LiteralPath ([IO.Path]::Combine($Repo, 'tools', 'Vps.ps1'))))
 
 $expectedAddress = (Get-Content -LiteralPath $VpsJson -Raw | ConvertFrom-Json).address
 Yes 'vps.json has an address' (-not [string]::IsNullOrWhiteSpace($expectedAddress))
@@ -134,14 +134,6 @@ Yes 'empty $VpsHost fills from Vps.ps1' ($VpsHost -eq $expectedAddress)
 $VpsHost = '198.51.100.4'
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 Yes 'explicit -VpsHost still wins' ($VpsHost -eq '198.51.100.4')
-
-# tools shim dotsources the real helper
-$shim = Join-Path $Repo 'tools\Vps.ps1'
-Remove-Item Function:Get-ThornswoodVpsAddress -ErrorAction SilentlyContinue
-Remove-Item Function:Get-ThornswoodVps -ErrorAction SilentlyContinue
-Remove-Item Function:Get-ThornswoodVpsUser -ErrorAction SilentlyContinue
-. $shim
-Yes 'tools\Vps.ps1 shim resolves the same address' ((Get-ThornswoodVpsAddress) -eq $expectedAddress)
 
 # Every changed script (except Vps.ps1 itself) contains the fill line
 $missingFill = @()

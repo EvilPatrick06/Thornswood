@@ -22,10 +22,11 @@ server half are the same source now. `Deploy-Server.ps1` refuses a rebuilt
 as a change here. A different commit checked out in it still shows, and is
 committed here together with the new build records (`.gitmodules:7-10`).
 
-Scripts ask `scripts\release\Where.ps1` where things are: `Engine` is `engine\skymp`
-once it has a `CMakeLists.txt`, else the old `C:\Thornswood-Dev\skymp`
-(`Where.ps1:56-62`); `ServerDist` and `ClientDist` are `build\dist\server` and
-`build\dist\client` in it (`Where.ps1:74-75`); `Out` is the ignored `out`.
+Scripts ask `scripts\release\Where.ps1` where things are, and it reads
+`layout.json` at the repository root: `Engine` is `engine\skymp`, fetched or
+not (`layout.json:6`); `ServerDist` and `ClientDist` are `build\dist\server` and
+`build\dist\client` in it (`layout.json:10-11`); `Out` is the ignored `out`.
+The old `C:\Thornswood-Dev\skymp` is not looked at any more (issue #440).
 
 ## Fetching it
 

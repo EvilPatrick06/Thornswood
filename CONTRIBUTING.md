@@ -137,8 +137,9 @@ How to use it:
   output (packs, launcher, installer, server payload) is `out`, ignored by
   git; anything else that folder held and that never goes to GitHub is
   `local`, ignored too. Scripts ask `scripts\release\Where.ps1` where each of these is
-  rather than naming a path, and it falls back to `C:\Thornswood-Dev` on a
-  machine that still has it, so nothing breaks halfway through the move.
+  rather than naming a path. It no longer falls back to `C:\Thornswood-Dev`:
+  no machine has that folder any more, and the fallback went on 28 Sep
+  (issue #440), along with the forwarding copies in `tools\`.
 - Launcher code is C# 5 only: no string interpolation, no ?., no nameof,
   no expression bodied members, no out var.
 - Every change goes out as one complete release: launcher, game files and
