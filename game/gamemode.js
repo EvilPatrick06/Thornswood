@@ -27587,6 +27587,232 @@ log('gamemode loaded:',
 // ==== end thornswood load order refusal ====
 
 
+// ==== thornswood join pass ====
+/*
+  NOBODY IS IN THE WORLD WHO DID NOT COME THROUGH AN UP TO DATE LAUNCHER (#937).
+
+  Patrick, 28 Sep: "People should not be allowed in at all if they don't join
+  from our launcher." Until this only the launcher checked: it holds Play while
+  an update waits, but the server never asked which launcher, if any, started
+  the game. Skyrim or skse started by hand, another launcher, or an old one of
+  ours walked straight in, under a profile id the client picks (#410).
+
+  THE PASS. When a character is picked at the menu, the launcher asks the site
+  (/api/play/pass) with the Discord ticket it holds. The site answers only for
+  an account that may play, for its own character, from a launcher between the
+  channel's minLauncher and its current one, and signs the profile, the server,
+  the launcher version, the Discord id and a ten minute expiry with the key it
+  shares with this server: passKey in door.json, which Set-Door.ps1 -Connect
+  copies there from the site. The launcher leaves it in
+  Data/Platform/thornswood-pass.txt and renews it every four minutes, and the
+  front plugin sends it here as "/joinpass <pass>" over the command relay, at
+  once and every minute. The format is makePass in site/server.js.
+
+  WHAT IS CHECKED, here and with nothing asked of anybody: the signature, the
+  expiry, that it names this server (thornswoodServer in server-settings.json,
+  "dev" on the dev box, "main" when absent), and that its profile is the one
+  the relay says sent it, which the voice join token proves.
+
+  THE PROFILE ID IS THE PASS'S. Every profile online needs a valid pass
+  received since it was first seen, or in the minute before. One with none is
+  told one line and ended GRACE_MS after it was first seen. A session under
+  somebody else's number cannot have a pass for it: the site will not issue
+  one and nothing else can sign one. A pass is forgotten when its profile
+  leaves, so a reconnect needs a fresh one, which the front sends within the
+  minute and the launcher keeps fresh.
+
+  THE SERVER'S OWN FAILURES REFUSE TOO, decided on purpose (the standing rule
+  is that refusing is the secure side, #937): no passKey in door.json, a relay
+  that is down, a site that would not issue a pass. Each leaves a session with
+  no valid pass, and the log says which.
+
+  WATCHING UNTIL IT IS SWITCHED ON. thornswoodRequirePass true in
+  server-settings.json ends sessions; anything else writes WOULD REFUSE and
+  lets them stay, so the server can go out before a launcher that fetches the
+  pass does. Deploy-DevGamemode.ps1 -RequirePass on|off sets it on the dev box.
+  No older launcher or plugin is kept working once it is on (Patrick, 28 Sep).
+*/
+(function () {
+  var g = globalThis;
+  var crypto = null, fs = null, path = null;
+  try { crypto = require('crypto'); fs = require('fs'); path = require('path'); } catch (e) { }
+
+  var GRACE_MS = 180000;      // online this long with no valid pass: ended
+  var BEFORE_MS = 60000;      // a pass this long before the session was first seen counts
+  var SWEEP_MS = 5000;
+  var KEY_READ_MS = 60000;
+  var SAY_AGAIN_MS = 600000;  // the same bad pass is logged at most this often
+  var SENTENCE = 'This game was not started from an up to date Thornswood launcher, so ' +
+                 'the session is being ended. Open the Thornswood launcher, let it update, ' +
+                 'then press Play.';
+
+  // On globalThis, so a hot reload keeps who has shown a pass.
+  // passes: profile -> { at, x, v }; online: profile -> { joined, judged, actorId }.
+  if (!g.__thornswoodPassSeen) { g.__thornswoodPassSeen = { passes: {}, online: {}, said: {} }; }
+  var seen = g.__thornswoodPassSeen;
+
+  function settings() {
+    try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
+  }
+  function requiring() { return settings().thornswoodRequirePass === true; }
+  function serverName() {
+    return String(settings().thornswoodServer || '').trim().toLowerCase() || 'main';
+  }
+
+  var keyAt = 0;
+  var keyHad = '';
+  function passKey(now) {
+    if (keyAt && now - keyAt < KEY_READ_MS) { return keyHad; }
+    keyAt = now;
+    var k = '';
+    try {
+      var dir = String(settings().privDir || 'private');
+      var doc = JSON.parse(String(fs.readFileSync(path.join(dir, 'door.json'), 'utf8')).replace(/^﻿/, ''));
+      k = String((doc && doc.passKey) || '');
+    } catch (e) { k = ''; }
+    if (!k && fresh('no key', now)) {
+      console.log('[thornswood] door.json has no passKey, so no join pass can be checked and every ' +
+                  'session counts as having none. Set-Door.ps1 -Connect copies it from the site.');
+    }
+    keyHad = k;
+    return k;
+  }
+
+  /* True when this line has not been said lately. */
+  function fresh(key, now) {
+    if (seen.said[key] && now - seen.said[key] < SAY_AGAIN_MS) { return false; }
+    seen.said[key] = now;
+    return true;
+  }
+
+  function b64u(buf) {
+    return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  /*
+    What a pass says, or why it says nothing. { ok, p, v, x } or { why, p }.
+    The signature is checked before anything in the body is believed, with
+    timingSafeEqual, so how long this takes says nothing about a guess.
+  */
+  function readPass(raw, key, now, server) {
+    if (!key) { return { why: 'this server has no join pass key' }; }
+    var parts = String(raw == null ? '' : raw).trim().split('.');
+    if (parts.length !== 3 || parts[0] !== 'jp1' || !parts[1] || !parts[2]) { return { why: 'not a join pass' }; }
+    var want = Buffer.from(b64u(crypto.createHmac('sha256', key).update('jp1.' + parts[1]).digest()));
+    var got = Buffer.from(parts[2]);
+    if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) {
+      return { why: 'a signature that does not check out' };
+    }
+    var o = null;
+    try { o = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8')); } catch (e) { o = null; }
+    var p = o ? Number(o.p) : 0;
+    if (!o || !(p > 0) || !(Number(o.x) > 0)) { return { why: 'a pass with nothing in it' }; }
+    if (now > Number(o.x)) { return { why: 'an expired pass', p: p }; }
+    if (String(o.s) !== server) { return { why: 'a pass for the ' + String(o.s) + ' server', p: p }; }
+    return { ok: true, p: p, v: String(o.v || ''), x: Number(o.x) };
+  }
+
+  /* One "/joinpass <pass>" from the relay, sent under profileId. */
+  function take(profileId, raw, now) {
+    var r = readPass(raw, passKey(now), now, serverName());
+    if (r.ok && r.p !== profileId) { r = { why: 'a pass for profile ' + r.p, p: r.p }; }
+    if (!r.ok) {
+      if (fresh('bad ' + profileId + ' ' + r.why, now)) {
+        console.log('[thornswood] join pass from profile ' + profileId + ' not taken: ' + r.why);
+      }
+      return r;
+    }
+    if (!seen.passes[profileId]) {
+      console.log('[thornswood] join pass for profile ' + profileId + ', launcher ' + r.v);
+    }
+    seen.passes[profileId] = { at: now, x: r.x, v: r.v };
+    return r;
+  }
+
+  // After the sentence, so it is on screen before the connection goes.
+  function refuseLater(profileId, actorId) {
+    setTimeout(function () {
+      var userId = -1;
+      try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
+      if (userId === undefined || userId === null || userId < 0) {
+        console.log('[thornswood] could not find the connection of profile ' + profileId + ', so they stayed');
+        return;
+      }
+      try { mp.kick(userId); } catch (e) { console.log('[thornswood] could not end profile ' + profileId + ': ' + e); }
+    }, 5000);
+  }
+
+  /*
+    Once every SWEEP_MS. online is [{ actorId, profileId }]; tell(profileId,
+    text) says a line. Returns the profiles judged to have no pass this sweep.
+  */
+  function sweep(now, online, tell) {
+    var here = {};
+    var judged = [];
+    for (var i = 0; i < online.length; i++) {
+      var pid = Number(online[i] && online[i].profileId) || 0;
+      if (!pid) { continue; }
+      here[pid] = true;
+      var e = seen.online[pid];
+      if (!e) { e = seen.online[pid] = { joined: now, judged: false, actorId: 0 }; }
+      e.actorId = online[i].actorId;
+      if (e.judged) { continue; }
+      var had = seen.passes[pid];
+      if (had && had.at >= e.joined - BEFORE_MS) { e.judged = true; continue; }
+      if (now - e.joined < GRACE_MS) { continue; }
+      e.judged = true;
+      judged.push(pid);
+      var why = passKey(now) ? 'no valid join pass in ' + Math.round((now - e.joined) / 1000) + 's online'
+                             : 'this server has no join pass key in door.json';
+      if (!requiring()) {
+        console.log('[thornswood] WOULD REFUSE profile ' + pid + ': ' + why +
+                    '. Watching only, they stayed (thornswoodRequirePass is not true).');
+        continue;
+      }
+      tell(pid, SENTENCE);
+      console.log('[thornswood] refusing profile ' + pid + ': ' + why);
+      refuseLater(pid, e.actorId);
+    }
+    // Gone: the next session under that number needs a pass of its own.
+    for (var k in seen.online) {
+      if (Object.prototype.hasOwnProperty.call(seen.online, k) && !here[k]) {
+        delete seen.online[k];
+        delete seen.passes[k];
+      }
+    }
+    for (var q in seen.passes) {
+      if (Object.prototype.hasOwnProperty.call(seen.passes, q) && !here[q] &&
+          now - seen.passes[q].at > BEFORE_MS) { delete seen.passes[q]; }
+    }
+    return judged;
+  }
+
+  g.__thornswoodJoinPass = { take: take, sweep: sweep, readPass: readPass,
+                             grace: GRACE_MS, sentence: SENTENCE };
+
+  if (g.__thornswoodPassTimer) { clearInterval(g.__thornswoodPassTimer); }
+  g.__thornswoodPassTimer = setInterval(function () {
+    try {
+      var list = [];
+      var online = mp.get(0, 'onlinePlayers') || [];
+      for (var i = 0; i < online.length; i++) {
+        var pid = 0;
+        try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+        if (pid) { list.push({ actorId: online[i], profileId: pid }); }
+      }
+      var say = g.__thornswoodToProfile;
+      sweep(Date.now(), list, function (p, text) { if (say) { say(p, text); } });
+    } catch (e) {
+      console.log('[thornswood] join pass sweep failed: ' + e);
+    }
+  }, SWEEP_MS);
+
+  console.log('[thornswood] join pass ' + (requiring() ? 'REQUIRED' : 'watched only') +
+              ' on the ' + serverName() + ' server, key ' + (passKey(Date.now()) ? 'present' : 'MISSING'));
+})();
+// ==== end thornswood join pass ====
+
+
 // ==== thornswood progression ====
 /*
   The rulebook, as data and as rules. Patrick, 20 September.
@@ -34884,6 +35110,15 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     var profileId = Number(cmd && cmd.profileId) || 0;
     var parts = String((cmd && cmd.text) || '').trim().split(/\s+/);
     var word = parts[0].toLowerCase();
+    // The launcher's join pass, from the front plugin (#937). Needs no
+    // character and answers nothing; see the join pass block.
+    if (word === '/joinpass') {
+      var jp = g.__thornswoodJoinPass;
+      if (jp && profileId) {
+        try { jp.take(profileId, parts[1], Date.now()); } catch (eJp) { log('/joinpass failed:', eJp); }
+      }
+      return;
+    }
     if (!profileId || runsNow(word, parts)) { handle(cmd); return; }
 
     var q = held[profileId];
