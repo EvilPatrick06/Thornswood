@@ -66,6 +66,7 @@ $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $writer = Join-Path $Here '..\vps\Write-BotToken.ps1'
 . $writer
@@ -83,9 +84,10 @@ function Done([int]$code) { Write-Host ''; if (-not $NoPause) { [void](Read-Host
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Done 1 }
 
 # The remote scripts here are short on purpose: the writer goes up as a file
-# first, so what goes on the command line is a few lines and the payload. That
-# keeps the token off the disk on both machines, where the long form, a script
-# sent as a temp file, would have put it.
+# first, so what goes on the command line is a few lines. The token itself goes
+# on ssh's standard input (Send-Secret.ps1, issue #451), so it is on no command
+# line and in no file on either machine. Until then it went base64'd inside
+# the command line, which a comment here called never a word on one.
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
   # Bypass, because the script dot-sources the writer from a file, and a file
@@ -151,17 +153,14 @@ if (-not $app) {
 }
 Say "  a bot token for application $app" 'Green'
 
-# Base64 so the token is never a word on a command line on either machine.
-$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($token))
-$token = $null
-
 $any = ''
 if ($AnyApplication) { $any = ' -AnyApplication' }
 
 # --------------------------------------------------------------- write ---
 Head 'Writing both files, then restarting the bot and the site'
 SendWriter
-$out = Remote @"
+# The token goes on ssh's standard input and arrives as $ThornswoodSecret.
+$out = Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Bypass -Secret $token -Script @"
 `$ErrorActionPreference = 'Continue'
 try {
   . '$farWin'
@@ -169,10 +168,8 @@ try {
     'NOT WRITTEN: Write-BotToken.ps1 did not load on the VPS. Nothing changed.'
     return
   }
-  # Caught and never shown: an error on this line would print the line, and
-  # the line holds the payload.
-  `$t = ''
-  try { `$t = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64')) } catch { }
+  `$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+  if (-not `$t) { 'NOT WRITTEN: nothing arrived on standard input. Nothing changed.'; return }
   `$r = Write-ThornswoodBotToken -Token `$t -BotEnv '$envFile' -SiteConfig '$cfgFile'$any
   `$t = `$null
   `$r.Lines
@@ -186,7 +183,7 @@ try {
   Get-ThornswoodBotTokenState -BotEnv '$envFile' -SiteConfig '$cfgFile'
 } finally { Remove-Item -LiteralPath '$farWin' -Force -EA SilentlyContinue }
 "@
-$b64 = $null
+$token = $null
 Show $out
 
 if ("$out" -match 'NOT WRITTEN') {

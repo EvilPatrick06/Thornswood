@@ -79,6 +79,7 @@ $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $App  = Join-Path $Here '..\..\site'
 
@@ -285,13 +286,14 @@ if ($Password) {
   # and node writes none. Written with no mark, because one is how the site
   # once ran for days on its defaults while looking configured.
   #
-  # Base64 so quoting survives ssh, cmd and PowerShell. It still travels inside
-  # the command handed to ssh, so while this runs it is on the command line of
-  # ssh here and of powershell on the VPS.
-  $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Password))
-  Remote @"
+  # The password goes on ssh's standard input (Send-Secret.ps1, issue #451),
+  # so it is on no command line on either machine and in no file. Until then
+  # it was base64'd into this script, which put it on the command line of ssh
+  # here and of powershell on the VPS for the length of the call.
+  Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $Password -Script @"
 `$ErrorActionPreference = 'Stop'
-`$pw = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64'))
+`$pw = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+if (-not `$pw) { 'NOTHING ARRIVED on standard input. Nothing written, the password is unchanged.'; return }
 `$f = '$rootWin\config.json'
 `$cfg = [ordered]@{}
 if (Test-Path -LiteralPath `$f) {
