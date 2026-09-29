@@ -621,7 +621,7 @@ foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRS
 #
 # Measured 24 September: git ls-remote against the public fork, with no
 # credentials, answers c8832519866e for thornswood/engine-changes, the commit
-# both records named that day. Both name b6721bb0 since 27 September, and this
+# both records named that day. Both name the pinned commit since #1200, and this
 # note reads them rather than repeating either. Which folder builds which file
 # was read off the fork's own build files at that commit, and each licence off
 # that folder's LICENSE.

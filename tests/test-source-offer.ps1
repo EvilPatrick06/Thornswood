@@ -19,8 +19,8 @@
   MEASURED 24 SEPTEMBER. git ls-remote against the public fork with no
   credentials answers c8832519866e for thornswood/engine-changes, the commit
   both records named that day, and the tree, compare and upstream links on the
-  page all answer 200 signed out. Both records name b6721bb0 since 27
-  September, and this file reads them rather than holding a commit of its own.
+  page all answer 200 signed out. Both records name the pinned commit since
+  #1200, and this file reads them rather than holding a commit of its own.
 
   NOT ALL OF IT IS OURS. The 23 September installer stage also carried
   Data\Platform\UI\build.js (a webpack build of skymp5-front, GPL v3, dated
