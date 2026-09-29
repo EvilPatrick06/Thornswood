@@ -458,8 +458,11 @@ namespace Thornswood
         /// 9: body shape sliders and jiggle (CBPC's cbp.dll and the three
         ///    RaceMenu body slider scripts) are left out, and taken out of a
         ///    folder that already has them. See BodyShape, issue #993.
+        /// 10: Bethesda's Creation Kit and copies of the game's own programs
+        ///    are left out, and taken out of a folder that already has them.
+        ///    See BethesdaTool, issue #1152.
         /// </summary>
-        const int Rules = 9;
+        const int Rules = 10;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -726,6 +729,16 @@ namespace Thornswood
                     if (File.Exists(dest)) { DropName(dest); removed++; }
                 }
                 catch (Exception ex) { Swallow.Note("OwnGame.Refresh, drop body shape", ex); }
+            }
+
+            // And Bethesda's Creation Kit and copies of the game's programs
+            // (#1152), whoever put them here: the Steam copy, or a pack that
+            // carried them before Ship-Rules kept them out. Only this folder's
+            // names go; a Creation Kit in the Steam copy is the person's own.
+            foreach (string dest in BethesdaToolsIn(Folder))
+            {
+                try { if (File.Exists(dest)) { DropName(dest); removed++; } }
+                catch (Exception ex) { Swallow.Note("OwnGame.Refresh, drop Bethesda tool", ex); }
             }
 
             File.WriteAllLines(FilesList, lines.ToArray());
@@ -1119,7 +1132,71 @@ namespace Thornswood
             if (CrashesUs(rel)) return "it crashes the quick favourites menu";
             if (Retired(rel)) return "Start On Save is no longer part of Thornswood";
             if (BodyShape(rel)) return "body shape sliders and jiggle are not part of Thornswood";
+            if (BethesdaTool(rel)) return "Bethesda's Creation Kit or a copy of one of the game's programs, not part of Thornswood";
             return null;
+        }
+
+        /// <summary>
+        /// Bethesda's Creation Kit and copies of the game's own programs, never
+        /// part of Thornswood's folder (#1152).
+        /// </summary>
+        /// <remarks>
+        /// Steam installs the Creation Kit into the Steam copy, and this folder
+        /// used to take it from there like any file Vortex did not deploy. The
+        /// shipping machine's folder then held CreationKit.exe, its Tools,
+        /// Papyrus Compiler and lex folders, Data\DialogueViews, Data\Scripts.zip
+        /// and SkyrimSE.exe.bak-1160-for-369, a copy of Skyrim itself, and packs
+        /// handed them to everybody as files of ours. The game needs none of
+        /// them, and they are Bethesda's.
+        ///
+        /// Refresh also deletes them from a folder that has them; Rules 10 makes
+        /// every folder refresh once to do it. Only this folder's names go: a
+        /// hard link removed here leaves the Steam copy's file where it is.
+        /// Ship-Rules.ps1 keeps the same files out of every pack, record and
+        /// installer (Test-ShipBethesdaTool); change the two together.
+        /// </remarks>
+        static readonly string[] BethesdaToolDirs = { "Tools", "Papyrus Compiler", "lex", "Data\\DialogueViews" };
+        static readonly string[] BethesdaToolFiles = {
+            "flowchartx64.dll", "flowchartx32.dll", "p4com64.dll",
+            "EditorWarnings.txt", "DataFiles.txt", "SkyrimReservedAddOnIndexes.txt",
+            "Data\\Scripts.zip",
+        };
+
+        static bool BethesdaTool(string rel)
+        {
+            foreach (string d in BethesdaToolDirs)
+                if (rel.StartsWith(d + "\\", StringComparison.OrdinalIgnoreCase)) return true;
+            foreach (string f in BethesdaToolFiles)
+                if (rel.Equals(f, StringComparison.OrdinalIgnoreCase)) return true;
+            if (rel.IndexOf('\\') >= 0) return false;
+            if (rel.StartsWith("CreationKit", StringComparison.OrdinalIgnoreCase)) return true;
+            // A copy of one of the game's programs under another name, such as
+            // SkyrimSE.exe.bak-1160-for-369. The programs themselves stay.
+            return Regex.IsMatch(rel, @"^(SkyrimSE|SkyrimSELauncher|skse64_loader)\.exe.", RegexOptions.IgnoreCase);
+        }
+
+        /// <summary>Every file in the folder that BethesdaTool names.</summary>
+        static List<string> BethesdaToolsIn(string folder)
+        {
+            var found = new List<string>();
+            try
+            {
+                if (!Directory.Exists(folder)) return found;
+                foreach (string f in Directory.GetFiles(folder))
+                    if (BethesdaTool(Path.GetFileName(f))) found.Add(f);
+                foreach (string rel in BethesdaToolFiles)
+                {
+                    string p = Path.Combine(folder, rel);
+                    if (rel.IndexOf('\\') >= 0 && File.Exists(p)) found.Add(p);
+                }
+                foreach (string d in BethesdaToolDirs)
+                {
+                    string p = Path.Combine(folder, d);
+                    if (Directory.Exists(p)) found.AddRange(Directory.GetFiles(p, "*", SearchOption.AllDirectories));
+                }
+            }
+            catch (Exception ex) { Swallow.Note("OwnGame.BethesdaToolsIn", ex); }
+            return found;
         }
 
         /// <summary>
