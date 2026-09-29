@@ -310,11 +310,37 @@ $bsa = 'Data\MarketplaceTextures.bsa'
 Yes 'MarketplaceTextures.bsa is one machine''s own: never shipped, never removed' (Test-ShipMachine $bsa)
 Yes 'whatever the case of the path' (Test-ShipMachine 'data\marketplacetextures.bsa')
 Yes 'only at the Data root, not a file of that name in a mod folder' (-not (Test-ShipMachine 'Data\textures\MarketplaceTextures.bsa'))
-Yes 'and not a name that merely starts the same way' (-not (Test-ShipMachine 'Data\MarketplaceTextures.bsa.bak'))
+Yes 'and not a name that merely starts the same way' (-not (Test-ShipMachine 'Data\MarketplaceTextures.bsa2'))
 Yes 'it is not a runtime path, which would list it as removed' (-not (Test-ShipRuntime $bsa))
 Yes 'it is not on the list every pack deletes' (@(Get-ShipDeleteAlways) -notcontains $bsa)
 Yes 'a mod''s own archive beside it still ships' (-not (Test-ShipMachine 'Data\SkyUI_SE.bsa'))
 Yes 'and so does our own plugin' (-not (Test-ShipMachine 'Data\Thornswood-Content.esp'))
+
+# ---- Bethesda's Creation Kit and a copy of the game, issue #1152 ----------------
+#
+# The dev record of 29 September listed all of these as files of ours, and main
+# pack 20260926-1603 carried the Creation Kit and the copy of SkyrimSE.exe.
+# Never shipped, never in a record, never listed as removed (a pack's delete
+# list reaches a Steam copy, where a Creation Kit is the person's own); the
+# launcher takes them out of its own game folder. tests\test-no-bethesda-files.ps1
+# holds the rest.
+$ck = @(
+    'CreationKit.exe', 'CreationKit.ini', 'CreationKitPrefs.ini',
+    'SkyrimSE.exe.bak-1160-for-369',
+    'Tools\AssetWatcher\AssetWatcher.exe', 'Tools\HavokBehaviorPostProcess\HavokBehaviorPostProcess.exe',
+    'Tools\RoboVoicer.exe', 'Tools\Archive\Archive.exe', 'Tools\redist\VC_redist.x64.exe',
+    'Papyrus Compiler\PapyrusCompiler.exe', 'lex\ssceam.tlx',
+    'Data\DialogueViews\0001A2A8.xml', 'Data\Scripts.zip',
+    'flowchartx64.dll', 'flowchartx32.dll', 'p4com64.dll',
+    'EditorWarnings.txt', 'DataFiles.txt', 'SkyrimReservedAddOnIndexes.txt'
+)
+foreach ($rel in $ck) {
+    Yes "$rel is Bethesda's: never shipped, never removed" ((Test-ShipBethesdaTool $rel) -and (Test-ShipMachine $rel) -and -not (Test-ShipRuntime $rel))
+}
+foreach ($rel in @('VERSION.bak', 'Data\SKSE\Plugins\SkyrimPlatform.ini.bak', 'Data\SKSE\Plugins\SkyrimPlatform.ini.2026-09-19T20-17-00-253Z.bak')) {
+    Yes "$rel, a backup the same record carried, is never shipped or removed" ((Test-ShipBackup $rel) -and (Test-ShipMachine $rel))
+}
+Yes 'one person''s face tint the same record carried is runtime' (Test-ShipRuntime 'Data\textures\CharGen\Exported\Adventurer3424.dds')
 
 # ---- the shipped diff, lifted out of Publish-Update.ps1 ------------------------
 #
@@ -338,7 +364,10 @@ $prev = @{}
 $prev[$bsa] = '2938167:639246568900000000'
 $prev['Data\meshes\gone\old.nif'] = '100:1'
 $prev['Data\Platform\Plugins\thornswood-hud.js'] = '10:1'
-$onDisk = @($bsa, 'Data\Platform\Plugins\thornswood-hud.js')
+# #1152: the last record listed the Creation Kit and the copy of the game.
+$prev['CreationKit.exe'] = '48685408:1'
+$prev['SkyrimSE.exe.bak-1160-for-369'] = '37157144:1'
+$onDisk = @($bsa, 'Data\Platform\Plugins\thornswood-hud.js', 'CreationKit.exe')
 $now = @{}
 foreach ($rel in $onDisk) {
     if (Test-Machine $rel) { continue }
@@ -350,6 +379,8 @@ Yes 'the next pack does not carry MarketplaceTextures.bsa' (-not $now.ContainsKe
 Yes 'and does not list it as changed' ($changed -notcontains $bsa)
 Yes 'and does not list it as removed, so no tester loses it' ($removed -notcontains $bsa)
 Yes 'the lifted diff is live: a mesh that really went is still removed' ($removed -contains 'Data\meshes\gone\old.nif')
+Yes 'the next pack does not carry the Creation Kit, nor list it as removed' (-not $now.ContainsKey('CreationKit.exe') -and $removed -notcontains 'CreationKit.exe')
+Yes 'nor list the copy of SkyrimSE.exe as removed, which could reach a Steam copy' ($removed -notcontains 'SkyrimSE.exe.bak-1160-for-369')
 Yes 'and our overlay is neither changed nor removed' (($changed -notcontains 'Data\Platform\Plugins\thornswood-hud.js') -and ($removed -notcontains 'Data\Platform\Plugins\thornswood-hud.js'))
 
 # ---- the installer asks the same question ----------------------------------------
