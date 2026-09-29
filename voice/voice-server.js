@@ -1630,7 +1630,9 @@ server.on('upgrade', (req, socket, head) => {
       // placeatme, disable, mp) and coc is not one of them, so a coc moves you
       // in your own game and the server puts you straight back.
       if (!verb && text.charAt(0) === '/') {
-        chatWrite('command', myId, me, text);
+        // A join pass is good for ten minutes to whoever holds it, so the
+        // chat log keeps that one was sent and never the pass itself (#937).
+        chatWrite('command', myId, me, /^\/joinpass\b/i.test(text) ? '/joinpass [pass]' : text);
         // Full: the newest is refused and its sender told, and everything
         // already taken stays. See the note over COMMAND_CAP.
         if (commands.length >= COMMAND_CAP) {

@@ -137,6 +137,12 @@ param(
     # announces and this writes as maxPlayers. Empty means the one
     # Publish-Update.ps1 would find. See MaxOnline.ps1.
     [string]$LauncherRoot = '',
+    # thornswoodRequirePass for the live server (#937): on ends a session that
+    # shows no join pass from an up to date launcher, off only logs WOULD
+    # REFUSE. Left off, the built settings keep what they have. Live goes on
+    # only when Patrick says Main.
+    [ValidateSet('', 'on', 'off')]
+    [string]$RequirePass = '',
     # Deploy even though the collection installed here is behind the one
     # Vortex knows is out. For the case where that is deliberate; it is a
     # refusal rather than a warning because a warning in a long run is a line
@@ -569,6 +575,14 @@ if ($s.PSObject.Properties.Name -contains 'thornswoodVoicePort' -and
     Write-Host '  A value that is not ours here means a dev deploy was pointed at this folder.' -ForegroundColor DarkGray
 }
 $s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
+# Which server a join pass must name (#937). Asserted for the same reason as
+# the voice port: a dev deploy pointed at this folder writes dev here, and the
+# live server would then refuse every pass the site issues for it.
+$s | Add-Member -NotePropertyName thornswoodServer -NotePropertyValue 'main' -Force
+if ($RequirePass) {
+    $s | Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue ($RequirePass -eq 'on') -Force
+}
+Write-Host ("  join pass: {0}" -f $(if ($s.thornswoodRequirePass -eq $true) { 'required' } else { 'watched only, nobody refused' })) -ForegroundColor DarkGray
 # Server-simulated NPCs. Off is SkyMP's default and it is the Skyrim Together
 # behaviour we are leaving behind: everyone gets their own private copy of every
 # bandit. On means one shared world. npcSettings stays empty, which is "no

@@ -62,6 +62,7 @@ function Run-Block([string]$value, [hashtable]$settings) {
     $VoicePort = 7789
     $maxOnline = 0
     $LoadOrderRefuse = $value
+    $RequirePass = ''
     $expanded = $ExecutionContext.InvokeCommand.ExpandString($body)
     $file = Join-Path $tmp 'block.ps1'
     [IO.File]::WriteAllText($file, $expanded, (New-Object Text.UTF8Encoding $true))
@@ -71,7 +72,7 @@ function Run-Block([string]$value, [hashtable]$settings) {
 }
 
 $base = [ordered]@{
-    port = 7787; thornswoodVoicePort = 7789
+    port = 7787; thornswoodVoicePort = 7789; thornswoodServer = 'dev'
     equipmentSlotCheckEnabled = $false; equipmentSpellCheckEnabled = $false; equipmentInventoryCheckEnabled = $false
     loadOrder = @('C:/p/Skyrim.esm'); maxPlayers = 10
 }
