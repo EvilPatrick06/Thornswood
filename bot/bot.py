@@ -2274,6 +2274,8 @@ _MOD_DID = {
     'banaccount': 'banned the whole account of %s, every character on it',
     'unbanaccount': 'lifted the ban on the account of %s',
     'pk': 'killed %s for good (PK), quietly',
+    # An admin undoing a PK made by mistake (#1010, 29 September).
+    'unpk': 'undid the PK of %s, so the character can be played again',
     'note': 'wrote a note on %s',
     # Not staff: somebody's own /stuck (#414), said as its why reads.
     'stuck': 'used /stuck',

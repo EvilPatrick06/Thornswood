@@ -12,7 +12,13 @@
   notes. Enforced by the game server and by the site's join pass, from the
   hub and from the game, every action in the staff log with who did it.
 
-  SIX PARTS.
+  Patrick, 29 September: an admin, and only the admin role, can undo a PK
+  made by mistake, from the hub and with /unpk, with a reason. The character
+  comes back into a free slot or not at all, the PK keeps its history, and
+  the staff log and the bot's line say it. And the rules page says staff can
+  end a character for good.
+
+  EIGHT PARTS.
 
   1. The site, the real site\server.js from a scratch copy on a loopback port:
      a character ban against an account ban against a PK, through the game's
@@ -39,7 +45,16 @@
      character, and will not play a dead or banned one.
   6. The launcher: Roster reads the site's pk and banned lists (the lifted C#
      compiled with the .NET Framework csc), and Chars moves a dead character
-     out of its slot, never picks it and lets it be forgotten.
+     out of its slot, never picks it and lets it be forgotten; and puts one an
+     admin brought back into the lowest free slot (RaiseRevived, compiled).
+  7. Undoing a PK: /unpk in the game (by the character in the world, by name,
+     by profile number), refused while every slot is held, refused to staff
+     who are not an admin; Undo PK on the hub; pk.json keeps every PK and
+     undo; the join pass, the door and the launcher's roster follow it; both
+     moderation.logs say it. The rules page and the terms.
+  8. Only the admin role: a second scratch site with Discord roles, where a
+     Moderator is refused on the hub and in the game and an Owner is not, and
+     a Patreon tier's third slot counts.
 
   Nothing leaves this machine. Scratch files go under THORNSWOOD_TEMP when it
   is set.
@@ -169,7 +184,7 @@ const WORLD = {
   0xff000007: { pid: 6006, name: 'Sigrid' },
   0xff000008: { pid: 3003, name: 'Nobody' }
 };
-function loadStaff() {
+function loadStaff(opts) {
   const w = { said: [], logs: [], kicked: [], timeouts: [] };
   const mp = {
     get(id, key) {
@@ -199,6 +214,8 @@ function loadStaff() {
       }
     }
   };
+  // The door's admins, when a part wants a staff member who is not one.
+  if (opts && opts.isAdmin) g.__thornswoodIsAdmin = opts.isAdmin;
   const run = new Function('mp', 'require', 'globalThis', 'console', 'URL', 'Buffer', 'log', 'guard',
     'voicePort', 'setInterval', 'clearInterval', 'setTimeout', 'addItem', 'idOf', 'placeActors',
     STAFF_SRC + '\nreturn globalThis.__thornswoodStaff;');
@@ -236,6 +253,132 @@ function braceGrab(text, head) {
     else if (text[i] === '}') { d--; if (d === 0) return text.slice(at, i + 1); }
   }
   return null;
+}
+
+/*
+  Part 8: a second scratch site whose people have Discord roles, from a stub
+  loaded ahead of server.js (the way test-hub-staff-gallery.js does it), so a
+  staff member who is not an admin exists. Owner is the admin role;
+  Moderator is staff and not an admin. Tova (Playtester) has two slots and
+  two living characters; Mira (Milk Drinker, a Patreon tier) has three.
+*/
+function discordStub() {
+  const https = require('https');
+  const { EventEmitter } = require('events');
+  const GUILD = process.env.TS_STUB_GUILD;
+  const ROLES = [{ id: 'r1', name: 'Owner' }, { id: 'r2', name: 'Moderator' },
+                 { id: 'r3', name: 'Playtester' }, { id: 'r4', name: 'Milk Drinker' }];
+  const member = (id, name, roles) => ({ nick: name, roles, user: { id, username: name.toLowerCase(), global_name: name } });
+  const ids = JSON.parse(process.env.TS_STUB_IDS);
+  const MEMBERS = [member(ids.owner, 'Owner', ['r1']), member(ids.mod, 'Moderator', ['r2']),
+                   member(ids.tova, 'Tova', ['r3']), member(ids.mira, 'Mira', ['r3', 'r4'])];
+  function answer(where) {
+    if (where === '/api/v10/guilds/' + GUILD) return { id: GUILD, name: 'Thornswood (harness)' };
+    if (where === '/api/v10/guilds/' + GUILD + '/roles') return ROLES;
+    if (where === '/api/v10/guilds/' + GUILD + '/members?limit=1000') return MEMBERS;
+    return null;
+  }
+  function fake(a, b, c) {
+    const cb = typeof b === 'function' ? b : c;
+    let host = '', where = '';
+    if (typeof a === 'string' || a instanceof URL) { const u = new URL(String(a)); host = u.hostname; where = u.pathname + (u.search || ''); }
+    else { host = String(a.hostname || a.host || ''); where = String(a.path || ''); }
+    const req = new EventEmitter();
+    let ended = false;
+    req.setTimeout = () => req; req.destroy = () => { }; req.write = () => true;
+    req.end = () => {
+      if (ended) return;
+      ended = true;
+      const body = host === 'discord.com' ? answer(where) : null;
+      setImmediate(() => {
+        if (!body) { req.emit('error', new Error('the harness lets no request leave this machine')); return; }
+        const res = new EventEmitter();
+        res.statusCode = 200; res.headers = {}; res.setEncoding = () => { }; res.resume = () => { };
+        if (cb) cb(res);
+        res.emit('data', Buffer.from(JSON.stringify(body)));
+        res.emit('end');
+      });
+    };
+    return req;
+  }
+  https.request = fake;
+  https.get = function (a, b, c) { const r = fake(a, b, c); r.end(); return r; };
+}
+async function adminRoleOnly() {
+  const d2 = fs.mkdtempSync(path.join(TEMP, 'ts-unpk-roles-'));
+  const GUILD = '900000000000000001';
+  const ids = { owner: '710000001', mod: '720000002', tova: '730000003', mira: '740000004' };
+  const key2 = crypto.randomBytes(24).toString('hex');
+  const secret2 = crypto.randomBytes(32).toString('hex');
+  fs.copyFileSync(SITE, path.join(d2, 'server.js'));
+  fs.mkdirSync(path.join(d2, 'data'), { recursive: true });
+  fs.writeFileSync(path.join(d2, 'config.json'), JSON.stringify({
+    password: crypto.randomBytes(12).toString('hex'),
+    discord: { clientId: 'harness-client', clientSecret: 'harness-secret', botToken: 'harness-bot', guildId: GUILD, invite: '' },
+    access: { admin: ['Owner', 'Dev'] },
+    botKey: key2, admins: [], secret: secret2, passKey: crypto.randomBytes(32).toString('hex'),
+    gameCheckPort: 1, onlineFile: path.join(d2, 'online.json')
+  }, null, 2));
+  const D2 = path.join(d2, 'data');
+  fs.writeFileSync(path.join(D2, 'linked.json'), JSON.stringify({
+    [ids.owner]: { id: ids.owner, name: 'Owner', profiles: [8001] },
+    [ids.mod]: { id: ids.mod, name: 'Moderator', profiles: [8002] },
+    [ids.tova]: { id: ids.tova, name: 'Tova', profiles: [8101, 8102, 8103] },
+    [ids.mira]: { id: ids.mira, name: 'Mira', profiles: [8201, 8202, 8203] }
+  }));
+  fs.writeFileSync(path.join(D2, 'roster.json'), JSON.stringify({ who: {
+    8101: { name: 'Tova One' }, 8102: { name: 'Tova Two' }, 8103: { name: 'Tova Dead' },
+    8201: { name: 'Mira One' }, 8202: { name: 'Mira Two' }, 8203: { name: 'Mira Dead' }
+  } }));
+  fs.writeFileSync(path.join(D2, 'pk.json'), JSON.stringify({
+    8103: { at: 1, by: 'Moderator', why: 'thought it was agreed', name: 'Tova Dead', account: ids.tova, from: 'the hub' },
+    8203: { at: 1, by: 'Moderator', why: 'wrong character', name: 'Mira Dead', account: ids.mira, from: 'the hub' }
+  }));
+  fs.writeFileSync(path.join(d2, 'stub.js'), '(' + discordStub.toString() + ')();\n');
+  const pk2 = () => JSON.parse(fs.readFileSync(path.join(D2, 'pk.json'), 'utf8'));
+  const log2 = () => { try { return fs.readFileSync(path.join(D2, 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)); } catch (e) { return []; } };
+  const cookie2 = (id, name) => {
+    const at = String(Date.now());
+    const sig = crypto.createHmac('sha256', secret2).update(id + '|' + name + '|' + at).digest('hex').slice(0, 32);
+    return { Cookie: 'twa=' + encodeURIComponent(id + '|' + name + '|' + at + '|' + sig) };
+  };
+  const port2 = await freePort();
+  const site2 = spawn(process.execPath, ['-r', path.join(d2, 'stub.js'), path.join(d2, 'server.js')], {
+    cwd: d2, stdio: ['ignore', 'ignore', 'ignore'],
+    env: Object.assign({}, process.env, { THORNSWOOD_DOCS_PORT: String(port2), THORNSWOOD_DOCS_LOCAL: '1',
+                                          TS_STUB_GUILD: GUILD, TS_STUB_IDS: JSON.stringify(ids) })
+  });
+  try {
+    yes('the second scratch site starts, with Discord roles from the stub', await waitUp(port2));
+    const modC = cookie2(ids.mod, 'Moderator'), ownC = cookie2(ids.owner, 'Owner');
+    let r = await request(port2, 'GET', '/api/all', modC);
+    yes('the Moderator is staff and not an admin', r.status === 200 && r.j.me.dev === true && r.j.me.admin === false);
+    r = await request(port2, 'POST', '/api/staff/unpk', modC, { id: ids.mira, profileId: 8203, why: 'made by mistake' });
+    yes('Undo PK on the hub refuses the Moderator with a plain line, and nothing changes',
+        r.status === 403 && r.j.message === 'Only an admin can undo a PK.' && !pk2()['8203'].undone);
+    r = await request(port2, 'POST', '/api/staff/game/unpk', { 'X-Thornswood-Key': key2 },
+                      { profileId: 8203, why: 'made by mistake', byProfileId: 8002, byName: 'Moderator' });
+    yes('and so does the game\'s /unpk route, asking Discord itself',
+        r.status === 403 && r.j.message === 'Only an admin can undo a PK.' && !pk2()['8203'].undone);
+    r = await request(port2, 'GET', '/api/all', ownC);
+    yes('the Owner is an admin', r.status === 200 && r.j.me.admin === true);
+    r = await request(port2, 'POST', '/api/staff/unpk', ownC, { id: ids.tova, profileId: 8103, why: 'made by mistake' });
+    yes('an admin\'s undo on an account whose two slots both hold living characters is refused, and says so',
+        r.status === 409 && r.j.message === 'Every character slot on that account is taken (2 of 2), so Tova Dead is still ' +
+          'dead for good and nothing changed. Its owner can forget a character in the launcher to free a slot, then undo the PK again.' &&
+        !pk2()['8103'].undone);
+    r = await request(port2, 'POST', '/api/staff/unpk', ownC, { id: ids.mira, profileId: 8203, why: 'made by mistake' });
+    yes('an account with a Patreon tier\'s third slot free gets its character back from the Owner',
+        r.status === 200 && r.j.was === true && pk2()['8203'].undone.by === 'Owner' && pk2()['8203'].undone.byId === ids.owner &&
+        pk2()['8203'].why === 'wrong character');
+    const l = log2();
+    yes('the hub\'s moderation.log names the Owner, the character and why, and nothing for the refusals',
+        l.length === 1 && l[0].did === 'unpk' && l[0].byName === 'Owner' && l[0].who === 8203 &&
+        l[0].whoName === 'Mira Dead (Mira)' && l[0].why === 'made by mistake');
+  } finally {
+    try { site2.kill(); } catch (e) { }
+    setTimeout(() => { try { fs.rmSync(d2, { recursive: true, force: true }); } catch (e) { } }, 500).unref();
+  }
 }
 
 (async function main() {
@@ -358,7 +501,8 @@ function braceGrab(text, head) {
         r.status === 200 && r.j.was === true && readData('pk.json', {})['2003'].why === 'fell at the siege of Whiterun');
     r = await game('unban', Object.assign({ profileId: 2003, name: 'Hrefna' }, by));
     yes('/unban does not bring a dead character back', r.j.was === false && (await passFor(BJORN_D, 2003)).status === 403);
-    yes('there is no route that undoes a PK', !/\/api\/staff\/(game\/)?un-?pk/.test(siteSrc) && !/'\/unpk'/.test(src));
+    yes('/unban and /unbanaccount are not how a PK is undone: that is /unpk, the admin role\'s (part 7)',
+        siteSrc.indexOf('staff\\/(ban|unban|note|pk|unpk)') >= 0 && /'\/unpk'/.test(src));
 
     // ------------------------------------------------ 2. lengths and expiry --
     console.log('\nlengths and expiry:');
@@ -592,7 +736,37 @@ function braceGrab(text, head) {
           /data-act="ban" data-id="333333333" data-pid="2002">Ban character/.test(ctl) &&
           /data-act="unban" data-id="333333333" data-pid="2002">Lift character ban/.test(ctl) &&
           /data-act="pk" data-id="333333333" data-pid="2002"/.test(ctl) && /value="0">for good/.test(ctl));
-      yes('and offer nothing on a dead character, which cannot be undone', !/data-pid="2003"/.test(ctl));
+      yes('and offer no ban or PK on a dead character',
+          !/data-act="(ban|unban|pk)" data-id="333333333" data-pid="2003"/.test(ctl));
+      yes('to staff who are not an admin, a dead character says only an admin can undo a PK, with no button',
+          /Hrefna the Bold is dead for good\.<\/span> <span class="said">Only an admin can undo a PK\.<\/span>/.test(ctl) &&
+          !/data-act="unpk"/.test(ctl));
+      const ctlAdmin = P.linkedControls(u, rec, Date.now(), true);
+      yes('to an admin it offers Undo PK, with a reason box',
+          /<input class="unpkwhy" data-id="333333333:2003" placeholder="Why the PK is undone">/.test(ctlAdmin) &&
+          /data-act="unpk" data-id="333333333" data-pid="2003" data-name="Hrefna the Bold">Undo PK/.test(ctlAdmin) &&
+          !/data-act="unpk"[^>]*data-pid="2002"/.test(ctlAdmin));
+      const undoneRec = JSON.parse(JSON.stringify(rec));
+      undoneRec.pk['2003'] = { at: 1, by: 'Brynja', why: 'fell at the siege', from: 'the dev server', account: BJORN_D,
+                               undone: { at: 2, by: 'Aela', why: 'made by mistake', from: 'the hub' },
+                               history: [{ at: 0, by: 'Aela', why: 'an older PK', undone: { at: 0.5, by: 'Aela', why: 'also a mistake' } }] };
+      const undoneLine = P.linkedNotes(u, undoneRec, Date.now());
+      yes('a PK an admin undid no longer shows as dead, and its whole record stays under the character, oldest first',
+          !/Dead for good \(PK\)/.test(undoneLine) &&
+          /PK an older PK \(by Aela[^)]*\), undone by an admin: also a mistake \(by Aela/.test(undoneLine) &&
+          /PK fell at the siege \(by Brynja, from the dev server[^)]*\), undone by an admin: made by mistake \(by Aela, from the hub/.test(undoneLine) &&
+          undoneLine.indexOf('an older PK') < undoneLine.indexOf('fell at the siege'));
+      const undoneCtl = P.linkedControls(u, undoneRec, Date.now(), true);
+      yes('and the character it brought back can be banned or PKed again like any other',
+          /data-act="pk" data-id="333333333" data-pid="2003"/.test(undoneCtl) && !/data-act="unpk"/.test(undoneCtl));
+      yes('and it is not in the dead list', P.deadList(undoneRec) === '');
+      yes('the Undo PK words are plain', fair(ctlAdmin) && fair(undoneLine));
+      const wire = braceGrab(page, 'function wireLinked(') || '';
+      yes('Undo PK asks for why and to confirm, and shows the site\'s own sentence when it says no',
+          /act === 'unpk'/.test(wire) && /pick\('unpkwhy', key\)/.test(wire) && /confirm\('Undo the PK of '/.test(wire) &&
+          /alert\(said \|\| 'The site did not take that\.'\)/.test(wire));
+      yes('drawLinked tells linkedControls whether the one looking is an admin',
+          /linkedControls\(u, S\.records, Date\.now\(\), !!S\.me\.admin\)/.test(page));
       const dead = P.deadList(rec);
       yes('the dead are listed for staff with their name, profile, account and why',
           /Hrefna the Bold <span class="said">profile 2003, Discord 333333333<\/span>: fell at the siege/.test(dead));
@@ -671,6 +845,166 @@ function braceGrab(text, head) {
     yes('the menu list carries the dead with "pk":true in slot 0, and a banned character with "banned":true',
         /all\.AddRange\(DeadRows\(rows\)\)/.test(write) && /,\\"pk\\":true/.test(write) &&
         /,\\"banned\\":true/.test(write) && /isDead \? 0 : r\.Slot/.test(write));
+
+    // An admin undoing a PK (29 September): the launcher puts it back.
+    yes('Roster.cs reads the site\'s revived list, and Revived is false for an id still dead',
+        /ReadIds\(text, "revived"\)/.test(rosterCs) &&
+        /return revived\.Contains\(profileId\) && !dead\.Contains\(profileId\);/.test(rosterCs));
+    const raise = lift(charsCs, 'static string RaiseRevived(List<Row> rows)') || '';
+    const nextSlot = lift(charsCs, 'static int NextSlot(List<Row> rows)') || '';
+    const findSlot = lift(charsCs, 'static Row Find(List<Row> rows, int slot)') || '';
+    yes('Chars has RaiseRevived, run in Prepare after BuryDead and before the slots are tidied',
+        !!raise && prep.indexOf('RaiseRevived(rows)') > prep.indexOf('BuryDead(rows)') &&
+        prep.indexOf('RaiseRevived(rows)') < prep.indexOf('TidySlots(rows, slots)'));
+    if (raise && nextSlot && findSlot && fs.existsSync(csc)) {
+      const prog = 'using System; using System.Collections.Generic;\n' +
+        'static class Roster { public static HashSet<int> back = new HashSet<int>();\n' +
+        '  public static bool Revived(int id) { return back.Contains(id); } }\n' +
+        'static class T {\n class Row { public int Slot; public int Id; }\n const int DeadSlot = -1;\n' +
+        ' static int saved = 0;\n static void Save(List<Row> rows) { saved++; }\n' +
+        ' ' + findSlot + '\n ' + nextSlot + '\n ' + raise + '\n' +
+        ' static Row R(int id, int slot) { var r = new Row(); r.Id = id; r.Slot = slot; return r; }\n' +
+        ' static void Main() {\n' +
+        '  var rows = new List<Row> { R(99, 0), R(11, 1), R(12, DeadSlot), R(13, DeadSlot) };\n' +
+        '  Console.WriteLine("none " + (RaiseRevived(rows) == null) + " " + saved + " " + rows[2].Slot);\n' +
+        '  Roster.back.Add(12);\n' +
+        '  string line = RaiseRevived(rows);\n' +
+        '  Console.WriteLine("back " + rows[2].Slot + " " + rows[3].Slot + " " + saved);\n' +
+        '  Console.WriteLine(line);\n } }\n';
+      const cdir = fs.mkdtempSync(path.join(dir, 'cs-'));
+      fs.writeFileSync(path.join(cdir, 'r.cs'), prog);
+      let out = '';
+      try {
+        cp.execFileSync(csc, ['/nologo', '/langversion:5', '/out:' + path.join(cdir, 'r.exe'), path.join(cdir, 'r.cs')], { stdio: 'pipe' });
+        out = cp.execFileSync(path.join(cdir, 'r.exe'), { encoding: 'utf8' });
+      } catch (e) { out = 'ERROR ' + ((e.stdout || '') + (e.stderr || '') || e.message); }
+      yes('the lifted RaiseRevived compiles as C# 5 and moves nobody when the site named nobody',
+          /none True 0 -1/.test(out));
+      yes('and puts the one the site names as revived into the lowest free slot, leaves the other dead, and saves',
+          /back 2 -1 1/.test(out) && /An admin undid the PK of a character, so it can be played again: profile 12 to slot 2\./.test(out));
+      if (/ERROR/.test(out)) console.log(out);
+    }
+
+    // ------------------------------------------------ 7. an admin undoes a PK --
+    console.log('\nundoing a PK:');
+    // Part 4 banned Aela's account; Brynja lifts it so Aela can act again.
+    r = await game('unbanaccount', { profileId: 1001, name: 'Aela', byProfileId: 1002, byName: 'Brynja' });
+    yes('Aela\'s account ban from part 4 is lifted first', r.status === 200 && !readData('bans.json', {})[STAFF_D]);
+    // Both staff on this site are on its admin list, so both are admins here;
+    // part 8 has a staff member who is not.
+    let roster0 = readData('roster.json', { who: {} });
+    roster0.who['2005'] = { name: 'Solveig' };
+    fs.writeFileSync(path.join(DATA, 'roster.json'), JSON.stringify(roster0));
+    fs.writeFileSync(path.join(PRIV, 'allowed.json'), JSON.stringify({ at: new Date().toISOString(), profiles: [], bans: [], pk: [2003] }));
+    await wait(20);
+    w = loadStaff();
+    staffLine(w, '/unpk Hrefna made by mistake');
+    yes('with both of the account\'s slots held by living characters, /unpk says so and changes nothing',
+        await until(() => w.to(1001).some((t) => t === 'Every character slot on that account is taken (2 of 2), so Hrefna is still ' +
+          'dead for good and nothing changed. Its owner can forget a character in the launcher to free a slot, then undo the PK again.')) &&
+        !readData('pk.json', {})['2003'].undone && (await passFor(BJORN_D, 2003)).status === 403);
+    roster0 = readData('roster.json', { who: {} });
+    delete roster0.who['2005'];
+    fs.writeFileSync(path.join(DATA, 'roster.json'), JSON.stringify(roster0));
+    const unAt = Date.now();
+    staffLine(w, '/unpk Hrefna made by mistake');
+    yes('with a slot free, /unpk from an admin in the game brings the character back and says so',
+        await until(() => w.to(1001).some((t) => t === 'Hrefna is no longer dead for good and can be played again from a free slot. ' +
+          'The PK stays on the record with your reason beside it.')));
+    let pkRow = readData('pk.json', {})['2003'];
+    yes('pk.json keeps the PK as it was and adds the undo: who, which account, from where, when and why',
+        pkRow.why === 'fell at the siege of Whiterun' && pkRow.by === 'Aela' && pkRow.undone &&
+        pkRow.undone.by === 'Aela' && pkRow.undone.byId === STAFF_D && pkRow.undone.why === 'made by mistake' &&
+        pkRow.undone.from === 'the live server' && Math.abs(pkRow.undone.at - unAt) < 5000);
+    r = await passFor(BJORN_D, 2003);
+    yes('the join pass lets the character in again', r.status === 200 && !!r.j.pass);
+    r = await allowed();
+    yes('the door\'s list has it back and no longer sends it as pk',
+        r.j.profiles.indexOf(2003) >= 0 && r.j.pk.indexOf(2003) < 0);
+    r = await roster(BJORN_D);
+    yes('the launcher\'s roster names it as revived and not dead, so the launcher puts it back in a slot',
+        JSON.stringify(r.j.revived) === '[2003]' && r.j.pk.indexOf(2003) < 0);
+    log = modlog();
+    yes('moderation.log says unpk, the character, who undid it and why, for the staff channel',
+        log[log.length - 1].did === 'unpk' && log[log.length - 1].who === 2003 && log[log.length - 1].byName === 'Aela' &&
+        log[log.length - 1].whoName === 'Hrefna' && log[log.length - 1].why === 'made by mistake');
+    w.api.banSweep();
+    yes('and the door\'s older list, which still names it, does not end Hrefna\'s session', !w.to(2003).length);
+    staffLine(w, '/unpk Hrefna again');
+    yes('a second /unpk says the account has nobody dead for good',
+        await until(() => w.to(1001).some((t) => t === 'Hrefna has no character that is dead for good.')));
+
+    await game('pk', Object.assign({ profileId: 5005, name: 'Ulfric Ghost', why: 'wrong man' }, by));
+    await game('pk', Object.assign({ profileId: 5006, name: 'Ulfric Other', why: 'the other one' }, by));
+    staffLine(w, '/unpk Ulfric oops');
+    yes('/unpk finds a dead character nobody is playing by its name, and asks which when two start the same',
+        await until(() => w.to(1001).some((t) => /^More than one character dead for good starts with "Ulfric": Ulfric Ghost \(profile 5005\), Ulfric Other \(profile 5006\)\. Name one, or its profile number\.$/.test(t))));
+    staffLine(w, '/unpk Ulfric Ghost the wrong man');
+    yes('and by the whole name, with the rest as the reason',
+        await until(() => w.to(1001).some((t) => /^Ulfric Ghost is no longer dead for good/.test(t))) &&
+        readData('pk.json', {})['5005'].undone.why === 'the wrong man' && !readData('pk.json', {})['5006'].undone);
+    staffLine(w, '/unpk 5006 wrong one too');
+    yes('and by profile number', await until(() => !!(readData('pk.json', {})['5006'] || {}).undone) &&
+        readData('pk.json', {})['5006'].undone.why === 'wrong one too');
+    staffLine(w, '/unpk 5006');
+    yes('/unpk with a profile number and no reason asks for one', /^Say why: \/unpk 5006 made by mistake\./.test(w.to(1001).slice(-1)[0] || ''));
+
+    const notAdmin = loadStaff({ isAdmin: (p) => p === 1001 });
+    staffLine(notAdmin, '/unpk Dara wrong Dara', 1002);
+    yes('staff who are not an admin are refused in the game with a plain line, and nothing changes',
+        notAdmin.to(1002).slice(-1)[0] === 'Only an admin can undo a PK.' && !readData('pk.json', {})['4002'].undone);
+    staffLine(notAdmin, '/unpk Dara wrong Dara', 3003);
+    yes('and somebody with no staff role gets the usual refusal', notAdmin.to(3003).slice(-1)[0] === 'That one is not yours to run.');
+    r = await game('unpk', { profileId: 4002, why: 'x', byProfileId: 2002, byName: 'Bjorn' });
+    yes('the site refuses /unpk itself for anybody its Discord check does not call an admin, with the same line',
+        r.status === 403 && r.j.message === 'Only an admin can undo a PK.' && !readData('pk.json', {})['4002'].undone);
+    yes('every line /unpk said in the game is plain', w.said.concat(notAdmin.said).every((s) => fair(s.text)));
+
+    // The hub.
+    r = await hub('unpk', { id: CARA_D, profileId: 4002, why: 'wrong Dara' }, plainC);
+    yes('Undo PK on the hub is refused to somebody with no staff role', (r.status === 401 || r.status === 403) &&
+        !readData('pk.json', {})['4002'].undone);
+    r = await hub('unpk', { id: CARA_D, profileId: 4002, why: '' });
+    yes('Undo PK on the hub says why, or is refused', r.status === 400 && !readData('pk.json', {})['4002'].undone);
+    r = await hub('unpk', { id: CARA_D, profileId: 4002, why: 'wrong Dara' });
+    pkRow = readData('pk.json', {})['4002'];
+    yes('an admin\'s Undo PK on the hub brings Dara back, keeping the PK with the undo beside it',
+        r.status === 200 && r.j.was === true && pkRow.why === 'executed by the Jarl' &&
+        pkRow.undone.why === 'wrong Dara' && pkRow.undone.by === 'Aela' && pkRow.undone.from === 'the hub');
+    yes('and the join pass lets her in', (await passFor(CARA_D, 4002)).status === 200);
+    let hl2 = hublog();
+    yes('the hub writes unpk to moderation.log with the character, the account, who and why',
+        hl2[hl2.length - 1].did === 'unpk' && hl2[hl2.length - 1].who === 4002 && hl2[hl2.length - 1].byName === 'Aela' &&
+        hl2[hl2.length - 1].whoName === 'Dara (' + readData('linked.json', {})[CARA_D].name + ')' &&
+        hl2[hl2.length - 1].why === 'wrong Dara');
+    r = await hub('unpk', { id: CARA_D, profileId: 4002, why: 'again' });
+    yes('undoing it twice changes nothing and writes no second line',
+        r.status === 200 && r.j.was === false && hublog().length === hl2.length);
+    r = await hub('pk', { id: CARA_D, profileId: 4002, why: 'executed again, for real' });
+    pkRow = readData('pk.json', {})['4002'];
+    yes('a new PK after an undo holds again, and the old PK and its undo move into its history',
+        r.status === 200 && r.j.was === false && !pkRow.undone && pkRow.why === 'executed again, for real' &&
+        pkRow.history.length === 1 && pkRow.history[0].why === 'executed by the Jarl' &&
+        pkRow.history[0].undone.why === 'wrong Dara' && (await passFor(CARA_D, 4002)).j.why === 'pk');
+    await hub('unpk', { id: CARA_D, profileId: 4002, why: 'still a mistake' });
+    pkRow = readData('pk.json', {})['4002'];
+    yes('and undoing that keeps all of it: nothing in pk.json is ever deleted',
+        pkRow.undone.why === 'still a mistake' && pkRow.history.length === 1 && pkRow.history[0].undone.why === 'wrong Dara');
+    yes('the records staff read carry the undo and the history', (await request(port, 'GET', '/api/staff/records', staffC)).j.pk['4002'].history.length === 1);
+
+    // The rules page (Patrick, 29 September).
+    const rulesMd = read(path.join(ROOT, 'site', 'data', 'site', 'rules.md'));
+    const rule2 = rulesMd.slice(rulesMd.indexOf('## 2. Nobody dies without agreeing to'), rulesMd.indexOf('## 3.'));
+    yes('rule 2 on the rules page says staff can end a character for good, for serious rule breaking or in an event its owner agreed to',
+        /\*\*Staff can end a character for good\.\*\* They do it for serious rule breaking,\s+or in an event its owner agreed to\./.test(rule2));
+    const termsMd = read(path.join(ROOT, 'site', 'data', 'site', 'terms.md'));
+    yes('and the terms say the same where they sum rule 2 up',
+        /nobody's character dies without that person\s+agreeing, except that staff can end a character for good for serious rule\s+breaking or in an event its owner agreed to;/.test(termsMd));
+    yes('both in plain words', fair(rule2) && fair(termsMd));
+
+    // ------------------------------------------------ 8. only the admin role --
+    console.log('\nonly the admin role, with Discord roles:');
+    await adminRoleOnly();
   } catch (e) {
     yes('the harness ran to the end: ' + (e && e.stack ? e.stack : e), false);
   } finally {

@@ -312,7 +312,9 @@ if (PUSH && ASK && FRESH) {
     'const Date = { now: function () { return NOW; } };\n' +
     'function body() { return Promise.resolve(o_body); }\n' +
     'function sameSecret(a, b) { return a === b; }\n' +
-    'function jsonFile(f, d) { if (f === "linked") return LINKED; return store.file ? JSON.parse(JSON.stringify(store.file)) : d; }\n' +
+    'function jsonFile(f, d) { if (f === "linked") return LINKED; if (f === "pk") return d; return store.file ? JSON.parse(JSON.stringify(store.file)) : d; }\n' +
+    // Nor any PK an admin undid (#1010): pk.json is empty here.
+    'const PK = "pk"; function pkActive(r) { return !!r && !r.undone; }\n' +
     'function putJson(f, v) { store.file = JSON.parse(JSON.stringify(v)); return true; }\n' +
     // Nobody killed for good or banned by character here (#1010); test-bans-pk.js runs those.
     'function characterBar() { return null; }\n' +
