@@ -22,6 +22,11 @@
     old-owner        the owner is Patrick, never the old name (Words)
     open-alpha       never a closed playtest: an alpha, open by application (#428)
     placeholder      no placeholders: TODO, TBD, FIXME, lorem ipsum (Words)
+    signer-name      the name on the code signing certificate is written in
+                     one place, ExpectedSigner in launcher\app\Updater.cs,
+                     which the launcher checks every update against. A page
+                     says "the name on the signing certificate", or names the
+                     profile, ThornswoodRelease (issue #1052)
     names-person     README.md and the six component READMEs name nobody:
                      operational documents are losing names, and problems go
                      to the Discord or the report page, never to one person
@@ -86,12 +91,11 @@ $Rules = @(
     @{ Id = 'banned-word'; Case = 'IgnoreCase'; For = 'people'
        Re = '\bplayers?\b'
        Say = 'the word player. Say customers, clients, people, testers or partners.' },
-    # "Gavin Knotts" is the Authenticode certificate subject (Azure Artifact
-    # Signing). That string is what Windows shows as publisher, so Help and
-    # Downloads may name it. `gavin/` is a branch prefix from before 17 Sep,
-    # a name in git. Lone "Gavin" is still the old owner name.
+    # `gavin/` is a branch prefix from before 17 Sep, a name in git. Any other
+    # "Gavin" is the old owner name. Until #1052 the name on the signing
+    # certificate was let through here; no page names it now (signer-name).
     @{ Id = 'old-owner'; Case = 'IgnoreCase'; For = 'people'
-       Re = '\bgavin\b(?!\s+Knotts\b)(?!/)'
+       Re = '\bgavin\b(?!/)'
        Say = 'the old owner name. He is Patrick.' },
     # Issue #428. Patrick, 28 Sep: "we are in alpha so the world is open by
     # application". Anybody can download it, so nothing people read may call
@@ -107,6 +111,21 @@ $Rules = @(
        Re = '\b(Patrick|Djinn|Gavin|WiccanDjinn|Ataxayk)\b|(?<![/\w])EvilPatrick06(?![/\w])'
        Say = 'a person by name. Say what was decided and when, or where to ask (the Discord, the report page).' }
 )
+# The name on the signing certificate, read from the one place it is written,
+# so this file does not carry it either (issue #1052). A root without the
+# launcher's source (the harness's temp folder, before it puts one there) has
+# no name to look for.
+$SignerUnread = $false
+$UpdaterRel = 'launcher/app/Updater.cs'
+$UpdaterPath = Join-Path $Root $UpdaterRel
+if (Test-Path -LiteralPath $UpdaterPath) {
+    $sm = [regex]::Match([System.IO.File]::ReadAllText($UpdaterPath, [System.Text.Encoding]::UTF8), 'const string ExpectedSigner = "([^"]+)"')
+    if ($sm.Success -and $sm.Groups[1].Value.Trim()) {
+        $Rules += @{ Id = 'signer-name'; Case = 'IgnoreCase'; For = 'people'
+            Re = '(?<![\w])' + [regex]::Escape($sm.Groups[1].Value.Trim()).Replace('\ ', '\s+') + '(?![\w])'
+            Say = 'the name on the signing certificate. Say "the name on the signing certificate", or the profile, ThornswoodRelease; the name itself is ExpectedSigner in launcher\app\Updater.cs.' }
+    } else { $SignerUnread = $true }
+}
 $RuleIds = @($Rules | ForEach-Object { $_.Id })
 
 function Test-ForPeople([string]$rel) {
@@ -131,6 +150,10 @@ if ($null -eq $all) {
 $files = @($all | Where-Object { Test-ForPeople $_ } | Sort-Object -Unique)
 
 $hits = 0
+if ($SignerUnread) {
+    $hits++
+    Write-Host ("::error file={0}::[signer-name] ExpectedSigner could not be read, so no page can be checked for it" -f $UpdaterRel)
+}
 foreach ($n in $Named) {
     if ($files -notcontains $n -or -not (Test-Path -LiteralPath (Join-Path $Root $n))) {
         Write-Host ("::warning::{0} is not there, so it was not checked" -f $n)
