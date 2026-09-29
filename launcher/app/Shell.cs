@@ -887,12 +887,11 @@ namespace Thornswood
 
         static bool linkingDiscord = false;
 
-        /// <summary>Both buttons that can start a link, moved together.</summary>
+        /// <summary>The button that starts a link. The collection bar used to be
+        /// a second one; since #428 it only ever opens the collection.</summary>
         static void SetLinkButtons(bool on)
         {
             if (buttonDiscord != null) buttonDiscord.IsEnabled = on;
-            if (btnInstallNow != null && collectionBarUp && !Discord.Linked)
-                btnInstallNow.IsEnabled = on;
         }
 
         /// <summary>The Discord account block above Settings. Called whenever it changes.</summary>
@@ -2159,7 +2158,6 @@ namespace Thornswood
             {
                 if (collectionBarUp)
                 {
-                    if (!Discord.Linked) { ConnectDiscord(); return; }
                     try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
                     catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
                     return;
@@ -5698,27 +5696,15 @@ namespace Thornswood
             btnInstallNow.Visibility = Visibility.Visible;
             collectionBarUp = true;
 
-            if (Discord.Linked)
-            {
-                btnInstallNow.Content = "Open the collection";
-                btnInstallNow.IsEnabled = true;
-            }
-            else
-            {
-                // It used to read "Apply first" and be dead. That is a card
-                // telling somebody to do a thing, with the button that does the
-                // thing switched off, and the only other way to it greyed out
-                // underneath by a bug. Somebody who has been accepted and has
-                // simply not linked yet had nowhere to go from this screen.
-                //
-                // The gate has not moved: the collection still only opens once
-                // Discord is linked and the site says yes. The button is just
-                // the next step now instead of a wall.
-                btnInstallNow.Content = "Connect Discord";
-                btnInstallNow.IsEnabled = !linkingDiscord;
-                txtUpdateNote.Text = txtUpdateNote.Text +
-                    "  Connect Discord first and this opens the collection.";
-            }
+            // Open to everybody (#428). Patrick, 28 Sep: "we are in alpha so the
+            // world is open by application". Anyone can download, and the
+            // collection's link is on the public Downloads page, so holding it
+            // back here until Discord was linked kept nothing from anybody and
+            // left somebody still waiting on their application with a button
+            // that only said Connect Discord, which the site refuses until they
+            // are accepted. The application is what unlocks Play, not the mods.
+            btnInstallNow.Content = "Open the collection";
+            btnInstallNow.IsEnabled = true;
         }
 
 

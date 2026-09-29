@@ -158,14 +158,21 @@ let cfg = {
   /* Discord roles decide everything. A role name here, not an id, because the
      names are what he maintains and the ids are what Discord hands back. */
   /*
-    Member is NOT on the play list, and that is the whole closed playtest.
-    Everybody who joins the Discord gets Member, so if Member let you into the
-    game then anybody who found the invite could walk in, and the application
-    would be decoration.
+    Patrick, 28 Sep: "we are in alpha so the world is open by application".
+    Anyone can download it; getting in is an application in the Discord, and
+    Playtester is what being accepted means. So Playtester is on the play
+    list and Member is NOT: the application, and the age and rules questions
+    it asks (#428), is the way into the world. Who gives Member, and when, is
+    #986.
 
-    Playtester is what being accepted means. When the server opens to
-    everybody, add 'Member' to this list and that is the entire change.
+    The day the world opens to everybody, "open": true in config.json is the
+    one switch (#428). It puts Member on the play list at load (playRoles),
+    tells the bot and the pages through /api/public, and they follow: the
+    bot drops the application from its panel, and the join, help, rules and
+    home wording change with it. Off unless config.json says true. It only
+    opens the world to everybody if everybody in the Discord has Member.
   */
+  open: false,
   access: {
     admin:  ['Owner', 'Dev'],
     play:   ['Owner', 'Dev', 'Moderator', 'Gamemaster', 'Loremaster',
@@ -196,6 +203,9 @@ cfg.discord = Object.assign({ clientId:'', clientSecret:'', botToken:'', guildId
 // below never applied and a config.json without access.jarl let nobody hold
 // the office (#905). dev, jarl and slots3 get their defaults below.
 cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
+// The one switch (#428). Only a real true opens it: "true", 1 or a typo does not.
+cfg.open = cfg.open === true;
+cfg.access.play = playRoles(cfg.access.play, cfg.open);
 // Who may use the dev build and join the dev server. Left out of config.json
 // it is the Discord staff roles, the same set the bot's STAFF_ROLES names
 // (Owner, Dev, Gamemaster, Moderator, Loremaster; Content Creator is not
@@ -496,8 +506,52 @@ function pageMarkdown(name) {
   const dir = PUBLIC_DOCS.indexOf(name) >= 0 ? DATA : SITE;
   const file = path.join(dir, name + '.md');
   if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) return null;
-  try { return fs.readFileSync(file, 'utf8'); } catch (e) { return null; }
+  try { return forMode(fs.readFileSync(file, 'utf8'), cfg.open); } catch (e) { return null; }
 }
+
+// ==== thornswood open switch ====
+/* The one switch (#428), cfg.open, off unless config.json says true.
+
+   playRoles is the play list with Member added when the world is open to
+   everybody. That is the whole of opening the game, as long as everybody in
+   the Discord is given Member (#986); with the switch off the list is left
+   exactly as it was.
+
+   forMode is how the written pages follow the same switch. A page marks its
+   alpha wording with <!-- alpha --> ... <!-- /alpha --> lines and its open
+   wording with <!-- open --> ... <!-- /open -->, and only the one that
+   applies is served. bot/content.py reads join.md through the same markers
+   for #start-here, so the site and the Discord cannot disagree. */
+function playRoles(play, open) {
+  const list = Array.isArray(play) ? play.slice() : [];
+  if (open === true && list.indexOf('Member') < 0) list.push('Member');
+  return list;
+}
+
+function forMode(md, open) {
+  const drop = open === true ? 'alpha' : 'open';
+  return String(md)
+    .replace(new RegExp('^<!-- ' + drop + ' -->[ \\t]*\\r?\\n[\\s\\S]*?^<!-- /' + drop +
+                        ' -->[ \\t]*(?:\\r?\\n|$)', 'gm'), '')
+    .replace(/^<!-- \/?(?:alpha|open) -->[ \t]*(?:\r?\n|$)/gm, '');
+}
+/* What somebody in the Discord without a play role is told, by the launcher's
+   door, the join pass and the sign in page. In the alpha that is an
+   application; with the switch on it is only the Member role. With inner, the
+   words that follow "That account is in the Discord, but". */
+function notAcceptedYet(inner) {
+  const open = cfg.open === true;
+  const how = open
+    ? 'Ask in the Discord and somebody will sort it.'
+    : 'Apply in the Discord: open a ticket and pick Apply to be an alpha playtester.';
+  if (inner) {
+    return (open ? 'it does not have the Member role yet. '
+                 : 'it has not been accepted into the alpha yet. ') + how;
+  }
+  return (open ? 'That Discord account does not have the Member role yet. '
+               : 'That Discord account has not been accepted into the alpha yet. ') + how;
+}
+// ==== end thornswood open switch ====
 
 const PAGES = {
   '/hub':         'home',
@@ -591,6 +645,42 @@ function writeBoardOne(name, value) {
 
 const RESULTS = path.join(DATA, 'results.json');
 const INBOX   = path.join(DATA, 'inbox.json');
+
+// ==== thornswood rules accepted ====
+/* Who accepted the rules, by Discord id (#428). Before this nobody ever did:
+   somebody could join for the invite, be let in and press Play having agreed
+   to nothing. The alpha application in the Discord asks, the bot sends the
+   answer with the ticket, and it is kept here rather than only in the inbox,
+   because the inbox is trimmed and this record should not be.
+
+   One row per Discord id: the latest answer, its time and their words, and
+   the time of their first yes, which a later answer never moves. A file that
+   is there and cannot be read is never written over, so a bad read cannot
+   throw everybody else's answers away. */
+const RULES_OK = path.join(DATA, 'rules-accepted.json');
+
+function noteRules(file, discordId, rules, by, now) {
+  const id = String(discordId || '').replace(/[^0-9]/g, '').slice(0, 20);
+  if (!id || !rules || typeof rules !== 'object') return false;
+  let book = {};
+  if (fs.existsSync(file)) {
+    try { book = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '')); }
+    catch (e) { return false; }
+    if (!book || typeof book !== 'object' || Array.isArray(book)) return false;
+  }
+  const had = (book[id] && typeof book[id] === 'object') ? book[id] : {};
+  const yes = rules.yes === true;
+  book[id] = {
+    yes: yes,
+    at: now,
+    said: String(rules.said || '').slice(0, 200),
+    by: String(by || '').slice(0, 60),
+    firstYes: had.firstYes || (yes ? now : null)
+  };
+  return putJson(file, book);
+}
+// ==== end thornswood rules accepted ====
+
 /* Written by Publish-News.ps1 at the end of every release: the same feed the
    launcher shows, stripped of the server password before it leaves his
    machine. Nothing here writes it. */
@@ -2508,8 +2598,7 @@ function notAllowedPage(me, st) {
         ? '<p><a style="color:#C9A24B" href="' + cfg.discord.invite + '">Join it here</a>, then try again.</p>'
         : '');
   } else {
-    why = '<p>That account is in the Discord but has no role that lets it in yet. ' +
-          'Ask in there and somebody will sort it.</p>' +
+    why = '<p>That account is in the Discord, but ' + esc(notAcceptedYet(true)) + '</p>' +
           '<p style="color:#8D9682;font-size:13px">Roles Thornswood can see on it: ' +
           (st.roles && st.roles.length ? '<b>' + st.roles.map(esc).join(', ') + '</b>' : 'none') +
           '.<br>It needs one of: <b>' + (cfg.access.play || []).map(esc).join(', ') + '</b>.</p>';
@@ -2843,7 +2932,8 @@ async function handle(req, res) {
   // ---------------------------------------------------------- public front
   if (req.method === 'GET' && PUBLIC_PAGES.indexOf(route) >= 0) {
     try {
-      let html = fs.readFileSync(path.join(PUBLIC, 'home.html'), 'utf8');
+      // The one switch (#428): only the alpha or the open wording goes out.
+      let html = forMode(fs.readFileSync(path.join(PUBLIC, 'home.html'), 'utf8'), cfg.open);
       // One place holds the invite link, so it cannot go stale in nine.
       // /join, never /hub. Somebody clicking Apply wants to know how to apply,
       // and sending them to the admin panel is the worst possible answer.
@@ -2896,6 +2986,8 @@ async function handle(req, res) {
   if (route === '/api/public' && req.method === 'GET') {
     const feed = jsonFile(NEWS, { news: [] });
     return sendJson(res, 200, {
+      // The one switch (#428), for the pages and the Discord bot.
+      open: cfg.open === true,
       invite: cfg.discord.invite || '',
       patreon: cfg.patreon || '',
       status: { up: gameStatus.up, online: gameStatus.online },
@@ -3167,6 +3259,13 @@ async function handle(req, res) {
     });
     if (!putJson(INBOX, trimInbox(list))) {
       return sendJson(res, 500, { error: 'could not save' });
+    }
+    // An application's answer to the rules question (#428), kept against the
+    // Discord id. The ticket is already saved, so a failure here is logged
+    // rather than handed back as a failed ticket.
+    if (o.rules && !noteRules(RULES_OK, o.discordId, o.rules, o.by, Date.now())) {
+      console.error('[thornswood-docs] could not write down the rules answer for ' +
+                    String(o.discordId || '').replace(/[^0-9]/g, '').slice(0, 20));
     }
     return sendJson(res, 200, { ok: true });
   }
@@ -3773,7 +3872,7 @@ async function handle(req, res) {
     if (st.banned) return sendJson(res, 403, { ok:false, why:'banned', message:
       'That Discord account is banned from Thornswood.' });
     if (!st.play) return sendJson(res, 403, { ok:false, why:'role', message:
-      'That Discord account has no role that lets it in yet.',
+      notAcceptedYet(),
       invite: cfg.discord.invite || '' });
     // The dev build checks in as channel dev. It is for the roles in
     // access.dev (the staff roles by default, Patrick 27 Sep #605, unless
@@ -4436,7 +4535,7 @@ async function handle(req, res) {
     if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', message:
       'That Discord account is banned from Thornswood.' });
     if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', message:
-      'That Discord account has no role that lets it in yet.' });
+      notAcceptedYet() });
     if (server === 'dev' && !st.dev) return sendJson(res, 403, { ok: false, why: 'dev', message:
       'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
 

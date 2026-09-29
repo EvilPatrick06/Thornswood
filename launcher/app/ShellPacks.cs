@@ -189,24 +189,10 @@ namespace Thornswood
                 catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
             };
 
-            // Connecting Discord only succeeds for an account the site has
-            // already accepted, so a linked launcher is an accepted one and
-            // this is the whole test. Anybody who has not been through the
-            // application can see what is coming and cannot start on it.
-            if (!Discord.Linked)
-            {
-                b.IsEnabled = false;
-                b.Content = "Apply first";
-                b.ToolTip = "The collection opens once your application is accepted and you have " +
-                            "connected Discord in the sidebar.";
-                var gate = new TextBlock();
-                gate.Text = "Connect Discord first. The collection opens once you have been accepted.";
-                gate.FontSize = 11.5;
-                gate.Foreground = Res("Bad");
-                gate.TextWrapping = TextWrapping.Wrap;
-                gate.Margin = new Thickness(0, 7, 12, 0);
-                left.Children.Add(gate);
-            }
+            // Open to everybody (#428): anyone can download in the alpha, and
+            // the same link is on the public Downloads page. It used to say
+            // "Apply first" until Discord was linked, which kept nothing from
+            // anybody. The application in the Discord unlocks Play, not this.
 
             var card = new Border();
             card.Padding = new Thickness(14, 12, 14, 12);

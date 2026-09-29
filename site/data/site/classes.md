@@ -279,7 +279,7 @@ nothing to sow can never do the work that earns the next rank.
 
 How long a crop takes to come up, how much a harvest gives back, and how long a
 claim survives unworked are all set on the server rather than settled here.
-They will move during the playtest, because the only way to find out what a
+They will move during the alpha, because the only way to find out what a
 day's farming should be worth is to watch people farm.
 
 ## Getting better at it

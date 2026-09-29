@@ -20,28 +20,44 @@ extra space, and the few files other programs rewrite are real copies. Vortex ke
 switching back to your usual profile and running Purge Mods leaves your own
 Skyrim the way it was.
 
+<!-- alpha -->
 ## 1. Apply
 
 **Thornswood is eighteen and over.** Applying is you stating that you are. The
 [rules](/rules) say what that is about before they say anything else.
 
-**Thornswood is in alpha.** Anyone can download and install it. The world stays
-locked until you have applied in the Discord and been given the role, so
-applying is the first thing to do.
+**Thornswood is in alpha, and the world is open by application.** Anyone can
+download and install it. Play unlocks once you have applied in the Discord and
+been given the Playtester role, so applying is the first thing to do.
 
-Come into the Discord and open a ticket. Say who you are, roughly what you are
-after, and whether you have played on a server like this before. A few lines is
-plenty, it is not an essay and nobody is marking it.
+Read the [rules](/rules) first. Then come into the Discord, open a ticket in
+the applications channel and pick **Apply to be an alpha playtester**. It asks
+whether you are eighteen or over, whether you accept the rules, and a few lines
+about who you want to play and a bug you have run into. It is not an essay and
+nobody is marking it. Your answers, the rules one included, are kept against
+your Discord account.
 
-We are taking people in small numbers on purpose. A bug found by four people is
-a bug that gets fixed by the weekend. The same bug found by two hundred is a
-bad week for everybody, and a first impression nobody comes back from.
+Somebody reads every application and answers it. Once you are accepted, your
+Discord account is what lets you in. There is nothing else to sign up for, no
+second password, and no form on this site.
 
-If you are accepted, your Discord account is what lets you in. There is nothing
-else to sign up for, no second password, and no form on this site.
+You can do steps 2 and 3 while you wait. Step 4 works once you are accepted.
+It is an alpha, so things break: a bug found by four people is a bug that gets
+fixed by the weekend, so say when you find one.
+<!-- /alpha -->
+<!-- open -->
+## 1. Come into the Discord
 
-If you are not accepted yet, you are not being turned away. Stay in the Discord
-and you will be asked when there is room.
+**Thornswood is eighteen and over.** Joining is you stating that you are. The
+[rules](/rules) say what that is about before they say anything else.
+
+**Thornswood is open.** Anyone can download it and anyone in the Discord can
+play. Read the [rules](/rules), because being in the Discord and in the world
+means accepting them.
+
+Your Discord account is what lets you in. There is nothing else to sign up
+for, no second password, and no form on this site.
+<!-- /open -->
 
 ## 2. Take the installer
 

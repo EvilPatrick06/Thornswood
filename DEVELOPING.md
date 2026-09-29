@@ -10,8 +10,8 @@ SECOND-DEVELOPER.md until 25 September, when the team grew past two.
 ## What Thornswood is
 
 Thornswood is a modded co-op Skyrim roleplay server on SkyMP, the server
-authoritative multiplayer for Skyrim Special Edition. It is Patrick's, in a
-closed playtest with friends and testers, becoming an RP server of its own,
+authoritative multiplayer for Skyrim Special Edition. It is Patrick's, in an
+alpha that is open by application, becoming an RP server of its own,
 less strict than the big ones, with working NPCs, its own launcher, its own
 website and Discord, and a lore of its own (fifty years after the civil war,
 the Stormcloaks won, a High King over the Jarls, the Thalmor expelled, the

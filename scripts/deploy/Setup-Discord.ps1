@@ -90,6 +90,22 @@ if ($Posts) { $env:DISCORD_POSTS = '1' }
 if ($Check) { $env:DISCORD_CHECK = '1' }
 $tok = $null
 
+# The one switch (#428): the site's "open", read off its public page so the
+# posts say the same as the site. Anything that goes wrong is the alpha
+# wording, which is what is true until somebody flips it.
+$open = $false
+try {
+  $pub = Invoke-RestMethod -Uri 'https://thornswood.net/api/public' -TimeoutSec 15
+  $open = ($pub.open -eq $true)
+} catch {
+  Write-Host ('  Could not ask the site whether the world is open (' + $_.Exception.Message + '), so the posts use the alpha wording.') -ForegroundColor Yellow
+}
+$env:THORNSWOOD_OPEN = $(if ($open) { '1' } else { '0' })
+if ($Posts) {
+  if ($open) { Write-Host '  The site says the world is open to everybody, so the posts say so.' }
+  else { Write-Host '  The site says the world is in alpha, open by application, so the posts say so.' }
+}
+
 try {
   & $py $app
   $code = $LASTEXITCODE
@@ -98,6 +114,7 @@ try {
   $env:DISCORD_PRUNE = $null
   $env:DISCORD_POSTS = $null
   $env:DISCORD_CHECK = $null
+  $env:THORNSWOOD_OPEN = $null
 }
 
 # It used to say the webhook was ready whatever happened, including on the run

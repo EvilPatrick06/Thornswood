@@ -1,6 +1,7 @@
 # Thornswood
 
-A modded co-op Skyrim roleplay server on SkyMP, in closed playtest. This
+A modded co-op Skyrim roleplay server on SkyMP, in alpha and open by
+application. This
 repository is everything behind it. It is not where the game is downloaded:
 people who want to join apply in the [Discord](https://thornswood.net/discord)
 and follow [thornswood.net/join](https://thornswood.net/join).
