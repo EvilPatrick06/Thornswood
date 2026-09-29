@@ -37,7 +37,11 @@
       git show release/main/<id>         what it shipped and where to find it
 
   Get-ReleaseDisagreements says whether a feed's names for its release agree
-  with each other. tests\test-release-name.ps1 drives all of it.
+  with each other, and with "releases", the list Rollback-Feed.ps1 puts a
+  channel back from (#442): the newest entry there is this release, by the same
+  id, ending on its last pack. Rollback-Feed does not rewrite "release" yet, so
+  after a rollback the feed's "release" still names the last Ship until the
+  next one. tests\test-release-name.ps1 drives all of it.
 #>
 
 # The tag for a release, by its channel and id. '' when there is no id.
@@ -58,11 +62,12 @@ function Get-ReleaseSource([string]$RepoDir) {
     try {
         # "$(...)", not [string](...): a command that prints nothing gives
         # $null through a cast, and '' through a string.
-        $top = "$(& git -C $RepoDir rev-parse --show-toplevel 2>$null | Select-Object -First 1)"
-        if ($LASTEXITCODE -ne 0 -or -not $top) { return $o }
-        $a = [IO.Path]::GetFullPath($top.Trim()).TrimEnd('\', '/')
-        $b = [IO.Path]::GetFullPath($RepoDir).TrimEnd('\', '/')
-        if (-not [string]::Equals($a, $b, [StringComparison]::OrdinalIgnoreCase)) { return $o }
+        # The top of the checkout has no prefix. Asked of git rather than by
+        # comparing paths, which a subst drive or a junction would fool.
+        $inside = "$(& git -C $RepoDir rev-parse --is-inside-work-tree 2>$null | Select-Object -First 1)".Trim()
+        if ($LASTEXITCODE -ne 0 -or $inside -ne 'true') { return $o }
+        $prefix = "$(& git -C $RepoDir rev-parse --show-prefix 2>$null | Select-Object -First 1)".Trim()
+        if ($LASTEXITCODE -ne 0 -or $prefix) { return $o }
         $c = "$(& git -C $RepoDir rev-parse HEAD 2>$null | Select-Object -First 1)"
         if ($LASTEXITCODE -ne 0 -or $c.Trim() -notmatch '^[0-9a-f]{40}$') { return $o }
         $o.Commit = $c.Trim()
@@ -133,6 +138,17 @@ function Get-ReleaseDisagreements($doc) {
     if ($base -ne $feedBase) {
         $said = if ($feedBase) { $feedBase } else { 'none' }
         $bad += "release $id names baseline '$base' and the feed's baseline is $said"
+    }
+    # The feed's list of releases a channel can be put back to (#442) names
+    # this one first, by the same id, ending on its last pack, once it has
+    # sent its record. A -NoUpload run sends none and adds nothing to it.
+    if ($base -and $doc.PSObject.Properties['releases'] -and $null -ne $doc.releases -and @($doc.releases).Count) {
+        $top = @($doc.releases)[0]
+        $topId = Get-ReleaseField $top 'id'
+        if ($topId -ne $id) { $bad += "release $id is not the newest in the feed's releases, which starts with $topId" }
+        elseif ($packs.Count -and (Get-ReleaseField $top 'lastPack') -ne $packs[$packs.Count - 1]) {
+            $bad += ("release $id ends on pack " + $packs[$packs.Count - 1] + " and its entry in releases on '" + (Get-ReleaseField $top 'lastPack') + "'")
+        }
     }
     $commit = Get-ReleaseField $r 'commit'
     $tag = Get-ReleaseField $r 'tag'

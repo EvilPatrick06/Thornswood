@@ -111,6 +111,9 @@ try {
             launcherVersion = '1.1.102.7'
             packs = @([pscustomobject]@{ id = '20260928-2324-dev' }, [pscustomobject]@{ id = '20260929-0100-dev' }, [pscustomobject]@{ id = '20260929-0100-dev-2' })
             baseline = [pscustomobject]@{ id = '20260929-0100-dev'; sha256 = ('b' * 64); url = 'x'; entries = 3 }
+            # The list a channel can be put back to (#442), newest first.
+            releases = @([pscustomobject]@{ id = '20260929-0100-dev'; lastPack = '20260929-0100-dev-2' },
+                         [pscustomobject]@{ id = '20260928-2324-dev'; lastPack = '20260928-2324-dev' })
         }
         $doc | Add-Member -NotePropertyName release -NotePropertyValue (New-ReleaseRecord '20260929-0100-dev' 'dev' '1.1.102.7' @('20260929-0100-dev', '20260929-0100-dev-2') '20260929-0100-dev' $c1 'claude/x' 0)
         return $doc
@@ -126,7 +129,9 @@ try {
         @('the feed names another baseline', { param($x) $x.baseline.id = '20260928-2324-dev' }, 'feed''s baseline'),
         @('a tag for the other channel', { param($x) $x.release.tag = 'release/main/20260929-0100-dev' }, 'names tag'),
         @('a short commit', { param($x) $x.release.commit = 'abc1234'; $x.release.tag = 'release/dev/20260929-0100-dev' }, 'full commit'),
-        @('a tag with no commit', { param($x) $x.release.commit = '' }, 'names tag')
+        @('a tag with no commit', { param($x) $x.release.commit = '' }, 'names tag'),
+        @('another release is the newest in releases', { param($x) $x.releases = @($x.releases[1], $x.releases[0]) }, 'not the newest'),
+        @('its entry in releases ends on another pack', { param($x) $x.releases[0].lastPack = '20260929-0100-dev' }, 'its entry in releases')
     )
     foreach ($c in $cases) {
         $x = Good; & $c[1] $x
@@ -225,6 +230,9 @@ try {
         Yes ("  its packs are the ones it added, named by the release ({0})" -f (@($rec.packs) -join ', ')) (
             @($rec.packs).Count -ge 1 -and @($rec.packs | Where-Object { $packIds -notcontains $_ -or ($_ -ne $id -and $_ -notlike "$id-*") }).Count -eq 0)
         Yes ("  its baseline is the release's own record, and the one the feed names ({0})" -f $rec.baseline) ($rec.baseline -eq $id -and $feed.baseline.id -eq $id)
+        $top = if ($feed.PSObject.Properties['releases'] -and @($feed.releases).Count) { @($feed.releases)[0] } else { $null }
+        Yes '  and it is the newest of the releases the channel can be put back to, ending on its last pack' (
+            $null -ne $top -and [string]$top.id -eq $id -and [string]$top.lastPack -eq [string]@($rec.packs)[-1])
         Yes ("  it names the launcher the feed offers ({0})" -f $rec.launcherVersion) ($rec.launcherVersion -eq '1.1.102' -and $feed.launcherVersion -eq '1.1.102')
         Yes '  the commit it was built from, and the checkout was clean' ($rec.commit -eq $head -and [int]$rec.uncommitted -eq 0)
         Yes ("  and its tag, {0}" -f $rec.tag) ($rec.tag -eq "release/main/$id")
@@ -274,6 +282,13 @@ try {
     [void](RunGit $work @gitId commit -q -am two)
     $cB = (RunGit $work rev-parse HEAD).Out
     [void](RunGit $work remote add origin $bare)
+    $src = Get-ReleaseSource $work
+    Yes 'the top of a checkout reports its commit and branch' ($src.Commit -eq $cB -and $src.Branch -and $src.Uncommitted -eq 0)
+    New-Item -ItemType Directory -Force -Path (Join-Path $work 'inner') | Out-Null
+    Yes '  a folder inside one reports none, so it never names another repository''s commit' ((Get-ReleaseSource (Join-Path $work 'inner')).Commit -eq '')
+    Put (Join-Path $work 'a.txt') 'three'
+    Yes '  and a changed tracked file is counted' ((Get-ReleaseSource $work).Uncommitted -eq 1)
+    [void](RunGit $work checkout -q -- a.txt)
     $vf = Join-Path $Scratch 'tagfeed\version.json'
     function Feed-For([string]$rid, [string]$ch, [string]$commit) {
         $doc = [pscustomobject][ordered]@{
