@@ -43,6 +43,18 @@
     .\Deploy-DevGamemode.ps1 -Now  no warning and no wait, which is what this
                                    did for everybody until 24 September
 
+    .\Deploy-DevGamemode.ps1 -PutBack
+                                   the files the last run replaced go back in,
+                                   after the same warning, checked the same way
+
+  STAGED, CHECKED, THEN SWAPPED (issue #446). Nothing is copied over the
+  running dev server any more. The new files and an edited copy of the dev
+  settings go into $Root\.stage-<stamp> while it runs, the box checks them
+  there, and only then is anybody warned and the server stopped. If it does
+  not answer on its ports afterwards, the old files go back and this exits 1.
+  What a run replaced is kept in $Root\.prev-<stamp>, the newest three, and
+  -PutBack puts the newest back. See THE STAGE below and Swap.ps1.
+
   A gamemode change that also changes the CHARGEN records needs
   Deploy-Gamemode.ps1 -Vortex first. Code-only changes do not.
 
@@ -159,7 +171,13 @@ param(
   [ValidateSet('notice','restart')]
   [string]$Mode = 'notice',
   [string]$Why = 'a gamemode update',
-  [switch]$Now
+  [switch]$Now,
+  # How long the new dev server has to answer on its game port and its
+  # resources port before the old files go back.
+  [int]$Wait = 60,
+  # Put the files the last run replaced back in, and send nothing. See the
+  # header.
+  [switch]$PutBack
 )
 
 $ErrorActionPreference = 'Stop'
@@ -169,6 +187,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Vps.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
+. (Join-Path $Here 'Swap.ps1')
+if ($PutBack -and $LoadOrder) { throw '-PutBack puts the last files back and sends nothing, so it does not take -LoadOrder.' }
 if (-not $Gamemode) { $Gamemode = Join-Path $Here '..\..\game\gamemode.js' }
 if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $Gamemode" }
 
@@ -177,7 +197,10 @@ if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $G
 # sent to the box's store first. A -Gamemode from anywhere else goes in as an
 # edit and the artifact says so. From here $Gamemode is the artifact's copy,
 # so the check, the stamp and the send are all of what the zip holds.
+# -PutBack builds and sends nothing.
 . (Join-Path $Here 'Artifact.ps1')
+$artifact = $null
+if (-not $PutBack) {
 $fromRepo = (Resolve-Path -LiteralPath (Join-Path $Here '..\..\game\gamemode.js')).ProviderPath
 if ((Resolve-Path -LiteralPath $Gamemode).ProviderPath -eq $fromRepo) {
   $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js'
@@ -187,6 +210,7 @@ if ((Resolve-Path -LiteralPath $Gamemode).ProviderPath -eq $fromRepo) {
 Write-Host ('  artifact ' + (Format-ThornswoodArtifact $artifact))
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 $Gamemode = Join-Path $artifact.Folder 'game\gamemode.js'
+}
 
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
@@ -527,166 +551,161 @@ function Warn-DevRoom {
 }
 # ==== end thornswood dev deploy warning ====
 
-Write-Host ''
-Write-Host 'Who is on the dev server...'
-Warn-DevRoom
-
-# The port comes from the dev server's own settings on the box, so the process
-# stopped is the one on that port and nothing else. 7777 is the live server;
-# refusing it here is what makes this script safe to run without thinking.
+# ------------------------------------------------------------ the stage ---
 #
-# Once the process is gone, so is any restart.json it never read. The gamemode
-# deletes that file when it reads it, and a process that is down, or whose
-# gamemode failed at load, never does. The next one to start then finds it
-# within a tick and a half and counts down on its own: under -Mode notice a
-# "Pushing a server update in 1 minute" with nothing behind it, to people who
-# have just come back to the fixed server, and under -Mode restart a kick a
-# minute after boot with no restart behind it, which is the empty world with
-# no NPCs that Request-Restart's -RestartFollows guard exists to prevent.
-Write-Host ''
-Write-Host 'Stopping the dev server...'
-Remote @"
+# Issue #446. This used to stop the dev server first and then copy gamemode.js,
+# the stamp and any plugins straight over the running files, edit the settings
+# in place, start it, and print DEV SERVER IS NOT LISTENING if it did not come
+# up, with nothing put back. So a copy that failed half way, or a gamemode that
+# would not start, left the dev server down until somebody noticed.
+#
+# Now everything goes into $Root\.stage-<stamp> while the dev server runs: the
+# files from here, and a copy of its settings, edited there by the block below
+# rather than in place. The box checks the stage with the same block
+# Deploy-Server.ps1 uses (every file by its hash, the settings with no byte
+# order mark and parsing, the port not moving, every plugin in the load order
+# on disk, gamemode.js parsing), and only then is anybody warned. The stop, the
+# renames, the start and the way back are Swap.ps1's $swapBlock, the same as
+# live. -PutBack puts the newest .prev folder back the same way.
+$stamp     = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stageName = '.stage-' + $stamp
+$prevName  = '.prev-' + $stamp
+$stageWin  = "$rootWin\$stageName"
+$stageFar  = ($Root -replace '\\', '/') + '/' + $stageName
+$hashes    = [ordered]@{}
+
+if (-not $PutBack) {
+  Write-Host ''
+  Write-Host "Staging in $stageWin..."
+  # A stage a run that died part way left is cleared first; it was never
+  # swapped in. The running settings are copied in to be edited there, and a
+  # root on the live port is refused before anything is sent.
+  $made = @(Remote @"
 `$s = Get-Content '$rootWin\server-settings.json' -Raw | ConvertFrom-Json
-`$port = [int]`$s.port
-if (`$port -eq 7777) { 'REFUSING: $rootWin is on port 7777, which is the live server'; exit 9 }
-'dev port ' + `$port + ', name ' + `$s.name
-Stop-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
-`$pids = @()
-`$pids += @(Get-NetUDPEndpoint -LocalPort `$port -EA SilentlyContinue | Select-Object -ExpandProperty OwningProcess)
-`$pids += @(Get-NetTCPConnection -LocalPort (`$port + 1) -State Listen -EA SilentlyContinue | Select-Object -ExpandProperty OwningProcess)
-foreach (`$id in (`$pids | Sort-Object -Unique)) {
-  if (`$id -gt 0) { Stop-Process -Id `$id -Force -EA SilentlyContinue; 'stopped pid ' + `$id }
-}
-Start-Sleep -Seconds 2
-if (Test-Path '$rootWin\gamemode.js') {
-  Copy-Item '$rootWin\gamemode.js' ('$rootWin\gamemode.js.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
-  'kept the old gamemode beside it as gamemode.js.before-<stamp>'
-}
-`$d = 'data'
-if (`$s.dataDir) { `$d = [string]`$s.dataDir }
-`$rq = Join-Path ([IO.Path]::Combine('$rootWin', `$d)) 'restart.json'
-if (Test-Path -LiteralPath `$rq) {
-  try { Remove-Item -LiteralPath `$rq -Force -EA Stop; 'removed a restart.json the old process never read' }
-  catch { 'COULD NOT REMOVE ' + `$rq + ', so the new process will count down on its own: ' + `$_.Exception.Message }
-}
-'stopped'
-"@ | ForEach-Object { "  $_" }
-if ($LASTEXITCODE -eq 9) { throw 'Refused: that root is the live server.' }
+if ([int]`$s.port -eq 7777) { 'REFUSING: $rootWin is on port 7777, which is the live server'; exit 9 }
+Get-ChildItem -LiteralPath '$rootWin' -Directory -Force -EA SilentlyContinue |
+  Where-Object { `$_.Name -like '.stage-*' } |
+  ForEach-Object { Remove-Item -LiteralPath `$_.FullName -Recurse -Force -EA SilentlyContinue }
+New-Item -ItemType Directory -Path '$stageWin\plugins' -Force | Out-Null
+Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\server-settings.json' -Force
+'dev port ' + `$s.port + ', name ' + `$s.name
+'STAGE MADE'
+"@ | ForEach-Object { "$_".Trim() })
+  foreach ($l in $made) { Write-Host "  $l" }
+  if ($made -match '^REFUSING') { throw 'Refused: that root is the live server. Nothing was sent or stopped.' }
+  if ($made -notcontains 'STAGE MADE') { throw "could not make $stageWin on the dev box. Nothing was sent or stopped." }
 
-Write-Host ''
-Write-Host 'Copying...'
-& scp @ssh $Gamemode "$User@${Vps}:$Root/gamemode.js"
-if ($LASTEXITCODE -ne 0) { throw 'scp failed for gamemode.js' }
-Write-Host '  gamemode.js'
-# A warning and not a stop. The dev server is stopped at this point and the new
-# gamemode has already been sent, so throwing here would leave it stopped for a
-# file that nothing reads yet. An old stamp left behind names the old
-# gamemode's hash, so it cannot be mistaken for this one.
-& scp @ssh $stampFile "$User@${Vps}:$Root/thornswood-build.json"
-if ($LASTEXITCODE -ne 0) { Write-Host '  thornswood-build.json did not go up, carrying on' -ForegroundColor Yellow }
-else { Write-Host '  thornswood-build.json' }
-
-if ($LoadOrder) {
-  foreach ($p in $sendPlugins) {
-    $n = Split-Path $p -Leaf
-    & scp @ssh $p "$User@${Vps}:$remotePlugins/$n"
-    if ($LASTEXITCODE -ne 0) { throw "scp failed for plugin $n" }
-    Write-Host "  plugins/$n"
+  $send = [ordered]@{}
+  $send['gamemode.js'] = $Gamemode
+  # The stamp goes up in the stage with the gamemode it describes, so a
+  # rollback cannot leave a new stamp naming the old gamemode.
+  $send['thornswood-build.json'] = $stampFile
+  foreach ($p in $sendPlugins) { $send['plugins/' + (Split-Path $p -Leaf)] = $p }
+  foreach ($rel in $send.Keys) {
+    & scp @ssh $send[$rel] "$User@${Vps}:$stageFar/$rel"
+    if ($LASTEXITCODE -ne 0) { throw "scp failed for $rel. The dev server has not been touched." }
+    Write-Host "  $rel"
   }
-  & scp @ssh $orderFile "$User@${Vps}:$farOrder"
-  if ($LASTEXITCODE -ne 0) { throw 'scp failed for the load order list' }
-  Write-Host ('  the load order list, {0} plugins' -f $pluginNames.Count)
-}
+  if ($LoadOrder) {
+    & scp @ssh $orderFile "$User@${Vps}:$farOrder"
+    if ($LASTEXITCODE -ne 0) { throw 'scp failed for the load order list. The dev server has not been touched.' }
+    Write-Host ('  the load order list, {0} plugins' -f $pluginNames.Count)
+  }
+  $hashes = Get-SwapHashes $send
 
-Write-Host ''
-Write-Host 'Pointing the dev server at the dev voice service...'
-# Deliberately not sent from here. server-settings.json on the dev box
-# carries the dev port and name and must not be overwritten from a local
-# build, which is the whole reason this script exists rather than
-# Deploy-Server.ps1. One key is set in place instead, and the old file is
-# kept beside it.
-# WHAT YOU ARE WEARING STAYS ON, and the three keys below are why. Measured on
-# 20 September from the live server.log: 24 refused equipment updates over two
-# days, every one of them 'inventory does not contain item 13790', which is
-# IronWarAxe. Skyrim Unbound hands out starting gear inside the client's own
-# game and the server never sees it happen, so the first equipment update a new
-# character sends names an item the server has no record of, and upstream throws
-# the WHOLE update away for it. The equipment record then stays empty all
-# session, and on the next spawn the client empties the pack and refills it from
-# that empty record, four times in a second and a half. equipmentSlotCheckEnabled
-# and equipmentSpellCheckEnabled are the other two refusals, neither of which the
-# log shows firing, both switchable in our fork already.
-# equipmentInventoryCheckEnabled is the one that matters and it needs the server
-# rebuilt from thornswood/engine-changes before it does anything; an unknown key
-# is ignored until then.
-#
-# AND THE START POINT MOVES WITH THE LOAD ORDER, added 23 September.
-#
-# The block below rewrites loadOrder on the dev box whenever the build's
-# order differs from the one up there. startPoints sits in the same file and
-# holds a form id, and a form id is fileIndex * 0x01000000 + local id, so
-# moving the load order under it silently points it at a different plugin,
-# or at no plugin at all.
-#
-# That is what happened. The dev settings were written on 22 September when
-# Skyrim Unbound.esp was at index 58; the order moved and Unbound is at 54
-# there now, in a list of 57. Every new character on dev died at login with
-#   Error: FromFormId failed due to invalid file index 58  (spawn.ts:38)
-# and the client showed its OOPS box with no way to tell what was wrong.
-# Patrick hit it on 23 September at 18:30.
-#
-# The index is recomputed here from whatever load order this run leaves on
-# the box, and only the index: the local id is kept exactly as it was, so
-# this fixes a moved plugin and never decides where the creation room is.
-# Deploy-Gamemode.ps1 computes the same thing the same way for the live
-# server, which is why live was right and dev was not.
-#
-# AND HOW MANY IT HOLDS AT ONCE, #481. thornswoodMostOnline is the number the
-# gamemode turns people away past, and maxPlayers, the engine's own slot
-# count, is set that plus the staff seats, both from records\most-online.json
-# read above. With no number both are left as the box has them and that does
-# not count as a reason to rewrite.
-#
-# AND NO "default" KEY IN npcSettings, added 28 September for issue #879. The
-# engine reads every key of npcSettings as a plugin name and refuses every NPC
-# when one names no loaded plugin, so {"default": {...}} emptied the world:
-# NPCs showed for a moment and went, or never showed. Deploy-Gamemode stopped
-# writing it in #880, but this script never sends the settings file, so the
-# dev box kept the old one. The key is dropped here and the rest of npcSettings
-# is left as it is.
-#
-# AND THE PEOPLE COME BACK, added 28 September for issue #956. Two more gates
-# in the engine refuse an NPC, both off unless a setting says otherwise, and no
-# script here ever said so: npcAllowCrimeFaction (anyone in a hold's crime
-# faction, which is every guard and nearly every townsperson) and
-# npcAllowEssential (essential, protected and unique actors, which is every
-# named shopkeeper and resident). Animals are in neither, which is why they
-# came back with #879 and the people did not. Measured with the server binary
-# over the dev load order: 1406 of 4942 people in Skyrim.esm load with both
-# off, 3274 with both on; across the other plugins 275 of 1445 against 1243.
-# Belethor, Hulda and Nazeem are refused on both counts. Both are set true
-# here on every run.
-#
-# AND WHETHER A WRONG LOAD ORDER ENDS THE SESSION, added 28 September for
-# #402. -LoadOrderRefuse on sets thornswoodLoadOrderRefuse true, off sets it
-# false, and leaving the switch off keeps whatever the box has. This is the
-# only place the dev settings are edited, so the switch lives here.
-#
-# AND WHETHER A SESSION NEEDS A JOIN PASS, added 28 September for #937.
-# -RequirePass on sets thornswoodRequirePass true, off sets it false, and no
-# switch keeps what the box has. thornswoodServer is always dev here, so a pass
-# the site issued for the live server is refused on this one.
-#
-# AND WHETHER THE SERVER KEEPS NPCS ALIVE, added 28 September for #385.
-# -Npcs off sets npcEnabled false and -Npcs on sets it true, which with the
-# empty npcSettings above is every NPC in the world. Nothing else changes, so
-# the same spot on dev with it off and then on is the before and after.
-#
-# This comment is HERE and not inside the here-string below on purpose. Anything
-# in that string is base64 encoded and sent as an ssh command line, where it
-# counts double and the far end truncates at about 8191 characters. Ten lines of
-# comment in there took the block from roughly 7,400 to 10,252 and the VPS
-# received a script that stopped in the middle of the line that writes the file.
+  Write-Host ''
+  Write-Host 'Pointing the dev server at the dev voice service...'
+  # Deliberately not sent from here. server-settings.json on the dev box
+  # carries the dev port and name and must not be overwritten from a local
+  # build, which is the whole reason this script exists rather than
+  # Deploy-Server.ps1. One key is set in place instead, and the old file is
+  # kept beside it.
+  # WHAT YOU ARE WEARING STAYS ON, and the three keys below are why. Measured on
+  # 20 September from the live server.log: 24 refused equipment updates over two
+  # days, every one of them 'inventory does not contain item 13790', which is
+  # IronWarAxe. Skyrim Unbound hands out starting gear inside the client's own
+  # game and the server never sees it happen, so the first equipment update a new
+  # character sends names an item the server has no record of, and upstream throws
+  # the WHOLE update away for it. The equipment record then stays empty all
+  # session, and on the next spawn the client empties the pack and refills it from
+  # that empty record, four times in a second and a half. equipmentSlotCheckEnabled
+  # and equipmentSpellCheckEnabled are the other two refusals, neither of which the
+  # log shows firing, both switchable in our fork already.
+  # equipmentInventoryCheckEnabled is the one that matters and it needs the server
+  # rebuilt from thornswood/engine-changes before it does anything; an unknown key
+  # is ignored until then.
+  #
+  # AND THE START POINT MOVES WITH THE LOAD ORDER, added 23 September.
+  #
+  # The block below rewrites loadOrder on the dev box whenever the build's
+  # order differs from the one up there. startPoints sits in the same file and
+  # holds a form id, and a form id is fileIndex * 0x01000000 + local id, so
+  # moving the load order under it silently points it at a different plugin,
+  # or at no plugin at all.
+  #
+  # That is what happened. The dev settings were written on 22 September when
+  # Skyrim Unbound.esp was at index 58; the order moved and Unbound is at 54
+  # there now, in a list of 57. Every new character on dev died at login with
+  #   Error: FromFormId failed due to invalid file index 58  (spawn.ts:38)
+  # and the client showed its OOPS box with no way to tell what was wrong.
+  # Patrick hit it on 23 September at 18:30.
+  #
+  # The index is recomputed here from whatever load order this run leaves on
+  # the box, and only the index: the local id is kept exactly as it was, so
+  # this fixes a moved plugin and never decides where the creation room is.
+  # Deploy-Gamemode.ps1 computes the same thing the same way for the live
+  # server, which is why live was right and dev was not.
+  #
+  # AND HOW MANY IT HOLDS AT ONCE, #481. thornswoodMostOnline is the number the
+  # gamemode turns people away past, and maxPlayers, the engine's own slot
+  # count, is set that plus the staff seats, both from records\most-online.json
+  # read above. With no number both are left as the box has them and that does
+  # not count as a reason to rewrite.
+  #
+  # AND NO "default" KEY IN npcSettings, added 28 September for issue #879. The
+  # engine reads every key of npcSettings as a plugin name and refuses every NPC
+  # when one names no loaded plugin, so {"default": {...}} emptied the world:
+  # NPCs showed for a moment and went, or never showed. Deploy-Gamemode stopped
+  # writing it in #880, but this script never sends the settings file, so the
+  # dev box kept the old one. The key is dropped here and the rest of npcSettings
+  # is left as it is.
+  #
+  # AND THE PEOPLE COME BACK, added 28 September for issue #956. Two more gates
+  # in the engine refuse an NPC, both off unless a setting says otherwise, and no
+  # script here ever said so: npcAllowCrimeFaction (anyone in a hold's crime
+  # faction, which is every guard and nearly every townsperson) and
+  # npcAllowEssential (essential, protected and unique actors, which is every
+  # named shopkeeper and resident). Animals are in neither, which is why they
+  # came back with #879 and the people did not. Measured with the server binary
+  # over the dev load order: 1406 of 4942 people in Skyrim.esm load with both
+  # off, 3274 with both on; across the other plugins 275 of 1445 against 1243.
+  # Belethor, Hulda and Nazeem are refused on both counts. Both are set true
+  # here on every run.
+  #
+  # AND WHETHER A WRONG LOAD ORDER ENDS THE SESSION, added 28 September for
+  # #402. -LoadOrderRefuse on sets thornswoodLoadOrderRefuse true, off sets it
+  # false, and leaving the switch off keeps whatever the box has. This is the
+  # only place the dev settings are edited, so the switch lives here.
+  #
+  # AND WHETHER A SESSION NEEDS A JOIN PASS, added 28 September for #937.
+  # -RequirePass on sets thornswoodRequirePass true, off sets it false, and no
+  # switch keeps what the box has. thornswoodServer is always dev here, so a pass
+  # the site issued for the live server is refused on this one.
+  #
+  # AND WHETHER THE SERVER KEEPS NPCS ALIVE, added 28 September for #385.
+  # -Npcs off sets npcEnabled false and -Npcs on sets it true, which with the
+  # empty npcSettings above is every NPC in the world. Nothing else changes, so
+  # the same spot on dev with it off and then on is the before and after.
+  #
+  # This comment is HERE and not inside the here-string below on purpose. Anything
+  # in that string is base64 encoded and sent as an ssh command line, where it
+  # counts double and the far end truncates at about 8191 characters. Ten lines of
+  # comment in there took the block from roughly 7,400 to 10,252 and the VPS
+  # received a script that stopped in the middle of the line that writes the file.
+  & {
+    # The block below edits the staged copy, never the running one: $rootWin
+    # is the stage folder for as long as it runs (issue #446).
+    $rootWin = $stageWin
 Remote @"
 `$p = '$rootWin\server-settings.json'
 if (-not (Test-Path `$p)) { 'NO server-settings.json AT ' + `$p; exit 0 }
@@ -846,12 +865,52 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
   }
 }
 "@ | ForEach-Object { "  $_" }
+  }
+
+  # The settings the block above left in the stage are hashed there, so the
+  # check holds them to what was written, like every file sent from here.
+  $sum = @(Remote "(Get-FileHash -LiteralPath '$stageWin\server-settings.json' -Algorithm SHA256).Hash" |
+           ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^[0-9A-Fa-f]{64}$' })
+  if (-not $sum.Count) { throw "the staged settings could not be read back on the dev box. The dev server has not been touched." }
+  $hashes['server-settings.json'] = $sum[0].ToLowerInvariant()
+
+  $checkOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes) + $checkBlock) |
+                ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
+  if ($checkOut -notcontains 'STAGE OK') {
+    Write-Host ''
+    Write-Host '  THE STAGE DID NOT CHECK OUT, so nothing was stopped and nobody was warned.' -ForegroundColor Red
+    Write-Host '  The dev server is still running exactly as it was. The lines above say why.' -ForegroundColor Red
+    throw 'the stage did not check out, so the dev server was left running'
+  }
+}
 
 Write-Host ''
-Write-Host 'Starting...'
+Write-Host 'Who is on the dev server...'
+Warn-DevRoom
+
+# The stop, the renames, the start, the check that it answers on its game port
+# and its resources port, and the way back if it does not: Swap.ps1's
+# $swapBlock, the one Deploy-Server.ps1 runs on live. It stops only whatever
+# holds this root's own UDP port, so the live server is never touched, and it
+# removes any restart.json the old process never read, so the next one does
+# not count down on its own. What it replaced is kept in .prev-<stamp>.
+Write-Host ''
+Write-Host 'Stopping the dev server...'
+$pick = ''
+if ($PutBack) { $pick = $putBackPick }
+# A stray line on stderr must not stop this side reading while the far side is
+# half way through a swap.
+$eap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes) + $pick + $swapBlock) |
+               ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
+} finally { $ErrorActionPreference = $eap }
+$swapped = Show-SwapResult $swapOut "$rootWin\.prev-<stamp>"
+
+Write-Host ''
+Write-Host 'What it is running...'
 Remote @"
-Start-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
-Start-Sleep -Seconds 10
 `$s = Get-Content '$rootWin\server-settings.json' -Raw | ConvertFrom-Json
 `$port = [int]`$s.port
 if (Get-NetUDPEndpoint -LocalPort `$port -EA SilentlyContinue) { 'dev server up on UDP ' + `$port } else { 'DEV SERVER IS NOT LISTENING on UDP ' + `$port }
@@ -875,7 +934,15 @@ if (Test-Path '$rootWin\server.log') {
 }
 "@ | ForEach-Object { "  $_" }
 
-# The new gamemode is in place: the box records that the dev server runs this
-# artifact, and the dev server serves the record from its data folder, so
-# http://<box>:7788/thornswood-deploy.json says which commit it runs.
-$null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root -Beside "$Root/data/thornswood-deploy.json"
+if (-not $swapped) { exit 1 }
+
+# The new gamemode is in place and the dev server answers: the box records
+# that it runs this artifact, and serves the record from its data folder, so
+# http://<box>:7788/thornswood-deploy.json says which commit it runs. The
+# record it had goes into .prev with the files it describes (Swap.ps1), and
+# after -PutBack the record that came back with them is the one recorded.
+if ($PutBack) { Restore-SwapRecord "$User@$Vps" $ssh $Root $swapOut "$Root/data/thornswood-deploy.json" 'gamemode' }
+else {
+  Save-SwapPreviousRecord "$User@$Vps" $ssh $Root $prevName "$Root/data/thornswood-deploy.json"
+  $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root -Beside "$Root/data/thornswood-deploy.json"
+}

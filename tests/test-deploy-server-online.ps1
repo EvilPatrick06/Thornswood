@@ -1,4 +1,4 @@
-﻿<#
+<#
   test-deploy-server-online.ps1
 
   Deploy-Server.ps1 treats a server with nothing listening as nobody online,
@@ -40,6 +40,8 @@ function Done {
 }
 
 $src = Get-Content -LiteralPath $deployPath -Raw
+# The stage check and the swap moved into Swap.ps1 beside it for issue #446.
+$lib = Get-Content -LiteralPath (Join-Path (Split-Path -Parent $deployPath) 'Swap.ps1') -Raw
 
 Yes 'OnlineNow asks whether anything is on the game port' (
     $src -match 'function OnlineNow' -and $src -match 'Get-NetUDPEndpoint -EA Stop')
@@ -48,7 +50,7 @@ Yes 'OnlineNow zeroes the count when nothing is listening' (
     $src -match "if \(-not ``\$up\) \{ 'ONLINE 0' \}" -or
     ($src -match "if \(-not ``\`$up\)" -and $src -match "'ONLINE 0'"))
 Yes 'StopOurs removes a leftover restart.json' (
-    $src -match "removed a restart\.json the old process never read")
+    $lib -match "removed a restart\.json the old process never read")
 
 $open  = '# ==== thornswood live deploy warning ===='
 $close = '# ==== end thornswood live deploy warning ===='
@@ -145,13 +147,13 @@ try {
             ($room.Data -replace '\\','/') -eq ($elsewhere -replace '\\','/'))
     }
 
-    $a2 = $src.IndexOf('# ==== deploy-server remote blocks ====')
-    $b2 = $src.IndexOf('# ==== end deploy-server remote blocks ====')
+    $a2 = $lib.IndexOf('# ==== deploy-server remote blocks ====')
+    $b2 = $lib.IndexOf('# ==== end deploy-server remote blocks ====')
     Yes 'the remote blocks are still between their markers' ($a2 -ge 0 -and $b2 -gt $a2)
     if ($a2 -ge 0 -and $b2 -gt $a2) {
         $checkBlock = $null
         $swapBlock = $null
-        Invoke-Expression $src.Substring($a2, $b2 - $a2)
+        Invoke-Expression $lib.Substring($a2, $b2 - $a2)
         Yes 'the swap block defines StopOurs' ($swapBlock -match 'function StopOurs')
 
         $standIns = "function Stop-ScheduledTask { }`r`n" +
