@@ -163,8 +163,27 @@ const COMMAND_CAP = 200;
 const COMMAND_REFUSED_EVERY_MS = 10000;
 
 // What the gamemode is handed. The offer count is this service's business.
+// proven says this connection's join token checked out, which the gamemode's
+// staff commands require (#412).
 function commandOut(c) {
-  return { id: c.id, profileId: c.profileId, name: c.name, text: c.text, at: c.at };
+  return { id: c.id, profileId: c.profileId, name: c.name, text: c.text, at: c.at, proven: c.proven === true };
+}
+
+/*
+  Who staff have silenced, profile -> until (ms), set whole by the gamemode's
+  /silence over loopback (POST /silenced, #412). Their plain lines, /me, /do,
+  /w and /s reach nobody until then; their slash commands still go to the game
+  server, which refuses /ooc and /roll from them itself. Kept in this process
+  only: the gamemode sends the whole list again every thirty seconds.
+*/
+const silenced = new Map();
+const SILENCED_TOLD_EVERY_MS = 10000;
+function silencedLeft(profileId, now) {
+  const pid = Number(profileId) || 0;
+  const until = silenced.get(pid);
+  if (!until) return 0;
+  if (now >= until) { silenced.delete(pid); return 0; }
+  return until - now;
 }
 
 /* ------------------------------------------------------------- chat log ---
@@ -1436,6 +1455,24 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Staff's silences, the whole list each time (#412). See silenced above.
+  if (req.method === 'POST' && route === '/silenced') {
+    if (!isLoopback(req)) { res.writeHead(403).end('no'); return; }
+    readBody(req, res, 20000, (doc) => {
+      const list = (doc && doc.profiles && typeof doc.profiles === 'object') ? doc.profiles : {};
+      const now = Date.now();
+      silenced.clear();
+      for (const k of Object.keys(list)) {
+        const pid = Number(k) || 0;
+        const until = Number(list[k]) || 0;
+        if (pid && until > now) silenced.set(pid, until);
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ silenced: silenced.size }));
+    });
+    return;
+  }
+
   // And the way back. The gamemode answers a command by writing a line into
   // the chat, either to one person or to the room.
   if (req.method === 'POST' && route === '/say') {
@@ -1655,8 +1692,23 @@ server.on('upgrade', (req, socket, head) => {
           name: (me && me.name) || '',
           text: text,
           at: Date.now(),
-          offers: 0
+          offers: 0,
+          proven: !!(me && me.proven)
         });
+        return;
+      }
+
+      // Silenced by staff: said to nobody, and they are told why (#412).
+      const hush = me ? silencedLeft(me.profileId, Date.now()) : 0;
+      if (hush) {
+        chatWrite('silenced', myId, me, text);
+        if (!me.hushTold || Date.now() - me.hushTold >= SILENCED_TOLD_EVERY_MS) {
+          me.hushTold = Date.now();
+          const mins = Math.max(1, Math.ceil(hush / 60000));
+          ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', at: Date.now(),
+                    text: 'Staff have silenced you for another ' + mins +
+                          (mins === 1 ? ' minute' : ' minutes') + ', so that did not reach anybody.' });
+        }
         return;
       }
 
