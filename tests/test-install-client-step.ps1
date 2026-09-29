@@ -61,7 +61,9 @@ Yes 'Install-Thornswood.ps1 parses' ($errs.Count -eq 0)
 $text = [IO.File]::ReadAllText($install)
 $m = [regex]::Match($text, "(?s)Key = 'client';.*?Script = '([^']+)'")
 Yes ('the client step runs ' + $m.Groups[1].Value) ($m.Success -and $m.Groups[1].Value -eq '..\release\Sync-Client.ps1')
-Yes 'Install-SkyMPClient.ps1 is gone' (-not (Test-Path -LiteralPath (Join-Path $Repo 'scripts\release\Install-SkyMPClient.ps1')))
+# By name anywhere under scripts, not by path: a path to a file that is gone is
+# what tests\test-script-paths.ps1 fails on.
+Yes 'Install-SkyMPClient.ps1 is gone' (@(Get-ChildItem -LiteralPath (Join-Path $Repo 'scripts') -Recurse -File -Filter 'Install-SkyMPClient.*').Count -eq 0)
 
 $named = @()
 foreach ($dir in 'scripts', 'tests', 'launcher', 'installer', 'site', '.github') {
