@@ -4,6 +4,7 @@
       .\scripts\vps\Watch-Services.ps1            what the watcher has seen lately
       .\scripts\vps\Watch-Services.ps1 -Install   put the watcher on the server
       .\scripts\vps\Watch-Services.ps1 -Remove    take it off again
+      .\scripts\vps\Watch-Services.ps1 -SetWebhook  where messages go when the bot is down
 
   Everything runs on one box now. The website, the game, the bot and the voice
   server are four things that can stop on their own, and nothing up there
@@ -18,16 +19,30 @@
   look, because a thing that crashes on startup restarted forever is a thing
   nobody ever finds out about.
 
-  Somebody is told. The bot on the same box reads watch.log every minute and
-  says each "needs a look", "could not be started" and "did not come back" in
-  the staff channel, once per outage, and "needs a look" again every hour the
-  service stays down (watch_services in bot\bot.py). An outage is
-  over when this writes "is back", or when one of its runs finds the service
-  answering and so writes nothing about it, which is the only sign a fix made
-  by hand ever leaves. The hourly repeat covers a fix that falls over again
-  before the next run. bot\test-watch-services.py renders the Note()
-  lines below and checks the bot still recognises them, so change the words
-  and that fails.
+  Somebody is told (issue #447). Each run decides, for everything it watches,
+  whether it is down, and keeps that in outages.txt. The first run that finds
+  a thing down writes ONE message saying what died and when; the message
+  saying it is back comes once it has answered on two runs in a row, so a
+  service that flaps is one outage and two messages, not two every five
+  minutes. A thing that answers on its port but fails its health check is
+  told about after two runs in a row, and is never restarted for it.
+
+  The messages go into alerts.jsonl beside watch.log, one JSON line each (id,
+  at, service, kind, text), and the same sentence goes into watch.log. The
+  bot on this box reads alerts.jsonl every minute and posts each one in the
+  staff channel (watch_services in bot\bot.py), writing its id to
+  alerts-sent-bot.txt. When the bot is not running, or has not posted one
+  within two and a half minutes, this posts it itself through a Discord
+  webhook whose address is in alerts-webhook.txt in this folder on the VPS,
+  and writes its id to alerts-sent-webhook.txt. That file is put there by
+  -SetWebhook or by hand, never committed, never printed, never logged.
+  With no webhook set, a message waits for the bot.
+
+  Anything else on this box that needs to tell staff something (the bot's own
+  wrapper, issue #449) appends a line of the same shape to alerts.jsonl and
+  this delivers it the same way. tests\test-watch-alerts.ps1 drives the real
+  code below against fakes: down, back, flapping, the bot down, a webhook
+  that fails. bot\test-watch-services.py reads what that harness writes.
 
   What it checks:
     caddy     https://thornswood.net answers, which is the only one of these
@@ -45,6 +60,15 @@
               twenty percent it writes DISK LOW, under ten DISK CRITICAL,
               once when the line is crossed and once when it comes back. It
               restarts nothing for it, because a restart frees nothing.
+
+  And, told about but never restarted:
+    health    the site, both game servers and both voice servers are also
+              asked over HTTP, because a hung node process still accepts a
+              connection (the kernel does that) and the port check above
+              cannot tell hung from idle. That was the 18 September case.
+    backup    the Thornswood Backup task's last result, and a backup file in
+              C:\Thornswood-Backup less than 26 hours old
+    runner    the build runner's Windows service is running
 
   The two dev ones are here because the box has been watching them since 16
   September and this file did not know. vps-dev-instance.ps1, which runs ON
@@ -67,6 +91,7 @@ param(
   [int]$Lines   = 25,
   [switch]$Install,
   [switch]$Remove,
+  [switch]$SetWebhook,
   [switch]$NoPause
 )
 
@@ -184,6 +209,278 @@ function BotAlive() {
   return $false
 }
 
+# ---------------------------------------------------- telling a person ---
+#
+# Everything below up to the checks is how a person hears about it (#447).
+# The header of Watch-Services.ps1 says the whole of it; the short form:
+# outages.txt remembers what is down, alerts.jsonl is the outbox the bot
+# posts from, and the webhook in alerts-webhook.txt is for when the bot
+# cannot. One message when a thing goes down, one when it is back.
+$outages  = Join-Path $root 'outages.txt'
+$alerts   = Join-Path $root 'alerts.jsonl'
+$sentBot  = Join-Path $root 'alerts-sent-bot.txt'
+$sentHook = Join-Path $root 'alerts-sent-webhook.txt'
+$hookFile = Join-Path $root 'alerts-webhook.txt'
+# Two runs in a row before a failed health check counts, because one slow
+# answer under load is not an outage.
+$healthMisses = 2
+# Two runs in a row answering before it is said to be back, so a service
+# that comes up and falls over again is still the same outage.
+$backAfter = 2
+# How long the bot has to post a message before this posts it instead.
+$ackWait = 150
+# A message older than this is not posted at all: a day late is noise.
+$alertMaxAge = 24 * 3600
+$hookRx = '^https://((ptb|canary)\.)?discord(app)?\.com/api/webhooks/\d+/[A-Za-z0-9_-]+$'
+$now = Get-Date
+
+function UnixTime($t) { return ([DateTimeOffset]$t).ToUnixTimeSeconds() }
+
+# '' when the address answers over HTTP within ten seconds, else why not.
+# Any answer under 500 counts: the process is alive and answering.
+function HealthProblem($url) {
+  try {
+    $null = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 10
+    return ''
+  } catch {
+    $code = 0
+    try { $code = [int]$_.Exception.Response.StatusCode } catch { }
+    if ($code -gt 0 -and $code -lt 500) { return '' }
+    if ($code -gt 0) { return ('answered HTTP ' + $code) }
+    $st = ''
+    try { $st = '' + $_.Exception.Status } catch { }
+    if ($st -eq 'Timeout') { return 'did not answer within ten seconds' }
+    return 'could not be reached'
+  }
+}
+
+# '' when every service matching the name is running, else why not.
+function ServiceProblem($name) {
+  $s = @(Get-Service -Name $name -EA SilentlyContinue)
+  if ($s.Count -eq 0) { return 'its Windows service is not installed' }
+  foreach ($one in $s) {
+    if ("$($one.Status)" -ne 'Running') { return ('its Windows service is ' + $one.Status) }
+  }
+  return ''
+}
+
+# '' when the nightly backup's task last ran clean and a backup file is
+# younger than $hours, else why not. 267009 is running now and 267011 is not
+# yet run, neither of which is a failure.
+function BackupProblem($task, $folder, $hours) {
+  $t = Get-ScheduledTask -TaskName $task -EA SilentlyContinue
+  if (-not $t) { return ('its task, ' + $task + ', is not registered') }
+  $i = Get-ScheduledTaskInfo -TaskName $task -EA SilentlyContinue
+  if ($i -and @(0, 267009, 267011) -notcontains [int64]$i.LastTaskResult) {
+    return ('its last run, at ' + $i.LastRunTime.ToString('yyyy-MM-dd HH:mm') + ', ended with code ' + $i.LastTaskResult)
+  }
+  $newest = Get-ChildItem -LiteralPath $folder -File -EA SilentlyContinue |
+            Where-Object { $_.Name -match '^thornswood-\d{8}-\d{6}\.zip(\.enc)?$' } |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  if (-not $newest) { return ('there is no backup in ' + $folder) }
+  $age = ($now - $newest.LastWriteTime).TotalHours
+  if ($age -gt $hours) { return ('the newest backup, ' + $newest.Name + ', is ' + [math]::Round($age) + ' hours old') }
+  return ''
+}
+
+# What is down, one line per thing: name|down or up|bad runs|good runs|first
+# bad|first good. Only this script writes it.
+function ReadOutages() {
+  $o = @{}
+  if (-not (Test-Path -LiteralPath $outages)) { return $o }
+  foreach ($line in (Get-Content -LiteralPath $outages -EA SilentlyContinue)) {
+    $b = "$line" -split '\|'
+    if ($b.Count -ne 6) { continue }
+    try {
+      $o[$b[0]] = @{ Down = ($b[1] -eq 'down'); Misses = [int]$b[2]; Clean = [int]$b[3]; Since = $b[4]; Good = $b[5] }
+    } catch { continue }
+  }
+  return $o
+}
+
+function SaveOutages($o) {
+  $lines = @()
+  foreach ($k in ($o.Keys | Sort-Object)) {
+    $s = $o[$k]
+    $lines += ($k + '|' + $(if ($s.Down) { 'down' } else { 'up' }) + '|' + $s.Misses + '|' + $s.Clean + '|' + $s.Since + '|' + $s.Good)
+  }
+  Set-Content -LiteralPath $outages -Value $lines -Encoding ASCII
+}
+
+# A time as Discord shows it, in each reader's own clock, and as watch.log
+# has it, in this box's.
+function Shown($t, $discord) {
+  if ($discord) { return ('<t:' + (UnixTime $t) + ':f>') }
+  return ($t.ToString('yyyy-MM-dd HH:mm') + ' VPS time')
+}
+
+function Took($from, $to) {
+  $m = [math]::Round(($to - $from).TotalMinutes)
+  if ($m -lt 1) { return 'under a minute' }
+  if ($m -lt 120) { return ('about ' + $m + ' minutes') }
+  return ('about ' + [math]::Round($m / 60.0, 1) + ' hours')
+}
+
+# What the watchdog did about it, said after what is wrong.
+function HowWords($c, $how) {
+  switch ($how) {
+    'back'    { return 'The watchdog restarted it and it answered again. If it stays up, a message saying it is back follows in about ten minutes.' }
+    'stuck'   { return 'The watchdog restarted it and it is still not answering. It tries every five minutes, three times an hour at most, then leaves it for a person.' }
+    'refused' { return ('Windows would not start its task, ' + $c.Task + ', which usually means the task is missing or was renamed. It needs a person.') }
+    'gaveup'  { return 'The watchdog has restarted it three times this hour and has stopped trying. It needs a person.' }
+    'soft'    { return 'It is still running, so the watchdog does not restart it for this. It may be hung. It needs a person.' }
+    default   { return 'Nothing restarts this by itself. It needs a person.' }
+  }
+}
+
+# One message into the outbox, and the same sentence into watch.log.
+function Tell($c, $kind, $head, $body, $plain) {
+  $id = $now.ToString('yyyyMMddHHmmss') + '-' + ($c.Name -replace '[^A-Za-z0-9]', '') + '-' + $kind
+  $text = '**' + $head + '** ' + $body
+  if ($text.Length -gt 1900) { $text = $text.Substring(0, 1900) }
+  $row = ConvertTo-Json @{ id = $id; at = (UnixTime $now); service = $c.Name; kind = $kind; text = $text } -Compress
+  [IO.File]::AppendAllText($alerts, $row + "`r`n", (New-Object Text.UTF8Encoding($false)))
+  Note ('told staff: ' + $head + ' ' + $plain)
+}
+
+# A check's own word for going down or coming back, or the usual one.
+function Word($c, $key, $usual) {
+  if ($c.ContainsKey($key)) { return $c[$key] }
+  return $usual
+}
+
+# One run's verdict on one thing. $bad is whether it was found down, $soft
+# whether that was only its health check, $why what is wrong in words and
+# $how what the watchdog did about it.
+function Observe($o, $c, $bad, $soft, $why, $how) {
+  if (-not $o.ContainsKey($c.Name)) { $o[$c.Name] = @{ Down = $false; Misses = 0; Clean = 0; Since = ''; Good = '' } }
+  $s = $o[$c.Name]
+  $stamp = $now.ToString('o')
+  if ($bad) {
+    $s.Clean = 0
+    $s.Good = ''
+    $s.Misses = $s.Misses + 1
+    if (-not $s.Since) { $s.Since = $stamp }
+    $need = 1
+    if ($soft) { $need = $healthMisses }
+    if (-not $s.Down -and $s.Misses -ge $need) {
+      $s.Down = $true
+      $since = [datetime]::Parse($s.Since, $null, 'RoundtripKind')
+      $rest = $why + '. First noticed '
+      $after = '. ' + (HowWords $c $how)
+      Tell $c 'down' ($c.Say + ' ' + (Word $c 'Fails' 'is down') + '.') ($rest + (Shown $since $true) + $after) ($rest + (Shown $since $false) + $after)
+    }
+    return
+  }
+  $s.Misses = 0
+  if (-not $s.Down) { $s.Since = ''; return }
+  if (-not $s.Good) { $s.Good = $stamp }
+  $s.Clean = $s.Clean + 1
+  if ($s.Clean -lt $backAfter) { return }
+  $good  = [datetime]::Parse($s.Good, $null, 'RoundtripKind')
+  $since = $good
+  if ($s.Since) { $since = [datetime]::Parse($s.Since, $null, 'RoundtripKind') }
+  $gone = Took $since $good
+  Tell $c 'back' ($c.Say + ' ' + (Word $c 'Recovers' 'is back') + '.') ('Working normally since ' + (Shown $good $true) + ', after ' + $gone + ' down (first noticed ' + (Shown $since $true) + ').') ('Working normally since ' + (Shown $good $false) + ', after ' + $gone + ' down (first noticed ' + (Shown $since $false) + ').')
+  $s.Down = $false
+  $s.Clean = 0
+  $s.Since = ''
+  $s.Good = ''
+}
+
+# The webhook's address, or '' when there is none or it is not one. Never
+# printed and never written anywhere by this script.
+function WebhookUrl() {
+  if (-not (Test-Path -LiteralPath $hookFile)) { return '' }
+  $u = ('' + (Get-Content -LiteralPath $hookFile -TotalCount 1 -EA SilentlyContinue)).Trim()
+  if ($u -notmatch $hookRx) { return '' }
+  return $u
+}
+
+# '' when Discord took it, else a short reason that never holds the address.
+# No mentions, so nothing in a message can ping anybody.
+function PostWebhook($url, $text) {
+  try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    $body = ConvertTo-Json @{ content = $text; allowed_mentions = @{ parse = @() } } -Compress
+    $null = Invoke-WebRequest -Uri $url -Method Post -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body)) -UseBasicParsing -TimeoutSec 15
+    return ''
+  } catch {
+    $code = 0
+    try { $code = [int]$_.Exception.Response.StatusCode } catch { }
+    if ($code -gt 0) { return ('HTTP ' + $code) }
+    return $_.Exception.GetType().Name
+  }
+}
+
+function SentIds() {
+  $s = @{}
+  foreach ($f in @($sentBot, $sentHook)) {
+    if (-not (Test-Path -LiteralPath $f)) { continue }
+    foreach ($l in (Get-Content -LiteralPath $f -EA SilentlyContinue)) {
+      $t = "$l".Trim()
+      if ($t) { $s[$t] = $true }
+    }
+  }
+  return $s
+}
+
+# Post through the webhook whatever the bot has not: everything when the bot
+# is not running, and anything it has left for longer than $ackWait when it
+# is, which is a bot that is up but not talking. Each failure is written to
+# watch.log once, on the first run that tries it.
+function Deliver() {
+  if (-not (Test-Path -LiteralPath $alerts)) { return }
+  $sent  = SentIds
+  $url   = WebhookUrl
+  $botUp = BotAlive
+  $from  = 0
+  if ($botUp) { $from = $ackWait }
+  $nowUnix = UnixTime $now
+  foreach ($line in (Get-Content -LiteralPath $alerts -Encoding UTF8 -EA SilentlyContinue)) {
+    $a = $null
+    try { $a = ConvertFrom-Json $line } catch { continue }
+    if (-not $a -or -not $a.id -or -not $a.text) { continue }
+    if ($sent.ContainsKey($a.id)) { continue }
+    $age = $nowUnix - [int64]$a.at
+    if ($age -gt $alertMaxAge -or $age -lt $from) { continue }
+    $first = ($age -lt ($from + 300))
+    if (-not $url) {
+      if ($first) { Note ('the bot has not posted ' + $a.id + ' and there is no webhook in ' + $hookFile + ', so it waits for the bot') }
+      continue
+    }
+    $why = PostWebhook $url $a.text
+    if ($why -eq '') {
+      Add-Content -LiteralPath $sentHook -Value $a.id -Encoding ASCII
+      $sent[$a.id] = $true
+      Note ('posted ' + $a.id + ' through the webhook, because the bot ' + $(if ($botUp) { 'had not' } else { 'is not running' }))
+    } elseif ($first) {
+      Note ('could not post ' + $a.id + ' through the webhook: ' + $why + '. It is tried again every run for a day.')
+    }
+  }
+}
+
+# The outbox keeps two days, and the two lists of what was posted keep far
+# more than two days' worth, so nothing still in the outbox loses its mark.
+function TrimAlerts() {
+  if (Test-Path -LiteralPath $alerts) {
+    $all = @(Get-Content -LiteralPath $alerts -Encoding UTF8 -EA SilentlyContinue)
+    $keep = @()
+    foreach ($line in $all) {
+      try { $a = ConvertFrom-Json $line } catch { continue }
+      if ($a -and ((UnixTime $now) - [int64]$a.at) -le (2 * $alertMaxAge)) { $keep += $line }
+    }
+    if ($keep.Count -lt $all.Count) {
+      [IO.File]::WriteAllText($alerts, $(if ($keep.Count) { ($keep -join "`r`n") + "`r`n" } else { '' }), (New-Object Text.UTF8Encoding($false)))
+    }
+  }
+  foreach ($f in @($sentBot, $sentHook)) {
+    if (-not (Test-Path -LiteralPath $f)) { continue }
+    $all = @(Get-Content -LiteralPath $f -EA SilentlyContinue)
+    if ($all.Count -gt 5000) { Set-Content -LiteralPath $f -Value ($all[-2500..-1]) -Encoding ASCII }
+  }
+}
+
 # How many times each service has been restarted in the last hour. A service
 # that will not stay up is a service to stop restarting and start reading.
 $recent = @{}
@@ -201,18 +498,35 @@ if (Test-Path $hist) {
 
 # Caddy first, because it is the one the outside world meets and because a
 # website answering on 3001 means nothing while 443 is unserved.
+#
+# Say is how a message names it. Health is asked over HTTP after the port
+# answers, and only ever told about, never restarted for (the header says why).
 $checks = @(
-  @{ Name = 'caddy';   Task = 'Thornswood Web';    Port = 0; Url = 'https://thornswood.net/' },
-  @{ Name = 'website'; Task = 'Thornswood Docs';   Port = 3001 },
-  @{ Name = 'game';    Task = 'Thornswood Server'; Port = 3000 },
-  @{ Name = 'voice';   Task = 'Thornswood Voice';  Port = 7778 },
-  @{ Name = 'bot';     Task = 'Thornswood Bot';    Port = 0    },
+  @{ Name = 'caddy';   Task = 'Thornswood Web';    Port = 0; Url = 'https://thornswood.net/'; Say = 'The website (https://thornswood.net, through Caddy)' },
+  @{ Name = 'website'; Task = 'Thornswood Docs';   Port = 3001; Say = 'The website''s app'; Health = 'http://127.0.0.1:3001/api/public' },
+  @{ Name = 'game';    Task = 'Thornswood Server'; Port = 3000; Say = 'The live game server'; Health = 'http://127.0.0.1:3000/api/servers/thornswood/manifest.json' },
+  @{ Name = 'voice';   Task = 'Thornswood Voice';  Port = 7778; Say = 'Live voice'; Health = 'http://127.0.0.1:7778/health' },
+  @{ Name = 'bot';     Task = 'Thornswood Bot';    Port = 0; Say = 'The Discord bot' },
   # The dev pair. The dev game server's own traffic is UDP on 7787 and
   # cannot be connected to, so its resources port stands in, exactly as
   # 3000 does for the live one.
-  @{ Name = 'dev game';  Task = 'Thornswood Dev Server'; Port = 7788 },
-  @{ Name = 'dev voice'; Task = 'Thornswood Dev Voice';  Port = 7789 }
+  @{ Name = 'dev game';  Task = 'Thornswood Dev Server'; Port = 7788; Say = 'The dev game server'; Health = 'http://127.0.0.1:7788/api/servers/thornswood/manifest.json' },
+  @{ Name = 'dev voice'; Task = 'Thornswood Dev Voice';  Port = 7789; Say = 'Dev voice'; Health = 'http://127.0.0.1:7789/health' }
 )
+
+# Told about and never restarted. The runner's service name is the one
+# Install-Runner.ps1 registers, actions.runner.<owner>-<repo>.<runner name>.
+$tellOnly = @(
+  @{ Name = 'backup'; Say = 'The nightly backup'; Fails = 'is failing'; Recovers = 'is working again'; Backup = 'Thornswood Backup'; Folder = 'C:\Thornswood-Backup'; Hours = 26 },
+  @{ Name = 'runner'; Say = 'The build runner (Launcher builds on thornswood-vps)'; Service = 'actions.runner.*.thornswood-vps' }
+)
+
+# What is wrong with one of $checks when it does not answer, in words.
+function DownWords($c) {
+  if ($c.ContainsKey('Url')) { return ($c.Url + ' is not answering') }
+  if ($c.Port -eq 0) { return 'Its python process is not running' }
+  return ('It is not answering on port ' + $c.Port)
+}
 
 # One place that knows how each of them is asked.
 function IsUp($c) {
@@ -222,13 +536,21 @@ function IsUp($c) {
 }
 
 $fresh = @()
+$told = ReadOutages
 foreach ($c in $checks) {
-  if (IsUp $c) { continue }
+  if (IsUp $c) {
+    $sick = ''
+    if ($c.ContainsKey('Health')) { $sick = HealthProblem $c.Health }
+    if ($sick) { Observe $told $c $true $true ('It answers on port ' + $c.Port + ', but ' + $c.Health + ' ' + $sick) 'soft' }
+    else { Observe $told $c $false $false '' '' }
+    continue
+  }
 
   $already = 0
   if ($recent.ContainsKey($c.Name)) { $already = $recent[$c.Name] }
   if ($already -ge 3) {
     Note ($c.Name + ' is still down after ' + $already + ' restarts this hour. Leaving it. This one needs a look.')
+    Observe $told $c $true $false (DownWords $c) 'gaveup'
     continue
   }
 
@@ -239,17 +561,26 @@ foreach ($c in $checks) {
 
   if ($rc -ne 0) {
     Note ($c.Name + ' could not be started. schtasks exited with ' + $rc + '. Is the task called ' + $c.Task + ' ?')
+    Observe $told $c $true $false (DownWords $c) 'refused'
     continue
   }
 
   # Caddy's first start after a gap waits on its certificate, so it is given
   # longer before the watcher decides it did not come back.
   Start-Sleep -Seconds $(if ($c.ContainsKey('Url')) { 45 } else { 25 })
-  if (IsUp $c) { Note ($c.Name + ' is back') }
-  else { Note ($c.Name + ' did not come back in time') }
+  if (IsUp $c) { Note ($c.Name + ' is back'); Observe $told $c $true $false (DownWords $c) 'back' }
+  else { Note ($c.Name + ' did not come back in time'); Observe $told $c $true $false (DownWords $c) 'stuck' }
 }
 
 if ($fresh.Count -gt 0) { Add-Content -LiteralPath $hist -Value $fresh }
+
+foreach ($c in $tellOnly) {
+  $why = ''
+  if ($c.ContainsKey('Backup')) { $why = BackupProblem $c.Backup $c.Folder $c.Hours }
+  else { $why = ServiceProblem $c.Service }
+  if ($why) { Observe $told $c $true $false ($why.Substring(0, 1).ToUpper() + $why.Substring(1)) 'nobody' }
+  else { Observe $told $c $false $false '' '' }
+}
 
 # Free space. Everything on this box shares one volume: both game servers, the
 # site and its uploads, voice, the bot, every log and every payload.
@@ -322,6 +653,21 @@ $space = DiskNow
 if ($space) { DiskCheck $space.Free $space.Size }
 else { 'disk      could not be read' }
 
+# The disk is told about too, from the verdict DiskCheck just kept. Going
+# from low to critical is the same outage, and DISK CRITICAL is still in
+# watch.log; the message says how full it was when it was first seen.
+$level = ''
+if (Test-Path -LiteralPath $diskState) { $level = ('' + (Get-Content -LiteralPath $diskState -TotalCount 1 -EA SilentlyContinue)).Trim() }
+if ($space -and $level) {
+  $diskCheck = @{ Name = 'disk'; Say = 'Free disk space on the VPS'; Fails = 'is running out'; Recovers = 'is fine again' }
+  $pct = [math]::Round(100.0 * $space.Free / $space.Size, 1)
+  if ($level -eq 'ok') { Observe $told $diskCheck $false $false '' '' }
+  else { Observe $told $diskCheck $true $false ('It is ' + $level + ': ' + $pct + '% free, ' + [math]::Round($space.Free / 1GB, 1) + ' GB. Every service on this box stops when it fills. Clear old logs, uploads or payloads') 'nobody' }
+}
+
+SaveOutages $told
+Deliver
+
 # Keep the two files from growing forever.
 foreach ($f in @($log, $hist)) {
   if (Test-Path $f) {
@@ -331,6 +677,7 @@ foreach ($f in @($log, $hist)) {
     }
   }
 }
+TrimAlerts
 '@
 
 # ------------------------------------------------------------------ off ---
@@ -343,6 +690,58 @@ if (`$LASTEXITCODE -eq 0) { 'the task is gone' } else { 'there was no task calle
 'the log is still at $Root\watch.log if you want to read it'
 "@
   foreach ($l in $out) { Say "  $l" }
+  Write-Host ''
+  if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  exit 0
+}
+
+# -------------------------------------------------------------- webhook ---
+# The address goes to the VPS on ssh's standard input, not on its command
+# line, so it is in no process list, no shell history and no log. It is
+# checked for the shape of a Discord webhook first, so a stray paste goes
+# nowhere. On the box the file is readable by SYSTEM and Administrators only,
+# which keeps the build runner's account away from it.
+$hookRx = '^https://((ptb|canary)\.)?discord(app)?\.com/api/webhooks/\d+/[A-Za-z0-9_-]+$'
+if ($SetWebhook) {
+  Head 'Where the watchdog posts when the bot is down'
+  Say '  In Discord: the staff channel, Edit Channel, Integrations, Webhooks,' 'DarkGray'
+  Say '  New Webhook, then Copy Webhook URL. Paste it below. It is not shown,' 'DarkGray'
+  Say '  not printed and not kept on this machine.' 'DarkGray'
+  $sec = Read-Host '  Webhook address' -AsSecureString
+  $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
+  try { $url = ('' + [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)).Trim() }
+  finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+  if ($url -notmatch $hookRx) { Die 'That is not a Discord webhook address (https://discord.com/api/webhooks/...). Nothing was sent.' }
+
+  $put = @"
+`$ErrorActionPreference = 'Continue'
+`$u = ('' + [Console]::In.ReadLine()).Trim()
+if (-not `$u) { 'FAILED    nothing arrived on standard input'; exit 1 }
+if (-not (Test-Path '$Root')) { `$null = New-Item -ItemType Directory -Path '$Root' -Force }
+`$f = '$Root\alerts-webhook.txt'
+[IO.File]::WriteAllText(`$f, `$u + "``r``n", (New-Object Text.UTF8Encoding(`$false)))
+`$null = & icacls `$f /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' 2>&1
+if (`$LASTEXITCODE -eq 0) { 'saved     ' + `$f + ', readable by SYSTEM and Administrators only' } else { 'FAILED    icacls exited with ' + `$LASTEXITCODE + ' locking ' + `$f }
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+`$body = ConvertTo-Json @{ content = 'The watchdog on the VPS can post here. When the Discord bot is down, what stops on the VPS and when it is back is said here instead.'; allowed_mentions = @{ parse = @() } } -Compress
+try {
+  `$null = Invoke-WebRequest -Uri `$u -Method Post -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes(`$body)) -UseBasicParsing -TimeoutSec 15
+  'posted    a test message. Look for it in the channel.'
+} catch {
+  `$code = 0
+  try { `$code = [int]`$_.Exception.Response.StatusCode } catch { }
+  'FAILED    the test message: ' + `$(if (`$code) { 'HTTP ' + `$code } else { `$_.Exception.GetType().Name })
+}
+"@
+  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($put))
+  $out = $url | & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" 2>&1
+  $url = $null
+  foreach ($l in $out) {
+    $c = 'Gray'
+    if ("$l" -match '^FAILED') { $c = 'Red' }
+    if ("$l" -match '^(saved|posted)') { $c = 'Green' }
+    Say "  $l" $c
+  }
   Write-Host ''
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
   exit 0
@@ -374,7 +773,11 @@ if (Test-Path '$Root\watch.log') {
   'first run:'
   Get-Content '$Root\watch.log' -Tail 10 | ForEach-Object { '  ' + `$_ }
 }
-else { 'first run wrote nothing, which means all four were answering' }
+else { 'first run wrote nothing, which means everything it watches was answering' }
+if (Test-Path '$Root\alerts-webhook.txt') {
+  `$null = & icacls '$Root\alerts-webhook.txt' /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' 2>&1
+  'webhook   set, for when the bot is down'
+} else { 'webhook   none yet. Messages wait for the bot until -SetWebhook is run' }
 "@
 
   foreach ($l in $out) {
@@ -386,6 +789,7 @@ else { 'first run wrote nothing, which means all four were answering' }
 
   Head 'From now on'
   Say '  Anything that stops gets started again within five minutes.' 'DarkGray'
+  Say '  The staff channel hears once when something goes down and once when it is back.' 'DarkGray'
   Say '  Run this script with no switches to see what it has been doing.' 'DarkGray'
   Write-Host ''
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -438,6 +842,15 @@ if (`$d -and ([double]`$d.Used + `$d.Free) -gt 0) { 'disk      ' + [math]::Round
 else { 'disk      could not be read' }
 `$t = & schtasks /query /tn '$Task' /fo list 2>`$null
 if (`$LASTEXITCODE -eq 0) { 'watcher   installed' } else { 'watcher   NOT installed. Run this with -Install' }
+if (Test-Path '$Root\alerts-webhook.txt') { 'webhook   set' } else { 'webhook   none, so only the bot tells anybody. Run this with -SetWebhook' }
+`$down = @()
+if (Test-Path '$Root\outages.txt') {
+  foreach (`$line in (Get-Content '$Root\outages.txt' -EA SilentlyContinue)) {
+    `$b = "`$line" -split '\|'
+    if (`$b.Count -eq 6 -and `$b[1] -eq 'down') { `$down += `$b[0] }
+  }
+}
+if (`$down.Count) { 'told      DOWN: ' + (`$down -join ', ') } else { 'told      nothing is down' }
 "@
 foreach ($l in $out) {
   $c = 'Gray'
