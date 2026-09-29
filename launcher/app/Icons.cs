@@ -63,7 +63,7 @@ namespace Thornswood
                     if (!string.IsNullOrEmpty(me) && File.Exists(me)) return me;
                 }
                 catch (Exception ex) { Swallow.Note("Icons.LauncherExe", ex); }
-                return Path.Combine(Paths.LauncherDir, SelfSwap.NewName);
+                return Path.Combine(Paths.LauncherDir, "Thornswood.exe");
             }
         }
 
@@ -278,20 +278,6 @@ namespace Thornswood
                             // path or a shortcut to the game gets an icon that
                             // is not the game's.
                             if (string.IsNullOrEmpty(target)) continue;
-                            // The update that renames an install from the
-                            // old name deletes the old exe, so a shortcut
-                            // still aimed at it in this launcher's folder is
-                            // ours and is pointed at this one. Issue #497:
-                            // the update path, kept with SelfSwap.OldName.
-                            bool repointed = false;
-                            if (SelfSwap.AimsAtOld(target, exe))
-                            {
-                                t.InvokeMember("TargetPath", BindingFlags.SetProperty, null, sc, new object[] { exe });
-                                t.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, sc,
-                                               new object[] { Path.GetDirectoryName(exe) });
-                                target = exe;
-                                repointed = true;
-                            }
                             if (!string.Equals(Full(target), Full(exe),
                                                StringComparison.OrdinalIgnoreCase)) continue;
 
@@ -320,7 +306,7 @@ namespace Thornswood
                                 continue;
                             }
 
-                            bool touched = repointed;
+                            bool touched = false;
                             string now = t.InvokeMember("IconLocation", BindingFlags.GetProperty,
                                                         null, sc, null) as string;
                             // Force rewrites even when the string matches: the
