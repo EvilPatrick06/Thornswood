@@ -151,6 +151,8 @@ function NoRealTask {
     $readable = $false
     try { $null = [IO.Directory]::GetFiles($folder, 'x'); $readable = $true } catch { }
     if ($readable -and -not (Test-Path -Path (Join-Path $folder 'Thornswood Test*'))) { return $true }
+    $svc = @(Get-Service -Name 'ThornswoodTest*' -ErrorAction SilentlyContinue)
+    if ($svc.Count) { return $false }
     $real = @(Get-ScheduledTask -TaskName 'Thornswood Test*' -ErrorAction SilentlyContinue)
     foreach ($r in $real) {
         Stop-ScheduledTask -TaskName $r.TaskName -ErrorAction SilentlyContinue
@@ -244,9 +246,23 @@ function Get-NetFirewallRule { }
 function New-NetFirewallRule { }
 function Remove-NetFirewallRule { }
 function icacls { $global:LASTEXITCODE = 0 }
+# The bot's Windows service (issue #465), kept in the same book as the tasks:
+# a service is an entry whose action is what the service runs. Only names the
+# book holds exist; nothing here reaches a real service.
+function Get-Service {
+  [CmdletBinding()] param([string]$Name)
+  $t = TsRead $Name
+  if (-not $t) { return }
+  $up = $false
+  if ($t.Pid) { $up = [bool](Get-Process -Id ([int]$t.Pid) -EA SilentlyContinue) }
+  [pscustomobject]@{ Name = $Name; Status = $(if ($up) { 'Running' } else { 'Stopped' }) }
+}
+function Stop-Service { [CmdletBinding()] param([string]$Name, [switch]$Force) if (-not (TsRead $Name)) { throw ('no service ' + $Name) }; Stop-ScheduledTask -TaskName $Name }
+function Start-Service { [CmdletBinding()] param([string]$Name) if (-not (TsRead $Name)) { throw ('no service ' + $Name) }; Start-ScheduledTask -TaskName $Name }
 foreach ($n in 'Get-ScheduledTask', 'Register-ScheduledTask', 'Start-ScheduledTask', 'Stop-ScheduledTask',
                'Unregister-ScheduledTask', 'Set-ScheduledTask', 'Export-ScheduledTask', 'New-NetFirewallRule',
-               'New-ScheduledTaskAction', 'New-ScheduledTaskTrigger', 'New-ScheduledTaskSettingsSet', 'New-ScheduledTaskPrincipal') {
+               'New-ScheduledTaskAction', 'New-ScheduledTaskTrigger', 'New-ScheduledTaskSettingsSet', 'New-ScheduledTaskPrincipal',
+               'Get-Service', 'Stop-Service', 'Start-Service') {
   $c = Get-Command $n
   if ($c.CommandType -ne 'Function' -or $c.Source) { 'THE STAND-IN FOR ' + $n + ' IS NOT THE ONE FOUND'; exit 97 }
 }
@@ -285,10 +301,11 @@ function global:ssh {
     $cmd = $all[-1]
     $body = ''
     $m = [regex]::Match($cmd, 'EncodedCommand\s+(\S+)')
-    if ($m.Success) { $body = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value)) }
+    if ($m.Success) { $body = MapTemp ([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))) }
     else {
         $m = [regex]::Match($cmd, '-File\s+(\S+)\s*$')
-        if ($m.Success) { $body = "& '" + (MapTemp $m.Groups[1].Value).Replace("'", "''") + "'" }
+        # The file's own text, with the box's fixed places mapped too.
+        if ($m.Success) { $body = MapTemp ([IO.File]::ReadAllText((MapTemp $m.Groups[1].Value))) }
         else {
             $m = [regex]::Match($cmd, '-Command\s+(.*)$')
             if ($m.Success) { $body = MapTemp $m.Groups[1].Value }
@@ -341,6 +358,9 @@ function Show { foreach ($l in $script:lastSaid) { Write-Host ('        ' + $l) 
 
 # ---- the scratch repository ---------------------------------------------------
 Copy-Item -LiteralPath $scripts -Destination (Join-Path $repo 'scripts') -Recurse
+# Where.ps1 reads the layout from the repository's root; the artifacts go
+# under the out folder it names, inside the scratch repository.
+Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $scripts) 'layout.json') -Destination (Join-Path $repo 'layout.json')
 Put (Join-Path $repo 'scripts\vps\vps.json') '{ "address": "127.0.0.1" }'
 
 $siteJs = @'
@@ -408,6 +428,9 @@ Put (Join-Path $repo 'bot\requirements.txt') ''
 Put (Join-Path $repo 'bot\staff-channel.txt') '0'
 Put (Join-Path $repo 'bot\assets\join-card.png') 'not really a picture'
 Put (Join-Path $repo 'game\gamemode.js') '// the committed gamemode'
+Site 'docs v0'
+Voice 'voice-v0'
+Bot 'bot v0'
 # The deploys build their artifact out of git (Artifact.ps1, issue #459), so the
 # scratch repository is one, committed once. Every version the cases write
 # after that goes in as an uncommitted edit, which the artifact carries.
@@ -583,15 +606,17 @@ try {
     Put (Join-Path $botRoot 'bot.env.json') '{ "DISCORD_TOKEN": "not a token" }'
     $bq = $botRoot.Replace("'", "''")
     Put (Join-Path $botRoot 'run.ps1') ("Set-Location -LiteralPath '" + $bq + "'`r`nwhile (`$true) {`r`n  & cmd /c ""python """"" + $botRoot + "\bot.py"""" >> """"" + $botRoot + "\bot.log"""" 2>&1""`r`n  Start-Sleep -Seconds 2`r`n}`r`n")
-    Task 'Thornswood Test Bot' 'powershell.exe' ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $botRoot + '\run.ps1"') $botRoot
+    # The service ThornswoodTestBot, standing in for ThornswoodBot (#465).
+    Task 'ThornswoodTestBot' 'powershell.exe' ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $botRoot + '\run.ps1"') $botRoot
     function BotSays([string]$v) { return ((Get (Join-Path $botRoot 'bot.log')) -match [regex]::Escape($v + ' watching')) }
-    $bot = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $botRoot; Task = 'Thornswood Test Bot'; CodeOnly = $true; NoPause = $true; Wait = 20 }
+    $bot = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $botRoot; Service = 'ThornswoodTestBot'; CodeOnly = $true; NoPause = $true; Wait = 20 }
     Yes 'Install-Bot: the stand-in bot is up' (WaitFor { BotSays 'bot v1' })
 
     Bot 'bot v2'
     $r = Deploy 'Install-Bot.ps1' $bot.Clone()
     $failed = $script:fail
     Yes 'Install-Bot -CodeOnly: good code is SWAP OK and the new bot says it is watching' ($r.Ok -and $r.Said -match 'SWAP OK' -and (BotSays 'bot v2'))
+    Yes '  and only then the box records the bot artifact' ((Current 'thornswood-bot').name -like 'bot-*')
     $prev = @(Kept $botRoot '.prev-*')
     Yes '  and the old bot.py is kept in .prev' ($prev.Count -eq 1 -and (Get (Join-Path $prev[0] 'bot.py')) -match 'bot v1')
     if ($script:fail -gt $failed) { Show }
@@ -624,6 +649,7 @@ try {
     $r = Deploy 'Install-Bot.ps1' $a
     $failed = $script:fail
     Yes 'Install-Bot -PutBack puts the previous code back, and it comes up' ($r.Ok -and (Get (Join-Path $botRoot 'bot.py')) -match 'bot v1' -and $r.Said -match 'SWAP OK')
+    Yes '  and the store no longer names the code it took out' ((Current 'thornswood-bot').name -eq 'an older copy kept before deploys were recorded')
     if ($script:fail -gt $failed) { Show }
 
     # ======================================================= the dev server
@@ -640,7 +666,7 @@ try {
     $launcher = Join-Path $work 'launcher'
     $null = [IO.Directory]::CreateDirectory($launcher)
     $dev = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $devRoot; Task = 'Thornswood Test Dev Server'; Gamemode = $gm
-              LauncherRoot = $launcher; Dist = (Join-Path $work 'dist'); Wait = 10 }
+              Dist = (Join-Path $work 'dist'); Wait = 10 }
     function DevUp { return ((UdpOwner $devPort) -gt 0) -and ((Listener ($devPort + 1)) -gt 0) }
     Yes 'Deploy-DevGamemode: the stand-in dev server is up' (WaitFor { DevUp })
 
