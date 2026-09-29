@@ -413,9 +413,10 @@ What differs, none of it broken:
   the site holds every one; each channel's next Ship moves them (see
   "Downloads come from the site"). Thornswood-Releases is deleted only once
   neither feed names one (#907).
-- **Main's client runtime is behind the record.** Main names fork
-  commit `9732d2cc`; `records\client-build.json` and the dev feed are on
-  `ccf71644`. The next main Ship carries it.
+- **Both feeds' client runtime is behind the record.** Main and dev both
+  name fork commit `ccf71644` (read 28 Sep, after the main Ship);
+  `records\client-build.json` is on `8fb4673a` since #919, which stops the
+  game's browser starting an mDNS responder. The next dev Ship carries it.
 - **Main has no Skyrim pin fields.** The dev feed's `expectedExeBytes`,
   `newerExeBytes` and `depots` match `records\skyrim-pin.json`; main was last
   published before #874 added them, so main launchers use their compiled
