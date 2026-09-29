@@ -242,20 +242,64 @@ function Run {
     # so the site feed is the only place updates are read from: a config with a
     # repository and no feed url has no update source at all.
     Yes 'RepoCandidates is gone with the GitHub fallback' ($null -eq $U.GetMethod('RepoCandidates', $flags))
-    $C = $asm.GetType('Thornswood.Config')
-    $en = $U.GetMethod('Enabled', $flags)
-    if ($null -ne $C -and $null -ne $en) {
-        $cfg = [Activator]::CreateInstance($C)
-        $C.GetField('UpdateRepo').SetValue($cfg, 'EvilPatrick06/Thornswood-Releases')
-        $C.GetField('UpdateFeedUrl').SetValue($cfg, '')
-        Yes 'a repository with no site feed url is no update source' (-not [bool]$en.Invoke($null, @($cfg)))
-        $C.GetField('UpdateFeedUrl').SetValue($cfg, 'https://thornswood.net/feed/version.json')
-        Yes 'the site feed url is' ([bool]$en.Invoke($null, @($cfg)))
-    } else {
-        Yes 'Config and Updater.Enabled are in the build' $false
-    }
     $upSrc = [IO.File]::ReadAllText((Join-Path $Src 'Updater.cs'))
     Yes 'Updater.cs builds no GitHub contents API address' ($upSrc -notmatch '/contents/version\.json')
+
+    # ---- FeedUrl: config.json cannot switch the update check off (#937) -----
+    #
+    # Blanking UpdateFeedUrl in config.json used to turn the check off, and a
+    # launcher with no update source let Play through on its own say. Now a
+    # feed address config.json names is kept only on thornswood.net over https,
+    # the way a feed announces a move; anything else is the built-in address
+    # for the channel. A repository with no feed url is no update source any
+    # more, and neither is anything else: there is always one.
+    $C = $asm.GetType('Thornswood.Config')
+    $fu = $U.GetMethod('FeedUrl', $flags)
+    Yes 'Updater.Enabled is gone: nothing can say updates are off' ($null -eq $U.GetMethod('Enabled', $flags))
+    if ($null -ne $C -and $null -ne $fu) {
+        $main = 'https://thornswood.net/feed/version.json'
+        $devFeed = 'https://thornswood.net/feed-dev/version.json'
+        function FeedFor([string]$url, [string]$channel, [string]$branch) {
+            $cfg = [Activator]::CreateInstance($C)
+            $C.GetField('UpdateFeedUrl').SetValue($cfg, $url)
+            $C.GetField('Channel').SetValue($cfg, $channel)
+            $C.GetField('UpdateBranch').SetValue($cfg, $branch)
+            return [string]$fu.Invoke($null, @($cfg))
+        }
+        Yes 'FeedUrl: an empty UpdateFeedUrl is the built-in main feed' ((FeedFor '' '' 'main') -eq $main)
+        Yes 'FeedUrl: a missing one too' ((FeedFor $null '' 'main') -eq $main)
+        Yes 'FeedUrl: an empty one on the dev build is the built-in dev feed' ((FeedFor '' 'dev' 'dev') -eq $devFeed)
+        Yes 'FeedUrl: UpdateBranch dev alone is the dev feed too' ((FeedFor '   ' '' 'dev') -eq $devFeed)
+        foreach ($bent in @('https://evil.example/version.json', 'http://thornswood.net/feed/version.json',
+                            'https://thornswood.net.evil.example/feed/version.json',
+                            'https://evilthornswood.net/feed/version.json',
+                            'https://someone@thornswood.net/feed/version.json',
+                            'https://thornswood.net:8443/feed/version.json',
+                            'file:///C:/Thornswood/version.json', 'not an address', 'off')) {
+            Yes "FeedUrl: '$bent' in config.json falls back to the built-in feed" ((FeedFor $bent '' 'main') -eq $main)
+        }
+        Yes 'FeedUrl: and on the dev build to the dev feed' ((FeedFor 'https://evil.example/v.json' 'dev' 'dev') -eq $devFeed)
+        Yes 'FeedUrl: the site feed is kept' ((FeedFor $main '' 'main') -eq $main)
+        Yes 'FeedUrl: a move the feed announced within thornswood.net is kept' (
+            (FeedFor 'https://thornswood.net/feed-next/version.json' '' 'main') -eq 'https://thornswood.net/feed-next/version.json')
+        Yes 'FeedUrl: and on a thornswood.net host of its own' (
+            (FeedFor 'https://cdn.thornswood.net/feed/version.json' '' 'main') -eq 'https://cdn.thornswood.net/feed/version.json')
+    } else {
+        Yes 'Config and Updater.FeedUrl are in the build' $false
+    }
+    $checkAt = $upSrc.IndexOf('public static VersionDoc Check(Config cfg)')
+    $checkBody = if ($checkAt -ge 0) { $upSrc.Substring($checkAt, $upSrc.IndexOf('static VersionDoc FromSite(', $checkAt) - $checkAt) } else { '' }
+    Yes 'Updater.Check reads FeedUrl and never UpdateFeedUrl itself' (
+        $checkBody -match 'string feedUrl = FeedUrl\(cfg\);' -and $checkBody -notmatch 'UpdateFeedUrl' -and $checkBody -notmatch 'return null;')
+    $shellAll = ''
+    foreach ($f in (Get-ChildItem -LiteralPath $Src -Filter 'Shell*.cs')) { $shellAll += [IO.File]::ReadAllText($f.FullName) }
+    Yes 'the Shell no longer lets Play through with no update source (Unblock is gone)' ($shellAll -notmatch '\bUnblock\s*\(')
+    $opened = @([regex]::Matches($shellAll, 'updatePending = false')).Count
+    $upd = [IO.File]::ReadAllText((Join-Path $Src 'ShellUpdate.cs'))
+    $inDoc = $upd.Substring($upd.IndexOf('static void OnVersionDoc('), $upd.IndexOf('static void CheckUpdatesInPlay(') - $upd.IndexOf('static void OnVersionDoc('))
+    $installed = @([regex]::Matches($upd, 'updatePending = false;\s*DrawStatus\(\); BuildModList\(\);\s*Log\("Update finished\."\);')).Count
+    Yes 'Play is let through only by a feed that was read: every updatePending = false is in OnVersionDoc or after its packs went in' (
+        $opened -gt 0 -and $opened -eq (@([regex]::Matches($inDoc, 'updatePending = false')).Count + $installed))
 
     # ---- Inside: the fence round every write and delete ----------------------
     #

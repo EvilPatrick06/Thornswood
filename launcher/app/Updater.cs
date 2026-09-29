@@ -124,31 +124,38 @@ namespace Thornswood
             return wc;
         }
 
-        public static bool Enabled(Config cfg)
-        {
-            // No token needed. The site feed (UpdateFeedUrl) is the only
-            // source since #907; the GitHub Contents API fallback on UpdateRepo
-            // went with Thornswood-Releases.
-            if (!string.IsNullOrEmpty(cfg.UpdateFeedUrl))
-            {
-                Uri feed;
-                if (Uri.TryCreate(cfg.UpdateFeedUrl.Trim(), UriKind.Absolute, out feed)
-                    && feed.Scheme == Uri.UriSchemeHttps)
-                    return true;
-            }
-            return false;
-        }
+        /// <summary>The feed this build reads when config.json names none of Thornswood's.</summary>
+        public const string MainFeed = "https://thornswood.net/feed/version.json";
+        public const string DevFeed = "https://thornswood.net/feed-dev/version.json";
 
-        public static string WhyDisabled(Config cfg)
+        /// <summary>
+        /// Where version.json is read from. Always somewhere: the update check
+        /// cannot be switched off (#937).
+        ///
+        /// Until #937 an UpdateFeedUrl blanked or bent in config.json turned
+        /// the check off, and a launcher with no update source let Play through
+        /// on its own say (Unblock, gone with this). So an out of date
+        /// launcher was one edit away from playing. Now config.json may only
+        /// move the feed within thornswood.net, over https, the way a feed
+        /// announces a move (updateFeedUrl); anything else, empty included, is
+        /// the built-in address for this build's channel. A feed address that
+        /// then does not answer keeps Play shut like any other failed check,
+        /// and a dev build pointed at the main feed gets no join pass from the
+        /// site, which checks the launcher against its own channel's feed.
+        /// </summary>
+        public static string FeedUrl(Config cfg)
         {
-            if (!string.IsNullOrEmpty(cfg.UpdateFeedUrl))
-            {
-                Uri feed;
-                if (Uri.TryCreate(cfg.UpdateFeedUrl.Trim(), UriKind.Absolute, out feed)
-                    && feed.Scheme == Uri.UriSchemeHttps)
-                    return cfg.UpdateFeedUrl.Trim();
-            }
-            return "no update source set";
+            bool dev = cfg != null &&
+                       (string.Equals(cfg.Channel, "dev", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(cfg.UpdateBranch, "dev", StringComparison.OrdinalIgnoreCase));
+            string builtIn = dev ? DevFeed : MainFeed;
+            string said = (cfg == null || cfg.UpdateFeedUrl == null) ? "" : cfg.UpdateFeedUrl.Trim();
+            Uri u;
+            if (said.Length == 0 || !Uri.TryCreate(said, UriKind.Absolute, out u)) return builtIn;
+            if (u.Scheme != Uri.UriSchemeHttps || !u.IsDefaultPort || u.UserInfo.Length > 0) return builtIn;
+            string host = u.Host.ToLowerInvariant();
+            if (host != "thornswood.net" && !host.EndsWith(".thornswood.net", StringComparison.Ordinal)) return builtIn;
+            return said;
         }
 
         /// <summary>
@@ -201,39 +208,27 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Reads version.json. Prefers UpdateFeedUrl (direct https on the
-        /// site, #649), with the ETag of the last copy so an unchanged feed is
-        /// answered 304 and not downloaded again. Until #907 a miss fell back to
-        /// the GitHub Contents API on UpdateRepo (Thornswood-Releases); that
-        /// repository is gone, so a miss is reported and the next check tries
-        /// the site again. Returns null if updates are off.
+        /// Reads version.json from FeedUrl (direct https on the site, #649),
+        /// with the ETag of the last copy so an unchanged feed is answered 304
+        /// and not downloaded again. Until #907 a miss fell back to the GitHub
+        /// Contents API on UpdateRepo (Thornswood-Releases); that repository is
+        /// gone, so a miss throws and the next check tries the site again.
+        /// Never null: updates cannot be off (#937).
         /// </summary>
         public static VersionDoc Check(Config cfg)
         {
-            if (!Enabled(cfg)) return null;
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
             LastNotModified = false;
 
-            Exception hostFail = null;
-            if (!string.IsNullOrEmpty(cfg.UpdateFeedUrl))
-            {
-                string feedUrl = cfg.UpdateFeedUrl.Trim();
-                LastFeedUrl = feedUrl;
-                try { return FromSite(cfg, feedUrl); }
-                catch (Exception ex)
-                {
-                    // Site feed missed. Said below; the next check asks again.
-                    hostFail = ex;
-                }
-            }
-
+            string feedUrl = FeedUrl(cfg);
+            LastFeedUrl = feedUrl;
             // No GitHub fallback any more (#907): Thornswood-Releases is gone.
             // A site feed that misses is what the caller gets, which reads as
             // no answer rather than as no update, so the in play clock is left
             // where it is (Shell.CheckUpdatesInPlay) and the next check, thirty
             // seconds on, asks the site again.
-            if (hostFail != null) throw WrapFeedFail(hostFail, true);
-            return null;
+            try { return FromSite(cfg, feedUrl); }
+            catch (Exception ex) { throw WrapFeedFail(ex, true); }
         }
 
         /// <summary>
