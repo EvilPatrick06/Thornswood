@@ -9,6 +9,9 @@
       .\Install-Bot.ps1 -NoToken     everything except asking for it
       .\Install-Bot.ps1 -PutBack     the code the last run replaced goes back
                                      in, checked the same way
+      .\Install-Bot.ps1 -SetPing     asks for the outside monitor's ping
+                                     address, puts it in bot.env.json and
+                                     restarts the bot; nothing else is sent
 
   What it does:
 
@@ -78,7 +81,11 @@ param(
   # code goes back. Connecting to Discord and reading the roles takes a while.
   [int]$Wait = 90,
   # Put the code the last run replaced back in, and send nothing.
-  [switch]$PutBack
+  [switch]$PutBack,
+  # The outside monitor's ping address (issue #449), asked for hidden, into
+  # bot.env.json as PING_URL on ssh's standard input, then the bot restarted
+  # by name so it reads it. Typing off takes it out. Nothing else is sent.
+  [switch]$SetPing
 )
 
 $ErrorActionPreference = 'Stop'
@@ -105,10 +112,10 @@ $docsWin = $DocsRoot.Replace('/','\')
 # as the commit holds them, in one zip named by commit and hash, sent to the
 # box's store first. From here $Repo is the artifact's folder, which is laid
 # out like the repository, so every copy below sends exactly what the zip holds.
-# -PutBack builds and sends nothing.
+# -PutBack and -SetPing build and send nothing.
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
-if (-not $PutBack) {
+if (-not $PutBack -and -not $SetPing) {
 $artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
 Write-Host ('artifact ' + (Format-ThornswoodArtifact $artifact)) -ForegroundColor DarkGray
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
@@ -164,6 +171,99 @@ function Remote($script) {
 
 Write-Host ''
 Write-Host '  THORNSWOOD  -  the bot' -ForegroundColor White
+
+# ------------------------------------------------------------ ping url ---
+# The outside monitor's ping address (issue #449, bot.py uptime_ping). The
+# bot sends it one GET a minute while it is on Discord, and the monitor
+# alerts when that stops, whether or not One is on. The address is a secret
+# (whoever has it can keep the monitor quiet): asked for hidden, never
+# printed, sent on ssh's standard input (Send-Secret.ps1, issue #451), kept
+# only in bot.env.json on the VPS, never in the repository. The full run
+# keeps it, since it keeps every setting it does not write.
+if ($SetPing) {
+  Head 'The outside monitor''s ping address'
+  Say '  From the monitor''s page for the bot check. Hidden while you paste it, never shown.' 'DarkGray'
+  Say '  Type off instead to take it out, so the bot stops pinging.' 'DarkGray'
+  $ss = Read-Host '  Paste it' -AsSecureString
+  if (-not $ss -or $ss.Length -eq 0) { Die 'Nothing pasted, nothing sent.' }
+  $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($ss)
+  try { $pingUrl = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr).Trim() }
+  finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+  $ss = $null
+  if ($pingUrl -ne 'off') {
+    $shape = $pingUrl -match '^https://[^\s/]+\.[^\s/]+/\S+$' -and $pingUrl.Length -le 400
+    if (-not $shape) {
+      $pingUrl = $null
+      Die 'That is not a ping address: it starts with https:// and has no spaces. Nothing was sent.'
+    }
+    Say ('  a ping address on ' + ([Uri]$pingUrl).Host) 'Green'
+  } else { Say '  taking the ping address out' 'Yellow' }
+
+  $writer = Join-Path $Here '..\vps\Write-BotToken.ps1'
+  if (-not (Test-Path -LiteralPath $writer)) { Die "missing: $writer" }
+  Head 'Into bot.env.json, then the bot restarted by name'
+  $out = Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $pingUrl -Script ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
+`$ErrorActionPreference = 'Continue'
+`$u = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+`$f = '$rootWin\bot.env.json'
+if (-not `$u) { 'NOT WRITTEN: nothing arrived on standard input. Nothing changed.'; return }
+`$h = `$null
+try { `$h = Read-ThornswoodJsonFile `$f }
+catch { 'NOT WRITTEN: ' + `$_.Exception.Message + '. Run Install-Bot.ps1 once first. Nothing changed.'; return }
+`$off = (`$u -eq 'off')
+if (`$off) {
+  if (-not `$h.Contains('PING_URL')) { 'PING UNCHANGED: bot.env.json holds no ping address. Nothing changed.'; return }
+  `$h.Remove('PING_URL')
+} else {
+  if ([string]`$h['PING_URL'] -ceq `$u) { 'PING UNCHANGED: bot.env.json already holds that ping address. Nothing changed.'; return }
+  `$h['PING_URL'] = `$u
+}
+try { Write-ThornswoodJsonFile `$f `$h }
+catch { 'NOT WRITTEN: ' + `$f + ' could not be written. Nothing else changed.'; return }
+`$back = `$null
+try { `$back = Read-ThornswoodJsonFile `$f } catch { }
+if (-not `$back) { 'NOT WRITTEN: ' + `$f + ' does not read back. Put it right before the bot restarts.'; return }
+if (`$off) {
+  if (`$back.Contains('PING_URL')) { 'NOT WRITTEN: the ping address is still in ' + `$f; return }
+  'ping address taken out of ' + `$f + ' and read back'
+} else {
+  if (-not ([string]`$back['PING_URL'] -ceq `$u)) { 'NOT WRITTEN: ' + `$f + ' reads back a different ping address'; return }
+  'ping address written to ' + `$f + ' and read back'
+}
+`$u = `$null; `$h = `$null; `$back = `$null
+# The service hands bot.env.json to python only when it starts it.
+`$log = '$rootWin\bot.log'
+`$before = Get-ThornswoodLogLength `$log
+`$r = @(Restart-ThornswoodBot -Root '$rootWin' -Service '$Service')
+`$r
+if (`$r -contains 'bot reconnected') {
+  # uptime_ping says once how its first ping went, within seconds of connecting.
+  `$seen = @()
+  for (`$i = 0; `$i -lt 30 -and -not `$seen.Count; `$i += 2) {
+    `$seen = @(Read-ThornswoodLogTail `$log `$before | Where-Object { `$_ -match 'uptime ping' })
+    if (-not `$seen.Count) { Start-Sleep -Seconds 2 }
+  }
+  if (`$seen.Count) { `$seen | ForEach-Object { 'bot: ' + (`$_ -replace '^\s*\[thornswood-bot\]\s*', '') } }
+  else { 'THE BOT HAS NOT SAID how its first ping went. Show-BotLog.ps1 shows its log.' }
+}
+"@)
+  $pingUrl = $null
+  foreach ($l in @($out)) {
+    $s = "$l"
+    $c = 'Gray'
+    if ($s -match 'NOT WRITTEN|NOT RESTARTED|HAS NOT SAID|FAILED') { $c = 'Red' }
+    elseif ($s -match 'read back|reconnected|reached the outside monitor|hears from this bot again') { $c = 'Green' }
+    Say "  $s" $c
+  }
+  Write-Host ''
+  if ("$out" -match 'NOT WRITTEN') { Die 'The ping address was not changed.' }
+  if ("$out" -match 'PING UNCHANGED') { Say '  Nothing to do: the bot already has that.' 'DarkGray' }
+  elseif ("$out" -match 'reached the outside monitor') { Say '  The monitor hears from the bot. Its page shows the first ping.' 'Green' }
+  elseif ("$out" -match 'taken out') { Say '  The bot no longer pings anything. Pause or delete the check on the monitor''s page, or it alerts.' 'Yellow' }
+  else { Say '  Check the monitor''s page: it shows each ping it gets.' 'Yellow' }
+  if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  exit 0
+}
 
 # ------------------------------------------------------------- python ---
 Head 'Python on the VPS'
