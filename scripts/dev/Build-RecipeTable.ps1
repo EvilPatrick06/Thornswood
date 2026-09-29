@@ -855,6 +855,21 @@ $GAMEMODE_JS = Join-Path $PSScriptRoot '..\..\game\gamemode.js'
 # worth doing once to see how far it pushes every half up.
 $PRODUCER_RANK_IS_LOWEST = $true
 
+# A CROP THAT ALSO GROWS WILD. WAITING ON PATRICK, issue #398, and a knob so his
+# answer is one line.
+#
+# Lowest wins, above, means a crop that a gatherer can also pick in the wild
+# costs the gatherer's rank and never the farmer's: Tomato is gatherer novice,
+# not farmer advanced, and every overlapping crop is the same, so the farmer's
+# ladder decides nothing where it overlaps the gatherer's.
+#
+# $false  IN USE, and what the table has always done: the cheapest way wins,
+#         whichever class it is.
+# $true   anything the farmer produces costs the farmer's rank, even where a
+#         gatherer picks the same thing lower, so a Cook's rungs follow the
+#         farmer's. Everything the farmer does not produce is unchanged.
+$CROP_COSTS_THE_FARMERS_RANK = $false
+
 # WHETHER THE INPUT RULE RANKS AT ALL. Set to $false and every row falls back
 # to RANK_SHARE, which is what this script did before 21 September, including
 # the three empty rungs.
@@ -1117,6 +1132,34 @@ $HOP_THROUGH_A_TEMPER = $false
 #                   in every half measured, so it collapses sooner.
 $SECOND_RULE_KEY = 'total inputs'
 
+# BEFORE THE SECOND RULE, TRY MOVING A FEW ROWS ONE RUNG. INVENTED, and it is
+# here because the second rule turned out to be a much bigger hammer than the
+# holes it was being used on. Issue #398.
+#
+# The second rule was written for the Bladebinder, a half where price and input
+# cost both say one number for every row. It is applied to ANY half the first
+# two rules leave with a hole, and it throws the whole half's ranking away to
+# fill one rung. Measured on the build of 28 September, after Tundra Cotton moved
+# to the gatherer (#626): the Liverywright's input cost put its 102 rows at
+# novice 82, advanced 10, expert 0, master 10, a hole at expert and nothing
+# else wrong. The second rule re-ranked all 102 by shopping list length and put
+# 30 robes whose makings are novice work, four Thread and a Leather Strip, on
+# expert and master: 39 Liverywright rows sat two rungs or more above what they
+# cost, and the Confectioner lost five more the same way.
+#
+# $true   IN USE. A hole is filled first from the rung next to it, above and
+#         then below, and no row moves more than one rung from where the first
+#         two rules put it. How many move is the hole's share in RANK_SHARE
+#         against its neighbour's, so the ladder keeps the shape the shares ask
+#         for. Rows whose own input cost does not stand in the way move first,
+#         then the cheapest (moving down) or the dearest (moving up). The rung
+#         moved from always keeps a row, named ranks and the row moved to novice
+#         for a new character never move, and a row moved once is never moved
+#         again. Only a half this cannot close, the Bladebinder with all 161
+#         rows on master, goes on to the second rule, and every move is printed.
+# $false  every hole goes straight to the second rule, as it did before.
+$HOLE_FILL_MOVES_ONE_RUNG = $true
+
 # A RUNG YOU CAN REACH AND CANNOT GATHER FOR IS STILL AN EMPTY RUNG. INVENTED,
 # and it is the other half of the rule HoleIn already enforces.
 #
@@ -1137,7 +1180,7 @@ $RUNGS_MUST_BE_STANDABLE = $true
 # a check quietly passing. Any half not named here that fails the check fails
 # the build, because a rung nobody can gather for is a rank that opens nothing.
 $HALVES_WITH_AN_UNSTANDABLE_RUNG = [ordered]@{
-    'Cook/Confectioner' = 'every one of its 28 rows wants a Sack of Flour and a pat of Butter, counted over the whole half on 21 September, and flour is made from Wheat, which harvests.json ranks advanced for a gatherer and for a farmer alike. So the cheapest thing a Confectioner can bake is advanced work to gather for and the novice rung cannot be stood on whatever rule ranks the half: by input cost the 22 rows the rule reaches land 14 advanced and 14 expert and none novice, and the second rule only relabels seven of them. This appeared the day the hop was followed and it was always true; before it, flour had no producer at all and every row read as costing nothing. It closes when somebody decides where a Confectioner''s flour comes from, which is the same decision HALVES_NOBODY_CAN_START is already waiting on for this half: all 28 rows are behind two vanilla perks nobody here will ever hold, so nothing is being opened to anybody at any rank yet.'
+    'Cook/Confectioner' = 'every one of its 28 rows wants a Sack of Flour and a pat of Butter, counted over the whole half on 21 September, and flour is made from Wheat, which harvests.json ranks advanced for a gatherer and for a farmer alike. So the cheapest thing a Confectioner can bake is advanced work to gather for and the novice rung cannot be stood on whatever rule ranks the half: by input cost all 28 land 20 advanced and 8 expert and none novice (28 September), and filling the empty novice rung (HOLE_FILL_MOVES_ONE_RUNG) only relabels eight of the advanced ones. This appeared the day the hop was followed and it was always true; before it, flour had no producer at all and every row read as costing nothing. It closes when somebody decides where a Confectioner''s flour comes from, which is the same decision HALVES_NOBODY_CAN_START is already waiting on for this half: all 28 rows are behind two vanilla perks nobody here will ever hold, so nothing is being opened to anybody at any rank yet.'
     'Enchanter/Bladebinder' = 'its novice, advanced and expert rungs are the second rule''s, not the input rule''s. 160 of its 161 rows want a Heart Stone and ores.json ranks all four Heart Stone deposits master, so every rung below master holds rows nobody at that rank can gather for. The second rule is argued for at SECOND_RULE_KEY and this is the price of it, stated rather than passed over: the half is ranked by how long a recipe''s shopping list is and the shopping list starts with a master miner''s stone either way. It closes when somebody decides where an Enchanter''s Heart Stones come from, which is the same decision HALVES_NOBODY_CAN_START is waiting on for this half.'
 }
 
@@ -1955,6 +1998,11 @@ function RememberProducer([string]$desc, [string]$rank, [int]$at, [string]$who, 
     $take = $false
     if (-not $have) {
         $take = $true
+    } elseif ($CROP_COSTS_THE_FARMERS_RANK -and ($who -eq 'farmer' -or $have.Who -eq 'farmer')) {
+        # See CROP_COSTS_THE_FARMERS_RANK: the farmer's entry wins over any
+        # other class, and between two farmer entries the usual rule decides.
+        if ($who -eq 'farmer' -and $have.Who -ne 'farmer') { $take = $true }
+        elseif ($who -eq 'farmer' -and $have.Who -eq 'farmer' -and $at -lt $have.At) { $take = $true }
     } elseif ($PRODUCER_RANK_IS_LOWEST) {
         if ($at -lt $have.At) { $take = $true }
     } else {
@@ -2222,6 +2270,74 @@ function SecondRule([string]$key, $descs) {
         $at++
     }
     return (CountRungs $descs)
+}
+
+# The share RANK_SHARE gives one rung, 0.25 for novice and so on.
+function RungShare([int]$i) {
+    $lo = 0.0
+    if ($i -gt 0) { $lo = [double]$RANK_SHARE[$i - 1].Upto }
+    return ([double]$RANK_SHARE[$i].Upto - $lo)
+}
+
+# THE ONE RUNG HOLE FILL, argued for at HOLE_FILL_MOVES_ONE_RUNG. Moves rows
+# from the rung next to each hole into it, never a row more than one rung and
+# never a pinned row. Returns the list of moves when every hole is closed. When
+# it cannot close them all it puts every row back as it found it and returns
+# $null, and the caller goes on to the second rule.
+function FillHolesOneRung($descs) {
+    $saved = @{}
+    foreach ($d in $descs) { $saved[$d] = @($owned[$d].Rank, $owned[$d].RankFrom, $owned[$d].RankWhy) }
+    $moved = @{}
+    $moves = New-Object 'System.Collections.Generic.List[string]'
+    for ($round = 0; $round -lt ($RANKS.Count * 2); $round++) {
+        $counts = CountRungs $descs
+        $hole = HoleIn $counts
+        if ($hole -lt 0) { return ,($moves.ToArray()) }
+        $took = $false
+        foreach ($from in @(($hole + 1), ($hole - 1))) {
+            if ($from -lt 0 -or $from -ge $RANKS.Count) { continue }
+            $total = [int]$counts[$RANKS[$from]]
+            if ($total -lt 2) { continue }
+            $pool = @($descs | Where-Object {
+                [string]$owned[$_].Rank -eq $RANKS[$from] -and -not $owned[$_].Pinned -and -not $moved.ContainsKey($_)
+            })
+            if ($pool.Count -eq 0) { continue }
+            $take = [int][math]::Floor($total * (RungShare $hole) / ((RungShare $hole) + (RungShare $from)))
+            if ($take -lt 1) { $take = 1 }
+            if ($take -gt ($total - 1)) { $take = $total - 1 }
+            if ($take -gt $pool.Count) { $take = $pool.Count }
+            $down = ($from -gt $hole)
+            # A row whose input cost is already at or past the hole loses
+            # nothing by moving, so those go first. Then the cheapest when the
+            # move is down and the dearest when it is up, then the id so the
+            # order is total and the build is the same every run.
+            $order = @($pool | Sort-Object `
+                @{ Expression = {
+                    $ir = RankAt ([string]$owned[$_].InputRank)
+                    if ($ir -lt 0) { 0 } elseif ($down -and $ir -le $hole) { 0 } elseif ((-not $down) -and $ir -ge $hole) { 0 } else { 1 }
+                } }, `
+                @{ Expression = { if ($down) { [int64]$owned[$_].Value } else { -[int64]$owned[$_].Value } } }, `
+                @{ Expression = { [int](SecondRuleKey $owned[$_]) } }, `
+                @{ Expression = { [string]$_ } })
+            for ($t = 0; $t -lt $take; $t++) {
+                $d = $order[$t]
+                $owned[$d].Rank = $RANKS[$hole]
+                $owned[$d].RankFrom = ('moved one rung from ' + $RANKS[$from] + ' to fill an empty ' + $RANKS[$hole] + ' rung, after ' + $saved[$d][1])
+                $owned[$d].RankWhy = ($saved[$d][2] + '. Then moved one rung, ' + $RANKS[$from] + ' to ' + $RANKS[$hole] +
+                                      ', because the ' + $RANKS[$hole] + ' rung of this half was empty with work above it (HOLE_FILL_MOVES_ONE_RUNG)')
+                $moved[$d] = $true
+                $moves.Add(('{0} ({1}), {2} to {3}' -f $owned[$d].Edid, $owned[$d].OutName, $RANKS[$from], $RANKS[$hole]))
+            }
+            $took = $true
+            break
+        }
+        if (-not $took) { break }
+    }
+    if ((HoleIn (CountRungs $descs)) -lt 0) { return ,($moves.ToArray()) }
+    foreach ($d in $descs) {
+        $owned[$d].Rank = $saved[$d][0]; $owned[$d].RankFrom = $saved[$d][1]; $owned[$d].RankWhy = $saved[$d][2]
+    }
+    return $null
 }
 
 # The number the second rule sorts on, and the other one, so that changing
@@ -3246,6 +3362,10 @@ foreach ($desc in $recipes.Keys) {
         # 'the dearest input is novice' means something different on a row where
         # that is the whole list and on a row with four unknowns beside it.
         InputsUnplaced = 0
+        # True for a row whose rank a rule set on purpose (the novice row a new
+        # character can reach, a rank named in RECIPE_RANK), which the one
+        # rung hole fill must never move. See HOLE_FILL_MOVES_ONE_RUNG.
+        Pinned = $false
     }
 }
 
@@ -4102,6 +4222,9 @@ $rankedByValue = @{}
 # totalled, because this number is the whole of the dragonbone defect.
 $heldByPrice = @{}
 $secondRuleUsed = [ordered]@{}
+# Per half: the rows HOLE_FILL_MOVES_ONE_RUNG moved, when it closed the half's
+# holes without the second rule. Written into the json beside secondRule.
+$oneRungFill = [ordered]@{}
 # Per half: the rungs that hold rows nobody at that rank can gather the makings
 # for. Written into the json so Check-Balance.ps1 reads the same finding off the
 # table rather than working it out a second way and disagreeing.
@@ -4230,6 +4353,7 @@ foreach ($p in $PROFESSIONS.Keys) {
                                $key, $owned[$firstOpen].Edid, $owned[$firstOpen].OutName, $owned[$firstOpen].Value, $owned[$firstOpen].Rank))
                 $owned[$firstOpen].Rank = 'novice'
                 $owned[$firstOpen].RankWhy = 'the cheapest row of this half that a new character can reach, moved to novice so the half has a way in'
+                $owned[$firstOpen].Pinned = $true
             }
         }
 
@@ -4251,6 +4375,7 @@ foreach ($p in $PROFESSIONS.Keys) {
             $owned[$d].Rank = [string]$named.Rank
             $owned[$d].RankFrom = 'named outright in RECIPE_RANK'
             $owned[$d].RankWhy = [string]$named.Why
+            $owned[$d].Pinned = $true
             $namedRanks.Add(("{0}: {1} ({2}) is {3}. {4}" -f $key, $edid, $owned[$d].OutName, $named.Rank, $named.Why))
         }
 
@@ -4291,15 +4416,26 @@ foreach ($p in $PROFESSIONS.Keys) {
             $why = ('{0} row(s) ranked by what their inputs cost and {1} by what they sell for, and they land {2}. What is left to rank by is {3} distinct output price(s), {4} distinct input list length(s) and {5} distinct total input count(s)' -f `
                     $rankedByInputs[$key], $rankedByValue[$key], ($spreadTxt -join ', '), $vals.Keys.Count, $distinct.Keys.Count, $totals.Keys.Count)
             Loud ("{0}: the {1} rung is empty with rows above it. {2}" -f $key, $RANKS[$hole], $why)
-            $secondRuleUsed[$key] = ('the {0} rung came out empty with rows above it. {1}. Ranked by {2} for this half alone.' -f `
-                                     $RANKS[$hole], $why, $SECOND_RULE_KEY)
-            $counts = SecondRule $key $sorted
-            $hole = HoleIn $counts
-            if ($hole -ge 0) {
-                Bad ("{0}: the {1} rung is still empty after the {2} rule, so this half has no ladder and the table was not written" -f `
-                     $key, $RANKS[$hole], $SECOND_RULE_KEY)
+            $filled = $null
+            if ($HOLE_FILL_MOVES_ONE_RUNG) { $filled = FillHolesOneRung $sorted }
+            if ($null -ne $filled) {
+                $oneRungFill[$key] = @($filled)
+                $counts = CountRungs $sorted
+                $hole = HoleIn $counts
+                Loud ("  {0}: {1} row(s) moved one rung each and every rung now has work on it (HOLE_FILL_MOVES_ONE_RUNG)" -f $key, @($filled).Count)
+                foreach ($mv in @($filled | Select-Object -First 10)) { Loud ("    " + $mv) }
+                if (@($filled).Count -gt 10) { Loud ("    ... and {0} more, each one's rankFrom in the json says so" -f (@($filled).Count - 10)) }
             } else {
-                Loud ("  {0}: ranked by {1} instead, and every rung now has work on it" -f $key, $SECOND_RULE_KEY)
+                $secondRuleUsed[$key] = ('the {0} rung came out empty with rows above it. {1}. Ranked by {2} for this half alone.' -f `
+                                         $RANKS[$hole], $why, $SECOND_RULE_KEY)
+                $counts = SecondRule $key $sorted
+                $hole = HoleIn $counts
+                if ($hole -ge 0) {
+                    Bad ("{0}: the {1} rung is still empty after the {2} rule, so this half has no ladder and the table was not written" -f `
+                         $key, $RANKS[$hole], $SECOND_RULE_KEY)
+                } else {
+                    Loud ("  {0}: ranked by {1} instead, and every rung now has work on it" -f $key, $SECOND_RULE_KEY)
+                }
             }
         }
 
@@ -4862,6 +4998,9 @@ foreach ($k in $keys) {
             ', "craftsAtAll": ' + $craftsTxt +
             ', "offerInCharacterCreation": true'
     if ($secondRuleUsed.Contains($k)) { $line += ', "secondRule": ' + (JsonStr $secondRuleUsed[$k]) }
+    if ($oneRungFill.Contains($k)) {
+        $line += ', "movedOneRung": ' + (JsonStr (('{0} row(s) moved one rung each to fill an empty rung, HOLE_FILL_MOVES_ONE_RUNG: ' -f @($oneRungFill[$k]).Count) + (@($oneRungFill[$k]) -join '; ')))
+    }
     if ($unstandable.Contains($k)) {
         $line += ', "rungsNobodyCanGatherFor": ' + (JsonStr $unstandable[$k])
         if ($HALVES_WITH_AN_UNSTANDABLE_RUNG.Contains($k)) {
@@ -5002,10 +5141,12 @@ if ($blockRows.Count -gt 0) {
 $ruleInput = 0
 $rulePrice = 0
 $ruleSecond = 0
+$ruleMoved = 0
 foreach ($desc in $owned.Keys) {
     if (-not $owned[$desc].Fires) { continue }
     $rf = [string]$owned[$desc].RankFrom
     if ($rf.StartsWith('the second rule')) { $ruleSecond++ }
+    elseif ($rf.StartsWith('moved one rung')) { $ruleMoved++ }
     elseif ($rf.StartsWith('what its inputs cost')) { $ruleInput++ }
     else { $rulePrice++ }
 }
@@ -5049,6 +5190,10 @@ if ($secondRuleHalves.Count -gt 0) {
 } else {
     $lines.Add('     and only where the first two leave a rung with nothing on it, which no')
     $lines.Add('     half in this build did.')
+}
+if ($ruleMoved -gt 0) {
+    $lines.Add('     ' + $ruleMoved + ' more row(s) were moved one rung, and no further, to fill an empty')
+    $lines.Add('     rung without the second rule: ' + (@($oneRungFill.Keys) -join ', ') + '.')
 }
 $lines.Add('     Every row carries rankFrom in game\data\recipes.json saying which of the')
 $lines.Add('     three answered for it. Nothing in here is the script''s opinion of what a')
