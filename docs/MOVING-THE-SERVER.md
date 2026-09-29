@@ -122,8 +122,16 @@ Then, in this order:
 2. Order the new box in the same datacenter as the old one, so nobody's ping
    changes. Windows Server, same version as the old one, which is in
    `notes.txt` inside the backup zip.
-3. `.\scripts\vps\Setup-SshKey.ps1` against the new address, so the rest of the
-   scripts can reach it without a password.
+3. Pin the new box's ssh host key, then `.\scripts\vps\Setup-SshKey.ps1
+   -VpsHost <new address>`, so the rest of the scripts can reach it without a
+   password. Every script runs ssh with StrictHostKeyChecking=yes (issue
+   #450), and Setup-SshKey writes a box into known_hosts only when it shows a
+   key `scripts\vps\vps.json` pins under `hostKeys`. So first read the new
+   box's fingerprints on the box itself, in the provider's console, not over
+   the network: `ssh-keygen -lf` on each
+   `C:\ProgramData\ssh\ssh_host_*_key.pub`, and add the `SHA256:...` values
+   to `hostKeys`. They are public; the private halves never leave the box.
+   Once the move is done, take the old box's out.
 4. `.\scripts\vps\Bootstrap-VPS.ps1` against the new address. Node, Python, git,
    the folders.
 5. Restore from the backup, by hand, as `docs\RESTORING.md` says, into:
@@ -155,11 +163,14 @@ Then, in this order:
 12. `.\scripts\vps\Set-Vps.ps1`. It asks for the new address and repoints all
     twenty three files in the repo that carry the old one, and adds a line to
     the launcher so copies already installed move themselves across.
-    The deploy scripts check the box's ssh host key (accept-new): the first
-    connection to a new address records its key, and a box rebuilt on the
-    same address is refused until the old key is taken out with
-    `ssh-keygen -R <address>` on each machine that deploys. That refusal is
-    the check working, so confirm the rebuild was yours before removing it.
+    The scripts check the box's ssh host key with StrictHostKeyChecking=yes:
+    ssh never records a key by itself, and a box rebuilt on the same address
+    is refused with "Host key verification failed" on every machine. That
+    refusal is the check working. Confirm the rebuild was yours, pin its
+    fingerprints as step 3 says, then on each machine that deploys run
+    `ssh-keygen -R <address>` and `.\scripts\vps\Setup-SshKey.ps1`.
+    Once key login works from each of them, `.\scripts\vps\Harden-VPS.ps1`
+    turns ssh password login and Remote Desktop off on the new box.
 13. Commit what Set-Vps changed on a branch, open a pull request and merge
     it, then `.\scripts\release\Bump-Version.ps1` through its own pull request, then a
     main `.\scripts\release\Ship.ps1 "Server moved"` from Patrick's machine, so a
