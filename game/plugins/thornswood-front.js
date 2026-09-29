@@ -1157,9 +1157,12 @@
   let menuCachedAt = 0;
   let menuCached = '';
 
-  function busyMenuOpenNow() {
+  // except: a menu our own key just opened, which is being shut for it
+  // (ourKeyMenu below), and so is not in the way.
+  function busyMenuOpenNow(except) {
     let asked = false;
     for (const name of KEYBOARD_MENUS) {
+      if (except && name === except) { asked = true; continue; }
       try {
         if (sp.Ui.isMenuOpen(name)) { return name; }
         asked = true;
@@ -1502,6 +1505,56 @@
     applyFocus();
   };
   T.hasFocus = function (who) { return !!claims[who]; };
+
+  /*
+    A PANEL THAT HOLDS THE KEYBOARD HAS A CURSOR. Issue 958.
+
+    Patrick on dev, 28 September: "Journal doesn't make your cursor appear so
+    I have to click F6 to make it appear to do anything". His log has the J
+    block's one repair firing, "the game's journal took the cursor with it,
+    raised it again for ours", and still no cursor after it: something in the
+    game's closing of its book took the cursor down again later, and one
+    try inside two seconds of the shut did not cover it. F6 did, because
+    skymp5-client's F6 lowers focus and applyFocus raises it again, and the
+    raise is what opens the Cursor Menu (BrowserApiTilted.cpp in the fork).
+
+    The cursor the page shows is drawn by the browser only while the game's
+    Cursor Menu is open (main.cpp in the fork parks it off screen otherwise),
+    so focus up for a claim with that menu down is a panel nobody can click.
+    This does what F6 did, whenever that is the state: lowered and raised
+    once, a quarter of a second apart at most, and no more than CURSOR_TRIES
+    times for one claim, so a game that keeps taking it cannot make this
+    flicker for ever. Not while one of the game's own menus is up, because
+    that menu is on its way out and its closing is what takes the cursor.
+  */
+  const CURSOR_MENU = 'Cursor Menu';
+  const CURSOR_AGAIN_MS = 250;
+  const CURSOR_TRIES = 4;
+  let cursorTries = 0;
+  let cursorTriedAt = 0;
+
+  function keepCursor() {
+    if (!anyClaim()) { cursorTries = 0; return; }
+    let up = false, shown = true;
+    try {
+      up = !!sp.browser.isFocused();
+      shown = !!sp.Ui.isMenuOpen(CURSOR_MENU);
+    } catch (e) { return; }
+    if (!up || shown) { return; }
+    if (cursorTries >= CURSOR_TRIES) { return; }
+    const now = Date.now();
+    if (now - cursorTriedAt < CURSOR_AGAIN_MS) { return; }
+    if (busyMenuOpen()) { return; }
+    cursorTries++;
+    cursorTriedAt = now;
+    try {
+      sp.browser.setFocused(false);
+      sp.browser.setFocused(true);
+    } catch (e) { return; }
+    const who = Object.keys(claims).filter(function (k) { return claims[k]; }).join(', ');
+    say('the keyboard is with ' + who + ' and the cursor was down, raised it again (' +
+        cursorTries + ' of ' + CURSOR_TRIES + ')');
+  }
 
   // ---------------------------------------------------------------- typing --
   // Asked for, not taken.
@@ -5206,6 +5259,10 @@
   let journalLag = 0;
   let journalAsked = 0;
   let journalGone = false;
+  // When the book's menuOpen came (0 once its menuClose has), and whether it
+  // was up already when J was heard. See the note on shutJournalForJ below.
+  let journalOpenAt = 0;
+  let journalUpAtPress = false;
 
   // The key code is the fallback for an event that arrives without a name,
   // the same as the jump and sprint probe.
@@ -5217,6 +5274,7 @@
   // Every key that goes down, J included, from the key handler below.
   function journalKeyDown(e) {
     journalPressAt = 0;
+    journalUpAtPress = false;
     journalShutAt = 0;
     if (e.userEventName === 'Pause' || (!e.userEventName && e.code === ESC)) {
       journalPauseAt = Date.now();
@@ -5229,6 +5287,11 @@
     if (!journalPanelIn || !gameJournalPress(e)) { return; }
     if (Date.now() - journalPauseAt < JOURNAL_PAUSE_MS) { return; }
     journalPressAt = Date.now();
+    // Up already, and new: this J opened it. Shut in the next update (#958,
+    // the note on shutJournalForJ below).
+    let up = false;
+    try { up = !!sp.Ui.isMenuOpen(JOURNAL_MENU); } catch (err) { up = false; }
+    journalUpAtPress = up && (!journalOpenAt || Date.now() - journalOpenAt < JOURNAL_PRESS_MS);
   }
 
   function shutJournal() {
@@ -5247,14 +5310,55 @@
     if (a[1] === 'bridge is up') { journalPanelIn = false; }
   }));
 
-  sp.on('menuOpen', guard('journal shut', (e) => {
-    if (!e || e.name !== JOURNAL_MENU || !journalPressAt) { return; }
-    journalLag = Date.now() - journalPressAt;
+  /*
+    SHUT AS SOON AS IT IS UP, NOT WHEN ITS menuOpen COMES. Issue 958.
+
+    Patrick on dev, 28 September: "J now opens the vanilla journal first".
+    His log from that session: "J: the game's journal opened 37ms after the
+    press and was gone 41ms after it was shut". The book is in the game's
+    menu stack well before its menuOpen reaches this file (P found the magic
+    menu already up at the press in the same log), so waiting for the event
+    kept the book on screen for 37ms that did not need to be. So a book that
+    is up already when J is heard is shut in the next update, which still
+    lets an Escape that went down in the same frame end J's claim first.
+    menuOpen stays the path for a book that is not up at the press: one that
+    turns up between frames may be Escape's, whose key has not been heard
+    yet, and its menuOpen comes after that key does. A book whose menuOpen
+    came longer ago than JOURNAL_PRESS_MS was up before J, and is left alone.
+
+    This makes the book's time on screen shorter. It cannot make it nothing:
+    the game opens its book on the same press before any plugin hears it, and
+    only a change in the client can keep J from the game (see the note at the
+    top of this block).
+  */
+  // upAlready: the book was up when J was heard, so it opened with the press.
+  function shutJournalForJ(upAlready) {
+    journalLag = upAlready ? 0 : Date.now() - journalPressAt;
     journalPressAt = 0;
-    if (journalLag > JOURNAL_PRESS_MS) { return; }
+    journalUpAtPress = false;
     journalAsked = 0;
     journalGone = false;
     if (shutJournal()) { journalShutAt = Date.now(); }
+  }
+
+  sp.on('menuOpen', guard('journal shut', (e) => {
+    if (!e || e.name !== JOURNAL_MENU) { return; }
+    journalOpenAt = Date.now();
+    if (!journalPressAt) { return; }
+    if (Date.now() - journalPressAt > JOURNAL_PRESS_MS) { journalPressAt = 0; return; }
+    shutJournalForJ();
+  }));
+
+  sp.on('menuClose', guard('journal closed', (e) => {
+    if (e && e.name === JOURNAL_MENU) { journalOpenAt = 0; }
+  }));
+
+  sp.on('update', guard('journal up', () => {
+    if (!journalPressAt || !journalUpAtPress) { return; }
+    journalUpAtPress = false;
+    let up = false;
+    try { up = !!sp.Ui.isMenuOpen(JOURNAL_MENU); } catch (err) { up = false; }
+    if (up) { shutJournalForJ(true); }
   }));
 
   /*
@@ -5532,64 +5636,125 @@
     RE::UserEvents), so somebody who moved Quick Stats to another key keeps it
     there untouched.
 
-    Either order of events is handled. The tree opening before this file
-    hears the key is shut at the press; opening after, it is shut when it
-    opens. A tree that was already up before / went down is left alone, and so
-    is the /: in the tree, / is the game's key for closing it.
+    A tree that was already up before / went down is left alone, and so is
+    the /: in the tree, / is the game's key for closing it. The shutting is
+    ourKeyMenu's, below, which P uses for the magic menu the same way.
   */
-  const STATS_MENU = 'StatsMenu';
-  const STATS_PRESS_MS = 1000;
-  let statsPressAt = 0;
-  let statsOpenedAt = 0;
-  let statsShutAt = 0;
-  let statsAsked = 0;
+  // ------------------------------------ the game's menu on one of our keys --
+  /*
+    A GAME MENU THAT OUR KEY OPENED IS SHUT. Issues 957 and 958.
 
-  function gameStatsPress(e) {
-    if (e.userEventName) { return e.userEventName === 'Quick Stats'; }
-    try { return sp.Input.getMappedKey('Quick Stats', 0) === e.code; } catch (err) { return false; }
-  }
+    / is the game's Quick Stats and P its Quick Magic, and no plugin can keep
+    a key from the game (the J block above says why), so each press opens the
+    game's menu as well as ours. That menu is shut when this press opened it,
+    told by the game's own name for the press, so somebody who moved Quick
+    Stats or Quick Magic to another key keeps it there untouched.
 
-  function shutStats() {
-    statsPressAt = 0;
-    statsAsked++;
-    // The clock runs from the first ask, so asking again does not restart it.
-    if (statsAsked === 1) { statsShutAt = Date.now(); }
-    try { sp.TESModPlatform.closeMenu(STATS_MENU); }
-    catch (err) { say('/: closeMenu threw on the skill tree: ' + err); statsShutAt = 0; }
-  }
+    WHAT WENT WRONG ON DEV, 28 September (Patrick's front log):
+      20:37:41.881 / seen, but StatsMenu is open
+      20:38:37.659 key 25 seen, but MagicMenu is open
+    The game has its menu in the stack by the time this file hears the key,
+    and the menuOpen event that says so comes later: the J block's line from
+    the same session measures it, "the game's journal opened 37ms after the
+    press". The / code asked isMenuOpen at the press, found the tree up, had
+    no menuOpen yet to say it was new, and took it for a tree that was up
+    before /. P had no shutting at all, so the magic menu it opened made the
+    menu check refuse the party window.
 
-  sp.on('menuOpen', guard('stats shut', (e) => {
-    if (!e || e.name !== STATS_MENU) { return; }
-    statsOpenedAt = Date.now();
-    if (!statsPressAt || Date.now() - statsPressAt > STATS_PRESS_MS) { statsPressAt = 0; return; }
-    statsAsked = 0;
-    shutStats();
-  }));
+    So a menu counts as opened by this press when it is up and its menuOpen
+    has not come yet, or came within PRESS_MS. One that opened longer ago was
+    up before the press, and the key is the game's.
 
-  // A tree still up a second after the shut is asked once more, and one still
-  // up after two is said in the log and left.
-  sp.on('update', guard('stats after', () => {
-    if (!statsShutAt) { return; }
-    const since = Date.now() - statsShutAt;
-    let up = false;
-    try { up = !!sp.Ui.isMenuOpen(STATS_MENU); } catch (err) { up = false; }
-    if (!up) { statsShutAt = 0; return; }
-    if (since > 2000) {
-      statsShutAt = 0;
-      say('/: the skill tree is still open ' + since + 'ms after it was shut, asked ' + statsAsked + ' times');
-    } else if (since > 1000 && statsAsked < 2) {
-      shutStats();
+    A menu up at the press is shut in the next update rather than inside the
+    key handler, so any other key that went down in the same frame (Escape
+    above all) still ends the claim first. A menu not up at the press is shut
+    at its menuOpen, never by asking in an update: a menu that turns up in
+    the stack between frames may be Escape's, whose key this file has not
+    heard yet, and the menuOpen comes after that key does.
+
+    A menu still up a second after the shut is asked once more, and one still
+    up after two is said in the log and left.
+  */
+  const OUR_KEY_PRESS_MS = 1000;
+
+  function ourKeyMenu(menu, control, key, what) {
+    let openAt = 0;     // when its menuOpen came, 0 once its menuClose has
+    let pressAt = 0;    // our key went down and the game took it as control
+    let upAtPress = false;  // and the menu was already up when it did
+    let shutAt = 0;
+    let asked = 0;
+
+    function took(e) {
+      if (e.userEventName) { return e.userEventName === control; }
+      try { return sp.Input.getMappedKey(control, 0) === e.code; } catch (err) { return false; }
     }
-  }));
+    function up() {
+      try { return !!sp.Ui.isMenuOpen(menu); } catch (err) { return false; }
+    }
+    function fresh() { return !openAt || Date.now() - openAt < OUR_KEY_PRESS_MS; }
+    function shut() {
+      pressAt = 0;
+      upAtPress = false;
+      asked++;
+      // The clock runs from the first ask, so asking again does not restart it.
+      if (asked === 1) { shutAt = Date.now(); }
+      try { sp.TESModPlatform.closeMenu(menu); }
+      catch (err) { say(key + ': closeMenu threw on ' + what + ': ' + err); shutAt = 0; }
+    }
+
+    sp.on('menuOpen', guard(key + ' menu open', (e) => {
+      if (!e || e.name !== menu) { return; }
+      openAt = Date.now();
+      if (!pressAt) { return; }
+      const lag = openAt - pressAt;
+      pressAt = 0;
+      if (lag > OUR_KEY_PRESS_MS) { return; }
+      asked = 0;
+      shut();
+    }));
+    sp.on('menuClose', guard(key + ' menu close', (e) => {
+      if (e && e.name === menu) { openAt = 0; }
+    }));
+    sp.on('update', guard(key + ' menu after', () => {
+      if (pressAt && upAtPress) {
+        upAtPress = false;
+        if (up()) { asked = 0; shut(); }
+      }
+      if (!shutAt) { return; }
+      const since = Date.now() - shutAt;
+      if (!up()) { shutAt = 0; return; }
+      if (since > 2000) {
+        shutAt = 0;
+        say(key + ': ' + what + ' is still open ' + since + 'ms after it was shut, asked ' + asked + ' times');
+      } else if (since > 1000 && asked < 2) {
+        shut();
+      }
+    }));
+
+    return {
+      // The menu's name when this press has it up already, so the menu
+      // check lets ours open over it; '' otherwise.
+      openedBy: function (e) { return took(e) && up() && fresh() ? menu : ''; },
+      // Ours opens on this press: the game's menu goes, now or when it opens.
+      shutFor: function (e) {
+        if (!took(e)) { return; }
+        pressAt = Date.now();
+        upAtPress = up() && fresh();
+      },
+      // Any key going down ends the last press's claim.
+      keyDown: function () { pressAt = 0; upAtPress = false; }
+    };
+  }
+
+  const STATS_MENU = 'StatsMenu';
+  const statsOnSlash = ourKeyMenu(STATS_MENU, 'Quick Stats', '/', 'the skill tree');
+  const magicOnP = ourKeyMenu('MagicMenu', 'Quick Magic', 'P', 'the magic menu');
 
   function commandKeyPressed(e) {
     if (claims.chat) { return; }
-    const busy = busyMenuOpenNow();
-    const treeJustNow = busy === STATS_MENU && Date.now() - statsOpenedAt < STATS_PRESS_MS;
-    if (busy && !treeJustNow) { say('/ seen, but ' + busy + ' is open'); return; }
-    if (gameStatsPress(e)) {
-      if (treeJustNow) { statsAsked = 0; shutStats(); } else { statsPressAt = Date.now(); }
-    }
+    const busy = busyMenuOpenNow(statsOnSlash.openedBy(e));
+    if (busy) { say('/ seen, but ' + busy + ' is open'); return; }
+    statsOnSlash.shutFor(e);
     say('/ seen, opening the chat with a slash in it');
     wantTyping(true, '/');
   }
@@ -5611,8 +5776,10 @@
     // Any key going down ends J's claim on the next Journal Menu, Escape
     // above all. See JOURNAL_MENU above.
     journalKeyDown(e);
-    // And any key ends a / press's claim on the next skill tree.
-    statsPressAt = 0;
+    // And any key ends a / or P press's claim on the next skill tree or magic
+    // menu. See ourKeyMenu above.
+    statsOnSlash.keyDown();
+    magicOnP.keyDown();
     // 17 30 31 32 are W A S D. Somebody standing at a handle pressing E is not
     // stuck, they are using something, and that is what the one and only
     // firing of this detector actually caught.
@@ -5660,16 +5827,20 @@
       swallow the key. The Journal Menu does not count against J: J is the
       game's own journal key as well, the game may have opened its book
       before this runs, and shutting that book is the J block's job
-      (JOURNAL_MENU above).
+      (JOURNAL_MENU above). The magic menu does not count against P when
+      this same press opened it, for the same reason: P is the game's Quick
+      Magic, and ourKeyMenu above shuts what it opened (issue 957).
     */
     if (e.code === FRIEND_KEY || e.code === TRADE_KEY || e.code === MUTE_KEY ||
         e.code === PARTY_KEY || e.code === JOURNAL_KEY) {
       if (claims.chat) { return; }
       const closing = (e.code === PARTY_KEY && T.hasFocus('party')) ||
                       (e.code === JOURNAL_KEY && T.hasFocus('journal'));
+      const pOpened = e.code === PARTY_KEY ? magicOnP.openedBy(e) : '';
       if (!closing) {
         for (const name of KEYBOARD_MENUS) {
           if (e.code === JOURNAL_KEY && name === JOURNAL_MENU) { continue; }
+          if (name === pOpened) { continue; }
           let up = false;
           try { up = !!sp.Ui.isMenuOpen(name); } catch (err) { up = false; }
           if (up) { say('key ' + e.code + ' seen, but ' + name + ' is open'); return; }
@@ -5681,6 +5852,8 @@
     if (e.code === MUTE_KEY) { lookVerb('mute'); return; }
     if (e.code === PARTY_KEY) {
       T.js('try{window.thornswoodParty&&window.thornswoodParty.toggle();}catch(e){}');
+      // The game took this same press as its Quick Magic: shut that menu.
+      magicOnP.shutFor(e);
       return;
     }
     if (e.code === JOURNAL_KEY) {
@@ -5913,6 +6086,8 @@
       }
 
       applyFocus();
+      // And a claim holding the keyboard has its cursor (issue 958).
+      keepCursor();
     } catch (e) { }
 
     // Two watchdogs, because the worst outcome here is somebody standing in a
