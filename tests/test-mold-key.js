@@ -133,7 +133,7 @@ const PIECES_FRONT = {
   keyName: liftFrom(front, 'function keyName(code) {', '  '),
   anyClaim: liftFrom(front, 'function anyClaim() {', '  '),
   gameMenuOpen: liftFrom(front, 'function gameMenuOpen() {', '  '),
-  busyMenuOpenNow: liftFrom(front, 'function busyMenuOpenNow() {', '  '),
+  busyMenuOpenNow: liftFrom(front, 'function busyMenuOpenNow(except) {', '  '),
   menus: (function () {
     const a = front.indexOf('  const KEYBOARD_MENUS = [');
     const b = a < 0 ? -1 : front.indexOf('\n  ];\n', a);
@@ -251,7 +251,10 @@ function client(opt) {
     'const MOLD_NAME = keyName(MOLD_KEY);',
     'const FRIEND_KEY = 21, TRADE_KEY = 35, MUTE_KEY = 38, PARTY_KEY = 25, JOURNAL_KEY = 36;',
     'const SKILLS_KEY = 37, CHAT_KEY = 28, ESC = 1;',
-    'const COMMAND_KEY = 53; let statsPressAt = 0; function commandKeyPressed() { }',
+    'const COMMAND_KEY = 53; function commandKeyPressed() { }',
+    // The / and P watchers on the game's own menus (test-slash-key.js).
+    'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };',
+    'const statsOnSlash = OFF_MENU, magicOnP = OFF_MENU;',
     'let keysSeen = 0, stuckKeys = 0, stuckMoveKeys = 0, sawAnyKey = true;',
     'function busyMenuOpen() { return busyMenuOpenNow(); }',
     'function rememberKey() {}',
