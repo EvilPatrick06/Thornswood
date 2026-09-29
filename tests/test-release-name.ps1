@@ -24,7 +24,11 @@
        the same id as its baseline, the launcher the feed offers, the commit
        and its tag; releases.txt in the store has the same line; and the
        publisher says it sent it. A -NoUpload -NoPush run (what Ship -DryRun
-       passes) and a run whose feed send fails both say nothing was sent.
+       passes) and a run whose feed send fails both say nothing was sent; the
+       first exits 0 (#1056), the second does not (#1055). The same build
+       again is Nothing to do, the rule paths alone being no release (#1012),
+       and a second release straight after gets an id of its own (#1057),
+       which New-ReleaseId (1b) never takes from the feed.
     4. Add-ReleaseTag against a scratch repository and a bare one standing in
        for GitHub: the annotated tag lands on the commit the feed names, main
        and dev apart; nothing is tagged without the publisher's word, for
@@ -102,6 +106,35 @@ try {
     Yes ("release.yml builds a launcher on tags '" + $trig.Groups[1].Value + "'") ($trig.Success)
     $glob = $trig.Groups[1].Value
     Yes '  and no release tag matches it, so a Ship never starts a launcher build' (-not ($m -like $glob) -and -not ($d -like $glob))
+
+    # ---- 1b. a new id is never one the feed has (#1057) ------------------------------
+    Write-Host ''; Write-Host 'a new release id'
+    $at = [datetime]::new(2026, 9, 28, 23, 48, 12)
+    Yes 'it is the second, yyyyMMdd-HHmmss' ((New-ReleaseId $null -Now $at) -eq '20260928-234812')
+    Yes '  with -dev on dev' ((New-ReleaseId $null -Dev -Now $at) -eq '20260928-234812-dev')
+    $f = [pscustomobject]@{ packs = @([pscustomobject]@{ id = '20260928-234812' }) }
+    Yes 'the id of a pack already on the feed moves on to the next second' ((New-ReleaseId $f -Now $at) -eq '20260928-234813')
+    $f = [pscustomobject]@{ packs = @([pscustomobject]@{ id = '20260928-234812' }, [pscustomobject]@{ id = '20260928-234812-2' }, [pscustomobject]@{ id = '20260928-234813' }) }
+    Yes '  past every one taken, parts included' ((New-ReleaseId $f -Now $at) -eq '20260928-234814')
+    $f = [pscustomobject]@{ packs = @([pscustomobject]@{ id = '20260928-234812-dev-2' }) }
+    Yes '  a part alone is enough to move it (<id>-2)' ((New-ReleaseId $f -Dev -Now $at) -eq '20260928-234813-dev')
+    $f = [pscustomobject]@{ packs = @(); releases = @([pscustomobject]@{ id = '20260928-234812' }); release = [pscustomobject]@{ id = '20260928-234813' }; baseline = [pscustomobject]@{ id = '20260928-234814' } }
+    Yes '  and so is a release the feed names in releases, release or baseline' ((New-ReleaseId $f -Now $at) -eq '20260928-234815')
+    $f = [pscustomobject]@{ packs = @([pscustomobject]@{ id = '20260928-2348' }) }
+    Yes 'a minute id from before #1057 is not the new one of that minute' ((New-ReleaseId $f -Now $at) -eq '20260928-234812')
+    # Every installed launcher compares pack ids for equality (applied.txt) and
+    # a record by its sha256; the one place it sorts ids is a log line, which
+    # has to put the newer release last across the change of shape.
+    $old = '20260928-2348'; $new = New-ReleaseId $null -Now $at
+    Yes ('  and sorts before it, ordinal, as the launcher''s log line sorts them') ([string]::CompareOrdinal($old, $new) -lt 0 -and
+        [string]::CompareOrdinal('20260928-2349', $new) -gt 0 -and [string]::CompareOrdinal($old + '-dev', $new + '-dev') -lt 0)
+    Yes '  and Ship reads the time out of both the same way (the first 13 characters)' ($new.Substring(0, 13) -eq $old)
+    $up = [IO.File]::ReadAllText((Join-Path $repo 'launcher\app\Updater.cs'))
+    Yes 'the launcher skips a pack only when applied.txt has that exact id' ($up -match '!done\.Contains\(p\.id\)\) list\.Add\(p\)')
+    foreach ($s in 'Publish-Update.ps1', 'Rollback-Feed.ps1') {
+        $src = [IO.File]::ReadAllText((Join-Path $repo ('scripts\release\' + $s)))
+        Yes "$s mints through New-ReleaseId and mints no id from the minute" ($src -match 'New-ReleaseId \$\w+ -Dev:\$Dev' -and $src -notmatch "Get-Date -Format 'yyyyMMdd-HHmm'")
+    }
 
     # ---- 2. do the names agree ---------------------------------------------------------
     Write-Host ''; Write-Host 'do the names agree'
@@ -220,7 +253,7 @@ try {
 
     # a. A release, sent for real into the stand-in site and store.
     $r = Publish @('-Notes', "'Test release`n- one line'")
-    YesR ("a release goes out (exit {0}) and the publisher says which one ({1})" -f $r.Code, $r.Published) ($r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{4}$') $r
+    YesR ("a release goes out (exit {0}) and the publisher says which one ({1})" -f $r.Code, $r.Published) ($r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$') $r
     $id = $r.Published
     $feed = Read-Json (Join-Path $site 'feed\version.json')
     $rec = Get-ReleaseRecord $feed
@@ -247,13 +280,57 @@ try {
         $listed[0].Commit -eq $head -and $listed[0].Tag -eq "release/main/$id" -and $listed[0].Baseline -eq $id -and
         $listed[0].LauncherVersion -eq '1.1.102' -and @($listed[0].Packs).Count -eq @($rec.packs).Count)
 
+    # The rule paths still ride in a pack that carries a real change (#1012).
+    . (Join-Path $repo 'scripts\release\Ship-Rules.ps1')
+    $rule = @(Get-ShipDeleteAlways)
+    $zipA = @(Get-ChildItem -LiteralPath (Join-Path $inst 'dist') -Recurse -File -Filter "pack-$id*.zip" -ErrorAction SilentlyContinue)
+    $del = @()
+    if ($zipA.Count) {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $za = [IO.Compression.ZipFile]::OpenRead($zipA[0].FullName)
+        try {
+            $de = $za.GetEntry('delete.txt')
+            if ($de) { $sr = New-Object IO.StreamReader($de.Open()); try { $del = @($sr.ReadToEnd() -split "`r?`n" | Where-Object { $_ }) } finally { $sr.Dispose() } }
+        } finally { $za.Dispose() }
+    }
+    # delete.txt names them with forward slashes.
+    $rule = @($rule | ForEach-Object { $_ -replace '\\', '/' })
+    Yes ("  its pack's delete.txt lists every rule path ({0} of {1})" -f @($rule | Where-Object { $del -contains $_ }).Count, $rule.Count) (
+        $rule.Count -gt 0 -and @($rule | Where-Object { $del -notcontains $_ }).Count -eq 0)
+
+    # e. The same build again, nothing of ours changed (#1012): the rule paths
+    #    alone are no reason for a release, so it stops with Nothing to do.
+    $packsBefore = @((Read-Json (Join-Path $site 'feed\version.json')).packs).Count
+    $r = Publish @('-Notes', "'Test release`n- the same again'")
+    YesR ("the same build again says Nothing to do (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'Nothing to do' -and $r.Published -eq '') $r
+    Yes '  and the feed gained no pack' (@((Read-Json (Join-Path $site 'feed\version.json')).packs).Count -eq $packsBefore)
+
+    # d. A second real release straight after the first (#1057): its own id,
+    #    never the first's, so a launcher that took the first still takes it.
+    Put (Join-Path $inst 'Game\Data\ours.esp') 'the plugin, changed for a second release'
+    $r = Publish @('-Notes', "'Test release`n- a second one'")
+    YesR ("a second release goes out under an id of its own ({0} after {1}, exit {2})" -f $r.Published, $id, $r.Code) (
+        $r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$' -and $r.Published -ne $id) $r
+    $ids = @((Read-Json (Join-Path $site 'feed\version.json')).packs | ForEach-Object { [string]$_.id })
+    Yes ("  the feed lists both, no id twice ({0})" -f ($ids -join ', ')) ($ids -contains $id -and $ids -contains $r.Published -and
+        @($ids | Select-Object -Unique).Count -eq $ids.Count)
+    $applied = @($id)
+    Yes '  and a launcher that applied the first has the second still to take' (@($ids | Where-Object { $applied -notcontains $_ }) -contains $r.Published)
+    Put (Join-Path $inst 'Game\Data\ours.esp') 'the plugin, changed for a release under a taken name'
+    $r2 = Publish @('-Notes', "'Test release`n- a clash'", '-Id', $r.Published)
+    YesR ("  an -Id the feed already has is refused (exit {0})" -f $r2.Code) ($r2.Code -ne 0 -and $r2.Out -match 'already has a release or pack named') $r2
+
     # b. What Ship -DryRun passes: -NoUpload -NoPush. Nothing is sent, so
     #    nothing may be named as sent.
     Put (Join-Path $inst 'Game\Data\ours.esp') 'the plugin, changed again'
     $siteBefore = [IO.File]::ReadAllText((Join-Path $site 'feed\version.json'))
-    # A fixed id: ids are minted from the minute, and these runs share one.
+    # A fixed id, so the checks below can name it.
     $r = Publish @('-Notes', "'Test release`n- two lines'", '-Id', '20990101-0001', '-NoUpload', '-NoPush', '-NoClose', '-KeepPacks', '0')
     YesR ("-NoUpload -NoPush: the publisher says no release was sent (exit {0})" -f $r.Code) ($r.Published -eq '') $r
+    # #1056: a dry run of a real change is a dry run that worked, not exit 1
+    # with advice about the ssh key, and it asks nothing of the keyboard.
+    YesR ("  and finishes with exit 0, the packs' empty urls expected (exit {0})" -f $r.Code) (
+        $r.Code -eq 0 -and $r.Out -notmatch 'uploaded no asset' -and $r.Out -match 'nothing was uploaded') $r
     Yes '  and the site''s feed is what it was' ([IO.File]::ReadAllText((Join-Path $site 'feed\version.json')) -eq $siteBefore)
     $local = Read-Json (Join-Path $rel 'version.json')
     $lrec = Get-ReleaseRecord $local
@@ -266,6 +343,9 @@ try {
     $siteBefore = [IO.File]::ReadAllText((Join-Path $site 'feed\version.json'))
     $r = Publish @('-Notes', "'Test release`n- three lines'", '-Id', '20990101-0002')
     YesR ("a feed send that fails: the publisher says no release was sent (exit {0})" -f $r.Code) ($r.Published -eq '' -and $r.Out -match 'NOT SHIPPED') $r
+    # #1055: and says it with its exit code, which is all a Ship that keeps its
+    # launcher reads; anything but 0 or 2 stops Ship before it tells anybody.
+    Yes ("  with an exit code that is not 0 or 2 ({0})" -f $r.Code) ($r.Code -ne 0 -and $r.Code -ne 2)
     Yes '  and the site''s feed is what it was' ([IO.File]::ReadAllText((Join-Path $site 'feed\version.json')) -eq $siteBefore)
     Remove-Item -LiteralPath (Join-Path $site 'feed\version.json.part') -Recurse -Force
 
