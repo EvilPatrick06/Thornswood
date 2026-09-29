@@ -269,9 +269,17 @@
         '</span>');
     }
 
-    stripEl.innerHTML = bits.join('');
-    stripEl.style.display = '';
+    /*
+      ONLY WHEN IT READS DIFFERENTLY (#963). This runs five times a second for
+      as long as somebody is in a party, and nobody standing still changes a
+      letter of it; every innerHTML write was a rebuilt node tree and a repaint
+      of the game's browser layer over the frame, for the same words.
+    */
+    var html = bits.join('');
+    if (html !== stripHtml) { stripHtml = html; stripEl.innerHTML = html; }
+    if (stripEl.style.display !== '') { stripEl.style.display = ''; }
   }
+  var stripHtml = null;
 
   var UNITS_PER_METRE = 70;   // the same seventy the voice page uses
 
