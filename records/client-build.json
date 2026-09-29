@@ -1,35 +1,35 @@
 {
-  "recordedUtc": "2026-09-27T23:28:47Z",
-  "builtUtc": "2026-09-27T23:26:30Z",
+  "recordedUtc": "2026-09-29T00:50:33Z",
+  "builtUtc": "2026-09-29T00:47:00Z",
   "fork": "https://github.com/EvilPatrick06/skymp",
   "forkBranch": "thornswood/engine-changes",
-  "forkCommit": "ccf71644",
+  "forkCommit": "8fb4673a",
   "upstreamBase": "f926944b",
   "thornswoodPatchBlocks": 18,
   "files": {
     "Data\\SKSE\\Plugins\\MpClientPlugin.dll": {
-      "sha256": "f45de10862d9ac0c84e504e07035a9fadcd6e55a3eb062fbcafb42f1e6a4435c",
-      "bytes": 1477632
+      "sha256": "eb7f394195a733b77add1b42686bd9dd42c83839c321da55a7e50f41adac1291",
+      "bytes": 1479680
     },
     "Data\\SKSE\\Plugins\\SkyrimPlatform.dll": {
-      "sha256": "f60fa3e61444114cf6818658a47fac50297c62710007b7c1823bfaeae636d99a",
-      "bytes": 149504
+      "sha256": "559bfad6ebabbcc762f99a74dc8326d796c4b19dafd7959d3b445663d6a4ee22",
+      "bytes": 150528
     },
     "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll": {
-      "sha256": "ff91ebe7c656e7ac87b27f6e89059de5c3043528600859f1053235bf965c23c0",
-      "bytes": 15668224
+      "sha256": "7bda4c63a3250c3dd21d5a9f402ee40ed8764dd17709ced061b5628d9fb7d980",
+      "bytes": 15676416
     },
     "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformCEF.exe.hidden": {
-      "sha256": "1197021954b14ec84ca05c0c91d6dc045c1b59b4f60df3fe3760662b195132fa",
-      "bytes": 431616
+      "sha256": "a4ee32e853a87aa6b96ec5a864f2f6c5c5b8c49f05a4f75d5d579d8dfa1b6034",
+      "bytes": 433152
     },
     "Data\\Platform\\Plugins\\skymp5-client.js": {
-      "sha256": "6799b9e9e090d1add656336bf395f458ed663537cc9938ecb1bb113ddbbb10e7",
-      "bytes": 1428530
+      "sha256": "18833d23f1c5da2e89b23caa49248e8ca0803b6d007d88ec656c6c4158da2e35",
+      "bytes": 1435094
     },
     "Data\\Scripts\\TESModPlatform.pex": {
-      "sha256": "fc02e76eb66788204908b7adda93aebcd447661ad7589c01ca2dc08e3d863137",
-      "bytes": 2530
+      "sha256": "a47ae140d212dd272c37fa3ad03eb7fe0db3527448a3c6ce3ddd698f1eabdbf7",
+      "bytes": 2495
     }
   }
 }
