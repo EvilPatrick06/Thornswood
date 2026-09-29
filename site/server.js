@@ -174,7 +174,8 @@ let cfg = {
   },
   botKey: '',            // shared secret the Discord bot signs /api/ticket with
   admins: [],            // discord ids, an override for when the bot is down
-  secret: ''
+  secret: '',
+  passKey: ''            // signs join passes; the game servers hold a copy (#937)
 };
 /* The byte order mark matters. Windows PowerShell puts one on the front of
    anything it writes with -Encoding UTF8, JSON.parse refuses a string that
@@ -246,6 +247,23 @@ if (cfgBroken) {
 } else if (!cfg.secret) {
   cfg.secret = crypto.randomBytes(32).toString('hex');
   try { fs.writeFileSync(CFGFILE, JSON.stringify(cfg, null, 2), 'utf8'); } catch (e) { }
+}
+/* The join pass key (#937). Made here once and kept in config.json, never in
+   the repository; Set-Door.ps1 -Connect copies it into each game server's
+   door.json, which is how the two ends share it without anybody handling it.
+   A key that could not be kept is no key at all: a pass signed with one that
+   dies with this process would be refused by every game server, so /api/play/pass
+   answers 503 instead, which is the safe side. */
+if (cfgBroken) {
+  cfg.passKey = '';
+} else if (!cfg.passKey) {
+  cfg.passKey = crypto.randomBytes(32).toString('hex');
+  try { fs.writeFileSync(CFGFILE, JSON.stringify(cfg, null, 2), 'utf8'); }
+  catch (e) {
+    cfg.passKey = '';
+    console.error('[thornswood] could not keep a join pass key in config.json, so no join ' +
+                  'passes are issued: ' + e.message);
+  }
 }
 
 for (const dir of [DATA, PUBLIC, FILES, UP]) {
@@ -2099,6 +2117,81 @@ function readTicket(t) {
   return o;
 }
 
+/*
+  THE JOIN PASS (#937). Patrick, 28 Sep: "People should not be allowed in at all
+  if they don't join from our launcher." The game server only ever sees a
+  profile number the client picked, so it cannot tell our launcher from Skyrim
+  started by hand, from another launcher, or from one of ours that is out of
+  date. The launcher asks /api/play/pass for this with the Discord ticket it
+  already holds, the game's front plugin hands it to the game server, and the
+  game server checks it with its own copy of the key (gamemode.js, the join pass
+  block) and ends a session that has none.
+
+      jp1.<body>.<mac>
+
+  body is base64url JSON: p the profile number, s the server ("main" or "dev"),
+  v the launcher version, d the Discord id, i when it was issued and x when it
+  runs out, both unix milliseconds. mac is base64url HMAC-SHA256 over "jp1." and
+  the body, keyed on cfg.passKey. tests\test-join-pass-site.js and
+  tests\test-join-pass-game.js hold one pass in common, so the two ends cannot
+  drift apart. Ten minutes: the launcher renews it every four while the game
+  runs, so a session that reconnects after a server restart still has one.
+*/
+const PASS_MS = 10 * 60000;
+
+function b64u(buf) {
+  return Buffer.from(buf).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function makePass(key, o) {
+  const body = b64u(JSON.stringify({ p: o.p, s: o.s, v: o.v, d: o.d, i: o.i, x: o.x }));
+  const mac = b64u(crypto.createHmac('sha256', key).update('jp1.' + body).digest());
+  return 'jp1.' + body + '.' + mac;
+}
+
+/* Digits and dots, an optional leading v, nine digits a part at most: the
+   same rule FeedNotice.IsVersion keeps in the launcher. Null for anything else. */
+function versionParts(v) {
+  const t = String(v == null ? '' : v).trim().replace(/^v/i, '');
+  if (!/^\d{1,9}(\.\d{1,9})*$/.test(t)) return null;
+  return t.split('.').map(Number);
+}
+
+function versionCompare(a, b) {
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    const x = a[i] || 0, y = b[i] || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+/* Which launchers a channel lets into the game: from minLauncher (Publish-Update
+   writes it as the launcher it published) up to launcherVersion, both read from
+   this site's own copy of the feed. With no minLauncher the floor is the current
+   launcher. Null when the feed cannot be read, which refuses the pass. Read again
+   only when the file changes. */
+const feedLaunchersSeen = {};
+function feedLaunchers(server) {
+  const dir = server === 'dev' ? 'feed-dev' : 'feed';
+  const file = path.join(ROOT, dir, 'version.json');
+  let st;
+  try { st = fs.statSync(file); } catch (e) { return null; }
+  const hit = feedLaunchersSeen[dir];
+  if (hit && hit.mtime === st.mtimeMs && hit.size === st.size) return hit.v;
+  let doc = null;
+  try { doc = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '')); } catch (e) { doc = null; }
+  let v = null;
+  if (doc && versionParts(doc.launcherVersion)) {
+    const current = String(doc.launcherVersion).trim().replace(/^v/i, '');
+    const min = versionParts(doc.minLauncher) ? String(doc.minLauncher).trim().replace(/^v/i, '') : current;
+    v = { current: current, min: min };
+  }
+  feedLaunchersSeen[dir] = { mtime: st.mtimeMs, size: st.size, v: v };
+  return v;
+}
+
 function getWithToken(url, token) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
@@ -3860,6 +3953,93 @@ async function handle(req, res) {
     // Nobody has it. The launcher that just made the character is the one
     // asking, and it checks in with this number a moment later anyway.
     return sendJson(res, 200, { ok: true, why: 'unclaimed' });
+  }
+
+  /*
+    A join pass for one character (#937; the format is over makePass).
+
+    The launcher asks when a character is picked at the game's menu and again
+    every four minutes while the game runs. Every no names what to do, because
+    the launcher shows the message as it stands.
+
+    REFUSED, NOT GUESSED, whenever this cannot be sure: no key, a feed it cannot
+    read, a launcher version that is not a version, or Discord not answering
+    (the hand written admin list aside, as at /api/play/join). A refusal here
+    means that session is ended by the game server, which is the point.
+
+    THE VERSION IS THE LAUNCHER'S OWN WORD, checked against the channel's feed
+    both ways: below minLauncher is an old launcher and is told to update, and
+    above launcherVersion is a number Thornswood never published. So an old
+    launcher cannot get in, and neither can a request that simply claims to be a
+    new one. A person who writes their own request with their own ticket gets a
+    pass only for their own characters, which is all the game server lets it
+    prove.
+
+    WHOSE CHARACTER, the rule /api/play/owns keeps: the caller's own, one that
+    nobody holds yet (the launcher checks every id in at Play), or one held only
+    by an account that has left the Discord. Somebody else's is refused.
+  */
+  if (p === '/api/play/pass' && req.method === 'POST') {
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    const t = readTicket(o.ticket);
+    if (!t) return sendJson(res, 401, { ok: false, why: 'link', message:
+      'This copy is not linked to a Discord account yet.' });
+    const pid = Number(o.profileId) || 0;
+    if (!(pid > 0) || Math.floor(pid) !== pid) return sendJson(res, 400, { ok: false, why: 'profile', message:
+      'No character was named.' });
+    const server = String(o.channel || '') === 'dev' ? 'dev' : 'main';
+    if (!cfg.passKey) return sendJson(res, 503, { ok: false, why: 'no key', message:
+      'Thornswood cannot let anybody into the game right now. Tell Patrick.' });
+
+    const feed = feedLaunchers(server);
+    if (!feed) return sendJson(res, 503, { ok: false, why: 'feed', message:
+      'Thornswood could not read its own update feed just now. Try again in a minute.' });
+    const said = String(o.version == null ? '' : o.version).trim().slice(0, 40);
+    const have = versionParts(said);
+    if (!have || versionCompare(have, versionParts(feed.min)) < 0) {
+      return sendJson(res, 403, { ok: false, why: 'update', need: feed.min, message:
+        'This launcher is ' + (said || 'too old to say') + ' and Thornswood needs ' + feed.min +
+        ' or newer. Update the launcher, then press Play again.' });
+    }
+    if (versionCompare(have, versionParts(feed.current)) > 0) {
+      return sendJson(res, 403, { ok: false, why: 'unknown launcher', need: feed.current, message:
+        'This launcher says it is ' + said + ', which Thornswood never published. ' +
+        'Install the launcher from thornswood.net, then press Play again.' });
+    }
+
+    const st = await standingCached(t.d);
+    if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', message:
+      'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
+    if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', message:
+      'That Discord account is not in the Thornswood Discord.' });
+    if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', message:
+      'That Discord account is banned from Thornswood.' });
+    if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', message:
+      'That Discord account has no role that lets it in yet.' });
+    if (server === 'dev' && !st.dev) return sendJson(res, 403, { ok: false, why: 'dev', message:
+      'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
+
+    const linked = jsonFile(LINKED, {});
+    const mine = (linked[t.d] && Array.isArray(linked[t.d].profiles))
+      ? linked[t.d].profiles.map(Number) : [];
+    if (mine.indexOf(pid) < 0) {
+      const left = await departed(linked, pid, t.d);
+      for (const d of Object.keys(linked)) {
+        if (String(d) === String(t.d)) continue;
+        const theirs = (linked[d] && Array.isArray(linked[d].profiles))
+          ? linked[d].profiles.map(Number) : [];
+        if (theirs.indexOf(pid) < 0 || left.has(String(d))) continue;
+        console.log('[thornswood-docs] no join pass for profile ' + pid + ' to Discord ' + t.d +
+                    ': it is held by Discord ' + d);
+        return sendJson(res, 403, { ok: false, why: 'somebody else', message:
+          'That character belongs to another Discord account.' });
+      }
+    }
+
+    const now = Date.now();
+    const pass = makePass(cfg.passKey, { p: pid, s: server, v: said, d: String(t.d), i: now, x: now + PASS_MS });
+    return sendJson(res, 200, { ok: true, pass: pass, until: now + PASS_MS, server: server });
   }
 
   // The same question without asking for the password, for the launcher to
