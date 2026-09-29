@@ -303,7 +303,7 @@ if (block) {
         yes('and it asks for the four form types the table is built from',
             /const CELL_TYPES = \[24, 34, 36, 42\];/.test(FRONT));
         yes('a fire somebody switched off is still skipped',
-            /found\[k\]\.ref\.isDisabled\(\)/.test(FRONT));
+            /off = !!r\.isDisabled\(\)/.test(FRONT));
         yes('and a non-empty walk is kept for the cell rather than redone every probe',
             /if \(cellId !== fireCell\)/.test(FRONT) &&
             /if \(fireHere && fireHere\.length\)/.test(FRONT));

@@ -1042,11 +1042,39 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The slow tick's half of PublishStatus: puts the line back in any
+        /// folder whose copy is missing or says something else, and writes
+        /// nothing when both already say it. It used to write both copies
+        /// every two seconds whatever they said (#963, #977); a read of an
+        /// eleven byte file is all an unchanged one costs now.
+        /// </summary>
+        static void RepublishIfLost()
+        {
+            string line = lastStatusLine;
+            if (string.IsNullOrEmpty(line)) { PublishStatus(); return; }
+            foreach (string d in ChannelDirs())
+            {
+                string f = Path.Combine(d, "voice-status.txt");
+                string there = null;
+                try { if (File.Exists(f)) there = File.ReadAllText(f).Trim(); }
+                catch (Exception ex) { Swallow.Note("Voice.RepublishIfLost, read", ex); there = null; }
+                if (there == line) continue;
+                try { File.WriteAllText(f, line); } catch (Exception ex) { Swallow.Note("Voice.RepublishIfLost, write", ex); }
+            }
+        }
+
+        /// <summary>
         /// The last mute line handed to the voice page, or null when the page
         /// has not been given one. Written from the UI thread when the page
         /// loads and from the file channel's thread, hence volatile.
         /// </summary>
         static volatile string mutedSeen;
+
+        /// <summary>
+        /// Set when a read of a file the game writes met it mid-write, so the
+        /// file channel looks again in 100 ms instead of waiting for a change.
+        /// </summary>
+        static volatile bool readAgain;
 
         /// <summary>
         /// Who this person has muted, from the game to the page that plays
@@ -1069,7 +1097,7 @@ namespace Thornswood
                 string f = Path.Combine(d, "voice-muted.txt");
                 if (!File.Exists(f)) continue;
                 try { now = File.ReadAllText(f).Trim(); }
-                catch { now = null; }   // mid-write, try again in 100ms
+                catch { now = null; readAgain = true; }   // mid-write, try again in 100ms
                 if (now != null) break;
             }
             if (now == null || now == mutedSeen) return;
@@ -1098,29 +1126,39 @@ namespace Thornswood
 
                 lastStatusLine = "";
                 PublishStatus();
-                Say("Voice: talking to the game through " + string.Join(" and ", dirs));
+
+                // Woken by the game writing push to talk or the mute list,
+                // not by a 100 ms poll (#977). See ChannelWait.
+                ChannelWait wake = new ChannelWait(dirs, "voice-ptt.txt", "voice-muted.txt");
+                Say("Voice: talking to the game through " + string.Join(" and ", dirs) +
+                    (wake.Watching ? ", woken when the game writes" : ", read every " + ChannelWait.Poll + " ms"));
 
                 while (true)
                 {
                     try
                     {
-                        // 100ms is the whole latency budget this adds to push
-                        // to talk, and it is under the time it takes to get a
-                        // word out after pressing the key.
-                        Thread.Sleep(100);
+                        // Push to talk is read the moment Windows says the
+                        // file changed. The two second timeout is the slow
+                        // tick below; with no watcher this is the old 100 ms
+                        // sleep. A read that met the game mid-write is tried
+                        // again in 100 ms, as before, rather than waiting on
+                        // a change Windows has already reported.
+                        bool again = readAgain;
+                        readAgain = false;
+                        wake.Wait(again ? ChannelWait.Poll : 2000);
 
                         // Republished on a slow tick as well as on change,
                         // because the game may have started after the last
                         // change and a file it never sees is no better than no
-                        // file. Two seconds, not every pass: clearing the
-                        // change check each time round a 100ms loop rewrote
-                        // both copies of voice-status.txt ten times a second
-                        // for the whole life of the launcher, game or no game.
+                        // file. Two seconds, and only a copy that is missing
+                        // or says something else is written: this used to
+                        // rewrite both copies every two seconds, and before
+                        // that ten times a second, game or no game.
                         if ((DateTime.UtcNow - republished).TotalMilliseconds >= 2000)
                         {
                             republished = DateTime.UtcNow;
-                            lastStatusLine = "";
-                            // On the same slow tick, not the 100ms one.
+                            RepublishIfLost();
+                            // On the same slow tick, not on every wake.
                             RenewToken();
                         }
                         PublishStatus();
@@ -1137,7 +1175,7 @@ namespace Thornswood
                             string f = Path.Combine(d, "voice-ptt.txt");
                             if (!File.Exists(f)) continue;
                             try { now = File.ReadAllText(f).Trim(); }
-                            catch { now = null; }   // mid-write, try again in 100ms
+                            catch { now = null; readAgain = true; }   // mid-write, try again in 100ms
                             if (now != null) break;
                         }
                         if (now == null || now.Length == 0 || now == seen) continue;

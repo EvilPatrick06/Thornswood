@@ -1267,6 +1267,9 @@ namespace Thornswood
         /// </summary>
         static void MusicDecide()
         {
+            // While the game runs the browser behind the theme is closed, not
+            // paused (#963). The first call after the game closes makes it again.
+            if (playing) { try { MenuMusic.Close(); } catch (Exception ex) { Swallow.Note("Shell.MusicDecide, close", ex); } return; }
             bool want = cfg != null && cfg.MusicOn && cfg.MusicVolume > 0 && !playing
                 && win != null && win.WindowState != WindowState.Minimized;
             double vol = cfg == null ? 0 : Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
@@ -2509,7 +2512,10 @@ namespace Thornswood
                 if (++pingTicks >= 15) { pingTicks = 0; StartPing(); }
 
                 if (!playing) return;
-                if (Checks.GameRunning())
+                // Asks the game processes the last look found whether they are
+                // still up, and lists the machine's processes only when none is
+                // (#978). Same answer as GameRunning, on the same tick.
+                if (Checks.GameStillRunning())
                 {
                     // Who was picked at the game's menu, every tick. One file
                     // read, and nothing when the file says what it said last.
