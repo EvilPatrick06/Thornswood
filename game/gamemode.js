@@ -5504,8 +5504,10 @@ mp.onRespawn = guard('onRespawn', function (actorId) {
 });
 
 // No book moves anybody's rank. Patrick, 21 September: rank comes from working
-// the trade and from nothing else. There is no book event here any more and the
-// manuals are gone from the plugin. A book in this world is a book.
+// the trade and from nothing else. The manuals are gone from the plugin and a
+// book in this world is a book. The one book event here, mp.onReadBook in THE
+// STAFF SPELLS, records a staff's spell when somebody who makes staves reads its
+// tome (#967), and never touches a rank.
 
 
 // ---------------------------------------------------------------------------
@@ -8076,6 +8078,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
      with open false needs something first, an item, a spell or a vanilla
      perk nobody here can hold, and Skyrim's own crafting menu decides that
      before the server is ever asked. game\data\recipes.json says which.
+     A staff whose one condition is a spell some tome teaches is open too:
+     the tome is how an Enchanter learns it, and spell names that spell's
+     desc for the staff gate, which reads STAFF_SPELLS below.
 
      A recipe id that is not in here is one nobody owns and anybody may
      make. Tempering is not in here either: the server is never asked about
@@ -8360,100 +8365,100 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "2b051:Dragonborn.esm": { "out": "1cd88:Dragonborn.esm", "name": "Chitin Bracers", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Gauntlets", "open": false },
     "2b050:Dragonborn.esm": { "out": "1cd87:Dragonborn.esm", "name": "Chitin Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Body armour", "open": false },
     "2b04f:Dragonborn.esm": { "out": "1cd86:Dragonborn.esm", "name": "Chitin Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Armoured boots", "open": false },
-    "17773:Dragonborn.esm": { "out": "10fcf4:Skyrim.esm", "name": "Staff of Thunderbolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17772:Dragonborn.esm": { "out": "29b87:Skyrim.esm", "name": "Staff of the Storm Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17771:Dragonborn.esm": { "out": "29b86:Skyrim.esm", "name": "Staff of the Frost Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17770:Dragonborn.esm": { "out": "29b85:Skyrim.esm", "name": "Staff of the Flame Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "1776f:Dragonborn.esm": { "out": "29b94:Skyrim.esm", "name": "Minor Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1776e:Dragonborn.esm": { "out": "29b95:Skyrim.esm", "name": "Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "1776d:Dragonborn.esm": { "out": "29b97:Skyrim.esm", "name": "Grand Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "1776c:Dragonborn.esm": { "out": "4dee2:Skyrim.esm", "name": "Staff of Sparks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1776b:Dragonborn.esm": { "out": "be122:Skyrim.esm", "name": "Staff of Soul Trapping", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1776a:Dragonborn.esm": { "out": "29b92:Skyrim.esm", "name": "Staff of Vanquishment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17769:Dragonborn.esm": { "out": "29b7a:Skyrim.esm", "name": "Staff of Greater Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17768:Dragonborn.esm": { "out": "29b9b:Skyrim.esm", "name": "Grand Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17767:Dragonborn.esm": { "out": "29b9a:Skyrim.esm", "name": "Greater Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17766:Dragonborn.esm": { "out": "29b76:Skyrim.esm", "name": "Staff of Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17765:Dragonborn.esm": { "out": "29b8e:Skyrim.esm", "name": "Staff of Inspiration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17764:Dragonborn.esm": { "out": "29b74:Skyrim.esm", "name": "Staff of Lesser Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17763:Dragonborn.esm": { "out": "29b73:Skyrim.esm", "name": "Staff of Paralysis", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17762:Dragonborn.esm": { "out": "be121:Skyrim.esm", "name": "Staff of Magelight", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17761:Dragonborn.esm": { "out": "10fcf2:Skyrim.esm", "name": "Staff of Incineration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17760:Dragonborn.esm": { "out": "10fcf7:Skyrim.esm", "name": "Staff of Icy Spear", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "1775f:Dragonborn.esm": { "out": "29b83:Skyrim.esm", "name": "Staff of Ice Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1775e:Dragonborn.esm": { "out": "4ded8:Skyrim.esm", "name": "Staff of Ice Spikes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1775d:Dragonborn.esm": { "out": "29b99:Skyrim.esm", "name": "Staff of Mending", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1775c:Dragonborn.esm": { "out": "29b93:Skyrim.esm", "name": "Staff of the Healing Hand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1775b:Dragonborn.esm": { "out": "29b89:Skyrim.esm", "name": "Staff of Fury", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1775a:Dragonborn.esm": { "out": "4dee1:Skyrim.esm", "name": "Staff of Frostbite", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17759:Dragonborn.esm": { "out": "29b8f:Skyrim.esm", "name": "Staff of Frenzy", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17758:Dragonborn.esm": { "out": "4dee0:Skyrim.esm", "name": "Staff of Flames", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17757:Dragonborn.esm": { "out": "4c6ca:Skyrim.esm", "name": "Staff of Firebolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17756:Dragonborn.esm": { "out": "29b82:Skyrim.esm", "name": "Staff of Fireballs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17755:Dragonborn.esm": { "out": "29b8c:Skyrim.esm", "name": "Staff of Fear", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17754:Dragonborn.esm": { "out": "29b7e:Skyrim.esm", "name": "Staff of Expulsion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17753:Dragonborn.esm": { "out": "29b7c:Skyrim.esm", "name": "Staff of Dread Zombies", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17752:Dragonborn.esm": { "out": "29b88:Skyrim.esm", "name": "Staff of Courage", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17751:Dragonborn.esm": { "out": "29b7d:Skyrim.esm", "name": "Staff of the Storm Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17750:Dragonborn.esm": { "out": "be120:Skyrim.esm", "name": "Staff of the Frost Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1774f:Dragonborn.esm": { "out": "29b78:Skyrim.esm", "name": "Staff of the Flame Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1774e:Dragonborn.esm": { "out": "29b75:Skyrim.esm", "name": "Staff of the Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1774d:Dragonborn.esm": { "out": "29b7b:Skyrim.esm", "name": "Staff of Daedric Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "1774c:Dragonborn.esm": { "out": "29b84:Skyrim.esm", "name": "Staff of Chain Lightning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1774b:Dragonborn.esm": { "out": "29b8b:Skyrim.esm", "name": "Staff of Calm", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1774a:Dragonborn.esm": { "out": "29b79:Skyrim.esm", "name": "Staff of Banishing", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17737:Dragonborn.esm": { "out": "4dee3:Skyrim.esm", "name": "Staff of Lightning Bolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
+    "17773:Dragonborn.esm": { "out": "10fcf4:Skyrim.esm", "name": "Staff of Thunderbolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "10f7ee:Skyrim.esm" },
+    "17772:Dragonborn.esm": { "out": "29b87:Skyrim.esm", "name": "Staff of the Storm Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "35d81:Skyrim.esm" },
+    "17771:Dragonborn.esm": { "out": "29b86:Skyrim.esm", "name": "Staff of the Frost Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "35d80:Skyrim.esm" },
+    "17770:Dragonborn.esm": { "out": "29b85:Skyrim.esm", "name": "Staff of the Flame Wall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "35d7f:Skyrim.esm" },
+    "1776f:Dragonborn.esm": { "out": "29b94:Skyrim.esm", "name": "Minor Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4b146:Skyrim.esm" },
+    "1776e:Dragonborn.esm": { "out": "29b95:Skyrim.esm", "name": "Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "5dd5d:Skyrim.esm" },
+    "1776d:Dragonborn.esm": { "out": "29b97:Skyrim.esm", "name": "Grand Staff of Turning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "5dd5e:Skyrim.esm" },
+    "1776c:Dragonborn.esm": { "out": "4dee2:Skyrim.esm", "name": "Staff of Sparks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2dd2a:Skyrim.esm" },
+    "1776b:Dragonborn.esm": { "out": "be122:Skyrim.esm", "name": "Staff of Soul Trapping", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4dba4:Skyrim.esm" },
+    "1776a:Dragonborn.esm": { "out": "29b92:Skyrim.esm", "name": "Staff of Vanquishment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "4deef:Skyrim.esm" },
+    "17769:Dragonborn.esm": { "out": "29b7a:Skyrim.esm", "name": "Staff of Greater Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "96d94:Skyrim.esm" },
+    "17768:Dragonborn.esm": { "out": "29b9b:Skyrim.esm", "name": "Grand Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "247c86:Odin - Skyrim Magic Overhaul.esp" },
+    "17767:Dragonborn.esm": { "out": "29b9a:Skyrim.esm", "name": "Greater Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "26121c:Odin - Skyrim Magic Overhaul.esp" },
+    "17766:Dragonborn.esm": { "out": "29b76:Skyrim.esm", "name": "Staff of Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "65bd7:Skyrim.esm" },
+    "17765:Dragonborn.esm": { "out": "29b8e:Skyrim.esm", "name": "Staff of Inspiration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4deec:Skyrim.esm" },
+    "17764:Dragonborn.esm": { "out": "29b74:Skyrim.esm", "name": "Staff of Lesser Reanimation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "7e8e1:Skyrim.esm" },
+    "17763:Dragonborn.esm": { "out": "29b73:Skyrim.esm", "name": "Staff of Paralysis", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "5ad5f:Skyrim.esm" },
+    "17762:Dragonborn.esm": { "out": "be121:Skyrim.esm", "name": "Staff of Magelight", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "43323:Skyrim.esm" },
+    "17761:Dragonborn.esm": { "out": "10fcf2:Skyrim.esm", "name": "Staff of Incineration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "10f7ed:Skyrim.esm" },
+    "17760:Dragonborn.esm": { "out": "10fcf7:Skyrim.esm", "name": "Staff of Icy Spear", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "10f7ec:Skyrim.esm" },
+    "1775f:Dragonborn.esm": { "out": "29b83:Skyrim.esm", "name": "Staff of Ice Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "45f9c:Skyrim.esm" },
+    "1775e:Dragonborn.esm": { "out": "4ded8:Skyrim.esm", "name": "Staff of Ice Spikes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2b96c:Skyrim.esm" },
+    "1775d:Dragonborn.esm": { "out": "29b99:Skyrim.esm", "name": "Staff of Mending", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "12fd2:Skyrim.esm" },
+    "1775c:Dragonborn.esm": { "out": "29b93:Skyrim.esm", "name": "Staff of the Healing Hand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4d3f2:Skyrim.esm" },
+    "1775b:Dragonborn.esm": { "out": "29b89:Skyrim.esm", "name": "Staff of Fury", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4deeb:Skyrim.esm" },
+    "1775a:Dragonborn.esm": { "out": "4dee1:Skyrim.esm", "name": "Staff of Frostbite", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2b96b:Skyrim.esm" },
+    "17759:Dragonborn.esm": { "out": "29b8f:Skyrim.esm", "name": "Staff of Frenzy", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4deee:Skyrim.esm" },
+    "17758:Dragonborn.esm": { "out": "4dee0:Skyrim.esm", "name": "Staff of Flames", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "12fcd:Skyrim.esm" },
+    "17757:Dragonborn.esm": { "out": "4c6ca:Skyrim.esm", "name": "Staff of Firebolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "12fd0:Skyrim.esm" },
+    "17756:Dragonborn.esm": { "out": "29b82:Skyrim.esm", "name": "Staff of Fireballs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "1c789:Skyrim.esm" },
+    "17755:Dragonborn.esm": { "out": "29b8c:Skyrim.esm", "name": "Staff of Fear", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4deea:Skyrim.esm" },
+    "17754:Dragonborn.esm": { "out": "29b7e:Skyrim.esm", "name": "Staff of Expulsion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "6f952:Skyrim.esm" },
+    "17753:Dragonborn.esm": { "out": "29b7c:Skyrim.esm", "name": "Staff of Dread Zombies", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "96d95:Skyrim.esm" },
+    "17752:Dragonborn.esm": { "out": "29b88:Skyrim.esm", "name": "Staff of Courage", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4dee8:Skyrim.esm" },
+    "17751:Dragonborn.esm": { "out": "29b7d:Skyrim.esm", "name": "Staff of the Storm Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "204c5:Skyrim.esm" },
+    "17750:Dragonborn.esm": { "out": "be120:Skyrim.esm", "name": "Staff of the Frost Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "204c4:Skyrim.esm" },
+    "1774f:Dragonborn.esm": { "out": "29b78:Skyrim.esm", "name": "Staff of the Flame Atronach", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "204c3:Skyrim.esm" },
+    "1774e:Dragonborn.esm": { "out": "29b75:Skyrim.esm", "name": "Staff of the Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "640b6:Skyrim.esm" },
+    "1774d:Dragonborn.esm": { "out": "29b7b:Skyrim.esm", "name": "Staff of Daedric Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "6f953:Skyrim.esm" },
+    "1774c:Dragonborn.esm": { "out": "29b84:Skyrim.esm", "name": "Staff of Chain Lightning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "45f9d:Skyrim.esm" },
+    "1774b:Dragonborn.esm": { "out": "29b8b:Skyrim.esm", "name": "Staff of Calm", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "4dee9:Skyrim.esm" },
+    "1774a:Dragonborn.esm": { "out": "29b79:Skyrim.esm", "name": "Staff of Banishing", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "6d22c:Skyrim.esm" },
+    "17737:Dragonborn.esm": { "out": "4dee3:Skyrim.esm", "name": "Staff of Lightning Bolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2dd29:Skyrim.esm" },
     "2ba5f3:WindhelmSSE.esp": { "out": "2ba5f0:WindhelmSSE.esp", "name": "Pelt of Karhu", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Body armour", "open": false },
-    "17b5e3:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5df:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Panic", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8168:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd23:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Minor Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a817d:Odin - Skyrim Magic Overhaul.esp": { "out": "21a2f5:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Illusions", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "bae31:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eed:Odin - Skyrim Magic Overhaul.esp", "name": "Greater Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8164:Odin - Skyrim Magic Overhaul.esp": { "out": "293d23:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Corrosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8165:Odin - Skyrim Magic Overhaul.esp": { "out": "293d0c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Vulnerability", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17b5e1:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5dc:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Soothe", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "17b5e2:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5dd:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Subjugation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8185:Odin - Skyrim Magic Overhaul.esp": { "out": "2a8184:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Purge Magic", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8172:Odin - Skyrim Magic Overhaul.esp": { "out": "2a305d:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Frosthand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d4350:Odin - Skyrim Magic Overhaul.esp": { "out": "d434f:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Ancestors", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "bae2f:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eeb:Odin - Skyrim Magic Overhaul.esp", "name": "Minor Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a8177:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Arctic Frost", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8173:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7a4:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Ice Shards", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a816a:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd26:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a816b:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd2b:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Major Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a816c:Odin - Skyrim Magic Overhaul.esp": { "out": "1b4e31:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Ursine Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a816d:Odin - Skyrim Magic Overhaul.esp": { "out": "1b4e34:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Mourning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8180:Odin - Skyrim Magic Overhaul.esp": { "out": "23897a:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Damned", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a816f:Odin - Skyrim Magic Overhaul.esp": { "out": "26b480:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Lightning Grasp", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a8169:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd2c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Feline Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8170:Odin - Skyrim Magic Overhaul.esp": { "out": "2a305c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Firehand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a817e:Odin - Skyrim Magic Overhaul.esp": { "out": "21f403:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Mute", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8166:Odin - Skyrim Magic Overhaul.esp": { "out": "293d24:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Corrosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a818b:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7b0:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Tears", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8179:Odin - Skyrim Magic Overhaul.esp": { "out": "26b485:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Shockblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8189:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7ae:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Disintegration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8187:Odin - Skyrim Magic Overhaul.esp": { "out": "21a2f6:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Shadow Legion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a816e:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47b:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Arctic Blast", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a8174:Odin - Skyrim Magic Overhaul.esp": { "out": "26b481:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Charged Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e78:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47d:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Taldam's Scorcher", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "17b5e4:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5e0:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Bravery", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e7d:Odin - Skyrim Magic Overhaul.esp": { "out": "26b483:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Fireblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8167:Odin - Skyrim Magic Overhaul.esp": { "out": "293d15:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Vulnerability", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8178:Odin - Skyrim Magic Overhaul.esp": { "out": "26b484:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Frostblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8171:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47e:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Flame Darts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8186:Odin - Skyrim Magic Overhaul.esp": { "out": "2100da:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Domination", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a817a:Odin - Skyrim Magic Overhaul.esp": { "out": "26b482:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Thundering Grasp", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8176:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47f:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Wildfire", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "17b5e5:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5de:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Rage", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "bae30:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eec:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a8175:Odin - Skyrim Magic Overhaul.esp": { "out": "7c848:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Stormhand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a817f:Odin - Skyrim Magic Overhaul.esp": { "out": "23386b:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Illusions", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "2a817b:Odin - Skyrim Magic Overhaul.esp": { "out": "22963a:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Crying Eyes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a817c:Odin - Skyrim Magic Overhaul.esp": { "out": "20afcf:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2c16a7:Odin - Skyrim Magic Overhaul.esp": { "out": "2c16a6:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Hush", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a818a:Odin - Skyrim Magic Overhaul.esp": { "out": "2611f4:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "2a8188:Odin - Skyrim Magic Overhaul.esp": { "out": "23897b:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of the Damned", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8181:Odin - Skyrim Magic Overhaul.esp": { "out": "21f40c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Wizard Rend", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "2a8163:Odin - Skyrim Magic Overhaul.esp": { "out": "293d09:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Horsemanship", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
+    "17b5e3:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5df:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Panic", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "17b5c9:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8168:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd23:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Minor Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "18c58c:Odin - Skyrim Magic Overhaul.esp" },
+    "2a817d:Odin - Skyrim Magic Overhaul.esp": { "out": "21a2f5:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Illusions", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "8558a:Odin - Skyrim Magic Overhaul.esp" },
+    "bae31:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eed:Odin - Skyrim Magic Overhaul.esp", "name": "Greater Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "247c89:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8164:Odin - Skyrim Magic Overhaul.esp": { "out": "293d23:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Corrosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "27a7b1:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8165:Odin - Skyrim Magic Overhaul.esp": { "out": "293d0c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Vulnerability", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "173074:Odin - Skyrim Magic Overhaul.esp" },
+    "17b5e1:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5dc:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Soothe", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "17b5c2:Odin - Skyrim Magic Overhaul.esp" },
+    "17b5e2:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5dd:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Subjugation", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "17b5d1:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8185:Odin - Skyrim Magic Overhaul.esp": { "out": "2a8184:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Purge Magic", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "27569c:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8172:Odin - Skyrim Magic Overhaul.esp": { "out": "2a305d:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Frosthand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "2a3051:Odin - Skyrim Magic Overhaul.esp" },
+    "d4350:Odin - Skyrim Magic Overhaul.esp": { "out": "d434f:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Ancestors", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "d4349:Odin - Skyrim Magic Overhaul.esp" },
+    "bae2f:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eeb:Odin - Skyrim Magic Overhaul.esp", "name": "Minor Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "3f52:Dawnguard.esm" },
+    "2a8177:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Arctic Frost", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1e78ad:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8173:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7a4:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Ice Shards", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "27f2e:Odin - Skyrim Magic Overhaul.esp" },
+    "2a816a:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd26:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "18c58e:Odin - Skyrim Magic Overhaul.esp" },
+    "2a816b:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd2b:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Major Daedra", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1967b9:Odin - Skyrim Magic Overhaul.esp" },
+    "2a816c:Odin - Skyrim Magic Overhaul.esp": { "out": "1b4e31:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Ursine Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1a5ad7:Odin - Skyrim Magic Overhaul.esp" },
+    "2a816d:Odin - Skyrim Magic Overhaul.esp": { "out": "1b4e34:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Mourning", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1916b1:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8180:Odin - Skyrim Magic Overhaul.esp": { "out": "23897a:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Damned", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "224526:Odin - Skyrim Magic Overhaul.esp" },
+    "2a816f:Odin - Skyrim Magic Overhaul.esp": { "out": "26b480:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Lightning Grasp", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "1e279f:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8169:Odin - Skyrim Magic Overhaul.esp": { "out": "1afd2c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Feline Familiar", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1a5aea:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8170:Odin - Skyrim Magic Overhaul.esp": { "out": "2a305c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Firehand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "2a304f:Odin - Skyrim Magic Overhaul.esp" },
+    "2a817e:Odin - Skyrim Magic Overhaul.esp": { "out": "21f403:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Mute", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "21f3fd:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8166:Odin - Skyrim Magic Overhaul.esp": { "out": "293d24:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Corrosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "27a7b4:Odin - Skyrim Magic Overhaul.esp" },
+    "2a818b:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7b0:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Tears", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "159d8:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8179:Odin - Skyrim Magic Overhaul.esp": { "out": "26b485:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Shockblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1dd699:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8189:Odin - Skyrim Magic Overhaul.esp": { "out": "7a7ae:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Disintegration", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "3e0f:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8187:Odin - Skyrim Magic Overhaul.esp": { "out": "21a2f6:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Shadow Legion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "21a2eb:Odin - Skyrim Magic Overhaul.esp" },
+    "2a816e:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47b:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Arctic Blast", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "1d347b:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8174:Odin - Skyrim Magic Overhaul.esp": { "out": "26b481:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Charged Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "24e49:Odin - Skyrim Magic Overhaul.esp" },
+    "d1e78:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47d:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Taldam's Scorcher", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "1d3482:Odin - Skyrim Magic Overhaul.esp" },
+    "17b5e4:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5e0:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Bravery", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "17b5bb:Odin - Skyrim Magic Overhaul.esp" },
+    "d1e7d:Odin - Skyrim Magic Overhaul.esp": { "out": "26b483:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Fireblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1d8588:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8167:Odin - Skyrim Magic Overhaul.esp": { "out": "293d15:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Vulnerability", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "293d0e:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8178:Odin - Skyrim Magic Overhaul.esp": { "out": "26b484:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Frostblooms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1dd697:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8171:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47e:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Flame Darts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1d347e:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8186:Odin - Skyrim Magic Overhaul.esp": { "out": "2100da:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Domination", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "2100d4:Odin - Skyrim Magic Overhaul.esp" },
+    "2a817a:Odin - Skyrim Magic Overhaul.esp": { "out": "26b482:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Thundering Grasp", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1e27a7:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8176:Odin - Skyrim Magic Overhaul.esp": { "out": "26b47f:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Wildfire", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1d858b:Odin - Skyrim Magic Overhaul.esp" },
+    "17b5e5:Odin - Skyrim Magic Overhaul.esp": { "out": "17b5de:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Rage", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "17b5b3:Odin - Skyrim Magic Overhaul.esp" },
+    "bae30:Odin - Skyrim Magic Overhaul.esp": { "out": "2e9eec:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of the Sun", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "38b6:Dawnguard.esm" },
+    "2a8175:Odin - Skyrim Magic Overhaul.esp": { "out": "7c848:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Stormhand", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "7c83b:Odin - Skyrim Magic Overhaul.esp" },
+    "2a817f:Odin - Skyrim Magic Overhaul.esp": { "out": "23386b:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of Illusions", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "233865:Odin - Skyrim Magic Overhaul.esp" },
+    "2a817b:Odin - Skyrim Magic Overhaul.esp": { "out": "22963a:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Crying Eyes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "229634:Odin - Skyrim Magic Overhaul.esp" },
+    "2a817c:Odin - Skyrim Magic Overhaul.esp": { "out": "20afcf:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "20afc9:Odin - Skyrim Magic Overhaul.esp" },
+    "2c16a7:Odin - Skyrim Magic Overhaul.esp": { "out": "2c16a6:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Hush", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2c169f:Odin - Skyrim Magic Overhaul.esp" },
+    "2a818a:Odin - Skyrim Magic Overhaul.esp": { "out": "2611f4:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Vipers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "256fce:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8188:Odin - Skyrim Magic Overhaul.esp": { "out": "23897b:Odin - Skyrim Magic Overhaul.esp", "name": "Grand Staff of the Damned", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "224524:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8181:Odin - Skyrim Magic Overhaul.esp": { "out": "21f40c:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Wizard Rend", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "21f405:Odin - Skyrim Magic Overhaul.esp" },
+    "2a8163:Odin - Skyrim Magic Overhaul.esp": { "out": "293d09:Odin - Skyrim Magic Overhaul.esp", "name": "Staff of Horsemanship", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "289aec:Odin - Skyrim Magic Overhaul.esp" },
     "d9a:Hothtrooper44_ArmorCompilation.esp": { "out": "d62:Hothtrooper44_ArmorCompilation.esp", "name": "Falkreath Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "advanced", "family": "Armoured boots", "open": false },
     "d9c:Hothtrooper44_ArmorCompilation.esp": { "out": "d63:Hothtrooper44_ArmorCompilation.esp", "name": "Falkreath Crown", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "master", "family": "Other armour and clothing", "open": false },
     "d9d:Hothtrooper44_ArmorCompilation.esp": { "out": "d64:Hothtrooper44_ArmorCompilation.esp", "name": "Falkreath Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "expert", "family": "Body armour", "open": false },
@@ -9362,73 +9367,73 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "9fd:MoreCraftableEquipment.esp": { "out": "d820:HearthFires.esm", "name": "Girl's Grey Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
     "9fe:MoreCraftableEquipment.esp": { "out": "d822:HearthFires.esm", "name": "Girl's Yellow Dress", "type": "MISC", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "", "rank": "novice", "family": "Other goods", "open": true },
     "9ff:MoreCraftableEquipment.esp": { "out": "426c8:Skyrim.esm", "name": "Shiv", "type": "WEAP", "makes": 1, "owner": "Smith", "half": "Edgewright", "race": "", "rank": "novice", "family": "Daggers", "open": false },
-    "d1e8e:Apocalypse - Magic of Skyrim.esp": { "out": "89702:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Skyfall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1a793f:Apocalypse - Magic of Skyrim.esp": { "out": "1a793e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Poisoned Chalice", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e71:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b8:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Honor Guard", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e6d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b6:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Cat Totem", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e6e:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Pit Fighter", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "161633:Apocalypse - Magic of Skyrim.esp": { "out": "161632:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ice Prisms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e6f:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Xivilai Sorcerer", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "10983d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ac:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Seidkona", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e72:Apocalypse - Magic of Skyrim.esp": { "out": "7a7bd:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Herne", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "10c70a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Incendiary Flows", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e78:Apocalypse - Magic of Skyrim.esp": { "out": "7c848:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Thundercracks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e79:Apocalypse - Magic of Skyrim.esp": { "out": "7a79f:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Bolides", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e7a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a1:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Electrospheres", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e7b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a0:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ice Shivs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e80:Apocalypse - Magic of Skyrim.esp": { "out": "7a797:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Silent", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e8c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b1:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Decomposition", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e7e:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a6:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Clouds", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e7f:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a5:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Bombardment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e8b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b0:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ruin", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e81:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Illusory Flames", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e82:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a8:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Mind Vision", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e8d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Nature's Balance", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e84:Apocalypse - Magic of Skyrim.esp": { "out": "7a7aa:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Shadowbond", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e85:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ab:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Empathic Agony", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e87:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ad:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e88:Apocalypse - Magic of Skyrim.esp": { "out": "7a798:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Leech Seed", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e89:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ae:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Slaying", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e8a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7af:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Death", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e99:Apocalypse - Magic of Skyrim.esp": { "out": "bb974:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Atronach Marks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e92:Apocalypse - Magic of Skyrim.esp": { "out": "896fd:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Blaze", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e70:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ba:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Champion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e90:Apocalypse - Magic of Skyrim.esp": { "out": "896fb:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Flesh", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e91:Apocalypse - Magic of Skyrim.esp": { "out": "bb97a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Summoning Runes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e97:Apocalypse - Magic of Skyrim.esp": { "out": "896fa:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Undermining", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e93:Apocalypse - Magic of Skyrim.esp": { "out": "896fe:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Shadows", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e94:Apocalypse - Magic of Skyrim.esp": { "out": "896ff:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Welling Blood", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e95:Apocalypse - Magic of Skyrim.esp": { "out": "89700:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Wilting", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e96:Apocalypse - Magic of Skyrim.esp": { "out": "974e2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Lamb", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1a792f:Apocalypse - Magic of Skyrim.esp": { "out": "1a792e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ganking", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e98:Apocalypse - Magic of Skyrim.esp": { "out": "803f7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Perilous Paths", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e67:Apocalypse - Magic of Skyrim.esp": { "out": "7a799:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Crackling", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "1a7933:Apocalypse - Magic of Skyrim.esp": { "out": "1a7932:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Silvery Barbs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e9a:Apocalypse - Magic of Skyrim.esp": { "out": "bb977:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Deadeye Captain", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e9e:Apocalypse - Magic of Skyrim.esp": { "out": "bb96e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Pain", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "1a7937:Apocalypse - Magic of Skyrim.esp": { "out": "1a7934:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Hrormir's Misdirection", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e9d:Apocalypse - Magic of Skyrim.esp": { "out": "bdfac:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Scorching Hands", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e9b:Apocalypse - Magic of Skyrim.esp": { "out": "896fc:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Corpse Explosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "1a793b:Apocalypse - Magic of Skyrim.esp": { "out": "1a793a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Automaton Breaking", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e83:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Whispers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e74:Apocalypse - Magic of Skyrim.esp": { "out": "7a79c:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Creeping Cold", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e8f:Apocalypse - Magic of Skyrim.esp": { "out": "896f9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Imprisonment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e7d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a4:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Sleet Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e75:Apocalypse - Magic of Skyrim.esp": { "out": "7c849:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Dragon's Teeth", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e76:Apocalypse - Magic of Skyrim.esp": { "out": "7a79d:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Fractures", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e77:Apocalypse - Magic of Skyrim.esp": { "out": "7a79e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Rift Bolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e9c:Apocalypse - Magic of Skyrim.esp": { "out": "bb97c:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Oathbound", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e9f:Apocalypse - Magic of Skyrim.esp": { "out": "bb968:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Illusory Pyres", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1ea0:Apocalypse - Magic of Skyrim.esp": { "out": "bb969:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Necroplagues", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e6c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b5:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Churl", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "161624:Apocalypse - Magic of Skyrim.esp": { "out": "161625:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Monarch Mark", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e7c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a3:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Scattershocks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": false },
-    "d1e66:Apocalypse - Magic of Skyrim.esp": { "out": "7a234:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Avenging Wraith", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e73:Apocalypse - Magic of Skyrim.esp": { "out": "7a7bc:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Xivilai Lord", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e68:Apocalypse - Magic of Skyrim.esp": { "out": "7a79b:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Hailstones", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e69:Apocalypse - Magic of Skyrim.esp": { "out": "7a79a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Withering", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": false },
-    "d1e6a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b3:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Entombing", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
-    "d1e6b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b4:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Lockblasting", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": false },
+    "d1e8e:Apocalypse - Magic of Skyrim.esp": { "out": "89702:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Skyfall", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "b646:Apocalypse - Magic of Skyrim.esp" },
+    "1a793f:Apocalypse - Magic of Skyrim.esp": { "out": "1a793e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Poisoned Chalice", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "15e721:Apocalypse - Magic of Skyrim.esp" },
+    "d1e71:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b8:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Honor Guard", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "133d6:Apocalypse - Magic of Skyrim.esp" },
+    "d1e6d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b6:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Cat Totem", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "27144:Apocalypse - Magic of Skyrim.esp" },
+    "d1e6e:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Pit Fighter", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "12364:Apocalypse - Magic of Skyrim.esp" },
+    "161633:Apocalypse - Magic of Skyrim.esp": { "out": "161632:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ice Prisms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "15e73e:Apocalypse - Magic of Skyrim.esp" },
+    "d1e6f:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Xivilai Sorcerer", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1228a8:Apocalypse - Magic of Skyrim.esp" },
+    "10983d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ac:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Seidkona", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "3789f:Apocalypse - Magic of Skyrim.esp" },
+    "d1e72:Apocalypse - Magic of Skyrim.esp": { "out": "7a7bd:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Herne", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "128e8:Apocalypse - Magic of Skyrim.esp" },
+    "10c70a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Incendiary Flows", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "85910:Apocalypse - Magic of Skyrim.esp" },
+    "d1e78:Apocalypse - Magic of Skyrim.esp": { "out": "7c848:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Thundercracks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "7c83b:Apocalypse - Magic of Skyrim.esp" },
+    "d1e79:Apocalypse - Magic of Skyrim.esp": { "out": "7a79f:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Bolides", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "294cd:Apocalypse - Magic of Skyrim.esp" },
+    "d1e7a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a1:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Electrospheres", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1879:Apocalypse - Magic of Skyrim.esp" },
+    "d1e7b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a0:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ice Shivs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "24b44:Apocalypse - Magic of Skyrim.esp" },
+    "d1e80:Apocalypse - Magic of Skyrim.esp": { "out": "7a797:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Silent", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "17509:Apocalypse - Magic of Skyrim.esp" },
+    "d1e8c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b1:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Decomposition", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "1f1fb:Apocalypse - Magic of Skyrim.esp" },
+    "d1e7e:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a6:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Clouds", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "2878:Apocalypse - Magic of Skyrim.esp" },
+    "d1e7f:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a5:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Bombardment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "294d4:Apocalypse - Magic of Skyrim.esp" },
+    "d1e8b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b0:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ruin", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "159d8:Apocalypse - Magic of Skyrim.esp" },
+    "d1e81:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Illusory Flames", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "3682f:Apocalypse - Magic of Skyrim.esp" },
+    "d1e82:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a8:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Mind Vision", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "378a9:Apocalypse - Magic of Skyrim.esp" },
+    "d1e8d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Nature's Balance", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "12dc:Apocalypse - Magic of Skyrim.esp" },
+    "d1e84:Apocalypse - Magic of Skyrim.esp": { "out": "7a7aa:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Shadowbond", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "31c4d:Apocalypse - Magic of Skyrim.esp" },
+    "d1e85:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ab:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Empathic Agony", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "a4ef7:Apocalypse - Magic of Skyrim.esp" },
+    "d1e87:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ad:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Command", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "378ae:Apocalypse - Magic of Skyrim.esp" },
+    "d1e88:Apocalypse - Magic of Skyrim.esp": { "out": "7a798:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Leech Seed", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "13e4fd:Apocalypse - Magic of Skyrim.esp" },
+    "d1e89:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ae:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Slaying", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "3e0f:Apocalypse - Magic of Skyrim.esp" },
+    "d1e8a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7af:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Death", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "35452:Apocalypse - Magic of Skyrim.esp" },
+    "d1e99:Apocalypse - Magic of Skyrim.esp": { "out": "bb974:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Atronach Marks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2cd7e:Apocalypse - Magic of Skyrim.esp" },
+    "d1e92:Apocalypse - Magic of Skyrim.esp": { "out": "896fd:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Blaze", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "85594:Apocalypse - Magic of Skyrim.esp" },
+    "d1e70:Apocalypse - Magic of Skyrim.esp": { "out": "7a7ba:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Champion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "128df:Apocalypse - Magic of Skyrim.esp" },
+    "d1e90:Apocalypse - Magic of Skyrim.esp": { "out": "896fb:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Flesh", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "88694:Apocalypse - Magic of Skyrim.esp" },
+    "d1e91:Apocalypse - Magic of Skyrim.esp": { "out": "bb97a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Summoning Runes", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "124ec5:Apocalypse - Magic of Skyrim.esp" },
+    "d1e97:Apocalypse - Magic of Skyrim.esp": { "out": "896fa:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Undermining", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "2e31:Apocalypse - Magic of Skyrim.esp" },
+    "d1e93:Apocalypse - Magic of Skyrim.esp": { "out": "896fe:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Shadows", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "8558a:Apocalypse - Magic of Skyrim.esp" },
+    "d1e94:Apocalypse - Magic of Skyrim.esp": { "out": "896ff:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Welling Blood", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "1fcd9:Apocalypse - Magic of Skyrim.esp" },
+    "d1e95:Apocalypse - Magic of Skyrim.esp": { "out": "89700:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Wilting", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "12214:Apocalypse - Magic of Skyrim.esp" },
+    "d1e96:Apocalypse - Magic of Skyrim.esp": { "out": "974e2:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Lamb", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "36a03:Apocalypse - Magic of Skyrim.esp" },
+    "1a792f:Apocalypse - Magic of Skyrim.esp": { "out": "1a792e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Ganking", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1a1b79:Apocalypse - Magic of Skyrim.esp" },
+    "d1e98:Apocalypse - Magic of Skyrim.esp": { "out": "803f7:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Perilous Paths", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "803f2:Apocalypse - Magic of Skyrim.esp" },
+    "d1e67:Apocalypse - Magic of Skyrim.esp": { "out": "7a799:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Crackling", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "109653:Apocalypse - Magic of Skyrim.esp" },
+    "1a7933:Apocalypse - Magic of Skyrim.esp": { "out": "1a7932:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Silvery Barbs", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "15b843:Apocalypse - Magic of Skyrim.esp" },
+    "d1e9a:Apocalypse - Magic of Skyrim.esp": { "out": "bb977:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Deadeye Captain", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "37e17:Apocalypse - Magic of Skyrim.esp" },
+    "d1e9e:Apocalypse - Magic of Skyrim.esp": { "out": "bb96e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Pain", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "43ce1:Apocalypse - Magic of Skyrim.esp" },
+    "1a7937:Apocalypse - Magic of Skyrim.esp": { "out": "1a7934:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Hrormir's Misdirection", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "15b847:Apocalypse - Magic of Skyrim.esp" },
+    "d1e9d:Apocalypse - Magic of Skyrim.esp": { "out": "bdfac:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Scorching Hands", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "2388c:Apocalypse - Magic of Skyrim.esp" },
+    "d1e9b:Apocalypse - Magic of Skyrim.esp": { "out": "896fc:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Corpse Explosion", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1212eb:Apocalypse - Magic of Skyrim.esp" },
+    "1a793b:Apocalypse - Magic of Skyrim.esp": { "out": "1a793a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Automaton Breaking", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "1a4a46:Apocalypse - Magic of Skyrim.esp" },
+    "d1e83:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Whispers", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "58655:Apocalypse - Magic of Skyrim.esp" },
+    "d1e74:Apocalypse - Magic of Skyrim.esp": { "out": "7a79c:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Creeping Cold", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "279bd:Apocalypse - Magic of Skyrim.esp" },
+    "d1e8f:Apocalypse - Magic of Skyrim.esp": { "out": "896f9:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Imprisonment", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "2e25:Apocalypse - Magic of Skyrim.esp" },
+    "d1e7d:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a4:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Sleet Storms", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "27f2e:Apocalypse - Magic of Skyrim.esp" },
+    "d1e75:Apocalypse - Magic of Skyrim.esp": { "out": "7c849:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Dragon's Teeth", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "24361:Apocalypse - Magic of Skyrim.esp" },
+    "d1e76:Apocalypse - Magic of Skyrim.esp": { "out": "7a79d:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Fractures", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "279c0:Apocalypse - Magic of Skyrim.esp" },
+    "d1e77:Apocalypse - Magic of Skyrim.esp": { "out": "7a79e:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Rift Bolts", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "253c2:Apocalypse - Magic of Skyrim.esp" },
+    "d1e9c:Apocalypse - Magic of Skyrim.esp": { "out": "bb97c:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Oathbound", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "18ae7:Apocalypse - Magic of Skyrim.esp" },
+    "d1e9f:Apocalypse - Magic of Skyrim.esp": { "out": "bb968:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Illusory Pyres", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "32c8b:Apocalypse - Magic of Skyrim.esp" },
+    "d1ea0:Apocalypse - Magic of Skyrim.esp": { "out": "bb969:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Necroplagues", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "34d12:Apocalypse - Magic of Skyrim.esp" },
+    "d1e6c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b5:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Dremora Churl", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "12359:Apocalypse - Magic of Skyrim.esp" },
+    "161624:Apocalypse - Magic of Skyrim.esp": { "out": "161625:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Monarch Mark", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "161621:Apocalypse - Magic of Skyrim.esp" },
+    "d1e7c:Apocalypse - Magic of Skyrim.esp": { "out": "7a7a3:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Scattershocks", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "expert", "family": "Staves", "open": true, "spell": "24e49:Apocalypse - Magic of Skyrim.esp" },
+    "d1e66:Apocalypse - Magic of Skyrim.esp": { "out": "7a234:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Avenging Wraith", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "17a8e:Apocalypse - Magic of Skyrim.esp" },
+    "d1e73:Apocalypse - Magic of Skyrim.esp": { "out": "7a7bc:Apocalypse - Magic of Skyrim.esp", "name": "Staff of the Xivilai Lord", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "12370:Apocalypse - Magic of Skyrim.esp" },
+    "d1e68:Apocalypse - Magic of Skyrim.esp": { "out": "7a79b:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Hailstones", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "2e634:Apocalypse - Magic of Skyrim.esp" },
+    "d1e69:Apocalypse - Magic of Skyrim.esp": { "out": "7a79a:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Withering", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "novice", "family": "Staves", "open": true, "spell": "12649c:Apocalypse - Magic of Skyrim.esp" },
+    "d1e6a:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b3:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Entombing", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "4581c:Apocalypse - Magic of Skyrim.esp" },
+    "d1e6b:Apocalypse - Magic of Skyrim.esp": { "out": "7a7b4:Apocalypse - Magic of Skyrim.esp", "name": "Staff of Lockblasting", "type": "WEAP", "makes": 1, "owner": "Enchanter", "half": "Bladebinder", "race": "", "rank": "advanced", "family": "Staves", "open": true, "spell": "ab69:Apocalypse - Magic of Skyrim.esp" },
     "3383:CommonClothes.esp": { "out": "1870:CommonClothes.esp", "name": "Boiled Leather Cuirass", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
     "3384:CommonClothes.esp": { "out": "1879:CommonClothes.esp", "name": "Robed Iron Armor", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
     "3385:CommonClothes.esp": { "out": "1871:CommonClothes.esp", "name": "Mail Tunic", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "", "rank": "novice", "family": "Body armour", "open": true },
@@ -25595,6 +25600,13 @@ function craftAnswer(actorId, row) {
     plate, because anybody who works a forge does.'
   */
   if (P.canWork(s, half, rank)) {
+    // A staff also needs its spell learned from a tome (THE STAFF SPELLS, #967).
+    const staff = globalThis.__thornswoodStaffSpells;
+    const unlearned = (staff && row.spell) ? staff.refusal(s, row) : null;
+    if (unlearned) {
+      out.refusal = unlearned;
+      return out;
+    }
     out.credit = half;
     return out;
   }
@@ -35042,6 +35054,322 @@ log('gamemode loaded:',
 })();
 // ==== end thornswood character ====
 
+// ==== thornswood staff spells ====
+/*
+  THE STAFF SPELLS: AN ENCHANTER LEARNS WHAT A STAFF BINDS FROM A SPELL TOME.
+
+  Patrick, 28 September, answering issue #967: "Enchanters learn staff spells
+  from spell tomes". 160 of the Bladebinder's 161 staff recipes carry a
+  HasSpell condition naming the staff's own spell, and until this nobody could
+  make one: an Enchanter starts with no spells at all.
+
+  HOW IT WORKS.
+    - Reading a spell tome raises onReadBook. When the tome teaches a spell a
+      staff binds (STAFF_SPELLS, generated below) and the reader may make
+      staves at all, the spell is recorded on their character (staffSpells in
+      the character state, the thornswoodCharacter property, so it survives a
+      restart) and they are told so in chat. The handler never refuses: the
+      engine then teaches the spell and spends the tome as it does for anybody
+      (ReadBookEvent in the fork), which is also what makes the game's own
+      crafting menu list the staff, because the menu checks HasSpell itself.
+    - Somebody who may not make staves reads the tome and gets exactly that
+      normal effect, the spell, and nothing is recorded or said.
+    - Making a staff asks craftAnswer, and craftAnswer asks refusal() below
+      once rank and half have said yes: a staff whose spell is not recorded
+      is refused with the sentence saying which tome to read. So a spell known
+      some other way (read before this existed, or before the profession was
+      picked) does not open a staff; reading its tome again does, and the
+      engine keeps that tome when the spell is already known.
+
+  WHO MAY LEARN. Anybody with standing in the Bladebinder half, which is the
+  one question the craft gate asks before it lets a staff through: both
+  halves of the Enchanter (the Wardweaver has the Bladebinder's novice as
+  its sister half) and anybody a Master Enchanter taught. Recording it for
+  somebody who could never make a staff would promise them something.
+
+  A SPELL NO TOME TEACHES. Some Apocalypse staves name the copy of a spell only
+  a creature casts. Build-RecipeTable prints every one, STAFF_SPELLS lists
+  them with no tomes, and the refusal says nobody can learn it here yet.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+
+  // ==== STAFF_SPELLS ====
+  /* Built by scripts\dev\Build-RecipeTable.ps1 out of the game's own records. Do not hand edit.
+     160 spells a staff recipe binds, 160 of them taught by a spell tome.
+     Spell desc -> its name and every BOOK record whose teaches spell flag names it.
+     A spell with no tome is one nobody can learn here, so its staves stay closed. */
+  var STAFF_SPELLS = {
+    "10f7ee:Skyrim.esm": { "name": "Thunderbolt", "tomes": ["10f7f5:Skyrim.esm"] },
+    "35d81:Skyrim.esm": { "name": "Wall of Storms", "tomes": ["a270b:Skyrim.esm"] },
+    "35d80:Skyrim.esm": { "name": "Wall of Frost", "tomes": ["a270a:Skyrim.esm"] },
+    "35d7f:Skyrim.esm": { "name": "Wall of Flames", "tomes": ["a2709:Skyrim.esm"] },
+    "4b146:Skyrim.esm": { "name": "Turn Lesser Undead", "tomes": ["a271f:Skyrim.esm"] },
+    "5dd5d:Skyrim.esm": { "name": "Turn Undead", "tomes": ["a2721:Skyrim.esm"] },
+    "5dd5e:Skyrim.esm": { "name": "Turn Greater Undead", "tomes": ["a2729:Skyrim.esm"] },
+    "2dd2a:Skyrim.esm": { "name": "Sparks", "tomes": ["9cd53:Skyrim.esm"] },
+    "4dba4:Skyrim.esm": { "name": "Soul Trap", "tomes": ["9cd54:Skyrim.esm"] },
+    "4deef:Skyrim.esm": { "name": "Rout", "tomes": ["a2718:Skyrim.esm"] },
+    "96d94:Skyrim.esm": { "name": "Reanimate Greater Corpse", "tomes": ["a26f2:Skyrim.esm"] },
+    "247c86:Odin - Skyrim Magic Overhaul.esp": { "name": "Toxic Cloud", "tomes": ["a2726:Skyrim.esm"] },
+    "26121c:Odin - Skyrim Magic Overhaul.esp": { "name": "Black Hand", "tomes": ["a2725:Skyrim.esm"] },
+    "65bd7:Skyrim.esm": { "name": "Reanimate Corpse", "tomes": ["a26eb:Skyrim.esm"] },
+    "4deec:Skyrim.esm": { "name": "Rally", "tomes": ["a2713:Skyrim.esm"] },
+    "7e8e1:Skyrim.esm": { "name": "Reanimate Lesser Corpse", "tomes": ["9e2aa:Skyrim.esm"] },
+    "5ad5f:Skyrim.esm": { "name": "Paralyze", "tomes": ["a26e8:Skyrim.esm"] },
+    "43323:Skyrim.esm": { "name": "Magelight", "tomes": ["a26e2:Skyrim.esm"] },
+    "10f7ed:Skyrim.esm": { "name": "Incinerate", "tomes": ["10f7f4:Skyrim.esm"] },
+    "10f7ec:Skyrim.esm": { "name": "Icy Spear", "tomes": ["10f7f3:Skyrim.esm"] },
+    "45f9c:Skyrim.esm": { "name": "Ice Storm", "tomes": ["a2707:Skyrim.esm"] },
+    "2b96c:Skyrim.esm": { "name": "Ice Spike", "tomes": ["a26fe:Skyrim.esm"] },
+    "12fd2:Skyrim.esm": { "name": "Heal Other", "tomes": ["a2727:Skyrim.esm"] },
+    "4d3f2:Skyrim.esm": { "name": "Healing Hands", "tomes": ["a271e:Skyrim.esm"] },
+    "4deeb:Skyrim.esm": { "name": "Fury", "tomes": ["9e2ac:Skyrim.esm"] },
+    "2b96b:Skyrim.esm": { "name": "Frostbite", "tomes": ["9cd52:Skyrim.esm"] },
+    "4deee:Skyrim.esm": { "name": "Frenzy", "tomes": ["a2714:Skyrim.esm"] },
+    "12fcd:Skyrim.esm": { "name": "Flames", "tomes": ["9cd51:Skyrim.esm"] },
+    "12fd0:Skyrim.esm": { "name": "Firebolt", "tomes": ["a26fd:Skyrim.esm"] },
+    "1c789:Skyrim.esm": { "name": "Fireball", "tomes": ["a2706:Skyrim.esm"] },
+    "4deea:Skyrim.esm": { "name": "Fear", "tomes": ["a2712:Skyrim.esm"] },
+    "6f952:Skyrim.esm": { "name": "Expel Daedra", "tomes": ["a26f8:Skyrim.esm"] },
+    "96d95:Skyrim.esm": { "name": "Dread Zombie", "tomes": ["a26f7:Skyrim.esm"] },
+    "4dee8:Skyrim.esm": { "name": "Courage", "tomes": ["9e2ad:Skyrim.esm"] },
+    "204c5:Skyrim.esm": { "name": "Conjure Storm Atronach", "tomes": ["a26f0:Skyrim.esm"] },
+    "204c4:Skyrim.esm": { "name": "Conjure Frost Atronach", "tomes": ["a26ef:Skyrim.esm"] },
+    "204c3:Skyrim.esm": { "name": "Conjure Flame Atronach", "tomes": ["a26ec:Skyrim.esm"] },
+    "640b6:Skyrim.esm": { "name": "Conjure Familiar", "tomes": ["9e2ab:Skyrim.esm"] },
+    "6f953:Skyrim.esm": { "name": "Command Daedra", "tomes": ["a26f6:Skyrim.esm"] },
+    "45f9d:Skyrim.esm": { "name": "Chain Lightning", "tomes": ["a2708:Skyrim.esm"] },
+    "4dee9:Skyrim.esm": { "name": "Calm", "tomes": ["a2711:Skyrim.esm"] },
+    "6d22c:Skyrim.esm": { "name": "Banish Daedra", "tomes": ["a26ee:Skyrim.esm"] },
+    "2dd29:Skyrim.esm": { "name": "Lightning Bolt", "tomes": ["a26ff:Skyrim.esm"] },
+    "17b5c9:Odin - Skyrim Magic Overhaul.esp": { "name": "Panic", "tomes": ["17b5db:Odin - Skyrim Magic Overhaul.esp"] },
+    "18c58c:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Clannfear", "tomes": ["1afd19:Odin - Skyrim Magic Overhaul.esp"] },
+    "8558a:Odin - Skyrim Magic Overhaul.esp": { "name": "Simulacrum", "tomes": ["21a2f7:Odin - Skyrim Magic Overhaul.esp"] },
+    "247c89:Odin - Skyrim Magic Overhaul.esp": { "name": "Sun Storm", "tomes": ["261216:Odin - Skyrim Magic Overhaul.esp"] },
+    "27a7b1:Odin - Skyrim Magic Overhaul.esp": { "name": "Corrosion", "tomes": ["293d18:Odin - Skyrim Magic Overhaul.esp"] },
+    "173074:Odin - Skyrim Magic Overhaul.esp": { "name": "Vulnerability", "tomes": ["275692:Odin - Skyrim Magic Overhaul.esp"] },
+    "17b5c2:Odin - Skyrim Magic Overhaul.esp": { "name": "Soothe", "tomes": ["17b5d8:Odin - Skyrim Magic Overhaul.esp"] },
+    "17b5d1:Odin - Skyrim Magic Overhaul.esp": { "name": "Subjugate", "tomes": ["17b5da:Odin - Skyrim Magic Overhaul.esp"] },
+    "27569c:Odin - Skyrim Magic Overhaul.esp": { "name": "Purge Magic", "tomes": ["27569e:Odin - Skyrim Magic Overhaul.esp"] },
+    "2a3051:Odin - Skyrim Magic Overhaul.esp": { "name": "Frosthand", "tomes": ["2a3054:Odin - Skyrim Magic Overhaul.esp"] },
+    "d4349:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Gloom Wraith", "tomes": ["d4351:Odin - Skyrim Magic Overhaul.esp"] },
+    "3f52:Dawnguard.esm": { "name": "Sun Fire", "tomes": ["3f51:Dawnguard.esm"] },
+    "1e78ad:Odin - Skyrim Magic Overhaul.esp": { "name": "Arctic Frost", "tomes": ["26b450:Odin - Skyrim Magic Overhaul.esp"] },
+    "27f2e:Odin - Skyrim Magic Overhaul.esp": { "name": "Ice Shards", "tomes": ["3e090:Odin - Skyrim Magic Overhaul.esp"] },
+    "18c58e:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Daedroth", "tomes": ["1afd1a:Odin - Skyrim Magic Overhaul.esp"] },
+    "1967b9:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Houndmaster", "tomes": ["1afd1b:Odin - Skyrim Magic Overhaul.esp"] },
+    "1a5ad7:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Ursine Familiar", "tomes": ["1afd1e:Odin - Skyrim Magic Overhaul.esp"] },
+    "1916b1:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Dread Shade", "tomes": ["1afd22:Odin - Skyrim Magic Overhaul.esp"] },
+    "224526:Odin - Skyrim Magic Overhaul.esp": { "name": "Discordant Wail", "tomes": ["23897e:Odin - Skyrim Magic Overhaul.esp"] },
+    "1e279f:Odin - Skyrim Magic Overhaul.esp": { "name": "Lightning Grasp", "tomes": ["3db25:Odin - Skyrim Magic Overhaul.esp"] },
+    "1a5aea:Odin - Skyrim Magic Overhaul.esp": { "name": "Conjure Feline Familiar", "tomes": ["1afd1d:Odin - Skyrim Magic Overhaul.esp"] },
+    "2a304f:Odin - Skyrim Magic Overhaul.esp": { "name": "Firehand", "tomes": ["2a3053:Odin - Skyrim Magic Overhaul.esp"] },
+    "21f3fd:Odin - Skyrim Magic Overhaul.esp": { "name": "Mute", "tomes": ["21f417:Odin - Skyrim Magic Overhaul.esp"] },
+    "27a7b4:Odin - Skyrim Magic Overhaul.esp": { "name": "Dire Corrosion", "tomes": ["293d19:Odin - Skyrim Magic Overhaul.esp"] },
+    "159d8:Odin - Skyrim Magic Overhaul.esp": { "name": "Enervate", "tomes": ["3eb87:Odin - Skyrim Magic Overhaul.esp"] },
+    "1dd699:Odin - Skyrim Magic Overhaul.esp": { "name": "Shockbloom", "tomes": ["26b44c:Odin - Skyrim Magic Overhaul.esp"] },
+    "3e0f:Odin - Skyrim Magic Overhaul.esp": { "name": "Destroy Living", "tomes": ["3eb82:Odin - Skyrim Magic Overhaul.esp"] },
+    "21a2eb:Odin - Skyrim Magic Overhaul.esp": { "name": "Shadow Legion", "tomes": ["21a2f8:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d347b:Odin - Skyrim Magic Overhaul.esp": { "name": "Arctic Blast", "tomes": ["26b446:Odin - Skyrim Magic Overhaul.esp"] },
+    "24e49:Odin - Skyrim Magic Overhaul.esp": { "name": "Charged Storm", "tomes": ["26b44e:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d3482:Odin - Skyrim Magic Overhaul.esp": { "name": "Taldam's Scorcher", "tomes": ["26b445:Odin - Skyrim Magic Overhaul.esp"] },
+    "17b5bb:Odin - Skyrim Magic Overhaul.esp": { "name": "Bravery", "tomes": ["17b5d9:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d8588:Odin - Skyrim Magic Overhaul.esp": { "name": "Firebloom", "tomes": ["26b44a:Odin - Skyrim Magic Overhaul.esp"] },
+    "293d0e:Odin - Skyrim Magic Overhaul.esp": { "name": "Dire Vulnerability", "tomes": ["293d12:Odin - Skyrim Magic Overhaul.esp"] },
+    "1dd697:Odin - Skyrim Magic Overhaul.esp": { "name": "Frostbloom", "tomes": ["26b44b:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d347e:Odin - Skyrim Magic Overhaul.esp": { "name": "Flame Darts", "tomes": ["26b44d:Odin - Skyrim Magic Overhaul.esp"] },
+    "2100d4:Odin - Skyrim Magic Overhaul.esp": { "name": "Dominate", "tomes": ["2100db:Odin - Skyrim Magic Overhaul.esp"] },
+    "1e27a7:Odin - Skyrim Magic Overhaul.esp": { "name": "Thundering Grasp", "tomes": ["3db2c:Odin - Skyrim Magic Overhaul.esp"] },
+    "1d858b:Odin - Skyrim Magic Overhaul.esp": { "name": "Wildfire", "tomes": ["26b44f:Odin - Skyrim Magic Overhaul.esp"] },
+    "17b5b3:Odin - Skyrim Magic Overhaul.esp": { "name": "Rage", "tomes": ["17b5d7:Odin - Skyrim Magic Overhaul.esp"] },
+    "38b6:Dawnguard.esm": { "name": "Vampire's Bane", "tomes": ["3f4d:Dawnguard.esm"] },
+    "7c83b:Odin - Skyrim Magic Overhaul.esp": { "name": "Stormhand", "tomes": ["2a3055:Odin - Skyrim Magic Overhaul.esp"] },
+    "233865:Odin - Skyrim Magic Overhaul.esp": { "name": "Greater Simulacrum", "tomes": ["23386c:Odin - Skyrim Magic Overhaul.esp"] },
+    "229634:Odin - Skyrim Magic Overhaul.esp": { "name": "Crying Eye", "tomes": ["22e73b:Odin - Skyrim Magic Overhaul.esp"] },
+    "20afc9:Odin - Skyrim Magic Overhaul.esp": { "name": "Command", "tomes": ["20afd0:Odin - Skyrim Magic Overhaul.esp"] },
+    "2c169f:Odin - Skyrim Magic Overhaul.esp": { "name": "Hush", "tomes": ["2c16a3:Odin - Skyrim Magic Overhaul.esp"] },
+    "256fce:Odin - Skyrim Magic Overhaul.esp": { "name": "Viperbolt", "tomes": ["2611fa:Odin - Skyrim Magic Overhaul.esp"] },
+    "224524:Odin - Skyrim Magic Overhaul.esp": { "name": "Dirge", "tomes": ["23897f:Odin - Skyrim Magic Overhaul.esp"] },
+    "21f405:Odin - Skyrim Magic Overhaul.esp": { "name": "Wizard Rend", "tomes": ["21f416:Odin - Skyrim Magic Overhaul.esp"] },
+    "289aec:Odin - Skyrim Magic Overhaul.esp": { "name": "Haste Mount", "tomes": ["298e2d:Odin - Skyrim Magic Overhaul.esp"] },
+    "b646:Apocalypse - Magic of Skyrim.esp": { "name": "Drop Zone", "tomes": ["3c51a:Apocalypse - Magic of Skyrim.esp"] },
+    "15e721:Apocalypse - Magic of Skyrim.esp": { "name": "Poisoned Chalice", "tomes": ["15e723:Apocalypse - Magic of Skyrim.esp"] },
+    "133d6:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Honor Guard", "tomes": ["3d5b2:Apocalypse - Magic of Skyrim.esp"] },
+    "27144:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Cat Totem", "tomes": ["3d048:Apocalypse - Magic of Skyrim.esp"] },
+    "12364:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Pit Fighter", "tomes": ["3d049:Apocalypse - Magic of Skyrim.esp"] },
+    "15e73e:Apocalypse - Magic of Skyrim.esp": { "name": "Ice Prism", "tomes": ["16160a:Apocalypse - Magic of Skyrim.esp"] },
+    "1228a8:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Xivilai Sorcerer", "tomes": ["3d04b:Apocalypse - Magic of Skyrim.esp"] },
+    "3789f:Apocalypse - Magic of Skyrim.esp": { "name": "Seidstone", "tomes": ["3e60f:Apocalypse - Magic of Skyrim.esp"] },
+    "128e8:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Herne", "tomes": ["3d5b3:Apocalypse - Magic of Skyrim.esp"] },
+    "85910:Apocalypse - Magic of Skyrim.esp": { "name": "Incendiary Flow", "tomes": ["3db2b:Apocalypse - Magic of Skyrim.esp"] },
+    "7c83b:Apocalypse - Magic of Skyrim.esp": { "name": "Thundercrack", "tomes": ["3db25:Apocalypse - Magic of Skyrim.esp"] },
+    "294cd:Apocalypse - Magic of Skyrim.esp": { "name": "Bolide", "tomes": ["3db27:Apocalypse - Magic of Skyrim.esp"] },
+    "1879:Apocalypse - Magic of Skyrim.esp": { "name": "Electrosphere", "tomes": ["3db28:Apocalypse - Magic of Skyrim.esp"] },
+    "24b44:Apocalypse - Magic of Skyrim.esp": { "name": "Ice Shiv", "tomes": ["3db2a:Apocalypse - Magic of Skyrim.esp"] },
+    "17509:Apocalypse - Magic of Skyrim.esp": { "name": "Curse of the Silent", "tomes": ["3e5ff:Apocalypse - Magic of Skyrim.esp"] },
+    "1f1fb:Apocalypse - Magic of Skyrim.esp": { "name": "Decompose", "tomes": ["3eb8e:Apocalypse - Magic of Skyrim.esp"] },
+    "2878:Apocalypse - Magic of Skyrim.esp": { "name": "Lightning Strike", "tomes": ["3e092:Apocalypse - Magic of Skyrim.esp"] },
+    "294d4:Apocalypse - Magic of Skyrim.esp": { "name": "Bombardment", "tomes": ["3e094:Apocalypse - Magic of Skyrim.esp"] },
+    "159d8:Apocalypse - Magic of Skyrim.esp": { "name": "Ruin", "tomes": ["3eb87:Apocalypse - Magic of Skyrim.esp"] },
+    "3682f:Apocalypse - Magic of Skyrim.esp": { "name": "Illusory Flames", "tomes": ["3e602:Apocalypse - Magic of Skyrim.esp"] },
+    "378a9:Apocalypse - Magic of Skyrim.esp": { "name": "Mind Vision", "tomes": ["3e603:Apocalypse - Magic of Skyrim.esp"] },
+    "12dc:Apocalypse - Magic of Skyrim.esp": { "name": "Nature's Balance", "tomes": ["3eb8c:Apocalypse - Magic of Skyrim.esp"] },
+    "31c4d:Apocalypse - Magic of Skyrim.esp": { "name": "Shadowbond", "tomes": ["3e60a:Apocalypse - Magic of Skyrim.esp"] },
+    "a4ef7:Apocalypse - Magic of Skyrim.esp": { "name": "Empathic Agony", "tomes": ["3e60c:Apocalypse - Magic of Skyrim.esp"] },
+    "378ae:Apocalypse - Magic of Skyrim.esp": { "name": "Mind Control", "tomes": ["3e60d:Apocalypse - Magic of Skyrim.esp"] },
+    "13e4fd:Apocalypse - Magic of Skyrim.esp": { "name": "Leech Seed", "tomes": ["3eb7f:Apocalypse - Magic of Skyrim.esp"] },
+    "3e0f:Apocalypse - Magic of Skyrim.esp": { "name": "Slay Living", "tomes": ["3eb82:Apocalypse - Magic of Skyrim.esp"] },
+    "35452:Apocalypse - Magic of Skyrim.esp": { "name": "Finger of Death", "tomes": ["3eb84:Apocalypse - Magic of Skyrim.esp"] },
+    "2cd7e:Apocalypse - Magic of Skyrim.esp": { "name": "Atronach Mark", "tomes": ["3d043:Apocalypse - Magic of Skyrim.esp"] },
+    "85594:Apocalypse - Magic of Skyrim.esp": { "name": "Blaze", "tomes": ["89709:Apocalypse - Magic of Skyrim.esp"] },
+    "128df:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Champion", "tomes": ["3d5b1:Apocalypse - Magic of Skyrim.esp"] },
+    "88694:Apocalypse - Magic of Skyrim.esp": { "name": "Azure Reconstruction", "tomes": ["89706:Apocalypse - Magic of Skyrim.esp"] },
+    "124ec5:Apocalypse - Magic of Skyrim.esp": { "name": "Summoning Rune", "tomes": ["3d04e:Apocalypse - Magic of Skyrim.esp"] },
+    "2e31:Apocalypse - Magic of Skyrim.esp": { "name": "Undermine", "tomes": ["3c520:Apocalypse - Magic of Skyrim.esp"] },
+    "8558a:Apocalypse - Magic of Skyrim.esp": { "name": "Pale Shadow", "tomes": ["8970c:Apocalypse - Magic of Skyrim.esp"] },
+    "1fcd9:Apocalypse - Magic of Skyrim.esp": { "name": "Welling Blood", "tomes": ["3eb7d:Apocalypse - Magic of Skyrim.esp"] },
+    "12214:Apocalypse - Magic of Skyrim.esp": { "name": "Horrid Wilting", "tomes": ["3eb85:Apocalypse - Magic of Skyrim.esp"] },
+    "36a03:Apocalypse - Magic of Skyrim.esp": { "name": "Lamb of Mara", "tomes": ["3eb7e:Apocalypse - Magic of Skyrim.esp"] },
+    "1a1b79:Apocalypse - Magic of Skyrim.esp": { "name": "Gank", "tomes": ["1a1b7b:Apocalypse - Magic of Skyrim.esp"] },
+    "803f2:Apocalypse - Magic of Skyrim.esp": { "name": "Perilous Path", "tomes": ["3c51b:Apocalypse - Magic of Skyrim.esp"] },
+    "109653:Apocalypse - Magic of Skyrim.esp": { "name": "Crackle", "tomes": ["3db1f:Apocalypse - Magic of Skyrim.esp"] },
+    "15b843:Apocalypse - Magic of Skyrim.esp": { "name": "Silvery Barbs", "tomes": ["15b845:Apocalypse - Magic of Skyrim.esp"] },
+    "37e17:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Deadeye Captain", "tomes": ["3d046:Apocalypse - Magic of Skyrim.esp"] },
+    "43ce1:Apocalypse - Magic of Skyrim.esp": { "name": "Figment of Pain", "tomes": ["3e607:Apocalypse - Magic of Skyrim.esp"] },
+    "15b847:Apocalypse - Magic of Skyrim.esp": { "name": "Hrormir's Misdirection", "tomes": ["15b84c:Apocalypse - Magic of Skyrim.esp"] },
+    "2388c:Apocalypse - Magic of Skyrim.esp": { "name": "Scorching Hands", "tomes": ["3e08f:Apocalypse - Magic of Skyrim.esp"] },
+    "1212eb:Apocalypse - Magic of Skyrim.esp": { "name": "Corpse Explosion", "tomes": ["3d04d:Apocalypse - Magic of Skyrim.esp"] },
+    "1a4a46:Apocalypse - Magic of Skyrim.esp": { "name": "Dust in the Clockwork", "tomes": ["1a4a48:Apocalypse - Magic of Skyrim.esp"] },
+    "58655:Apocalypse - Magic of Skyrim.esp": { "name": "Compelling Whispers", "tomes": ["3e606:Apocalypse - Magic of Skyrim.esp"] },
+    "279bd:Apocalypse - Magic of Skyrim.esp": { "name": "Creeping Cold", "tomes": ["3db22:Apocalypse - Magic of Skyrim.esp"] },
+    "2e25:Apocalypse - Magic of Skyrim.esp": { "name": "Tharn's Prison", "tomes": ["3c524:Apocalypse - Magic of Skyrim.esp"] },
+    "27f2e:Apocalypse - Magic of Skyrim.esp": { "name": "Sleet Storm", "tomes": ["3e090:Apocalypse - Magic of Skyrim.esp"] },
+    "24361:Apocalypse - Magic of Skyrim.esp": { "name": "Dragon's Teeth", "tomes": ["3db21:Apocalypse - Magic of Skyrim.esp"] },
+    "279c0:Apocalypse - Magic of Skyrim.esp": { "name": "Fracture", "tomes": ["3db23:Apocalypse - Magic of Skyrim.esp"] },
+    "253c2:Apocalypse - Magic of Skyrim.esp": { "name": "Rift Bolt", "tomes": ["3db26:Apocalypse - Magic of Skyrim.esp"] },
+    "18ae7:Apocalypse - Magic of Skyrim.esp": { "name": "Oathbound Guardian", "tomes": ["3d5b5:Apocalypse - Magic of Skyrim.esp"] },
+    "32c8b:Apocalypse - Magic of Skyrim.esp": { "name": "Illusory Pyre", "tomes": ["3e609:Apocalypse - Magic of Skyrim.esp"] },
+    "34d12:Apocalypse - Magic of Skyrim.esp": { "name": "Necroplague", "tomes": ["3eb81:Apocalypse - Magic of Skyrim.esp"] },
+    "12359:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Dremora Churl", "tomes": ["3d045:Apocalypse - Magic of Skyrim.esp"] },
+    "161621:Apocalypse - Magic of Skyrim.esp": { "name": "Monarch Mark", "tomes": ["161623:Apocalypse - Magic of Skyrim.esp"] },
+    "24e49:Apocalypse - Magic of Skyrim.esp": { "name": "Scattershock", "tomes": ["3db2c:Apocalypse - Magic of Skyrim.esp"] },
+    "17a8e:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Avenging Wraith", "tomes": ["3d041:Apocalypse - Magic of Skyrim.esp"] },
+    "12370:Apocalypse - Magic of Skyrim.esp": { "name": "Conjure Xivilai Lord", "tomes": ["3d5b4:Apocalypse - Magic of Skyrim.esp"] },
+    "2e634:Apocalypse - Magic of Skyrim.esp": { "name": "Hailstone", "tomes": ["3db20:Apocalypse - Magic of Skyrim.esp"] },
+    "12649c:Apocalypse - Magic of Skyrim.esp": { "name": "Wither", "tomes": ["3c51e:Apocalypse - Magic of Skyrim.esp"] },
+    "4581c:Apocalypse - Magic of Skyrim.esp": { "name": "Entomb", "tomes": ["3f65b:Apocalypse - Magic of Skyrim.esp"] },
+    "ab69:Apocalypse - Magic of Skyrim.esp": { "name": "Detonate Lock", "tomes": ["3c527:Apocalypse - Magic of Skyrim.esp"] }
+  };
+  // ==== end STAFF_SPELLS ====
+
+  // The half that makes staves, in the rules' spelling.
+  var HALF = 'bladebinder';
+
+  function own(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+
+  // Tome desc -> the spell desc it teaches, built once out of STAFF_SPELLS.
+  var byTome = null;
+  function spellForTome(tomeDesc) {
+    if (!byTome) {
+      byTome = {};
+      for (var sp in STAFF_SPELLS) {
+        if (!own(STAFF_SPELLS, sp)) { continue; }
+        var tomes = STAFF_SPELLS[sp].tomes || [];
+        for (var i = 0; i < tomes.length; i++) { byTome[tomes[i]] = sp; }
+      }
+    }
+    return own(byTome, tomeDesc) ? byTome[tomeDesc] : null;
+  }
+
+  function spellName(spellDesc) {
+    return (own(STAFF_SPELLS, spellDesc) && STAFF_SPELLS[spellDesc].name) || 'its spell';
+  }
+
+  function taught(spellDesc) {
+    return own(STAFF_SPELLS, spellDesc) && (STAFF_SPELLS[spellDesc].tomes || []).length > 0;
+  }
+
+  /** The staff spells recorded on this character state, as a fresh array. */
+  function known(state) {
+    var list = state && state.staffSpells;
+    return Array.isArray(list) ? list.slice() : [];
+  }
+
+  function knows(state, spellDesc) { return known(state).indexOf(spellDesc) !== -1; }
+
+  /** May this character learn staff spells: anybody who may make a staff. */
+  function canLearn(P, state) { return !!(state && P.rankOf(state, HALF)); }
+
+  /**
+    The state after reading a tome that teaches spellDesc. Pure: it is handed
+    the rules and a state and gives back { ok, state } or { ok: false, why }.
+  */
+  function learn(P, state, spellDesc) {
+    if (!spellDesc) { return { ok: false, why: 'not a staff spell' }; }
+    if (!canLearn(P, state)) { return { ok: false, why: 'may not make staves' }; }
+    if (knows(state, spellDesc)) { return { ok: false, why: 'already known' }; }
+    var s = P.clone(state);
+    s.staffSpells = known(s);
+    s.staffSpells.push(spellDesc);
+    return { ok: true, state: s };
+  }
+
+  /** null when this state may bind this row's spell, otherwise the sentence. */
+  function refusal(state, row) {
+    if (!row || !row.spell || knows(state, row.spell)) { return null; }
+    var made = aWord(row.name || 'staff');
+    made = made.charAt(0).toUpperCase() + made.slice(1);
+    var name = spellName(row.spell);
+    if (!taught(row.spell)) {
+      return made + ' binds ' + name + ', and no spell tome here teaches it, so nobody can make one yet.';
+    }
+    return made + ' binds ' + name + ', and you have not learned it for staves yet. ' +
+           'Read a spell tome of ' + name + ' and you can make it.';
+  }
+
+  /**
+    A book was read. Answers the line to say, or null to say nothing. Records
+    the spell when the book is a tome of a staff spell and the reader may make
+    staves; never stops the book being read.
+  */
+  function readTome(actorId, bookBaseId) {
+    var tomeDesc = null;
+    try { tomeDesc = mp.getDescFromId(bookBaseId); } catch (e) { tomeDesc = null; }
+    var spell = tomeDesc ? spellForTome(String(tomeDesc)) : null;
+    if (!spell) { return null; }
+    var C = g.__thornswoodCharacter;
+    var P = g.__thornswoodProgression;
+    if (!C || !P) { return null; }
+    var r = learn(P, C.stateOf(actorId), spell);
+    if (!r.ok) { return null; }
+    C.writeState(actorId, r.state);
+    return 'The tome teaches you ' + spellName(spell) +
+           ', and you can now bind it into a staff at a staff enchanter.';
+  }
+
+  g.__thornswoodStaffSpells = {
+    STAFF_SPELLS: STAFF_SPELLS, spellForTome: spellForTome, known: known, knows: knows,
+    canLearn: canLearn, learn: learn, refusal: refusal, readTome: readTome
+  };
+})();
+
+/*
+  Reading a book. Only a tome of a staff spell is answered, and only with a
+  line in chat: nothing here ever returns false, so every book reads exactly
+  as it does in Skyrim. See THE STAFF SPELLS above.
+*/
+mp.onReadBook = guard('onReadBook', function (actorId, bookBaseId) {
+  const staff = globalThis.__thornswoodStaffSpells;
+  const line = staff ? staff.readTome(actorId, bookBaseId) : null;
+  if (line) {
+    notify(actorId, line);
+    say(actorId, line);
+  }
+});
+// ==== end thornswood staff spells ====
+
 // ==== thornswood chat commands ====
 /*
   EVERY WORD THIS SERVER ANSWERS, WRITTEN DOWN ONCE.
@@ -37617,9 +37945,11 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     onEatItem     Eating or drinking something in the pack. No handler: the
                   engine applies a potion's effects. The needs block hears
                   about eating from the client's /ate line instead.
-    onReadBook    Reading a book. No handler since 21 September, when books
-                  stopped moving anybody's rank. The engine teaches the spell a
-                  spell tome carries.
+    onReadBook    Reading a book. The engine teaches the spell a spell tome
+                  carries. mp.onReadBook never refuses: it records a staff's
+                  spell for somebody who makes staves and says so in chat
+                  (THE STAFF SPELLS, #967). Books stopped moving anybody's
+                  rank on 21 September.
     onUpdateAppearanceAttempt
                   A face sent to the server. The engine refuses it by itself
                   unless the server opened the race menu
