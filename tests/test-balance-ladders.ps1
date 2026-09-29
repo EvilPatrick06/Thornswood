@@ -16,6 +16,11 @@
      and read Thread as advanced farmer work for 188 recipes.
   2. NO HALF HAS AN EMPTY RUNG WITH WORK ABOVE IT, over every owned row and over
      the rows the server is asked about.
+  2b. PATRICK'S ANSWERS OF 28 SEPTEMBER ARE IN THE TABLES: every Heart Stone
+     deposit is advanced mining and the miner keeps 20 master deposits; the 161
+     Bladebinder staves sit on all four rungs, none more than one rung from its
+     stone, and no half needs the second rule; every row held dear by something
+     nobody gathers says in rankFrom that it is kept on purpose.
   3. THE ONE RUNG HOLE FILL does what HOLE_FILL_MOVES_ONE_RUNG says: it closes a
      hole next to a crowded rung without moving any row more than one rung or
      any pinned row, and a half it cannot close (every row on master, the
@@ -24,8 +29,10 @@
      code under test and not a copy. The full build needs the game's plugins
      and takes minutes, so it is not run here.
   4. CHECK-BALANCE RUNS GREEN, which now includes: every row more than one rung
-     out is kept on purpose or waiting on one of Patrick's named decisions.
-  5. THE THREE DECISIONS ARE STILL ONE LINE EACH: the knobs exist.
+     out is kept on purpose, and none is waiting on a decision.
+  5. THE THREE DECISIONS ARE STILL ONE LINE EACH, set as Patrick answered:
+     RANK_BY_ORE names the Heart Stone advanced, CROP_COSTS_THE_FARMERS_RANK is
+     off and UNPLACED_INPUT_RULE is 'floor'.
 
   -Repo points it at another checkout, which is how it was shown to fail on
   main before this change (checks 1 and 4).
@@ -132,7 +139,32 @@ foreach ($h in $recipes.halves.PSObject.Properties.Name) {
     if ($recipes.halves.$h.PSObject.Properties.Name -contains 'secondRule') { $second += $h }
 }
 Write-Host ("      second rule used by: {0}; rows moved one rung: {1}" -f ($second -join ', '), $moved)
-Yes 'the second rule ranks the Bladebinder and no other half' ($second.Count -eq 1 -and $second[0] -like '*Bladebinder')
+# Patrick, 28 September: Heart Stone deposits are advanced mining, so the
+# Bladebinder's staves are ranked by what they cost and no half needs the
+# second rule any more.
+Yes 'no half needs the second rule since Heart Stones went to advanced' ($second.Count -eq 0)
+
+# ---- 2b. Patrick's three answers of 28 September, read off the tables ------
+$heart = @($ores.ores.PSObject.Properties | Where-Object { [string]$_.Value.name -eq 'Heart Stone' })
+Yes ('every Heart Stone deposit is advanced mining ({0} of them)' -f $heart.Count) (
+    $heart.Count -eq 4 -and @($heart | Where-Object { [string]$_.Value.rank -ne 'advanced' }).Count -eq 0)
+Yes 'and ores.json says why, under rankNamedOutright' (
+    $ores.PSObject.Properties.Name -contains 'rankNamedOutright' -and
+    ([string]$ores.rankNamedOutright.DLC2HeartStone).StartsWith('advanced'))
+$masters = @($ores.ores.PSObject.Properties | Where-Object { [string]$_.Value.rank -eq 'master' }).Count
+Yes ('the miner keeps 20 master deposits ({0})' -f $masters) ($masters -eq 20)
+$bb = @($recipes.recipes.PSObject.Properties | Where-Object { [string]$_.Value.owner -eq 'Enchanter' -and [string]$_.Value.half -eq 'Bladebinder' } | ForEach-Object { $_.Value })
+$bbBy = @(0, 0, 0, 0); $bbFar = 0
+foreach ($r in $bb) {
+    $bbBy[(At ([string]$r.rank))]++
+    if ([string]$r.inputRank -and [Math]::Abs((At ([string]$r.rank)) - (At ([string]$r.inputRank))) -gt 1) { $bbFar++ }
+}
+Write-Host ("      Bladebinder staves: novice {0}, advanced {1}, expert {2}, master {3}" -f $bbBy[0], $bbBy[1], $bbBy[2], $bbBy[3])
+Yes 'the staves spread over all four rungs, none more than one rung from its stone' (
+    $bb.Count -eq 161 -and $bbBy[0] -gt 0 -and $bbBy[1] -gt 0 -and $bbBy[2] -gt 0 -and $bbBy[3] -gt 0 -and $bbFar -eq 0)
+$held = @($recipes.recipes.PSObject.Properties | Where-Object { ([string]$_.Value.rankFrom).Contains('held above what its placed inputs cost') } | ForEach-Object { $_.Value })
+$notKept = @($held | Where-Object { -not ([string]$_.rankFrom).Contains('Kept on purpose') })
+Yes ('every row held dear by something nobody gathers says it is kept on purpose ({0} rows)' -f $held.Count) ($held.Count -gt 0 -and $notKept.Count -eq 0)
 
 # ---- 3. the one rung hole fill, lifted out of the build script ------------
 $build = Join-Path $Repo 'scripts\dev\Build-RecipeTable.ps1'
@@ -202,13 +234,16 @@ $out = & pwsh -NoProfile -File $cb -NoPause 2>&1 | Out-String
 $code = $LASTEXITCODE
 foreach ($l in ($out -split "`r?`n")) { if ($l -match '^\s+BAD') { Write-Host ('      ' + $l.Trim()) } }
 Yes 'Check-Balance.ps1 exits 0' ($code -eq 0)
-Yes 'and says every row more than one rung out is kept on purpose or waiting on a named decision' (
-    $out -match 'every recipe more than one rung out is kept on purpose or waiting on a named decision' -or
+Yes 'and says every row more than one rung out is kept on purpose, none waiting on a decision' (
+    $out -match 'every recipe more than one rung out is kept on purpose, and none is waiting on a decision' -or
     $out -match 'no recipe is more than one rung away from what its inputs cost')
+Yes 'and no line of it says a row is waiting on Patrick' ($out -notmatch 'waiting on Patrick')
 
-# ---- 5. the decisions are one line each ----------------------------------
-Yes 'Patrick''s Bladebinder decision is one knob: SECOND_RULE_KEY' ($null -ne (Knob '$SECOND_RULE_KEY'))
-Yes 'the wild crop decision is one knob: CROP_COSTS_THE_FARMERS_RANK' ($null -ne (Knob '$CROP_COSTS_THE_FARMERS_RANK'))
-Yes 'what an input nobody produces costs is one knob: UNPLACED_INPUT_RULE' ($null -ne (Knob '$UNPLACED_INPUT_RULE'))
+# ---- 5. the decisions are one line each, set as Patrick answered ----------
+Yes 'the wild crop decision is one knob, and it stays off' ((Knob '$CROP_COSTS_THE_FARMERS_RANK') -and (Knob '$CROP_COSTS_THE_FARMERS_RANK').Right.Extent.Text -eq '$false')
+Yes 'what an input nobody produces costs is one knob, and it stays floor' ((Knob '$UNPLACED_INPUT_RULE') -and (Knob '$UNPLACED_INPUT_RULE').Right.Extent.Text -eq "'floor'")
+$oreAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $Repo 'scripts\dev\Build-OreTable.ps1'), [ref]$tokens, [ref]$errors)
+$rbo = $oreAst.Find({ param($x) $x -is [System.Management.Automation.Language.AssignmentStatementAst] -and $x.Left.Extent.Text -eq '$RANK_BY_ORE' }, $true)
+Yes 'the Heart Stone decision is one entry in RANK_BY_ORE in Build-OreTable.ps1' ($errors.Count -eq 0 -and $rbo -and $rbo.Extent.Text -match "'DLC2HeartStone'\s*=\s*@\{\s*Rank\s*=\s*'advanced'")
 
 Done
