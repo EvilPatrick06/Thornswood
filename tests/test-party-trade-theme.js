@@ -137,7 +137,10 @@ function load(name) {
   };
   const win = {
     skyrimPlatform: { sendMessage(to, what) { page.told.push(to + ' ' + what); } },
-    thornswoodNet: { say(line) { page.sent.push(line); return true; } }
+    thornswoodNet: { say(line) { page.sent.push(line); return true; } },
+    // The journal is scaled to the screen (test-journal-scale.js holds that).
+    innerWidth: 1920, innerHeight: 1080,
+    addEventListener() { }
   };
   new Function('window', 'document', SRC[name])(win, doc);
   page.win = win;

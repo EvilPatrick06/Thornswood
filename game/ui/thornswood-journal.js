@@ -142,6 +142,37 @@
     '#' + ID + ' ::-webkit-scrollbar-corner{background:transparent}'
   ].join('\n');
 
+  /*
+    SCALED TO THE SCREEN, THE K PANEL'S WAY. Issue 958.
+
+    Patrick on dev, 28 September: "it doesn't scale the menu size for bigger
+    screens or is just too small". The panel is a fixed 1040 by 660 box in
+    CSS pixels, and the game's browser is the size of the screen, so at his
+    3440 by 1440 it filled under a third of the width, and at 3840 by 2160 a
+    quarter. It is laid out for 1920 by 1080 and scaled up from there by the
+    smaller of the two ratios, exactly as fit() in thornswood-skills.js does:
+    1920 by 1080 draws it as is, 2560 by 1440 at 1.333, 3440 by 1440 at
+    1.333, 3840 by 2160 at 2. Never below 1, where max-width and max-height
+    already keep it on a smaller screen, and never above 2.4.
+    tests/test-journal-scale.js holds it at those sizes.
+  */
+  var BASE_W = 1920, BASE_H = 1080, MAX_SCALE = 2.4;
+
+  function scaleFor(w, h) {
+    var s = Math.min(w / BASE_W, h / BASE_H);
+    if (!isFinite(s) || s < 1) { s = 1; }
+    return Math.min(s, MAX_SCALE);
+  }
+
+  function fit() {
+    try {
+      var panel = root && root.querySelector('.panel');
+      if (!panel) { return; }
+      panel.style.transformOrigin = 'center center';
+      panel.style.transform = 'scale(' + scaleFor(window.innerWidth, window.innerHeight).toFixed(3) + ')';
+    } catch (e) { }
+  }
+
   function build() {
     if (root) { return root; }
     var style = document.createElement('style');
@@ -161,6 +192,8 @@
       '</div>';
     document.body.appendChild(root);
     root.querySelector('#' + ID + '-close').onclick = close;
+    fit();
+    window.addEventListener('resize', fit);
     // The page answers its own Escape, and its own J; no plugin can see a key
     // while the browser holds the keyboard. See thornswood-bridge.js. The
     // footer has said "Escape or J closes this" since #288, and J reached
@@ -395,6 +428,7 @@
     if (shown) { return; }
     shown = true;
     root.className = 'on';
+    fit();
     draw();
     tell('opened');
   }
@@ -413,6 +447,7 @@
     close: close,
     toggle: toggle,
     isOpen: function () { return shown; },
+    scaleFor: scaleFor,
     setData: function (d) {
       data = d || null;
       /*
