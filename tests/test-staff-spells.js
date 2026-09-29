@@ -12,12 +12,16 @@
 // and proves:
 //   A. the generated table: every staff row names a spell STAFF_SPELLS knows,
 //      and the build opened the Bladebinder (issue's Done when)
-//   B. an Enchanter who reads a tome of a staff spell has it recorded and is
-//      told so in chat, and the book is never refused
+//   B. since #1026 (Patrick, 29 September: "No they still need the spell
+//      points, the level, and a spell from the level below") an Enchanter
+//      learns a staff spell from its tome only under the Mage rules: one with
+//      no magic is refused and keeps the tome, the line saying which rules are
+//      missing; one a Master mage taught the school learns a Novice spell,
+//      has it recorded for staves, and is told so in chat
 //   C. a staff whose spell is not recorded is refused with a sentence saying
-//      which tome to read, and allowed once it is
-//   D. anybody who may not make staves reads the tome and gets the normal
-//      effect only: nothing recorded, nothing said
+//      which tome to read and that the Mage rules apply, and allowed once it is
+//   D. anybody who may not make staves learns the spell under the same rules
+//      and nothing is recorded for staves
 //   E. what was learned survives a restart, in the character store
 //
 // Read only.
@@ -49,6 +53,7 @@ function take(start, end) {
 const RULES = between('// ==== thornswood progression ====', '// ==== end thornswood progression ====');
 const CHARACTER = between('// ==== thornswood character ====', '// ==== end thornswood character ====');
 const STAFF = between('// ==== thornswood staff spells ====', '// ==== end thornswood staff spells ====');
+const TOMES = between('// ==== thornswood spell tomes ====', '// ==== end thornswood spell tomes ====');
 const GATE_PARTS = [
   take('function craftAnswer(actorId, row) {'),
   take('function raceGate(actorId, row) {'),
@@ -57,11 +62,11 @@ const GATE_PARTS = [
   take('function aWord(name) {'),
   take('function rankWord(rank) {')
 ];
-yes('the rules, the character store and the staff spells block are in the gamemode',
-    RULES !== null && CHARACTER !== null && STAFF !== null);
+yes('the rules, the character store, the spell tomes and the staff spells blocks are in the gamemode',
+    RULES !== null && CHARACTER !== null && STAFF !== null && TOMES !== null);
 yes('craftAnswer and what it calls are in the gamemode',
     GATE_PARTS.every(function (p) { return p !== null; }));
-if (RULES === null || CHARACTER === null || STAFF === null ||
+if (RULES === null || CHARACTER === null || STAFF === null || TOMES === null ||
     !GATE_PARTS.every(function (p) { return p !== null; })) {
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(1);
@@ -74,6 +79,17 @@ let TABLE = {};
 try { TABLE = JSON.parse(src.slice(tableAt + '  var RECIPES_BY_ID = '.length, tableEnd + 4)); } catch (e) { TABLE = {}; }
 
 // ------------------------------------------------------------- the server --
+
+// Tome desc -> the spell it teaches, read out of STAFF_SPELLS as it stands.
+const SPELL_OF_TOME = {};
+{
+  const t = /var STAFF_SPELLS = (\{[\s\S]*?\n  \});/.exec(src);
+  let table = {};
+  try { table = t ? JSON.parse(t[1]) : {}; } catch (e) { table = {}; }
+  Object.keys(table).forEach(function (sp) {
+    (table[sp].tomes || []).forEach(function (tm) { SPELL_OF_TOME[tm] = sp; });
+  });
+}
 
 // A tome desc -> a number and back, the way mp.getDescFromId answers.
 const IDS = {};
@@ -101,7 +117,17 @@ function server(store) {
     set: function (id, key, value) {
       (store[id] = store[id] || {})[key] = JSON.stringify(value);
     },
-    getDescFromId: function (n) { return DESCS[n] || ('unknown' + n + ':Nowhere.esp'); }
+    getDescFromId: function (n) { return DESCS[n] || ('unknown' + n + ':Nowhere.esp'); },
+    // Every tome in STAFF_SPELLS as the engine's BOOK record: DATA flag 0x04
+    // and the spell it teaches at offset 4, global already.
+    lookupEspmRecordById: function (n) {
+      const spellDesc = SPELL_OF_TOME[DESCS[n]];
+      if (!spellDesc) { return {}; }
+      const sp = idFor(spellDesc);
+      return { record: { type: 'BOOK', editorId: 'SpellTome', fields: [
+        { type: 'DATA', data: [4, 0, 0, 0, sp & 255, (sp >>> 8) & 255, (sp >>> 16) & 255, (sp >>> 24) & 255] }] },
+        toGlobalRecordId: function (x) { return x; } };
+    }
   };
   const ctx = {
     mp: mp, JSON: JSON, Object: Object, Array: Array, String: String, Number: Number, Math: Math,
@@ -116,6 +142,7 @@ function server(store) {
   vm.runInContext(RULES, ctx, { filename: 'gamemode.js rules' });
   vm.runInContext(CHARACTER, ctx, { filename: 'gamemode.js character' });
   vm.runInContext(GATE_PARTS[4], ctx, { filename: 'gamemode.js aWord' });
+  vm.runInContext(TOMES, ctx, { filename: 'gamemode.js spell tomes' });
   vm.runInContext(STAFF, ctx, { filename: 'gamemode.js staff spells' });
   const gate = new Function('globalThis', 'log', 'toldCraftingIsComing', 'raceOf',
                             GATE_PARTS.join('\n') + '\nreturn craftAnswer;')(
@@ -199,35 +226,78 @@ const ENCH = 0xff000011;
 const WARD = 0xff000012;
 const SMITH = 0xff000013;
 const NOBODY = 0xff000014;
+const RAW = 0xff000017;
+const TAUGHT_SMITH = 0xff000018;
 const TOME = SPELLS[THUNDERBOLT] ? SPELLS[THUNDERBOLT].tomes[0] : 'none:None.esp';
+const FLAMES = '12fcd:Skyrim.esm';
+const FLAMES_TOME = SPELLS[FLAMES] ? SPELLS[FLAMES].tomes[0] : 'none:None.esp';
+yes('Flames, a Novice Destruction spell, is a staff spell a tome teaches',
+    !!SPELLS[FLAMES] && SPELLS[FLAMES].name === 'Flames' && SPELLS[FLAMES].tomes.length > 0);
+// A Master mage of Destruction, to teach it.
+const TEACHER = { prof: 'mage', ranks: { destruction: 'master' } };
+function taught(srv, actor) {
+  const s = srv.P.teach(srv.C.stateOf(actor), TEACHER, 'destruction');
+  if (s.ok) { srv.C.writeState(actor, s.state); }
+  return srv.C.stateOf(actor);
+}
+function chat(srv, actor) {
+  return srv.said.filter(function (x) { return x.id === actor && x.how === 'chat'; });
+}
 {
   const srv = server(store0);
-  make(srv, ENCH, 'miner', 'enchanter', 'bladebinder', 'master');
-  const before = srv.C.stateOf(ENCH);
-  yes('a new Enchanter knows no staff spell', srv.S.known(before).length === 0);
 
-  const back = srv.read(ENCH, TOME);
-  yes('reading the tome is never refused: the handler returns nothing, so the engine teaches the spell and spends the tome',
+  // An Enchanter with no magic at all: the Mage rules refuse every tome.
+  make(srv, RAW, 'miner', 'enchanter', 'bladebinder', 'master');
+  srv.said.length = 0;
+  const refused = srv.read(RAW, TOME);
+  const rl = (chat(srv, RAW)[0] || {}).text || '';
+  yes('ISSUE #1026: a master Bladebinder with no magic reading Thunderbolt is refused, so the tome is kept',
+      refused === false);
+  yes('  nothing is recorded for staves and nothing learned',
+      srv.S.known(srv.C.stateOf(RAW)).length === 0 &&
+      (((srv.C.stateOf(RAW).spells || {}).known) || []).length === 0);
+  yes('  and the line names all three missing: a spell point, Expert rank in Destruction, an Advanced Destruction spell (' + rl + ')',
+      /Thunderbolt \(Expert Destruction\)/.test(rl) && /a spell point to spend/.test(rl) &&
+      /Expert rank in Destruction, and you have no rank in it/.test(rl) &&
+      /an Advanced Destruction spell you already know/.test(rl));
+  yes('  with no em dash and no word player', rl.indexOf('\u2014') === -1 && !/player/i.test(rl));
+
+  // An Enchanter a Master mage taught Destruction: a Novice staff spell passes.
+  make(srv, ENCH, 'miner', 'enchanter', 'bladebinder', 'master');
+  const before = taught(srv, ENCH);
+  yes('a taught Enchanter knows no staff spell yet', srv.S.known(before).length === 0);
+  srv.said.length = 0;
+  const back = srv.read(ENCH, FLAMES_TOME);
+  yes('a taught Enchanter reading Flames passes the rules: not refused, so the engine teaches it and spends the tome',
       back === undefined);
   const after = srv.C.stateOf(ENCH);
-  yes('the Enchanter now has Thunderbolt recorded for staves', srv.S.knows(after, THUNDERBOLT));
-  const chat = srv.said.filter(function (s) { return s.id === ENCH && s.how === 'chat'; });
-  yes('and is told in chat, by the spell\'s name, that it can go into a staff now',
-      chat.length === 1 && chat[0].text.indexOf('Thunderbolt') !== -1 && /staff/.test(chat[0].text));
-  yes('the line has no em dash and no word player',
-      chat.length === 1 && chat[0].text.indexOf('—') === -1 && !/player/i.test(chat[0].text));
+  yes('  Flames is recorded for staves and is in their book, one of their two places spent',
+      srv.S.knows(after, FLAMES) && after.spells.known.indexOf('Flames') !== -1 &&
+      srv.P.spellPoints(after) === 1);
+  const ch = chat(srv, ENCH);
+  yes('  and one chat line says what was learned and that it can go into a staff (' + ((ch[0] || {}).text || '') + ')',
+      ch.length === 1 && /The tome teaches you Flames/.test(ch[0].text) && /staff/.test(ch[0].text));
 
   srv.said.length = 0;
-  srv.read(ENCH, TOME);
-  yes('reading it again records nothing twice and says nothing',
-      srv.S.known(srv.C.stateOf(ENCH)).length === 1 && srv.said.length === 0);
+  srv.read(ENCH, FLAMES_TOME);
+  yes('reading it again records nothing twice, spends nothing and says nothing',
+      srv.S.known(srv.C.stateOf(ENCH)).length === 1 && srv.P.spellPoints(srv.C.stateOf(ENCH)) === 1 &&
+      srv.said.length === 0);
+
+  srv.said.length = 0;
+  const thunder = srv.read(ENCH, TOME);
+  const tl = (chat(srv, ENCH)[0] || {}).text || '';
+  yes('the same Enchanter is refused Thunderbolt: a taught school stays Novice (' + tl + ')',
+      thunder === false && !srv.S.knows(srv.C.stateOf(ENCH), THUNDERBOLT) &&
+      /Expert rank in Destruction, and you are Novice in it/.test(tl));
 
   // A Wardweaver has the Bladebinder's novice as the sister half, so may make
-  // novice staves and so learns their spells.
+  // novice staves and so learns their spells, under the same rules.
   make(srv, WARD, 'miner', 'enchanter', 'wardweaver');
-  srv.read(WARD, TOME);
-  yes('a Wardweaver, who makes novice staves as the sister half, learns it too',
-      srv.S.knows(srv.C.stateOf(WARD), THUNDERBOLT));
+  taught(srv, WARD);
+  srv.read(WARD, FLAMES_TOME);
+  yes('a taught Wardweaver, who makes novice staves as the sister half, learns Flames for staves too',
+      srv.S.knows(srv.C.stateOf(WARD), FLAMES));
 }
 
 // ------------------------------------------------ D. anybody else reading --
@@ -236,40 +306,54 @@ const TOME = SPELLS[THUNDERBOLT] ? SPELLS[THUNDERBOLT].tomes[0] : 'none:None.esp
   make(srv, SMITH, 'miner', 'smith', 'edgewright', 'master');
   srv.said.length = 0;
   const back = srv.read(SMITH, TOME);
-  yes('a Smith reading the tome gets the normal effect only: not refused', back === undefined);
+  yes('a Smith with no magic reading Thunderbolt is refused under the same rules', back === false);
   yes('  nothing recorded', srv.S.known(srv.C.stateOf(SMITH)).length === 0);
-  yes('  and nothing said', srv.said.length === 0);
+  yes('  and told why', chat(srv, SMITH).length === 1 && /You need/.test(chat(srv, SMITH)[0].text));
+
+  make(srv, TAUGHT_SMITH, 'miner', 'smith', 'edgewright', 'master');
+  taught(srv, TAUGHT_SMITH);
+  srv.said.length = 0;
+  const b2 = srv.read(TAUGHT_SMITH, FLAMES_TOME);
+  const l2 = (chat(srv, TAUGHT_SMITH)[0] || {}).text || '';
+  yes('a Smith a Master mage taught Destruction learns Flames, and nothing is recorded for staves (' + l2 + ')',
+      b2 === undefined && srv.C.stateOf(TAUGHT_SMITH).spells.known.indexOf('Flames') !== -1 &&
+      srv.S.known(srv.C.stateOf(TAUGHT_SMITH)).length === 0 && !/staff/.test(l2));
 
   make(srv, NOBODY, 'miner', null);
-  srv.read(NOBODY, TOME);
-  yes('somebody with no profession yet: nothing recorded, nothing said',
-      srv.S.known(srv.C.stateOf(NOBODY)).length === 0 && srv.said.length === 0);
+  srv.said.length = 0;
+  const b3 = srv.read(NOBODY, TOME);
+  yes('somebody with no profession yet: refused, nothing recorded',
+      b3 === false && srv.S.known(srv.C.stateOf(NOBODY)).length === 0);
 
-  srv.read(ENCH, '12345:Skyrim.esm');
-  yes('a book that is not a tome of a staff spell: nothing said, nothing changed',
-      srv.said.length === 0 && srv.S.known(srv.C.stateOf(ENCH)).length === 1);
+  srv.said.length = 0;
+  const b4 = srv.read(ENCH, '12345:Skyrim.esm');
+  yes('a book that is not a spell tome: not refused, nothing said, nothing changed',
+      b4 === undefined && srv.said.length === 0 && srv.S.known(srv.C.stateOf(ENCH)).length === 1);
 }
 
 // -------------------------------------------- C. the staff gate, and E. a restart --
 {
   // A restart: a second server over the same store and nothing else.
   const srv = server(JSON.parse(JSON.stringify(store0)));
-  yes('AFTER A RESTART the Enchanter still has Thunderbolt recorded, out of the character store',
-      srv.S.knows(srv.C.stateOf(ENCH), THUNDERBOLT));
+  yes('AFTER A RESTART the Enchanter still has Flames recorded, out of the character store',
+      srv.S.knows(srv.C.stateOf(ENCH), FLAMES));
 
-  const ok = srv.craft(ENCH, thunderRow);
-  yes('a master Bladebinder who learned Thunderbolt may make the Staff of Thunderbolts, and the work is credited',
-      !ok.refusal && ok.credit === 'bladebinder');
+  const flamesRow = withSpell.map(function (k) { return TABLE[k]; })
+    .filter(function (r) { return r.spell === FLAMES; })[0];
+  yes('the recipe table has a staff that binds Flames', !!flamesRow);
+  if (flamesRow) {
+    const ok = srv.craft(ENCH, flamesRow);
+    yes('a master Bladebinder who learned Flames under the rules may make ' + flamesRow.name + ', and the work is credited',
+        !ok.refusal && ok.credit === 'bladebinder');
+  }
 
-  const other = withSpell.map(function (k) { return TABLE[k]; }).filter(function (r) {
-    return r.spell !== THUNDERBOLT && (SPELLS[r.spell].tomes || []).length > 0;
-  })[0];
-  const no = srv.craft(ENCH, other);
-  yes('a staff whose spell they have not learned is refused', !!no.refusal);
-  yes('  and the refusal names the spell and says to read its tome',
-      !!no.refusal && no.refusal.indexOf(SPELLS[other.spell].name) !== -1 && /spell tome/.test(no.refusal));
+  const no = srv.craft(ENCH, thunderRow);
+  yes('a staff whose spell they could not learn is refused', !!no.refusal);
+  yes('  and the refusal names the spell, says to read its tome, and that the Mage rules apply',
+      !!no.refusal && no.refusal.indexOf('Thunderbolt') !== -1 && /spell tome/.test(no.refusal) &&
+      /Mage rules/.test(no.refusal));
   yes('  with no em dash and no word player',
-      !!no.refusal && no.refusal.indexOf('—') === -1 && !/player/i.test(no.refusal));
+      !!no.refusal && no.refusal.indexOf('\u2014') === -1 && !/player/i.test(no.refusal));
 
   if (untaught.length) {
     const closed = withSpell.map(function (k) { return TABLE[k]; })
@@ -282,11 +366,18 @@ const TOME = SPELLS[THUNDERBOLT] ? SPELLS[THUNDERBOLT].tomes[0] : 'none:None.esp
   // The spell known some other way does not open a staff: only the record does.
   const fresh = 0xff000015;
   make(srv, fresh, 'miner', 'enchanter', 'bladebinder', 'master');
-  const s = srv.C.stateOf(fresh);
-  s.spells = { points: 0, known: ['Thunderbolt'] };
+  const s = taught(srv, fresh);
+  s.spells = { points: 0, known: ['Flames'] };
   srv.C.writeState(fresh, s);
-  yes('a spell in the mage book but not learned from a tome does not open the staff',
-      !!srv.craft(fresh, thunderRow).refusal);
+  yes('a spell in the book but not learned from a tome does not open the staff',
+      !!flamesRow && !!srv.craft(fresh, flamesRow).refusal);
+  srv.said.length = 0;
+  const again = srv.read(fresh, FLAMES_TOME);
+  yes('  reading its tome then records it for staves, without spending another place',
+      again === undefined && srv.S.knows(srv.C.stateOf(fresh), FLAMES) &&
+      srv.C.stateOf(fresh).spells.known.length === 1 &&
+      chat(srv, fresh).length === 1 && /staff/.test(chat(srv, fresh)[0].text));
+  yes('  and the staff opens', !!flamesRow && !srv.craft(fresh, flamesRow).refusal);
 
   // The staff gate asks after rank and half, so the old answers stand.
   const smith = srv.craft(SMITH, thunderRow);
@@ -310,9 +401,14 @@ const TOME = SPELLS[THUNDERBOLT] ? SPELLS[THUNDERBOLT].tomes[0] : 'none:None.esp
   const lines = src.split('\n').filter(function (l) { return /^mp\.onReadBook\s*=/.test(l); });
   yes('mp.onReadBook is registered once, through guard under its own name',
       lines.length === 1 && lines[0].indexOf("guard('onReadBook', function") !== -1);
-  const body = take("mp.onReadBook = guard('onReadBook', function", '\n});');
-  yes('and it never returns false, so no book is ever refused',
-      !!body && !/\breturn\s+false\b/.test(body));
+  const body = (function () {
+    const i = src.indexOf("mp.onReadBook = guard('onReadBook', function");
+    const j = i < 0 ? -1 : src.indexOf('\n});', i);
+    return (i >= 0 && j >= 0) ? src.slice(i, j) : null;
+  })();
+  yes('and it returns false only when the spell tomes block refuses the tome',
+      !!body && /if \(r && r\.refused\) \{ return false; \}/.test(body) &&
+      (body.match(/return\s+false/g) || []).length === 1);
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

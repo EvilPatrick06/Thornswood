@@ -111,7 +111,11 @@ Grab `thornswood-front.log`.
 
 ## TEST 5. Spells stay equipped
 
-1. Read a spell tome. Prefer Odin, Apocalypse or Triumvirate over vanilla.
+1. Read a spell tome your character can learn: a Mage with a spell point, and a
+   Novice spell of one of their two schools. Prefer Odin, Apocalypse or
+   Triumvirate over vanilla. A tome you cannot learn stays in your pack and chat
+   says which of the three you are missing (a spell point, the rank, a spell of
+   the rank below); that is the rule working, not a failure.
 2. Equip the spell.
 3. Cast it.
 4. Wait ten seconds and check it is still in your hand.
