@@ -53,8 +53,16 @@ function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Ok($m) { Write-Host ('  ok       ' + $m) -ForegroundColor Green }
 function Miss($m) { Write-Host ('  MISSING  ' + $m) -ForegroundColor Red }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
-# Native tools write progress to stderr; the exit code alone decides.
-function Run { $ErrorActionPreference = 'Continue'; & $args[0] @($args | Select-Object -Skip 1); return $LASTEXITCODE }
+# Native tools write progress to stderr; the exit code alone decides. Their
+# output is written to the screen, not returned: returned, every line cmake
+# printed came back with the code, "$code -ne 0" was true for any configure
+# or build that printed anything, and a configure that succeeded stopped with
+# "cmake configure exited with ... 0" (found building for #919).
+function Run {
+    $ErrorActionPreference = 'Continue'
+    & $args[0] @($args | Select-Object -Skip 1) 2>&1 | ForEach-Object { Write-Host $_ }
+    return [int]$LASTEXITCODE
+}
 
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $build = Join-Path $Fork 'build'
@@ -135,7 +143,9 @@ if ($Check) {
 # ---- 4. build ---------------------------------------------------------------
 Head 'Build'
 Say '  Release, everything (only what changed, after the first time)'
-$code = Run $cmake --build $build --config Release -- /m /v:minimal /nologo
+# '--' is quoted: bare, PowerShell takes it as the end of Run's own
+# parameters and drops it, and cmake then refuses /m as its own argument.
+$code = Run $cmake --build $build --config Release '--' /m /v:minimal /nologo
 if ($code -ne 0) { Die "the build exited with $code. The errors are above; the first one is usually the only real one." }
 Ok 'built'
 
