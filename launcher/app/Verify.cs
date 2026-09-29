@@ -174,8 +174,10 @@ namespace Thornswood
                     true, !onDisk));
             }
 
-            foreach (string p in have)
-                if (!wantSet.Contains(p)) issues.Add(new Issue(p + " is enabled but is not part of this build.", true));
+            // An Anniversary owner's Creation Club plugins that take no place in
+            // the order are not counted here (#479, LoadOrder.NotInBuild).
+            foreach (string p in LoadOrder.NotInBuild(have, want, LightOrMissing))
+                issues.Add(new Issue(p + " is enabled but is not part of this build.", true));
 
             // Another server's client. Not a plugin, so nothing above would ever
             // have found it, and it is the difference between Thornswood loading

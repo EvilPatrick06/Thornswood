@@ -25,7 +25,10 @@
       plugin list whose file is in Data and is not light (an .esl, or the ESL
       flag in its header). Light plugins take no position, so they are not
       counted, wherever they sit. Skyrim.ccc is not read: this checks the list
-      Vortex wrote.
+      Vortex wrote. Nor are official Creation Club plugins (#479): the server
+      needs only Special Edition, and Thornswood's own game folder leaves any
+      Creation Club plugin out (OwnGame.UnwantedCreation), so somebody who owns
+      the Anniversary upgrade and has its plugins switched on still passes.
     - the files: size, then crc32, of every plugin the server names that is in
       Data, apart from the ten storefront files the launcher does not compare.
 
@@ -228,9 +231,15 @@ foreach ($line in $file.Lines) {
 }
 $inData = { param($n) [IO.File]::Exists((Join-Path $Data $n)) }
 $isLight = { param($n) Test-LoadOrderLight (Join-Path $Data $n) }
-$game = Get-LoadOrderGame -Enabled $enabled.ToArray() -IsLightOrMissing $isLight -Ccc @() -ExistsInData $inData
+# Creation Club plugins take no position here, for the reason in the header.
+$noPlace = { param($n) (Test-LoadOrderCreation $n) -or (Test-LoadOrderLight (Join-Path $Data $n)) }
+$game = Get-LoadOrderGame -Enabled $enabled.ToArray() -IsLightOrMissing $noPlace -Ccc @() -ExistsInData $inData
 $lightCount = @($enabled | Where-Object { (& $inData $_) -and (& $isLight $_) }).Count
 Say ("        {0} switched on, {1} of them light, {2} positions with the base masters" -f $enabled.Count, $lightCount, $game.Count)
+$creationCount = @($enabled | Where-Object { Test-LoadOrderCreation $_ }).Count
+if ($creationCount -gt 0) {
+  Say ("        {0} of them Creation Club plugins, not counted: Thornswood's own game folder leaves those out" -f $creationCount)
+}
 
 # ------------------------------------------------------------- the servers --
 $targets = New-Object Collections.Generic.List[object]
