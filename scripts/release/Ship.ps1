@@ -366,6 +366,54 @@ function Get-ReleaseLauncher([string]$repo, [string]$version, [string]$into) {
     return ''
 }
 
+# THE SETUP PROGRAM COMES FROM CI TOO, issue #932. Package-Thornswood.ps1
+# builds the installer around setup-stub.exe, which Build-Launcher.ps1
+# compiles. A main Ship takes the launcher CI built and never runs
+# Build-Launcher, so on 28 September Ship -Package on main stopped on
+# "setup-stub.exe is missing" after the release was already published, and
+# the stub in a shared clone's out\ is whatever the last local build left,
+# from whichever branch. release.yml builds the stub beside the launcher from
+# the same tagged commit and lists both in SHA256SUMS; this downloads it into
+# $into and checks it, the same way as the launcher. Returns '' when the
+# verified stub is in $into, or a sentence saying why not. A release drafted
+# before #932 has no stub: building that tag again attaches one.
+function Get-ReleaseStub([string]$repo, [string]$version, [string]$into) {
+    $tag = 'v' + $version
+    $again = ("Build the release for $tag again, which attaches the setup program beside the launcher, wait for the " +
+              """Build the release launcher"" run to finish, then run this same Ship again:`r`n" +
+              "    gh workflow run release.yml --repo $repo -f tag=$tag")
+    if (-not (Get-Command gh -EA SilentlyContinue)) {
+        return 'gh is not installed, so the setup program CI built cannot be downloaded. Install the GitHub CLI, gh auth login, then Ship again.'
+    }
+    New-Item -ItemType Directory -Force -Path $into | Out-Null
+    foreach ($n in 'setup-stub.exe', 'SHA256SUMS') {
+        $p = Join-Path $into $n
+        if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
+    }
+    $repoArg = @(); if ($repo) { $repoArg = @('--repo', $repo) }
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    & gh release download $tag @repoArg --dir $into --pattern 'setup-stub.exe' --pattern 'SHA256SUMS' --clobber 2>&1 | Out-Host
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    $stub = Join-Path $into 'setup-stub.exe'
+    $sums = Join-Path $into 'SHA256SUMS'
+    if ($rc -ne 0 -or -not (Test-Path -LiteralPath $stub) -or -not (Test-Path -LiteralPath $sums)) {
+        return ("The release for $tag on $repo has no setup program (setup-stub.exe), so -Package would build an installer " +
+                "with nothing to run it. Nothing was published. " + $again)
+    }
+    $want = ''
+    foreach ($line in [IO.File]::ReadAllLines($sums)) {
+        $m = [regex]::Match($line, '(?i)^\s*([0-9a-f]{64})\s+\*?setup-stub\.exe\s*$')
+        if ($m.Success) { $want = $m.Groups[1].Value.ToLower(); break }
+    }
+    if (-not $want) { return ("SHA256SUMS from $tag has no line for setup-stub.exe, so the download cannot be verified. Nothing was published. " + $again) }
+    $got = (Get-FileHash -LiteralPath $stub -Algorithm SHA256).Hash.ToLower()
+    if ($got -ne $want) {
+        return ("The setup program downloaded for $tag does not match its SHA256SUMS (wanted $want, got $got). Do not ship it. Nothing was published.")
+    }
+    return ''
+}
+
 # THE TAG IS OLDER THAN THE LAUNCHER ON MAIN, issue #883. The exe CI built for
 # v<version> is the source at that tag, so a main Ship that has not moved the
 # version takes the exe of the last bump and quietly leaves out every launcher
@@ -944,6 +992,25 @@ function Unbump([string]$why) {
     Set-Content $updaterCs $back -Encoding UTF8 -NoNewline
     Head 'Version'
     Say "  put back to $current, $why" 'Yellow'
+}
+
+# ------------------------------------------------------------ setup program
+# A main release with -Package builds the installer around the setup program
+# CI built for this tag (Get-ReleaseStub, issue #932), fetched here, before
+# anything is built or published, so a release with none stops now and not
+# after it is out. A dev Ship compiles its own with Build-Launcher below, and
+# Package-Thornswood finds it in out\ as before.
+$ciStub = ''
+if ($Package -and -not $Dev -and -not $DryRun) {
+    Head 'The setup program from CI'
+    $stubDir = Join-Path ([IO.Path]::GetTempPath()) ('Thornswood-setup-' + (Split-Path -Leaf $Root.TrimEnd('\')))
+    $why = Get-ReleaseStub (Get-SourceRepo $RepoDir) $target $stubDir
+    if ($why) {
+        Unbump 'there is no verified setup program to package'
+        Die $why
+    }
+    $ciStub = Join-Path $stubDir 'setup-stub.exe'
+    Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item -LiteralPath $ciStub).Length / 1KB)) 'Green'
 }
 
 # ------------------------------------------------------------ build
@@ -1574,7 +1641,9 @@ elseif ($Package -and $DryRun) {
 }
 elseif ($Package) {
     Head 'Rebuilding the installer'
-    & (Join-Path $Here 'Package-Thornswood.ps1') -Root $Root -OutDir $DistDir -NoPause
+    $pkgArgs = @{ Root = $Root; OutDir = $DistDir; NoPause = $true }
+    if ($ciStub) { $pkgArgs['Stub'] = $ciStub }
+    & (Join-Path $Here 'Package-Thornswood.ps1') @pkgArgs
 
     # AND READ WHETHER IT WORKED, which is the same fault as the build step
     # above and entry 118 on the list: Ship called a script and never looked at
