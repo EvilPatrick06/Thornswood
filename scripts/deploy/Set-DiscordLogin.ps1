@@ -87,6 +87,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
@@ -315,22 +316,27 @@ $payload = @{
 $any = ''
 if ($ClientId) { $any = ' -AnyApplication' }
 
-# Base64 so neither secret is ever a word on a command line on either machine.
-$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
-$clientSecret = $null; $botToken = $null; $payload = $null
+# Both secrets go on ssh's standard input (Send-Secret.ps1, issue #451), so
+# neither is on a command line or in a file on either machine. A comment here
+# used to say base64 kept them off the command line; it did not, the base64
+# went inside it.
+$clientSecret = $null; $botToken = $null
 
 Write-Host ''
 Write-Host 'Writing it to the VPS...'
 if (-not (Test-Path -LiteralPath $writer)) { Write-Host "  missing: $writer" -ForegroundColor Red; exit 1 }
-Remote ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
+Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $payload -Script ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Stop'
+`$patch = `$null
+try { `$patch = `$ThornswoodSecret | ConvertFrom-Json } catch { }
+`$ThornswoodSecret = `$null
+if (-not `$patch) { 'NOTHING ARRIVED on standard input. Nothing written.'; return }
 `$f = '$rootWin\config.json'
 `$cfg = @{}
 if (Test-Path `$f) {
   try { (Get-Content `$f -Raw | ConvertFrom-Json).PSObject.Properties |
         ForEach-Object { `$cfg[`$_.Name] = `$_.Value } } catch { }
 }
-`$patch = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64')) | ConvertFrom-Json
 
 `$d = @{}
 if (`$cfg.discord) { `$cfg.discord.PSObject.Properties | ForEach-Object { `$d[`$_.Name] = `$_.Value } }
@@ -406,6 +412,7 @@ function TokenLooks(`$v, `$cid) {
 Restart-ThornswoodSite -Root '$rootWin' -Task '$Task'
 if (`$tokenChanged) { Restart-ThornswoodBot -Root '$botWin' -Task '$BotTask' }
 "@) | ForEach-Object { "  $_" }
+$payload = $null
 
 Write-Host ''
 Write-Host '  The redirect in the Discord application must be exactly this:' -ForegroundColor DarkGray
