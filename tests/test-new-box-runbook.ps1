@@ -534,6 +534,11 @@ try {
     # Two restores inside one second (#1107). What an earlier run kept under
     # this second's name is not in the way: stand-ins for it are put there for
     # the next minute, and the run keeps its own copies beside them as -2.
+    # Counted from what is there now, not from nothing (#1117): the two runs
+    # above can land in one second on a fast runner, and then the second has
+    # already kept its copies as -2.
+    $was2File = @(Get-ChildItem -LiteralPath $nSite -File -Filter 'config.json-before-restore-*-2').Count
+    $was2Dir = @(Get-ChildItem -LiteralPath $nSite -Directory -Filter 'data-before-restore-*-2').Count
     $at = Get-Date
     foreach ($s in 0..60) {
         $st = $at.AddSeconds($s).ToString('yyyyMMdd-HHmmss')
@@ -542,8 +547,8 @@ try {
     }
     $code = Run $ps51 $svc (@('-From', $unpacked) + $roots)
     Yes "a run in the same second as the last keeps its copies beside that one's, not over or inside them (exit $code)" (
-        $code -eq 0 -and @(Get-ChildItem -LiteralPath $nSite -File -Filter 'config.json-before-restore-*-2').Count -eq 1 -and
-        @(Get-ChildItem -LiteralPath $nSite -Directory -Filter 'data-before-restore-*-2').Count -eq 1 -and
+        $code -eq 0 -and @(Get-ChildItem -LiteralPath $nSite -File -Filter 'config.json-before-restore-*-2').Count -eq ($was2File + 1) -and
+        @(Get-ChildItem -LiteralPath $nSite -Directory -Filter 'data-before-restore-*-2').Count -eq ($was2Dir + 1) -and
         @(Get-ChildItem -LiteralPath $nSite -Directory -Filter 'data-before-restore-*' | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'data') }).Count -eq 0)
 
     $thin = Join-Path $work 'thin'
