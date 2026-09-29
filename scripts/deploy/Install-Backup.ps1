@@ -121,6 +121,17 @@ if ($LASTEXITCODE -ne 0) { Die 'scp failed.' }
 Say "  $runner" 'Green'
 
 Head 'The passphrase'
+# A new box, and this machine already has the passphrase every backup so far
+# was made with: that one goes up, rather than the box making its own. A new
+# one there would leave this machine's copy unable to open anything the new
+# box takes, and the "already a copy here" below would keep it that way
+# without a word (issue #454). Sent as a file, never on a command line.
+$there = Remote "if (Test-Path '$keyFile') { 'KEY THERE' } else { 'KEY NONE' }"
+if ("$there" -match 'KEY NONE' -and (Test-Path -LiteralPath $KeyOut)) {
+  & scp @ssh $KeyOut "${target}:$($keyFile.Replace('\','/'))"
+  if ($LASTEXITCODE -ne 0) { Die 'could not send the passphrase up. Nothing was registered.' }
+  Say "  sent this machine's copy up from $KeyOut, so every backup opens with the same file" 'Green'
+}
 $made = Remote @"
 if (Test-Path '$keyFile') {
   'already there, left alone'

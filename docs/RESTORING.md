@@ -20,6 +20,8 @@ start the restored server and connect to it; see the end of that section.
 | `Thornswood Fetch Backups` | that task, on Patrick's machine (One), keeping 30 days and never fewer than seven, logging to `fetch.log` beside them |
 | `scripts\vps\Restore-Backup.ps1` | checks and unpacks one; `-CheckOnly` fails a backup with no characters in it |
 | `scripts\vps\Restore-Server.ps1` | puts one back into a server folder and checks the load order resolves and the characters are there |
+| `scripts\vps\Restore-Box.ps1` | run on Patrick's machine: carries one to a new box and puts all of it back there, both worlds with Restore-Server.ps1 and the rest with `vps-restore-services.ps1`, then deletes its copy (issue #454) |
+| `scripts\vps\vps-freeze.ps1` | run on the old box through Remote.ps1 on the day of a move: stops everything and takes the last backup |
 | `tests\test-backup-restore.ps1` | backs up a scratch server, restores it into another, and checks it, every night in the build checks |
 | the passphrase | `Documents\thornswood-backup-key.txt` here, `C:\Thornswood-Backup\key.txt` on the box |
 
@@ -32,15 +34,21 @@ folder: the character cards in `characters.json`, the door's `door.json`,
 `farm-claims.json`, on dev `property.json`; `mod-settings.json` and
 `take-limit.json` when the server has written them), `game\data`, `server-settings.json`,
 `gamemode.js`, the same five from the dev server under `game-dev` (since issue
-#401), the site's `data` folder, the bot's config and its join record
+#401), the site's `data` folder and `config.json`, since issue #454 the
+site's `uploads` (the gallery's pictures) and each feed's store
+(`version.json`, `published.json`, `launchers.txt`, `releases.txt` and
+`history`, for `feed` and `feed-dev`), the bot's config and its join record
 (`joins.json`, which arrival each person was), the voice service's
 `choices.json`, and the Caddyfile. `NOTES.txt` in it counts the characters in
-each world and names any private file that was missing. The voice service's
+each world and names any private file that was missing. `choices.json` is
+still taken but is not put back: nothing has read it since the voice
+service's character choices went on 20 September. The voice service's
 `owners.json` and `secret.txt` stopped being taken on 23 September, when the
 character register they belonged to was retired. It does **not** hold
-node_modules, the installer, the dev voice service, or the Skyrim data files.
-Those come back from the repo. The published launcher feed is not in it
-either; it is kept separately.
+node_modules, the installer, the dev voice service, the feed's downloads
+(`feed\assets`, the size of every release; `Remirror-Site-Feed.ps1` sends them
+again from the machine that shipped), or the Skyrim data files. Those come
+back from the repo and from Patrick's machine.
 
 Before 18 September it held none of it. The world was never in the backup at
 all.
@@ -93,64 +101,73 @@ played since.
 
 Order matters here. The game server must not start before its world is in
 place, or it writes fresh empty characters over the top.
+`docs\MOVING-THE-SERVER.md` "If it is a new machine, new address" is the whole
+sequence, checked against the scripts on 29 September (issue #454); with the
+old box gone it is the same list without its steps 10 to 12. In short:
 
-1. **A new box, and the repo.** `docs\MOVING-THE-SERVER.md` is the long form
-   of standing one up: Windows, node, the firewall rules, the scheduled tasks.
-   Do all of that first and start nothing.
-2. **Unpack the newest backup that opens.**
+1. **A new box**, steps 1 to 8 there: the box, its ssh server, Set-Vps, the
+   key, Bootstrap-VPS, the live server program installed and not started,
+   voice, and the dev instance. Start nothing else.
+2. **The newest backup that opens**, from `Downloads\Thornswood-Backups` on
+   Patrick's machine, where Fetch-Backups.ps1 brings them every day:
    ```powershell
-   .\scripts\vps\Restore-Backup.ps1 -Backup <newest>.zip.enc -To C:\restore
+   .\scripts\vps\Restore-Box.ps1 -Backup <newest>.zip.enc -Check
    ```
-   If the newest will not open, work backwards. That is what four weeklies are
-   for.
-3. **Check it before you trust it.** The unpack prints how many characters are
-   in it. If it says `NOTHING. This backup has no characters in it.`, stop and
-   use an older one. That is exactly the state the 15 September backups were in
-   and the reason any of this exists.
-4. **Put the pieces back**, with every Thornswood task stopped. The game
-   server's half is one command, once the server program is in its folder
-   (`Deploy-Server.ps1`, or `Install-ThornswoodServer.ps1 -Zip <payload>
-   -Root C:\Thornswood-Server -NoTask`):
+   It opens it there with the passphrase and prints how many characters are in
+   it. If it says `NOTHING. This backup has no characters in it.`, stop and
+   use an older one, and if the newest will not open, work backwards. That is
+   what four weeklies are for, and exactly the state the 15 September backups
+   were in. It also asks the new box whether it is ready, and sends nothing.
+3. **Put it back**, with nothing that writes into it running:
    ```powershell
-   .\scripts\vps\Restore-Server.ps1 -Backup <newest>.zip.enc -Root C:\Thornswood-Server
-   .\scripts\vps\Restore-Server.ps1 -Backup <newest>.zip.enc -Root C:\Thornswood-Server-Dev -Which dev
+   .\scripts\vps\Restore-Box.ps1 -Backup <newest>.zip.enc
    ```
-   It puts `world` and `private` back whole, fills in `data`, refuses if the
-   server is running, and ends with `RESTORE OK` only when every plugin in the
-   load order is on disk and the characters are there. It also takes the
-   server's port, name and voice port from the backup: `C:\thornswood-server.zip`
-   is whichever channel was published last, so a live restore on top of a dev
-   payload would otherwise come back on the dev port under the dev name. Read
-   the `from the backup, was` lines it prints. By hand it is:
-   - `C:\restore\game\world` -> `C:\Thornswood-Server\world`
-   - `C:\restore\game\private` -> `C:\Thornswood-Server\private`
-   - `C:\restore\game\data` -> `C:\Thornswood-Server\data`
-   - `C:\restore\game\server-settings.json` -> the server root
-   - `C:\restore\game-dev\...` -> `C:\Thornswood-Server-Dev\...` the same way
-   - `C:\restore\site\data` -> `C:\Thornswood-Docs\data`
-   - `C:\restore\bot\bot.env.json`, `C:\restore\site\config.json` -> their roots
-   - `C:\restore\bot\joins.json` -> `C:\Thornswood-Bot\joins.json`, before the
-     bot starts, or the join cards start counting again
-   - `C:\restore\voice\choices.json` -> `C:\Thornswood-Voice\choices.json`
-   - `C:\restore\web\Caddyfile` -> `C:\Thornswood-Caddy\Caddyfile`
-5. **The rest comes from the repository, not from the backup.** `Ship.ps1`
-   publishes the launcher and the packs and deploys none of these, so each
-   goes back with its own command, from main on Patrick's machine, in this
-   order: `.\scripts\deploy\Deploy-Server.ps1` (the recorded server build),
-   `.\scripts\deploy\Deploy-Gamemode.ps1`, `.\scripts\deploy\Deploy-Docs.ps1` (never
+   On the new box it runs Restore-Server.ps1 for each game server: `world` and
+   `private` back whole, `data` filled in, a refusal if the server is running,
+   and `RESTORE OK` only when every plugin in the load order is on disk and the
+   characters are there. It takes each server's port, name and voice port from
+   the backup, because `C:\thornswood-server.zip` is whichever channel was
+   published last and a live restore on a dev payload would otherwise come
+   back on the dev port under the dev name: read the `from the backup, was`
+   lines it prints. Then `vps-restore-services.ps1` puts the rest back, and
+   the copy on the box is deleted. By hand, from an unpacked backup, it is:
+   - `game\world` -> `C:\Thornswood-Server\world`
+   - `game\private` -> `C:\Thornswood-Server\private`
+   - `game\data` -> `C:\Thornswood-Server\data`
+   - `game\server-settings.json` -> the server root
+   - `game-dev\...` -> `C:\Thornswood-Server-Dev\...` the same way
+   - `site\data`, `site\config.json` and `site\uploads` -> `C:\Thornswood-Docs`
+   - `site\feed\...` and `site\feed-dev\...` -> `C:\Thornswood-Docs\feed` and
+     `feed-dev`, file by file, beside the downloads already there
+   - `bot\bot.env.json` -> `C:\Thornswood-Bot`, readable by SYSTEM and
+     Administrators only
+   - `bot\joins.json` -> `C:\Thornswood-Bot\joins.json`, before the bot
+     starts, or the join cards start counting again
+   - `web\Caddyfile` -> `C:\Thornswood-Caddy\Caddyfile`
+4. **The rest comes from the repository and Patrick's machine, not from the
+   backup**, steps 14 to 25 there: `.\scripts\deploy\Deploy-Docs.ps1` (never
    `-SeedDocs`, which would flatten the restored documents),
-   `.\scripts\deploy\Install-Bot.ps1 -CodeOnly` and `.\scripts\deploy\Install-Voice.ps1`.
-   `gamemode.js` is in the backup to be read, not to be the thing you run.
-   The dev server's world and private folder are in the backup since issue
-   #401 (step 4); the dev voice folder is not, and
-   `.\scripts\deploy\Deploy-DevGamemode.ps1` puts the dev gamemode back.
-6. **Secrets that are not in there.** The Discord bot token, the client secret and the site keys are in the config files above, so
-   they do come back. What does not is anything that was only ever in a config
-   on the old box and not in one of those. Check `NOTES.txt` in the backup for
-   what was running.
-7. **Start the game server first, alone**, and watch `thornswood.log` until a
+   `.\scripts\deploy\Install-Bot.ps1 -NoToken` (the whole install: `-CodeOnly`
+   on a new box has no Python libraries and no task to restart), the feed's
+   downloads with `.\scripts\deploy\Remirror-Site-Feed.ps1`, the installer with
+   `.\scripts\release\Publish-Installer.ps1`, the name and Caddy with
+   `.\scripts\deploy\Setup-Domain.ps1`, then the watchers. `gamemode.js` is in
+   the backup to be read, not to be the thing you run; Restore-Box says when
+   the one installed differs from it. A backup from before 29 September has
+   no uploads and no feed store: the gallery's pictures are then gone, and
+   each feed goes back from Patrick's working copy by handing
+   `Remirror-Site-Feed.ps1 -FeedDir` a new folder holding only a copy of the
+   `version.json` in `%LOCALAPPDATA%\Thornswood\feed\main` (or `dev`, with
+   `-Dev`), which it sends as a feed it never received.
+5. **Secrets that are not in there.** The Discord bot token, the client
+   secret and the site keys are in the config files above, so they do come
+   back. The watchdog's webhook does not: `Watch-Services.ps1 -SetWebhook`
+   asks for it. Nor does anything that was only ever in a config on the old
+   box and not in one of those; check `NOTES.txt` in the backup for what was
+   running.
+6. **Start the game server first, alone**, and watch `thornswood.log` until a
    character connects properly. Then the rest.
-8. **Tell people.** Anything they did after the backup was taken is gone, and
+7. **Tell people.** Anything they did after the backup was taken is gone, and
    they should hear that from us rather than notice it.
 
 ## Rehearsing it

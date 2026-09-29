@@ -14,6 +14,10 @@
     data                  the door's own records and the online count
     server-settings.json  the port, the name, the load order
     gamemode.js           so a restore is a working server and not a puzzle
+    the site's uploads    the gallery's pictures and what staff put up; over
+                          300 MB, only its files of 10 MB or less
+    the feed's store      each channel's version.json, published.json,
+                          launchers.txt, releases.txt and history, not assets
     the site's data       linked Discord accounts, the boards, the documents
     the bot's config      bot.env.json, and the voice service's choices.json
     the bot's join record joins.json, which arrival each person was
@@ -66,6 +70,8 @@ param(
   [int]$KeepWeekly    = 4,
   # Per file. The installer is the only thing that goes near it.
   [int]$MaxFileMB     = 200,
+  # The site's uploads folder, whole, up to this; see where it is taken.
+  [int]$MaxUploadsMB  = 300,
   # Take the copy but do not encrypt it. For working out what is wrong, never
   # for a backup that is kept.
   [switch]$Plain
@@ -175,6 +181,32 @@ foreach ($sv in $servers) {
 }
 Grab (Join-Path $SiteRoot 'data')                 'site\data'
 Grab (Join-Path $SiteRoot 'config.json')          'site\config.json'
+# Issue #454: a restore onto a new box came back without these. uploads is
+# the gallery's pictures and everything staff put up through the site, which
+# gallery.json in data only names. The feed's store is each channel's
+# version.json, the baseline the next Ship compares against, the launcher and
+# release lists and their history (#907), which live nowhere else since the
+# releases repository went. Not the feed's assets: they are every release's
+# downloads, and Remirror-Site-Feed.ps1 sends them again from the machine that
+# shipped them.
+# The site takes recordings of up to 100 MB there, so it has a budget: over
+# it, the pictures and anything else of 10 MB or less are taken and the big
+# files are named in the log, rather than one night's backup growing past what
+# this box can encrypt in memory.
+$up = Join-Path $SiteRoot 'uploads'
+$upFiles = @(Get-ChildItem -LiteralPath $up -Recurse -File -EA SilentlyContinue)
+$upMB = [math]::Round((($upFiles | Measure-Object Length -Sum).Sum) / 1MB, 1)
+if (-not (Test-Path -LiteralPath $up) -or $upMB -le $MaxUploadsMB) { Grab $up 'site\uploads' }
+else {
+  $small = @($upFiles | Where-Object { $_.Length -le 10MB })
+  foreach ($f in $small) { Grab $f.FullName ('site\uploads\' + $f.FullName.Substring($up.Length).TrimStart('\')) }
+  Note ("  site\uploads is {0} MB, over {1}: took the {2} file(s) of 10 MB or less, left out {3} bigger" -f $upMB, $MaxUploadsMB, $small.Count, ($upFiles.Count - $small.Count))
+}
+foreach ($feed in 'feed', 'feed-dev') {
+  foreach ($n in 'version.json', 'published.json', 'launchers.txt', 'releases.txt', 'history') {
+    Grab (Join-Path $SiteRoot "$feed\$n")         "site\$feed\$n"
+  }
+}
 # bot.env.json, not config.json. The first nightly run reported the bot config
 # missing because this asked for a name the bot has never used.
 Grab (Join-Path $BotRoot  'bot.env.json')         'bot\bot.env.json'

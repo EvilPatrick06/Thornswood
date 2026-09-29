@@ -178,14 +178,17 @@ it through the webhook in `alerts-webhook.txt` beside it
 
 What the backup takes: the live server's `world`, `private`, `data`,
 `server-settings.json` and `gamemode.js`, and the same five from
-`C:\Thornswood-Server-Dev` under `game-dev` (issue #401); the site's data; the
+`C:\Thornswood-Server-Dev` under `game-dev` (issue #401); the site's data,
+config, uploads and each feed's store but not its downloads (issue #454); the
 bot's config and join record; the voice service's `choices.json`; the
 Caddyfile. Encrypted, seven daily and four weekly kept
-(`vps-nightly-backup.ps1:8-51`). It takes nothing from
+(`vps-nightly-backup.ps1:8-55`). It takes nothing from
 `C:\Thornswood-Voice-Dev`. The copy off the box is pulled to Patrick's machine
 over ssh by the `Thornswood Fetch Backups` task there (`Fetch-Backups.ps1
 -Schedule`), never served over HTTPS; `Restore-Server.ps1` puts one back into
-a server folder, and `tests\test-backup-restore.ps1` proves the round trip.
+a server folder, `Restore-Box.ps1` puts all of it onto a new box, and
+`tests\test-backup-restore.ps1` and `tests\test-new-box-runbook.ps1` prove the
+round trip.
 
 ## How the pieces talk
 
