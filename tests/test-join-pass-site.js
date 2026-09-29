@@ -58,7 +58,7 @@ const HELPERS = [
   // What a refusal for want of a role says, alpha or open (#428).
   grab('function notAcceptedYet('),
   // One character banned by itself, or killed for good by staff (#1010).
-  grab('function banActive('), grab('function characterBar('), grab('function banUntilText('),
+  grab('function banActive('), grab('function pkActive('), grab('function characterBar('), grab('function banUntilText('),
   grab('function accountBanned(')
 ];
 yes('the pass helpers are in server.js where this expects them', HELPERS.every(function (h) { return h.length > 10; }));

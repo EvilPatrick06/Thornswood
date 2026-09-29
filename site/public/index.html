@@ -837,7 +837,7 @@ function drawLinked() {
           (u.played ? new Date(u.played).toLocaleString() : 'never') + '</div></td>' +
       '</tr>' +
       '<tr class="notesrow"><td colspan="5" data-label="Notes"><div class="cell">' +
-        linkedNotes(u, S.records, Date.now()) + linkedControls(u, S.records, Date.now()) +
+        linkedNotes(u, S.records, Date.now()) + linkedControls(u, S.records, Date.now(), !!S.me.admin) +
       '</div></td></tr>';
     });
     out += '</tbody></table></div>';
@@ -851,7 +851,10 @@ function drawLinked() {
     'worlds, and stops it making new ones, until it ends. <b>Ban character</b> (/ban) keeps that ' +
     'one character out and leaves the rest. <b>PK</b> (/pk) kills a character for good: it can ' +
     'never be played or picked again, it is kept here for staff, the account can make a new ' +
-    'character, and nobody but its owner is told. Anybody banned or dead for good who is in the ' +
+    'character, and nobody but its owner is told. <b>Undo PK</b> (/unpk) is for a PK made by ' +
+    'mistake and only an admin can use it: the character comes back into a free slot on its ' +
+    'account, or stays dead while every slot is taken, and the PK stays on its record with the ' +
+    'undo beside it. Anybody banned or dead for good who is in the ' +
     'world has their session ended. The <b>Banned</b> role in Discord still works too, for good. ' +
     'Notes are for staff and nobody else sees them.</p>';
   el('page').innerHTML = out;
@@ -889,7 +892,13 @@ function charLine(pid, rec, now) {
     ' <span class="said">profile ' + esc(pid) + '</span> ';
   var pk = (rec.pk || {})[String(pid)];
   var b = (rec.bans || {})['p:' + pid];
-  if (pk) {
+  // Every earlier PK an admin undid, oldest first, then the row itself (#1010).
+  var past = pk ? (pk.history || []).concat(pk.undone ? [pk] : []) : [];
+  var was = past.map(function (h) {
+    return '<div class="said">PK ' + esc(h.why || '') + byLine(h) + (h.undone
+      ? ', undone by an admin: ' + esc(h.undone.why || '') + byLine(h.undone) : '') + '</div>';
+  }).join('');
+  if (pk && !pk.undone) {
     out += '<span class="pill fail">Dead for good (PK)</span> ' + esc(pk.why || '') + byLine(pk);
   } else if (b && b.active) {
     out += '<span class="pill fail">Character banned ' + esc(banUntil(b)) + '</span> ' +
@@ -897,7 +906,7 @@ function charLine(pid, rec, now) {
   } else if (b) {
     out += '<span class="said">A character ban ' + esc(banUntil(b)) + ' has ended: ' + esc(b.why || '') + '</span>';
   }
-  return out + '</div>';
+  return out + was + '</div>';
 }
 
 /* The Notes line under one account (#412, #1010): the account's ban if there
@@ -937,8 +946,9 @@ function lengthPick(key) {
 }
 
 /* A note and the account's ban for one account, then for each of its
-   characters a ban of its own and PK (#1010). */
-function linkedControls(u, rec, now) {
+   characters a ban of its own and PK (#1010). A dead character offers Undo
+   PK to an admin and says so to the other staff roles (29 September). */
+function linkedControls(u, rec, now, admin) {
   rec = rec || {};
   var raw = String(u && u.id || '');
   var id = esc(raw);
@@ -956,7 +966,15 @@ function linkedControls(u, rec, now) {
     var name = charName(pid, rec) || ('profile ' + pid);
     var pk = (rec.pk || {})[String(pid)];
     var cb = (rec.bans || {})['p:' + pid];
-    if (pk) return;
+    if (pk && !pk.undone) {
+      out += '<div class="bar notesbar charbar"><span class="said">' + esc(name) + ' is dead for good.</span>' +
+        (admin
+          ? '<input class="unpkwhy" data-id="' + key + '" placeholder="Why the PK is undone">' +
+            '<button class="btn small" data-act="unpk" data-id="' + id + '" data-pid="' + esc(pid) + '" data-name="' + esc(name) + '">Undo PK</button>'
+          : ' <span class="said">Only an admin can undo a PK.</span>') +
+        '</div>';
+      return;
+    }
     out += '<div class="bar notesbar charbar"><span class="said">' + esc(name) + '</span>' +
       lengthPick(key) +
       '<input class="banwhy" data-id="' + key + '" placeholder="Why, for a ban or a PK">' +
@@ -987,7 +1005,8 @@ function looseBans(rec, now, linked) {
 /* Every character dead for good, newest first, so staff can find them for an event. */
 function deadList(rec) {
   var pk = (rec || {}).pk || {};
-  var keys = Object.keys(pk).sort(function (a, b) { return (Number(pk[b].at) || 0) - (Number(pk[a].at) || 0); });
+  var keys = Object.keys(pk).filter(function (k) { return pk[k] && !pk[k].undone; })
+    .sort(function (a, b) { return (Number(pk[b].at) || 0) - (Number(pk[a].at) || 0); });
   var out = '';
   keys.forEach(function (k) {
     var r = pk[k] || {};
@@ -1024,14 +1043,28 @@ function wireLinked() {
         bodyOf.why = (pick('banwhy', key) || {}).value || '';
         if (!bodyOf.why.trim()) { alert('Say why the character dies.'); return; }
         if (!confirm('PK ' + (this.getAttribute('data-name') || 'this character') + '? It dies for good and ' +
-                     'can never be played again. It is kept for staff, and it cannot be undone here.')) return;
+                     'can never be played again. It is kept for staff, and only an admin can undo it.')) return;
+      }
+      if (act === 'unpk') {
+        bodyOf.why = (pick('unpkwhy', key) || {}).value || '';
+        if (!bodyOf.why.trim()) { alert('Say why the PK is undone.'); return; }
+        if (!confirm('Undo the PK of ' + (this.getAttribute('data-name') || 'this character') + '? It can be ' +
+                     'played again from a free slot on its account. The PK stays on its record.')) return;
       }
       if (act === 'note' && !bodyOf.text.trim()) return;
+      // The site's own sentence when it has one: Undo PK says why it did not.
+      var said = '';
       api('/api/staff/' + act, { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify(bodyOf) })
-        .then(function (r) { if (!r.ok) throw 0; return refresh(); })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            said = (j && j.message) || '';
+            if (!r.ok) throw 0;
+            return refresh();
+          });
+        })
         .then(function () { drawLinked(); })
-        .catch(function () { alert('The site did not take that.'); });
+        .catch(function () { alert(said || 'The site did not take that.'); });
     };
   }
 }

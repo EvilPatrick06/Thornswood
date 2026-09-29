@@ -184,13 +184,15 @@ try:
     dids = ['kick', 'freeze', 'unfreeze', 'bring', 'goto', 'silence', 'unsilence', 'warn',
             'give', 'spawn', 'tp', 'ban', 'unban', 'note',
             # One character or the whole account, and PK (#1010).
-            'banaccount', 'unbanaccount', 'pk']
+            'banaccount', 'unbanaccount', 'pk',
+            # An admin undoing a PK made by mistake (#1010, 29 September).
+            'unpk']
     yes('M8 every action the staff block records has a sentence here',
         all(("record('%s'" % d) in gm and d in bot._MOD_DID for d in dids))
     site = open(os.path.join(HERE, '..', 'site', 'server.js'), encoding='utf-8').read()
     yes('M8 and so does every one the hub writes',
         all(("modLog({ did: '%s'" % d) in site and d in bot._MOD_DID
-            for d in ('ban', 'unban', 'note', 'banaccount', 'unbanaccount', 'pk')))
+            for d in ('ban', 'unban', 'note', 'banaccount', 'unbanaccount', 'pk', 'unpk')))
 
     # M10: the hub's lines say the site, and name a person by account.
     hub = bot.moderation_text('site', {'did': 'banaccount', 'byName': 'Aela', 'whoName': 'Bjorn',
@@ -206,6 +208,11 @@ try:
     yes('M10 a PK says the character died for good, and why',
         pk == '**Staff on the dev server:** Aela (profile 1001) killed Bjorn (profile 2002) for good (PK), '
               'quietly: died in the siege')
+    unpk = bot.moderation_text('site', {'did': 'unpk', 'byName': 'Aela', 'who': 2003,
+                                        'whoName': 'Hrefna (Bjorn)', 'why': 'made by mistake'})
+    yes('M10 undoing a PK says who undid it, the character, that it can be played again, and why',
+        unpk == '**Staff on the site:** Aela undid the PK of Hrefna (Bjorn) (profile 2003), so the '
+                'character can be played again: made by mistake')
     note = bot.moderation_text('dev', json.loads(row('note', why='asked twice about the bridge')))
     yes('M10 a note says what it says', 'wrote a note on Bjorn (profile 2002): asked twice' in note)
 

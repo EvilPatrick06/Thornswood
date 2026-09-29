@@ -54,11 +54,21 @@ namespace Thornswood
         // picked. Empty when the site said nothing.
         static HashSet<int> dead = new HashSet<int>();
         static HashSet<int> barred = new HashSet<int>();
+        // And the ones an admin brought back from a PK made by mistake (#1010,
+        // 29 September). Only an id the site names here leaves DeadSlot, so a
+        // site that said nothing brings nobody back.
+        static HashSet<int> revived = new HashSet<int>();
 
         /// <summary>True when staff have killed this character for good.</summary>
         public static bool Dead(int profileId)
         {
             lock (gate) { return dead.Contains(profileId); }
+        }
+
+        /// <summary>True when an admin undid this character's PK.</summary>
+        public static bool Revived(int profileId)
+        {
+            lock (gate) { return revived.Contains(profileId) && !dead.Contains(profileId); }
         }
 
         /// <summary>True when staff have banned this character by itself.</summary>
@@ -196,15 +206,18 @@ namespace Thornswood
             HashSet<int> goneNow = ReadGone(text, out goneWhen);
             HashSet<int> deadNow = ReadIds(text, "pk");
             HashSet<int> barredNow = ReadIds(text, "banned");
+            HashSet<int> revivedNow = ReadIds(text, "revived");
             bool goneChanged;
             lock (gate)
             {
                 goneChanged = goneWhen != goneAt || !goneNow.SetEquals(gone) ||
-                              !deadNow.SetEquals(dead) || !barredNow.SetEquals(barred);
+                              !deadNow.SetEquals(dead) || !barredNow.SetEquals(barred) ||
+                              !revivedNow.SetEquals(revived);
                 gone = goneNow;
                 goneAt = goneWhen;
                 dead = deadNow;
                 barred = barredNow;
+                revived = revivedNow;
             }
 
             var got = new Dictionary<int, Row>();
