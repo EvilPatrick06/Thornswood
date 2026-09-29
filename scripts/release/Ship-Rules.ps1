@@ -27,6 +27,8 @@
       Test-ShipBethesdaTool $rel   the Creation Kit, its script sources, or a copy of one of the game's programs; never shipped, never recorded, never removed (the launcher drops it)
       Test-ShipBackup $rel         any *.bak; never shipped, never removed
       Test-ShipBethesda $rel       Bethesda's by any of the three rules above (vanilla, Creation Kit, left alone); never packed, recorded or on the site
+      Test-ShipOneMachine $rel     one machine's own by kind (runtime state, logs, session and token files, backups, face exports,
+                                   Vortex's records, window layouts, settings saved from a mod's menu, saves); never packed, recorded or on the site
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
       Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
@@ -669,6 +671,105 @@ function Test-ShipBethesda([string]$rel) {
     return ((Test-ShipBethesdaTool $rel) -or (Test-ShipVanilla $rel) -or (Test-ShipBethesdaLeftAlone $rel))
 }
 
+# ---------------------------------------------------------------------------
+# ONE MACHINE'S OWN FILES, BY KIND (#1239).
+#
+# A file of the build is the same bytes on every install: a mod's plugin, its
+# meshes, our overlays, the client. A file of one machine is whatever the game,
+# a mod, the launcher, Vortex or a session wrote on the machine that ships,
+# about that machine: who is signed in, what it last played, its screen, its
+# key binds, where its windows sat, what its Vortex deployed. Handed to
+# everybody it is at best dead weight and at worst one person's token or
+# settings on every install.
+#
+# Until this rule the question was a list of names ($ShipMachineFiles), and a
+# name nobody had added went out. MEASURED 29 September over HTTPS, every pack
+# and record both feeds name: the join pass the launcher writes for the game
+# server (Data\Platform\thornswood-pass.txt, #937) was in dev packs
+# 20260928-2131-dev and 20260929-122410-dev and in four dev records, because it
+# arrived after the list did; Data\MCM\Settings\Precision.ini,
+# TrueDirectionalMovement.ini and TrueHUD.ini (the values a person saved in
+# those mods' menus, two of them another server's) were in all five dev
+# records, so a launcher that syncs to the record fetched them; and so were
+# CommunityShaders\SettingsUser.json, two window layout files, the spot
+# marker's output and a hang report. So it is asked by KIND now, and a new
+# file of one of these kinds is caught the day it appears:
+#
+#   - Written at runtime into a folder of its own (Test-ShipRuntime above):
+#     Claude outputs, _to_delete, RaceMenu's face exports and face tints,
+#     .sentry-native.
+#   - The named files in $ShipMachineFiles above: SkyrimPlatform.ini, the
+#     launcher's Thornswood.ini, the display, crash and animation settings the
+#     launcher or the mod writes back.
+#   - Anything straight in Data\Platform. That is where the launcher and the
+#     plugins talk to each other while the game runs: the session note, the
+#     join pass, the voice port, status and token, the character list and the
+#     pick, the load order the game saw, the spots file, the plugins' logs.
+#     Every file the build ships under Data\Platform is in a folder (Plugins,
+#     UI, Modules, Distribution, Fonts, Images); nothing ships straight in it.
+#   - The SkyMP client's saved sign in, Data\Platform\PluginsNoLoad.
+#   - Logs and crash dumps (*.log, *.dmp), anywhere.
+#   - Backups (Test-ShipBackup, *.bak) and Vortex's own records: its
+#     deployment manifests, the *.vortex_backup files it moved aside and the
+#     __folder_managed_by_vortex markers. They describe THIS Skyrim, and
+#     handing them to somebody else's Vortex is how it loses track of its own
+#     deployment; pack-20260916-1217 carried a 6 MB vortex.deployment.json.
+#   - Window layouts Dear ImGui writes on exit, imgui.ini and <mod>_ImGui.ini:
+#     where each window sat on that screen.
+#   - What a person saved from a mod's own menu: Data\MCM\Settings (MCM Helper
+#     writes a mod's ini there the first time somebody changes a value; the
+#     mod's own defaults are in Data\MCM\Config and ship), and Community
+#     Shaders' SettingsUser.json and SettingsTest.json (its defaults,
+#     SettingsDefault.json, are the same on every install and stay).
+#   - Saves and profiles: a Saves folder, *.ess and *.skse, and a Profile or
+#     My Games folder at the top of the game folder.
+#   - ShaderCache, anywhere: rebuilt by the game on first launch for that GPU.
+#
+# NOT one machine's, and never caught here: the six client files in
+# client-build.json (ours by recorded bytes), a mod's own settings file that
+# ships in its archive (TrueHUD\RP_Bosses.ini, SkyHUD's skyhud.txt), and
+# SkyUI's config.shipped.txt, which is the launcher's copy of the settings the
+# build ships.
+#
+# Never packed, never in a record (as a file or as gone), and never on the site:
+# Publish-Update's scan and the installer's leave them out through
+# Test-ShipMachine, which asks this; Publish-Update's record guard and
+# Rollback-Feed's filter refuse them; Check-Secrets fails a pack or a stage that
+# carries one; Scrub-Feed.ps1 takes them out of what is already published.
+#
+# NEVER LISTED AS REMOVED, except the runtime folders, which Publish-Update lists
+# as removed when a baseline once had them (see $ShipRuntimeDirs), and the
+# paths on $ShipDeleteAlways below, which every pack deletes on purpose. A
+# delete reaches every install, and every one of these is that person's own file
+# on theirs: their key binds, their Vortex, their face.
+$ShipOneMachineFiles = @(
+    'Data\SKSE\Plugins\CommunityShaders\SettingsUser.json',
+    'Data\SKSE\Plugins\CommunityShaders\SettingsTest.json'
+)
+
+function Test-ShipOneMachine([string]$rel) {
+    if (-not $rel) { return $false }
+    if ($ShipClientFiles.Contains($rel)) { return $false }
+    if (Test-ShipRuntime $rel) { return $true }
+    foreach ($f in $ShipMachineFiles) { if ($rel -ieq $f) { return $true } }
+    foreach ($f in $ShipOneMachineFiles) { if ($rel -ieq $f) { return $true } }
+    $parts = $rel -split '\\'
+    $leaf = $parts[$parts.Count - 1]
+    if ($parts.Count -eq 3 -and $parts[0] -ieq 'Data' -and $parts[1] -ieq 'Platform' -and $leaf) { return $true }
+    if ($rel.StartsWith('Data\Platform\PluginsNoLoad\', 'OrdinalIgnoreCase')) { return $true }
+    if ($leaf -match '\.(log|dmp)$') { return $true }
+    if (Test-ShipBackup $rel) { return $true }
+    if ($leaf -ieq 'vortex.deployment.json' -or $leaf -like 'vortex.deployment.*.json') { return $true }
+    if ($leaf -ieq '__folder_managed_by_vortex') { return $true }
+    if ($leaf -like '*.vortex_backup') { return $true }
+    if ($leaf -ieq 'imgui.ini' -or $leaf -like '*_ImGui.ini') { return $true }
+    if ($rel.StartsWith('Data\MCM\Settings\', 'OrdinalIgnoreCase')) { return $true }
+    if ($leaf -match '\.(ess|skse)$') { return $true }
+    if ($rel -match '(^|\\)(Saves|ShaderCache)\\') { return $true }
+    if ($rel -match '^(Profile|My Games)\\') { return $true }
+    return $false
+}
+
 # One machine's own, never shipped and never listed as removed. Other servers'
 # files count as the machine's here, so a release never strips another
 # server's install off a tester.
@@ -685,20 +786,10 @@ function Test-ShipMachine([string]$rel) {
     if (Test-ShipVanilla $rel) { return $true }
     if (Test-ShipForeignFramework $rel) { return $true }
     if (Test-ShipBethesdaLeftAlone $rel) { return $true }
-    foreach ($f in $ShipMachineFiles) {
-        if ($rel -eq $f) { return $true }
-    }
-    # Vortex's own bookkeeping. The deployment manifests record what Vortex
-    # put into THIS Skyrim, the .vortex_backup files are what it moved aside
-    # here, and the __folder_managed_by_vortex markers are its claim on a
-    # folder. Handing somebody else's copy to their Vortex is how it loses
-    # track of its own deployment; pack-20260916-1217 carried a 6 MB
-    # vortex.deployment.json for exactly that reason.
-    $leaf = Split-Path $rel -Leaf
-    if ($leaf -eq 'vortex.deployment.json') { return $true }
-    if ($leaf -eq 'vortex.deployment.dinput.json') { return $true }
-    if ($leaf -eq '__folder_managed_by_vortex') { return $true }
-    if ($leaf -like '*.vortex_backup') { return $true }
+    # One machine's own by kind (#1239), the named files and Vortex's records
+    # among them. The runtime folders are the one kind left to Test-ShipRuntime,
+    # which lists them as removed when a baseline once had them.
+    if ((Test-ShipOneMachine $rel) -and -not (Test-ShipRuntime $rel)) { return $true }
     return $false
 }
 
@@ -854,11 +945,14 @@ $ShipDeleteAlways = @(
     # one of those nine. Harmless to a working machine, because the launcher
     # writes a fresh token at Play and the update is applied before that.
     #
-    # THE PUBLISHED PACKS ARE DELIBERATELY LEFT ALONE. Rewriting a release
-    # asset changes its sha256, and version.json records that hash for every
-    # pack: a launcher that took the old one would fail its checksum and stop.
-    # Breaking the feed to remove an expired token is a worse trade than
-    # leaving nine dead tokens in nine old zips.
+    # THE PUBLISHED PACKS NO LONGER CARRY THEM (#1239). This note used to say
+    # the nine packs were left alone because rewriting one changes its sha256.
+    # That stopped being a reason once Scrub-Feed.ps1 rewrote a pack and its
+    # feed entry together: a launcher matches packs by id in applied.txt and
+    # never fetches one it applied again, and one replaying every pack reads
+    # the new sha256 from the same feed. Scrub-Feed takes every file
+    # Test-ShipOneMachine names out of the packs and records on the site, the
+    # tokens with them, and keeps this line in every delete list.
     'Data\Platform\voice-token.txt',
 
     # THE RETIRED DRESSER, To Do List entry 127. It put the best armour it
