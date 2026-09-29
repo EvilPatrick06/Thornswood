@@ -159,6 +159,11 @@
     '#ts-select .line .place{font-size:40px;color:#f6e9c8;line-height:1.15}',
     '#ts-select .line .why{font-size:16px;line-height:1.55;color:rgba(228,217,191,.72);margin:14px auto 0;max-width:680px}',
     '#ts-select.waiting .line{display:block}',
+    // Join now shows only when it is their turn (Patrick, 29 Sep: nothing to do while waiting,
+    // only at their turn, and a minute to do it).
+    '#ts-select .line .turnrow{display:none;justify-content:center;margin-top:20px}',
+    '#ts-select.turn .line .turnrow{display:flex}',
+    '#ts-select .line .turn{font-size:20px;padding:10px 30px}',
     '#ts-select.waiting .list,#ts-select.waiting .hint{display:none}',
     // Well below the hint and centred, so it is nowhere near the characters.
     '#ts-select .quitrow{display:flex;justify-content:center;margin-top:18px}',
@@ -256,7 +261,8 @@
       '<div class="head"><div><div class="eyebrow">Thornswood</div><div class="title">Who are you today?</div></div>' +
       '<div class="count"></div></div>' +
       '<div class="list"></div>' +
-      '<div class="line"><div class="place"></div><div class="why"></div></div>' +
+      '<div class="line"><div class="place"></div><div class="why"></div>' +
+        '<div class="turnrow"><button class="btn2 turn" type="button">Join now</button></div></div>' +
       '<div class="foot"><div class="status"></div>' +
       '<div class="hint">Click a character to play. Click an empty slot for a new character. Delete forgets the one that is lit.</div>' +
       /*
@@ -767,8 +773,42 @@
   var elPlace = root.querySelector('.line .place');
   var elWhy = root.querySelector('.line .why');
   var elTitle = root.querySelector('.title');
-  var KEEP_OPEN = 'Keep the game open: you will join by yourself when a seat frees and it is your turn. ' +
-                  'Closing the game gives up your place.';
+  var KEEP_OPEN = 'You do not need to do anything while you wait: just keep the game open. ' +
+                  'When it is your turn, press Join now within a minute. Closing the game gives up your place.';
+  var elTurn = root.querySelector('.line .turn');
+  var turnUntil = 0, turnTimer = 0;
+  function turnOff() {
+    turnUntil = 0;
+    if (turnTimer) { clearInterval(turnTimer); turnTimer = 0; }
+    if (waiting) root.className = 'waiting';
+  }
+  /* Their turn: Join now, with the seconds the server holds the seat. */
+  function turn(secs) {
+    var until = Date.now() + Math.max(0, Number(secs) || 60) * 1000;
+    if (!turnUntil || until < turnUntil) turnUntil = until;   // the server's clock wins
+    root.className = 'waiting turn';
+    elPlace.textContent = 'It is your turn';
+    function tick() {
+      var left = Math.ceil((turnUntil - Date.now()) / 1000);
+      if (left <= 0) {
+        turnOff();
+        elPlace.textContent = 'Your turn passed';
+        elWhy.textContent = 'The seat went to the next in line, and you are back at the end of the line. ' + KEEP_OPEN;
+        tell('line: turn passed');
+        return;
+      }
+      elWhy.textContent = 'A seat is yours for ' + left + (left === 1 ? ' second' : ' seconds') +
+                          '. Press Join now, or it goes to the next in line.';
+    }
+    tick();
+    if (!turnTimer) turnTimer = setInterval(tick, 1000);
+  }
+  if (elTurn) elTurn.addEventListener('click', function () {
+    if (!turnUntil) return;
+    turnOff();
+    tell('line: joined on our turn');
+    go();
+  });
   /* What the line says, from the front (finding, launcher) or the server (place, pass). */
   function lineSays(what) {
     what = what || {};
@@ -782,8 +822,14 @@
     }
     if (Number(what.id) > 0 && !picked) picked = Number(what.id);
     if (Number(what.place) > 0) {
-      elPlace.textContent = 'You are ' + ordinal(Number(what.place)) + ' in line';
-      elWhy.textContent = (Number(what.of) > 1 ? Number(what.of) + ' people are waiting. ' : '') + KEEP_OPEN;
+      if (turnUntil) turnOff();   // back in line: the turn is over
+      // Place against how many are waiting, both from the server, redrawn
+      // each time either moves (Patrick, 29 Sep: the place against the
+      // number in line, updated live).
+      var of = Math.max(Number(what.of) || 0, Number(what.place));
+      elPlace.textContent = 'You are ' + ordinal(Number(what.place)) + ' of ' + of + ' in line';
+      elWhy.textContent = (of === 1 ? 'Nobody is ahead of you. ' :
+                           (Number(what.place) - 1) + ' ahead of you, ' + (of - Number(what.place)) + ' behind. ') + KEEP_OPEN;
     } else if (what.pass) {
       elPlace.textContent = 'Waiting for your place in line';
       elWhy.textContent = 'The launcher is still vouching for this character. Keep the launcher and the game open.';
@@ -798,7 +844,7 @@
   /* The server's word, over the relay: a place, or that it is their turn. */
   function onRelay(msg) {
     if (!msg || msg.t !== 'line' || !waiting || cleared) return;
-    if (msg.go) { tell('line: our turn'); go(); return; }
+    if (msg.go) { if (!turnUntil) tell('line: our turn'); turn(msg.secs); return; }
     lineSays(msg);
   }
   var hooked = false;
