@@ -311,6 +311,11 @@ function points(actor) { const s = srv.C.stateOf(actor); return (s.spells && s.s
   yes('E  and it counts as the Advanced spell below an Expert one',
       P.tomeMissing(st, { name: 'Icy Spear', school: 'destruction', rank: 'expert' })
         .filter(function (m) { return m.what === 'below'; }).length === 0);
+  srv.logs.length = 0;
+  srv.C.grantKnown(M);
+  yes('E  and putting known spells back at a spawn skips it rather than looking for it in SPELL_IDS',
+      srv.logs.some(function (l) { return /Flames/.test(l); }) &&
+      !srv.logs.some(function (l) { return /Firehand/.test(l); }));
 
   const b2 = srv.read(M, 't-houndmaster:Odin.esp');
   const l2 = (srv.chat(M)[0] || {}).text || '';

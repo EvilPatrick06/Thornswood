@@ -35026,8 +35026,14 @@ log('gamemode loaded:',
   function grantKnown(actorId) {
     var s = stateOf(actorId);
     var known = (s.spells && s.spells.known) || [];
+    // A spell a tome taught that the book does not list (#1026) has no name
+    // in SPELL_IDS; the engine put it on the character when the tome was read
+    // and keeps it in learnedSpells, so it is skipped here, not logged as
+    // missing on every spawn.
+    var tomes = (s.spells && s.spells.tomes) || {};
     var n = 0;
     for (var i = 0; i < known.length; i++) {
+      if (P.has(tomes, known[i])) { continue; }
       if (grantSpell(actorId, known[i], true)) { n++; }
     }
     if (known.length) {
