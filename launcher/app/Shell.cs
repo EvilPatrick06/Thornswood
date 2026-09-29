@@ -2512,7 +2512,10 @@ namespace Thornswood
                 if (++pingTicks >= 15) { pingTicks = 0; StartPing(); }
 
                 if (!playing) return;
-                if (Checks.GameRunning())
+                // Asks the game processes the last look found whether they are
+                // still up, and lists the machine's processes only when none is
+                // (#978). Same answer as GameRunning, on the same tick.
+                if (Checks.GameStillRunning())
                 {
                     // Who was picked at the game's menu, every tick. One file
                     // read, and nothing when the file says what it said last.
