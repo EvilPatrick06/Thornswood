@@ -7379,5 +7379,41 @@
     say('field of view set to ' + wantedFov);
   }
 
+  /*
+    HOW FAR PEOPLE AND NPCS ARE DRAWN, the same for everybody (#963).
+
+    Patrick, 28 September: lower the draw distance for everyone to one value
+    we set, not left to each person's settings. The launcher writes it into
+    SkyrimPrefs.ini before every Play (Enforce.ActorFade in launcher\app\
+    Enforce.cs, which must say the same number as ACTOR_FADE; the harness
+    tests\test-963-perf-settings.ps1 holds the two together), so the game
+    starts on it. This holds it for the session: the Display menu's Actor
+    Fade slider changes it in memory, and this puts it back. One ini read
+    every five seconds.
+  */
+  const ACTOR_FADE = 10;
+  const ACTOR_FADE_KEY = 'fLODFadeOutMultActors:LOD';
+  let actorFadeAt = 0;
+  let actorFadeSet = 0;
+  let actorFadeFailed = false;
+  sp.on('update', guard('actor fade', () => {
+    const now = Date.now();
+    if (now - actorFadeAt < 5000) { return; }
+    actorFadeAt = now;
+    let cur = NaN;
+    try { cur = Number(sp.Utility.getINIFloat(ACTOR_FADE_KEY)); } catch (e) { return; }
+    if (Math.abs(cur - ACTOR_FADE) < 0.01) { return; }
+    try { sp.Utility.setINIFloat(ACTOR_FADE_KEY, ACTOR_FADE); } catch (e) {
+      if (!actorFadeFailed) { actorFadeFailed = true; log('actor fade: could not set it:', e); }
+      return;
+    }
+    actorFadeSet++;
+    // Said the first few times only: somebody dragging the slider back and
+    // forth is not worth a line every five seconds.
+    if (actorFadeSet <= 3) {
+      log('actor fade was ' + cur + ', put back to ' + ACTOR_FADE + ', the same for everybody');
+    }
+  }));
+
   log('loaded. browser:', typeof sp.browser, 'chat key', CHAT_KEY);
 })();

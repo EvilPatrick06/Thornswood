@@ -339,7 +339,8 @@ Steam closed, does `SteamUpdates.cs:226 Hold()` change that one value. Play is
 never held on it.
 
 **The settings Play writes every time.** Enforce.cs (`SkyrimSoulsRE.ini` and
-`OpenAnimationReplacer.ini`, which those mods rewrite on exit), ThornIni.cs
+`OpenAnimationReplacer.ini`, which those mods rewrite on exit; `SkyrimPlatform.ini`'s
+log level and text window; the actor draw distance in `SkyrimPrefs.ini`), ThornIni.cs
 (`Thornswood.ini` from the template when missing), Mics.cs (the microphone
 name and voice address in `Thornswood.ini`), Display.cs
 (`SSEDisplayTweaks.ini`, `SkyrimPrefs.ini`, SkyUI's `config.txt`), and Keys.cs
@@ -441,7 +442,7 @@ configured at all, which is a developer's own build and never a tester's.
 | 12 | `Shell.cs:3899 Verify.Run` | Under Waiting. Reads the plugin list, the server's manifest and the plugins' bytes. Any problem that would get the person refused: the Mods page opens with a message saying what to do, and Play stops. | nothing |
 | 13 | `Shell.cs:3943 Verify.DeployPersonal` | `<Root>\Your Mods` copied into `Game\Data`, never a plugin. | those files in `Game\Data` |
 | 14 | `Shell.cs:3957 Display.MatchScreen` | Skipped when Lock resolution is ticked. The game's window size and Display Tweaks' resolution follow the screen, then `Shell.cs:3959 Display.ScaleMenus`. | `Game\Data\SKSE\Plugins\SSEDisplayTweaks.ini`, `Profile\MyGames\SkyrimPrefs.ini`, `Game\Data\Interface\skyui\config.txt` and `config.shipped.txt`, each only when it changes |
-| 15 | `Shell.cs:3962 Enforce.Apply` | Settings two mods rewrite on the way out, put back. | `Game\Data\SKSE\Plugins\SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini` |
+| 15 | `Shell.cs:3962 Enforce.Apply` | Settings two mods rewrite on the way out, put back; SkyrimPlatform at its normal log level with no text window; one actor draw distance for everybody (#963). | `Game\Data\SKSE\Plugins\SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`, `SkyrimPlatform.ini`, `Profile\MyGames\SkyrimPrefs.ini` |
 | 16 | `Shell.cs:3969 AutoJoin.Apply` | `AutoJoin.cs:124 Apply()`: the server address and port, and where the client fetches the server's load order, through Hold.Around. SkyMP has no join screen; this file is the whole of joining. | `skymp5-client-settings.txt` when it changes |
 | 17 | `Shell.cs:3978 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
 | 18 | `Shell.cs:3981 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
@@ -468,7 +469,7 @@ box.
 | `Chars.cs:694 Prepare()` | The saves folder Skyrim will see, `Profile\MyGames\Saves`, becomes a junction to `Profile\Characters\saves`. A real folder there with files in it is moved aside whole, never deleted. SkyrimPlatform's scaffolding saves are deleted. | `Profile\Characters\saves`, the junction, maybe `Saves-before-Thornswood-<time>` |
 | `Chars.cs:766 EnsureSpare` | Mints the spare id for New character when there is none. | `Profile\Characters\profiles.txt` |
 | `Chars.cs:769 AutoJoin.SetChooseAtMenu` | `AutoJoin.cs:295 SetChooseAtMenu()`: the id played last and `chooseAtMenu` inside `gameData`, read back, and a throw if the file does not say what was written. | `skymp5-client-settings.txt` |
-| `Chars.cs:772 WriteBrowserBackend` | Which in-game browser SkyrimPlatform uses, then `Chars.cs:773 KeepPlatformLogReadable` stops its log being switched off. Edited, never rewritten, and only when a value changes. | `Game\Data\SKSE\Plugins\SkyrimPlatform.ini` |
+| `Chars.cs:772 WriteBrowserBackend` | Which in-game browser SkyrimPlatform uses (its log level and text window are Enforce's, step 15). Edited, never rewritten, and only when a value changes. | `Game\Data\SKSE\Plugins\SkyrimPlatform.ini` |
 | `Chars.cs:778 Voice.Reconfigure` | Voice fetches a token for that id, when the voice address is https. | `voice-token.txt` in `Game\Data\Platform` and Profile |
 | `Chars.cs:800 TidySlots` | Only on the site's own answer about how many slots this account has. | `profiles.txt` when a slot moves |
 | `Chars.cs:802 WriteCharacters` | Names from the site's roster, then the list the menu draws. Throws when it cannot be written. | `Game\Data\Platform\thornswood-characters.json`, `Game\Data\Platform\UI\thornswood-characters.js` |
