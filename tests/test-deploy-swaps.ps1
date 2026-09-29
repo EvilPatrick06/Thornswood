@@ -35,6 +35,13 @@
   and the old version answering again; and -PutBack puts the previous version
   back and keeps what it took out in .undone.
 
+  And issue #1121, Patrick, 29 Sep: a deploy sends a commit or nothing. Each
+  of Deploy-Docs, Install-Voice, Install-Bot, Deploy-DevGamemode,
+  Deploy-Server and Publish-Server, run with a file it would send changed,
+  staged, or untracked, is refused before it talks to the box, naming the
+  file, with no ssh or scp run at all. And only the newest two .prev folders
+  are kept, not three.
+
   Connects to nothing but 127.0.0.1.
 #>
 [CmdletBinding()]
@@ -56,7 +63,7 @@ function Yes([string]$what, [bool]$cond) {
 function Done {
     Remove-Item -Path function:global:ssh, function:global:scp -ErrorAction SilentlyContinue
     Remove-Variable -Name TsBox -Scope Global -ErrorAction SilentlyContinue
-    Remove-Variable -Name TsScpFail, TsScpCorrupt, TsLastCode, TsRun -Scope Global -ErrorAction SilentlyContinue
+    Remove-Variable -Name TsScpFail, TsScpCorrupt, TsLastCode, TsRun, TsScpCount -Scope Global -ErrorAction SilentlyContinue
     Write-Host ''
     Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
     if ($script:fail) { exit 1 }
@@ -319,6 +326,7 @@ function global:ssh {
 # scp: into the scratch box, failing like the real one when the folder is not
 # there, and failing or arriving different when a test asks it to.
 function global:scp {
+    $global:TsScpCount++
     $all = @($args | ForEach-Object { [string]$_ })
     $src = $all[-2]; $dst = $all[-1]
     $m = [regex]::Match($dst, '^[^@\s]+@[^:\s]+:(.+)$')
@@ -332,11 +340,25 @@ function global:scp {
     $global:LASTEXITCODE = 0
 }
 $global:TsRun = New-Object Collections.Generic.List[string]
+$global:TsScpCount = 0
 Yes 'ssh and scp are the stand-ins here, so nothing can reach a server' (
     (Get-Command ssh).CommandType -eq 'Function' -and (Get-Command scp).CommandType -eq 'Function')
 
 # Runs one of the scripts, from the scratch repository, and says how it ended.
-function Deploy([string]$name, [hashtable]$a) {
+# What the case wrote into the scratch repository is committed first, because
+# a deploy sends a commit or nothing (#1121); -Dirty leaves it uncommitted,
+# for the cases that prove the refusal. A name with a folder in it is under
+# scripts\, the rest under scripts\deploy\.
+function Commit {
+    $eap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & git -C $repo add -A 2>&1 | Out-Null
+        & git -C $repo -c user.name=harness -c user.email=harness@invalid -c commit.gpgsign=false commit -q -m step 2>&1 | Out-Null
+    } finally { $ErrorActionPreference = $eap }
+}
+function Deploy([string]$name, [hashtable]$a, [switch]$Dirty) {
+    if (-not $Dirty) { Commit }
     $global:TsScpFail = ''
     $global:TsScpCorrupt = ''
     if ($a.ContainsKey('ScpFail')) { $global:TsScpFail = $a['ScpFail']; $a.Remove('ScpFail') }
@@ -346,7 +368,9 @@ function Deploy([string]$name, [hashtable]$a) {
     # Kept line by line, so what a script said before it threw is not lost
     # with the assignment the throw cuts short.
     $said = New-Object Collections.Generic.List[string]
-    try { & (Join-Path $repo ('scripts\deploy\' + $name)) @a *>&1 | ForEach-Object { [void]$said.Add("$_") } }
+    $script = Join-Path $repo ('scripts\deploy\' + $name)
+    if ($name.Contains('\')) { $script = Join-Path $repo ('scripts\' + $name) }
+    try { & $script @a *>&1 | ForEach-Object { [void]$said.Add("$_") } }
     catch { $threw = $_.Exception.Message }
     $global:TsScpFail = ''
     $global:TsScpCorrupt = ''
@@ -362,6 +386,8 @@ Copy-Item -LiteralPath $scripts -Destination (Join-Path $repo 'scripts') -Recurs
 # under the out folder it names, inside the scratch repository.
 Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $scripts) 'layout.json') -Destination (Join-Path $repo 'layout.json')
 Put (Join-Path $repo 'scripts\vps\vps.json') '{ "address": "127.0.0.1" }'
+# The artifacts are built under out\, which is ignored, as it is in the repository.
+Put (Join-Path $repo '.gitignore') "out/`n"
 
 $siteJs = @'
 const http = require('http'), fs = require('fs'), path = require('path');
@@ -432,8 +458,8 @@ Site 'docs v0'
 Voice 'voice-v0'
 Bot 'bot v0'
 # The deploys build their artifact out of git (Artifact.ps1, issue #459), so the
-# scratch repository is one, committed once. Every version the cases write
-# after that goes in as an uncommitted edit, which the artifact carries.
+# scratch repository is one, committed once, and every version a case writes
+# after that is committed by Deploy before the deploy runs.
 $eap = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
@@ -461,11 +487,69 @@ function TaskArg([string]$name) {
 }
 
 try {
-    # =========================================================== the site
+    # ============================================ uncommitted is refused (#1121)
+    # Each deploy, with one file it would send left uncommitted: changed,
+    # staged, new, or one of the files it sends beside its artifact. It must
+    # stop before the first ssh or scp, name the file, and leave the box as it
+    # was. Run before anything is set up on the box, so "as it was" is empty.
     $docsRoot = Join-Path $box 'Thornswood-Docs'
     $docsPort = PickPort
     Put (Join-Path $docsRoot 'port.txt') ([string]$docsPort)
     $docs = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $docsRoot; Task = 'Thornswood Test Docs'; Port = $docsPort; Wait = 10 }
+    $null = [IO.Directory]::CreateDirectory((Join-Path $work 'dist'))
+    function Git-Scratch { $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'; try { & git -C $repo @args 2>&1 | Out-Null } finally { $ErrorActionPreference = $eap } }
+    $refusals = @(
+        @{ Name = 'Deploy-Docs.ps1'; File = 'site/public/home.html'; How = 'changed'
+           Args = $docs.Clone() },
+        @{ Name = 'Install-Voice.ps1'; File = 'voice/public/extra.js'; How = 'new'
+           Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
+                     Auth = 'log'; ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 } },
+        @{ Name = 'Install-Voice.ps1'; File = 'scripts/vps/Roll-Log.ps1'; How = 'changed'
+           Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
+                     Auth = 'log'; ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 } },
+        @{ Name = 'Install-Bot.ps1'; File = 'bot/card.py'; How = 'staged'
+           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Bot'); Service = 'ThornswoodTestBot'; CodeOnly = $true; NoPause = $true; Wait = 20 } },
+        @{ Name = 'Deploy-DevGamemode.ps1'; File = 'game/gamemode.js'; How = 'changed'
+           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Server-Dev'); Task = 'Thornswood Test Dev Server'; Dist = (Join-Path $work 'dist'); Wait = 10; Now = $true } },
+        @{ Name = 'Deploy-Server.ps1'; File = 'game/content/Thornswood-Content.esp'; How = 'new'
+           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Server'); Task = 'Thornswood Test Live Server'; Dist = (Join-Path $work 'dist'); Wait = 10 } },
+        @{ Name = 'release\Publish-Server.ps1'; File = 'game/gamemode.js'; How = 'changed'
+           Args = @{ Channel = 'dev'; VpsHost = '127.0.0.1'; VpsUser = 'nobody'; VpsRoot = (Join-Path $box 'Thornswood-Server-Dev'); TaskName = 'Thornswood Test Dev Server'
+                     Dist = (Join-Path $work 'dist'); Zip = (Join-Path $work 'payload.zip'); SkipBuild = $true; NoPause = $true; Wait = 8 } },
+        @{ Name = 'release\Publish-Server.ps1'; File = 'scripts/deploy/Install-ThornswoodServer.ps1'; How = 'changed'
+           Args = @{ Channel = 'dev'; VpsHost = '127.0.0.1'; VpsUser = 'nobody'; VpsRoot = (Join-Path $box 'Thornswood-Server-Dev'); TaskName = 'Thornswood Test Dev Server'
+                     Dist = (Join-Path $work 'dist'); Zip = (Join-Path $work 'payload.zip'); SkipBuild = $true; NoPause = $true; Wait = 8; PutBack = $true } }
+    )
+    foreach ($c in $refusals) {
+        $at = Join-Path $repo ($c.File.Replace('/', '\'))
+        $had = $null
+        if (Test-Path -LiteralPath $at) { $had = [IO.File]::ReadAllBytes($at) }
+        Put $at ('an uncommitted change to ' + $c.File + "`n")
+        if ($c.How -eq 'staged') { Git-Scratch add -- $c.File }
+        $boxBefore = @(Get-ChildItem -LiteralPath $box -Recurse -Force -EA SilentlyContinue | ForEach-Object { $_.FullName }) -join "`n"
+        $sshBefore = $global:TsRun.Count
+        $scpBefore = $global:TsScpCount
+        $r = Deploy $c.Name $c.Args.Clone() -Dirty
+        $failed = $script:fail
+        $label = (Split-Path -Leaf $c.Name) + $(if ($c.Args.ContainsKey('PutBack')) { ' -PutBack' } else { '' })
+        Yes ($label + ': a ' + $c.How + ' ' + $c.File + ' refuses the deploy, naming the file') (
+            (-not $r.Ok) -and $r.Said -match 'Refused' -and $r.Said -match 'not committed' -and $r.Said.Contains($c.File))
+        Yes '  before it talks to the box: no ssh, no scp, nothing on the box changed' (
+            $global:TsRun.Count -eq $sshBefore -and $global:TsScpCount -eq $scpBefore -and
+            (@(Get-ChildItem -LiteralPath $box -Recurse -Force -EA SilentlyContinue | ForEach-Object { $_.FullName }) -join "`n") -eq $boxBefore)
+        if ($script:fail -gt $failed) { Show }
+        if ($c.How -eq 'staged') { Git-Scratch reset -q -- $c.File }
+        if ($null -ne $had) { [IO.File]::WriteAllBytes($at, $had) } else { Remove-Item -LiteralPath $at -Force }
+    }
+    Yes 'and with the files put back the scratch repository is clean again' (
+        -not ((& git -C $repo status --porcelain 2>$null) | Where-Object { $_ }))
+    Yes 'no deploy script takes a switch past the refusal, and Deploy-DevGamemode no longer takes -Gamemode' (
+        -not (@('Deploy-Docs.ps1', 'Install-Voice.ps1', 'Install-Bot.ps1', 'Deploy-DevGamemode.ps1', 'Deploy-Server.ps1') | ForEach-Object {
+            (Get-Command (Join-Path $repo ('scripts\deploy\' + $_))).Parameters.Keys } |
+            Where-Object { $_ -match '^(Gamemode|Force|AllowDirty|Dirty|Edited|AllowEdits|Uncommitted)$' }) -and
+        -not ((Get-Command (Join-Path $repo 'scripts\release\Publish-Server.ps1')).Parameters.Keys | Where-Object { $_ -match '^(Force|AllowDirty|Dirty|Edited|AllowEdits|Uncommitted)$' }))
+
+    # =========================================================== the site
 
     Site 'docs v1'
     $r = Deploy 'Deploy-Docs.ps1' $docs.Clone()
@@ -536,6 +620,21 @@ try {
         (Get (Join-Path $docsRoot 'thornswood-deploy.json')) -eq $v1rec -and
         (Current 'thornswood-docs').name -eq ($v1rec | ConvertFrom-Json).name -and
         (Get (Join-Path $store 'history.log')) -match 'thornswood-docs put back to site-')
+    if ($script:fail -gt $failed) { Show }
+
+    # Two old copies, not three (#1121): three more good deploys leave the
+    # newest two .prev folders, holding the two versions before the last.
+    foreach ($v in 'docs v6', 'docs v7', 'docs v8') {
+        Site $v
+        $r = Deploy 'Deploy-Docs.ps1' $docs.Clone()
+        if (-not $r.Ok) { break }
+        Start-Sleep -Milliseconds 1100
+    }
+    $prev = @(Kept $docsRoot '.prev-*')
+    $failed = $script:fail
+    Yes 'Deploy-Docs: after three more deploys only the newest two .prev folders are kept' (
+        $r.Ok -and (WaitFor { (Http $docsPort '/') -eq 'docs v8' }) -and $prev.Count -eq 2 -and
+        (Get (Join-Path $prev[0] 'server.js')) -match 'docs v6' -and (Get (Join-Path $prev[1] 'server.js')) -match 'docs v7')
     if ($script:fail -gt $failed) { Show }
 
     # ==================================================== the voice service
@@ -662,10 +761,10 @@ try {
         loadOrder = @($devFar + 'Skyrim.esm'); thornswoodServer = 'dev' }) | ConvertTo-Json)
     Put (Join-Path $devRoot 'data\keep.txt') 'the character book'
     Task 'Thornswood Test Dev Server' $node.Source ('"' + $gameStub + '" "' + $devRoot + '"') $devRoot
-    $gm = Join-Path $work 'gamemode.js'
+    $gm = Join-Path $repo 'game\gamemode.js'
     $launcher = Join-Path $work 'launcher'
     $null = [IO.Directory]::CreateDirectory($launcher)
-    $dev = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $devRoot; Task = 'Thornswood Test Dev Server'; Gamemode = $gm
+    $dev = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $devRoot; Task = 'Thornswood Test Dev Server'
               Dist = (Join-Path $work 'dist'); Wait = 10 }
     function DevUp { return ((UdpOwner $devPort) -gt 0) -and ((Listener ($devPort + 1)) -gt 0) }
     Yes 'Deploy-DevGamemode: the stand-in dev server is up' (WaitFor { DevUp })

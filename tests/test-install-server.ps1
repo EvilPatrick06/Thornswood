@@ -35,7 +35,7 @@
     - a payload that does not start is INSTALL ROLLED BACK: the old root back
       as it was, answering again, the new one kept as .failed to read
     - a good one swaps in, carries the world, the roster, the runtime data and
-      the logs across, keeps the old root as .prev and the newest three of them
+      the logs across, keeps the old root as .prev and the newest two of them
     - -PutBack puts the newest .prev back and keeps what it took out
     - a root that cannot be moved because something holds a file in it is
       INSTALL REFUSED, and the old server is started again
@@ -477,7 +477,7 @@ try {
     Yes '  and the old server was started again' ((WaitUp $P) -and ((Owner $P) -ne $running))
     if ($script:fail -gt $failed) { Show }
 
-    # ---- -FreshWorld, and the newest three .prev ---------------------------------
+    # ---- -FreshWorld, and the newest two .prev -----------------------------------
     foreach ($n in 1..4) { Put (Join-Path $box ('Thornswood-Server.prev-20000101-00000' + $n + '\gamemode.js')) '// long ago' }
     $out = Install (Payload -Gamemode '// v4') @('-FreshWorld')
     $failed = $script:fail
@@ -485,8 +485,8 @@ try {
     $prev = @(Beside '.prev-*')
     Yes '  and the old world is kept in the .prev it left' ((Get (Join-Path $prev[-1] 'world\w.txt')) -eq 'every character')
     Yes '  and the roster still came across' ((Get (Join-Path $root 'private\door.json')) -match 'site')
-    Yes '  and only the newest three .prev folders are kept' (
-        $prev.Count -eq 3 -and -not (Test-Path -LiteralPath (Join-Path $box 'Thornswood-Server.prev-20000101-000002')))
+    Yes '  and only the newest two .prev folders are kept, not three (#1121)' (
+        $prev.Count -eq 2 -and -not (Test-Path -LiteralPath (Join-Path $box 'Thornswood-Server.prev-20000101-000003')))
     if ($script:fail -gt $failed) { Show }
 
     # ---- Publish-Server.ps1, whole, against the dev channel's ports ---------------
