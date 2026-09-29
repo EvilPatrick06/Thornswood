@@ -203,6 +203,10 @@ namespace Thornswood
 
         [DataMember] public bool KeepLauncherOpen = false;
 
+        // Said No to setting Steam's Updates setting for Skyrim (ShellSteamUpdates.cs,
+        // #493), so the start does not ask again. The question after a downgrade still does.
+        [DataMember] public bool SteamUpdatesDeclined = false;
+
         // Ticked, the launcher stops matching the game's resolution to the
         // screen when you press Play. For anyone deliberately running the game
         // at something other than what the monitor is set to.
