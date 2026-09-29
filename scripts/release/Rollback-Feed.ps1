@@ -217,12 +217,13 @@ foreach ($pair in @(@('now', $curMap), @($tgtId, $tgtMap))) {
 # them out again, and going forward from one must not list them as gone, since
 # the pack's delete list reaches a Steam copy where they are the person's own.
 # So both records are read without them; the launcher takes them out of its own
-# game folder itself (OwnGame.BethesdaTool).
+# game folder itself (OwnGame.BethesdaTool). Bethesda's is Test-ShipBethesda,
+# the question Check-Secrets asks, MarketplaceTextures.bsa included (#1229).
 $notOurs = 0
 foreach ($m in @($curMap, $tgtMap)) {
     foreach ($k in @($m.Keys)) {
         $p = $(if ($k.StartsWith(':gone:')) { $k.Substring(6) } elseif ($k.StartsWith(':')) { '' } else { $k })
-        if ($p -and ((Test-ShipBethesdaTool $p) -or (Test-ShipBackup $p) -or (Test-ShipVanilla $p))) { $m.Remove($k); $notOurs++ }
+        if ($p -and ((Test-ShipBethesda $p) -or (Test-ShipBackup $p))) { $m.Remove($k); $notOurs++ }
     }
 }
 if ($notOurs) { Say ("  left out {0} record entries naming Bethesda's files or backups; they are never ours to send" -f $notOurs) 'DarkGray' }
