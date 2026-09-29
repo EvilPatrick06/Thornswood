@@ -430,10 +430,25 @@ try {
     if ($script:fail -gt $failed) { Show }
 
     # ---- a good one ----------------------------------------------------------
+    # The site's read on the root's files and on data's, which Deploy-Docs.ps1
+    # puts on the folder going out (issue #1105): carried across by name.
+    foreach ($d in $root, (Join-Path $root 'data')) {
+        $acl = Get-Acl -LiteralPath $d
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-19')), 'Read', 'ObjectInherit', 'NoPropagateInherit', 'Allow')))
+        Set-Acl -LiteralPath $d -AclObject $acl
+    }
     $running = Owner $P
     $v2 = Payload
     $out = Install $v2 @()
     $failed = $script:fail
+    $broadOn = { param($p) @((Get-Acl -LiteralPath $p).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object { @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11') -contains $_.IdentityReference.Value }).Count }
+    Yes '  and no Users rule reaches the root, data, the world or private\door.json (#1105)' (
+        (Get-Acl -LiteralPath $root).AreAccessRulesProtected -and
+        @($root, (Join-Path $root 'data\shipped.txt'), (Join-Path $root 'world\w.txt'), (Join-Path $root 'private\door.json') | Where-Object { (& $broadOn $_) -gt 0 }).Count -eq 0)
+    Yes '  and private takes nothing from the root' ((Get-Acl -LiteralPath (Join-Path $root 'private')).AreAccessRulesProtected)
+    Yes '  and the site''s rules on the root and data came across with it' (
+        @((Get-Acl -LiteralPath $root).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq 'S-1-5-19' }).Count -eq 1 -and
+        @((Get-Acl -LiteralPath (Join-Path $root 'data')).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq 'S-1-5-19' }).Count -eq 1)
     Yes 'a good payload is INSTALL OK' ($out -contains 'INSTALL OK')
     Yes '  and the new gamemode and binary are live, and answering as a new process' (
         (Get (Join-Path $root 'gamemode.js')) -eq '// v2' -and (Get (Join-Path $root 'scam_native.node')) -eq 'binary v2' -and

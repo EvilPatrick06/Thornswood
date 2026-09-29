@@ -218,10 +218,13 @@ typed on a command line or written on this page.
    keep, so without those two it falls back to letting unproven joins in, on
    every address.
 8. **The dev game server and dev voice**, copied from the live ones onto their
-   own ports, tasks and firewall rules:
+   own ports, tasks and firewall rules, with nothing of live's private folder,
+   chat logs or keys, and dev voice starting with auth on, on 127.0.0.1 only
+   (#1082, #1083):
    `.\scripts\vps\Remote.ps1 -File .\scripts\vps\vps-dev-instance.ps1`. Then dev
    voice set the way `https://thornswood.net/voice-dev/health` says it runs
-   (auth on, bind 127.0.0.1 on 29 September):
+   (auth on, bind 127.0.0.1 on 29 September), which is what the dev instance
+   already starts it with:
    `.\scripts\deploy\Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice' -Auth on -Bind 127.0.0.1`.
    The dev server is not started.
 9. **Is it ready for the restore:**
@@ -261,7 +264,10 @@ as docs\RESTORING.md "The box is gone" says.
     `-RunAs 'LOCAL SERVICE'` when step 11 said the site ran as LOCAL SERVICE.
     Never `-SeedDocs`, which flattens every document with the repo copy and
     throws away what people have written. It starts the site on the restored
-    config, so nobody has to link Discord again.
+    config, so nobody has to link Discord again. It also gives the site its
+    read on the servers' logs and the chat logs, so then lock the server and
+    voice folders to their own services (#1105):
+    `.\scripts\vps\Remote.ps1 -File .\scripts\vps\Lock-VpsFolders.ps1`.
 15. **The bot:** `.\scripts\deploy\Install-Bot.ps1 -NoToken`. Python, its
     libraries and the task; the token and the site key are the restored ones,
     so it asks for nothing. The old bot stopped at step 11, so only this one
