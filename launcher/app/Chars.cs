@@ -269,6 +269,32 @@ namespace Thornswood
                    " for good, so the slot is free for a new one: " + string.Join(", ", moved.ToArray()) + ".";
         }
 
+        /// <summary>
+        /// Every row in DeadSlot whose PK an admin undid (#1010, Patrick,
+        /// 29 September) goes back into the lowest free slot, and the file is
+        /// saved when any did. The site undoes a PK only while the account has
+        /// a free slot, and TidySlots brings the row under the allowance after
+        /// this. Only ids the site names as revived move, so a site that did
+        /// not answer brings nobody back. Returns a line for the log, or null.
+        /// </summary>
+        static string RaiseRevived(List<Row> rows)
+        {
+            var moved = new List<string>();
+            foreach (Row r in rows)
+            {
+                if (r.Slot != DeadSlot || r.Id <= 0) continue;
+                bool back = false;
+                try { back = Roster.Revived(r.Id); } catch { back = false; }
+                if (!back) continue;
+                r.Slot = NextSlot(rows);
+                moved.Add("profile " + r.Id + " to slot " + r.Slot);
+            }
+            if (moved.Count == 0) return null;
+            Save(rows);
+            return "An admin undid the PK of " + (moved.Count == 1 ? "a character" : moved.Count + " characters") +
+                   ", so it can be played again: " + string.Join(", ", moved.ToArray()) + ".";
+        }
+
         /// <summary>The rows staff have killed for good that were played here.</summary>
         static List<Row> DeadRows(List<Row> rows)
         {
@@ -882,6 +908,10 @@ namespace Thornswood
             try { Roster.Refresh(cfg); } catch (Exception ex) { Swallow.Note("Chars.Prepare, roster", ex); }
             string buried = null;
             try { buried = BuryDead(rows); } catch (Exception ex) { Swallow.Note("Chars.Prepare, dead", ex); }
+            // And one an admin brought back from a PK made by mistake goes back
+            // into a free slot, before the slots are tidied (#1010).
+            string raised = null;
+            try { raised = RaiseRevived(rows); } catch (Exception ex) { Swallow.Note("Chars.Prepare, revived", ex); }
 
             Row oldSpare = Find(rows, 0);
             int spareBefore = oldSpare != null ? oldSpare.Id : 0;
@@ -948,6 +978,7 @@ namespace Thornswood
             // rides along here rather than being written from this class.
             if (tidied != null) note = (note == null ? "" : note + " ") + tidied;
             if (buried != null) note = (note == null ? "" : note + " ") + buried;
+            if (raised != null) note = (note == null ? "" : note + " ") + raised;
             if (reminted != null) note = (note == null ? "" : note + " ") + reminted;
             return note;
         }

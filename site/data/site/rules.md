@@ -114,6 +114,10 @@ person for good.
 If you go down in the world and nobody agreed to anything, you woke up in a
 temple. That happened. Move on.
 
+**Staff can end a character for good.** They do it for serious rule breaking,
+or in an event its owner agreed to. That character cannot be played again, and
+you can make a new one. Nobody else is told.
+
 ## 3. Fights start freely. What they cost does not
 
 Combat against the world is what the game is for. Go and get killed by a

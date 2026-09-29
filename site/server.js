@@ -1482,8 +1482,16 @@ const BANS = path.join(DATA, 'bans.json');
   characters", it is quiet, and the account can make a new character. So
   nothing here or in the game server deletes anything: the join pass refuses
   the character, the door's lists leave it out, the launcher's menu shows it
-  as dead in no slot, and staff read the row. There is no way to undo one
-  from the site or the game; a mistake is an edit of this file on the VPS.
+  as dead in no slot, and staff read the row.
+
+  UNDONE BY AN ADMIN (Patrick, 29 September: a PK made by mistake can be
+  undone, by the admin role only, from the hub and with the game's /unpk,
+  with a reason). The row is never deleted: undoing it adds "undone" {"at",
+  "by", "byId", "why", "from"}, and a row with "undone" is not a PK any more
+  (pkActive). A later PK of the same character moves the old row into
+  "history" first, so every PK and every undo stays readable. The character
+  comes back only into a free slot: undoPk refuses while every slot on the
+  account holds a living character, and says so.
 */
 const PK = path.join(DATA, 'pk.json');
 // Staff notes against a person, keyed the same way as bans. Staff read them.
@@ -1520,7 +1528,7 @@ function characterBar(pid, now) {
   const n = Number(pid) || 0;
   if (!(n > 0)) return null;
   const pk = jsonFile(PK, {});
-  if (pk && Object.prototype.hasOwnProperty.call(pk, String(n))) {
+  if (pk && pkActive(pk[String(n)])) {
     return { pk: true, at: Number((pk[String(n)] || {}).at) || 0 };
   }
   const byChar = jsonFile(BANS, {});
@@ -1528,9 +1536,14 @@ function characterBar(pid, now) {
   if (banActive(b, now)) return { pk: false, why: String(b.why || ''), until: Number(b.until) || 0 };
   return null;
 }
+/* Whether a pk.json row is a PK that holds: there, and not undone by an admin. */
+function pkActive(row) {
+  return !!row && typeof row === 'object' && !row.undone;
+}
 /* Every profile staff have killed for good, as numbers. */
 function pkProfiles() {
-  return Object.keys(jsonFile(PK, {}) || {}).map(Number).filter((n) => n > 0);
+  const table = jsonFile(PK, {}) || {};
+  return Object.keys(table).filter((k) => pkActive(table[k])).map(Number).filter((n) => n > 0);
 }
 /* A ban's end in words, for the people told about it. */
 function banUntilText(until) {
@@ -1592,11 +1605,122 @@ function modLog(row) {
   try { fs.appendFileSync(MODLOG, JSON.stringify(Object.assign({ at: new Date().toISOString(), server: 'site' }, row)) + '\n'); }
   catch (e) { console.log('[thornswood-docs] could not write moderation.log: ' + e.message); }
 }
-/* A PK, kept for good. */
+/* A PK, kept for good. A row an admin undid goes into the new row's history. */
 function putPk(pid, row) {
   const table = jsonFile(PK, {});
+  const had = table[String(Number(pid))];
+  if (had && typeof had === 'object') {
+    const old = Object.assign({}, had);
+    delete old.history;
+    row = Object.assign({}, row, { history: (Array.isArray(had.history) ? had.history : []).concat([old]) });
+  }
   table[String(Number(pid))] = row;
   return putJson(PK, table);
+}
+/*
+  How many character slots a Discord account has, for bringing a character
+  back (#1010): its standing's, or, when Discord cannot be asked, the roles
+  linked.json kept from its last Play.
+*/
+async function slotsOfAccount(account) {
+  let st = null;
+  try { st = await standingCached(String(account)); } catch (e) { st = null; }
+  if (st && !st.lookupFailed) return slotsFor(st);
+  const roles = (jsonFile(LINKED, {})[String(account)] || {}).roles;
+  const list = Array.isArray(roles) ? roles : [];
+  const has = (names) => (names || []).some((n) => list.indexOf(n) >= 0);
+  return slotsFor({ roles: list, admin: has(cfg.access.admin), dev: has(cfg.access.dev) });
+}
+/*
+  An admin undoes a PK made by mistake (#1010, Patrick, 29 September). The
+  row stays, with "undone" saying who, when and why. The character comes
+  back into a free slot: every other character on the account the game
+  server has a character for, that is not dead for good, holds one, and when
+  they fill the account's slots nothing changes and the answer says so.
+  Answers { status, body } for the route to send.
+*/
+async function undoPk(pid, by, byId, why, from) {
+  const table = jsonFile(PK, {});
+  const row = table[String(pid)];
+  if (!pkActive(row)) return { status: 200, body: { ok: true, was: false } };
+  const account = String(row.account || accountOf(pid) || '');
+  const name = String(row.name || '') || ('profile ' + pid);
+  if (account) {
+    const slots = await slotsOfAccount(account);
+    const who = (jsonFile(ROSTER, { who: {} }) || {}).who || {};
+    const held = ((jsonFile(LINKED, {})[account] || {}).profiles || []).map(Number)
+      .filter((n, i, a) => n > 0 && n !== Number(pid) && a.indexOf(n) === i && who[String(n)] && !pkActive(table[String(n)]));
+    if (held.length >= slots) {
+      return { status: 409, body: { ok: false, error: 'every slot is taken', slots, held: held.length,
+        message: 'Every character slot on that account is taken (' + held.length + ' of ' + slots + '), so ' +
+                 name + ' is still dead for good and nothing changed. Its owner can forget a character in ' +
+                 'the launcher to free a slot, then undo the PK again.' } };
+    }
+  }
+  // Read again after the wait above, so a write in between is not lost.
+  const now = jsonFile(PK, {});
+  const cur = now[String(pid)];
+  if (!pkActive(cur)) return { status: 200, body: { ok: true, was: false } };
+  cur.undone = { at: Date.now(), by, byId, why, from };
+  if (!putJson(PK, now)) return { status: 500, body: { error: 'could not save' } };
+  return { status: 200, body: { ok: true, was: true, name: String(cur.name || ''), account } };
+}
+/*
+  The dead character the game's /unpk names (#1010): o.profileId, exact; or
+  o.personProfileId, somebody in the world, whose account's one dead
+  character it is; or o.words, the start of a dead character's name, or of
+  the name of the account that holds it. Answers { pid, rest } or
+  { message } saying who it could not tell apart.
+*/
+function findDead(o) {
+  const table = jsonFile(PK, {}) || {};
+  const dead = Object.keys(table).filter((k) => pkActive(table[k])).map(Number).filter((n) => n > 0);
+  const linked = jsonFile(LINKED, {});
+  const nameOf = (n) => String((table[String(n)] || {}).name || '') || ('profile ' + n);
+  const listed = (ps) => ps.map((n) => nameOf(n) + ' (profile ' + n + ')').join(', ');
+  const ofAccount = (acc, label) => {
+    const ps = dead.filter((n) => String((table[String(n)] || {}).account || accountOf(n)) === String(acc));
+    if (ps.length === 1) return { pid: ps[0] };
+    if (!ps.length) return { message: label + ' has no character that is dead for good.' };
+    return { message: label + ' has ' + ps.length + ' characters dead for good: ' + listed(ps) +
+                      '. Name the character, or its profile number.' };
+  };
+  const words = (Array.isArray(o.words) ? o.words : []).map((w) => String(w || '').trim()).filter(Boolean).slice(0, 40);
+  const pid = Number(o.profileId) || 0;
+  if (pid > 0) {
+    if (pkActive(table[String(pid)])) return { pid, rest: words };
+    const acc = accountOf(pid);
+    if (!acc) return { message: 'Profile ' + pid + ' is not dead for good.' };
+    const r = ofAccount(acc, 'Profile ' + pid + '\'s account');
+    return r.pid ? { pid: r.pid, rest: words } : r;
+  }
+  const person = Number(o.personProfileId) || 0;
+  if (person > 0) {
+    if (pkActive(table[String(person)])) return { pid: person, rest: words };
+    const acc = accountOf(person);
+    if (!acc) return { message: 'Nobody\'s account holds profile ' + person + '.' };
+    const r = ofAccount(acc, String(o.personName || '').slice(0, 60) || ('Profile ' + person));
+    return r.pid ? { pid: r.pid, rest: words } : r;
+  }
+  for (let n = words.length; n >= 1; n--) {
+    const want = words.slice(0, n).join(' ').toLowerCase();
+    const exact = dead.filter((k) => nameOf(k).toLowerCase() === want);
+    const hits = exact.length ? exact : dead.filter((k) => nameOf(k).toLowerCase().indexOf(want) === 0);
+    if (hits.length === 1) return { pid: hits[0], rest: words.slice(n) };
+    if (hits.length > 1) {
+      return { message: 'More than one character dead for good starts with "' + words.slice(0, n).join(' ') +
+                        '": ' + listed(hits) + '. Name one, or its profile number.' };
+    }
+    const accs = Object.keys(linked).filter((d) => {
+      const u = linked[d] || {};
+      return [u.name, u.handle].some((s) => s && String(s).toLowerCase().indexOf(want) === 0);
+    });
+    if (accs.length === 1) {
+      const r = ofAccount(accs[0], String(linked[accs[0]].name || linked[accs[0]].handle || 'That account'));
+      return r.pid ? { pid: r.pid, rest: words.slice(n) } : r;
+    }
+  }
+  return { message: 'No character dead for good goes by that name. Use its name, its owner\'s name or its profile number.' };
 }
 /*
   Every ban (with whether it still holds), every note and every PK, for staff,
@@ -3385,8 +3509,10 @@ async function handle(req, res) {
     holds has no account to ban, and says so. minutes 0 is for good. pk kills
     the character for good (see PK): it is kept, never played again. Staff
     may do any of these to staff; the game refuses only doing it to yourself.
+    unpk (/unpk) undoes a PK made by mistake, for the admin role only (see
+    PK); the character is found by findDead, and o.why is required.
   */
-  const staffGame = /^(\/dev)?\/api\/staff\/game\/(ban|unban|banaccount|unbanaccount|pk|note)$/.exec(route);
+  const staffGame = /^(\/dev)?\/api\/staff\/game\/(ban|unban|banaccount|unbanaccount|pk|unpk|note)$/.exec(route);
   if (staffGame && req.method === 'POST') {
     if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
     if (!sameSecret(String(req.headers['x-thornswood-key'] || ''), String(cfg.botKey))) {
@@ -3396,8 +3522,28 @@ async function handle(req, res) {
     try { o = JSON.parse(await body(req, 8000)) || {}; }
     catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
     const from = staffGame[1] ? 'the dev server' : 'the live server';
-    const pid = Number(o.profileId) || 0;
     const byPid = Number(o.byProfileId) || 0;
+    if (staffGame[2] === 'unpk' && byPid > 0) {
+      const byIdU = accountOf(byPid);
+      if (!byIdU) return sendJson(res, 403, { error: 'the staff profile is not linked to a Discord account' });
+      const stU = await standingCached(byIdU);
+      if (stU.lookupFailed && !stU.admin) return sendJson(res, 503, { error: 'could not ask Discord' });
+      if (!stU.admin || stU.banned) {
+        return sendJson(res, 403, { error: 'admins only', message: 'Only an admin can undo a PK.' });
+      }
+      const hit = findDead(o);
+      if (!hit.pid) return sendJson(res, 404, { error: 'no such dead character', message: hit.message });
+      const whyU = String(o.why || (hit.rest || []).join(' ')).trim().slice(0, 500);
+      if (!whyU) {
+        return sendJson(res, 400, { error: 'an undo says why',
+          message: 'Say why: /unpk ' + (String((jsonFile(PK, {})[String(hit.pid)] || {}).name || '') || hit.pid) +
+                   ' made by mistake.' });
+      }
+      const byNameU = String(o.byName || stU.name || '').slice(0, 60);
+      const u = await undoPk(hit.pid, byNameU, byIdU, whyU, from);
+      return sendJson(res, u.status, Object.assign({ profileId: hit.pid, why: whyU }, u.body));
+    }
+    const pid = Number(o.profileId) || 0;
     if (!(pid > 0) || !(byPid > 0)) return sendJson(res, 400, { error: 'no profile' });
     const byId = accountOf(byPid);
     if (!byId) return sendJson(res, 403, { error: 'the staff profile is not linked to a Discord account' });
@@ -3449,7 +3595,7 @@ async function handle(req, res) {
       const why = String(o.why || '').trim().slice(0, 500);
       if (!why) return sendJson(res, 400, { error: 'a PK says why' });
       const had = jsonFile(PK, {})[String(pid)];
-      if (had) return sendJson(res, 200, { ok: true, was: true, at: Number(had.at) || 0 });
+      if (pkActive(had)) return sendJson(res, 200, { ok: true, was: true, at: Number(had.at) || 0 });
       if (!putPk(pid, { at: now, by: byName, byId, why, name, account, from })) {
         return sendJson(res, 500, { error: 'could not save' });
       }
@@ -4542,7 +4688,11 @@ async function handle(req, res) {
       if (bar && bar.pk) pk.push(pid);
       else if (bar) barred.push(pid);
     }
-    return sendJson(res, 200, { ok: true, rows, gone, goneAt, pk, banned: barred });
+    /* And the ones an admin brought back from a PK (#1010), so the launcher
+       puts a character it had moved out of its slots back into a free one. */
+    const pkRows = jsonFile(PK, {}) || {};
+    const revived = mine.filter((pid) => pkRows[String(pid)] && !pkActive(pkRows[String(pid)]));
+    return sendJson(res, 200, { ok: true, rows, gone, goneAt, pk, banned: barred, revived });
   }
 
   /*
@@ -4914,9 +5064,13 @@ async function handle(req, res) {
       to their own account: a ban would lock them out of the page that lifts
       it.
     */
-    const staffHub = /^\/api\/staff\/(ban|unban|note|pk)$/.exec(p);
+    const staffHub = /^\/api\/staff\/(ban|unban|note|pk|unpk)$/.exec(p);
     if (staffHub && req.method === 'POST') {
       if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+      // Undoing a PK is the admin role's alone (Patrick, 29 September).
+      if (staffHub[1] === 'unpk' && !w.admin) {
+        return sendJson(res, 403, { error: 'admins only', message: 'Only an admin can undo a PK.' });
+      }
       let o;
       try { o = JSON.parse(await body(req, 8000)) || {}; }
       catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
@@ -4929,7 +5083,7 @@ async function handle(req, res) {
       const act = staffHub[1];
       const pid = Number(o.profileId) || 0;
       if (pid && profiles.indexOf(pid) < 0) return sendJson(res, 404, { error: 'that character is not on this account' });
-      if (act === 'pk' && !pid) return sendJson(res, 400, { error: 'a PK names the character' });
+      if ((act === 'pk' || act === 'unpk') && !pid) return sendJson(res, 400, { error: 'a PK names the character' });
       if ((act === 'ban' || act === 'pk') && String(w.id) === id) {
         return sendJson(res, 400, { error: 'that is your own account' });
       }
@@ -4961,12 +5115,22 @@ async function handle(req, res) {
         const why = String(o.why || '').trim().slice(0, 500);
         if (!why) return sendJson(res, 400, { error: 'a PK says why' });
         const had = jsonFile(PK, {})[String(pid)];
-        if (had) return sendJson(res, 200, { ok: true, was: true, at: Number(had.at) || 0 });
+        if (pkActive(had)) return sendJson(res, 200, { ok: true, was: true, at: Number(had.at) || 0 });
         if (!putPk(pid, { at: now, by: w.name, byId: w.id, why, name: charName, account: id, from: 'the hub' })) {
           return sendJson(res, 500, { error: 'could not save' });
         }
         modLog({ did: 'pk', byName: w.name, whoName: whoChar, who: pid, why });
         return sendJson(res, 200, { ok: true, was: false, at: now });
+      }
+      if (act === 'unpk') {
+        const why = String(o.why || '').trim().slice(0, 500);
+        if (!why) return sendJson(res, 400, { error: 'an undo says why', message: 'Say why the PK is undone.' });
+        const u = await undoPk(pid, w.name, w.id, why, 'the hub');
+        if (u.body.ok && u.body.was) {
+          const deadName = String(u.body.name || '') || charName;
+          modLog({ did: 'unpk', byName: w.name, whoName: deadName ? deadName + ' (' + whoName + ')' : whoName, who: pid, why });
+        }
+        return sendJson(res, u.status, u.body);
       }
       const text = String(o.text || '').trim().slice(0, 1000);
       if (!text) return sendJson(res, 400, { error: 'a note says something' });

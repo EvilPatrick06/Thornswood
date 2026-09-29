@@ -35594,6 +35594,8 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // One character or the whole account, and a character killed
                // for good (#1010).
                '/banaccount', '/unbanaccount', '/pk',
+               // An admin undoing a PK made by mistake (#1010, 29 September).
+               '/unpk',
                /*
                  NOT A COMMAND ANYBODY TYPES. The client reports each fall of
                  the axe with it, because the server sees a press and Skyrim's
@@ -43225,6 +43227,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
                                           on it, and any new one
     /unbanaccount <person>                lifts the ban on the account
     /pk <person> <why>                    the character dies for good (#1010)
+    /unpk <person or character> <why>     an admin undoes a PK made by mistake
     /note <person> <text>                 kept against them, for staff to read
 
   One character or the whole account, and PK, are Patrick's of 28 September
@@ -43232,6 +43235,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   again, it is kept rather than deleted so staff can use it in events, the
   account can make a new character, and it is quiet: only the staff member
   and the person whose character it was are told, nobody else.
+
+  /unpk is Patrick's of 29 September: the admin role only, never the other
+  staff roles, with a reason. The dead character is not in the world, so the
+  site finds it (a profile number, the start of its name, or its owner, by
+  name or in the world). It comes back into a free slot on its account, and
+  when every slot is taken the site says so and nothing changes. The PK
+  stays on the site's record with the undo beside it.
 
   Bans and notes are kept on the site (Patrick, 28 September: "put the bans
   and notes on the site"), through its keyed /api/staff/game routes with the
@@ -43274,8 +43284,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   var WORDS_STAFF = ['/kick', '/freeze', '/unfreeze', '/bring', '/goto',
                      '/silence', '/unsilence', '/warn', '/spawnat',
-                     '/ban', '/unban', '/note', '/banaccount', '/unbanaccount', '/pk'];
-  var BAN_SWEEP_MS = 10000;         // how often online people are checked against bans
+                     '/ban', '/unban', '/note', '/banaccount', '/unbanaccount', '/pk', '/unpk'];
+  var BAN_SWEEP_MS = 10000;        // how often online people are checked against bans
   var SITE_WAIT_MS = 8000;
   // Everybody's (or a playtester's) words that staff can also aim at a person.
   var AIMED = ['/give', '/spawn', '/tp'];
@@ -43303,6 +43313,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   if (!state.ending) { state.ending = {}; }
   // Characters killed for good here (#1010), until the door's list carries them.
   if (!state.pk) { state.pk = {}; }
+  // PKs an admin undid here, so the door's older list does not end them again.
+  if (!state.unpk) { state.unpk = {}; }
   // Bans lifted here, so the door's list, which can carry a lifted ban for up
   // to its five minute refresh, does not end their session again meanwhile.
   if (!state.lifted) { state.lifted = {}; }
@@ -43605,13 +43617,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   // ------------------------------------------------------ bans and notes --
   /*
     One keyed call to the site's /api/staff/game/<what>. done(true, answer)
-    on a 200, done(false, why) for anything else, once. The key goes in a
+    on a 200, done(false, why, answer) for anything else, once; the answer
+    is null when there was none, and its message, when there is one, is a
+    sentence for the staff member (/unpk's). The key goes in a
     header and never the address, like the door's own fetch; door.json names
     the site with /dev on the end on the dev server.
   */
   function siteCall(what, row, done) {
     var once = false;
-    function end(ok, v) { if (!once) { once = true; done(ok, v); } }
+    function end(ok, v, j) { if (!once) { once = true; done(ok, v, j || null); } }
     var conf = null;
     try {
       conf = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'door.json'), 'utf8')
@@ -43637,7 +43651,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           var j = null;
           try { j = JSON.parse(buf); } catch (e) { j = null; }
           if (resp.statusCode === 200 && j && j.ok) { end(true, j); return; }
-          end(false, 'the site answered ' + resp.statusCode + (j && j.error ? ' (' + j.error + ')' : ''));
+          end(false, 'the site answered ' + resp.statusCode + (j && j.error ? ' (' + j.error + ')' : ''), j);
         });
       });
     } catch (e) { end(false, String((e && e.message) || e)); return; }
@@ -43681,13 +43695,22 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     for (var k in state.lifted) {
       if (Object.prototype.hasOwnProperty.call(state.lifted, k) && written > state.lifted[k].at) { delete state.lifted[k]; }
     }
+    // The same for a PK made or undone here: once the list is newer it says
+    // which holds, so a PK an admin undid on the site stops counting here too.
+    for (var p in state.pk) {
+      if (Object.prototype.hasOwnProperty.call(state.pk, p) && written > (Number(state.pk[p].at) || 0)) { delete state.pk[p]; }
+    }
+    for (var u in state.unpk) {
+      if (Object.prototype.hasOwnProperty.call(state.unpk, u) && written > state.unpk[u].at) { delete state.unpk[u]; }
+    }
   }
   /* Every character killed for good (#1010): the door's list and this server's own. */
   function pkNow(now) {
     readDoor(now);
     var out = {};
     for (var i = 0; i < bansRead.pk.length; i++) {
-      if (Number(bansRead.pk[i]) > 0) { out[Number(bansRead.pk[i])] = true; }
+      var d = Number(bansRead.pk[i]);
+      if (d > 0 && !(state.unpk[d] && state.unpk[d].at >= (bansRead.written || 0))) { out[d] = true; }
     }
     for (var k in state.pk) {
       if (Object.prototype.hasOwnProperty.call(state.pk, k)) { out[Number(k)] = true; }
@@ -43866,6 +43889,63 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return true;
   }
 
+  /*
+    /unpk <person or character> <why> (#1010, Patrick, 29 September): an
+    admin undoes a PK made by mistake. The admin role only; the site asks
+    Discord again and refuses anybody else with the same line. The dead
+    character is not in the world, so a profile number or a person in the
+    world is sent as that, and anything else as the words, for the site to
+    find by the dead character's name or its owner's.
+  */
+  var ONLY_ADMIN = 'Only an admin can undo a PK.';
+  function unpk(words, pid, me) {
+    var adm = g.__thornswoodIsAdmin;
+    var isAdm = true;
+    try { if (typeof adm === 'function') { isAdm = !!adm(pid); } } catch (e) { isAdm = false; }
+    if (!isAdm) {
+      tell(pid, ONLY_ADMIN);
+      log('staff: /unpk refused profile ' + pid + ', who is staff but not an admin');
+      return true;
+    }
+    var row = { byProfileId: pid, byName: me };
+    var why = '';
+    if (/^\d{3,}$/.test(words[0])) {
+      row.profileId = Number(words[0]);
+      why = words.slice(1).join(' ').trim();
+    } else {
+      var them = takePerson(words);
+      if (them.actorId && them.pid) {
+        row.personProfileId = them.pid;
+        row.personName = them.name;
+        why = (them.rest || []).join(' ').trim();
+      } else {
+        row.words = words.slice(0, 40);
+      }
+    }
+    if (!row.words && !why) {
+      tell(pid, 'Say why: /unpk ' + words[0] + ' made by mistake. The character comes back from the dead, ' +
+                'and the PK stays on the record with your reason beside it.');
+      return true;
+    }
+    if (why) { row.why = why; }
+    siteCall('unpk', row, function (ok, v, j) {
+      if (!ok) {
+        tell(pid, (j && j.message) ? String(j.message) : ('The site did not undo the PK, so nothing changed: ' + v + '.'));
+        return;
+      }
+      var p = Number(v.profileId) || 0;
+      var name = String(v.name || '') || ('profile ' + p);
+      if (!v.was) { tell(pid, name + ' is not dead for good, so there was nothing to undo.'); return; }
+      delete state.pk[p];
+      delete state.ending[p];
+      state.unpk[p] = { at: Date.now() };
+      tell(pid, name + ' is no longer dead for good and can be played again from a free slot. ' +
+                'The PK stays on the record with your reason beside it.');
+      record('unpk', pid, me, p, name, String(v.why || why), 0);
+    });
+    return true;
+  }
+
   // ------------------------------------------------------------ command --
   /*
     Called from handle() with the queued command, its word and parts, the
@@ -43932,6 +44012,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       if (!look) { tell(pid, 'The server has no creature list to spawn from right now.'); return true; }
       return doAimed(aimed(word, words), pid, actorId, me, look);
     }
+    if (word === '/unpk') { return unpk(words, pid, me); }
     if (word === '/ban' || word === '/unban' || word === '/note' ||
         word === '/banaccount' || word === '/unbanaccount' || word === '/pk') {
       return banOrNote(word, words, pid, me, takePerson(words));
