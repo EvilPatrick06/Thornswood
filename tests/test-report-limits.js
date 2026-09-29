@@ -196,7 +196,7 @@ yes('out of the tab order, so a keyboard never lands on it', /id="rHome"[^>]*tab
 yes('and hidden from a screen reader', /aria-hidden="true" style="position:absolute;left:-10000px/.test(HOME));
 yes('and the page sends it', /homepage: document\.getElementById\('rHome'\)\.value/.test(HOME));
 yes('the page shows the site\'s own sentence when a report is refused',
-    /said\.textContent = res\.j\.error \|\|/.test(HOME));
+    /(said\.textContent = |finish\()res\.j\.error \|\|/.test(HOME));
 
 // --------------------------------------------------- the real server --
 function freePort() {
