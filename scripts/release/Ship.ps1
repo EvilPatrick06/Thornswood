@@ -204,6 +204,14 @@
   for a security fix or for something that leaves the game untestable, and he
   says which.
 
+.PARAMETER AllowUncoveredBodies
+  Lets a main release go out while a body in the game folder is nude (issue
+  #405). A main release reads the collection revision this machine has
+  installed and tells every launcher to match it, so it refuses while
+  scripts\mods\Check-CoveredBodies.ps1 finds a nude body here; a dev release
+  only warns. Give it for a security fix that cannot wait for the covered
+  bodies' collection revision, and only on Patrick's word.
+
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
 
@@ -273,6 +281,8 @@ param(
     # Build, sign and publish a new launcher even when nothing it is compiled
     # from changed since the one on the feed (issue #921).
     ,[switch]$RebuildLauncher
+    # A main release with a nude body in the game folder (issue #405).
+    ,[switch]$AllowUncoveredBodies
 )
 
 
@@ -1179,6 +1189,30 @@ if ($LASTEXITCODE -eq 2) {
 if ($LASTEXITCODE -ne 0) {
     Unbump 'the client build could not be checked'
     Die 'Sync-Client.ps1 refused. Rebuild the client, run .\scripts\release\New-ClientBuildRecord.ps1, and Ship again.'
+}
+
+# ------------------------------------------------------------ covered bodies
+# Issue #405, Patrick 28 Sep: "no nudity in players or NPCs for both males and
+# females". The bodies come from the Nexus collection, and a release tells every
+# launcher which collection revision to match by reading the one installed
+# here, so a main release out of a game folder whose body is nude points
+# everybody at a nude body. Check-CoveredBodies.ps1 reads the shapes in each
+# body mesh: 0 covered, 2 a nude body, 1 unreadable. Main refuses on 2 unless
+# -AllowUncoveredBodies; dev warns, so work can still be tried on the dev build
+# while the covered bodies' revision is on its way.
+Head 'Covered bodies'
+if ($GameDir) {
+    $global:LASTEXITCODE = 0
+    & (Join-Path $Here '..\mods\Check-CoveredBodies.ps1') -Game $GameDir -Quiet
+    $bodiesExit = $LASTEXITCODE
+    if ($bodiesExit -eq 2 -and -not $Dev -and -not $AllowUncoveredBodies) {
+        Unbump 'a body in the game folder is nude'
+        Die 'A body in the game folder is nude, and a main release would point everybody at this collection revision. Install the collection revision with the covered bodies (issue #405), bring the game folder up to date, and Ship again. -AllowUncoveredBodies ships anyway, on Patrick''s word only.'
+    }
+    if ($bodiesExit -eq 2) { Say '  a body in the game folder is nude (issue #405); shipping anyway' 'Yellow' }
+    elseif ($bodiesExit -ne 0) { Say '  the body meshes could not all be read; see above' 'Yellow' }
+} else {
+    Say '  no game folder here, so the bodies were not read' 'DarkGray'
 }
 
 # HOW FAR BEHIND the public installer is: the zip on disk against the releases
