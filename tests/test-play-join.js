@@ -282,6 +282,7 @@ async function checkIn(table, discordId, profileId, standingOver, world) {
     gameStatus: { up: false, online: 0, max: 0 },
     seatsFull: function () { return false; },
     worldFull: function () { return ''; },
+    mostOnlineFallback: function () { return 0; },
     console: {
       log: function (s) { state.logged.push(String(s)); },
       error: function (s) { state.logged.push(String(s)); }

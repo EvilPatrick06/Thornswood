@@ -779,6 +779,8 @@
     // Before the phase check, because menuChose parks the phase at 9 and this
     // has to go on running after it.
     if (menuChosenId) { keepSayingChoice(now); }
+    // The line at the menu while the world is full (#481).
+    lineTick(now);
 
     if (menuPhase === 9) { return; }
 
@@ -974,7 +976,180 @@
     // The list the launcher wrote for the page. Gone now, so the page
     // reload in the world (phase 0 below) does not bring the choice back.
     try { require('fs').unlinkSync('Data/Platform/UI/thornswood-characters.js'); } catch (e) { }
+    if (lineId) {
+      log('menu: profile', lineId, 'leaves the line for the world after',
+          Math.round((Date.now() - lineSince) / 1000) + 's');
+      lineId = 0;
+    }
     log('menu: chosen profile', id);
+  }
+
+  /*
+    ------------------------------------------------- the line at the menu (#481)
+
+    Patrick, 29 Sep: a full world lets people "in the main menu if full but
+    they sit there until a slot is free and it's their turn to join".
+
+    The page no longer hands its pick straight to the client. It says
+    'select:want <id>' here, and this asks the server's online.json (the same
+    HTTP the load order manifest and the server probe use) whether somebody
+    picking now would wait. Not full, or no answer in LINE_ASK_MS: go(), and
+    the pick goes to the client exactly as before; the gamemode's seats block
+    still judges the arrival.
+
+    Full: the person stays at the menu with the page up, and waits in line.
+    The line is the gamemode's, so this only says who is waiting: it opens
+    the chat's relay at the menu (the voice join token the launcher fetches
+    for the picked character proves who is asking), sends the launcher's
+    join pass, and says "/line" every LINE_EVERY_MS. The gamemode answers the
+    page directly with the place and, when a seat frees and it is their turn,
+    go; the page then sends the pick and the world loads. Closing the game
+    stops the "/line" and the gamemode drops the place after its grace. The
+    choice file is written at once, because that is what makes the launcher
+    fetch the token and the pass for this character.
+
+    The client is told 'stay' while this waits, so its three minute fallback
+    never logs in as the last character played in the middle of the line.
+  */
+  const LINE_PASS_FILE = 'Data/Platform/thornswood-pass.txt';
+  const LINE_ASK_MS = 5000;
+  const LINE_EVERY_MS = 10000;
+  const LINE_PASS_EVERY_MS = 60000;
+  // Made when first needed. The server's own resource port, as
+  // SkyMp.ResourcePortFor has it: 3000 for the main server on 7777, the game
+  // port plus one for any other (dev).
+  let lineHttp = null;
+  function lineClient() {
+    if (lineHttp) { return lineHttp; }
+    try {
+      const p = Number(client['server-port']) || 7777;
+      lineHttp = HOST ? new sp.HttpClient('http://' + HOST + ':' + (p === 7777 ? 3000 : p + 1)) : null;
+    } catch (e) { lineHttp = null; }
+    return lineHttp;
+  }
+  let lineAsk = null;      // { id, at, seq } while online.json is asked about a pick
+  let lineAskSeq = 0;
+  let lineId = 0;          // the profile waiting in line, 0 for nobody
+  let lineSince = 0;
+  let lineTickAt = 0;
+  let lineSaidAt = 0;
+  let lineStayAt = 0;
+  let linePassAt = 0;
+  let linePassSent = '';
+  let lineToken = '';
+  let lineTokenAt = 0;
+  let lineToldLauncher = false;
+
+  /* The page picked. A seat, or the line. */
+  function lineWant(id) {
+    if (id === lineId || (lineAsk && lineAsk.id === id) || id === menuChosenId) { return; }
+    if (!lineClient()) { lineGo(id, 'no server address to ask'); return; }
+    const seq = ++lineAskSeq;
+    lineAsk = { id: id, at: Date.now(), seq: seq };
+    log('menu: profile', id, 'picked, asking the server whether there is a seat');
+    try {
+      lineHttp.get('/online.json', undefined, guard('line ask', (res) => {
+        if (!lineAsk || lineAsk.seq !== seq) { return; }
+        lineAsk = null;
+        let o = null;
+        try {
+          o = (res && res.status >= 200 && res.status < 300) ? JSON.parse(String(res.body || '{}')) : null;
+        } catch (e) { o = null; }
+        if (o && o.full === true) { lineStart(id, o); return; }
+        lineGo(id, o ? 'a seat is free (' + (Number(o.now) || 0) + ' in the world)'
+                     : 'the server did not say, so the pick goes and the server judges it');
+      }));
+    } catch (e) {
+      lineAsk = null;
+      lineGo(id, 'could not ask the server: ' + e);
+    }
+  }
+
+  function lineGo(id, why) {
+    log('menu: profile', id, 'goes in:', why);
+    T.js('try{window.thornswoodSelect&&window.thornswoodSelect.go();}catch(e){}');
+  }
+
+  function lineStart(id, o) {
+    lineId = id;
+    lineSince = Date.now();
+    lineTickAt = 0; lineSaidAt = 0; lineStayAt = 0; linePassAt = 0;
+    linePassSent = ''; lineToken = ''; lineTokenAt = 0; lineToldLauncher = false;
+    PROFILE = id;
+    try { require('fs').writeFileSync(CHOICE_FILE, id + ' ' + Date.now() + '\n'); }
+    catch (e) { log('menu: could not write the choice for the launcher:', e); }
+    T.js('try{window.thornswoodSelect&&window.thornswoodSelect.line(' + JSON.stringify({ id: id }) + ');}catch(e){}');
+    log('menu: the world is full (' + (Number(o.now) || 0) + ' in it, ' + (Number(o.max) || 0) +
+        ' seats, ' + (Number(o.line) || 0) + ' waiting), so profile', id, 'waits at the menu for a place in line');
+  }
+
+  /* Every tick at the menu. */
+  function lineTick(now) {
+    if (lineAsk && now - lineAsk.at > LINE_ASK_MS) {
+      const id = lineAsk.id;
+      lineAsk = null;
+      lineGo(id, 'the server took more than ' + (LINE_ASK_MS / 1000) + 's to say whether there is a seat, ' +
+                 'so the pick goes and the server judges it');
+    }
+    if (!lineId || now - lineTickAt < 1000) { return; }
+    lineTickAt = now;
+
+    if (now - lineStayAt >= 10000) {
+      lineStayAt = now;
+      T.js('try{window.skyrimPlatform.sendMessage("thornswood","stay");}catch(e){}');
+    }
+
+    // The relay needs this character's own voice join token, which the
+    // launcher fetches a moment after the choice file appears. v1.<profile>.<until>.<mac>.
+    const tok = joinToken();
+    if (!tok || (Number(String(tok).split('.')[1]) || 0) !== lineId) {
+      if (!lineToldLauncher && now - lineSince > 5000) {
+        lineToldLauncher = true;
+        T.js('try{window.thornswoodSelect&&window.thornswoodSelect.line(' +
+             JSON.stringify({ id: lineId, phase: 'launcher' }) + ');}catch(e){}');
+        log('menu: no voice join token for profile', lineId, 'yet, so the line waits for the launcher');
+      }
+      return;
+    }
+    if (tok !== lineToken) {
+      if (!lineToken) { log('menu: joining the relay as profile', lineId, 'to wait in line'); }
+      lineToken = tok;
+      lineTokenAt = now;
+      lineSaidAt = 0;
+    }
+    // Every two seconds while the relay is still coming up (the chat script
+    // loads and joins after this first asks, and a say before it is there
+    // goes nowhere), then every LINE_EVERY_MS.
+    const early = now - lineTokenAt < 20000;
+    if (now - lineSaidAt < (early ? 2000 : LINE_EVERY_MS)) { return; }
+    lineSaidAt = now;
+
+    // Idempotent, so a page the silence watch reloaded gets all of it back.
+    T.js('try{if(!window.thornswoodNet){window.THORNSWOOD=' + JSON.stringify({
+      host: HOST, port: VOICE_PORT, profileId: lineId, name: '', token: tok, base: VOICE_URL
+    }) + ';}}catch(e){}');
+    inject('thornswood-chat.js');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.setToken(' + JSON.stringify(tok) + ');' +
+         'window.thornswoodSelect&&window.thornswoodSelect.line(' + JSON.stringify({ id: lineId }) + ');}catch(e){}');
+
+    // The pass when it is new and every minute, as the world does (#937), so
+    // a staff role can be seated ahead of the line and a required pass is on hand.
+    const pass = readText(LINE_PASS_FILE).trim();
+    const passOk = /^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(pass);
+    if (passOk && (early || pass !== linePassSent || now - linePassAt >= LINE_PASS_EVERY_MS)) {
+      linePassSent = pass;
+      linePassAt = now;
+      T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/joinpass ' + pass) + ',true);}catch(e){}');
+    }
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line",true);}catch(e){}');
+  }
+
+  /* Close the game from the page: give the place up now rather than after the grace. */
+  function lineLeave() {
+    if (!lineId) { return; }
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line leave",true);}catch(e){}');
+    log('menu: profile', lineId, 'gave up their place in line');
+    lineId = 0;
   }
 
   /* The choice is on screen and this block is holding it up: asking the page
@@ -6855,8 +7030,17 @@
       message that only arrives after somebody has said yes to leaving is not
       one to second guess.
     */
+    // The pick, asking for a seat first (#481); see the line block.
+    if (what.indexOf('select:want ') === 0) {
+      menuBeatAt = Date.now();
+      const wid = Number(what.slice(12)) || 0;
+      if (wid > 0) { lineWant(wid); }
+      return;
+    }
     if (what === 'select:quit') {
       log('menu: closing the game, asked from the character choice page');
+      // Nothing about the line may stop the quit.
+      try { lineLeave(); } catch (e) { }
       /*
         win32.exitProcess, NOT Debug.quitGame, and the difference is the whole
         bug.

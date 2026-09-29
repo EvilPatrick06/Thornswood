@@ -1675,12 +1675,18 @@ fetch('/api/public', { credentials:'same-origin' })
             : 'apply to be an alpha playtester in the Discord!';
           t.appendChild(apply);
         } else {
-          /* Out of the server's own number when it says one (#481). */
+          /* N of the most the world holds (#481). The site sends the number
+             even when the server has not said it, from records\most-online.json.
+             Staff seats over it are not counted: it is N of 25, never 27 of 25.
+             And how many wait at the menu when anybody does. */
           var most = d.status.max > 0 ? d.status.max : 0;
-          if (most && n >= most) {
-            t.textContent = 'The world is full, ' + n + ' of ' + most + ' people are in it';
+          var seen = most ? Math.min(n, most) : n;
+          var waiting = d.status.line > 0 ? d.status.line : 0;
+          if (most && (n >= most || d.status.full === true)) {
+            t.textContent = 'The world is full, ' + seen + ' of ' + most + ' people are in it' +
+              (waiting ? ', ' + waiting + ' waiting for a seat' : '');
           } else if (most) {
-            t.textContent = n + ' of ' + most + ' people in the world';
+            t.textContent = seen + ' of ' + most + ' people in the world';
           } else {
             t.textContent = n === 1 ? '1 person in the world' : n + ' people in the world';
           }
@@ -1689,7 +1695,7 @@ fetch('/api/public', { credentials:'same-origin' })
         var w = document.getElementById('figOnlineWrap');
         // Only worth a tile of its own once there is somebody in it.
         if (f && w && n > 0) {
-          f.textContent = d.status.max > 0 ? n + ' of ' + d.status.max : String(n);
+          f.textContent = d.status.max > 0 ? Math.min(n, d.status.max) + ' of ' + d.status.max : String(n);
           w.hidden = false;
         }
       } else {

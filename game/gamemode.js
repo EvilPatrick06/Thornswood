@@ -26289,6 +26289,8 @@ log('gamemode loaded:',
     }
     var lastRestarting = false;
     var lastMax = -1;
+    var lastLine = -1;
+    var lastFull = null;
 
     globalThis.__thornswoodOnlineWriter = setInterval(function () {
       var n = 0;
@@ -26354,13 +26356,25 @@ log('gamemode loaded:',
       // site say "N of 25" from the server's own number.
       var max = 0;
       try { max = Number((mp.getServerSettings() || {}).thornswoodMostOnline) || 0; } catch (e) { max = 0; }
-      if (n === lastWritten && restarting === lastRestarting && max === lastMax) return;
+      // And how many wait at the menu, and whether somebody picking now would
+      // wait too, from the seats block (#481): the menu reads full to decide
+      // between joining and taking a place in line, the site to say so.
+      var line = 0, full = false;
+      try {
+        var seatsNow = globalThis.__thornswoodSeats ? globalThis.__thornswoodSeats.status() : null;
+        line = seatsNow ? Number(seatsNow.line) || 0 : 0;
+        full = !!(seatsNow && seatsNow.full);
+      } catch (e) { line = 0; full = false; }
+      if (n === lastWritten && restarting === lastRestarting && max === lastMax &&
+          line === lastLine && full === lastFull) return;
       lastWritten = n;
       lastRestarting = restarting;
       lastMax = max;
+      lastLine = line;
+      lastFull = full;
       try {
         fs.writeFileSync(onlineFile, JSON.stringify({
-          now: n, at: Date.now(), restarting: restarting, max: max
+          now: n, at: Date.now(), restarting: restarting, max: max, line: line, full: full
         }));
       } catch (e) { }
     }, 2000);
@@ -26894,7 +26908,17 @@ log('gamemode loaded:',
           if (jid) jarlIds[jid] = true;
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, count: Object.keys(ids).length };
+      // Who holds one of the Discord staff roles itself (#481), for the staff
+      // seats. Not devProfiles: that also counts the site's hand written
+      // admins list, which is not a role.
+      var staffRoleIds = {};
+      if (Array.isArray(doc.staffRoleProfiles)) {
+        for (var sr = 0; sr < doc.staffRoleProfiles.length; sr++) {
+          var sid = Number(doc.staffRoleProfiles[sr]);
+          if (sid) staffRoleIds[sid] = true;
+        }
+      }
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -26918,6 +26942,11 @@ log('gamemode loaded:',
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsAdmin = function (profileId) {
     var l = load();
     return !!(l && l.adminIds && l.adminIds[Number(profileId)]);
+  };
+  // A Discord staff role on the account, for the staff seats (#481).
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodHoldsStaffRole = function (profileId) {
+    var l = load();
+    return !!(l && l.staffRoleIds && l.staffRoleIds[Number(profileId)]);
   };
 
   /*
@@ -27164,6 +27193,7 @@ log('gamemode loaded:',
       devProfiles: merged(doc.devProfiles, had.devProfiles),
       adminProfiles: merged(doc.adminProfiles, had.adminProfiles),
       jarlProfiles: merged(doc.jarlProfiles, had.jarlProfiles),
+      staffRoleProfiles: merged(doc.staffRoleProfiles, had.staffRoleProfiles),
       people: people
     };
   }
@@ -27272,6 +27302,7 @@ log('gamemode loaded:',
             doc.devProfiles = kept.devProfiles;
             doc.adminProfiles = kept.adminProfiles;
             doc.jarlProfiles = kept.jarlProfiles;
+            doc.staffRoleProfiles = kept.staffRoleProfiles;
             doc.people = kept.people;
             note(doc.failedProfiles.length + ' profiles could not be checked with Discord ' +
                  'and keep the standing they had' +
@@ -27285,6 +27316,8 @@ log('gamemode loaded:',
               devProfiles: Array.isArray(doc.devProfiles) ? doc.devProfiles : [],
               adminProfiles: Array.isArray(doc.adminProfiles) ? doc.adminProfiles : [],
               jarlProfiles: Array.isArray(doc.jarlProfiles) ? doc.jarlProfiles : [],
+              // The Discord staff roles themselves, for the staff seats (#481).
+              staffRoleProfiles: Array.isArray(doc.staffRoleProfiles) ? doc.staffRoleProfiles : [],
               people: doc.people || [],
               // Staff bans with why and until (#412), from the site's own
               // file rather than Discord, so they are fresh even when the
@@ -28048,52 +28081,80 @@ log('gamemode loaded:',
 // ==== end thornswood join pass ====
 
 
-// ==== thornswood seats ====
+/// ==== thornswood seats ====
 /*
-  HOW MANY ARE IN THE WORLD AT ONCE (#481).
+  HOW MANY ARE IN THE WORLD AT ONCE, AND THE LINE PAST IT (#481).
 
   Patrick, 28 Sep: at most 25 people at once for the alpha, raised later.
-  Before this the engine's slot count (maxPlayers) was the only limit, and it
-  refuses at the network with nothing said and no way past it for staff.
+  Patrick, 29 Sep: "5 staff seats for now and only allow those seats to be
+  filled by the discord roles, we need a queue system as well that lets them
+  in the main menu if full but they sit there until a slot is free and it's
+  their turn to join".
 
-  THE NUMBER is thornswoodMostOnline in server-settings.json, written by the
-  deploy scripts from records\most-online.json, the one place it lives. The
-  engine's maxPlayers is set a few seats above it (staffSeats in that record)
-  so staff still reach this check when the world is full. No number here
-  means nobody is turned away for numbers.
+  THE NUMBERS. thornswoodMostOnline in server-settings.json is the seats
+  anybody may take. maxPlayers is the engine's slot count, written above it,
+  and the difference is the staff seats. The deploy scripts write both from
+  records\most-online.json, the one place they live (25 and 5, so maxPlayers
+  30). No thornswoodMostOnline means nobody is turned away and nobody waits.
 
-  WHO GETS A SEAT. Everybody in the world when this starts keeps theirs, so a
-  hot reload never ends a session. After that, each arrival takes a seat while
-  fewer than the number are seated. Past it, a staff role (isStaff in the chat
-  commands block: the admins, the written thornswoodDevs list and the site's
-  staff roles by way of allowed.json) is seated over the number, once a valid
-  join pass for that profile is on hand, because a profile id on its own is a
-  claim (#937). Staff get STAFF_WAIT_MS to show one. Anybody else past the
-  number is told one plain line, the log says "door: full", and the session
-  ends KICK_AFTER_MS later.
+  WHO MAY TAKE A STAFF SEAT. Only a profile whose Discord account holds one of
+  the site's staff roles (access.dev, which folds access.admin in: Owner, Dev,
+  Gamemaster, Moderator, Loremaster), from staffRoleProfiles in allowed.json,
+  and only with a valid join pass on hand, because a profile id on its own is
+  a claim (#937). The written thornswoodAdmins and thornswoodDevs lists and the
+  site's hand written admins list are not Discord roles and do not count here.
+  Staff in the world are counted into the staff seats first, so staff never
+  keep anybody else out of the 25.
 
-  The site refuses Play first (/api/play/join, why "full") when it can see the
-  world is full, so most people are told before the game starts. This is the
-  check that holds when two people press Play at once.
+  THE LINE. Somebody who picks a character at the menu while the world is
+  full does not join. The front plugin keeps them at the menu and says
+  "/line" over the command relay every LINE_EVERY_MS; the relay knows who
+  they are by their voice join token, and "/joinpass" rides the same way.
+  The line lives here and only here, in the order each profile first asked:
+  nothing a client sends moves its place. When a seat frees, the first in
+  line has it held for them (GRANT_MS to arrive) and is told to come in, and
+  their menu joins by itself. Somebody not heard from for LINE_GRACE_MS has
+  closed the game or lost the server, and their place goes. A staff role with
+  a pass is given a staff seat at once, ahead of the line.
+
+  AT THE DOOR. Everybody in the world when this starts keeps their seat, so a
+  hot reload never ends a session. After that an arrival is seated when a
+  seat was held for them, or when nobody is waiting and a seat is free, or,
+  holding a staff role with a pass, when a staff seat is free (a staff role
+  still waiting on its pass gets STAFF_WAIT_MS). Anybody else came in past
+  the line: they are told one plain line, the log says "door: full", and the
+  session ends KICK_AFTER_MS later. The site no longer refuses Play for
+  numbers; it says there may be a wait, and the menu shows the place.
 */
 (function () {
   var g = globalThis;
 
   var SWEEP_MS = 2000;
-  var STAFF_WAIT_MS = 60000;   // staff over the number: this long to show a join pass
+  var STAFF_WAIT_MS = 60000;   // a staff role arriving over the number: this long to show a join pass
   var KICK_AFTER_MS = 10000;   // after the line, so it is on screen first
+  var LINE_GRACE_MS = 45000;   // not heard from at the menu this long: the place in line goes
+  var GRANT_MS = 120000;       // a seat held for the one whose turn it is, this long to arrive
+  var SAY_AGAIN_MS = 10000;    // a place is said again this often even when it has not moved
+  var LINE_EVERY_MS = 10000;   // how often the menu says it is still waiting (the front's side)
 
   function sentence(cap) {
     return 'Thornswood is full: ' + cap + ' people are in the world, the most it holds at ' +
-           'once during the alpha. Try again in a few minutes.';
+           'once during the alpha, and others are waiting at the menu for a seat. Close the ' +
+           'game and press Play again to take your place in line.';
   }
 
-  // On globalThis, so a hot reload keeps who holds a seat.
-  // seated: profile -> when; waiting: staff profile -> since; refused: profile -> when.
+  // On globalThis, so a hot reload keeps who holds a seat and the line.
+  // seated: profile -> when; waiting: staff profile -> since; refused: profile -> when;
+  // line: [{ p, since, seen, said, saidAt }] in order; held: profile -> { at, staff }.
   if (!g.__thornswoodSeatState) {
     g.__thornswoodSeatState = { seated: {}, waiting: {}, refused: {}, primed: false };
   }
   var state = g.__thornswoodSeatState;
+  if (!state.line) { state.line = []; }
+  if (!state.held) { state.held = {}; }
+  if (!state.status) { state.status = { line: 0, full: false }; }
+
+  function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 
   function settings() {
     try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
@@ -28103,15 +28164,33 @@ log('gamemode loaded:',
     var n = Number((s || settings()).thornswoodMostOnline);
     return (n > 0 && Math.floor(n) === n) ? n : 0;
   }
+  /* The staff seats: the engine's slots over the number, or 0. */
+  function staffSeatsOf(s) {
+    s = s || settings();
+    var cap = capOf(s);
+    var most = Number(s.maxPlayers);
+    if (!cap || !(most > cap) || Math.floor(most) !== most) { return 0; }
+    return most - cap;
+  }
+
+  function lineIndex(pid) {
+    for (var i = 0; i < state.line.length; i++) { if (state.line[i].p === pid) { return i; } }
+    return -1;
+  }
 
   /*
     Once every SWEEP_MS. online is [{ actorId, profileId }] in the engine's
-    order; how is { cap, isStaff(pid), hasPass(pid, now), tell(pid, text),
-    end(pid, actorId), log(line) }. Returns what it decided this sweep.
+    order; how is { cap, staffSeats, holdsStaffRole(pid), hasPass(pid, now),
+    tell(pid, text), line(pid, what), end(pid, actorId), log(line) }.
+    Returns what it decided this sweep.
   */
   function sweep(now, online, how) {
     var cap = how.cap;
-    var out = { seated: 0, refused: [], staffOver: [], waiting: [] };
+    var extra = cap ? (how.staffSeats || 0) : 0;
+    var out = { seated: 0, refused: [], staffOver: [], waiting: [], granted: [], dropped: [] };
+    function holds(pid) { try { return !!how.holdsStaffRole(pid); } catch (e) { return false; } }
+    function proven(pid) { try { return !!how.hasPass(pid, now); } catch (e) { return false; } }
+
     var here = {};
     for (var i = 0; i < online.length; i++) {
       var p = Number(online[i] && online[i].profileId) || 0;
@@ -28120,7 +28199,7 @@ log('gamemode loaded:',
     var lists = [state.seated, state.waiting, state.refused];
     for (var l = 0; l < lists.length; l++) {
       for (var k in lists[l]) {
-        if (Object.prototype.hasOwnProperty.call(lists[l], k) && here[k] === undefined) { delete lists[l][k]; }
+        if (own(lists[l], k) && here[k] === undefined) { delete lists[l][k]; }
       }
     }
     // Everybody already in the world when this started keeps their seat.
@@ -28128,50 +28207,173 @@ log('gamemode loaded:',
       state.primed = true;
       var kept = 0;
       for (var q in here) {
-        if (Object.prototype.hasOwnProperty.call(here, q)) { state.seated[q] = now; kept++; }
+        if (own(here, q)) { state.seated[q] = now; kept++; }
       }
       if (kept) { how.log('[thornswood] seats: ' + kept + ' already in the world keep their seats'); }
     }
-    var count = 0;
-    for (var s in state.seated) {
-      if (Object.prototype.hasOwnProperty.call(state.seated, s)) { count++; }
+
+    // Arrivals a seat was held for go first: that seat is already counted.
+    for (var a = 0; a < online.length; a++) {
+      var ap = Number(online[a] && online[a].profileId) || 0;
+      if (!ap || state.seated[ap] || !state.held[ap]) { continue; }
+      state.seated[ap] = now;
+      delete state.held[ap];
+      how.log('[thornswood] seats: profile ' + ap + ' took the seat held for them');
     }
+
+    // The line: whoever is in the world now, or has gone quiet, is off it.
+    var still = [];
+    for (var n = 0; n < state.line.length; n++) {
+      var e = state.line[n];
+      if (state.seated[e.p]) { continue; }
+      if (now - e.seen > LINE_GRACE_MS) {
+        out.dropped.push(e.p);
+        how.log('[thornswood] line: profile ' + e.p + ' lost their place, not heard from at the menu in ' +
+                Math.round((now - e.seen) / 1000) + 's');
+        continue;
+      }
+      still.push(e);
+    }
+    state.line = still;
+    for (var h in state.held) {
+      if (own(state.held, h) && now - state.held[h].at > GRANT_MS) {
+        delete state.held[h];
+        how.log('[thornswood] seats: the seat held for profile ' + h + ' went unused for ' +
+                Math.round(GRANT_MS / 1000) + 's, so it goes to the next in line');
+      }
+    }
+
+    // Who is where. Staff in the world or on their way count into the staff seats first.
+    var total = 0, staffIn = 0, held = 0, heldStaff = 0;
+    for (var s in state.seated) {
+      if (own(state.seated, s)) { total++; if (holds(Number(s))) { staffIn++; } }
+    }
+    for (var hs in state.held) {
+      if (own(state.held, hs)) { held++; if (state.held[hs].staff) { heldStaff++; } }
+    }
+    function publicFree() {
+      if (!cap) { return 1; }
+      return cap - (total + held - Math.min(staffIn + heldStaff, extra));
+    }
+    function anyFree() {
+      if (!cap) { return 1; }
+      return cap + extra - (total + held);
+    }
+    function grant(pid, staff, why) {
+      state.held[pid] = { at: now, staff: staff };
+      held++;
+      if (staff) { heldStaff++; }
+      out.granted.push(pid);
+      how.log('[thornswood] seats: a seat is held for profile ' + pid + ', ' + why);
+      how.line(pid, { go: true });
+    }
+
+    // A staff role with a pass skips the line into a staff seat.
+    var rest = [];
+    for (var f = 0; f < state.line.length; f++) {
+      var w = state.line[f];
+      if (cap && anyFree() > 0 && holds(w.p) && proven(w.p)) {
+        grant(w.p, true, 'a staff role, ahead of the line');
+        continue;
+      }
+      rest.push(w);
+    }
+    state.line = rest;
+    // Then the line in order, while a seat anybody may take is free.
+    while (state.line.length && publicFree() > 0) {
+      var first = state.line.shift();
+      grant(first.p, holds(first.p), cap ? 'first in line' : 'nobody is turned away for numbers');
+    }
+    // And everybody still waiting is told their place when it moves.
+    for (var t = 0; t < state.line.length; t++) {
+      var we = state.line[t];
+      if (we.said !== t + 1 || we.saidOf !== state.line.length || now - we.saidAt >= SAY_AGAIN_MS) {
+        we.said = t + 1;
+        we.saidOf = state.line.length;
+        we.saidAt = now;
+        how.line(we.p, { place: t + 1, of: state.line.length });
+      }
+    }
+
+    // Everybody else who has just arrived.
     for (var j = 0; j < online.length; j++) {
       var pid = Number(online[j] && online[j].profileId) || 0;
       if (!pid || state.seated[pid] || state.refused[pid]) { continue; }
-      if (!cap || count < cap) {
+      var staff = holds(pid);
+      if (!cap || (!state.line.length && publicFree() > 0)) {
         state.seated[pid] = now;
         delete state.waiting[pid];
-        count++;
+        total++;
+        if (staff) { staffIn++; }
         continue;
       }
-      var staff = false;
-      try { staff = !!how.isStaff(pid); } catch (e) { staff = false; }
-      if (staff) {
-        var proven = false;
-        try { proven = !!how.hasPass(pid, now); } catch (e) { proven = false; }
-        if (proven) {
+      var reason = '';
+      if (staff && anyFree() > 0) {
+        if (proven(pid)) {
           state.seated[pid] = now;
           delete state.waiting[pid];
-          count++;
+          total++;
+          staffIn++;
           out.staffOver.push(pid);
-          how.log('[thornswood] seats: profile ' + pid + ' holds a staff role, seated over the number (' +
-                  count + ' in the world, the number is ' + cap + ')');
+          how.log('[thornswood] seats: profile ' + pid + ' holds a staff role, seated in a staff seat (' +
+                  total + ' in the world, the number is ' + cap + ')');
           continue;
         }
         if (!state.waiting[pid]) { state.waiting[pid] = now; }
         if (now - state.waiting[pid] < STAFF_WAIT_MS) { out.waiting.push(pid); continue; }
+        reason = ' (a staff role, but no join pass was shown)';
+      } else if (staff) {
+        reason = ' (a staff role, but every staff seat is taken)';
       }
       state.refused[pid] = now;
       delete state.waiting[pid];
       out.refused.push(pid);
-      how.log('[thornswood] door: full, refusing profile ' + pid + ': ' + count + ' of ' + cap +
-              ' already in the world' + (staff ? ' (a staff role, but no join pass was shown)' : ''));
+      how.log('[thornswood] door: full, refusing profile ' + pid + ': ' + total + ' of ' + cap +
+              ' already in the world' + (state.line.length ? ', ' + state.line.length + ' waiting in line' : '') +
+              reason);
       how.tell(pid, sentence(cap));
       how.end(pid, online[j].actorId);
     }
-    out.seated = count;
+
+    out.seated = total;
+    state.status = { line: state.line.length, full: !!cap && (state.line.length > 0 || publicFree() <= 0) };
     return out;
+  }
+
+  /*
+    One "/line" from the menu, under the profile the relay says sent it. A
+    first ask goes to the end of the line; a later one only says they are
+    still there. Somebody a seat is held for is told again to come in, so a
+    lost answer is never a lost turn. With thornswoodRequirePass on, nobody
+    waits without a join pass on hand, since without one they could not stay.
+  */
+  function want(pid, now, how) {
+    pid = Number(pid) || 0;
+    if (!pid) { return 'nobody'; }
+    if (state.seated[pid]) { return 'in the world'; }
+    if (state.held[pid]) { how.line(pid, { go: true }); return 'held'; }
+    var at = lineIndex(pid);
+    if (at >= 0) { state.line[at].seen = now; return 'waiting'; }
+    var hasOne = false;
+    try { hasOne = !!how.hasPass(pid, now); } catch (e) { hasOne = false; }
+    if (how.requirePass && !hasOne) { how.line(pid, { pass: true }); return 'no pass'; }
+    state.line.push({ p: pid, since: now, seen: now, said: 0, saidAt: 0 });
+    how.log('[thornswood] line: profile ' + pid + ' is waiting at the menu, ' + state.line.length + ' in line');
+    return 'joined';
+  }
+
+  /* "/line leave": the menu let go of its place on purpose. */
+  function leave(pid, how) {
+    pid = Number(pid) || 0;
+    var at = lineIndex(pid);
+    if (at >= 0) {
+      state.line.splice(at, 1);
+      how.log('[thornswood] line: profile ' + pid + ' left the line');
+    }
+    if (state.held[pid]) {
+      delete state.held[pid];
+      how.log('[thornswood] seats: profile ' + pid + ' let go of the seat held for them');
+    }
   }
 
   function endLater(pid, actorId) {
@@ -28186,8 +28388,9 @@ log('gamemode loaded:',
     }, KICK_AFTER_MS);
   }
 
-  function isStaff(pid) {
-    var f = g.__thornswoodIsStaff;
+  /* The Discord staff roles, as the site knows them; see the door block. */
+  function holdsStaffRole(pid) {
+    var f = g.__thornswoodHoldsStaffRole;
     return typeof f === 'function' ? !!f(pid) : false;
   }
   function hasPass(pid, now) {
@@ -28196,8 +28399,27 @@ log('gamemode loaded:',
     return !!(p && Number(p.x) > now);
   }
 
-  g.__thornswoodSeats = { sweep: sweep, cap: capOf, sentence: sentence,
-                          staffWait: STAFF_WAIT_MS, kickAfter: KICK_AFTER_MS };
+  function liveHow() {
+    var s = settings();
+    var say = g.__thornswoodToProfile;
+    return {
+      cap: capOf(s), staffSeats: staffSeatsOf(s), requirePass: s.thornswoodRequirePass === true,
+      holdsStaffRole: holdsStaffRole, hasPass: hasPass,
+      tell: function (p, text) { if (say) { say(p, text); } },
+      // The chat commands block posts it to the menu page (__thornswoodSayLine).
+      line: function (p, what) { var f = g.__thornswoodSayLine; if (typeof f === 'function') { f(p, what); } },
+      end: endLater,
+      log: function (line) { console.log(line); }
+    };
+  }
+
+  g.__thornswoodSeats = {
+    sweep: sweep, want: want, leave: leave, liveHow: liveHow,
+    cap: capOf, staffSeats: staffSeatsOf, sentence: sentence,
+    status: function () { return state.status; },
+    staffWait: STAFF_WAIT_MS, kickAfter: KICK_AFTER_MS, lineGrace: LINE_GRACE_MS,
+    grantFor: GRANT_MS, lineEvery: LINE_EVERY_MS
+  };
 
   if (g.__thornswoodSeatTimer) { clearInterval(g.__thornswoodSeatTimer); }
   g.__thornswoodSeatTimer = setInterval(function () {
@@ -28209,13 +28431,7 @@ log('gamemode loaded:',
         try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e) { pid = 0; }
         if (pid) { list.push({ actorId: online[i], profileId: pid }); }
       }
-      var say = g.__thornswoodToProfile;
-      sweep(Date.now(), list, {
-        cap: capOf(), isStaff: isStaff, hasPass: hasPass,
-        tell: function (p, text) { if (say) { say(p, text); } },
-        end: endLater,
-        log: function (line) { console.log(line); }
-      });
+      sweep(Date.now(), list, liveHow());
     } catch (e) {
       console.log('[thornswood] seats sweep failed: ' + e);
     }
@@ -28223,7 +28439,8 @@ log('gamemode loaded:',
 
   var capNow = capOf();
   console.log('[thornswood] seats: ' + (capNow
-    ? 'at most ' + capNow + ' in the world at once, staff roles may go over'
+    ? 'at most ' + capNow + ' in the world at once, ' + staffSeatsOf() + ' staff seats over it for the ' +
+      'Discord staff roles, and a line at the menu past that'
     : 'no thornswoodMostOnline in server-settings.json, so nobody is turned away for numbers'));
 })();
 // ==== end thornswood seats ====
@@ -36095,6 +36312,17 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   g.__thornswoodToProfile = toProfile;
 
   /*
+    The line at the menu (#481): somebody's place, or that it is their turn,
+    for the menu page to show. Data rather than words, under a name no person
+    can send from (the service puts from 0 on it), and the page takes it out
+    of the chat; see thornswood-chat.js.
+  */
+  var LINE_NAME = 'Thornswood line';
+  g.__thornswoodSayLine = function (profileId, what) {
+    post('/say', { profileId: profileId, name: LINE_NAME, text: JSON.stringify(what || {}) });
+  };
+
+  /*
     actorId for a connected profile, or 0.
 
     "The server cannot find your character right now" was reported often
@@ -36223,6 +36451,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       var jp = g.__thornswoodJoinPass;
       if (jp && profileId) {
         try { jp.take(profileId, parts[1], Date.now()); } catch (eJp) { log('/joinpass failed:', eJp); }
+      }
+      return;
+    }
+    // The line at the menu while the world is full (#481), from the front
+    // plugin: "/line" to wait or say they still are, "/line leave" to go.
+    // Needs no character; the place is the seats block's alone.
+    if (word === '/line') {
+      var seatsApi = g.__thornswoodSeats;
+      if (seatsApi && profileId) {
+        try {
+          if (String(parts[1] || '').toLowerCase() === 'leave') { seatsApi.leave(profileId, seatsApi.liveHow()); }
+          else { seatsApi.want(profileId, Date.now(), seatsApi.liveHow()); }
+        } catch (eLine) { log('/line failed:', eLine); }
       }
       return;
     }
@@ -37951,8 +38192,6 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   function isStaff(profileId) {
     return isDev(profileId);
   }
-  // For the seats block, which seats staff over the number (#481).
-  g.__thornswoodIsStaff = isStaff;
 
   function isPlaytester(profileId) {
     if (isDev(profileId)) { return true; }
