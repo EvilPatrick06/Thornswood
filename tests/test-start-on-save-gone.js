@@ -115,7 +115,7 @@ yes('and OwnGame names the files nowhere else in its code' +
 const skipBody = member(OG, 'static string Skip(string rel)');
 yes('Skip leaves a retired file out when a folder is made or refreshed',
     skipBody !== null && /if \(Retired\(rel\)\) return "/.test(skipBody));
-const refresh = member(OG, 'public static string Refresh(Config cfg, Action<string> say)');
+const refresh = member(OG, 'static string RefreshNow(Config cfg, Action<string> say)');
 const afterRetired = refresh ? refresh.slice(Math.max(0, refresh.indexOf('foreach (string r in RetiredFiles)'))) : '';
 yes('Refresh deletes a retired file from a folder that has it, recorded or not',
     refresh !== null && refresh.indexOf('foreach (string r in RetiredFiles)') >= 0 &&

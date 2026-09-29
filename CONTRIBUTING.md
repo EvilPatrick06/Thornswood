@@ -159,6 +159,14 @@ How to use it:
   copy, once (OwnGame.CleanSteamCopy); an existing own folder gets the same
   from its next update. Steam's "Wait until I launch the game" is set only
   until the folder exists (tests\test-own-folder-first.ps1).
+  Decided by Patrick on 29 Sep (#1232): `Thornswood\Game` takes only
+  Skyrim's own files (from the Steam copy when it is on the pinned build, or
+  the Downgrade's download), Vortex's deployed files by Vortex's own record,
+  and Thornswood's own files. Skyrim's own is the pinned build's file list,
+  `records\skyrim-files.json`, read out of the depot manifests the Downgrade
+  uses, never a guess by folder. A mod put into the Steam copy by hand stays
+  there, and a folder made before this loses such files at its next refresh,
+  logged (OwnGameKinds.cs, tests\test-own-folder-alone.ps1).
 - Whichever folder the game runs from, the launcher looks after its own
   files: Keep puts its files back before Play and parks any plugin in
   `Data\Platform\Plugins` that is not ours; Hold keeps its files open read

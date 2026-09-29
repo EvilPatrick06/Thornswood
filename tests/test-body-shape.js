@@ -207,7 +207,7 @@ yes('and nothing that height or weight comes from (RaceMenu itself, its plugin s
 const skipBody = member(og, 'static string Skip(string rel)');
 yes('Skip leaves them out when a folder is made or refreshed',
     skipBody !== null && /if \(BodyShape\(rel\)\) return "/.test(skipBody));
-const refresh = member(og, 'public static string Refresh(Config cfg, Action<string> say)');
+const refresh = member(og, 'static string RefreshNow(Config cfg, Action<string> say)');
 const loopAt = refresh ? refresh.indexOf('foreach (string r in BodyShapeFiles)') : -1;
 yes('Refresh deletes them from a folder that has them, recorded or not',
     loopAt >= 0 && /if \(File\.Exists\(dest\)\) \{ DropName\(dest\); removed\+\+; \}/.test(refresh.slice(loopAt, loopAt + 400)));

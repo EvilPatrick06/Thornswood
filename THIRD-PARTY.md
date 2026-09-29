@@ -54,7 +54,9 @@ or the build check goes red.
 Everything else Build-Launcher.ps1 compiles into the launcher is Thornswood's
 own: `ui.xaml`, `logo.png`, `logo-dev.png`, `launcher-header.jpg`,
 `launcher-header.mp4`, `app.ico`, `app-dev.ico`, `voice-host.html`,
-`Thornswood.ini` and `client-build.json`. `logo-dev.png` is the emblem the dev
+`Thornswood.ini`, `client-build.json` and `skyrim-files.json`, the list of
+the pinned Skyrim build's own file names, sizes and SHA-1s read out of Steam's
+depot manifests (no Bethesda file is in it). `logo-dev.png` is the emblem the dev
 build shows in place of `logo.png` (Art.cs) and `app-dev.ico` is the icon its
 shortcuts carry in place of `app.ico` (Icons.cs); both are drawn for
 Thornswood, the same as the two they stand in for. The setup stub,

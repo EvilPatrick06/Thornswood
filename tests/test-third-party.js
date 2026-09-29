@@ -77,7 +77,8 @@ const OURS = {
   'app-dev.ico': 'the icon the dev build\'s shortcuts carry, launcher\\app-dev.ico',
   'voice-host.html': 'the voice page, launcher',
   'Thornswood.ini': 'the key template, launcher',
-  'client-build.json': 'the record of the client runtime'
+  'client-build.json': 'the record of the client runtime',
+  'skyrim-files.json': 'the list of the pinned Skyrim build\'s own files, read from Steam\'s depot manifests'
 };
 
 const build = read(path.join(REPO, 'scripts', 'release', 'Build-Launcher.ps1')) || '';
