@@ -6986,6 +6986,36 @@
   }));
 
   /*
+    The join pass (#937). The game server ends a session that has not shown it
+    one: a short lived note, signed by the site, that this character came
+    through an up to date Thornswood launcher. The launcher fetches it when a
+    character is picked at the menu and every four minutes after, and leaves it
+    in thornswood-pass.txt. It goes over the command relay at once when it
+    changes and every minute, so a relay or server restart never leaves the
+    server without one. Never written to the log: it is good for ten minutes
+    to whoever holds it.
+  */
+  const PASS_FILE = 'Data/Platform/thornswood-pass.txt';
+  const PASS_RESEND_MS = 60000;
+  const PASS_READ_MS = 5000;
+  let passSent = '';
+  let passSentAt = 0;
+  let passReadAt = 0;
+  sp.on('update', guard('joinpass', () => {
+    const now = Date.now();
+    if (now - passReadAt < PASS_READ_MS) { return; }
+    passReadAt = now;
+    const raw = readText(PASS_FILE).trim();
+    if (!/^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(raw)) { return; }
+    if (raw === passSent && now - passSentAt < PASS_RESEND_MS) { return; }
+    const first = !passSent;
+    passSent = raw;
+    passSentAt = now;
+    tellServer('/joinpass ' + raw);
+    if (first) { log('sent the launcher\'s join pass to the server'); }
+  }));
+
+  /*
     Field of view, from the launcher.
 
     Skyrim's own fDefaultWorldFOV is not enough here. The game rewrites it at
