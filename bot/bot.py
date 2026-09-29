@@ -2327,6 +2327,142 @@ async def watch_reports():
         await asyncio.sleep(REPORTS_EVERY)
 
 
+# ------------------------------------------------------ staff in the world --
+#
+# What a moderator did in the game (#412): /kick, /freeze, /silence, /warn and
+# the rest. The gamemode appends one JSON line per action to
+# private\moderation.log beside each game server, on this same box, and this
+# says each new line once in the staff channel, so the record is outside the
+# game and in front of the rest of staff. A file rather than a request, for the
+# same reason as watch_trouble: no new secret, port or ticket.
+MODERATION_LOGS = [
+    ('live', os.environ.get('MODERATION_LOG',
+                            r'C:\Thornswood-Server\private\moderation.log')),
+    ('dev', os.environ.get('MODERATION_LOG_DEV',
+                           r'C:\Thornswood-Server-Dev\private\moderation.log')),
+]
+MODERATION_EVERY = _int_env('MODERATION_EVERY', 30)
+# More than this in one look from one server is said as a count, not a wall.
+MODERATION_AT_ONCE = 10
+
+_MOD_DID = {
+    'kick': 'removed %s from the world',
+    'freeze': 'froze %s in place',
+    'unfreeze': 'let %s move again',
+    'bring': 'brought %s to them',
+    'goto': 'went to %s',
+    'silence': 'silenced %s',
+    'unsilence': 'let %s speak again',
+    'warn': 'warned %s',
+    'give': 'gave %s',
+    'spawn': 'spawned beside %s',
+    'tp': 'sent %s',
+}
+
+
+def moderation_text(where, row):
+    """
+    One line of moderation.log as the staff channel reads it, or None for a
+    line that is not one. Names and reasons were typed in the game, so they
+    are escaped: nothing in them can ping anybody or dress itself up.
+    """
+    if not isinstance(row, dict) or row.get('did') not in _MOD_DID:
+        return None
+
+    def clean(v, n):
+        v = str(v or '').strip()[:n]
+        return discord.utils.escape_mentions(discord.utils.escape_markdown(v))
+
+    def person(name, pid):
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            pid = 0
+        return '%s (profile %d)' % (clean(name, 40) or 'somebody', pid)
+
+    did = _MOD_DID[row['did']] % person(row.get('whoName'), row.get('who'))
+    try:
+        minutes = int(row.get('minutes') or 0)
+    except (TypeError, ValueError):
+        minutes = 0
+    if row['did'] == 'silence' and minutes > 0:
+        did += ' for %d minute%s' % (minutes, '' if minutes == 1 else 's')
+    why = clean(row.get('why'), 300)
+    return ('**Staff on the %s server:** %s %s%s'
+            % (where, person(row.get('byName'), row.get('by')), did,
+               (': ' + why) if why else '.'))[:1900]
+
+
+def _moderation_lines(path):
+    """
+    Every whole line in one moderation.log, [] when there is no file yet (no
+    staff action on that server so far), None when it could not be read. A
+    last line with no line ending is left for the next look, the same as
+    _watch_log_lines.
+    """
+    try:
+        with open(path, 'rb') as f:
+            data = f.read()
+    except FileNotFoundError:
+        return []
+    except Exception:
+        return None
+    parts = data.decode('utf-8-sig', errors='replace').split('\n')
+    return [p.rstrip('\r') for p in parts[:-1] if p.strip()]
+
+
+async def watch_moderation():
+    """
+    Say each new staff action from the game in the staff channel, once.
+
+    The lines already in each file when this starts are treated as said, as in
+    watch_trouble, or every restart of the bot would repeat the history. A
+    file that cannot be read is skipped for that look rather than read as
+    empty. Nothing in here may end the loop.
+    """
+    await client.wait_until_ready()
+    loop = asyncio.get_running_loop()
+    seen = {}
+    for where, path in MODERATION_LOGS:
+        lines = await loop.run_in_executor(None, _moderation_lines, path)
+        seen[where] = set(lines) if lines is not None else None
+    log('moderation: reading %s every %ds'
+        % (', '.join(p for _, p in MODERATION_LOGS), MODERATION_EVERY))
+
+    while not client.is_closed():
+        try:
+            for where, path in MODERATION_LOGS:
+                lines = await loop.run_in_executor(None, _moderation_lines, path)
+                if lines is None:
+                    continue
+                if seen.get(where) is None:
+                    seen[where] = set(lines)
+                    continue
+                new = [l for l in lines if l not in seen[where]]
+                seen[where].update(new)
+                texts = []
+                for l in new:
+                    try:
+                        text = moderation_text(where, json.loads(l))
+                    except ValueError:
+                        text = None
+                    if text:
+                        texts.append(text)
+                if len(texts) > MODERATION_AT_ONCE:
+                    await report_say(
+                        '**%d staff actions on the %s server** since the last '
+                        'look, more than this channel should carry one at a '
+                        'time. They are in private\\moderation.log on the VPS.'
+                        % (len(texts), where))
+                else:
+                    for text in texts:
+                        await report_say(text)
+        except Exception:
+            log('moderation: the check itself failed, carrying on:\n'
+                + traceback.format_exc())
+        await asyncio.sleep(MODERATION_EVERY)
+
+
 # on_ready fires again on every reconnect, and a second loop would double every
 # message this ever sends.
 _watching = False
@@ -2429,6 +2565,7 @@ async def on_ready():
         asyncio.create_task(watch_trouble())
         asyncio.create_task(watch_services())
         asyncio.create_task(watch_reports())
+        asyncio.create_task(watch_moderation())
 
     log('up as %s' % client.user)
 
