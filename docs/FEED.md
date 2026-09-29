@@ -616,7 +616,9 @@ What differs, none of it broken:
   neither feed names one (#907).
 - **Both feeds' client runtime is behind the record.** Main names fork
   commit `ccf71644` and dev `44366c7e` (read 29 Sep); `records\client-build.json`
-  is on `c63fe637` since #898, which lets the game hear the key up of a key
+  is on `1ed42585` since #1200 (the pin and both build records one commit, a
+  refused craft put right at once), on top of `c63fe637` from #898, which lets
+  the game hear the key up of a key
   it holds while a panel has the keyboard, on top of `44366c7e` (#1016, J
   kept from the game's journal) and `8fb4673a` (#919, no mDNS responder in
   the game's browser). The next dev Ship carries it.
