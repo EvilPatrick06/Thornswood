@@ -655,7 +655,34 @@ namespace Thornswood
 
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
             string tmp = Path.Combine(Path.GetTempPath(), "thornswood-" + Guid.NewGuid().ToString("N") + ".bin");
-            using (var wc = Client(cfg, true, url)) wc.DownloadFile(url, tmp);
+            // Read in pieces rather than DownloadFile, so the Play button can
+            // show the bytes as they come (#1145, PlayProgress.Part).
+            try
+            {
+                using (var wc = Client(cfg, true, url))
+                using (Stream s = wc.OpenRead(url))
+                using (var f = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    long length;
+                    if (wc.ResponseHeaders == null || !long.TryParse(wc.ResponseHeaders["Content-Length"], out length)) length = -1;
+                    byte[] buf = new byte[81920];
+                    long had = 0;
+                    int n;
+                    PlayProgress.Part(0, length);
+                    while ((n = s.Read(buf, 0, buf.Length)) > 0)
+                    {
+                        f.Write(buf, 0, n);
+                        had += n;
+                        PlayProgress.Part(had, length);
+                    }
+                }
+            }
+            catch
+            {
+                try { File.Delete(tmp); } catch (Exception ex) { Swallow.Note("Updater.Download, delete part", ex); }
+                throw;
+            }
+            PlayProgress.PartDone();
 
             string got = Sha256(tmp);
             if (!string.Equals(got, expectSha, StringComparison.OrdinalIgnoreCase))

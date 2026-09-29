@@ -419,6 +419,10 @@ namespace Thornswood
             string data = Path.Combine(Paths.Game, "Data");
             for (int idx = 0; idx < mods.Length; idx++)
             {
+                // On the Play button only while it is waiting on this, after
+                // the game folder is prepared (#1145); PlayProgress drops it
+                // otherwise.
+                PlayProgress.Files("Checking files", idx + 1, mods.Length);
                 ServerMod m = mods[idx];
                 if (m == null || string.IsNullOrEmpty(m.filename) || Storefront.Contains(m.filename)) continue;
                 string p = Path.Combine(data, m.filename);

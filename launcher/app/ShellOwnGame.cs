@@ -273,6 +273,9 @@ namespace Thornswood
             if (!make && !OwnGame.Active) { Log("Thornswood does not have its own Skyrim folder yet."); return; }
 
             ownGameBusy = true;
+            // The Play button shows how far it has got (#1145): OwnGame counts
+            // the files, and Verify the plugins it checks after.
+            PlayProgress.Begin(OwnGame.Phase, 0);
             DrawStatus();
             DrawOwnGame();
             Log(make ? "Making Thornswood's own Skyrim folder from what Vortex has deployed. Play comes back when it is done."
@@ -350,6 +353,7 @@ namespace Thornswood
                     win.Dispatcher.BeginInvoke((Action)delegate
                     {
                         ownGameBusy = false;
+                        PlayProgress.End();
                         if (fail != null)
                         {
                             Log((make ? "Thornswood's own Skyrim folder was not made. " : "Thornswood's own Skyrim folder was not brought up to date. ") + fail);
