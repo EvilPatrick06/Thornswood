@@ -117,8 +117,15 @@ Yes 'Install-Bot registers no scheduled task and writes no run.ps1 any more' (
     $ibText -notmatch 'Register-ScheduledTask|New-ScheduledTask|\\run\.ps1''|RunLevel Highest')
 Yes 'Install-Bot never stops the bot by a command line itself' ($ibText -notmatch 'CommandLine|Stop-Process')
 Yes 'nor sends the old roller up for it' ($ibText -notmatch '/roll-log\.ps1')
-Yes 'Install-Bot sends BotService.cs and Bot-Service.ps1' (
-    $ibText -match [regex]::Escape("Join-Path `$Here '..\vps\BotService.cs'") -and $ibText -match [regex]::Escape("Join-Path `$Here '..\vps\Bot-Service.ps1'"))
+Yes 'Install-Bot sends BotService.cs from the bot''s artifact, and Bot-Service.ps1' (
+    $ibText -match [regex]::Escape("'scripts/vps/BotService.cs'") -and $ibText -match [regex]::Escape("Join-Path `$Repo 'scripts\vps\BotService.cs'") -and
+    $ibText -match [regex]::Escape("Join-Path `$Here '..\vps\Bot-Service.ps1'"))
+# #459's record of what the bot runs is written only once the service runs it.
+$recAt = $ibText.IndexOf('function Save-BotRecord')
+Yes 'the box records the bot''s artifact only after the service is running, in -CodeOnly and in a full run' (
+    $recAt -ge 0 -and ([regex]::Matches($ibText, 'Set-ThornswoodArtifactCurrent')).Count -eq 1 -and
+    $ibText -match [regex]::Escape("if (`"`$restart`" -match ('service ' + `$Service + ' is Running')) { Save-BotRecord }") -and
+    $ibText -match [regex]::Escape("-match ('service ' + `$Service + ': Running')) { Save-BotRecord }"))
 $svcParam = $ib.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'Service' }
 Yes 'Install-Bot''s -Service is ThornswoodBot' ($svcParam -and $svcParam.DefaultValue.Extent.Text -eq "'ThornswoodBot'")
 

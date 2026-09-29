@@ -96,7 +96,7 @@ $docsWin = $DocsRoot.Replace('/','\')
 # box's store first. From here $Repo is the artifact's folder, which is laid
 # out like the repository, so every copy below sends exactly what the zip holds.
 . (Join-Path $Here 'Artifact.ps1')
-$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/staff-channel.txt', 'bot/assets/join-card.png'
+$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
 Write-Host ('artifact ' + (Format-ThornswoodArtifact $artifact)) -ForegroundColor DarkGray
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 $Repo = $artifact.Folder
@@ -245,9 +245,13 @@ if (Test-Path $art) {
 } else {
   Say '  no join-card.png, cards will fall back to a plain background' 'Yellow'
 }
-# The code is in place over the old: the box records that the bot runs this
-# artifact (Artifact.ps1), whether this run goes on to restart it or not.
-$null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root
+# The box records that the bot runs this artifact (Artifact.ps1), and only
+# once the service is running on it (issue #465): -CodeOnly after the restart
+# by name, a full run after the service install. A run that ends with the bot
+# stopped records nothing, so the record never names code that is not up.
+function Save-BotRecord {
+  $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root
+}
 
 # ----------------------------------------------------------- code only ---
 # A change to bot.py and nothing else, which is most of them.
@@ -261,7 +265,7 @@ if ($CodeOnly) {
     Head 'Restarting it'
     $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
     if (-not (Test-Path -LiteralPath $svcLib)) { Die "missing: $svcLib" }
-    Remote ((Get-Content -LiteralPath $svcLib -Raw) + "`n" + @"
+    $restart = @(Remote ((Get-Content -LiteralPath $svcLib -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$log = '$rootWin\bot.log'
 `$before = 0
@@ -290,7 +294,10 @@ try {
     `$sr.Close()
   } else { 'nothing new in the log yet' }
 } catch { 'could not read the log: ' + `$_.Exception.Message } finally { if (`$fs) { `$fs.Dispose() } }
-"@) | ForEach-Object { Say "  $_" }
+"@))
+    $restart | ForEach-Object { Say "  $_" }
+    if ("$restart" -match ('service ' + $Service + ' is Running')) { Save-BotRecord }
+    else { Say '  The service is not running, so the box does not record this code as the bot''s.' 'Yellow' }
 
     Write-Host ''
     Say '  Code only. Python, the libraries, the token and the service were left alone.' 'DarkGray'
@@ -480,7 +487,9 @@ $settings | ForEach-Object { Say "  $_" }
 # it is.
 Head 'Keeping it running'
 $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
-$svcSrc = Join-Path $Here '..\vps\BotService.cs'
+# From the artifact, like the bot's own files: the program is part of what
+# the box records as running.
+$svcSrc = Join-Path $Repo 'scripts\vps\BotService.cs'
 foreach ($f in $svcLib, $svcSrc) { if (-not (Test-Path -LiteralPath $f)) { Die "missing: $f" } }
 $null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin\service' | Out-Null; 'ready'"
 & scp @ssh $svcSrc "${User}@${Vps}:$Root/service/BotService.cs" | Out-Null
@@ -540,6 +549,7 @@ if (-not `$ready) {
 if (`$said) { `$said | Select-Object -Last 25 } else { 'nothing yet' }
 "@))
 $running | ForEach-Object { Say "  $_" }
+if ("$running" -notmatch 'BOT SERVICE NOT INSTALLED' -and "$running" -match ('service ' + $Service + ': Running')) { Save-BotRecord }
 if ("$running" -match 'BOT SERVICE NOT INSTALLED') {
   Write-Host ''
   if ("$running" -match 'Nothing was stopped or changed') {
