@@ -68,11 +68,11 @@ handlers. So:
   helper `F<T>` just above it) and keeps it in a static field.
 - `Shell.cs:1021 Wire()` attaches every handler in code.
 - `Shell` is therefore a static class, not a `Window` subclass, and it is
-  split across seven files: Shell.cs, Pages.cs (the read-only pages),
+  split across eight files: Shell.cs, Pages.cs (the read-only pages),
   ShellOwnGame.cs (the game folder card and offer), ShellSteamUpdates.cs (the
   question about Steam's Updates setting after a downgrade), ShellUninstall.cs
-  (the launcher as Windows' Uninstall button opens it), Waiting.cs and
-  Stall.cs.
+  (the launcher as Windows' Uninstall button opens it), ShellProgress.cs (the
+  Play button as a progress bar), Waiting.cs and Stall.cs.
 
 A control renamed in ui.xaml is not a compile error. `F<T>` returns null and
 the first unguarded use of it throws, which at startup lands in Main's catch
@@ -141,7 +141,7 @@ One paragraph per class, naming the files it writes. Profile is
 `<Root>\Profile`; Game is `<Root>\Game`.
 
 **Shell** (Shell.cs, Pages.cs, ShellOwnGame.cs, ShellSteamUpdates.cs,
-ShellUninstall.cs, Waiting.cs, Stall.cs). The window and every flag that
+ShellUninstall.cs, ShellProgress.cs, Waiting.cs, Stall.cs). The window and every flag that
 decides the Play button: `playing`, `updatePending`, `updateAnswered`, `checkFailed`,
 `collectionBarUp`, `ownGameBusy`, `doorCheckOut`, `feedNotice` (the last
 answer FeedNotice gave), and `chosenId`, the character picked at the game's
@@ -190,6 +190,18 @@ version, moved by `scripts\release\Bump-Version.ps1` before a Ship. In the launc
 Play shut and asks again every thirty seconds when the source does not answer.
 Every document that was read also goes to `ShellUpdate.cs:91 ShowNotice()`, which
 asks FeedNotice what the bar above Play says and whether Play is held.
+
+**PlayProgress and PlayBar** (Progress.cs, painted by ShellProgress.cs).
+The Play button as a progress bar (#1145). RunUpdate, the client repair and
+StartOwnGame open it with `PlayProgress.Begin` and close it with `End`; in
+between, `Updater.Download` reports the bytes of each download, Sync the files
+it checks and the bytes it fetches, OwnGame.Make and Refresh the files they
+bring over, and Verify.Bytes the plugins it checks. A report with nothing open
+is dropped, so the same code run by Fix or a Scan leaves the button alone.
+`PlayBar` turns the reports into the words and the fill, never backwards
+within a phase, and a band that slides while the total is unknown;
+ShellProgress.cs redraws it at most every `PlayBar.DrawEveryMs`. It writes
+nothing. `tests\test-play-progress.ps1` compiles Progress.cs and drives it.
 
 **SelfSwap** (SelfSwap.cs). The launcher's own replacement, and the way back
 when the new one will not start. `SelfSwap.cs:67 Script()` is the cmd script
@@ -423,9 +435,11 @@ torn down and rebuilt, so an unchanged pass does not flash or re-say itself.
 it. Then it sets
 `Shell.cs:1885 btnPlay.IsEnabled`, which turns the button on only when no row
 counts against Play, none of
-`playing`, `updatePending`, `collectionBarUp` or `ownGameBusy` is set, and the
+`playing`, `updatePending`, `collectionBarUp` or `ownGameBusy` is set, no work
+is showing on the button (`playBar.Active`, see PlayProgress in section 2), and the
 feed does not hold Play (`feedNotice.Hold`, see FeedNotice in section 2). The
-button's words say which one is holding it: PREPARING THE GAME FOLDER,
+button's words say which one is holding it: while work shows, what it is doing
+and how far it has got (UPDATING 41%, 310 OF 740 MB), otherwise PREPARING THE GAME FOLDER,
 INSTALL THE MODS FIRST, CHECKING..., UPDATE FIRST, NO ANSWER FROM THE UPDATE
 SOURCE, CLOSED FOR MAINTENANCE or UPDATE THE LAUNCHER (the feed's hold, with
 the bar above Play saying why), DOWNGRADE FIRST, or in the shared shape MAKE

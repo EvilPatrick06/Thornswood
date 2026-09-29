@@ -2373,6 +2373,7 @@ namespace Thornswood
                 };
 
             WirePages();
+            WireProgress();
             WireOwnGame();
             btnFolder.Click += delegate { Open(Paths.Root); };
             btnOpenLog.Click += delegate
@@ -2874,7 +2875,9 @@ namespace Thornswood
                     txtDowngradeTitle.Text = steamCopyWrong ? "The Steam copy of Skyrim is on the wrong build" : "Skyrim is on the wrong build";
             }
 
-            btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp && !ownGameBusy && feedNotice.Hold == null;
+            bool working = playBar.Active;
+            btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp && !ownGameBusy && !working && feedNotice.Hold == null;
+            if (!working) HidePlayFill();
             // Only worth offering while there is something to quit, and it is
             // the one control on this page that stays live during a session.
             if (btnQuitGame != null)
@@ -2884,9 +2887,18 @@ namespace Thornswood
             // sets updatePending false, so the old order fell through to the
             // last branch and put PLAY back on a button that could not play:
             // the bar said install the mods and the button said go.
+            // Work that reports how far it has got (#1145): the button is the
+            // progress bar, and says what is going on and how much is left.
+            // ShellProgress.cs paints the fill; this keeps the words when
+            // anything else redraws the button in the meantime.
+            if (working && !playing)
+            {
+                btnPlay.Content = PlayBarCaption(playBar.Text);
+                btnPlay.ToolTip = "Play comes back when this is done.";
+            }
             // The game folder itself is being made or brought up to date, so
             // there is nothing complete to start yet.
-            if (ownGameBusy && !playing)
+            else if (ownGameBusy && !playing)
             {
                 btnPlay.Content = "PREPARING THE GAME FOLDER";
                 btnPlay.ToolTip = "Thornswood's own Skyrim folder is being brought up to date from Vortex. Play comes back when it is done.";
@@ -5562,6 +5574,8 @@ namespace Thornswood
             if (ClientRuntime.Recorded().Count == 0) return;
             if (ClientRuntime.Good()) return;
             healing = true;
+            // One download, the client runtime, shown on the Play button (#1145).
+            PlayProgress.Begin("Updating", 1);
             ThreadPool.QueueUserWorkItem(delegate
             {
                 int n = 0;
@@ -5584,6 +5598,7 @@ namespace Thornswood
                 finally
                 {
                     healing = false;
+                    PlayProgress.End();
                     if (n > 0) win.Dispatcher.BeginInvoke(new Action(delegate { DrawStatus(); }));
                 }
             });

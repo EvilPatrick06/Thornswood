@@ -160,7 +160,11 @@ namespace Thornswood
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
             if (Sync(cfg, at, r, v, log)) return;
 
-            foreach (Pack p in Pending(v))
+            List<Pack> packs = Pending(v);
+            int count = 0;
+            foreach (Pack p in packs) if (p != null && p.Record == null && !string.IsNullOrEmpty(p.url) && p.url.Trim().Length > 0) count++;
+            PlayProgress.Plan("Updating", count, "updates");
+            foreach (Pack p in packs)
             {
                 if (p == null || p.Record != null) continue;
                 if (string.IsNullOrEmpty(p.url) || p.url.Trim().Length == 0)
@@ -278,8 +282,12 @@ namespace Thornswood
             // ---- compare: size first, then the sha256 ---------------------
             log("Checking " + items.Count + " files against release " + r.id + "...");
             var need = new List<SyncItem>();
+            int looked = 0;
             foreach (SyncItem it in items)
+            {
                 if (!Matches(it.Dest, it.Bytes, it.Sha)) need.Add(it);
+                PlayProgress.Files("Checking files", ++looked, items.Count);
+            }
 
             // ---- fetch what differs, each file once ------------------------
             var fetch = new Dictionary<string, long>(StringComparer.Ordinal);
@@ -290,10 +298,14 @@ namespace Thornswood
             {
                 log("Downloading " + fetch.Count + (fetch.Count == 1 ? " file, " : " files, ") + Mb(total) + " MB.");
                 long got = 0; int quarter = 0;
+                PlayProgress.Bytes("Updating", 0, total);
                 foreach (KeyValuePair<string, long> f in fetch)
                 {
-                    FetchInto(at + f.Key, f.Key, f.Value, Path.Combine(stage, f.Key));
+                    long before = got;
+                    FetchInto(at + f.Key, f.Key, f.Value, Path.Combine(stage, f.Key),
+                              delegate(long had) { PlayProgress.Bytes("Updating", before + Math.Min(had, f.Value), total); });
                     got += f.Value;
+                    PlayProgress.Bytes("Updating", got, total);
                     int now = total > 0 ? (int)(got * 4 / total) : 4;
                     if (now > quarter && now < 4 && total > 20L * 1048576) log("  " + Mb(got) + " of " + Mb(total) + " MB");
                     quarter = now;
@@ -461,6 +473,12 @@ namespace Thornswood
         /// </summary>
         static void FetchInto(string url, string sha, long bytes, string dest)
         {
+            FetchInto(url, sha, bytes, dest, null);
+        }
+
+        /// <param name="onBytes">Bytes of this file on disk so far, for the Play button (#1145). May be null.</param>
+        static void FetchInto(string url, string sha, long bytes, string dest, Action<long> onBytes)
+        {
             if (File.Exists(dest))
             {
                 if (Matches(dest, bytes, sha)) return;
@@ -471,7 +489,7 @@ namespace Thornswood
             {
                 long have = File.Exists(part) ? new FileInfo(part).Length : 0;
                 if (bytes < 0 || have > bytes) { if (have > 0) File.Delete(part); have = 0; }
-                if (bytes < 0 || have < bytes) Transfer(url, part, have);
+                if (bytes < 0 || have < bytes) Transfer(url, part, have, onBytes);
                 if (Matches(part, bytes, sha))
                 {
                     File.Move(part, dest);
@@ -483,7 +501,7 @@ namespace Thornswood
             throw new Exception("Checksum did not match. Download rejected.");
         }
 
-        static void Transfer(string url, string part, long from)
+        static void Transfer(string url, string part, long from, Action<long> onBytes)
         {
             var req = (HttpWebRequest)WebRequest.Create(url);
             req.Timeout = 10000;
@@ -501,7 +519,13 @@ namespace Thornswood
                 {
                     byte[] buf = new byte[81920];
                     int n;
-                    while ((n = s.Read(buf, 0, buf.Length)) > 0) f.Write(buf, 0, n);
+                    long had = carryOn ? from : 0;
+                    while ((n = s.Read(buf, 0, buf.Length)) > 0)
+                    {
+                        f.Write(buf, 0, n);
+                        had += n;
+                        if (onBytes != null) onBytes(had);
+                    }
                 }
             }
         }
