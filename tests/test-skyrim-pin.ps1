@@ -376,6 +376,56 @@ try {
     } | ForEach-Object { $_.Index })
     Yes "P9 the first manifest is in Downgrade.cs's code only inside the fallback block ($($hits.Count) found)" ($fbStart -gt 0 -and $fbEnd -gt $fbStart -and $hits.Count -ge 1 -and @($hits | Where-Object { $_ -lt $fbStart -or $_ -gt $fbEnd }).Count -eq 0)
     Yes 'P9 Run asks for the pinned depots, not the fallback directly' ((Lift $downSrc 'static bool Run(Config cfg, Action<string> log, Action<string> status)') -match 'Depots = PinnedDepots\(cfg\);')
+
+    # ---- P10: the pinned build's own files (#1232) --------------------------------
+    # records\skyrim-files.json lists every file of the three pinned depots, read
+    # out of Steam's manifests of them by New-SkyrimFilesRecord.ps1. OwnGame takes
+    # a file from the Steam copy as Skyrim's own only when it is on this list, so
+    # the list has to be the pin's, moved in the same pull request.
+    $filesPath = Join-Path $Root 'records\skyrim-files.json'
+    Yes 'P10 records\skyrim-files.json is there' (Test-Path -LiteralPath $filesPath)
+    if (Test-Path -LiteralPath $filesPath) {
+        $filesText = (Read-Text $filesPath).TrimStart([char]0xFEFF)
+        $files = $filesText | ConvertFrom-Json
+        Yes 'P10 it is for the pinned build and app' ([string]$files.build -eq [string]$rec.build -and [string]$files.appId -eq [string]$rec.appId)
+        $fileDepots = @($files.depots | ForEach-Object { 'download_depot ' + $files.appId + ' ' + $_.id + ' ' + $_.manifest })
+        Yes 'P10 it was read from the same three depot manifests as the pin' (Same $fileDepots $recLines)
+        $props = @($files.files.PSObject.Properties)
+        $paths = @($props | ForEach-Object { $_.Name })
+        $depotIds = @($rec.depots | ForEach-Object { [string]$_.id })
+        $badRows = @($props | Where-Object { ([string]$_.Value.bytes) -notmatch '^\d+$' -or ([string]$_.Value.sha1) -notmatch '^[0-9a-f]{40}$' -or $depotIds -notcontains [string]$_.Value.depot })
+        Yes "P10 it lists files ($($paths.Count)), each with its bytes, SHA-1 and depot" ($paths.Count -gt 0 -and $badRows.Count -eq 0)
+        $counted = 0; foreach ($d in $files.depots) { $counted += [int]$d.files }
+        Yes 'P10 and as many as the depots say they hold' ($counted -eq $paths.Count)
+        Yes 'P10 its SkyrimSE.exe is the pin''s size' ($paths -contains 'SkyrimSE.exe' -and [string]$files.files.'SkyrimSE.exe'.bytes -eq [string]$rec.expectedExeBytes)
+        Yes 'P10 every path stays under the game folder: no drive, no leading slash, no ..' (@($paths | Where-Object { $_ -match ':|^\\|(^|\\)\.\.(\\|$)' }).Count -eq 0)
+        $mustHave = @('Data\Skyrim.esm', 'Data\Update.esm', 'Data\Dawnguard.esm', 'Data\HearthFires.esm', 'Data\Dragonborn.esm', 'Data\Skyrim - Textures0.bsa')
+        Yes 'P10 the masters and the archives are on it' (@($mustHave | Where-Object { $paths -notcontains $_ }).Count -eq 0)
+        $kinds = Read-Text (Join-Path $app 'OwnGameKinds.cs')
+        # The launcher's own pattern, over the record as it is.
+        $pattern = [regex]::Match($kinds, 'Regex\.Matches\(text, "((?:[^"\\]|\\.)*)"\)').Groups[1].Value
+        $pattern = $pattern.Replace('\\', '\').Replace('\"', '"')
+        $readBack = @([regex]::Matches($filesText, $pattern) | ForEach-Object { $_.Groups[1].Value.Replace('\\', '\') })
+        Yes "P10 the launcher's own pattern reads every path back out of it ($($readBack.Count))" ($pattern.Length -gt 0 -and (Same @($readBack | Sort-Object) @($paths | Sort-Object)))
+        $builder = Read-Text (Join-Path $Root 'scripts\release\Build-Launcher.ps1')
+        Yes 'P10 Build-Launcher.ps1 puts it inside the launcher as skyrim-files.json, and stops without it' (
+            $builder -match '\.\.\\\.\.\\records\\skyrim-files\.json' -and $builder -match ',skyrim-files\.json"' -and $builder -match 'Die "skyrim-files\.json is not at')
+        $gen = Join-Path $Root 'scripts\release\New-SkyrimFilesRecord.ps1'
+        Yes 'P10 New-SkyrimFilesRecord.ps1, which writes it, is there' (Test-Path -LiteralPath $gen)
+        # On a machine whose Steam has the three manifests, the record is what
+        # the script writes from them today.
+        $steamDir = ''
+        try { $steamDir = [string](Get-ItemProperty -Path 'HKCU:\Software\Valve\Steam' -Name SteamPath -ErrorAction Stop).SteamPath } catch { $steamDir = '' }
+        $have = $steamDir.Length -gt 0 -and @($rec.depots | Where-Object { -not (Test-Path -LiteralPath (Join-Path $steamDir ('depotcache\{0}_{1}.manifest' -f $_.id, $_.manifest))) }).Count -eq 0
+        if ($have -and (Test-Path -LiteralPath $gen)) {
+            $again = Join-Path $scratch 'skyrim-files.json'
+            # In its own process: it stops with exit when something disagrees.
+            $null = & ([Diagnostics.Process]::GetCurrentProcess().MainModule.FileName) -NoProfile -ExecutionPolicy Bypass -File $gen -Steam $steamDir -Out $again
+            # Line ends aside: git may check the record out with CRLF.
+            Yes 'P10 written again from this machine''s Steam manifests, it is the same file' ((Test-Path -LiteralPath $again) -and ((Read-Text $again).Replace("`r`n", "`n") -eq (Read-Text $filesPath).Replace("`r`n", "`n")))
+        }
+        else { Write-Host '      (this machine''s Steam does not have the three manifests, so the record is not written again here)' }
+    }
 }
 finally {
     Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue

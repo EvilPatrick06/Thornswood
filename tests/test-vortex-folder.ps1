@@ -103,6 +103,11 @@ if (Test-Path -LiteralPath $progress) { $real += $progress }
 # #1217 and #1218. Taken only where it exists, as above.
 $ownShare = Join-Path $AppPath 'OwnGameShare.cs'
 if (Test-Path -LiteralPath $ownShare) { $real += $ownShare }
+# And which kind of file each is, by the pinned build's list, since #1232.
+# Taken only where it exists, as above, with a list of the pretend game's own
+# files embedded the way Build-Launcher embeds records\skyrim-files.json.
+$ownKinds = Join-Path $AppPath 'OwnGameKinds.cs'
+if (Test-Path -LiteralPath $ownKinds) { $real += $ownKinds }
 foreach ($f in $real) {
     Yes "launcher\app\$([IO.Path]::GetFileName($f)) is there" (Test-Path -LiteralPath $f)
     if (-not (Test-Path -LiteralPath $f)) { Done }
@@ -149,7 +154,14 @@ namespace Thornswood
         public static void ClearDownloads(Config cfg, Action<string> say) { }
     }
     static class SkyMp { public static int ResourcePortFor(Config cfg) { return 0; } }
-    static class Updater { public const string Version = "test"; }
+    // An install that never synced to a release record: every record of
+    // Thornswood's own files is its packs', Keep's and the installer's.
+    static class Updater
+    {
+        public const string Version = "test";
+        public static bool ReleaseFilesKnown() { return true; }
+        public static List<string> ReleaseFiles() { return new List<string>(); }
+    }
 }
 '@
 
@@ -672,8 +684,10 @@ namespace Thornswood
             string made = null;
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             Yes("the folder is made from it", made != null && Text(Path.Combine(OwnGame.Folder, "Data\\TsOne.esp")) == "LIB2-TSONE");
-            Yes("the way it always was for a Steam copy: everything in it, from it",
-                Text(Path.Combine(OwnGame.Folder, "Mods\\left-by-someone.txt")) == "LIB2-OWN" && Text(Path.Combine(OwnGame.Folder, "SkyrimSE.exe")) == "LIB2-EXE");
+            // Since #1232 only Skyrim's own files, Vortex's and Thornswood's
+            // come from a Steam copy; a file somebody left there by hand stays.
+            Yes("the game comes from it, and a file left in it by hand stays out of Thornswood's folder",
+                !File.Exists(Path.Combine(OwnGame.Folder, "Mods\\left-by-someone.txt")) && Text(Path.Combine(OwnGame.Folder, "SkyrimSE.exe")) == "LIB2-EXE");
         }
 
         // ---- an older deployment left in the Steam copy ----------------------
@@ -787,10 +801,12 @@ namespace Thornswood
             string made = null;
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             string game = OwnGame.Folder;
-            List<string> expect = new List<string> { "bink2w64.dll", "Data\\Loose.esp", "Data\\Scripts\\vanilla.pex", "Data\\Skyrim - Textures0.bsa",
+            // Since #1232 Skyrim's own files and Vortex's, and not the plugin
+            // somebody put into the Steam copy by hand (Data\Loose.esp).
+            List<string> expect = new List<string> { "bink2w64.dll", "Data\\Scripts\\vanilla.pex", "Data\\Skyrim - Textures0.bsa",
                                                      "Data\\Skyrim.esm", "Data\\TsOne.esp", "Data\\TsTwo.esm", "SkyrimSE.exe" };
             expect.Sort(StringComparer.OrdinalIgnoreCase);
-            Yes("the folder is every file of the Steam copy but Vortex's record, as before",
+            Yes("the folder is Skyrim's own files and Vortex's from the Steam copy, and a plugin put there by hand stays out",
                 made != null && string.Join("|", Rels(game).ToArray()) == string.Join("|", expect.ToArray()));
             Yes("taken from the Steam copy itself, not from staging",
                 Text(Path.Combine(game, "Data\\TsOne.esp")) == "DEPLOYED-TSONE" && Id(Path.Combine(game, "Data\\TsOne.esp")) == Id(Path.Combine(steam, "Data\\TsOne.esp")));
@@ -827,6 +843,10 @@ namespace Thornswood
             Put(Path.Combine(steam, "_Profile Switch\\Switch.ps1"), "SWITCH");
             Put(Path.Combine(steam, "Data\\_disabledByKzl\\ccParked.esm"), "PARKED-CC");
             Put(Path.Combine(steam, "Data\\_ResourcePack.esl"), "GAME-RESOURCEPACK");
+            // The behavior output is Thornswood's, from a pack, as the shipping
+            // machine's Nemesis output is: since #1232 a file in the Steam copy
+            // that no record names is not taken at all.
+            Put(Path.Combine(Paths.PacksDir, "20260926-0000.files"), "a|game\\" + beh + "\r\nb|game\\" + male + "\r\nc|game\\" + fnis + "\r\n");
             // The animation is the collection's, deployed by Vortex. Since
             // #1218 only Vortex's files are linked; the game's own are copies.
             Record(Path.Combine(steam, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(steam, "Data"),
@@ -979,6 +999,14 @@ try {
     # own copies of the framework and a machine with the reference assemblies
     # installed stops on CS1703.
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/out:$exe")
+    if (Test-Path -LiteralPath $ownKinds) {
+        $skyrimList = Join-Path $work 'skyrim-files.json'
+        $listed = @('SkyrimSE.exe', 'bink2w64.dll', 'High.ini', 'installscript.vdf', 'Data\Skyrim.esm', 'Data\Skyrim - Textures0.bsa',
+                    'Data\_ResourcePack.esl', 'Data\Scripts\vanilla.pex') |
+            ForEach-Object { '    "{0}": {{ "bytes": 1, "sha1": "0", "depot": "1" }}' -f $_.Replace('\', '\') }
+        [IO.File]::WriteAllText($skyrimList, "{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" + ($listed -join ",`n") + "`n  }`n}`n", $utf8)
+        $cscArgs += "/resource:$skyrimList,skyrim-files.json"
+    }
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
     foreach ($f in $real) { $cscArgs += (Resolve-Path -LiteralPath $f).Path }
     $cscArgs += $stubFile

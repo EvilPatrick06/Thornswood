@@ -377,7 +377,7 @@ Yes 'OwnGame.Rules moved for it, so every folder made under the old rules refres
 # The model of Refresh below has two branches: a name Skip lets through that
 # the folder lacks is copied in, and one it holds is left alone. That is only
 # true while Refresh's own loop reads that way.
-$refresh = Get-CsMember $og 'public static string Refresh(Config cfg, Action<string> say)'
+$refresh = Get-CsMember $og 'static string RefreshNow(Config cfg, Action<string> say)'
 $order = @(
     'foreach (Found f in all)',
     'string skip = Skip(f.Rel);',

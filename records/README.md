@@ -25,6 +25,14 @@ read it (issue #440, phase 8):
   compiled fallback (Downgrade.cs, Config.cs) and Setup-Thornswood.ps1,
   because a pin move is one release. `tests\test-skyrim-pin.ps1` fails while
   they disagree.
+- `skyrim-files.json`: every file of the pinned build, 46 on 1.6.1170, with
+  its bytes, SHA-1 and depot, read out of Steam's own manifests of the three
+  depots `skyrim-pin.json` names by `scripts\release\New-SkyrimFilesRecord.ps1`
+  (issue #1232). Build-Launcher puts it inside the launcher, and Thornswood's
+  own folder takes a file from the Steam copy as Skyrim's own only when it is
+  on this list, so a mod put into the Steam copy by hand never gets in. Run
+  the script again in the same pull request as a pin move;
+  `tests\test-skyrim-pin.ps1` fails while the two disagree.
 - `update-creation-club.json`: the Creation Club records Bethesda keeps in
   Update.esm (354 on build 1.6.1170, editor ids starting cc). Every Special
   Edition has them, but their art comes with the Creation Club files

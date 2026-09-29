@@ -98,6 +98,77 @@ namespace Thornswood
             return s.SyncedId.Length > 0 ? s.SyncedId : s.Synced;
         }
 
+        // ---- the game files that release ships (#1232) -----------------------
+        //
+        // Profile\release-files.txt: "release <sha256> <id>", then every game
+        // file the release this install synced to ships, one path a line.
+        // Thornswood's own folder counts these as Thornswood's own files
+        // (OwnGameKinds.cs). A file that already had the release's bytes is
+        // not written by a sync, so no pack, Keep or installer record names
+        // it; on the machine that ships, the release's files are the folder's
+        // own and have no other record at all.
+
+        static string ReleaseFilesFile { get { return Path.Combine(Paths.ProfileDir, "release-files.txt"); } }
+
+        static void WriteReleaseFiles(RecordRef r, ICollection<string> rels)
+        {
+            var lines = new List<string>();
+            lines.Add("release " + r.sha256 + " " + r.id);
+            var sorted = new List<string>(rels);
+            sorted.Sort(StringComparer.OrdinalIgnoreCase);
+            lines.AddRange(sorted);
+            Directory.CreateDirectory(Paths.ProfileDir);
+            string tmp = ReleaseFilesFile + ".tmp";
+            File.WriteAllLines(tmp, lines.ToArray());
+            if (File.Exists(ReleaseFilesFile)) File.Delete(ReleaseFilesFile);
+            File.Move(tmp, ReleaseFilesFile);
+        }
+
+        /// <summary>The sha256 of the release the kept list is for, or "".</summary>
+        static string ReleaseFilesSha()
+        {
+            try
+            {
+                if (!File.Exists(ReleaseFilesFile)) return "";
+                using (var sr = new StreamReader(ReleaseFilesFile))
+                {
+                    string first = sr.ReadLine() ?? "";
+                    string[] w = first.Split(' ');
+                    return w.Length >= 2 && w[0] == "release" ? w[1].ToLowerInvariant() : "";
+                }
+            }
+            catch (Exception ex) { Swallow.Note("Updater.ReleaseFilesSha", ex); return ""; }
+        }
+
+        /// <summary>
+        /// True when every record of Thornswood's own game files is on this
+        /// machine: the install never synced to a release record (every file
+        /// of ours came through the installer, a pack or Keep, which all keep
+        /// records), or it keeps the list of the release it synced to.
+        /// </summary>
+        public static bool ReleaseFilesKnown()
+        {
+            SyncState s = ReadSyncState();
+            return s.Synced.Length == 0 || ReleaseFilesSha() == s.Synced;
+        }
+
+        /// <summary>
+        /// The kept list of the release's game files; empty when
+        /// ReleaseFilesKnown is not true of it. Throws when the list is there
+        /// and cannot be read, because an empty answer would call every file
+        /// of the release somebody else's.
+        /// </summary>
+        public static List<string> ReleaseFiles()
+        {
+            var l = new List<string>();
+            SyncState s = ReadSyncState();
+            if (s.Synced.Length == 0 || ReleaseFilesSha() != s.Synced) return l;
+            string[] all = File.ReadAllLines(ReleaseFilesFile);
+            for (int i = 1; i < all.Length; i++)
+                if (all[i].Trim().Length > 0) l.Add(all[i].Trim());
+            return l;
+        }
+
         /// <summary>
         /// The update Pending offers when the feed names a record this install
         /// has not synced to: one entry standing for the whole release, so the
@@ -110,7 +181,10 @@ namespace Thornswood
             RecordRef r = v == null ? null : v.record;
             if (r == null) return null;
             SyncState s = ReadSyncState();
-            if (s.Synced == r.sha256 || s.PacksOnly == r.sha256) return null;
+            // Synced by a launcher from before #1232, which kept no list of the
+            // release's files: checked against it once more, which downloads
+            // nothing that is already right, and the list is kept this time.
+            if ((s.Synced == r.sha256 && ReleaseFilesSha() == r.sha256) || s.PacksOnly == r.sha256) return null;
             var p = new Pack();
             p.id = "release " + r.id;
             p.url = r.url;
@@ -398,6 +472,9 @@ namespace Thornswood
                 foreach (Pack p in v.packs)
                     if (p != null && !string.IsNullOrEmpty(p.id) && !done.Contains(p.id)) { MarkApplied(p.id); done.Add(p.id); }
 
+            // The list first, so an install that says it is on this release
+            // always has the list of its files (#1232).
+            WriteReleaseFiles(r, listed);
             state = ReadSyncState();
             state.Synced = r.sha256;
             state.SyncedId = r.id;

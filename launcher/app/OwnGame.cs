@@ -86,7 +86,8 @@ namespace Thornswood
 
         /// <summary>
         /// One line per file brought in: kind (L linked, C copied), origin (V
-        /// deployed by Vortex, O anything else), size and write time of the
+        /// deployed by Vortex, O Skyrim's own, T Thornswood's own; before
+        /// Rules 13 O was anything not Vortex's), size and write time of the
         /// source when it was brought in, then the path under the game folder.
         /// Publish-Update reads the V lines to keep the collection out of packs.
         /// </summary>
@@ -364,6 +365,10 @@ namespace Thornswood
             // copy's build, and whether there is a Steam copy at all, matter
             // only to Make.
             bool made = Active;
+            // Without the pinned build's list nothing can be told apart from a
+            // mod put in by hand, so neither Make nor a refresh runs (#1232).
+            string noList = NoSkyrimList();
+            if (noList != null) return noList;
             if (string.IsNullOrEmpty(src) || !File.Exists(Path.Combine(src, "SkyrimSE.exe")))
                 return made
                     ? "Thornswood cannot find the Skyrim folder Vortex deploys into. In Vortex, Mods, Open, Open Game Folder shows which, and Choose Vortex's folder in Settings points Thornswood at it."
@@ -380,6 +385,13 @@ namespace Thornswood
                            "never from another folder, and this machine has none, so install Skyrim Special Edition in Steam and try again.";
                 string build = FirstBuild(cfg, game);
                 if (build != null) return build;
+                // Make takes Thornswood's own files from the Steam copy by
+                // Thornswood's records, the release's file list among them
+                // (#1232). An install an older launcher synced has not kept
+                // that list until it is checked against its release again.
+                if (!OursKnown())
+                    return "Thornswood is checking this install against its release first, which tells it which files in the Steam copy are Thornswood's own. " +
+                           "Let the update finish, then make the folder.";
             }
             if (SameFolder(src, Folder))
                 return "Vortex is set to deploy into Thornswood's own folder, which would make it out of itself.";
@@ -397,6 +409,20 @@ namespace Thornswood
             // files (Vortex), or the game's own that the folder already holds.
             HashSet<string> deployedNow = made ? Deployed(src) : null;
             Dictionary<string, Rec> ownFiles = made ? ReadFiles() : null;
+            // Not made: a plugin in the Steam copy counts only when Make will
+            // take it, which is one of the three kinds and never a mod put
+            // there by hand (#1232).
+            HashSet<string> deployedHere = !made && !apart ? Deployed(src) : null;
+            HashSet<string> oursNow = null;
+            if (!made)
+            {
+                try { oursNow = Ours(deployedHere); }
+                catch (Exception ex)
+                {
+                    return "Thornswood could not read its own records of which files are its own (" + ex.Message.TrimEnd('.') +
+                           "), so it cannot tell them from mods in the Steam copy yet. Close anything that has Thornswood's Profile folder open and try again.";
+                }
+            }
             int missing = 0, unstaged = 0;
             foreach (string p in want)
             {
@@ -418,11 +444,11 @@ namespace Thornswood
                     // Vortex's mods folder is gone is counted apart: the
                     // Thornswood profile is deployed, the deployment is just
                     // out of date (verification of hotfix 1.1.93).
-                    if (!apart) { if (!File.Exists(Path.Combine(src, "Data", p))) missing++; }
+                    if (!apart) { if (!File.Exists(Path.Combine(src, "Data", p)) || KindOf("Data\\" + p, deployedHere, oursNow) == '\0') missing++; }
                     else if (!(rec.From.TryGetValue("Data\\" + p, out from) && File.Exists(from)))
                     {
                         if (stale == null) stale = Deployed(game);
-                        if (!File.Exists(Path.Combine(game, "Data", p)) || stale.Contains("Data\\" + p))
+                        if (!File.Exists(Path.Combine(game, "Data", p)) || stale.Contains("Data\\" + p) || KindOf("Data\\" + p, null, oursNow) == '\0')
                         {
                             if (from != null) unstaged++; else missing++;
                         }
@@ -572,8 +598,13 @@ namespace Thornswood
         /// 12: the Creation Kit's script sources (Data\Source and
         ///    Data\Scripts\Source) are left out, and taken out of a folder that
         ///    already has them. See BethesdaTool, issue #1227.
+        /// 13: only three kinds of file (#1232): Skyrim's own by the pinned
+        ///    build's list, Vortex's by its record, Thornswood's by its records.
+        ///    What Make took from the Steam copy that is none of them, mods put
+        ///    there by hand, is taken out of the folder and logged, and each file
+        ///    is recorded as which kind it is (O, V or T). See OwnGameKinds.cs.
         /// </summary>
-        const int Rules = 12;
+        const int Rules = 13;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -595,6 +626,10 @@ namespace Thornswood
             // A folder with no number in its record was made before any of
             // this and reads as -1, so it refreshes once and then matches.
             if (Recorded("rules") != Rules) return true;
+
+            // Files from the Steam copy not sorted into the three kinds yet,
+            // and the records to sort them by are here now (#1232).
+            if (KindsDue()) return true;
 
             return DeploymentStamp(src) != Recorded("deployment");
         }
@@ -629,6 +664,11 @@ namespace Thornswood
         /// </summary>
         public static string Make(Config cfg, Action<string> say)
         {
+            lock (folderWork) return MakeNow(cfg, say);
+        }
+
+        static string MakeNow(Config cfg, Action<string> say)
+        {
             string src = DeploysInto(cfg);
             string why = WhyNot(cfg, src);
             if (why != null) throw new Exception(why);
@@ -642,13 +682,17 @@ namespace Thornswood
             Directory.CreateDirectory(Dir);
 
             HashSet<string> deployed = Deployed(src);
+            // Thornswood's own files by its records (#1232): the installer's
+            // list, the packs' and Keep's, while they still say so.
+            HashSet<string> ours = Ours(deployed);
             wantedPlugins = new HashSet<string>(ShippedPlugins(), StringComparer.OrdinalIgnoreCase);
             var left = new List<string>();
             // The Steam copy on another build: the game comes from the files
             // the Downgrade downloaded (FirstBuild let it through only then).
             string game = GameFor(src);
             List<string> pinned = FirstBuildWrong(cfg, game) ? Downgrade.Downloaded(cfg) : null;
-            List<Found> all = WithPayload(Gather(src, left, pinned));
+            int byHand = 0;
+            List<Found> all = WithPayload(Gather(src, left, pinned, ours, ref byHand));
 
             long copyBytes = 0, totalBytes = 0;
             foreach (Found f in all)
@@ -663,7 +707,7 @@ namespace Thornswood
                                     Mb(copyBytes) + " and " + Mb(free) + " is free.");
 
             var lines = new List<string>();
-            int linked = 0, copied = 0, fellBack = 0, ours = 0;
+            int linked = 0, copied = 0, fellBack = 0, fromPayload = 0;
             long done = 0; int shown = 0, looked = 0;
             foreach (Found f in all)
             {
@@ -685,9 +729,12 @@ namespace Thornswood
                 // Thornswood's own from Payload is linked in and its Payload
                 // name removed once the folder is in place, so on record it
                 // is what it then is: a copy of the folder's own.
-                if (f.Ours) ours++;
+                if (f.Ours) fromPayload++;
                 else if (asLink) linked++; else { copied++; if (!copy) fellBack++; }
-                lines.Add((asLink && !f.Ours ? "L" : "C") + "|" + (deployed.Contains(f.Rel) ? "V" : "O") + "|" + f.Size + "|" + f.Ticks + "|" + f.Rel);
+                // Which kind it is (OwnGameKinds.cs): Vortex's, Skyrim's own,
+                // or Thornswood's. Gather let nothing else through.
+                char kind = deployed.Contains(f.Rel) ? 'V' : f.Ours ? 'T' : f.Pinned ? 'O' : KindOf(f.Rel, deployed, ours);
+                lines.Add((asLink && !f.Ours ? "L" : "C") + "|" + kind + "|" + f.Size + "|" + f.Ticks + "|" + f.Rel);
 
                 done += f.Size;
                 int pct = totalBytes > 0 ? (int)(done * 100 / totalBytes) : 100;
@@ -705,7 +752,7 @@ namespace Thornswood
             // Thornswood's files back into the Steam copy (#1226).
             ForgetCleaned();
             Directory.Move(temp, Folder);
-            WriteMade(src, SumCopied(lines));
+            WriteMade(src, SumCopied(lines), 1);
             SettleSettings(true);
             string payloadLeft = DropPayload();
 
@@ -713,8 +760,11 @@ namespace Thornswood
                           linked.ToString("n0") + " files linked, " + copied.ToString("n0") + " copied (" + Mb(copyBytes) + ")";
             if (fellBack > 0) said += ", " + fellBack.ToString("n0") + " of them copied because a link could not be made";
             said += ". " + left.Count.ToString("n0") + " left out, other servers' files among them; the list is in " + LeftOutFile + ".";
-            if (ours > 0)
-                said += " " + ours.ToString("n0") + " of Thornswood's own files came from " + Paths.Payload +
+            if (byHand > 0)
+                said += " " + byHand.ToString("n0") + " of them " + (byHand == 1 ? "is" : "are") + " in the Steam copy and not Skyrim's own, Vortex's or Thornswood's, " +
+                        "such as mods put there by hand, so " + (byHand == 1 ? "it stays" : "they stay") + " with the Steam copy and out of Thornswood.";
+            if (fromPayload > 0)
+                said += " " + fromPayload.ToString("n0") + " of Thornswood's own files came from " + Paths.Payload +
                         ", where the installer and the launcher kept them so that nothing was written into the Steam copy.";
             if (payloadLeft != null) said += " " + payloadLeft;
             if (pinned != null)
@@ -738,6 +788,11 @@ namespace Thornswood
         public static string Refresh(Config cfg, Action<string> say)
         {
             if (!Active) throw new Exception("This install is not running from a folder of its own.");
+            lock (folderWork) return RefreshNow(cfg, say);
+        }
+
+        static string RefreshNow(Config cfg, Action<string> say)
+        {
             string src = DeploysInto(cfg);
 
             // Same deployment stamp and same rules as the last refresh: nothing
@@ -749,6 +804,7 @@ namespace Thornswood
             // after this returns; when nothing changed that write is a no-op.
             if (!string.IsNullOrEmpty(src)
                 && Recorded("rules") == Rules
+                && !KindsDue()
                 && DeploymentStamp(src) == Recorded("deployment")
                 && Recorded("deployment") != 0)
                 return "Thornswood's own Skyrim folder already matches what Vortex has deployed.";
@@ -759,6 +815,13 @@ namespace Thornswood
             Dictionary<string, Rec> old = ReadFiles();
             HashSet<string> deployed = Deployed(src);
             HashSet<string> owned = Owned(deployed);
+            HashSet<string> ours = Ours(deployed);
+            // Until every record of Thornswood's own files is here, nothing is
+            // taken out for being on none of them (OursKnown).
+            bool sortNow = OursKnown();
+            var byHand = new List<string>();
+            var stuck = new List<string>();
+            int unsorted = 0;
             wantedPlugins = new HashSet<string>(ShippedPlugins(), StringComparer.OrdinalIgnoreCase);
             var left = new List<string>();
             // Vortex's files and nothing else (#1218). The game itself is the
@@ -857,6 +920,14 @@ namespace Thornswood
             // a file copied over the Steam copy's writes through every hard
             // link to it (measured, OwnGameShare.cs); Skyrim's archives stay
             // shared, and Share checks them.
+            //
+            // And only the three kinds stay (#1232). Each file that is not
+            // Vortex's is Skyrim's own by the pinned build's list (O) or
+            // Thornswood's by its records (T), and is recorded as which. One
+            // that is neither came in with the Steam copy when the folder was
+            // made, before Make kept to the three: a mod put there by hand. It
+            // comes out of this folder, logged; only this folder's name for
+            // it goes, and the Steam copy keeps its own.
             foreach (KeyValuePair<string, Rec> kv in old)
             {
                 if (seen.Contains(kv.Key)) continue;
@@ -867,8 +938,41 @@ namespace Thornswood
                     try
                     {
                         if (!File.Exists(at) || (!mine && Skip(kv.Key) != null)) continue;
+                        char origin = kv.Value.Origin;
+                        if (origin != 'V')
+                        {
+                            origin = KindOf(kv.Key, null, ours);
+                            if (origin == '\0' && !sortNow)
+                            {
+                                // Kept as it was until the records are here.
+                                unsorted++;
+                                origin = kv.Value.Origin;
+                            }
+                            else if (origin == '\0')
+                            {
+                                try
+                                {
+                                    DropName(at);
+                                    byHand.Add(kv.Key);
+                                    left.Add(kv.Key + "  (taken out: " + NoneOfThree + ")");
+                                }
+                                catch (Exception ex)
+                                {
+                                    // Held open: it stays on record as it was,
+                                    // and made.txt says the folder is not sorted
+                                    // yet (kinds=0), so the next start tries again.
+                                    Swallow.Note("OwnGame.Refresh, taking out " + kv.Key, ex);
+                                    stuck.Add(kv.Key);
+                                    lines.Add(kv.Value.Kind + "|" + kv.Value.Origin + "|" + kv.Value.Size + "|" + kv.Value.Ticks + "|" + kv.Key);
+                                }
+                                continue;
+                            }
+                        }
                         char kind = kv.Value.Kind;
-                        if (!mine && kv.Value.Origin != 'V' && !IsArchive(kv.Key))
+                        // Thornswood's own too (T): one a pack wrote that the
+                        // folder still shares with the Steam copy, such as the
+                        // behavior files, is written in place there by Nemesis.
+                        if (origin != 'V' && !IsArchive(kv.Key))
                         {
                             if (Links(at) > 1) { Separate(at); if (Links(at) <= 1) separatedGame++; }
                         }
@@ -876,7 +980,7 @@ namespace Thornswood
                         // eighteen archives on the shipping machine were on
                         // record as linked and were copies (#1217).
                         kind = Links(at) > 1 ? 'L' : 'C';
-                        lines.Add(kind + "|" + kv.Value.Origin + "|" + kv.Value.Size + "|" + kv.Value.Ticks + "|" + kv.Key);
+                        lines.Add(kind + "|" + origin + "|" + kv.Value.Size + "|" + kv.Value.Ticks + "|" + kv.Key);
                     }
                     catch (Exception ex)
                     {
@@ -929,16 +1033,30 @@ namespace Thornswood
 
             File.WriteAllLines(FilesList, lines.ToArray());
             File.WriteAllLines(LeftOutFile, left.ToArray());
-            WriteMade(src, SumCopied(lines));
+            // Sorted into the three kinds only when every record was here and
+            // nothing was held open; otherwise the next start refreshes again
+            // once it can finish (KindsDue).
+            WriteMade(src, SumCopied(lines), sortNow && stuck.Count == 0 ? 1 : 0);
             SettleSettings(false);
 
             string own = "";
+            if (byHand.Count > 0)
+                own += " Took " + byHand.Count.ToString("n0") + (byHand.Count == 1 ? " file" : " files") + " out of Thornswood's folder that came in from the Steam copy when the folder was made " +
+                       "and are not Skyrim's own, Vortex's or Thornswood's, such as mods put there by hand: " + Some(byHand) +
+                       ". They are still in the Steam copy, which was not touched, for the Skyrim you play from Steam; the list is in " + LeftOutFile + ".";
+            if (stuck.Count > 0)
+                own += " " + stuck.Count.ToString("n0") + " more like " + (stuck.Count == 1 ? "it" : "them") + " could not be taken out yet, most likely because something has " +
+                       (stuck.Count == 1 ? "it" : "them") + " open (" + Some(stuck) + "); the launcher tries again the next time it starts.";
+            if (unsorted > 0)
+                own += " " + unsorted.ToString("n0") + (unsorted == 1 ? " file" : " files") + " in Thornswood's folder came in from the Steam copy and " + (unsorted == 1 ? "is" : "are") +
+                       " not Skyrim's own or Vortex's. Whether " + (unsorted == 1 ? "it is" : "they are") + " Thornswood's is known once the launcher has checked this install against its release, " +
+                       "and the next start after that takes out any that are not.";
             if (separated > 0) own += " " + separated.ToString("n0") + " animation file(s) it shared with the Steam copy are its own copies now.";
             if (relinked > 0) own += " " + relinked.ToString("n0") + " Distribution redistributable(s) it held as its own copies are hard links now.";
             if (separatedGame > 0) own += " " + separatedGame.ToString("n0") + " of the game's own file(s) it shared with the Steam copy are its own copies now, so nothing done to the Steam copy reaches them.";
             string shared = Share(GameFor(src), say);
             if (shared != null) own += " " + shared;
-            if (added + changed + removed == 0)
+            if (added + changed + removed + byHand.Count == 0)
                 return "Thornswood's own Skyrim folder already matches what Vortex has deployed." + own;
             return "Thornswood's own Skyrim folder is up to date with Vortex: " + added.ToString("n0") + " new, " +
                    changed.ToString("n0") + " changed, " + removed.ToString("n0") + " taken out" +
@@ -1870,7 +1988,10 @@ namespace Thornswood
         /// into <paramref name="src"/>, each with where it is brought from.
         /// Anything that cannot be brought in is said in <paramref name="left"/>.
         ///
-        /// When src is a Steam copy this is what it always was, a walk of src.
+        /// When src is a Steam copy this is a walk of src that keeps only the
+        /// three kinds of file (OnlyThree, #1232): Skyrim's own, Vortex's and
+        /// Thornswood's. It used to be the whole walk, so a mod put into the
+        /// Steam copy by hand came into Thornswood's folder.
         ///
         /// When it is not, NO BLEED. Patrick, 24 September, about a tester
         /// whose Vortex deploys into another server's copy of Skyrim: "can you
@@ -1886,31 +2007,40 @@ namespace Thornswood
         /// what Vortex deploying into the Steam copy does. The result is what
         /// somebody whose Vortex deploys into the Steam copy gets.
         /// </summary>
-        static List<Found> Gather(string src, List<string> left, List<string> pinned)
+        static List<Found> Gather(string src, List<string> left, List<string> pinned, HashSet<string> ours, ref int byHand)
         {
             string game = GameFor(src);
             if (SameFolder(game, src))
             {
-                List<Found> walked = Walk(src);
+                // Only the three kinds (#1232): Skyrim's own by the pinned
+                // build's list, Vortex's by its record, Thornswood's by its
+                // records. A mod the person put into the Steam copy by hand is
+                // theirs, for the Skyrim they play from Steam.
+                HashSet<string> deployed = Deployed(src);
+                List<Found> walked = OnlyThree(Walk(src), deployed, ours, left, ref byHand);
                 if (pinned == null) return walked;
                 // The Steam copy is on another build, so 1.6.1170's own files
                 // take the place of its game files. Not of what Vortex deployed
                 // there: the collection's files stay the collection's.
                 var withPinned = new Dictionary<string, Found>(StringComparer.OrdinalIgnoreCase);
                 foreach (Found f in walked) withPinned[f.Rel] = f;
-                Pin(withPinned, pinned, Deployed(src));
+                Pin(withPinned, pinned, deployed);
                 return new List<Found>(withPinned.Values);
             }
 
             // The game, and not an older deployment Vortex left in the Steam
             // copy before it moved: those files are its record there, if any.
+            // Of the rest, Skyrim's own and Thornswood's, and never a mod put
+            // into the Steam copy by hand (#1232).
             var byRel = new Dictionary<string, Found>(StringComparer.OrdinalIgnoreCase);
             HashSet<string> stale = Deployed(game);
+            var notStale = new List<Found>();
             foreach (Found f in Walk(game))
             {
                 if (stale.Contains(f.Rel)) { left.Add(f.Rel + "  (an older Vortex deployment in the Steam copy, not where Vortex deploys now)"); continue; }
-                byRel[f.Rel] = f;
+                notStale.Add(f);
             }
+            foreach (Found f in OnlyThree(notStale, null, ours, left, ref byHand)) byRel[f.Rel] = f;
             if (pinned != null) Pin(byRel, pinned, null);
 
             Record rec = Staged(src);
@@ -2245,13 +2375,19 @@ namespace Thornswood
             return n;
         }
 
-        static void WriteMade(string src, long copied)
+        /// <summary>
+        /// made.txt. kinds=1 when every file in the folder is one of the three
+        /// kinds and on record as which (OwnGameKinds.cs), 0 when some from
+        /// the Steam copy are still to sort or to take out.
+        /// </summary>
+        static void WriteMade(string src, long copied, int kinds)
         {
             File.WriteAllLines(MadeFile, new string[] {
                 "source=" + src,
                 "game=" + GameFor(src),
                 "deployment=" + DeploymentStamp(src),
                 "rules=" + Rules,
+                "kinds=" + kinds,
                 "copied=" + copied,
                 "at=" + DateTime.Now.ToString("o")
             });
