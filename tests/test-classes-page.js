@@ -1,0 +1,384 @@
+// test-classes-page.js
+//
+// The Professions page (site/data/site/classes.md) says what the game does.
+//
+// WHY. Issue #419. It was filed when the launcher asked for a class, a
+// profession and a half and the game did nothing with two of them. That is
+// long gone: all three are picked on the K panel, the server holds a class to
+// its one verb and a profession's half to what it can make. But the page had
+// drifted the other way. It said the three picks could be taken in any order
+// and "the third one" ends creation (the town ends it, and the other two can
+// wait); it never said a character with no profession is held to nothing at a
+// bench, or that one with no class can do none of the five verbs; it said an
+// Edgewright cannot make a cuirass, when an iron one is the novice work of
+// their sister half; and it promised a free tool when yours runs out, which
+// the server stopped doing on 21 September.
+//
+// So this reads the gamemode's own tables and runs its own rules, then reads
+// the page, and fails when they disagree. Every claim about the game is
+// checked against the code that makes it true, not against a sentence copied
+// into this harness, so a table that changes under the page fails here.
+//
+// Read only.
+const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const CR = String.fromCharCode(13);
+function read(rel) {
+  return fs.readFileSync(path.join(TOOLS_DIR, '..', rel), 'utf8').split(CR).join('');
+}
+
+let pass = 0, fail = 0;
+function yes(what, cond) {
+  if (cond) { pass++; console.log('PASS  ' + what); }
+  else { fail++; console.log('FAIL  ' + what); }
+}
+function done() {
+  console.log('');
+  console.log(pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+}
+
+const gm = process.env.GAMEMODE
+  ? fs.readFileSync(process.env.GAMEMODE, 'utf8').split(CR).join('')
+  : read(path.join('game', 'gamemode.js'));
+const page = process.env.CLASSES_MD
+  ? fs.readFileSync(process.env.CLASSES_MD, 'utf8').split(CR).join('')
+  : read(path.join('site', 'data', 'site', 'classes.md'));
+const join = read(path.join('site', 'data', 'site', 'join.md'));
+const home = read(path.join('site', 'public', 'home.html'));
+
+/** From a start marker to the first end marker after it, or null. */
+function slice(src, start, end) {
+  const a = src.indexOf(start);
+  if (a < 0) { return null; }
+  const b = src.indexOf(end, a + start.length);
+  return b < 0 ? null : src.slice(a, b + end.length);
+}
+/** A top level function, from its first line to the brace that closes it. */
+function cut(head) { return slice(gm, head, '\n}\n'); }
+
+// Paragraphs joined into one line each, so a sentence that wraps is found.
+function flat(md) { return md.replace(/\r/g, '').replace(/([^\n])\n(?=[^\n|#])/g, '$1 '); }
+const text = flat(page);
+
+/** One page section, from its heading to the next heading of the same depth. */
+function section(md, heading) {
+  const a = md.indexOf('\n' + heading + '\n');
+  if (a < 0) { return null; }
+  const depth = heading.match(/^#+/)[0];
+  const re = new RegExp('\\n' + depth + ' ', 'g');
+  re.lastIndex = a + heading.length + 1;
+  const m = re.exec(md);
+  return md.slice(a, m ? m.index : md.length);
+}
+
+/** The rows of the first table in a piece of markdown, as arrays of cells. */
+function tableRows(md) {
+  if (!md) { return []; }
+  const lines = md.split('\n');
+  const out = [];
+  let started = false;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (/^\|/.test(l)) {
+      started = true;
+      if (/^\|[-| ]+\|$/.test(l)) { continue; }
+      out.push(l.split('|').slice(1, -1).map(function (c) { return c.trim(); }));
+    } else if (started) {
+      break;
+    }
+  }
+  return out.slice(1); // the header row
+}
+/** Every **bold** phrase in a string, without the stars or a closing full stop. */
+function bolds(s) {
+  const out = [];
+  const re = /\*\*([^*]+)\*\*/g;
+  let m;
+  while ((m = re.exec(s)) !== null) { out.push(m[1].replace(/\.$/, '').trim()); }
+  return out;
+}
+function sameSet(a, b) {
+  const x = a.slice().sort(), y = b.slice().sort();
+  return x.length === y.length && x.every(function (v, i) { return v === y[i]; });
+}
+const letters = function (s) { return String(s).toLowerCase().replace(/[^a-z]/g, ''); };
+
+// ------------------------------------------------------ the rules, running
+
+const block = slice(gm, '// ==== thornswood progression ====', '// ==== end thornswood progression ====');
+yes('the gamemode has its progression block', block !== null);
+if (!block) { done(); }
+const box = { console: { log: function () {} } };
+box.globalThis = box;
+vm.runInNewContext(block, box, { filename: 'gamemode.js progression' });
+const P = box.__thornswoodProgression;
+yes('and it registers the rules', !!P && !!P.TABLE);
+if (!P || !P.TABLE) { done(); }
+const T = P.TABLE;
+
+// Recipes and benches, the two generated tables the craft gate reads.
+const recSrc = slice(gm, 'var RECIPES_BY_ID = {', '\n  };');
+let RECIPES = null;
+try { RECIPES = recSrc ? new Function('return ' + recSrc.slice('var RECIPES_BY_ID = '.length).replace(/;$/, ''))() : null; }
+catch (e) { RECIPES = null; }
+yes('the recipe table reads', !!RECIPES && Object.keys(RECIPES).length > 100);
+if (!RECIPES) { done(); }
+const rows = Object.keys(RECIPES).map(function (k) { return RECIPES[k]; });
+function row(name, half) {
+  return rows.filter(function (r) { return r.name === name && (!half || r.half === half); })[0] || null;
+}
+
+const benchLine = /^const BENCH_ACCESS = (\{.*\});$/m.exec(gm);
+let BENCH_ACCESS = null;
+try { BENCH_ACCESS = benchLine ? JSON.parse(benchLine[1]) : null; } catch (e) { BENCH_ACCESS = null; }
+yes('the bench table reads', !!BENCH_ACCESS && !!BENCH_ACCESS.alchemy && !!BENCH_ACCESS.enchanting);
+if (!BENCH_ACCESS) { done(); }
+
+/** The name the rules give a key: a class, a half or a profession. */
+function nameOf(key) {
+  if (P.has(T.classes, key)) { return T.classes[key].name; }
+  for (const p in T.professions) {
+    if (P.has(T.professions[p].halves, key)) { return T.professions[p].halves[key]; }
+  }
+  if (P.has(T.professions, key)) { return T.professions[key].name; }
+  return key;
+}
+
+// The craft gate and the bench gate, cut out and run against the real rules.
+const helpers = ['function rankWord(', 'function aWord(', 'function professionName(']
+  .map(cut);
+const craftSrc = cut('function craftAnswer(');
+const benchSrc = cut('function benchGate(');
+yes('craftAnswer, benchGate and their helpers are in the gamemode',
+    craftSrc !== null && benchSrc !== null && helpers.every(function (h) { return h !== null; }));
+if (!craftSrc || !benchSrc) { done(); }
+function gates(state) {
+  const g = {
+    __thornswoodProgression: P,
+    __thornswoodCharacter: { stateOf: function () { return state; }, nameOf: nameOf }
+  };
+  const fn = new Function('globalThis', 'log', 'raceGate', 'toldCraftingIsComing',
+                          'BENCH_BY_BASE', 'BENCH_ACCESS',
+                          helpers.join('\n') + '\n' + craftSrc + '\n' + benchSrc +
+                          '\nreturn { craftAnswer: craftAnswer, benchGate: benchGate };');
+  const byBase = { lab: 'alchemy', enchanter: 'enchanting' };
+  return fn(g, function () {}, function () { return null; }, {}, byBase, BENCH_ACCESS);
+}
+function made(state, r) { return gates(state).craftAnswer(1, r).refusal === null; }
+function smith(half, rank) {
+  const r = P.pickProfession(P.fresh(), 'smith', half);
+  if (r.ok && rank) { r.state.ranks[half] = rank; }
+  return r.ok ? r.state : null;
+}
+
+// ---------------------------------------------------------- the tables
+
+// Classes.
+const classRows = tableRows(section(page, '## Classes'));
+const classNames = Object.keys(T.classes).map(function (k) { return T.classes[k].name; });
+yes('the Classes table names the five classes the rules have (' + classNames.join(', ') + ')',
+    sameSet(classRows.map(function (r) { return bolds(r[0])[0]; }), classNames));
+// Each class's row says its one verb, and the rules give it that verb and no other.
+const VERB_WORD = { loot: 'loot', fish: 'fish', harvest: 'gather', mine: 'mine', farm: 'farm' };
+const verbs = Object.keys(VERB_WORD);
+yes('every class verb the rules know has a word on the page',
+    verbs.every(function (v) { return !!P.classFor(v); }) && verbs.length === classNames.length);
+Object.keys(T.classes).forEach(function (cls) {
+  const verb = verbs.filter(function (v) { return P.classFor(v) === cls; });
+  const r = classRows.filter(function (x) { return bolds(x[0])[0] === T.classes[cls].name; })[0];
+  const s = P.pickClass(P.fresh(), cls).state;
+  const only = verbs.filter(function (v) { return P.canDo(s, v); });
+  yes('a ' + T.classes[cls].name + ' may ' + (verb[0] || '?') + ' and nothing else of the five, and the page says so',
+      verb.length === 1 && sameSet(only, verb) && !!r &&
+      new RegExp('\\b' + VERB_WORD[verb[0]], 'i').test(r[1]));
+});
+// No class: none of the five.
+const noClass = verbs.filter(function (v) { return P.canDo(P.fresh(), v); });
+const gateSrc = slice(gm, 'function gate(actorId, verb) {', '\n  }\n');
+yes('with no class the rules allow none of the five verbs, and the gate says to press K',
+    noClass.length === 0 && gateSrc !== null && /if \(!s\.cls\) \{ return NO_CLASS; \}/.test(gateSrc) &&
+    /var NO_CLASS = '[^']*Press K/.test(gm));
+yes('and the page says a character with no class can do none of them',
+    /until you pick one, none of the five is yours/i.test(text) && /press K and choose/i.test(text));
+
+// Professions and their halves.
+const profRows = tableRows(section(page, '## Professions'));
+const profNames = Object.keys(T.professions).map(function (k) { return T.professions[k].name; });
+yes('the Professions table names the eight professions the rules have (' + profNames.join(', ') + ')',
+    sameSet(profRows.map(function (r) { return bolds(r[0])[0]; }), profNames));
+Object.keys(T.professions).forEach(function (key) {
+  const p = T.professions[key];
+  const r = profRows.filter(function (x) { return bolds(x[0])[0] === p.name; })[0];
+  const want = p.halves ? Object.keys(p.halves).map(function (h) { return p.halves[h]; }) : [];
+  yes(p.name + ': the page names the halves the rules have (' + (want.join(' and ') || 'none') + ')',
+      !!r && sameSet(bolds(r[1]), want));
+});
+
+// Master perks.
+const perkRows = tableRows(section(page, '### What Master actually gets you'));
+Object.keys(T.professions).forEach(function (key) {
+  const p = T.professions[key];
+  const r = perkRows.filter(function (x) { return bolds(x[0])[0] === p.name; })[0];
+  yes(p.name + '\'s Master perk is ' + p.perk.name + ' on the page too',
+      !!r && bolds(r[1])[0] === p.perk.name);
+});
+
+// The skill tree.
+Object.keys(T.tree).forEach(function (attr) {
+  const r = tableRows(section(page, '### ' + T.tree[attr].name));
+  const skills = T.tree[attr].skills;
+  const onPage = r.map(function (x) { return bolds(x[0])[0]; });
+  const inRules = Object.keys(skills).map(function (k) { return skills[k].name; });
+  yes(T.tree[attr].name + ': the page lists the five sub-skills the rules have', sameSet(onPage, inRules));
+  Object.keys(skills).forEach(function (k) {
+    const line = r.filter(function (x) { return bolds(x[0])[0] === skills[k].name; })[0];
+    yes('  ' + skills[k].name + ' fills to the perk the rules name (' + skills[k].perk + ')',
+        !!line && letters(bolds(line[2])[0]) === skills[k].perk);
+  });
+});
+
+// Roleplay only.
+const rpRows = tableRows(section(page, '## Roleplay only (not Class or Profession)'));
+const rpNames = Object.keys(T.rpOnly).map(function (k) { return T.rpOnly[k].name; });
+yes('the roleplay only names are the rules\' (' + rpNames.join(', ') + ')',
+    sameSet(rpRows.map(function (r) { return bolds(r[0])[0]; }), rpNames));
+yes('and none of them can be picked as a class or a profession',
+    Object.keys(T.rpOnly).every(function (k) {
+      return !P.pickClass(P.fresh(), k).ok && !P.pickProfession(P.fresh(), k, 'x').ok;
+    }));
+
+// Ranks.
+const rankRows = tableRows(section(page, '## Getting better at it'));
+yes('the four ranks, in order, are the rules\' (' + T.ranks.join(', ') + ')',
+    rankRows.length === T.ranks.length && rankRows.every(function (r, i) {
+      return letters(bolds(r[0])[0]) === T.ranks[i];
+    }));
+
+// The Mage and the apprenticeship limits.
+const NUM = { 1: 'one', 2: 'two', 3: 'three' };
+yes('a mage picks ' + NUM[T.professions.mage.schools] + ' schools',
+    new RegExp('picks \\*\\*' + NUM[T.professions.mage.schools] + ' schools\\*\\*').test(text) &&
+    !P.pickProfession(P.fresh(), 'mage', ['destruction']).ok &&
+    P.pickProfession(P.fresh(), 'mage', ['destruction', 'illusion']).ok);
+yes('then ' + NUM[T.limits.mageStartSpells] + ' starting spells',
+    new RegExp('\\*\\*' + NUM[T.limits.mageStartSpells] + ' starting spells\\*\\*').test(text));
+yes('and a ' + (T.professions.mage.mastered === 3 ? 'third' : '?') + ' school at Master',
+    T.professions.mage.mastered === 3 && /At \*\*Master\*\* a mage picks a \*\*third school\*\*/.test(text));
+yes('a trade outside your own can be taught ' + (T.limits.secondaries === 2 ? 'twice' : '?'),
+    T.limits.secondaries === 2 && /you may only ever do this twice/i.test(text));
+
+// ---------------------------------------------------- what a half makes
+
+const ironCuirass = row('Iron Armor', 'Platewright');
+const steelCuirass = row('Steel Armor', 'Platewright');
+yes('the recipe table has the iron and the steel cuirass, both Platewright work',
+    !!ironCuirass && !!steelCuirass);
+if (!ironCuirass || !steelCuirass) { done(); }
+const edge = smith('edgewright');
+const edgeMaster = smith('edgewright', 'master');
+const plate = smith('platewright', 'advanced');
+yes('an Edgewright makes the iron cuirass, novice work of their sister half',
+    ironCuirass.rank === 'novice' && made(edge, ironCuirass));
+yes('and the page says so',
+    /an Edgewright knows how to beat out a plain iron cuirass/i.test(text));
+yes('an Edgewright, even at Master, does not make the steel one',
+    steelCuirass.rank !== 'novice' && !made(edge, steelCuirass) && !made(edgeMaster, steelCuirass));
+yes('and an advanced Platewright does',
+    made(plate, steelCuirass));
+yes('and the page says a steel cuirass is not novice work, and a Master Edgewright cannot make one',
+    /a steel cuirass is not novice work/i.test(text) &&
+    /An Edgewright at Master still cannot make a steel cuirass/i.test(text));
+// No page says an Edgewright cannot make armour at all, because they can.
+const anyArmour = rows.some(function (r) {
+  return r.type === 'ARMO' && r.half === 'Platewright' && made(edge, r);
+});
+[['classes.md', page], ['join.md', join], ['home.html', home]].forEach(function (p) {
+  yes(p[0] + ' does not say an Edgewright cannot make armour',
+      !(anyArmour && /Edgewright\s+cannot\s+make\s+armou?r/i.test(p[1].replace(/\s+/g, ' '))));
+});
+
+// Nobody's work: smelting and tanning are in no half.
+const nobodys = ['Iron Ingot', 'Steel Ingot', 'Leather', 'Leather Strips'];
+yes('smelting and tanning belong to no half (' + nobodys.join(', ') + ' are in no recipe row)',
+    nobodys.every(function (n) { return row(n) === null; }));
+yes('and the page says anybody can smelt and tan',
+    /Smelting ore into ingots and tanning a hide into leather belong to no half/i.test(text));
+
+// The two halves that gate nothing.
+['bulwark', 'berserker'].forEach(function (h) {
+  const n = nameOf(h);
+  const owns = rows.some(function (r) { return String(r.half).toLowerCase() === h; });
+  const bench = Object.keys(BENCH_ACCESS).some(function (k) { return P.has(BENCH_ACCESS[k].halves, h); });
+  yes(n + ' owns no recipe and no bench, as the page says', !owns && !bench &&
+      /\*\*Bulwark\*\* and \*\*Berserker\*\*\. Warriors do not make things/.test(text));
+});
+
+// The alchemy lab and the arcane enchanter.
+[['alchemy', 'alchemy lab', 'alchemist'], ['enchanting', 'arcane enchanter', 'enchanter']].forEach(function (b) {
+  const halves = Object.keys(BENCH_ACCESS[b[0]].halves).map(nameOf);
+  const want = Object.keys(T.professions[b[2]].halves).map(nameOf);
+  const para = (text.split('\n').filter(function (l) { return l.indexOf('**' + b[1] + '**') >= 0; })[0]) || '';
+  yes('the ' + b[1] + ' opens for exactly the halves of ' + T.professions[b[2]].name + ' (' + halves.join(', ') + ')',
+      sameSet(halves, want) && halves.every(function (h) { return para.indexOf('**' + h + '**') >= 0; }));
+});
+
+// No profession yet: nothing at a bench is held against you.
+const newcomer = P.fresh();
+const openCraft = made(newcomer, steelCuirass) &&
+                  rows.filter(function (r) { return !r.race && !r.nobody; }).slice(0, 200)
+                    .every(function (r) { return made(newcomer, r); });
+const openBench = gates(newcomer).benchGate(1, 'lab') === null &&
+                  gates(newcomer).benchGate(1, 'enchanter') === null;
+const heldBench = gates(edge).benchGate(1, 'lab') !== null;
+yes('with no profession the craft gate lets anything through (as of this build: ' + openCraft + ')',
+    true);
+yes('the page says what happens with no profession, whichever way the gate answers',
+    openCraft
+      ? /The hold starts the day you pick a profession\. Until then nothing at a bench is held against you/i.test(text)
+      : !/Until then nothing at a bench is held against you/i.test(text));
+yes('the lab and the enchanter open for somebody with no profession and not for an Edgewright',
+    openBench && heldBench);
+yes('and the page says both are open to somebody who has not chosen a profession yet',
+    openBench && /Somebody who has not chosen a profession yet can use both/i.test(text));
+
+// -------------------------------------------------------- creation
+
+// The home is the pick that ends creation; class and profession can wait.
+const ends = slice(gm, 'if (creating && st.home) {', '\n      }\n');
+yes('the town is the pick that ends creation',
+    ends !== null && /chargen\.arrive\(actorId, st\.home\)/.test(ends) && !/st\.cls|st\.prof/.test(ends.split('clog(')[0]));
+[['classes.md', text], ['join.md', flat(join)]].forEach(function (p) {
+  yes(p[0] + ' says only the town has to be chosen, and class and profession can wait',
+      /Only the town has to be chosen before you leave the hall/i.test(p[1]) &&
+      /class and (your )?profession can wait/i.test(p[1]));
+  yes(p[0] + ' no longer says the picks go in any order with the last one ending it',
+      !/any order/i.test(p[1]) && !/the (third|last) one sends you/i.test(p[1]));
+});
+
+// -------------------------------------------------------- the tools
+
+const toolsSrc = slice(gm, 'const TOOLS = {', '\n};\n');
+let TOOLS = null;
+try { TOOLS = toolsSrc ? new Function('return ' + toolsSrc.slice('const TOOLS = '.length).replace(/;\n$/, ''))() : null; }
+catch (e) { TOOLS = null; }
+const toolRows = tableRows(section(page, '## The tools'));
+yes('the tools table is the gamemode\'s: ' + (TOOLS ? Object.keys(TOOLS).map(function (k) { return k + ' ' + TOOLS[k].name; }).join(', ') : '?'),
+    !!TOOLS && sameSet(toolRows.map(function (r) { return letters(bolds(r[0])[0]); }), Object.keys(TOOLS)) &&
+    Object.keys(TOOLS).every(function (k) {
+      const r = toolRows.filter(function (x) { return letters(bolds(x[0])[0]) === k; })[0];
+      return !!r && r[1].toLowerCase().indexOf(TOOLS[k].name.toLowerCase()) >= 0;
+    }));
+const toolGateSrc = cut('function toolGate(');
+const handsOut = toolGateSrc !== null && /offerTool\(/.test(toolGateSrc.replace(/\/\*[\s\S]*?\*\//g, ''));
+const usesMatch = /^const TOOL_USES = (\d+);$/m.exec(gm);
+yes('the tool gate refuses and hands nothing out (as of this build: ' + !handsOut + ')', toolGateSrc !== null);
+yes('the page says what happens with no tool, whichever way the gate answers',
+    handsOut ? !/nothing hands you a free one/i.test(text)
+             : /nothing hands you a free one/i.test(text) && !/hands you another/i.test(text));
+yes('the page gives a tool the uses the gamemode does (' + (usesMatch ? usesMatch[1] : '?') + ')',
+    !!usesMatch && (usesMatch[1] === '100' ? /a hundred uses/i.test(text) : text.indexOf(usesMatch[1] + ' uses') >= 0));
+
+done();
