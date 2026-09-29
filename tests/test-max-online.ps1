@@ -268,6 +268,7 @@ if ($open -ge 0 -and $close -gt $marker) {
             ('{"port":7787,"name":"Thornswood Dev",' + $max + '"thornswoodVoicePort":7789,' +
              '"equipmentSlotCheckEnabled":false,"equipmentSpellCheckEnabled":false,' +
              '"equipmentInventoryCheckEnabled":false,"dataDir":"data",' +
+             '"npcAllowCrimeFaction":true,"npcAllowEssential":true,"thornswoodServer":"dev",' +
              '"loadOrder":["C:/Thornswood-Server-Dev/plugins/Skyrim.esm"]}'), $utf8)
     }
     function Read-Dev([string]$root) { Get-Content -LiteralPath (Join-Path $root 'server-settings.json') -Raw | ConvertFrom-Json }

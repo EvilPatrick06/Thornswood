@@ -588,6 +588,15 @@ Write-Host ("  join pass: {0}" -f $(if ($s.thornswoodRequirePass -eq $true) { 'r
 # bandit. On means one shared world. npcSettings stays empty, which is "no
 # per-NPC overrides", not "no NPCs".
 $s | Add-Member -NotePropertyName npcEnabled  -NotePropertyValue ($Npcs -ne 'off') -Force
+# The people, not only the animals (#956). The engine refuses anyone in a
+# hold's crime faction (every guard, nearly every townsperson) and anyone
+# essential, protected or unique (every named shopkeeper and resident) unless
+# these two say otherwise, and nothing wrote them, so the world had its animals
+# and few of its people. Over the dev load order the server binary loads 1406
+# of 4942 Skyrim.esm people with both off and 3274 with both on.
+# Deploy-DevGamemode.ps1 sets the same two on the dev box.
+$s | Add-Member -NotePropertyName npcAllowCrimeFaction -NotePropertyValue $true -Force
+$s | Add-Member -NotePropertyName npcAllowEssential -NotePropertyValue $true -Force
 
 # WHAT YOU ARE WEARING STAYS ON. Measured 20 September, after Patrick rejoined
 # an existing character and arrived with nothing on.

@@ -75,6 +75,7 @@ function Run-Block([string]$value, $settings, [string]$npcValue = '') {
 $base = [ordered]@{
     port = 7787; thornswoodVoicePort = 7789; thornswoodServer = 'dev'
     equipmentSlotCheckEnabled = $false; equipmentSpellCheckEnabled = $false; equipmentInventoryCheckEnabled = $false
+    npcAllowCrimeFaction = $true; npcAllowEssential = $true
     loadOrder = @('C:/p/Skyrim.esm'); maxPlayers = 10
 }
 
