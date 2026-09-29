@@ -103,7 +103,11 @@ Order matters here. The game server must not start before its world is in
 place, or it writes fresh empty characters over the top.
 `docs\MOVING-THE-SERVER.md` "If it is a new machine, new address" is the whole
 sequence, checked against the scripts on 29 September (issue #454); with the
-old box gone it is the same list without its steps 10 to 12. In short:
+old box gone it is the same list without its steps 10 to 12. It has not
+been followed on a real box yet; "Rehearsing the move on a throwaway server"
+in the same file is how to try it for an afternoon without touching the real
+one. During the alpha all world and character data is throwaway, so a
+rehearsal, or a real move, that loses it is acceptable. In short:
 
 1. **A new box**, steps 1 to 8 there: the box, its ssh server, Set-Vps, the
    key, Bootstrap-VPS, the live server program installed and not started,
