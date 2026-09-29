@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <!-- The version here is a placeholder. Build-Launcher.ps1 writes the
+       launcher's own version (Updater.cs Version, four parts) into a copy of
+       this file and embeds that copy, so it can never drift from the version
+       the updater compares (issue #463). tests\test-app-manifest.ps1 reads it
+       back out of the built exe. -->
   <assemblyIdentity
     type="win32"
     name="Thornswood.Launcher.Thornswood"
-    version="1.1.101.0"
+    version="0.0.0.0"
     processorArchitecture="*" />
+  <!-- asInvoker: the launcher never asks for administrator. -->
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
