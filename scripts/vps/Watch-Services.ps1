@@ -55,7 +55,10 @@
     website   answers on 3001, which is what Caddy puts on 443
     game      answers on 3000, which is the resources the client pulls
     voice     answers on 7778
-    bot       a python process is alive with the bot script in its command line
+    bot       a python process is alive with the bot script in its command line.
+              And its heartbeat, heartbeat.json beside bot.py, says it is on
+              Discord: a bot hung or off Discord for ten minutes while its
+              process runs is told about, not restarted for (issue #449)
     dev game  answers on 7788, the dev server's resources port
     dev voice answers on 7789
     disk      free space on C:, which every one of the above shares. Under
@@ -209,6 +212,91 @@ function BotAlive() {
     if ("$($p.CommandLine)" -match 'Thornswood-Bot') { return $true }
   }
   return $false
+}
+
+# ------------------------------------------------ the bot's heartbeat ---
+#
+# A python process with the bot in its command line is not a bot that is
+# working (issue #449). It can be stuck logging in, hung, or cut off from
+# Discord and never getting back, and in every one of those it is still
+# running. So the bot writes heartbeat.json beside bot.py every minute
+# (heartbeat in bot\bot.py): its pid, when it started, when it wrote this,
+# whether it is connected to Discord, when it last was, and when it last
+# handled something Discord sent it. More than $beatStale seconds of any of
+# those going quiet is the bot being down while its process is alive.
+#
+# That is told about and not restarted for, like a failed health check: the
+# only way to stop a running bot today is to kill python by its command line
+# (issue #465), and that belongs to a proper service, not to this.
+#
+# No file at all says nothing either way: that is a bot from before this
+# went in, and the process check above is all there is for it.
+$botBeat = 'C:\Thornswood-Bot\heartbeat.json'
+# Ten minutes. The bot writes every minute and discord.py reconnects by
+# itself within a few, so ten is well past a blip and still inside two runs.
+$beatStale = 600
+
+# Every running bot process: its pid and when it started, in unix seconds.
+function BotProcs() {
+  $list = @()
+  foreach ($p in (Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -EA SilentlyContinue)) {
+    if ("$($p.CommandLine)" -notmatch 'Thornswood-Bot') { continue }
+    $at = 0
+    try { $at = ([DateTimeOffset]$p.CreationDate).ToUnixTimeSeconds() } catch { }
+    $list += @{ Id = [int64]$p.ProcessId; Started = [int64]$at }
+  }
+  return $list
+}
+
+# heartbeat.json as an object, or $null when it is not there or not readable.
+function ReadBeat($path) {
+  if (-not (Test-Path -LiteralPath $path)) { return $null }
+  try { return (Get-Content -LiteralPath $path -Raw -Encoding UTF8 -EA Stop | ConvertFrom-Json) } catch { return $null }
+}
+
+function Mins($s) {
+  $m = [math]::Round([double]$s / 60)
+  if ($m -lt 2) { return 'a minute' }
+  return ('' + $m + ' minutes')
+}
+
+# '' when the heartbeat says the bot is working, else what is wrong in words.
+# $beat is heartbeat.json or $null, $procs what BotProcs found, $at now in
+# unix seconds. Nothing in here looks at the world, so it can be tested.
+function BeatProblem($beat, $procs, $at) {
+  $procs = @($procs)
+  if ($procs.Count -eq 0 -or $null -eq $beat) { return '' }
+  $mine = $false
+  $young = [int64]::MaxValue
+  foreach ($p in $procs) {
+    if ([int64]$p.Id -eq [int64]$beat.pid) { $mine = $true }
+    if ([int64]$p.Started -gt 0 -and $at - [int64]$p.Started -lt $young) { $young = $at - [int64]$p.Started }
+  }
+  $heard = ''
+  if ([int64]$beat.last_event -gt 0) { $heard = '. The last thing it heard from Discord was ' + (Mins ($at - [int64]$beat.last_event)) + ' ago' }
+  if (-not $mine) {
+    # Every heartbeat there is came from an earlier run, so this one has not
+    # written one yet: fine while it is starting, stuck once it is old. A
+    # process Windows gave no start time for is not judged on its age.
+    if ($young -le $beatStale -or $young -eq [int64]::MaxValue) { return '' }
+    return ('Its python process has been running for ' + (Mins $young) + ' and has not written a heartbeat once, so it is stuck before it got going')
+  }
+  $quiet = $at - [int64]$beat.written
+  if ($quiet -gt $beatStale) { return ('Its python process is running, but its heartbeat stopped ' + (Mins $quiet) + ' ago, so it is hung' + $heard) }
+  if ($beat.connected) { return '' }
+  if ([int64]$beat.connected_at -le 0) {
+    $off = $at - [int64]$beat.started
+    if ($off -gt $beatStale) { return ('Its python process is running, but it has not reached Discord in the ' + (Mins $off) + ' since it started') }
+    return ''
+  }
+  $off = $at - [int64]$beat.connected_at
+  if ($off -gt $beatStale) { return ('Its python process is running, but it has not been connected to Discord for ' + (Mins $off) + $heard) }
+  return ''
+}
+
+# The one question the checks and the webhook both ask.
+function BotSilent($path) {
+  return (BeatProblem (ReadBeat $path) (BotProcs) ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds())
 }
 
 # ---------------------------------------------------- telling a person ---
@@ -435,7 +523,8 @@ function Deliver() {
   if (-not (Test-Path -LiteralPath $alerts)) { return }
   $sent  = SentIds
   $url   = WebhookUrl
-  $botUp = BotAlive
+  # A bot whose heartbeat says it is off Discord cannot post either (#449).
+  $botUp = (BotAlive) -and -not (BotSilent $botBeat)
   $from  = 0
   if ($botUp) { $from = $ackWait }
   $nowUnix = UnixTime $now
@@ -455,7 +544,7 @@ function Deliver() {
     if ($why -eq '') {
       Add-Content -LiteralPath $sentHook -Value $a.id -Encoding ASCII
       $sent[$a.id] = $true
-      Note ('posted ' + $a.id + ' through the webhook, because the bot ' + $(if ($botUp) { 'had not' } else { 'is not running' }))
+      Note ('posted ' + $a.id + ' through the webhook, because the bot ' + $(if ($botUp) { 'had not' } else { 'is not running or not on Discord' }))
     } elseif ($first) {
       Note ('could not post ' + $a.id + ' through the webhook: ' + $why + '. It is tried again every run for a day.')
     }
@@ -508,7 +597,7 @@ $checks = @(
   @{ Name = 'website'; Task = 'Thornswood Docs';   Port = 3001; Say = 'The website''s app'; Health = 'http://127.0.0.1:3001/api/public' },
   @{ Name = 'game';    Task = 'Thornswood Server'; Port = 3000; Say = 'The live game server'; Health = 'http://127.0.0.1:3000/api/servers/thornswood/manifest.json' },
   @{ Name = 'voice';   Task = 'Thornswood Voice';  Port = 7778; Say = 'Live voice'; Health = 'http://127.0.0.1:7778/health' },
-  @{ Name = 'bot';     Task = 'Thornswood Bot';    Port = 0; Say = 'The Discord bot' },
+  @{ Name = 'bot';     Task = 'Thornswood Bot';    Port = 0; Say = 'The Discord bot'; Beat = $botBeat },
   # The dev pair. The dev game server's own traffic is UDP on 7787 and
   # cannot be connected to, so its resources port stands in, exactly as
   # 3000 does for the live one.
@@ -543,7 +632,12 @@ foreach ($c in $checks) {
   if (IsUp $c) {
     $sick = ''
     if ($c.ContainsKey('Health')) { $sick = HealthProblem $c.Health }
+    # Running is not working (#449). Ten quiet minutes is already the grace,
+    # so one run is enough, and it is told about, never restarted for.
+    $hung = ''
+    if ($c.ContainsKey('Beat')) { $hung = BotSilent $c.Beat }
     if ($sick) { Observe $told $c $true $true ('It answers on port ' + $c.Port + ', but ' + $c.Health + ' ' + $sick) 'soft' }
+    elseif ($hung) { Observe $told $c $true $false $hung 'soft' }
     else { Observe $told $c $false $false '' '' }
     continue
   }
@@ -832,6 +926,16 @@ foreach (`$p in (Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -EA
 'game      ' + `$(if (Answers 3000) { 'up' } else { 'DOWN' })
 'voice     ' + `$(if (Answers 7778) { 'up' } else { 'DOWN' })
 'bot       ' + `$(if (`$bot) { 'up' } else { 'DOWN' })
+# What the bot last said about itself (#449). The watcher's own rule is in
+# BeatProblem above; this is only what a person looking wants to see.
+`$hb = 'C:\Thornswood-Bot\heartbeat.json'
+if (Test-Path `$hb) {
+  try {
+    `$b = Get-Content `$hb -Raw -Encoding UTF8 | ConvertFrom-Json
+    `$ago = [math]::Round(([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - [int64]`$b.written) / 60)
+    'heartbeat ' + `$ago + ' min ago, ' + `$(if (`$b.connected) { 'on Discord' } else { 'OFF DISCORD' })
+  } catch { 'heartbeat could not be read' }
+} else { 'heartbeat none. The bot writes one once Install-Bot.ps1 -CodeOnly has sent the version that does' }
 'dev game  ' + `$(if (Answers 7788) { 'up' } else { 'DOWN' })
 'dev voice ' + `$(if (Answers 7789) { 'up' } else { 'DOWN' })
 # Free space right now, and LOW or CRITICAL when the watcher's last run found
@@ -856,7 +960,7 @@ if (`$down.Count) { 'told      DOWN: ' + (`$down -join ', ') } else { 'told     
 "@
 foreach ($l in $out) {
   $c = 'Gray'
-  if ("$l" -match 'DOWN|NOT installed|LOW$|CRITICAL$') { $c = 'Red' }
+  if ("$l" -match 'DOWN|NOT installed|LOW$|CRITICAL$|OFF DISCORD') { $c = 'Red' }
   if ("$l" -match '\bup$|installed$') { $c = 'Green' }
   Say "  $l" $c
 }

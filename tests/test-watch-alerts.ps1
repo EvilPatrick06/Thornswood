@@ -97,7 +97,7 @@ Yes '-SetWebhook sends the address on standard input, never on the command line'
 
 # The watcher as it runs, without the probes that touch the world. The fakes
 # below stand in for those, and $root is a scratch folder.
-$fake = @('Answers', 'SiteAnswers', 'BotAlive', 'HealthProblem', 'ServiceProblem', 'BackupProblem', 'PostWebhook', 'DiskNow')
+$fake = @('Answers', 'SiteAnswers', 'BotAlive', 'BotProcs', 'HealthProblem', 'ServiceProblem', 'BackupProblem', 'PostWebhook', 'DiskNow')
 $body = @()
 foreach ($s in $inner.EndBlock.Statements) {
     if ($s -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $fake -contains $s.Name) { continue }
@@ -154,6 +154,9 @@ function schtasks {
 function Answers($port) { return [bool]$script:world[$ports[[int]$port]].Up }
 function SiteAnswers($url) { return [bool]$script:world['caddy'].Up }
 function BotAlive() { return [bool]$script:world['bot'].Up }
+# No process for the heartbeat rule (#449) to judge, so it never reads the
+# live bot's heartbeat when this runs on the VPS. test-bot-heartbeat.ps1 has it.
+function BotProcs() { return @() }
 function HealthProblem($url) {
     foreach ($k in $ports.Keys) { if ($url -match (':' + $k + '/')) { return $script:world[$ports[$k]].Health } }
     return ''
