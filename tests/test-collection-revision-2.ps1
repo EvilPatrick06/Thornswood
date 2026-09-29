@@ -253,6 +253,11 @@ try {
     Plugin $data 'AHZmoreHUD.esp' 0
     Plugin $data 'Playable Rieklings.esp' 0
     Plugin $data 'Expressive Facegen Morphs.esl' 0
+    # What an Anniversary Edition copy of Skyrim has in Data (#479): two full
+    # Creation Club masters and a light one.
+    Plugin $data 'ccBGSSSE001-Fish.esm' 0x1
+    Plugin $data 'ccBGSSSE025-AdvDSGS.esm' 0x1
+    Plugin $data 'ccQDRSSE001-SurvivalMode.esl' 0x200
 
     $server = @('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm',
                 'Water for ENB.esm', 'RaceCompatibility.esm', 'aaaGraniteHill.esp', 'ElysiumEstateSSE.esp',
@@ -278,6 +283,17 @@ try {
     $r = Run @('-List', $list, '-Data', $data, '-Manifest', $manifest)
     Yes 'CBBE.esp switched on: exit 1, named as extra at its position' ($r.Code -eq 1 -and (Has $r.Out 'extra         CBBE.esp (position 11 here)'))
     Yes '...and nothing else is called out of place for it' (-not (Has $r.Out 'out of place'))
+
+    # Somebody who owns the Anniversary upgrade (#479): its Creation Club
+    # plugins switched on, full and light, in Data and not, before and among
+    # the server's. Thornswood's own game folder leaves them out, so the check
+    # does not count them and it is still a PASS.
+    PluginList $list (@('*ccBGSSSE001-Fish.esm', '*ccQDRSSE001-SurvivalMode.esl', '*ccASVSSE001-ALMSIVI.esm') + $good[0..3] +
+                      @('*ccBGSSSE025-AdvDSGS.esm') + $good[4..($good.Count - 1)])
+    $r = Run @('-List', $list, '-Data', $data, '-Manifest', $manifest)
+    Yes 'Anniversary Creation Club plugins switched on as well: still PASS, exit 0' ($r.Code -eq 0 -and (Has $r.Out 'PASS  all 14 positions'))
+    Yes '...and it says how many it left out and why' (Has $r.Out '4 of them Creation Club plugins, not counted')
+    Yes '...and none is called extra' (-not (Has $r.Out 'extra         '))
 
     # Revision 1's Elysium Estate: the other plugin name.
     PluginList $list ($good | ForEach-Object { if ($_ -eq '*ElysiumEstateSSE.esp') { '*ElysiumEstate.esp' } else { $_ } })

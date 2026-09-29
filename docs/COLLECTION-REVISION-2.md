@@ -215,7 +215,10 @@ runs, and the plugin order now installs exactly as the server expects."
 3. `.\scripts\mods\Check-CleanInstall.ps1 -Server dev`, and once live has
    been deployed, `.\scripts\mods\Check-CleanInstall.ps1`.
 4. PASS on each closes #476. Anything else prints one line per difference,
-   saying which plugin, where, and what to do.
+   saying which plugin, where, and what to do. A Skyrim with the Anniversary
+   upgrade passes too: none of the 48 needs it (#479), and its Creation Club
+   plugins are not counted, because Thornswood's own game folder leaves them
+   out.
 5. Switch back to the Thornswood profile.
 
 ## Keeping this page true
