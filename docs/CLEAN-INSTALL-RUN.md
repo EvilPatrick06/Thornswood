@@ -417,7 +417,7 @@ tester confused by a list that no longer matches.
 | 38 | `Give Thornswood a Skyrim folder of its own?` | `launcher\app\ShellOwnGame.cs` |
 | 38 | `Thornswood and other servers are sharing one Skyrim right now` | `launcher\app\ShellOwnGame.cs` |
 | 38 | `Making Thornswood's own Skyrim folder:` | `launcher\app\OwnGame.cs` |
-| 39 | `It will ask for administrator.` | `launcher\app\ShellOwnGame.cs` |
+| 39 | `Making Thornswood's own Skyrim folder from what Vortex has deployed. Play comes back when it is done.` | `launcher\app\ShellOwnGame.cs` |
 | 40 | `Thornswood's own Skyrim folder is ready at` | `launcher\app\OwnGame.cs` |
 | 40 | `Restarting the launcher so it runs from the new folder.` | `launcher\app\ShellOwnGame.cs` |
 | 42 | `is missing, the launcher will fetch it` | `launcher\app\Checks.cs` |

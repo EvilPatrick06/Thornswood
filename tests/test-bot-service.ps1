@@ -58,7 +58,9 @@
                   sc.exe showsid gives, when sc.exe is there
 
   Never touches a real service, task or account. Writes only under its own
-  scratch folder, which is the system temp folder unless -Scratch says.
+  scratch folder, which is the system temp folder unless -Scratch says, and
+  three stand-in pythons in a folder of its own under ProgramData when that
+  scratch folder is in a profile (removed at the end).
   The program part needs a python; with none it is skipped, and says so.
 #>
 [CmdletBinding()]
@@ -453,6 +455,8 @@ Protect (Join-Path $gWatch 'alerts-webhook.txt') @('S-1-5-18', 'S-1-5-32-544', $
 $missing = Join-Path $g 'Thornswood-Server-Dev\private\moderation.log'
 $said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot $gWatch -DocsData $gData -ModLogs @($gMod, $missing))
 Yes 'every grant went on' (@($said | Where-Object { $_ -match '^COULD NOT' }).Count -eq 0)
+# Which one did not, and why, so a red on the build runner says it in the log.
+foreach ($l in @($said | Where-Object { $_ -match '^COULD NOT' })) { Write-Host ('      ' + $l) }
 $x = Rules $gRoot
 Yes 'the bot''s folder: Modify for the bot''s account, to everything under it' ($x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match 'Modify' -and "$($x[0].InheritanceFlags)" -match 'ContainerInherit' -and "$($x[0].InheritanceFlags)" -match 'ObjectInherit')
 Yes 'which bot.py under it inherits' (@(Rules (Join-Path $gRoot 'bot.py') | Where-Object { $_.IsInherited -and "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
@@ -507,9 +511,19 @@ function New-EventLog { [CmdletBinding()] param([string]$LogName, [string]$Sourc
 function Start-Sleep { }
 
 # A python that says where its libraries are, as the real check asks it to.
-$goodPy = Join-Path $tmp 'pyfake\good\python.cmd'
-$userPy = Join-Path $tmp 'pyfake\user\python.cmd'
-$failPy = Join-Path $tmp 'pyfake\fail\python.cmd'
+# Not under C:\Users: the check refuses any python there, rightly, because the
+# service's account cannot read another account's profile, and the temp
+# folder of whoever runs this (a person, or the runner's account on the VPS)
+# is in their profile. So the stand-ins go in a folder of their own under
+# ProgramData, removed at the end, when the scratch folder is in a profile.
+$pyRoot = Join-Path $tmp 'pyfake'
+if ($tmp -match '^[A-Za-z]:\\Users\\') {
+    $pyRoot = Join-Path $env:ProgramData ('ts-bot-service-pyfake-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    $script:pyOutside = $pyRoot
+}
+$goodPy = Join-Path $pyRoot 'good\python.cmd'
+$userPy = Join-Path $pyRoot 'user\python.cmd'
+$failPy = Join-Path $pyRoot 'fail\python.cmd'
 foreach ($p in @($goodPy, $userPy, $failPy)) { $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $p) }
 [IO.File]::WriteAllText($goodPy, "@echo off`r`necho C:\Program Files\Python312\Lib\site-packages\discord\__init__.py`r`necho C:\Program Files\Python312\Lib\site-packages\PIL\__init__.py`r`necho C:\Program Files\Python312\Lib\site-packages\certifi\cacert.pem`r`nexit /b 0`r`n")
 [IO.File]::WriteAllText($userPy, "@echo off`r`necho C:\Users\Administrator\AppData\Roaming\Python\Python312\site-packages\discord\__init__.py`r`necho C:\Program Files\Python312\Lib\site-packages\PIL\__init__.py`r`necho C:\Program Files\Python312\Lib\site-packages\certifi\cacert.pem`r`nexit /b 0`r`n")
@@ -621,6 +635,7 @@ finally {
     }
     Microsoft.PowerShell.Utility\Start-Sleep -Milliseconds 500
     Remove-Item -LiteralPath $tmp -Recurse -Force -EA SilentlyContinue
+    if ($script:pyOutside) { Remove-Item -LiteralPath $script:pyOutside -Recurse -Force -EA SilentlyContinue }
 }
 
 Done

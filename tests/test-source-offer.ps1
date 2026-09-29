@@ -51,11 +51,14 @@
   Read only apart from files under its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$Fork = (& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') Engine))
+param([string]$Fork)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# Resolved here rather than as the param default: Windows PowerShell 5.1 leaves
+# $PSScriptRoot empty inside a script's param block (issue #991).
+if (-not $Fork) { $Fork = & (Join-Path $Here '..\scripts\release\Where.ps1') Engine }
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
 
