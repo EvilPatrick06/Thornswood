@@ -2605,12 +2605,20 @@ $OUTPUT_TYPES = @('ARMO', 'WEAP', 'ALCH', 'MISC', 'INGR', 'AMMO', 'BOOK', 'SCRL'
 # of a number, which the flag bit 0x04 says. Everything else a condition can
 # name, a book or an ingot or a piece of armour, is already in $OUTPUT_TYPES.
 $CONDITION_TYPES = @('PERK', 'SPEL', 'GLOB')
-$SCAN_TYPES = @('KYWD', 'COBJ') + $OUTPUT_TYPES + $CONDITION_TYPES
+# MGEF is read for one thing: the school and rank of the spell a staff binds
+# (issue #1128, an Enchanter's staff spells unlock by rank). A SPEL record's
+# SPIT names its half cost perk, whose editor id says both (DestructionAdept50),
+# and failing that its effects say them: MGEF DATA int32 at offset 12 is the
+# magic skill and uint32 at offset 40 the minimum level. The same reading the
+# gamemode's spell tomes block does at runtime. Kept in $mgefs, not $items.
+$SCAN_TYPES = @('KYWD', 'COBJ') + $OUTPUT_TYPES + $CONDITION_TYPES + @('MGEF')
 
 # desc -> the record, last one in the load order wins, because that is the
 # record the game is using
 $items   = @{}
 $kwName  = @{}
+# MGEF desc -> { Skill, Level }, for the staff spells' school and rank (#1128).
+$mgefs   = @{}
 # item desc -> which class produces it, at the lowest rank any of them does.
 # Filled under 'what an input costs a producer', below, out of the five
 # producing tables and the server's own verbs. Declared here because InputsJson
@@ -2676,6 +2684,11 @@ foreach ($pl in $order) {
                     $hasEnit = $false
                     $weapAnim = -1
                     $teaches = ''
+                    # SPEL: the half cost perk (SPIT at 32) and the effects
+                    # (EFID); MGEF: the skill and minimum level. #1128.
+                    $spit = 0
+                    $efids = New-Object 'System.Collections.Generic.List[uint32]'
+                    $mgefSkill = -1; $mgefLevel = -1
                     $cnam = 0; $hasCnam = $false
                     $bnam = 0; $hasBnam = $false
                     $nam1 = 1
@@ -2740,6 +2753,13 @@ foreach ($pl in $order) {
                             if (([int]$rec[$k] -band $BOOK_TEACHES_SPELL) -ne 0) {
                                 $teaches = DescOf ([BitConverter]::ToUInt32($rec, $k + 4)) $masters $pl
                             }
+                        } elseif ($label -eq 'SPEL' -and $sub -eq 'SPIT' -and $sz -ge 36) {
+                            $spit = [BitConverter]::ToUInt32($rec, $k + 32)
+                        } elseif ($label -eq 'SPEL' -and $sub -eq 'EFID' -and $sz -ge 4) {
+                            $efids.Add([BitConverter]::ToUInt32($rec, $k))
+                        } elseif ($label -eq 'MGEF' -and $sub -eq 'DATA' -and $sz -ge 44) {
+                            $mgefSkill = [BitConverter]::ToInt32($rec, $k + 12)
+                            $mgefLevel = [int64][BitConverter]::ToUInt32($rec, $k + 40)
                         } elseif ($label -eq 'COBJ') {
                             if ($sub -eq 'CNAM' -and $sz -eq 4) { $cnam = [BitConverter]::ToUInt32($rec, $k); $hasCnam = $true }
                             elseif ($sub -eq 'BNAM' -and $sz -eq 4) { $bnam = [BitConverter]::ToUInt32($rec, $k); $hasBnam = $true }
@@ -2831,13 +2851,19 @@ foreach ($pl in $order) {
                         $here++
                         if (-not $perPluginRecipes.ContainsKey($pl)) { $perPluginRecipes[$pl] = 0 }
                         $perPluginRecipes[$pl] = $perPluginRecipes[$pl] + 1
+                    } elseif ($label -eq 'MGEF') {
+                        $mgefs[$desc] = [pscustomobject]@{ Skill = $mgefSkill; Level = $mgefLevel }
                     } else {
                         if (-not $full) { $full = $edid; $fullFrom = 'the editor id' }
+                        $spitDesc = ''
+                        if ($spit -ne 0) { $spitDesc = DescOf ([uint32]$spit) $masters $pl }
+                        $efidDescs = @()
+                        foreach ($e in $efids) { if ($e -ne 0) { $efidDescs += (DescOf ([uint32]$e) $masters $pl) } }
                         $items[$desc] = [pscustomobject]@{
                             Desc = $desc; Type = $label; Edid = $edid; Name = $full; NameFrom = $fullFrom
                             AlchFlags = $alchFlags; HasEnit = $hasEnit; WeapAnim = $weapAnim
                             Keywords = $kwds.ToArray(); SeenIn = $pl; Value = $value
-                            Teaches = $teaches
+                            Teaches = $teaches; Spit = $spitDesc; Efids = $efidDescs
                         }
                         if ($label -eq 'KYWD') { $kwName[$desc] = $edid }
                     }
@@ -5244,24 +5270,67 @@ foreach ($desc in $owned.Keys) {
         $staffSpells[$n.ParamDesc] = [pscustomobject]@{ Name = $sname; Edid = $n.Param; Tomes = @($n.Tomes) }
     }
 }
+# THE SCHOOL AND RANK OF A STAFF SPELL (#1128). An Enchanter unlocks staff
+# spells by rank, so each one needs its rank. Read the way the gamemode's spell
+# tomes block reads a tome's spell: the SPEL's half cost perk, whose editor id
+# names both (DestructionAdept50, AlterationNovice00), and failing that the
+# highest minimum level among its effects of the five schools. Skyrim's levels
+# to ranks as the rulebook sorts them: 0 Novice, 25 Apprentice and 50 Adept are
+# Advanced, 75 Expert, 100 Master. The gamemode still prefers the rulebook's own
+# rank for a spell its SPELLS lists.
+$SPELL_AV_SCHOOL = @{ 18 = 'alteration'; 19 = 'conjuration'; 20 = 'destruction'; 21 = 'illusion'; 22 = 'restoration' }
+$SPELL_PERK_WORD = @{ novice = 'novice'; apprentice = 'advanced'; adept = 'advanced'; expert = 'expert'; master = 'master' }
+function StaffSchoolRank([string]$spellDesc) {
+    if (-not $items.ContainsKey($spellDesc)) { return $null }
+    $sp = $items[$spellDesc]
+    if ($sp.Spit -and $items.ContainsKey($sp.Spit)) {
+        $m = [regex]::Match([string]$items[$sp.Spit].Edid, '(alteration|conjuration|destruction|illusion|restoration)(novice|apprentice|adept|expert|master)', 'IgnoreCase')
+        if ($m.Success) {
+            return [pscustomobject]@{ School = $m.Groups[1].Value.ToLower(); Rank = $SPELL_PERK_WORD[$m.Groups[2].Value.ToLower()] }
+        }
+    }
+    $best = $null
+    foreach ($e in @($sp.Efids)) {
+        if (-not $mgefs.ContainsKey($e)) { continue }
+        $mg = $mgefs[$e]
+        if (-not $SPELL_AV_SCHOOL.ContainsKey([int]$mg.Skill) -or $mg.Level -lt 0) { continue }
+        if (-not $best -or $mg.Level -gt $best.Level) { $best = [pscustomobject]@{ School = $SPELL_AV_SCHOOL[[int]$mg.Skill]; Level = $mg.Level } }
+    }
+    if (-not $best) { return $null }
+    $rk = 'novice'
+    if ($best.Level -ge 100) { $rk = 'master' } elseif ($best.Level -ge 75) { $rk = 'expert' } elseif ($best.Level -ge 25) { $rk = 'advanced' }
+    return [pscustomobject]@{ School = $best.School; Rank = $rk }
+}
 $staffTaught = 0
 $staffUntaught = New-Object 'System.Collections.Generic.List[string]'
+$staffUnranked = New-Object 'System.Collections.Generic.List[string]'
+$staffByRank = [ordered]@{ novice = 0; advanced = 0; expert = 0; master = 0 }
 foreach ($k in $staffSpells.Keys) {
     if ($staffSpells[$k].Tomes.Count -gt 0) { $staffTaught++ }
     else { $staffUntaught.Add(('{0} ({1}, {2})' -f $staffSpells[$k].Name, $staffSpells[$k].Edid, $k)) }
+    $sr = StaffSchoolRank $k
+    $staffSpells[$k] | Add-Member -NotePropertyName School -NotePropertyValue $(if ($sr) { $sr.School } else { $null }) -Force
+    $staffSpells[$k] | Add-Member -NotePropertyName Rank -NotePropertyValue $(if ($sr) { $sr.Rank } else { $null }) -Force
+    if ($sr) { $staffByRank[$sr.Rank] = $staffByRank[$sr.Rank] + 1 }
+    else { $staffUnranked.Add(('{0} ({1}, {2})' -f $staffSpells[$k].Name, $staffSpells[$k].Edid, $k)) }
 }
 Write-Host ''
 Write-Host 'the staff spells' -ForegroundColor Cyan
 Ok ("{0} spell(s) named by staff recipes, {1} of them taught by a tome" -f $staffSpells.Count, $staffTaught)
+Ok ("ranks read out of the records: novice {0}, advanced {1}, expert {2}, master {3}" -f $staffByRank['novice'], $staffByRank['advanced'], $staffByRank['expert'], $staffByRank['master'])
 if ($staffUntaught.Count -gt 0) {
-    Note ("{0} no tome teaches, so the staves that bind them stay closed:" -f $staffUntaught.Count)
+    Note ("{0} no tome teaches, so only an Enchanter can unlock them:" -f $staffUntaught.Count)
     foreach ($u in $staffUntaught) { Note ('    ' + $u) }
+}
+if ($staffUnranked.Count -gt 0) {
+    Loud ("{0} have no school and rank the records say, so nobody can unlock them:" -f $staffUnranked.Count)
+    foreach ($u in $staffUnranked) { Note ('    ' + $u) }
 }
 $staffLines = New-Object 'System.Collections.Generic.List[string]'
 $staffLines.Add('  /* Built by scripts\dev\Build-RecipeTable.ps1 out of the game''s own records. Do not hand edit.')
 $staffLines.Add('     ' + $staffSpells.Count + ' spells a staff recipe binds, ' + $staffTaught + ' of them taught by a spell tome.')
-$staffLines.Add('     Spell desc -> its name and every BOOK record whose teaches spell flag names it.')
-$staffLines.Add('     A spell with no tome is one nobody can learn here, so its staves stay closed. */')
+$staffLines.Add('     Spell desc -> its name, its school and rank read out of the records (#1128; null when they cannot be),')
+$staffLines.Add('     and every BOOK record whose teaches spell flag names it. */')
 $staffLines.Add('  var STAFF_SPELLS = {')
 $sn = 0
 foreach ($k in $staffSpells.Keys) {
@@ -5270,7 +5339,12 @@ foreach ($k in $staffSpells.Keys) {
     if ($sn -eq $staffSpells.Count) { $comma = '' }
     $tb = @()
     foreach ($tm in $staffSpells[$k].Tomes) { $tb += (JsonStr $tm) }
-    $staffLines.Add('    ' + (JsonStr $k) + ': { "name": ' + (JsonStr $staffSpells[$k].Name) + ', "tomes": [' + ($tb -join ', ') + '] }' + $comma)
+    $schTxt = 'null'
+    if ($staffSpells[$k].School) { $schTxt = JsonStr $staffSpells[$k].School }
+    $rkTxt = 'null'
+    if ($staffSpells[$k].Rank) { $rkTxt = JsonStr $staffSpells[$k].Rank }
+    $staffLines.Add('    ' + (JsonStr $k) + ': { "name": ' + (JsonStr $staffSpells[$k].Name) + ', "school": ' + $schTxt +
+                    ', "rank": ' + $rkTxt + ', "tomes": [' + ($tb -join ', ') + '] }' + $comma)
 }
 $staffLines.Add('  };')
 # And the refused rows, which carry a sentence instead of an owner. The gate
