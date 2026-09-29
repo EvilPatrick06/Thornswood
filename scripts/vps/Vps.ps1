@@ -70,6 +70,43 @@ function Get-ThornswoodVpsUser {
     return $u
 }
 
+# ------------------------------------------------------ ssh and scp -----
+# Every ssh, scp, ssh-keygen and ssh-keyscan a script runs goes through this:
+#
+#     $out = Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" $cmd } 2>&1
+#     $wire | Invoke-ThornswoodNative { $input | & ssh @ssh $target $cmd } 2>&1
+#
+# so a line the program writes on stderr is never an error by itself, and
+# whether it worked is its exit code ($LASTEXITCODE), the same in Windows
+# PowerShell 5.1 and PowerShell 7. Issue #941: from 28 September the box's
+# OpenSSH (9.5) made the client here print "** WARNING: connection is not
+# using a post-quantum key exchange algorithm" on stderr for every
+# connection. Under Windows PowerShell 5.1 a native program's stderr line
+# becomes an error record whenever stderr is redirected (2>&1, 2>$null, or a
+# caller that redirected the whole script), and with $ErrorActionPreference
+# = 'Stop', which every script here sets, the first one stops the script.
+# PowerShell 7 never does that, which is why Ship still worked and
+# Install-Voice.ps1 under powershell.exe did not.
+#
+# Inside this function the preference is Continue, for the call in the block
+# and nothing else, so the stderr lines still come out as they always did: in
+# the pipeline as error records under 2>&1 (Where-Object { $_ -is [string] }
+# still drops them, [string]$_ still reads them), gone under 2>$null, and on
+# the screen with no redirection. A real failure is still a failure: ssh and
+# scp exit non-zero (255 when they cannot connect), and the caller reads
+# $LASTEXITCODE as before. Keep the block to the one native call, so nothing
+# else in a script is softened. tests\test-ssh-stderr.ps1 runs a stand-in ssh
+# that prints the warning, under both PowerShells.
+#
+# A plain function on purpose: an advanced one (with [Parameter]) refuses
+# pipeline input it has no parameter for, and the secret goes in by pipe.
+function Invoke-ThornswoodNative($ThornswoodNativeCall) {
+    if (-not ($ThornswoodNativeCall -is [scriptblock])) { throw 'Invoke-ThornswoodNative takes a script block: { & ssh ... }' }
+    $ErrorActionPreference = 'Continue'
+    if ($MyInvocation.ExpectingInput) { $input | & $ThornswoodNativeCall }
+    else { & $ThornswoodNativeCall }
+}
+
 # ------------------------------------------------------------ host key ----
 # Every script that reaches the box runs ssh and scp with
 # StrictHostKeyChecking=yes (issue #450), so ssh only talks to a machine whose
@@ -96,10 +133,7 @@ function Get-ThornswoodSshFingerprint([string]$Line) {
     $tmp = [IO.Path]::GetTempFileName()
     try {
         [IO.File]::WriteAllText($tmp, $Line.Trim() + "`n", (New-Object Text.UTF8Encoding($false)))
-        $old = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        $out = @(& ssh-keygen -l -E sha256 -f $tmp 2>$null)
-        $ErrorActionPreference = $old
+        $out = @(Invoke-ThornswoodNative { & ssh-keygen -l -E sha256 -f $tmp } 2>$null)
         foreach ($o in $out) {
             $m = [regex]::Match([string]$o, 'SHA256:[A-Za-z0-9+/]+')
             if ($m.Success) { return $m.Value }
@@ -126,10 +160,7 @@ function Test-ThornswoodKnownHost {
     )
     $held = @()
     if (Test-Path -LiteralPath $KnownHosts) {
-        $old = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        $out = @(& ssh-keygen -F $Address -f $KnownHosts -l -E sha256 2>$null)
-        $ErrorActionPreference = $old
+        $out = @(Invoke-ThornswoodNative { & ssh-keygen -F $Address -f $KnownHosts -l -E sha256 } 2>$null)
         foreach ($o in $out) {
             if ([string]$o -match '^\s*#') { continue }
             $m = [regex]::Match([string]$o, 'SHA256:[A-Za-z0-9+/]+')
@@ -162,10 +193,7 @@ function Add-ThornswoodKnownHost {
     }
     if ($now.Status -eq 'trusted') { return 0 }
 
-    $old = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    $scan = @(& ssh-keyscan -T 10 $Address 2>$null)
-    $ErrorActionPreference = $old
+    $scan = @(Invoke-ThornswoodNative { & ssh-keyscan -T 10 $Address } 2>$null)
     $keep = @()
     foreach ($line in $scan) {
         $l = ([string]$line).Trim()

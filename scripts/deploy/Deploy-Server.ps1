@@ -558,7 +558,7 @@ Get-ChildItem -LiteralPath '$rootWin' -Directory -Force -EA SilentlyContinue |
 New-Item -ItemType Directory -Path '$rootWin\$stageName\plugins' -Force | Out-Null
 "@ | Out-Null
 foreach ($rel in $send.Keys) {
-  & scp @ssh $send[$rel] "$User@${Vps}:$stageFar/$rel"
+  Invoke-ThornswoodNative { & scp @ssh $send[$rel] "$User@${Vps}:$stageFar/$rel" }
   if ($LASTEXITCODE -ne 0) { throw "scp failed for $rel. The server has not been touched." }
   Write-Host "  $rel"
 }

@@ -65,7 +65,7 @@ function Die($m) {
 function Remote($script) {
   $s = "`$ProgressPreference = 'SilentlyContinue'`r`n" + $script
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($s))
-  & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" 2>&1
+  Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" } 2>&1
 }
 
 $map = @{

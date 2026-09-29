@@ -357,7 +357,7 @@ New-Item -ItemType Directory -Force -Path '$rootWin\$stageName\assets' | Out-Nul
 "@ | ForEach-Object { "$_".Trim() })
 if ($made -notcontains 'ready') { Die "could not make $rootWin\$stageName on the VPS. The bot was not touched." }
 foreach ($rel in $send.Keys) {
-  & scp @ssh $send[$rel] "${User}@${Vps}:$Root/$stageName/$rel" | Out-Null
+  Invoke-ThornswoodNative { & scp @ssh $send[$rel] "${User}@${Vps}:$Root/$stageName/$rel" } | Out-Null
   if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE for $rel. The bot was not touched." }
   Say "  $rel" 'Green'
 }
@@ -685,7 +685,7 @@ $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
 $svcSrc = Join-Path $Repo 'scripts\vps\BotService.cs'
 foreach ($f in $svcLib, $svcSrc) { if (-not (Test-Path -LiteralPath $f)) { Die "missing: $f" } }
 $null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin\service' | Out-Null; 'ready'"
-& scp @ssh $svcSrc "${User}@${Vps}:$Root/service/BotService.cs" | Out-Null
+Invoke-ThornswoodNative { & scp @ssh $svcSrc "${User}@${Vps}:$Root/service/BotService.cs" } | Out-Null
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE for BotService.cs. The bot was not touched." }
 Say '  service\BotService.cs' 'Green'
 $running = @(Remote ((Get-Content -LiteralPath $svcLib -Raw) + "`n" + @"

@@ -149,7 +149,7 @@ Get-ChildItem '$($Remote.Replace('/','\'))' -File -EA SilentlyContinue |
   Where-Object { `$_.Name -match '^thornswood-\d{8}-\d{6}\.zip(\.enc)?`$' } |
   ForEach-Object { `$_.Name + '|' + `$_.Length }
 "@))
-$listing = & ssh @ssh $target "powershell -NoProfile -EncodedCommand $e" 2>&1
+$listing = Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $e" } 2>&1
 
 Head 'On the VPS'
 $onBox = @()
@@ -187,7 +187,7 @@ $got = @()
 # scheduler shows as its last result.
 $failed = 0
 foreach ($b in $want) {
-  & scp @ssh "${target}:$Remote/$($b.Name)" (Join-Path $To $b.Name)
+  Invoke-ThornswoodNative { & scp @ssh "${target}:$Remote/$($b.Name)" (Join-Path $To $b.Name) }
   if ($LASTEXITCODE -ne 0) { Say ("  FAILED  " + $b.Name) 'Red'; $failed++; continue }
   $local = Join-Path $To $b.Name
   $len = (Get-Item $local).Length

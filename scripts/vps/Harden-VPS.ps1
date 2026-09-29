@@ -136,7 +136,7 @@ function Clean($lines) {
 function Test-KeyLogin {
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    $out = @(& ssh @ssh -o PreferredAuthentications=publickey "$User@$Vps" 'echo THORNSWOOD_KEY_OK' 2>&1 | ForEach-Object { [string]$_ })
+    $out = @(Invoke-ThornswoodNative { & ssh @ssh -o PreferredAuthentications=publickey "$User@$Vps" 'echo THORNSWOOD_KEY_OK' } 2>&1 | ForEach-Object { [string]$_ })
     $ErrorActionPreference = $old
     return (($out -join "`n") -match 'THORNSWOOD_KEY_OK')
 }
@@ -147,7 +147,7 @@ function Test-KeyLogin {
 function Get-LoginMethods {
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    $out = @(& ssh @ssh -v -o PubkeyAuthentication=no "$User@$Vps" 'exit' 2>&1 | ForEach-Object { [string]$_ })
+    $out = @(Invoke-ThornswoodNative { & ssh @ssh -v -o PubkeyAuthentication=no "$User@$Vps" 'exit' } 2>&1 | ForEach-Object { [string]$_ })
     $ErrorActionPreference = $old
     $line = @($out | Where-Object { $_ -match 'Authentications that can continue:' }) | Select-Object -Last 1
     if (-not $line) { return $null }
@@ -180,7 +180,7 @@ function Invoke-Box([bool]$dry) {
     $far = 'C:/Windows/Temp/thornswood-harden-' + [Guid]::NewGuid().ToString('N') + '.ps1'
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    & scp @ssh $BoxScript "${User}@${Vps}:$far" 2>&1 | Out-Null
+    Invoke-ThornswoodNative { & scp @ssh $BoxScript "${User}@${Vps}:$far" } 2>&1 | Out-Null
     $sent = ($LASTEXITCODE -eq 0)
     $ErrorActionPreference = $old
     if (-not $sent) { Die "Could not copy vps-harden.ps1 to the box. Nothing was changed." }
@@ -189,7 +189,7 @@ function Invoke-Box([bool]$dry) {
     $cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File $far"
     if ($dry) { $cmd += ' -DryRun' }
     $ErrorActionPreference = 'Continue'
-    $out = Clean @(& ssh @ssh "$User@$Vps" $cmd 2>&1)
+    $out = Clean @(Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" $cmd } 2>&1)
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     foreach ($l in $out) {
@@ -267,7 +267,7 @@ if ($armed) {
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cancel))
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    $said = (@(& ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" 2>&1 | ForEach-Object { [string]$_ }) -join ' ')
+    $said = (@(Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" } 2>&1 | ForEach-Object { [string]$_ }) -join ' ')
     $ErrorActionPreference = $old
     if ($said -match 'ROLLBACK_CANCELLED') { Say "  CHANGED the rollback task is cancelled, so the change stays" 'Green' }
     else { Die "Could not cancel the task '$Rollback', so the box will put password login back within ten minutes. Run this again once that has happened." }

@@ -68,7 +68,7 @@ if (Test-Path -LiteralPath '$Remote') {
 } else { 'MISSING||' }
 "@
 $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-$answer = (& ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" 2>&1) -join ''
+$answer = (Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" } 2>&1) -join ''
 if ($LASTEXITCODE -ne 0) {
   Say "  could not reach the server: $answer" 'Yellow'
   if (-not $NoPause) { [void](Read-Host 'Enter to exit') }

@@ -62,7 +62,7 @@ foreach ($t in 'ssh', 'scp') {
 
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  & ssh @ssh $target "powershell -NoProfile -EncodedCommand $e" 2>&1
+  Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $e" } 2>&1
 }
 
 $script = Join-Path $Here '..\vps\vps-nightly-backup.ps1'
@@ -142,7 +142,7 @@ try {
 "@
 if ("$locked" -notmatch 'LOCKED') { Die ("could not lock $Root to SYSTEM and Administrators: " + "$locked" + '. Nothing was sent.') }
 Say "  $Root is SYSTEM's and Administrators' only" 'Green'
-& scp @ssh $script "${target}:$($Root.Replace('\','/'))/vps-nightly-backup.ps1"
+Invoke-ThornswoodNative { & scp @ssh $script "${target}:$($Root.Replace('\','/'))/vps-nightly-backup.ps1" }
 if ($LASTEXITCODE -ne 0) { Die 'scp failed.' }
 Say "  $runner" 'Green'
 
@@ -154,7 +154,7 @@ Head 'The passphrase'
 # without a word (issue #454). Sent as a file, never on a command line.
 $there = Remote "if (Test-Path '$keyFile') { 'KEY THERE' } else { 'KEY NONE' }"
 if ("$there" -match 'KEY NONE' -and (Test-Path -LiteralPath $KeyOut)) {
-  & scp @ssh $KeyOut "${target}:$($keyFile.Replace('\','/'))"
+  Invoke-ThornswoodNative { & scp @ssh $KeyOut "${target}:$($keyFile.Replace('\','/'))" }
   if ($LASTEXITCODE -ne 0) { Die 'could not send the passphrase up. Nothing was registered.' }
   Say "  sent this machine's copy up from $KeyOut, so every backup opens with the same file" 'Green'
 }
@@ -175,7 +175,7 @@ $made | ForEach-Object { Say "  $_" }
 if (-not (Test-Path -LiteralPath $KeyOut)) {
   Say '  Copying it down to this machine, because a passphrase that only lives' 'DarkGray'
   Say '  on the box is no use the day the box is what you lost.' 'DarkGray'
-  & scp @ssh "${target}:$($keyFile.Replace('\','/'))" $KeyOut
+  Invoke-ThornswoodNative { & scp @ssh "${target}:$($keyFile.Replace('\','/'))" $KeyOut }
   if ($LASTEXITCODE -ne 0) { Say '  could not copy it down. Do that before you rely on any of this.' 'Red' }
   else { Say "  $KeyOut" 'Green' }
 } else {
