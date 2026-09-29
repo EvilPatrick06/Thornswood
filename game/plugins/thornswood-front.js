@@ -1650,7 +1650,7 @@
   let strayFocusSince = 0;
 
   /*
-    A PANEL TAKES THE KEYBOARD ONLY ONCE EVERY KEY IS UP. Issue 528.
+    A PANEL TAKES THE KEYBOARD AT ONCE, KEYS DOWN OR NOT. Issues 528 and 898.
 
     Djinn on dev, 24 September: after picking a character F and the mouse
     wheel stopped at a very close third person view and Tab did not open the
@@ -1663,51 +1663,26 @@
       15:00:01.522 input: 1800 keys in 5s, browser focus yes, menu no, controls on
 
     Shift and P were down, for the P in the name he typed, when the party
-    window opened and raised focus. While focus is up DInputHook.cpp in the
-    fork reads the keyboard buffer and hands the game none of it, so the two
-    key ups went nowhere and the game held Shift and P down for the rest of
-    the session: 1800 button events every five seconds at 180 frames a
-    second is two keys repeating every frame, with no menu open and the
-    controls on. Blade's dev session of 25 September shows the same after K
-    (one key, 715 every five seconds at 143 frames), and Djinn's of 26 and
-    27 September after the emote wheel and K.
+    window opened and raised focus. DInputHook.cpp in the fork handed the
+    game none of the keyboard while focus was up, key ups included, so the
+    game held Shift and P down for the rest of the session. Blade (K, 25
+    September) and Djinn (the emote wheel and K, 26 and 27 September) hit
+    the same.
 
-    So a claim that arrives while a key is down waits for it to come up,
-    which the game then sees, and only then raises focus. Input's count is
-    SKSE's, which still hears the keyboard while focus is up (the note on
-    watchFocusKeys below), so it is the keys under the fingers and not the
-    ones the game already believes held. A key somebody keeps holding does
-    not keep the panel from the keyboard for ever: after CLAIM_WAIT_MS focus
-    goes up anyway and the log names the keys, because that is the one case
-    left that can leave a key down in the game. An F6 focus is not held back:
-    skymp5-client raises that one itself on the same press.
+    Issue 528 made this plugin hold a claim back until every key was up, for
+    up to a second. Issue 898 fixed it where it happens: the fork's
+    DInputHook now lets the key up of every key the game holds through while
+    focus is up (HeldKeyRelease, in the client that records\client-build.json
+    names), and still withholds every key down. So a panel takes the keyboard
+    on the frame it asks, and a key that was down comes up in the game when
+    it is let go. The wait is gone; nothing here has to know which keys are
+    down.
+
+    keysHeldNow is SKSE's count of the keys under the fingers, which the idle
+    watch reads.
   */
-  const CLAIM_WAIT_MS = 1000;
-  let claimWaitSince = 0;
-
   function keysHeldNow() {
     try { return sp.Input.getNumKeysPressed() || 0; } catch (e) { return 0; }
-  }
-
-  function heldKeyCodes() {
-    const codes = [];
-    for (let k = 1; k < 256; k++) {
-      try { if (sp.Input.isKeyPressed(k)) { codes.push(k); } } catch (e) { break; }
-    }
-    return codes.join(', ') || 'none on the keyboard';
-  }
-
-  function keysUpForClaim() {
-    const held = keysHeldNow();
-    if (!held) { claimWaitSince = 0; return true; }
-    const now = Date.now();
-    if (!claimWaitSince) { claimWaitSince = now; return false; }
-    if (now - claimWaitSince < CLAIM_WAIT_MS) { return false; }
-    say('a panel waited ' + CLAIM_WAIT_MS + 'ms for ' + held + ' held key(s) [' +
-        heldKeyCodes() + '] to come up and takes the keyboard anyway; the game ' +
-        'may keep them down until they are pressed again');
-    claimWaitSince = 0;
-    return true;
   }
 
   /**
@@ -1769,14 +1744,9 @@
     if (claimed) { manualFocusSince = 0; }
     const want = claimed || manualFocusHeld();
 
-    if (up === want) { strayFocusSince = 0; claimWaitSince = 0; return; }
-
-    // A panel is only handed the keyboard once every key is up (issue 528,
-    // the note on CLAIM_WAIT_MS above).
-    if (want && claimed && !keysUpForClaim()) { return; }
+    if (up === want) { strayFocusSince = 0; return; }
 
     if (!want) {
-      claimWaitSince = 0;
       if (!strayFocusSince) { strayFocusSince = Date.now(); }
       const waited = Date.now() - strayFocusSince;
       if (raceMenuOpen() && waited < 1200) { return; }
@@ -1826,8 +1796,8 @@
 
     buttonEvent cannot hear the F6 that gives the keyboard back. It is built
     from the game's own input events (the kButton case in EventHandler.cpp in
-    the fork), and while focus is up DInputHook.cpp hands the game an empty
-    keyboard buffer. The snapshot it reads first goes to the browser and
+    the fork), and while focus is up DInputHook.cpp hands the game no key
+    downs, only the key up of a key it already held (issue 898). The snapshot it reads first goes to the browser and
     nowhere else: OnKeyStateChange in the fork's main.cpp returns at once
     unless the browser has focus, and then only injects the key into it.
     This machine's platform log for 23 September agrees: the K panel held
@@ -2013,17 +1983,18 @@
   // The keyboard is only handed over once the page has said it has a box to
   // type into, and it is handed back on a message from the page.
   //
-  // A plugin cannot hear a key as a buttonEvent while focus is up.
+  // A plugin cannot hear a key press as a buttonEvent while focus is up.
   // DInputHook::GetDeviceData does read the keyboard and call
   // ProcessKeyboardData before it checks ChromeFocus, but ProcessKeyboardData
   // feeds OnKeyStateChange in the fork's main.cpp, which only injects the key
   // into the browser. buttonEvent comes from the game's own input events, and
-  // the game gets an empty buffer:
+  // the game gets no key downs; since issue 898 it gets only the key up of a
+  // key it already held (HeldKeyRelease), so nothing stays held:
   //
   //     if (hr == DI_OK) { ProcessKeyboardData(rawData); ... }   // to the page
-  //     if (DInputHook::ChromeFocus()) { *outDataLen = 0; ... }   // not the game
+  //     g_heldKeys.Filter(..., listening)                        // the game
   //
-  // So the game and the plugins are both starved; only the page hears keys.
+  // So no press reaches the game or the plugins; only the page hears keys.
   // Escape below is caught by asking Input.isKeyPressed, the way F6 is (see
   // watchFocusKeys), not by waiting for a buttonEvent, and the cap further down
   // does not need any key at all. Both exist because everything that routes
