@@ -362,6 +362,8 @@ try {
     $dev    = Join-Path $tmp 'Thornswood-Server-Dev'
     $voice  = Join-Path $tmp 'Thornswood-Voice\chat'
     $voiceDev = Join-Path $tmp 'Thornswood-Voice-Dev\chat'
+    # The deploy records /api/deploys lists (#459).
+    $deploys = Join-Path $tmp 'Thornswood-Deploys\current'
     Put (Join-Path $docs 'config.json') '{}'
     Put (Join-Path $docs 'data\board.json') '{}'
     Put (Join-Path $server 'server.log') 'before'
@@ -369,6 +371,7 @@ try {
     Put (Join-Path $server 'world\changeForms.json') '{}'
     Put (Join-Path $voice '2026-09-24.jsonl') '{}'
     Put (Join-Path $voiceDev '2026-09-24.jsonl') '{}'
+    Put (Join-Path $deploys 'thornswood-docs.json') '{}'
     # The update feed the site serves and must not write (#913).
     Put (Join-Path $docs 'feed\version.json') '{}'
     Put (Join-Path $docs 'feed\assets\0000000000000000000000000000000000000000000000000000000000000000') 'x'
@@ -388,6 +391,7 @@ try {
         'C:\Thornswood-Server-Dev'     = $dev
         'C:\Thornswood-Voice\chat'     = $voice
         'C:\Thornswood-Voice-Dev\chat' = $voiceDev
+        'C:\Thornswood-Deploys\current' = $deploys
     }
 
     # -- SYSTEM: the principal it always had, and not one grant -----------------
@@ -441,6 +445,7 @@ try {
     # to survive that, which a grant on the file would not.
     Remove-Item -LiteralPath (Join-Path $server 'server.log') -Force
     Put (Join-Path $server 'server.log') 'after a restart'
+    Yes 'the deploy records: LOCAL SERVICE reads them and changes nothing (#459)' (ReadsOnly (RulesFor (Join-Path $deploys 'thornswood-docs.json') $ls))
     Yes 'server.log made again after the grant can still be read' (ReadsOnly (RulesFor (Join-Path $server 'server.log') $ls))
     Yes 'online.json can be read' (ReadsOnly (RulesFor (Join-Path $server 'data\online.json') $ls))
     Yes 'the chat can be read' (ReadsOnly (RulesFor (Join-Path $voice '2026-09-24.jsonl') $ls))
@@ -524,7 +529,7 @@ try {
     $refused = @([regex]::Matches($said, 'COULD NOT GRANT')).Count
     Yes 'a grant that fails does not throw' (-not $threw)
     Yes 'each one that fails is said, with what icacls said, and the rest are still tried' (
-        $refused -eq 5 -and $said -match 'Access is denied')
+        $refused -eq 6 -and $said -match 'Access is denied')
 
     # -- an account this box does not have: nothing is stopped ------------------
     $script:icaclsCalls = 0
