@@ -24,7 +24,7 @@
 [CmdletBinding()]
 param(
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Root = 'C:/Thornswood-Docs',
   # Short on purpose. A public news page is the last handful of releases, not
   # an archive of every build.
@@ -75,6 +75,7 @@ $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
 if (-not $From) {

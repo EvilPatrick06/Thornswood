@@ -32,7 +32,7 @@
 [CmdletBinding()]
 param(
     [string]$Vps   = '',
-    [string]$User  = 'Administrator',
+    [string]$User  = '',
     [int]$Lines    = 4000,
     [switch]$All,
     [int]$Port     = 0,
@@ -62,6 +62,7 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $Out) {
     $Out = Join-Path (Split-Path -Parent (Split-Path -Parent $Here)) 'logs'

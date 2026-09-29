@@ -42,7 +42,7 @@ param(
   [string]$Version,
   [string]$Note,
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Root = 'C:/Thornswood-Docs',
   [switch]$KeepOld,
   # The payload is inside the exe, so there is one file to publish and the
@@ -56,6 +56,7 @@ $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $rootWin = $Root.Replace('/','\')
 

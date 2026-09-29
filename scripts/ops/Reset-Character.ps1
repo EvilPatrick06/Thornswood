@@ -22,7 +22,7 @@
 [CmdletBinding()]
 param(
     [string]$VpsHost  = '',
-    [string]$VpsUser  = 'Administrator',
+    [string]$VpsUser  = '',
     [string]$VpsRoot  = 'C:\Thornswood-Server',
     [string]$TaskName = 'Thornswood Server',
     [string]$Local    = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
@@ -34,6 +34,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }

@@ -27,7 +27,7 @@
 [CmdletBinding()]
 param(
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Root = 'C:/Thornswood-Bot',
   [string]$DocsRoot = 'C:/Thornswood-Docs',
   [string]$Task = 'Thornswood Bot',
@@ -69,6 +69,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 # The bot sources live at the repo root, in bot\. This script sits two levels
 # down, in scripts\deploy, since #440 sorted the scripts into scripts\<area> on
@@ -80,6 +81,16 @@ if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $Repo = Split-Path -Parent (Split-Path -Parent $Here)
 $rootWin = $Root.Replace('/','\')
 $docsWin = $DocsRoot.Replace('/','\')
+
+# What goes up is the bot artifact (issue #459, Artifact.ps1): the bot's files
+# as the commit holds them, in one zip named by commit and hash, sent to the
+# box's store first. From here $Repo is the artifact's folder, which is laid
+# out like the repository, so every copy below sends exactly what the zip holds.
+. (Join-Path $Here 'Artifact.ps1')
+$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/staff-channel.txt', 'bot/assets/join-card.png'
+Write-Host ('artifact ' + (Format-ThornswoodArtifact $artifact)) -ForegroundColor DarkGray
+Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
+$Repo = $artifact.Folder
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -229,6 +240,9 @@ if (Test-Path $art) {
 } else {
   Say '  no join-card.png, cards will fall back to a plain background' 'Yellow'
 }
+# The code is in place over the old: the box records that the bot runs this
+# artifact (Artifact.ps1), whether this run goes on to restart it or not.
+$null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root
 
 # ----------------------------------------------------------- code only ---
 # A change to bot.py and nothing else, which is most of them.
