@@ -5317,15 +5317,14 @@
     as ours, so one press opened both: our panel, and the game's Journal Menu
     at its Quests page behind it.
 
-    WHY IT IS SHUT RATHER THAN STOPPED. Nothing a plugin has on this build can
-    keep a key from the game. buttonEvent is not a gate: the fork's
-    EventHandler.cpp copies each key into an update task and returns
-    kContinue, so the game's own MenuControls has the same key untouched and
-    has already asked for its menu by the time this file hears J. The one
-    hotkey the fork does keep from the game, Ctrl and Print Screen, is kept by
-    wrapping a MenuControls handler inside the client (DisableCtrlPrtScnHotkey
-    in DevApi.cpp), and doing that for the journal is a client build, not
-    this.
+    THE CLIENT KEEPS J FROM THE GAME (issue 1016, keepJournalKey below). A
+    plugin cannot: buttonEvent is not a gate, the fork's EventHandler.cpp
+    copies each key into an update task and returns kContinue, so the game's
+    own MenuControls has the same key untouched and has already asked for its
+    menu by the time this file hears J. So the fork's client has a list of
+    keys its menu opener does not see (setMenuOpenKeyBlocked), and J goes on
+    it while our panel is in. The shut described below is what is left for a
+    book that opens anyway, and its log line says when one does.
 
     And the game's journal cannot be switched off as a whole, because the
     Journal Menu is also what Escape opens, at its System page, which is where
@@ -5430,6 +5429,49 @@
   }));
 
   /*
+    J NEVER REACHES THE GAME'S JOURNAL. Issue 1016.
+
+    Patrick, 28 September, after #958 shut the book in the next update: "Don't
+    accept the flash make the game client change." The book was still drawn
+    for a frame or two, because the game opens it on the press before any
+    plugin hears J.
+
+    The fork's client keeps a list of keys the game's menu opener does not
+    see (MenuOpenKeyBlocks in platform_lib, hooked into MenuOpenHandler in
+    MenuOpenKeyBlockHook.cpp). While our panel is in and the overlays are
+    ready, our key going down as the game's 'Journal' control is on it, so
+    the game never asks for its book and nothing is drawn. This file still
+    hears J in buttonEvent.
+
+    Only as 'Journal': Escape goes down as 'Pause' and opens the System page
+    as always. Somebody who moved the game's journal off J keeps it on their
+    key, and somebody who moved ours off J gets the game's journal on J.
+
+    Not while one of the game's own menus is up (KEYBOARD_MENUS, the Journal
+    Menu among them): there J is the game's as it always was, which is also
+    when the key handler below leaves ours shut. So J in the inventory still
+    opens the game's quest log, and J on the System page closes it.
+
+    Checked every frame against a boolean, and the client is told only when
+    it changes. null at load, so a reloaded plugin sets the client's list
+    whatever an earlier copy left in it.
+  */
+  let journalKeyKept = null;
+  let journalKeySaid = false;
+  function keepJournalKey(on) {
+    if (journalKeyKept === on) { return; }
+    journalKeyKept = on;
+    try { sp.setMenuOpenKeyBlocked('Journal', JOURNAL_KEY, on, KEYBOARD_MENUS); }
+    catch (err) {
+      if (!journalKeySaid) { journalKeySaid = true; say('J: the client could not keep J from the game: ' + err); }
+    }
+  }
+
+  sp.on('update', guard('journal key kept', () => {
+    keepJournalKey(journalPanelIn && !!T.ready);
+  }));
+
+  /*
     SHUT AS SOON AS IT IS UP, NOT WHEN ITS menuOpen COMES. Issue 958.
 
     Patrick on dev, 28 September: "J now opens the vanilla journal first".
@@ -5445,10 +5487,10 @@
     yet, and its menuOpen comes after that key does. A book whose menuOpen
     came longer ago than JOURNAL_PRESS_MS was up before J, and is left alone.
 
-    This makes the book's time on screen shorter. It cannot make it nothing:
-    the game opens its book on the same press before any plugin hears it, and
-    only a change in the client can keep J from the game (see the note at the
-    top of this block).
+    This makes the book's time on screen shorter, not nothing: the game opens
+    its book on the same press before any plugin hears it. Since issue 1016
+    the client keeps J from the game (keepJournalKey above), so this is only
+    for a book that opens anyway.
   */
   // upAlready: the book was up when J was heard, so it opened with the press.
   function shutJournalForJ(upAlready) {
