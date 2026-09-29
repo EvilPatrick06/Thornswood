@@ -349,6 +349,29 @@ them, names the SIL Open Font License, Version 1.1.
 - SKSE, which is in the collection, and Skyrim Special Edition, which each
   person owns.
 - The WebView2 Runtime, which comes from Microsoft.
+- texconv, the tool the main menu picture is built with (next section).
+
+## texconv, Microsoft's texture converter, used to build and not shipped
+
+`scripts\dev\Build-Backdrop.py` uses texconv to write the main menu picture,
+`game\menu\Mainmenuwallpaper.dds`, as BC7 (issue #994), because Pillow cannot
+write that format. The picture ships; texconv does not. It is not in the
+repository either: the script fetches this one file the first time it runs,
+into `local\texconv\may2026` (ignored by git), and refuses to run any copy
+whose sha256 is not the one below.
+
+| File | Release | Download | sha256 |
+|---|---|---|---|
+| `texconv.exe` | DirectXTex `may2026`, file version 2026.5.8.1, 966,480 bytes | https://github.com/microsoft/DirectXTex/releases/download/may2026/texconv.exe | `dcfdec10244e02cf5037fba089c55fb7e1326b1c8181742d77d15fa5cb5eef06` |
+
+The sha256 is the one GitHub publishes for that release asset, and the file
+downloaded on 28 September matched it. Its Authenticode signature is valid,
+signed by Microsoft Corporation ("Microsoft 3rd Party Application Component").
+Source: https://github.com/microsoft/DirectXTex, tag `may2026`.
+
+Licence: MIT, by the `LICENSE` file at that tag, "Copyright (c) Microsoft
+Corporation." Nobody is handed a copy, so its notice has nothing to travel
+with.
 
 ## On our servers
 

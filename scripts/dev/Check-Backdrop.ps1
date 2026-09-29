@@ -47,15 +47,39 @@ function Shapes([string]$p) {
     }
     return $count
 }
+# The texture's header, and what is wrong with it. Issue #994: the backdrop is
+# BC7_UNORM (DXGI 98, behind a DX10 header), 4096 x 4096 with all 13 levels,
+# and exactly as long as those levels. DXT1 was the old build that bands in
+# the sky; BC7_UNORM_SRGB (99) draws darker than it was built.
 function Dds([string]$p) {
     $b = [IO.File]::ReadAllBytes($p)
-    if ($b.Length -lt 128 -or [Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'DDS ') { return 'not a DDS file' }
+    if ($b.Length -lt 128 -or [Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'DDS ') { return @{ Text = 'not a DDS file'; Wrong = @('not a DDS file') } }
     $h = [BitConverter]::ToUInt32($b, 12); $w = [BitConverter]::ToUInt32($b, 16)
     $mips = [BitConverter]::ToUInt32($b, 28)
     $fourcc = [Text.Encoding]::ASCII.GetString($b, 84, 4)
     $flags = [BitConverter]::ToUInt32($b, 8)
     $mipFlag = if ($flags -band 0x20000) { 'mipmap flag set' } else { 'no mipmap flag' }
-    return ('{0}x{1}, {2} mip level(s), {3}, {4}, {5:n0} bytes' -f $w, $h, $mips, $fourcc, $mipFlag, $b.Length)
+    $format = $fourcc; $start = 128; $block = 16
+    if ($fourcc -eq 'DX10' -and $b.Length -ge 148) {
+        $dxgi = [BitConverter]::ToUInt32($b, 128); $start = 148
+        $format = switch ($dxgi) { 98 { 'BC7_UNORM' } 99 { 'BC7_UNORM_SRGB' } 71 { 'BC1_UNORM' } default { "DXGI format $dxgi" } }
+    }
+    if ($format -eq 'DXT1' -or $format -eq 'BC1_UNORM') { $block = 8 }
+    $expect = $start
+    $s = [Math]::Max($w, $h)
+    for ($i = 0; $i -lt $mips; $i++) { $expect += [Math]::Pow([Math]::Ceiling($s / 4), 2) * $block; $s = [Math]::Max(1, [Math]::Floor($s / 2)) }
+    $wrong = @()
+    if ($w -ne 4096 -or $h -ne 4096) { $wrong += 'NOT 4096 x 4096' }
+    if ($mips -eq 1) { $wrong += 'NO MIPS: soft at any size but its own' }
+    elseif ($mips -ne 13) { $wrong += "$mips LEVELS, not the full 13" }
+    if ($format -eq 'DXT1') { $wrong += 'DXT1: the old build, the sky bands' }
+    elseif ($format -eq 'BC7_UNORM_SRGB') { $wrong += 'BC7_UNORM_SRGB: draws darker than built' }
+    elseif ($format -ne 'BC7_UNORM') { $wrong += "$($format): not BC7_UNORM" }
+    if ($w -eq $h -and $b.Length -ne $expect) { $wrong += ('{0:n0} BYTES, the levels need {1:n0}' -f $b.Length, $expect) }
+    return @{
+        Text  = ('{0}x{1}, {2} mip level(s), {3}, {4}, {5:n0} bytes' -f $w, $h, $mips, $format, $mipFlag, $b.Length)
+        Wrong = $wrong
+    }
 }
 
 Write-Host ''
@@ -82,8 +106,8 @@ foreach ($f in $files) {
         } elseif ($s -ne 1) { $line += ' (the backdrop plate should be one shape)'; $bad++ }
     } else {
         $d = Dds $p
-        $line += ', ' + $d
-        if ($d -match ', 1 mip level') { $line += ' (NO MIPS: soft at any size but its own)'; $bad++ }
+        $line += ', ' + $d.Text
+        if ($d.Wrong.Count) { $line += ' (' + ($d.Wrong -join '; ') + ')'; $bad++ }
     }
     if (Test-Path -LiteralPath $ours) {
         if ((Md5 $p) -eq (Md5 $ours)) { $line += ' = the repo copy' } else { $line += ' <> the repo copy in game\menu'; $bad++ }
@@ -94,5 +118,5 @@ foreach ($f in $files) {
 }
 Write-Host ''
 if ($bad) { Write-Host "  $bad thing(s) wrong. Go.ps1 puts the repo's copies in; Ship carries them." -ForegroundColor Yellow; exit 1 }
-Write-Host '  one plate, mipped texture, all as the repo has them.' -ForegroundColor Green
+Write-Host '  one plate, a BC7 texture with all its levels, all as the repo has them.' -ForegroundColor Green
 exit 0
