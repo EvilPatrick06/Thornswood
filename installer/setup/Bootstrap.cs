@@ -685,6 +685,202 @@ namespace ThornswoodSetup
             catch { return null; }
         }
 
+        // ==== the three pages a person accepts ====
+        // Issue #1009, Patrick on 28 September: "check boxes that lock the
+        // install for reading and accepting terms and conditions, privacy
+        // policy, and agreeing to the rules", "and links to all 3". Each name
+        // is the page's address on the site, its name for /api/page, and the
+        // ChkX and LnkX in the window. tests\test-setup-agreements.ps1 holds
+        // the three together and proves Install stays off until all are ticked.
+        static readonly string[] Pages = { "terms", "privacy", "rules" };
+        const string AcceptedFile = "accepted.json";
+        static CheckBox[] agree;
+        static DateTime acceptedAt;
+
+        static string Cap(string s)
+        {
+            return char.ToUpperInvariant(s[0]) + s.Substring(1);
+        }
+
+        /// <summary>The three page boxes in the order of Pages, or null when any is missing.</summary>
+        static CheckBox[] FindAgreements(FrameworkElement w)
+        {
+            var found = new CheckBox[Pages.Length];
+            for (int i = 0; i < Pages.Length; i++)
+            {
+                found[i] = w.FindName("Chk" + Cap(Pages[i])) as CheckBox;
+                if (found[i] == null) return null;
+            }
+            return found;
+        }
+
+        /// <summary>Install is on only while every box is ticked, looked at again on each tick and untick.</summary>
+        static void Gate(Button go, CheckBox[] boxes)
+        {
+            RoutedEventHandler check = delegate { go.IsEnabled = AllTicked(boxes); };
+            foreach (CheckBox c in boxes)
+            {
+                if (c == null) continue;
+                c.Checked += check;
+                c.Unchecked += check;
+            }
+            go.IsEnabled = AllTicked(boxes);
+        }
+
+        static bool AllTicked(CheckBox[] boxes)
+        {
+            if (boxes == null || boxes.Length == 0) return false;
+            foreach (CheckBox c in boxes)
+            {
+                if (c == null || c.IsChecked != true) return false;
+            }
+            return true;
+        }
+
+        static void HookPageLinks(FrameworkElement w)
+        {
+            foreach (string p in Pages)
+            {
+                var link = w.FindName("Lnk" + Cap(p)) as System.Windows.Documents.Hyperlink;
+                if (link == null) continue;
+                link.RequestNavigate += delegate(object s, System.Windows.Navigation.RequestNavigateEventArgs e)
+                {
+                    OpenPage(e.Uri);
+                    e.Handled = true;
+                };
+            }
+        }
+
+        /// <summary>
+        /// The browser, on one of the site's own pages and nothing else. This
+        /// is the one Process.Start in the setup program, and it only ever
+        /// hands Windows an https address on thornswood.net.
+        /// </summary>
+        static void OpenPage(Uri uri)
+        {
+            string url = uri == null ? "" : uri.AbsoluteUri;
+            if (!url.StartsWith(Site + "/", StringComparison.OrdinalIgnoreCase)) return;
+            try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+            catch (Exception)
+            {
+                MessageBox.Show(win, "Windows would not open your browser. The page is at " + url + ".",
+                                "Thornswood Setup", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        /// <summary>
+        /// A JSON string's value by its key, unescaped, or null. Enough for
+        /// the site's page answer, {"md":"...","html":"..."}, without a JSON
+        /// library in a program that has none.
+        /// </summary>
+        static string JsonString(string doc, string key)
+        {
+            if (doc == null) return null;
+            string head = "\"" + key + "\":";
+            int i = doc.IndexOf(head, StringComparison.Ordinal);
+            if (i < 0) return null;
+            i += head.Length;
+            while (i < doc.Length && char.IsWhiteSpace(doc[i])) i++;
+            if (i >= doc.Length || doc[i] != '"') return null;
+            var sb = new StringBuilder();
+            for (i++; i < doc.Length; i++)
+            {
+                char c = doc[i];
+                if (c == '"') return sb.ToString();
+                if (c != '\\') { sb.Append(c); continue; }
+                if (++i >= doc.Length) return null;
+                char e = doc[i];
+                if (e == 'n') sb.Append('\n');
+                else if (e == 'r') sb.Append('\r');
+                else if (e == 't') sb.Append('\t');
+                else if (e == 'b') sb.Append('\b');
+                else if (e == 'f') sb.Append('\f');
+                else if (e == 'u')
+                {
+                    if (i + 4 >= doc.Length) return null;
+                    sb.Append((char)Convert.ToInt32(doc.Substring(i + 1, 4), 16));
+                    i += 4;
+                }
+                else sb.Append(e);
+            }
+            return null;
+        }
+
+        /// <summary>SHA-256 of a page's text as UTF-8, lower case hex: the version that was accepted.</summary>
+        static string PageSha(string md)
+        {
+            if (md == null) return "";
+            using (var h = SHA256.Create())
+            {
+                byte[] d = h.ComputeHash(new UTF8Encoding(false).GetBytes(md));
+                var sb = new StringBuilder();
+                foreach (byte b in d) sb.Append(b.ToString("x2"));
+                return sb.ToString();
+            }
+        }
+
+        /// <summary>
+        /// What goes in Profile\accepted.json. shas are in the order of Pages,
+        /// empty for a page the site did not answer for. No name, no account,
+        /// nothing about the machine: when, which pages, which versions.
+        /// </summary>
+        static string AcceptanceJson(DateTime at, string[] shas)
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\n");
+            sb.Append("  \"accepted\": \"" + at.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'",
+                      System.Globalization.CultureInfo.InvariantCulture) + "\",\n");
+            sb.Append("  \"pages\": {\n");
+            for (int i = 0; i < Pages.Length; i++)
+            {
+                string sha = shas != null && i < shas.Length && shas[i] != null ? shas[i] : "";
+                sb.Append("    \"" + Pages[i] + "\": { \"url\": \"" + Site + "/" + Pages[i] +
+                          "\", \"sha256\": \"" + sha + "\" }" + (i < Pages.Length - 1 ? "," : "") + "\n");
+            }
+            sb.Append("  },\n");
+            sb.Append("  \"about\": \"Ticked in Thornswood Setup before Install. sha256 is of each page's text as " +
+                      Site + "/api/page/<name> served it when Install was pressed, and is empty when the site " +
+                      "did not answer.\"\n");
+            sb.Append("}\n");
+            return sb.ToString();
+        }
+
+        /// <summary>The page's text as the site serves it now, or null.</summary>
+        static string FetchPage(string name)
+        {
+            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
+            var req = (HttpWebRequest)WebRequest.Create(Site + "/api/page/" + name);
+            req.UserAgent = "ThornswoodSetup";
+            req.Timeout = 15000;
+            req.ReadWriteTimeout = 15000;
+            using (var resp = (HttpWebResponse)req.GetResponse())
+            using (var r = new StreamReader(resp.GetResponseStream(), new UTF8Encoding(false)))
+            {
+                return JsonString(r.ReadToEnd(), "md");
+            }
+        }
+
+        /// <summary>
+        /// Writes Profile\accepted.json in the install. Never stops the
+        /// install: the boxes were ticked whatever the site or the disk says.
+        /// </summary>
+        static void RecordAcceptance(string profileDir, DateTime at)
+        {
+            var shas = new string[Pages.Length];
+            for (int i = 0; i < Pages.Length; i++)
+            {
+                try { shas[i] = PageSha(FetchPage(Pages[i])); }
+                catch (Exception) { shas[i] = ""; }
+            }
+            try
+            {
+                Directory.CreateDirectory(profileDir);
+                File.WriteAllText(Path.Combine(profileDir, AcceptedFile), AcceptanceJson(at, shas), new UTF8Encoding(false));
+            }
+            catch (Exception e) { Say("Could not note what you accepted: " + e.Message); }
+        }
+        // ==== end the three pages a person accepts ====
+
         static SolidColorBrush B(string hex)
         {
             return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
@@ -697,7 +893,7 @@ namespace ThornswoodSetup
         const string Ui = @"
 <Window xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
         xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml""
-        Title=""Thornswood Setup"" Width=""700"" Height=""740""
+        Title=""Thornswood Setup"" Width=""700"" Height=""800""
         MinWidth=""560"" MinHeight=""520""
         ResizeMode=""CanResize"" WindowStartupLocation=""Manual""
         Background=""#100D0A"" FontFamily=""Segoe UI""
@@ -903,13 +1099,57 @@ namespace ThornswoodSetup
             <ColumnDefinition Width=""*""/>
             <ColumnDefinition Width=""Auto""/>
           </Grid.ColumnDefinitions>
-          <CheckBox x:Name=""ChkAge"" Grid.Column=""0"" VerticalAlignment=""Center""
-                    Margin=""0,0,24,0"" Foreground=""{StaticResource Ink}"">
-            <TextBlock Foreground=""{StaticResource Ink}"" FontSize=""12.5"" LineHeight=""18""
-                       TextWrapping=""Wrap"" Margin=""4,0,0,0""
-                       Text=""I am 18 or over. Thornswood is an adult server.""/>
-          </CheckBox>
-          <StackPanel Grid.Column=""1"" Orientation=""Horizontal"" HorizontalAlignment=""Right"">
+          <!-- Install stays off until all four boxes are ticked (issue #1009
+               added the three pages). Each link opens that page on the site
+               in the browser, so what a person reads is the current text and
+               never a copy in here that goes stale. The link sits beside its
+               box, not inside it, so opening the page does not tick it, and
+               goes under it on a narrow window, where the words wrap. -->
+          <StackPanel Grid.Column=""0"" VerticalAlignment=""Center"" Margin=""0,0,24,0"">
+            <CheckBox x:Name=""ChkAge"" Foreground=""{StaticResource Ink}"">
+              <TextBlock Foreground=""{StaticResource Ink}"" FontSize=""12.5"" LineHeight=""18""
+                         TextWrapping=""Wrap"" Margin=""4,0,0,0""
+                         Text=""I am 18 or over. Thornswood is an adult server.""/>
+            </CheckBox>
+            <WrapPanel Margin=""0,7,0,0"">
+              <CheckBox x:Name=""ChkTerms"" Foreground=""{StaticResource Ink}"" VerticalAlignment=""Center""
+                        MaxWidth=""{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=StackPanel}}"">
+                <TextBlock Foreground=""{StaticResource Ink}"" FontSize=""12.5"" Margin=""4,0,0,0"" TextWrapping=""Wrap""
+                           Text=""I have read and accept the Terms and Conditions""/>
+              </CheckBox>
+              <TextBlock FontSize=""12.5"" Margin=""10,0,0,0"" VerticalAlignment=""Center"">
+                <Hyperlink x:Name=""LnkTerms"" NavigateUri=""https://thornswood.net/terms""
+                           Foreground=""{StaticResource Accent}""
+                           ToolTip=""Opens thornswood.net/terms in your browser"">Read them</Hyperlink>
+              </TextBlock>
+            </WrapPanel>
+            <WrapPanel Margin=""0,7,0,0"">
+              <CheckBox x:Name=""ChkPrivacy"" Foreground=""{StaticResource Ink}"" VerticalAlignment=""Center""
+                        MaxWidth=""{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=StackPanel}}"">
+                <TextBlock Foreground=""{StaticResource Ink}"" FontSize=""12.5"" Margin=""4,0,0,0"" TextWrapping=""Wrap""
+                           Text=""I have read and accept the Privacy Policy""/>
+              </CheckBox>
+              <TextBlock FontSize=""12.5"" Margin=""10,0,0,0"" VerticalAlignment=""Center"">
+                <Hyperlink x:Name=""LnkPrivacy"" NavigateUri=""https://thornswood.net/privacy""
+                           Foreground=""{StaticResource Accent}""
+                           ToolTip=""Opens thornswood.net/privacy in your browser"">Read it</Hyperlink>
+              </TextBlock>
+            </WrapPanel>
+            <WrapPanel Margin=""0,7,0,0"">
+              <CheckBox x:Name=""ChkRules"" Foreground=""{StaticResource Ink}"" VerticalAlignment=""Center""
+                        MaxWidth=""{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=StackPanel}}"">
+                <TextBlock Foreground=""{StaticResource Ink}"" FontSize=""12.5"" Margin=""4,0,0,0"" TextWrapping=""Wrap""
+                           Text=""I have read and agree to the Rules""/>
+              </CheckBox>
+              <TextBlock FontSize=""12.5"" Margin=""10,0,0,0"" VerticalAlignment=""Center"">
+                <Hyperlink x:Name=""LnkRules"" NavigateUri=""https://thornswood.net/rules""
+                           Foreground=""{StaticResource Accent}""
+                           ToolTip=""Opens thornswood.net/rules in your browser"">Read them</Hyperlink>
+              </TextBlock>
+            </WrapPanel>
+          </StackPanel>
+          <StackPanel Grid.Column=""1"" Orientation=""Horizontal"" HorizontalAlignment=""Right""
+                      VerticalAlignment=""Bottom"">
             <Button x:Name=""BtnClose"" Style=""{StaticResource Btn}"" Content=""Not now""
                     Background=""{StaticResource Card}"" BorderBrush=""{StaticResource Line}""
                     Foreground=""{StaticResource Ink}"" Margin=""0,0,10,0""/>
@@ -981,16 +1221,21 @@ namespace ThornswoodSetup
             btnClose.Click += delegate { win.Close(); };
             btnGo.Click += delegate { Start(); };
 
-            // Install starts switched off and this is the only thing that
-            // turns it on. A box somebody can ignore and press Install anyway
-            // is decoration, so it gates the button rather than sitting next
-            // to it.
+            // Install starts switched off and these are the only thing that
+            // turns it on: the age box, then the terms, the privacy policy and
+            // the rules (issue #1009), all four ticked. A box somebody can
+            // ignore and press Install anyway is decoration, so they gate the
+            // button rather than sitting next to it.
             chkAge = (CheckBox)win.FindName("ChkAge");
-            if (chkAge != null)
+            agree = FindAgreements(win);
+            HookPageLinks(win);
+            if (chkAge != null && agree != null)
             {
                 btnGo.IsEnabled = false;
-                chkAge.Checked   += delegate { btnGo.IsEnabled = true; };
-                chkAge.Unchecked += delegate { btnGo.IsEnabled = false; };
+                var all = new List<CheckBox>();
+                all.Add(chkAge);
+                all.AddRange(agree);
+                Gate(btnGo, all.ToArray());
             }
             else
             {
@@ -1025,6 +1270,8 @@ namespace ThornswoodSetup
             try
             {
                 Rect work = SystemParameters.WorkArea;
+                // No taller than the screen, so Install is never below its edge.
+                if (win.Height > work.Height) win.Height = Math.Max(win.MinHeight, work.Height);
                 win.Left = work.Left + Math.Max(0, (work.Width - win.Width) / 2);
                 win.Top = work.Top + Math.Max(0, (work.Height - win.Height) / 2);
             }
@@ -1362,6 +1609,10 @@ namespace ThornswoodSetup
 
             btnGo.IsEnabled = false;
             if (chkAge != null) chkAge.IsEnabled = false;
+            if (agree != null) foreach (CheckBox c in agree) c.IsEnabled = false;
+            // When the boxes were ticked and Install pressed, for the record
+            // Work writes (issue #1009).
+            acceptedAt = DateTime.UtcNow;
             btnPick.IsEnabled = false;
             // The own folder choice as it stands now, for Work on its own thread.
             makeOwnGame = chkOwn != null && chkOwn.IsChecked == true;
@@ -1774,6 +2025,12 @@ namespace ThornswoodSetup
                 // of its own. Its lines come into this window (issue #889).
                 // Setup.bat and Install.bat stay in the payload for a person
                 // running it by hand.
+                // What was accepted, and when, before the script opens the
+                // launcher at its end. Never a stop: the boxes were ticked
+                // whatever the site says right now.
+                Say("Noting what you accepted");
+                RecordAcceptance(Path.Combine(installRoot, "Profile"), acceptedAt);
+
                 Say("Starting the installer");
                 string script = Path.Combine(temp, "Setup-Thornswood.ps1");
                 if (!File.Exists(script)) throw new Exception("Setup-Thornswood.ps1 was not in the payload.");

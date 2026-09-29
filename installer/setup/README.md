@@ -150,3 +150,25 @@ and saved as `VortexGame`, the field the Settings button writes. A standalone
 install has its Game folder already and writes neither.
 `tests\test-setup-own-folder.ps1` holds all of that to what is here.
 
+
+## What a person agrees to before Install
+
+Issue #1009, Patrick on 28 September: "check boxes that lock the install for
+reading and accepting terms and conditions, privacy policy, and agreeing to
+the rules", "and links to all 3". Beside Install are four boxes, all unticked:
+the age box, then "I have read and accept the Terms and Conditions", "I have
+read and accept the Privacy Policy" and "I have read and agree to the Rules".
+Install stays greyed out until all four are ticked. Each of the three has a
+link beside it that opens the page on the site in the browser
+(`https://thornswood.net/terms`, `/privacy`, `/rules`), so what a person
+reads is the current text, never a copy inside the installer.
+
+When Install is pressed, the setup program writes `Profile\accepted.json` in
+the install: the time in UTC, and for each page its address and the SHA-256
+of its text as `https://thornswood.net/api/page/<name>` serves it at that
+moment, which is the version accepted. The site can hash its own page the same
+way to say which version somebody agreed to. A page the site did not answer
+for is recorded with an empty hash, and the install carries on: the boxes
+were ticked either way. Nothing about the person or the machine goes in it.
+`tests\test-setup-agreements.ps1` holds all of that, and with `-Live` also
+checks the three links answer and the hashes match the pages served now.
