@@ -76,11 +76,11 @@ param(
   [string]$User = '',
   [string]$Root = 'C:/Thornswood-Docs',
   [string]$Task = 'Thornswood Docs',
-  # The bot's folder and task. A bot token goes into its bot.env.json as well
+  # The bot's folder and service. A bot token goes into its bot.env.json as well
   # as the site's config.json, through the one writer both use, and the bot is
   # restarted when it changed.
   [string]$BotRoot = 'C:/Thornswood-Bot',
-  [string]$BotTask = 'Thornswood Bot'
+  [string]$BotService = 'ThornswoodBot'
 )
 
 
@@ -411,7 +411,7 @@ function TokenLooks(`$v, `$cid) {
 '  lets into the game: ' + (@(`$back.access.play) -join ', ')
 
 Restart-ThornswoodSite -Root '$rootWin' -Task '$Task'
-if (`$tokenChanged) { Restart-ThornswoodBot -Root '$botWin' -Task '$BotTask' }
+if (`$tokenChanged) { Restart-ThornswoodBot -Root '$botWin' -Service '$BotService' }
 "@) | ForEach-Object { "  $_" }
 $payload = $null
 

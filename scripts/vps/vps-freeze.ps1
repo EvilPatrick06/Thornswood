@@ -16,10 +16,11 @@
        on the new box
     2. disables Thornswood Watch, which would otherwise start everything
        again within five minutes
-    3. stops both game servers, the site, the bot and both voice services,
-       and ends whatever a stopped task leaves behind: whoever holds each game
-       server's UDP port, whoever listens on the site's and the two voice
-       services' TCP ports, and the bot's python and its wrapper
+    3. stops both game servers, the site, the bot (its Windows service, by
+       name) and both voice services, and ends whatever a stopped task leaves
+       behind: whoever holds each game server's UDP port, whoever listens on
+       the site's and the two voice services' TCP ports, and any copy of the
+       bot started by hand
     4. runs the nightly backup once (C:\Thornswood-Backup\vps-nightly-backup.ps1,
        which Install-Backup.ps1 put there) and names the file it wrote
   Caddy, the nightly backup task and the build runner are left alone.
@@ -40,12 +41,17 @@ param(
 $ErrorActionPreference = 'Continue'
 $watch = 'Thornswood Watch'
 $tasks = @('Thornswood Server', 'Thornswood Dev Server', 'Thornswood Docs',
-           'Thornswood Bot', 'Thornswood Voice', 'Thornswood Dev Voice')
+           'Thornswood Voice', 'Thornswood Dev Voice')
+# The bot is a Windows service, not a task (issue #465). Stopped by its name,
+# it ends python and anything python started; left running, it would start
+# python again fifteen seconds after the sweep below ended it.
+$botService = 'ThornswoodBot'
 
 if ($Undo) {
   foreach ($t in $tasks) {
     if (Get-ScheduledTask -TaskName $t -EA SilentlyContinue) { Start-ScheduledTask -TaskName $t; 'started   ' + $t }
   }
+  if (Get-Service -Name $botService -EA SilentlyContinue) { Start-Service -Name $botService; 'started   ' + $botService }
   if (Get-ScheduledTask -TaskName $watch -EA SilentlyContinue) {
     Enable-ScheduledTask -TaskName $watch | Out-Null
     'enabled   ' + $watch
@@ -68,6 +74,8 @@ foreach ($t in $tasks) {
   if (Get-ScheduledTask -TaskName $t -EA SilentlyContinue) { Stop-ScheduledTask -TaskName $t; 'stopped   ' + $t }
   else { 'no task   ' + $t }
 }
+if (Get-Service -Name $botService -EA SilentlyContinue) { Stop-Service -Name $botService -Force; 'stopped   ' + $botService }
+else { 'no service ' + $botService }
 
 # A stopped task does not always take its child with it (Deploy-Server.ps1
 # StopOurs, Install-Bot.ps1): the process on each port, and the bot by its

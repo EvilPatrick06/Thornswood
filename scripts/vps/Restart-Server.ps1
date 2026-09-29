@@ -73,13 +73,14 @@ $map = @{
   dev   = @{ Task = 'Thornswood Dev Server'; Root = 'C:\Thornswood-Server-Dev'; Port = 7788 }
   docs  = @{ Task = 'Thornswood Docs';       Root = 'C:\Thornswood-Docs';       Port = 0 }
   voice = @{ Task = 'Thornswood Voice';      Root = 'C:\Thornswood-Voice';      Port = 0 }
-  bot   = @{ Task = 'Thornswood Bot';        Root = 'C:\Thornswood-Bot';        Port = 0 }
+  # A Windows service since issue #465, restarted by its name.
+  bot   = @{ Svc  = 'ThornswoodBot';         Root = 'C:\Thornswood-Bot';        Port = 0 }
 }
 $it = $map[$Service]
 
 Write-Host ''
 Write-Host "  THORNSWOOD  -  restarting $Service" -ForegroundColor White
-Say "  task $($it.Task)" 'DarkGray'
+if ($it.Svc) { Say "  service $($it.Svc)" 'DarkGray' } else { Say "  task $($it.Task)" 'DarkGray' }
 
 # ------------------------------------------------------------- who is on ----
 if (-not $Now -and $it.Port -gt 0) {
@@ -101,7 +102,17 @@ if (-not $Now -and $it.Port -gt 0) {
 
 # ------------------------------------------------------------- the bounce ---
 Head 'Restarting'
-$out = Remote @"
+if ($it.Svc) {
+  $out = Remote @"
+if (-not (Get-Service -Name '$($it.Svc)' -EA SilentlyContinue)) { 'NO SUCH SERVICE: $($it.Svc)'; return }
+try { Restart-Service -Name '$($it.Svc)' -Force -ErrorAction Stop } catch { 'COULD NOT RESTART: ' + `$_.Exception.Message }
+Start-Sleep -Seconds 12
+'state ' + (Get-Service -Name '$($it.Svc)').Status
+"@
+  $out | ForEach-Object { Say "  $_" }
+  if ("$out" -match 'NO SUCH SERVICE') { Die "There is no service called $($it.Svc) on the VPS. Install-Bot.ps1 puts it there." }
+} else {
+  $out = Remote @"
 Stop-ScheduledTask -TaskName '$($it.Task)' -EA SilentlyContinue
 Start-Sleep -Seconds 4
 Start-ScheduledTask -TaskName '$($it.Task)' -EA SilentlyContinue
@@ -109,8 +120,9 @@ Start-Sleep -Seconds 12
 `$t = Get-ScheduledTask -TaskName '$($it.Task)' -EA SilentlyContinue
 if (`$t) { 'state ' + `$t.State } else { 'NO SUCH TASK: $($it.Task)' }
 "@
-$out | ForEach-Object { Say "  $_" }
-if ("$out" -match 'NO SUCH TASK') { Die "There is no scheduled task called $($it.Task) on the VPS." }
+  $out | ForEach-Object { Say "  $_" }
+  if ("$out" -match 'NO SUCH TASK') { Die "There is no scheduled task called $($it.Task) on the VPS." }
+}
 
 # ------------------------------------------------------------- did it come back
 Head 'What it said on the way up'

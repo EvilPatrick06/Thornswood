@@ -11,7 +11,7 @@ message. No new messages, no new pings.
     python redraw.py --go     redraw them
     python redraw.py --all    every card, not only the ones that had boxes
 
-Reads the same bot.env.json as the bot (run.ps1 puts it in the environment).
+Reads the same bot.env.json as the bot (its service puts it in the environment).
 The number on the card is the one joins.json holds for that person, read
 through bot.py's own functions, so a redrawn card says what the bot gave
 them. Somebody the record has no number for, because their card went up
@@ -43,7 +43,7 @@ ALL = '--all' in sys.argv
 CHANNELS = [WELCOME, 'general-chat', 'general']
 
 if not TOKEN:
-    raise SystemExit('No DISCORD_TOKEN in the environment. Run through run.ps1 or set it.')
+    raise SystemExit('No DISCORD_TOKEN in the environment. Set it from bot.env.json first.')
 
 intents = discord.Intents(guilds=True, members=True)
 client = discord.Client(intents=intents)
