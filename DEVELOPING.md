@@ -440,7 +440,10 @@ produces which differ from upstream, by hash, against the fork commit, into
 build output into the game folder and refuses any file that is not the
 recorded one; `Go.ps1` runs it beside the overlays and the plugins. Ship runs
 `Sync-Client.ps1 -Check` and refuses a release whose client is not the recorded
-build. `OwnGame.Foreign` never takes those six paths from the Steam copy. The
+build. Ship never builds the engine: when the game folder already holds all
+six as recorded, Sync-Client copies nothing and does not need the build, so a
+checkout with no `engine\skymp` (a fresh Ship worktree) can still Ship, and
+`Check-ShipReady.ps1` does not ask for the fork (issue #946). `OwnGame.Foreign` never takes those six paths from the Steam copy. The
 launcher's Client row on the Play page compares all six with the same record
 (`ClientRuntime`), and `ClientRuntime.Heal` puts back any that is missing or
 not the recorded build.
