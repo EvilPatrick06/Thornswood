@@ -10,7 +10,7 @@
 //
 // Parties arrived on 23 September (#133), and the green names, the map
 // markers and the compass strip the same morning (#139). The Help item went on
-// saying "There is no party system", measured against Skyrim Together. It is
+// saying "There is no party system", measured against the old multiplayer mod. It is
 // copy, so nothing failed and nothing told anybody. This file reads the Help
 // items out of launcher\app\Help.cs and holds the party ones to the code they
 // describe: the cap, the bonus, how long an ask stands and the keys are read
@@ -99,8 +99,8 @@ const aboutTogether = together.concat(partyItems)
       !items.some(function (h) {
         return /no party system|nobody to invite|adds none of it/i.test(h.title + ' ' + h.body);
       }));
-  yes('nothing about playing together is measured against Skyrim Together',
-      !/Skyrim Together/i.test(aboutTogether));
+  yes('nothing about playing together is measured against the old multiplayer mod',
+      !/Skyrim\s*Together/i.test(aboutTogether));
 }
 
 // ------------------------------------------------- the numbers are the code's

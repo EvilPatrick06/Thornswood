@@ -509,11 +509,11 @@ right or wrong. To Do entries are named by title, because their numbers move.
   Nexus collection carries the plugin order from revision 5, and what is left is
   proving a clean install matches the server".
 - **An old README in the scratch folder (row 25).** The installer unpacks into
-  `C:\Thornswood-setup` with a READ ME FIRST.txt that still describes the Skyrim
-  Together installer and says no Nexus account or Vortex is needed. The launcher
+  `C:\Thornswood-setup` with a READ ME FIRST.txt that still describes the old
+  multiplayer mod's installer and says no Nexus account or Vortex is needed. The launcher
   clears the folder on its first start (`launcher\app\Shell.cs`), so a stranger only
   meets it if they look before then. Owned by "The repository's own docs still
-  describe the Skyrim Together product".
+  describe the old product".
 
 ## After the run
 

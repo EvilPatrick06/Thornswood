@@ -58,15 +58,8 @@ param(
 )
 
 
-# The launcher was SkyrimTogether.exe and is Thornswood.exe now. It replaces
-# itself in place when it updates rather than being reinstalled, so an install
-# made before the rename still carries the old name and both have to be looked
-# for, newest first.
+# The launcher, Thornswood.exe in the launcher folder.
 function Get-LauncherExe([string]$dir) {
-    foreach ($n in 'Thornswood.exe', 'SkyrimTogether.exe') {
-        $p = Join-Path $dir $n
-        if (Test-Path -LiteralPath $p) { return $p }
-    }
     return (Join-Path $dir 'Thornswood.exe')
 }
 
@@ -1055,7 +1048,7 @@ if ($preSig -and $preSig.Status -ne 'NotSigned' -and $preSig.SignerCertificate) 
 }
 
 # ---- one file, payload attached -------------------------------------------
-# STSFX001, then the offset the payload starts at, then its length. Both are
+# TWSFX001, then the offset the payload starts at, then its length. Both are
 # 64 bit and little endian, which is what BinaryReader.ReadInt64 wants on the
 # other side. Written after the copy so a failure here leaves a plain stub
 # rather than a half attached one.
@@ -1068,7 +1061,7 @@ if ($OneFile) {
         try { $fsIn.CopyTo($fsOut, 4MB) } finally { $fsIn.Dispose() }
         $len = (Get-Item $zip).Length
         $bw = New-Object IO.BinaryWriter($fsOut)
-        $bw.Write([Text.Encoding]::ASCII.GetBytes('STSFX001'))
+        $bw.Write([Text.Encoding]::ASCII.GetBytes('TWSFX001'))
         $bw.Write([long]$off)
         $bw.Write([long]$len)
         $bw.Flush()
@@ -1080,7 +1073,7 @@ if ($OneFile) {
 #
 # After the payload is attached, not before. Bootstrap.cs:625-636 already
 # expects this: the certificate lands on the end after the trailer, which is
-# exactly why its loader scans backwards for STSFX001 rather than reading a
+# exactly why its loader scans backwards for TWSFX001 rather than reading a
 # fixed offset from the end.
 #
 # Does nothing without tools\signing.json, so a machine with no certificate
@@ -1131,13 +1124,13 @@ $listing = & $7z l $zip 2>&1
 $ErrorActionPreference = $old
 # Four names, and they are the names this build actually uses.
 #
-# These were still looking for Install-SkyrimTogether.ps1 and
-# SkyrimTogether.exe, from before the rename. The first of those has not
+# These were still looking for the installer script and the launcher exe
+# under their names from before the rename. The first of those had not
 # existed for a long time, so the check failed on every run and reported a
 # missing installer script while the installer itself was fine.
 #
 # The launcher check was worse, because it passed. Somewhere in 22 GB of
-# game build there is a leftover SkyrimTogether.exe, and a bare substring
+# game build there was a leftover exe of the old name, and a bare substring
 # match found it and called it the launcher. A check that answers yes
 # whatever happens is not a check.
 #

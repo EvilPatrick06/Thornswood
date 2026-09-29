@@ -13,7 +13,7 @@
   Reads only the TES4 header of each plugin. Changes nothing.
 #>
 param(
-    # Was C:\SkyrimTogether until 23 September, which is a folder neither
+    # Was the old build folder until 23 September, which is a folder neither
     # machine has had for weeks: this read an empty list and said so in a way
     # that looked like an answer.
     [string]$Data    = 'C:\Thornswood\Game\Data',

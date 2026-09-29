@@ -4,18 +4,18 @@
 // this repository used to be.
 //
 // WHY THIS EXISTS. Entry 193 on the To Do List: README.md was the first page
-// of the repository and still described Skyrim Together. It promised an
+// of the repository and still described the old multiplayer mod. It promised an
 // install with "No Nexus account, no Vortex" while the join page says the
 // collection in Vortex is required, told people the password was in Discord
 // when the build carries it, described an F2 party menu that no plugin binds,
 // sent problems to one named person, and broke the repo's own rule against em
 // dashes five times. installer\READ ME FIRST.txt was worse, because it is not a
 // leftover: Package-Thornswood.ps1 copies it into every installer, and it
-// opened with "SKYRIM TOGETHER", named SkyrimTogether-Setup.exe and told a new
+// opened with the old mod's name, named its setup program and told a new
 // customer to ask in the Discord for a password. config.example.json still
 // pointed at the old box (192.135.119.166, port 25565) and the old product's
 // update repository. SETUP.md walked a reader through making a repository
-// called skyrim-together, a personal access token and a build script that
+// under the old mod's name, a personal access token and a build script that
 // does not exist, and CLAUDE.md and DEVELOPING.md both sent people to it.
 //
 // So this reads those three and fails on the old product, on the words the
@@ -155,7 +155,7 @@ if (cfgText === null) {
   yes('config.example.json carries an empty UpdateToken, never a real one',
       cfg !== null && cfg.UpdateToken === '');
   yes('config.example.json does not name the old product or its box',
-      !/skyrim-together|25565|192\.135\.119\.166/i.test(cfgText));
+      !/skyrim\s*-?\s*together|25565|192\.135\.119\.166/i.test(cfgText));
 }
 
 // ------------------------------------------------------------- repo wide

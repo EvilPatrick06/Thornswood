@@ -79,15 +79,8 @@ param(
 )
 
 
-# The launcher was SkyrimTogether.exe and is Thornswood.exe now. It replaces
-# itself in place when it updates rather than being reinstalled, so an install
-# made before the rename still carries the old name and both have to be looked
-# for, newest first.
+# The launcher, Thornswood.exe in the launcher folder.
 function Get-LauncherExe([string]$dir) {
-    foreach ($n in 'Thornswood.exe', 'SkyrimTogether.exe') {
-        $p = Join-Path $dir $n
-        if (Test-Path -LiteralPath $p) { return $p }
-    }
     return (Join-Path $dir 'Thornswood.exe')
 }
 

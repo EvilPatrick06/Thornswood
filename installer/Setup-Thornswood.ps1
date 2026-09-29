@@ -42,15 +42,8 @@ param(
 )
 
 
-# The launcher was SkyrimTogether.exe and is Thornswood.exe now. It replaces
-# itself in place when it updates rather than being reinstalled, so an install
-# made before the rename still carries the old name and both have to be looked
-# for, newest first.
+# The launcher, Thornswood.exe in the launcher folder.
 function Get-LauncherExe([string]$dir) {
-    foreach ($n in 'Thornswood.exe', 'SkyrimTogether.exe') {
-        $p = Join-Path $dir $n
-        if (Test-Path -LiteralPath $p) { return $p }
-    }
     return (Join-Path $dir 'Thornswood.exe')
 }
 
@@ -231,7 +224,7 @@ if ($Collection) {
 # the repo's Close-Launcher.ps1 and carries its own copy.
 function Stop-AnySkyrim {
     $found = @()
-    foreach ($n in 'SkyrimSE', 'skse64_loader', 'SkyrimTogether') {
+    foreach ($n in 'SkyrimSE', 'skse64_loader') {
         foreach ($p in @(Get-Process -Name $n -ErrorAction SilentlyContinue)) { $found += $p }
     }
     if ($found.Count -eq 0) { return $true }
@@ -250,7 +243,7 @@ function Stop-AnySkyrim {
     for ($i = 0; $i -lt 12; $i++) {
         Start-Sleep -Milliseconds 250
         $left = @()
-        foreach ($n in 'SkyrimSE', 'skse64_loader', 'SkyrimTogether') {
+        foreach ($n in 'SkyrimSE', 'skse64_loader') {
             foreach ($p in @(Get-Process -Name $n -ErrorAction SilentlyContinue)) { $left += $p }
         }
         if ($left.Count -eq 0) { Say '  Closed.' 'Green'; return $true }
@@ -534,10 +527,8 @@ foreach ($lic in @('GPL-3.0.txt', 'AGPL-3.0.txt', 'WebView2-LICENSE.txt')) {
     if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $Root -Force }
 }
 
-foreach ($f in 'Thornswood.exe', 'SkyrimTogether.exe') {
-    $s = Join-Path $Here $f
-    if (Test-Path $s) { Copy-Item $s $LaunchDir -Force }
-}
+$s = Join-Path $Here 'Thornswood.exe'
+if (Test-Path $s) { Copy-Item $s $LaunchDir -Force }
 
 # config.json is merged rather than copied over. The one in the archive is
 # deliberately blank where the credentials go, so a straight copy would wipe a
@@ -615,11 +606,6 @@ $lexe = Get-LauncherExe $LaunchDir
 if (Test-Path $lexe) {
     $ws = New-Object -ComObject WScript.Shell
     foreach ($dest in @([Environment]::GetFolderPath('Desktop'), $Root)) {
-        # The old name, tidied away so nobody ends up with two shortcuts to
-        # the same launcher after the rename.
-        $was = Join-Path $dest 'Skyrim Together.lnk'
-        if (Test-Path $was) { Remove-Item $was -Force -ErrorAction SilentlyContinue }
-
         $sc = $ws.CreateShortcut((Join-Path $dest 'Thornswood.lnk'))
         $sc.TargetPath       = $lexe
         $sc.WorkingDirectory = $LaunchDir
@@ -648,7 +634,7 @@ try {
 
 # ------------------------------------------------------------- verify
 Head 'Checking'
-# Multiplayer used to look for Data\SkyrimTogetherReborn\SkyrimTogether.exe.
+# Multiplayer used to look for the old multiplayer mod's client exe under Data.
 # SkyMP has no client exe of its own and has not had one for a long time: the
 # client is MpClientPlugin.dll under SKSE\Plugins, which is what the launcher
 # itself checks. So this reported a missing multiplayer client on an install

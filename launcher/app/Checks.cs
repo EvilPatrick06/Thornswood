@@ -1297,8 +1297,8 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
         /// what comes back and should pass it to Release when finished.
         ///
         /// The launcher's own name is not on the list any more. It was there
-        /// from the Skyrim Together days, when the multiplayer client was an exe
-        /// of that name; SkyMP has no client exe. Left on, another copy of this
+        /// from the old multiplayer mod's days, when its client was an exe of
+        /// the launcher's old name; SkyMP has no client exe. Left on, another copy of this
         /// launcher (the dev build beside the main one) counted as a running
         /// game, which blocked updates and deleting characters, and Clear then
         /// tried to close that launcher.
