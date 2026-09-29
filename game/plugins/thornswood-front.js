@@ -3079,37 +3079,79 @@
   */
   const CELL_TYPES = [24, 34, 36, 42];
 
+  /*
+    A SLICE A FRAME, NOT THE CELL IN ONE GO. Issue #976, from the #963 audit:
+    the walk used to run whole inside the place tick, and a cell holding 402
+    references of those four types cost that one frame 385 ms, a visible
+    hitch every time somebody walked into a busy cell or an empty walk was
+    retried. Now each frame takes the references that fit in FIRE_SLICE_MS
+    and stops, and the next frame carries on where it left off. Only numbers
+    are kept between frames: a native object does not survive the frame it
+    was made in (see "THE IDS, RESOLVED ONCE" below), so the cell is asked
+    for again in each slice, and whether a fire is switched off is asked in
+    the same slice that fetched it.
+  */
+  /*
+    The slice is measured with performance.now where the runtime has it
+    (SkyrimPlatform's Node does), which reads fractions of a millisecond.
+    Date.now only reads whole ones, so "2 ms gone" by it can be nearly 3, and
+    the slice is 1 ms on that clock to stay under the same ceiling.
+  */
+  const SLICE_PRECISE = typeof performance === 'object' && !!performance &&
+                        typeof performance.now === 'function';
+  const sliceNow = SLICE_PRECISE
+    ? function () { return performance.now(); }
+    : function () { return Date.now(); };
+  const FIRE_SLICE_MS = SLICE_PRECISE ? 2 : 1;
+
   /**
-   * Every reference in this cell whose base is one of `want`, as
-   * {ref, x, y, z}. Walked once by the caller and kept: nothing in here
-   * moves. `onWalked` is told how many references were looked at, for the
-   * probe line.
+   * One slice of a walk of `cell`. `w` is { t, i, n, walked, out } and holds
+   * where the walk has got to, between frames. Every lit reference whose base
+   * is one of `want` goes into w.out as [x, y, z]; nothing in here moves, so
+   * the finished list is kept by the caller. Stops once FIRE_SLICE_MS has
+   * gone since `began`, the start of the slice, which the caller may already
+   * have spent some of. Given no `began` it starts the clock itself and
+   * takes at least one reference. True once the walk is finished.
    */
-  function refsInCell(cell, want, onWalked, onThrew) {
-    const out = [];
-    let walked = 0;
-    if (!cell) { return out; }
-    for (let t = 0; t < CELL_TYPES.length; t++) {
-      let n = 0;
-      try { n = cell.getNumRefs(CELL_TYPES[t]); } catch (e) {
-        if (onThrew) { onThrew(e); }
-        continue;
+  function walkCellSlice(cell, w, want, onThrew, began) {
+    const from = began || sliceNow();
+    // A slice of our own always gets something done; a shared one that is
+    // already spent does nothing, and the next frame's slice is all walk.
+    let took = began ? 1 : 0;
+    while (w.t < CELL_TYPES.length) {
+      if (took > 0 && sliceNow() - from >= FIRE_SLICE_MS) { return false; }
+      if (w.n < 0) {
+        took++;
+        try { w.n = cell.getNumRefs(CELL_TYPES[w.t]); } catch (e) {
+          if (onThrew) { onThrew(e); }
+          w.t++; w.i = 0; w.n = -1;
+          continue;
+        }
       }
-      for (let i = 0; i < n; i++) {
-        walked++;
+      while (w.i < w.n) {
+        if (took > 0 && sliceNow() - from >= FIRE_SLICE_MS) { return false; }
+        const i = w.i++;
+        took++;
+        w.walked++;
         try {
-          const r = cell.getNthRef(i, CELL_TYPES[t]);
+          const r = cell.getNthRef(i, CELL_TYPES[w.t]);
           if (!r) { continue; }
           const b = r.getBaseObject();
           if (!b || !want[b.getFormID()]) { continue; }
-          out.push({ ref: r, x: r.getPositionX(), y: r.getPositionY(), z: r.getPositionZ() });
+          // A fire somebody has switched off is still a placed reference.
+          // The toggled ones are the reason this asks rather than trusting
+          // the base.
+          let off = false;
+          try { off = !!r.isDisabled(); } catch (e) { off = false; }
+          if (off) { continue; }
+          w.out.push([r.getPositionX(), r.getPositionY(), r.getPositionZ()]);
         } catch (e) {
           if (onThrew) { onThrew(e); }
         }
       }
+      w.t++; w.i = 0; w.n = -1;
     }
-    if (onWalked) { onWalked(walked); }
-    return out;
+    return true;
   }
 
   const BLOCK_BASES = [0x7022e, 0xa91bf, 0x10f575];
@@ -3420,13 +3462,40 @@
     extra call per base per probe, and the probe already makes one.
   */
   let fireIds = null;
+  let fireWant = null;      // the same ids as a set, for the walk
+  /*
+    Resolved a slice at a time as well (#976): sixty odd lookups in one frame
+    is its own hitch. fireIdAt is how far through FIRE_BASES the resolving
+    has got and fireIdOut what it has found so far. A pass that finds nothing
+    at all is the world not being up yet, and it is not tried again for
+    FIRE_IDS_RETRY, so a world that never answers costs a slice every few
+    seconds rather than one every frame.
+  */
+  let fireIdAt = 0;
+  let fireIdOut = [];
+  let fireIdFailedAt = 0;
+  const FIRE_IDS_RETRY = 4000;
 
+  /** The runtime ids of FIRE_BASES, or [] until the walk has resolved them. */
   function fireIdList() {
+    return fireIds || [];
+  }
+
+  /**
+   * Resolves the next of FIRE_BASES, as many as fit in FIRE_SLICE_MS from
+   * `from`, and at least one. Only the walk calls it, as part of its slice.
+   * Returns the ids once every base has been asked for, [] until then.
+   */
+  function resolveFireIds(from) {
     if (fireIds) { return fireIds; }
-    const out = [];
-    for (let i = 0; i < FIRE_BASES.length; i++) {
-      const file = FIRE_BASES[i][0];
-      const local = FIRE_BASES[i][1];
+    if (fireIdAt === 0 && fireIdFailedAt && Date.now() - fireIdFailedAt < FIRE_IDS_RETRY) { return []; }
+    let did = 0;
+    while (fireIdAt < FIRE_BASES.length) {
+      if (did > 0 && sliceNow() - from >= FIRE_SLICE_MS) { return []; }
+      const file = FIRE_BASES[fireIdAt][0];
+      const local = FIRE_BASES[fireIdAt][1];
+      fireIdAt++;
+      did++;
       try {
         const raw = (file === 'Skyrim.esm')
           ? sp.Game.getFormEx(local)
@@ -3436,16 +3505,21 @@
         // place it can be read.
         if (base) {
           const id = base.getFormID();
-          if (id) { out.push(id); }
+          if (id) { fireIdOut.push(id); }
         }
       } catch (e) {
         if (!fireWhy) { fireWhy = String((e && e.message) || e); }
       }
     }
+    const out = fireIdOut;
+    fireIdAt = 0;
+    fireIdOut = [];
     // Nothing at all means the world is not up yet, so it is worth asking
     // again rather than remembering an empty answer for the session.
-    if (!out.length) { return []; }
+    if (!out.length) { fireIdFailedAt = Date.now(); return []; }
     fireIds = out;
+    fireWant = {};
+    for (let i = 0; i < out.length; i++) { fireWant[out[i]] = true; }
     log('fires: ' + out.length + ' of ' + FIRE_BASES.length +
         ' bases resolved, across ' + FIRE_FILES.length + ' plugin(s)');
     return fireIds;
@@ -3490,6 +3564,10 @@
   */
   const FIRE_EMPTY_RETRY = 8000;
   let fireEmptyAt = 0;
+  // The walk under way, { cell, t, i, n, walked, out }, or null. See
+  // walkCellSlice. The 'fire walk' handler below the place tick carries it on
+  // a slice a frame; the place tick reads whatever list is finished.
+  let fireWalk = null;
 
   function fireSpotsHere(pc) {
     let cellId = 0;
@@ -3498,7 +3576,7 @@
       cell = pc.getParentCell();
       cellId = cell ? cell.getFormID() : 0;
     } catch (e) { cellId = 0; }
-    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; fireEmptyAt = 0; }
+    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; fireEmptyAt = 0; fireWalk = null; }
     // A non-empty list is good for the cell. An empty one is not final.
     if (fireHere && fireHere.length) { return fireHere; }
     if (fireHere && fireHere.length === 0) {
@@ -3510,33 +3588,59 @@
     }
     if (!cell) { return []; }
 
-    const ids = fireIdList();
-    fireBases = ids.length;
-    const want = {};
-    for (let i = 0; i < ids.length; i++) { want[ids[i]] = true; }
+    // Start a walk, or carry the one under way on by a slice, and answer
+    // with what is known now: nothing until the walk is done, which is a
+    // few frames in a busy cell.
+    if (!fireWalk) { fireWalk = { cell: cellId, t: 0, i: 0, n: -1, walked: 0, out: [] }; }
+    fireWalkStep(cell);
+    return fireHere || [];
+  }
 
-    const found = refsInCell(cell, want,
-      function (n) { fireWalked = n; },
-      function (e) {
-        fireThrew++;
-        if (!fireWhy) { fireWhy = String((e && e.message) || e); }
-      });
-    const out = [];
-    for (let k = 0; k < found.length; k++) {
-      // A fire somebody has switched off is still a placed reference. The
-      // toggled ones are the reason this asks rather than trusting the base.
-      try { if (found[k].ref.isDisabled()) { continue; } } catch (e) { }
-      out.push([found[k].x, found[k].y, found[k].z]);
+  /** One slice of the walk under way, in `cell`, the cell it was started in. */
+  function fireWalkStep(cell) {
+    const w = fireWalk;
+    if (!w) { return; }
+    // One slice for both: resolving the bases first while they are not all
+    // in, then the walk with whatever time is left of it.
+    const began = sliceNow();
+    if (!fireIds) {
+      resolveFireIds(began);
+      if (!fireIds) { return; }
     }
-    fireHere = out;
-    fireHits = out.length;
-    if (!out.length) { fireEmptyAt = Date.now(); }
-    // fireWalked, not walked: that one lives inside refsInCell. Naming it here
-    // threw on every cell change from #184 on, 80 times in the dev log of
-    // 23 September, and the place report for that tick never went.
-    log('fires: ' + out.length + ' of ours in this cell, out of ' + fireWalked +
+    fireBases = fireIds.length;
+    const done = walkCellSlice(cell, w, fireWant, function (e) {
+      fireThrew++;
+      if (!fireWhy) { fireWhy = String((e && e.message) || e); }
+    }, began);
+    fireWalked = w.walked;
+    if (!done) { return; }
+
+    fireWalk = null;
+    fireHere = w.out;
+    fireHits = w.out.length;
+    if (!w.out.length) { fireEmptyAt = Date.now(); }
+    // fireWalked, not walked: naming the walk's own counter here threw on
+    // every cell change from #184 on, 80 times in the dev log of 23
+    // September, and the place report for that tick never went.
+    log('fires: ' + w.out.length + ' of ours in this cell, out of ' + fireWalked +
         ' thing(s) looked at');
-    return fireHere;
+  }
+
+  /**
+   * The 'fire walk' handler: a walk under way goes on by one slice a frame
+   * until it is done. Nothing to do costs one comparison. A walk whose cell
+   * is no longer the one underfoot is dropped; the place tick starts the
+   * next one for the cell somebody is in now.
+   */
+  function fireWalkTick() {
+    if (!fireWalk) { return; }
+    let cell = null;
+    try {
+      const pc = sp.Game.getPlayer();
+      cell = pc ? pc.getParentCell() : null;
+      if (!cell || cell.getFormID() !== fireWalk.cell) { fireWalk = null; return; }
+    } catch (e) { fireWalk = null; return; }
+    fireWalkStep(cell);
   }
 
   /** How far the nearest lit fire is, or -1 when there is none in reach. */
@@ -3624,6 +3728,9 @@
   });
 
   sp.on('update', guard('clothes remount', clothesRemountTick));
+
+  // The fire probe's cell walk, a slice a frame (#976). See walkCellSlice.
+  sp.on('update', guard('fire walk', fireWalkTick));
 
   sp.on('update', guard('place', () => {
     const now = Date.now();
