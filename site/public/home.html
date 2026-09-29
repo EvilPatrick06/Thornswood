@@ -518,9 +518,16 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
 
 <div class="notice">
   <div class="wrap">
+<!-- alpha -->
     <b>Alpha, eighteen and over.</b> Anyone can download and install Thornswood.
     Playing is locked until you apply in the Discord and are given the role.
     <a href="DISCORD_URL" target="_blank" rel="noopener">Apply &rarr;</a>
+<!-- /alpha -->
+<!-- open -->
+    <b>Open, eighteen and over.</b> Anyone can download Thornswood, and anyone
+    in the Discord can play.
+    <a href="DISCORD_URL" target="_blank" rel="noopener">Join the Discord &rarr;</a>
+<!-- /open -->
   </div>
 </div>
 
@@ -619,9 +626,16 @@ try {
       <div>
         <div class="num">02</div>
         <h3>No paperwork once you are in</h3>
+<!-- alpha -->
         <p>Getting in is a short Discord apply while we are in Alpha. After that
           there is no character sheet to have approved, no lore exam, and no
           waiting on somebody to bless your backstory.</p>
+<!-- /alpha -->
+<!-- open -->
+        <p>Getting in is joining the Discord. After that there is no character
+          sheet to have approved, no lore exam, and no waiting on somebody to
+          bless your backstory.</p>
+<!-- /open -->
       </div>
       <div>
         <div class="num">03</div>
@@ -774,7 +788,12 @@ try {
   <div class="wrap">
     <h2>The road is open</h2>
     <p class="lede">Bring a name and a reason to be walking it.</p>
+<!-- alpha -->
     <a class="btn first" href="DISCORD_URL" target="_blank" rel="noopener">Apply in the Discord</a>
+<!-- /alpha -->
+<!-- open -->
+    <a class="btn first" href="DISCORD_URL" target="_blank" rel="noopener">Join the Discord</a>
+<!-- /open -->
   </div>
 </div>
 
@@ -1376,12 +1395,18 @@ if (AGE_PATHS[here] && !ageOk()) {
            'mods get to you.</p>' +
            '<p class="lede"><strong>Eighteen and over.</strong> Downloading or playing ' +
            'Thornswood is you stating that you are eighteen or older.</p>' +
-           '<p class="lede"><strong>Thornswood is in alpha.</strong> The installer is ' +
-           'open to anybody, so you can download and install it now. The launcher will ' +
-           'not let you into the world until you have applied in the Discord and been ' +
-           'given the role, and we are taking people in small numbers because a bug found ' +
-           'by four people is a bug we can fix, and the same bug found by two hundred is a ' +
-           'bad week for everybody.</p>';
+           // The one switch (#428): /api/public says open when the site's
+           // config does, and this says what is true either way.
+           (d.open === true
+             ? '<p class="lede"><strong>Thornswood is open.</strong> Anyone can download ' +
+               'it, and anyone in the Discord can play. Being there means accepting the ' +
+               '<a href="/rules">rules</a>.</p>'
+             : '<p class="lede"><strong>Thornswood is in alpha, and the world is open by ' +
+               'application.</strong> The installer is open to anybody, so you can download ' +
+               'and install it now. Play unlocks once you have applied in the Discord and been ' +
+               'given the Playtester role. The application asks whether you are eighteen or ' +
+               'over and whether you accept the <a href="/rules">rules</a>, and your answers ' +
+               'are kept against your Discord account.</p>');
 
     // The button belongs under the step that tells you to take it, not above
     // the list where it is the first thing you meet and the instructions are
@@ -1409,14 +1434,23 @@ if (AGE_PATHS[here] && !ageOk()) {
              sum(exe) + '</p></div>';
     }
 
-    out += '<h2>Apply in Discord, then four steps</h2>' +
-           '<div class="steps">' +
-           '<div class="step"><div><h3>Come into the Discord and apply</h3>' +
-             '<p>The installer is open to anybody, but the world is not, so this is ' +
-             'the step that unlocks Play. Open a ticket saying who you are and why you ' +
-             'want in. It is a few lines, not an essay, and somebody answers. If you are ' +
-             'accepted your Discord account is what lets you through, so there is nothing ' +
-             'else to sign up for.</p>' +
+    out += (d.open === true
+             ? '<h2>Join the Discord, then four steps</h2>' +
+               '<div class="steps">' +
+               '<div class="step"><div><h3>Come into the Discord</h3>' +
+                 '<p>Anyone in the Discord can play. Read the <a href="/rules">rules</a>, ' +
+                 'because being there means accepting them. Your Discord account is what ' +
+                 'lets you through, so there is nothing else to sign up for.</p>'
+             : '<h2>Apply in Discord, then four steps</h2>' +
+               '<div class="steps">' +
+               '<div class="step"><div><h3>Come into the Discord and apply</h3>' +
+                 '<p>The installer is open to anybody, and this is the step that unlocks ' +
+                 'Play. Read the <a href="/rules">rules</a>, then open a ticket and pick ' +
+                 'Apply to be an alpha playtester. It asks whether you are eighteen or over, ' +
+                 'whether you accept the rules, and a few lines about who you want to play. ' +
+                 'It is not an essay, and somebody answers. Once you are accepted your ' +
+                 'Discord account is what lets you through, so there is nothing else to sign ' +
+                 'up for.</p>') +
              // The first step is the only one that had no way to do it from
              // here. The installer has its two buttons and the collection has
              // one, and this said come into the Discord without a door. The
@@ -1425,8 +1459,8 @@ if (AGE_PATHS[here] && !ageOk()) {
              (d.invite
                ? '<div class="grab"><a class="btn first" href="' + esc(d.invite) +
                  '" target="_blank" rel="noopener">Open the Discord</a>' +
-                 '<p class="also faintly">The invite never expires. Open a ticket ' +
-                 'once you are in.</p></div>'
+                 '<p class="also faintly">The invite never expires.' +
+                 (d.open === true ? '' : ' Open a ticket once you are in.') + '</p></div>'
                : '') +
              '</div></div>' +
            '<div class="step"><div><h3>Take the installer</h3>' +
@@ -1470,13 +1504,17 @@ if (AGE_PATHS[here] && !ageOk()) {
              'world.</p></div></div>' +
            '</div>';
 
-    out += '<p class="lede" style="margin-top:34px">The installer is open to anybody. ' +
-           'The world is not: the launcher asks Discord who you are every time it ' +
-           'starts, so downloading it before you have been accepted just means you are ' +
-           'ready when you are.</p>' +
+    out += (d.open === true
+             ? '<p class="lede" style="margin-top:34px">The installer is open to anybody, ' +
+               'and so is the world: the launcher asks Discord who you are every time it ' +
+               'starts, and being in the Discord is enough.</p>'
+             : '<p class="lede" style="margin-top:34px">The installer is open to anybody, ' +
+               'and the world is open by application: the launcher asks Discord who you are ' +
+               'every time it starts, so downloading it before you have been accepted just ' +
+               'means you are ready when you are.</p>') +
            '<div class="acts" style="justify-content:flex-start;margin-top:26px">' +
            '<a class="btn first" href="' + esc(d.invite || '/join') + '" target="_blank" ' +
-           'rel="noopener">Apply in the Discord</a>' +
+           'rel="noopener">' + (d.open === true ? 'Join the Discord' : 'Apply in the Discord') + '</a>' +
            '<a class="btn ghost" href="/join">The long version</a></div>';
 
     show(out);
@@ -1610,7 +1648,10 @@ fetch('/api/public', { credentials:'same-origin' })
           t.textContent = 'The world is open, ';
           var apply = document.createElement('a');
           apply.href = '/join';
-          apply.textContent = 'apply to be an alpha playtester in the Discord!';
+          /* With the one switch on (#428) there is nothing to apply for. */
+          apply.textContent = d.open === true
+            ? 'come into the Discord and play!'
+            : 'apply to be an alpha playtester in the Discord!';
           t.appendChild(apply);
         } else {
           t.textContent = n === 1 ? '1 person in the world' : n + ' people in the world';

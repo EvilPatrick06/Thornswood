@@ -132,6 +132,15 @@ const b = serverText.indexOf('// ==== end thornswood page render ====');
 yes('the page render block is in server.js between its markers', a >= 0 && b > a);
 if (!(a >= 0 && b > a) || markedText === null) { done(); }
 eval(serverText.slice(a, b));
+// The pages are served through the open switch (#428), which takes out the
+// <!-- alpha --> and <!-- open --> marker lines and the other mode's words,
+// so they are compared as served, in both modes.
+const sa = serverText.indexOf('// ==== thornswood open switch ====');
+const sb = serverText.indexOf('// ==== end thornswood open switch ====');
+yes('the open switch block is in server.js between its markers', sa >= 0 && sb > sa);
+const forMode = (sa >= 0 && sb > sa)
+  ? new Function('cfg', serverText.slice(sa, sb) + '\nreturn forMode;')({ open: false })
+  : function (md) { return md; };
 const lib = require(path.join(PUBLIC, MARKED));
 const render = makePageRenderer(lib);
 
@@ -249,12 +258,16 @@ try {
 ['help.md', 'known.md'].forEach(function (f) { pages.push(path.join(APP, 'data', f)); });
 yes('there are real pages to draw, ' + pages.length + ' of them', pages.length >= 9);
 pages.forEach(function (p) {
-  const md = read(p);
-  if (md === null) { yes(path.basename(p) + ' reads', false); return; }
-  const ours = render(md);
-  const theirs = plain.parse(md).replace(/<a id='([A-Za-z0-9_-]+)'><\/a>/g, '<a id="$1"></a>');
-  yes(path.basename(p) + ' comes out the same as the browser drew it, and safe',
-      ours === theirs && unsafe(ours).length === 0);
+  const raw = read(p);
+  if (raw === null) { yes(path.basename(p) + ' reads', false); return; }
+  [false, true].forEach(function (open) {
+    const md = forMode(raw, open);
+    const ours = render(md);
+    const theirs = plain.parse(md).replace(/<a id='([A-Za-z0-9_-]+)'><\/a>/g, '<a id="$1"></a>');
+    yes(path.basename(p) + ' comes out the same as the browser drew it, and safe' +
+        (open ? ', with the switch on' : ''),
+        ours === theirs && unsafe(ours).length === 0 && ours.indexOf('&lt;!--') < 0);
+  });
 });
 
 // fillPage against the real home.html.

@@ -200,8 +200,10 @@ Start menu.
 ### Discord in the launcher
 
 The join page puts this after the collection. The launcher's collection card
-asks for it first and keeps the collection shut until it is done, so the list
-takes it here, and row 30 records which order the tester really took.
+used to ask for it first and keep the collection shut until it was done; since
+#428 the collection opens without it, because anyone can download in the alpha.
+The list still takes it here, and row 30 records which order the tester really
+took.
 
 | # | Step | Clock | Seen, word for word | A stranger would instead |
 | --- | --- | --- | --- | --- |
@@ -408,7 +410,7 @@ tester confused by a list that no longer matches.
 | 28 | `Exit Steam from its own menu (Steam, Exit), then press Yes.` | `launcher\app\ShellSteamUpdates.cs` |
 | 28 | `Wait until I launch the game` | `launcher\app\SteamUpdates.cs` |
 | 29 | `Your mods are not installed yet` | `launcher\app\Shell.cs` |
-| 29 | `Connect Discord first and this opens the collection.` | `launcher\app\Shell.cs` |
+| 29 | `Open the collection` | `launcher\app\Shell.cs` |
 | 29 | `INSTALL THE MODS FIRST` | `launcher\app\Shell.cs` |
 | 31 | `https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf` | `launcher\app\Config.cs` |
 | 37 | `MAKE THORNSWOOD'S OWN FOLDER` | `launcher\app\Shell.cs` |

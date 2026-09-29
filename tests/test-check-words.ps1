@@ -115,6 +115,9 @@ try {
     Put 'site/data/known.md' @('| A | B |', '| a player save | why |')
     Put 'site/data/help.md' @('Fine.')
     Put 'site/public/home.html' @('<html>', '<body>', '<p>one &mdash; two</p>', '</body>', '</html>')
+    # #428: the world is open by application, so a closed playtest is a hit,
+    # in either spelling, while a plain playtest and the role stay allowed.
+    Put 'installer/READ ME FIRST.txt' @('A server in alpha.', 'Still a Closed Playtest here.', 'An alpha playtester, and a playtest.', 'A closed-playtest one.')
 
     $want = @(
         'README.md:2', 'README.md:3', 'README.md:4', 'README.md:7',
@@ -123,7 +126,8 @@ try {
         'launcher/ui.xaml:2',
         'site/data/site/a.md:2',
         'site/data/known.md:2',
-        'site/public/home.html:3'
+        'site/public/home.html:3',
+        'installer/READ ME FIRST.txt:2', 'installer/READ ME FIRST.txt:4'
     ) | Sort-Object
 
     $before = @{}
@@ -139,6 +143,8 @@ try {
     Yes ('a hit exits 1 (exit ' + $s.Code + ')') ($s.Code -eq 1)
     Yes 'a file with a byte order mark is read through it' ($s.Hits -contains 'launcher/ui.xaml:2')
     Yes 'a page under the site glob is named by its own path' ($s.Hits -contains 'site/data/site/a.md:2')
+    Yes 'closed playtest is a hit in the installer read me, any case, space or hyphen (#428)' (($s.Hits -contains 'installer/READ ME FIRST.txt:2') -and ($s.Hits -contains 'installer/READ ME FIRST.txt:4'))
+    Yes 'an alpha playtester and a plain playtest are not (#428)' ($s.Hits -notcontains 'installer/READ ME FIRST.txt:3')
 
     $after = @{}
     foreach ($f in (Get-ChildItem -Path $tmp -Recurse -File)) { $after[$f.FullName] = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash }
@@ -167,6 +173,7 @@ try {
     Put 'site/data/site/a.md' @('Fine.')
     Put 'site/data/known.md' @('| A | B |', '| an ordinary Skyrim save | why |')
     Put 'site/public/home.html' @('<p>one, two</p>')
+    Put 'installer/READ ME FIRST.txt' @('A server in alpha, open by application.')
     $c2 = Invoke-Check $self $tmp
     Yes ('clean files exit 0 with no hits (exit ' + $c2.Code + ', ' + $c2.Hits.Count + ' hit(s))') ($c2.Code -eq 0 -and $c2.Hits.Count -eq 0)
 
