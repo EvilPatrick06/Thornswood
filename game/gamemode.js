@@ -25816,7 +25816,7 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
   The recipe that makes a key, and how long to wait before naming what it made.
 
   ThornswoodRecipeKey is added to Thornswood-Content.esp by
-  tools\Add-ContentRecords.py, one iron ingot at a forge. The delay is a tick
+  scripts\mods\Add-ContentRecords.py, one iron ingot at a forge. The delay is a tick
   rather than a measurement: the output lands as soon as this handler returns
   and nobody blocked, so anything above zero is enough and a quarter second is
   well clear of a slow frame.
