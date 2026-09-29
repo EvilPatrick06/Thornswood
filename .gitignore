@@ -50,6 +50,11 @@ bot/open-tickets.json
 bot/joins.json
 bot/joins.json.tmp
 
+# The bot's heartbeat for the watchdog (#449), rewritten every minute by
+# whichever bot is running; a copy here is some other run's.
+bot/heartbeat.json
+bot/heartbeat.json.tmp
+
 # The dev build's own news webhook, for the dev updates channel. Same rule as
 # news-webhook.txt above: anyone holding the URL can post as the bot.
 bot/dev-webhook.txt
