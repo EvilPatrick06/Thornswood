@@ -31,6 +31,10 @@
                                    join pass from an up to date launcher
                                    (#937); off only logs WOULD REFUSE
 
+    .\Deploy-DevGamemode.ps1 -Npcs off
+                                   the same, with no NPCs kept alive by the
+                                   server; -Npcs on puts them back (#385)
+
     .\Deploy-DevGamemode.ps1 -Minutes 3
                                    a longer warning for the people on it
     .\Deploy-DevGamemode.ps1 -Mode restart
@@ -141,6 +145,12 @@ param(
   # REFUSE. Left off, the box keeps what it has.
   [ValidateSet('', 'on', 'off')]
   [string]$RequirePass = '',
+  # npcEnabled in the dev settings (#385): on keeps every NPC in the world
+  # alive on the server, off keeps none. It is the before and after for "is
+  # the lag the NPCs", so it is one switch and a restart. Left off, the box
+  # keeps what it has.
+  [ValidateSet('', 'on', 'off')]
+  [string]$Npcs = '',
   # Where Deploy-Gamemode.ps1 leaves the built server. Its server-settings.json
   # is the one authority on what the load order is and in what order.
   [string]$Dist = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
@@ -641,6 +651,11 @@ Write-Host 'Pointing the dev server at the dev voice service...'
 # switch keeps what the box has. thornswoodServer is always dev here, so a pass
 # the site issued for the live server is refused on this one.
 #
+# AND WHETHER THE SERVER KEEPS NPCS ALIVE, added 28 September for #385.
+# -Npcs off sets npcEnabled false and -Npcs on sets it true, which with the
+# empty npcSettings above is every NPC in the world. Nothing else changes, so
+# the same spot on dev with it off and then on is the before and after.
+#
 # This comment is HERE and not inside the here-string below on purpose. Anything
 # in that string is base64 encoded and sent as an ssh command line, where it
 # counts double and the far end truncates at about 8191 characters. Ten lines of
@@ -721,6 +736,12 @@ if ('$RequirePass' -and `$s.thornswoodRequirePass -ne `$needPass) {
 }
 `$wantServer = (`$s.thornswoodServer -ne 'dev')
 if (`$wantServer) { 'thornswoodServer moves from ' + `$s.thornswoodServer + ' to dev' }
+`$wantNpcs = `$false
+`$npcOn = ('$Npcs' -eq 'on')
+if ('$Npcs' -and `$s.npcEnabled -ne `$npcOn) {
+  `$wantNpcs = `$true
+  'npcEnabled moves from ' + `$s.npcEnabled + ' to ' + `$npcOn
+}
 
 # A byte order mark counts as needing a rewrite even when the number is
 # already right. The run on 18 September set the value AND wrote a mark, so
@@ -729,7 +750,7 @@ if (`$wantServer) { 'thornswoodServer moves from ' + `$s.thornswoodServer + ' to
 `$bom = `$false
 try { `$bom = ([IO.File]::ReadAllBytes(`$p)[0] -eq 0xEF) } catch { }
 if (`$bom) { 'the settings file starts with a byte order mark, rewriting it without one' }
-if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax -and -not `$wantNpc -and -not `$wantRefuse -and -not `$wantPass -and -not `$wantServer) {
+if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax -and -not `$wantNpc -and -not `$wantRefuse -and -not `$wantPass -and -not `$wantServer -and -not `$wantNpcs) {
   'thornswoodVoicePort is already $VoicePort, both equipment checks are already off, and the load order is already right'
 } else {
   Copy-Item `$p (`$p + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
@@ -744,6 +765,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
   if (`$wantRefuse) { `$s | Add-Member -NotePropertyName thornswoodLoadOrderRefuse -NotePropertyValue `$refuse -Force }
   if (`$wantPass) { `$s | Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue `$needPass -Force }
   `$s | Add-Member -NotePropertyName thornswoodServer -NotePropertyValue 'dev' -Force
+  if (`$wantNpcs) { `$s | Add-Member -NotePropertyName npcEnabled -NotePropertyValue `$npcOn -Force }
   `$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
   `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
@@ -783,6 +805,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
             ', npcSettings keys ' + @(`$back.npcSettings.PSObject.Properties).Count +
             ', load order refusal ' + `$back.thornswoodLoadOrderRefuse +
             ', join pass required ' + `$back.thornswoodRequirePass + ' on ' + `$back.thornswoodServer +
+            ', NPCs ' + `$back.npcEnabled +
             ', start point ' + @(`$back.startPoints)[0].worldOrCell }
   } catch {
     'THE FILE NO LONGER PARSES: ' + `$_.Exception.Message + '. Put the .before- copy back.'
