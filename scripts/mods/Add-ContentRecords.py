@@ -64,6 +64,26 @@ woodworkers and also have the animation script". So the records are Bethesda's
 and untouched, and the chopping block is answered server side in gamemode.js by
 chopWood instead: the Woodwright's verb, axe required, firewood out.
 
+THE EXECUTION BLOCK'S SCRIPT, TAKEN OFF (issue #400)
+
+The plugin came from another server, and the last trace of that server's name
+in it was a script: FURN 0x05DF7B34, ThornswoodExecutionerChoppingBlock, the
+headsman's block placed once in Solitude (REFR 0x05DFCC75), carried a VMAD
+attaching KzlChop, with one property pointing at Skyrim.esm's executioner
+swing, IDLE 0x0F95BE. KzlChop.pex was never in C:\\Thornswood\\Game, the
+Steam copy or any pack, measured 20 and 24 September, so it has never run for
+anybody here. It is the headsman's block, not a woodcutting one: firewood comes
+from the three vanilla chopping blocks, answered server side by chopWood.
+
+Every way Patrick can settle that block (left as scenery, playing the
+executioner's swing from the front plugin, or taken out of Solitude) starts
+with the dead attachment gone, so this drops the VMAD from that one record and
+touches no other subrecord of it. The form id, the editor id, the name, the
+mesh and the placed reference all stay, so the gamemode, the load order check
+and every other record see the same plugin with one subrecord fewer. Renaming
+the script instead would have needed a compiled Papyrus script under the new
+name shipping in a pack, for a feature that does not exist yet.
+
 WHAT IT PROVES BEFORE IT WRITES
 
 The same discipline as Rename-ContentRecords.ps1, Remove-DeadRecords.ps1 and
@@ -72,8 +92,9 @@ byte for byte before it edits anything. Afterwards it checks that every record
 that was there is still there, in the same order, with the same form id, type and
 flags; that every record it was not asked to touch has the bytes it started with;
 that the new records parse back to exactly what was built; that no form id it
-allocates is already taken; and that the header's record count matches what is
-actually in the file.
+allocates is already taken; that the header's record count matches what is
+actually in the file; and that the other server's name (Kzl, kzolivar) is in
+no record, compressed ones included.
 
 It will not touch a compressed record, and it refuses to add a record whose
 editor id is already in the file, because two records with one name is the kind
@@ -82,7 +103,7 @@ of thing that is found months later.
 THIS IS A SHIPPED FILE, so its size changing means a release and every client
 downloading it again.
 
-Usage:
+Usage (both default to game\\content\\Thornswood-Content.esp in this repo):
     python scripts/mods/Add-ContentRecords.py --check
     python scripts/mods/Add-ContentRecords.py
 
@@ -94,8 +115,16 @@ import argparse
 import os
 import struct
 import sys
+import zlib
 
 COMPRESSED = 0x00040000
+
+# The headsman's block in Solitude, whose VMAD named KzlChop (see the top).
+EXECUTION_BLOCK = 0x5DF7B34
+
+# The other server's naming, in either spelling the plugin used. Lower case,
+# because the comparison is.
+OTHER_SERVER = (b'kzl', b'kzolivar')
 
 # Form ids for the three new records. The plugin's own records all sit in the
 # 0x05______ space; 0x501548E is the highest of the 0x0501____ family in use, so
@@ -284,10 +313,45 @@ def wants_handle(rec):
     rec.data = pack_subrecords(out)
 
 
+def drop_script(rec):
+    """Takes the VMAD off a record and leaves every other subrecord as it was.
+
+    True when there was one to take. Refuses (SystemExit) when the record's
+    subrecords do not pack back to its own bytes, because then dropping one of
+    them would be a guess about the rest."""
+    pairs = subrecords(rec.data)
+    if pack_subrecords(pairs) != rec.data:
+        raise SystemExit('STOP. 0x%07X does not read back as its own subrecords. '
+                         'Nothing was written.' % rec.fid)
+    kept = [(t, b) for t, b in pairs if t != b'VMAD']
+    if len(kept) == len(pairs):
+        return False
+    rec.data = pack_subrecords(kept)
+    return True
+
+
+def other_server_names(rec):
+    """Where the other server's name is in one record: its editor id, or a
+    script its VMAD attaches. A compressed record is inflated to be read, and
+    never written back from here."""
+    data = rec.data
+    if rec.compressed:
+        data = zlib.decompress(data[4:])
+    found = []
+    for tag, body in subrecords(data):
+        low = body.lower()
+        if tag == b'EDID' and low.startswith(OTHER_SERVER):
+            found.append('editor id ' + body.rstrip(b'\x00').decode('ascii', 'replace'))
+        elif tag == b'VMAD' and any(n in low for n in OTHER_SERVER):
+            found.append('a script it attaches')
+    return found
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser()
-    ap.add_argument('--data', default=here)
+    ap.add_argument('--data', default=os.path.normpath(
+        os.path.join(here, '..', '..', 'game', 'content')))
     ap.add_argument('--plugin', default='Thornswood-Content.esp')
     ap.add_argument('--check', action='store_true', help='say what would happen, write nothing')
     args = ap.parse_args()
@@ -353,6 +417,11 @@ def main():
     cobj_charcoal = by_edid['ThornswoodRecipeCharcoalTier1']
     cobj_pickaxe = by_edid['ThornswoodRecipeWeaponPickaxe']
     cobj_axe = by_edid['ThornswoodRecipeWeaponAxe']
+    # Looked up by form id, which is what the gamemode and the load order use.
+    # Absent is not an error: taking the block out of the plugin is one of the
+    # choices, and then there is no script to take off it.
+    block = next((r for r in records if r.fid == EXECUTION_BLOCK and r.tag == b'FURN'), None)
+    block_scripted = block is not None and any(t == b'VMAD' for t, _ in subrecords(block.data))
 
     handle = clone(misc_src, HANDLE, 'ThornswoodMiscToolHandle', sets={
         b'FULL': zstr('Tool Handle'),
@@ -450,6 +519,9 @@ def main():
           % cobj_pickaxe.fid)
     print('  COBJ 0x%07X ThornswoodRecipeWeaponAxe     now wants a handle as well as the ingot'
           % cobj_axe.fid)
+    if block_scripted:
+        print('  FURN 0x%07X %s loses the script it named, which never shipped'
+              % (block.fid, block.editor_id()))
 
     if args.check:
         print('')
@@ -469,6 +541,8 @@ def main():
             continue
         wants_handle(rec)
         edited.add(rec.fid)
+    if block is not None and drop_script(block):
+        edited.add(block.fid)
     if not built and not edited:
         print('')
         print('  Everything this adds is already in the plugin. Nothing was written.')
@@ -528,6 +602,19 @@ def main():
             print('  STOP. 0x%07X did not come back as it was built. Nothing was written.'
                   % b.fid)
             return 1
+    if block is not None and block.fid in edited:
+        now = next(r for r in after_records if r.fid == block.fid)
+        want = [(t, b) for t, b in subrecords(before[block.fid]) if t != b'VMAD']
+        if subrecords(now.data) != want:
+            print('  STOP. 0x%07X lost more than its script. Nothing was written.' % block.fid)
+            return 1
+    left = [(r, w) for r in after_records for w in other_server_names(r)]
+    if left:
+        for r, w in left:
+            print('  STOP. %s 0x%07X still carries the other server\'s name: %s'
+                  % (r.tag.decode(), r.fid, w))
+        print('  Nothing was written.')
+        return 1
     count = struct.unpack_from('<i', out, hedr + 6 + 4)[0]
     if count != len(after_records):
         print('  STOP. the header says %d records and there are %d. Nothing was written.'
@@ -538,6 +625,7 @@ def main():
     print('  ok    %d added, %d edited, every other byte untouched'
           % (len(built), len(edited)))
     print('  ok    the header record count reads %d, which is what is in the file' % count)
+    print('  ok    no record carries the other server\'s name, compressed ones included')
 
     open(path, 'wb').write(out)
     print('')
