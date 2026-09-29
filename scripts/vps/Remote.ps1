@@ -110,7 +110,7 @@ if ($Show) {
 # script on the command line or, when long, by file, the same as below.
 if ($PSBoundParameters.ContainsKey('Secret')) {
     . (Join-Path $Here 'Send-Secret.ps1')
-    $sshArgs = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+    $sshArgs = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
     Invoke-ThornswoodSecretRemote -Target "$VpsUser@$VpsHost" -SshArgs $sshArgs -Script $full -Secret $Secret
     $Secret = $null
     exit $LASTEXITCODE

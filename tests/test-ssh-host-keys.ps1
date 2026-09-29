@@ -27,7 +27,11 @@
     2. Every command that runs ssh, scp or sftp carries
        StrictHostKeyChecking=yes, on its own line or through a splatted
        array (& ssh @ssh ...) that the same file fills with it. A bare
-       "& ssh $target" would fall back to ask, which prompts.
+       "& ssh $target" would fall back to ask, which prompts. "& $ssh ..."
+       counts as ssh when the file got $ssh from Get-Command ssh. Every
+       call to Invoke-ThornswoodSecretRemote (Send-Secret.ps1, #451) hands
+       it such an array, and Send-Secret.ps1 itself adds the option and
+       refuses a weaker one, run here against a stand-in ssh.
     3. The same for the other languages: no .py, .js, .sh, .cmd or workflow
        file turns it off.
     4. vps.json pins the box's host keys as SHA256 fingerprints and carries
@@ -67,6 +71,7 @@ foreach ($d in @($Tools, (Join-Path $repo 'scripts'))) {
 $off = @()
 $bare = @()
 $calls = 0
+$secretCalls = 0
 foreach ($f in $files) {
     $tokens = $null; $errors = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors)
@@ -82,21 +87,45 @@ foreach ($f in $files) {
     }
 
     # The arrays this file fills with the strict option, by variable name.
+    # And the variables that hold ssh itself, for "& $ssh ..." (Watch-Outside.ps1
+    # finds it with Get-Command so it can say when it is missing).
     $strictVars = @{}
+    $toolVars = @{}
     $assigns = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true)
     foreach ($a in $assigns) {
         $left = $a.Left
         if ($left -is [System.Management.Automation.Language.ConvertExpressionAst]) { $left = $left.Child }
-        if ($left -is [System.Management.Automation.Language.VariableExpressionAst] -and
-            $a.Right.Extent.Text -match 'StrictHostKeyChecking=yes') {
-            $strictVars[$left.VariablePath.UserPath.ToLowerInvariant()] = $true
-        }
+        if (-not ($left -is [System.Management.Automation.Language.VariableExpressionAst])) { continue }
+        $vn = $left.VariablePath.UserPath.ToLowerInvariant()
+        if ($a.Right.Extent.Text -match 'StrictHostKeyChecking=yes') { $strictVars[$vn] = $true }
+        if ($a.Right.Extent.Text -match '(?i)Get-Command\s+[''"]?(ssh|scp|sftp)(\.exe)?\b|^[''"][^''"]*\\(ssh|scp|sftp)\.exe[''"]$') { $toolVars[$vn] = $true }
     }
 
     $cmds = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)
     foreach ($c in $cmds) {
         $name = $c.GetCommandName()
-        if (-not $name) { continue }
+        if (-not $name) {
+            $first = $c.CommandElements[0]
+            if ($c.InvocationOperator -ne 'Unknown' -and $first -is [System.Management.Automation.Language.VariableExpressionAst] -and
+                -not $first.Splatted -and $toolVars.ContainsKey($first.VariablePath.UserPath.ToLowerInvariant())) { $name = 'ssh' }
+            else { continue }
+        }
+        if ($name -eq 'Invoke-ThornswoodSecretRemote') {
+            # Send-Secret.ps1 adds the option itself and refuses a weaker one,
+            # but a caller still hands it the script's strict array.
+            $secretCalls++
+            $okS = $false
+            for ($i = 0; $i -lt $c.CommandElements.Count - 1; $i++) {
+                $e = $c.CommandElements[$i]
+                if ($e -is [System.Management.Automation.Language.CommandParameterAst] -and $e.ParameterName -eq 'SshArgs') {
+                    $v = $c.CommandElements[$i + 1]
+                    if ($v.Extent.Text -match 'StrictHostKeyChecking=yes' -or
+                        ($v -is [System.Management.Automation.Language.VariableExpressionAst] -and $strictVars.ContainsKey($v.VariablePath.UserPath.ToLowerInvariant()))) { $okS = $true }
+                }
+            }
+            if (-not $okS) { $bare += ('{0}:{1} (Invoke-ThornswoodSecretRemote)' -f (Rel $f.FullName), $c.Extent.StartLineNumber) }
+            continue
+        }
         if (@('ssh', 'scp', 'sftp', 'ssh.exe', 'scp.exe', 'sftp.exe') -notcontains $name.ToLowerInvariant()) { continue }
         $calls++
         $ok = $false
@@ -112,6 +141,26 @@ foreach ($f in $files) {
 Yes ('no script turns host key checking down' + $(if ($off.Count) { ': ' + ($off -join ', ') } else { '' })) ($off.Count -eq 0)
 Yes ('every ssh, scp and sftp call carries StrictHostKeyChecking=yes' + $(if ($bare.Count) { ': ' + ($bare -join ', ') } else { '' })) ($bare.Count -eq 0)
 Yes ("  and there are real calls to check ($calls found)") ($calls -ge 100)
+Yes ("  every Invoke-ThornswoodSecretRemote caller hands it a strict array ($secretCalls found)") ($secretCalls -ge 8)
+
+# ---- 2b: Send-Secret.ps1 keeps its own guard ----------------------------------------
+# Whatever a caller passes, the secret goes only over a host-key-checked
+# connection. Run against a stand-in ssh that records its options.
+. (Join-Path $repo 'scripts\vps\Send-Secret.ps1')
+$global:ThornswoodSshSeen = @()
+function global:ssh { $global:ThornswoodSshSeen = @($args | ForEach-Object { [string]$_ }); $null = @($input); 'stand-in'; $global:LASTEXITCODE = 0 }
+try {
+    [void](Invoke-ThornswoodSecretRemote -Target 'nobody@203.0.113.9' -SshArgs @('-o', 'BatchMode=yes') -Secret 'not-a-secret' -Script "'x'")
+    Yes 'Send-Secret.ps1 adds StrictHostKeyChecking=yes when a caller left it out' (($global:ThornswoodSshSeen -join ' ') -match 'StrictHostKeyChecking=yes')
+    $global:ThornswoodSshSeen = @()
+    $threw = $false
+    try { [void](Invoke-ThornswoodSecretRemote -Target 'nobody@203.0.113.9' -SshArgs @('-o', 'StrictHostKeyChecking=accept-new') -Secret 'not-a-secret' -Script "'x'") } catch { $threw = $true }
+    Yes '  and refuses one that turned it down, before ssh runs' ($threw -and $global:ThornswoodSshSeen.Count -eq 0)
+}
+finally {
+    Remove-Item -Path function:global:ssh -ErrorAction SilentlyContinue
+    Remove-Variable -Name ThornswoodSshSeen -Scope Global -ErrorAction SilentlyContinue
+}
 
 # ---- 3: the other languages ----------------------------------------------------------
 $others = @()
