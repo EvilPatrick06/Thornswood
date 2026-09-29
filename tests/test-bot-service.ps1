@@ -132,6 +132,11 @@ foreach ($f in @('scripts\deploy\Rotate-BotToken.ps1', 'scripts\deploy\Set-Disco
 }
 $rs = Get-Content -LiteralPath (Join-Path $repo 'scripts\vps\Restart-Server.ps1') -Raw
 Yes 'Restart-Server.ps1 -Service bot restarts the service by name' ($rs -match "bot\s+= @\{ Svc\s+= 'ThornswoodBot'" -and $rs -match 'Restart-Service -Name')
+$fz = Get-Content -LiteralPath (Join-Path $repo 'scripts\vps\vps-freeze.ps1') -Raw
+Yes 'vps-freeze.ps1 stops the bot''s service by name, and -Undo starts it, so the service cannot start python again mid-backup' (
+    $fz -match "\`$botService = 'ThornswoodBot'" -and $fz -match 'Stop-Service -Name \$botService' -and $fz -match 'Start-Service -Name \$botService' -and $fz -notmatch "'Thornswood Bot'")
+$rbx = Get-Content -LiteralPath (Join-Path $repo 'scripts\vps\Restore-Box.ps1') -Raw
+Yes 'Restore-Box.ps1 will not restore under a running bot service' ($rbx -match "Get-Service -Name 'ThornswoodBot'" -and $rbx -notmatch "'Thornswood Bot'")
 $cs = Get-Content -LiteralPath $svcSrc -Raw
 Yes 'BotService.cs names itself ThornswoodBot' ($cs -match 'public const string Name = "ThornswoodBot";')
 $wsText = Get-Content -LiteralPath (Join-Path $repo 'scripts\vps\Watch-Services.ps1') -Raw

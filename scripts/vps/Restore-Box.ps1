@@ -123,10 +123,13 @@ if ($LASTEXITCODE -ne 0) { Die 'The backup did not open here, so nothing was sen
 Head 'Is the box ready'
 $ready = @(Remote @'
 $ErrorActionPreference = 'SilentlyContinue'
-foreach ($t in 'Thornswood Watch', 'Thornswood Server', 'Thornswood Dev Server', 'Thornswood Docs', 'Thornswood Bot') {
+foreach ($t in 'Thornswood Watch', 'Thornswood Server', 'Thornswood Dev Server', 'Thornswood Docs') {
   $x = Get-ScheduledTask -TaskName $t
   if ($x) { 'TASK|' + $t + '|' + $x.State } else { 'TASK|' + $t + '|absent' }
 }
+# The bot is a Windows service since issue #465; Running blocks it the same way.
+$x = Get-Service -Name 'ThornswoodBot'
+if ($x) { 'TASK|ThornswoodBot service|' + $x.Status } else { 'TASK|ThornswoodBot service|absent' }
 foreach ($r in 'C:\Thornswood-Server', 'C:\Thornswood-Server-Dev') {
   'ROOT|' + $r + '|' + (Test-Path (Join-Path $r 'dist_back\skymp5-server.js'))
 }
