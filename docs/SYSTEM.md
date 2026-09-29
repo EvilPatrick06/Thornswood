@@ -145,7 +145,7 @@ somebody away only when `allowed.json` says `"enforce": true`
 ## The VPS services
 
 Every service is a Windows scheduled task. The watchdog starts a task by name
-when its check fails, three times an hour at most (`Watch-Services.ps1:198-247`).
+when its check fails, three times an hour at most (`Watch-Services.ps1:540-575`).
 
 | Service | Folder on the VPS | Port(s) | Scheduled task | Deployed or set up by | From |
 | --- | --- | --- | --- | --- | --- |
@@ -161,10 +161,16 @@ when its check fails, three times an hour at most (`Watch-Services.ps1:198-247`)
 
 What the watchdog checks: `https://thornswood.net/` for Caddy, then TCP 3001,
 3000, 7778, 7788 and 7789, and a python process with `Thornswood-Bot` in its
-command line for the bot (`Watch-Services.ps1:165-209,250-310`). It also writes DISK LOW
-under 20 percent free on C: and DISK CRITICAL under 10. The bot reads
-`C:\Thornswood-Watch\watch.log` every minute and posts outages in the staff
-channel (`bot/bot.py:219`, `Watch-Services.ps1:20-29`).
+command line for the bot (`Watch-Services.ps1:504-583`). It also asks the site,
+both game servers and both voice servers over HTTP, which it tells about and
+never restarts for, and checks the `Thornswood Backup` task's last result with
+a backup under 26 hours old, the build runner's service, and writes DISK LOW
+under 20 percent free on C: and DISK CRITICAL under 10. It tells the staff
+channel once when any of these goes down and once when it is back (issue
+#447): each message goes into `C:\Thornswood-Watch\alerts.jsonl`, the bot
+posts it within a minute, and when the bot is down or silent the watchdog posts
+it through the webhook in `alerts-webhook.txt` beside it
+(`Watch-Services.ps1:22-45,212-480`, `bot/bot.py:1990-2090`).
 
 What the backup takes: the live server's `world`, `private`, `data`,
 `server-settings.json` and `gamemode.js`, and the same five from
