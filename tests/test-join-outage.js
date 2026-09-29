@@ -98,6 +98,11 @@ eval(grab('guildMembers') + '\n' + grab('memberOf') + '\n' + grab('roleNames') +
      '\n' + route('function notAcceptedYet(') +
      // What a banned account is told at Play (#1010).
      '\n' + route('function banUntilText(') + '\n' + route('function accountBanned(') +
+     // Play's doors answer inside PLAY_ANSWER_MS (#1094).
+     '\n' + src.slice(src.indexOf('const PLAY_ANSWER_MS'), src.indexOf('\n', src.indexOf('const PLAY_ANSWER_MS'))) +
+     '\n' + src.slice(src.indexOf('const PLAY_BODY_MS'), src.indexOf('\n', src.indexOf('const PLAY_BODY_MS'))) +
+     '\n' + route('class BodyFailed') + '\n' + route('function passBodyFailure(') +
+     '\n' + route('function within(') + '\n' + route('function standingLate(') +
      '\nasync function join(p, req, res) {\n' + JOIN + '\n}');
 
 function reset() {
