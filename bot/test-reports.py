@@ -274,6 +274,37 @@ try:
         bot._trouble_channel = keep
     yes('R10 no staff channel is silence, not a fallback', len(sent) == before)
 
+    # R12 (#414): a call for help and a report from inside the game, and a
+    #      report about a person from the site, each say what they are.
+    helprow = report(1, kind='help', by='Aela', title='stuck in a rock',
+                     detail='At Whiterun. Profile 7: a claim, not proof.',
+                     **{'from': 'in game'})
+    t = bot.report_text(helprow)
+    yes('R12 a call for help from the game says who asked, in game',
+        'Aela asked for help in game' in t and 'stuck in a rock' in t
+        and 'a claim, not proof' in t)
+    t = bot.report_text(report(1, kind='report', by='Aela', about='@here Brynjolf',
+                               title='stole from my stall',
+                               **{'from': 'in game on the dev server'}))
+    yes('R12 a report from the dev server names who and says dev',
+        'Aela reported' in t and 'Brynjolf' in t and 'on the dev server' in t)
+    yes('R12 and a name typed as a ping is text', '@here' not in t)
+    t = bot.report_text(report(1, kind='report', by='Aela', about='Brynjolf',
+                               title='harassing people', discordId='123456',
+                               **{'from': 'the public page, signed in'}))
+    yes('R12 a report from the site names the account that sent it',
+        'Aela reported Brynjolf on the site' in t and '<@123456>' in t)
+    for w in (bot.report_text(helprow), t):
+        if 'player' in w.lower() or '—' in w:
+            yes('R12 the words are the site\'s words', False)
+            break
+    else:
+        yes('R12 the words are the site\'s words', True)
+    later2 = [report(8, kind='help', **{'from': 'in game'})] + first
+    ticks = drive(first, [later2])
+    yes('R12 and the watcher says a call for help like any other report',
+        len(ticks[1][1]) == 1 and 'asked for help in game' in ticks[1][1][0])
+
     # R11: it is started with the other watchers, once.
     import inspect  # noqa: E402
     src = inspect.getsource(bot.on_ready)
