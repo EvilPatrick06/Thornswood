@@ -15,7 +15,7 @@ Vortex owns it again.
 Tonight (27 Sep 2026) the lists and the server enable `ElysiumEstateSSE.esp`.
 Vortex still stages Elysium Estate 4.3.5 as `ElysiumEstate.esp` into Steam
 Data. OwnGame links that old name; one of 94 plugins was missing from the Steam
-path until a manual copy. Other players hit the same launcher warning.
+path until a manual copy. Other people hit the same launcher warning.
 
 The bytes here match the server payload plugin of the same name
 (sha256 A450BE33F0DF4C0E36DB8718A8523921D97F4C5B7C5998C614D707158DC467B2).

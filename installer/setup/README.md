@@ -153,7 +153,7 @@ install has its Game folder already and writes neither.
 
 ## What a person agrees to before Install
 
-Issue #1009, Patrick on 28 September: "check boxes that lock the install for
+Issue #1009, asked for on 28 September: "check boxes that lock the install for
 reading and accepting terms and conditions, privacy policy, and agreeing to
 the rules", "and links to all 3". Beside Install are four boxes, all unticked:
 the age box, then "I have read and accept the Terms and Conditions", "I have
