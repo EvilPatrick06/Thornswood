@@ -59,20 +59,28 @@ function Done {
 }
 
 # ---- the blocks, out of the script itself -----------------------------------
+# Swap.ps1 since issue #446, which Deploy-Server.ps1 and Deploy-DevGamemode.ps1
+# both load.
 $src = Get-Content -LiteralPath (Join-Path $Here '..\scripts\deploy\Deploy-Server.ps1') -Raw
-$a = $src.IndexOf('# ==== deploy-server remote blocks ====')
-$b = $src.IndexOf('# ==== end deploy-server remote blocks ====')
-Yes 'Deploy-Server.ps1 keeps the blocks that run on the box between its markers' ($a -ge 0 -and $b -gt $a)
+$lib = Get-Content -LiteralPath (Join-Path $Here '..\scripts\deploy\Swap.ps1') -Raw
+$a = $lib.IndexOf('# ==== deploy-server remote blocks ====')
+$b = $lib.IndexOf('# ==== end deploy-server remote blocks ====')
+Yes 'Swap.ps1 keeps the blocks that run on the box between their markers' ($a -ge 0 -and $b -gt $a)
 if ($a -lt 0 -or $b -le $a) { Done }
 $checkBlock = $null
 $swapBlock = $null
-Invoke-Expression $src.Substring($a, $b - $a)
-Yes 'the stage check, the swap and SwapVars are all there' (
-    [bool]$checkBlock -and [bool]$swapBlock -and [bool](Get-Command SwapVars -EA SilentlyContinue))
+Invoke-Expression $lib.Substring($a, $b - $a)
+$c = $lib.IndexOf('# ==== put-back pick ====')
+$d = $lib.IndexOf('# ==== end put-back pick ====')
+$putBackPick = $null
+if ($c -ge 0 -and $d -gt $c) { Invoke-Expression $lib.Substring($c, $d - $c) }
+Yes 'the stage check, the swap, the put-back pick and SwapVars are all there' (
+    [bool]$checkBlock -and [bool]$swapBlock -and [bool]$putBackPick -and [bool](Get-Command SwapVars -EA SilentlyContinue))
+Yes 'Deploy-Server.ps1 loads Swap.ps1' ($src -match "\. \(Join-Path \`$Here 'Swap\.ps1'\)")
 
 # ---- read, not run ----------------------------------------------------------
 Yes 'the blocks are plain ASCII, which the far end reads right with or without a byte order mark' (
-    ($checkBlock + $swapBlock) -notmatch '[^\x00-\x7F]')
+    ($checkBlock + $swapBlock + $putBackPick) -notmatch '[^\x00-\x7F]')
 
 # The narrowing on 17 September was a fix. The TCP port one above the game
 # port is 7778 on the live root, which is the voice service.
@@ -83,7 +91,7 @@ Yes 'the stop is still by the UDP port and nothing else' (
     $swapBlock -notmatch 'CommandLine')
 Yes 'the stage check stops nothing' ($checkBlock -notmatch 'Stop-Process|Stop-ScheduledTask')
 
-$flow = $src.Substring($b)
+$flow = $src.Substring([Math]::Max(0, $src.IndexOf('# ------------------------------------------------------------- the stage')))
 $iStage = $flow.IndexOf('$checkBlock)')
 $iWarn  = $flow.IndexOf('# ------------------------------------------------------------- the warning')
 $iSwap  = $flow.IndexOf('$swapBlock)')
@@ -304,7 +312,9 @@ try {
         @{ Label = 'settings with a byte order mark'; Why = 'byte order mark';
            Args = @{ Bom = $true } },
         @{ Label = 'a binary that is not the recorded build'; Why = 'not the build server-build\.json records';
-           Args = @{ RecordFor = 'some other binary' } }
+           Args = @{ RecordFor = 'some other binary' } },
+        @{ Label = 'a gamemode that does not parse'; Why = 'gamemode\.js does not parse';
+           Args = @{ Gamemode = 'function ( { this is not javascript' } }
     )) {
         $n++
         $stageName = '.stage-20260924-00010' + $n
@@ -386,6 +396,62 @@ try {
     Yes '  and the server answering is the new one' ((Answers $P) -and ((Owner $P) -ne $running))
     Yes '  and the other server was never touched' (((Owner $Q) -eq $otherPid) -and (Answers $Q))
     if ($script:fail -gt $failed) { Show }
+
+    # ---- -PutBack: the newest .prev goes back in, checked -------------------
+    # Issue #446. Deploy-Server.ps1 -PutBack sends SwapVars with no files, then
+    # $putBackPick, which makes the newest .prev folder the stage, then the
+    # same swap block.
+    $afterGood = Tree $root
+    $running = Owner $P
+    $failed = $script:fail
+    $out = RunFar ($putBackPick + $swapBlock) '.stage-none' '.undone-none' 30 ([ordered]@{})
+    $said = $out -join "`n"
+    Yes '-PutBack is SWAP OK' ($out -contains 'SWAP OK')
+    Yes '  and it named the .prev folder it put back' ($said -match [regex]::Escape('.prev-20260924-000401 kept'))
+    Yes '  and the old binary, gamemode, stamp and plugin are live again' (
+        ([IO.File]::ReadAllText((Join-Path $root 'scam_native.node')) -eq 'old binary') -and
+        ([IO.File]::ReadAllText((Join-Path $root 'gamemode.js')) -eq '// old gamemode') -and
+        ([IO.File]::ReadAllText((Join-Path $root 'thornswood-build.json')) -match (Sha '// old gamemode')) -and
+        ([IO.File]::ReadAllText((Join-Path $root ('plugins\' + $bob))) -eq 'bob v1'))
+    $undone = @(Get-ChildItem -LiteralPath $root -Directory -Force | Where-Object { $_.Name -like '.undone-*' })
+    Yes '  and what it took out is kept in one .undone folder' (
+        $undone.Count -eq 1 -and
+        ([IO.File]::ReadAllText((Join-Path $undone[0].FullName 'gamemode.js')) -eq '// new gamemode'))
+    Yes '  and the .prev folder it emptied is gone, the two older ones kept' (
+        -not (Test-Path -LiteralPath (Join-Path $root '.prev-20260924-000401')) -and
+        (Test-Path -LiteralPath (Join-Path $root '.prev-20000101-000004')))
+    Yes '  and a plugin the deploy added stays, since nothing came before it' (
+        Test-Path -LiteralPath (Join-Path $root 'plugins\New Plugin.esp'))
+    Yes '  and the server answering is a new process, on the old files' ((Answers $P) -and ((Owner $P) -ne $running))
+    Yes '  and the other server was never touched' (((Owner $Q) -eq $otherPid) -and (Answers $Q))
+    if ($script:fail -gt $failed) { Show }
+
+    # ---- a put-back whose old files do not start ----------------------------
+    Put (Join-Path $root '.prev-20990101-000001\gamemode.js') '// the kept one, will-not-start'
+    Put (Join-Path $root '.prev-20990101-000001\server-settings.json') (SettingsJson $root $P @('Skyrim.esm', $bob))
+    $beforeBack = Tree $root
+    $running = Owner $P
+    $failed = $script:fail
+    $out = RunFar ($putBackPick + $swapBlock) '.stage-none' '.undone-none' 4 ([ordered]@{})
+    Yes 'a put-back whose files do not start is SWAP ROLLED BACK' ($out -contains 'SWAP ROLLED BACK')
+    Yes '  and what was running is back, and the .prev folder is kept full, as it was' ((Tree $root) -eq $beforeBack)
+    Yes '  and the server is answering again' ((WaitUp $P) -and ((Owner $P) -ne $running))
+    Yes '  and the other server was never touched' ((Owner $Q) -eq $otherPid)
+    if ($script:fail -gt $failed) { Show }
+
+    # ---- nothing to put back --------------------------------------------------
+    $empty = Join-Path $work 'no-prev-root'
+    Put (Join-Path $empty 'gamemode.js') '// nothing kept'
+    $pre = SwapVars $empty 'Thornswood Test Swap' '.stage-none' '.undone-none' 4 ([ordered]@{})
+    $f = Join-Path $work 'far-empty.ps1'
+    [IO.File]::WriteAllText($f, ($pre + $putBackPick + $swapBlock), (New-Object Text.UTF8Encoding($true)))
+    $eap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $out = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $f 2>&1 | ForEach-Object { "$_".Trim() }) }
+    finally { $ErrorActionPreference = $eap }
+    Yes 'a root with no .prev folder is SWAP REFUSED, and stops nothing' (
+        ($out -contains 'SWAP REFUSED') -and ($out -notcontains 'SWAP OK') -and
+        -not (@($out | Where-Object { $_ -like 'stopped pid *' }).Count))
 }
 catch {
     Yes ('the runs finished without an error: ' + $_.Exception.Message) $false

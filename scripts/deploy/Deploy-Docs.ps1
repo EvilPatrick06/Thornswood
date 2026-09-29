@@ -24,6 +24,8 @@
                                replaces just the named documents with the
                                repo copy, .bak first. For a page rewritten
                                here on purpose, when -SeedDocs is too much.
+    .\Deploy-Docs.ps1 -PutBack puts the app the last deploy replaced back,
+                               checked the same way, and sends nothing
     .\Deploy-Docs.ps1 -RunAs 'LOCAL SERVICE'
                                runs the site as LOCAL SERVICE instead of
                                SYSTEM, with its own folder and nothing else
@@ -31,6 +33,18 @@
                                walking folders. It stays that way: a deploy
                                without -RunAs keeps the account the task
                                already has. -RunAs SYSTEM puts it back.
+
+  THE APP IS STAGED, CHECKED, THEN SWAPPED (issue #446). server.js and the
+  public files that changed go into $Root\.stage-<stamp> while the site runs,
+  the box checks them there (each file by its hash, server.js through
+  node --check), and nothing else happens if that fails. The task is set up,
+  and only then is the site stopped, the files renamed in (what they replace
+  goes to $Root\.prev-<stamp>, the newest three kept), started, and asked for
+  its front page. If it does not answer, the old files go back and are
+  started again, and this exits 1. It used to copy server.js and public\ over
+  the running site, restart it, and print DOCS DID NOT START with nothing put
+  back. The documents and the public pages under data are content, not the
+  app, and go up as they always did.
 
   The password crosses the wire in clear, because this is plain HTTP on an IP.
   Do not reuse one that matters. That improves the day a real domain and a
@@ -71,7 +85,11 @@ param(
   # or -Site after the switch, which is what CLAUDE.md, Install-Bot and
   # Set-Vps all tell people to run, and the read-back said nothing about it.
   [ValidateSet('SYSTEM', 'LOCAL SERVICE')]
-  [string]$RunAs
+  [string]$RunAs,
+  # How long the new site has to answer before the old files go back.
+  [int]$Wait = 30,
+  # Put the app the last deploy replaced back in, and send nothing.
+  [switch]$PutBack
 )
 
 $ErrorActionPreference = 'Stop'
@@ -82,9 +100,13 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
+. (Join-Path $Here 'Swap.ps1')
 $App  = Join-Path $Here '..\..\site'
 
 if (-not (Test-Path -LiteralPath $App)) { throw "not found: $App" }
+if ($PutBack -and ($Password -or $SeedDocs -or $Boards -or $Site -or $Docs -or $RunAs)) {
+  throw '-PutBack puts the last app back and sends nothing else, so it takes none of -Password, -SeedDocs, -Boards, -Site, -Docs or -RunAs.'
+}
 
 # -Docs names have to be documents this repo actually has, or a typo would
 # quietly send nothing and report nothing.
@@ -100,12 +122,16 @@ foreach ($d in @($Docs)) {
 # public and data as the commit holds them, in one zip named by commit and
 # hash. Everything below sends from its folder, not from the working tree, and
 # the zip itself goes to the box's store first. The box is told the site runs
-# it at the end, once the files are in place.
+# it at the end, once the files are in place and answering (issue #446).
+# -PutBack builds and sends nothing.
 . (Join-Path $Here 'Artifact.ps1')
+$artifact = $null
+if (-not $PutBack) {
 $artifact = New-ThornswoodArtifact -Component site -RepoDir (Join-Path $Here '..\..') -Paths 'site/server.js', 'site/public', 'site/data'
 Write-Host ('Artifact ' + (Format-ThornswoodArtifact $artifact))
 $App = Join-Path $artifact.Folder 'site'
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
+}
 
 # Runs a command up there and hands back what it said.
 #
@@ -162,18 +188,35 @@ function Push($local, $remote) {
   if ($LASTEXITCODE -ne 0) { throw "scp failed: $local" }
 }
 
+$rootWin   = $Root.Replace('/','\')
+$stamp     = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stageName = '.stage-' + $stamp
+$prevName  = '.prev-' + $stamp
+$stageFar  = ($Root -replace '\\', '/') + '/' + $stageName
+$hashes    = [ordered]@{}
+
+if (-not $PutBack) {
 Write-Host 'Making room...'
-$rootWin = $Root.Replace('/','\')
+# A stage a run that died part way left is cleared first; it was never
+# swapped in.
 Remote @"
 foreach (`$d in @('$rootWin','$rootWin\public','$rootWin\data','$rootWin\files','$rootWin\uploads')) {
   if (-not (Test-Path `$d)) { New-Item -ItemType Directory -Path `$d -Force | Out-Null }
 }
+Get-ChildItem -LiteralPath '$rootWin' -Directory -Force -EA SilentlyContinue |
+  Where-Object { `$_.Name -like '.stage-*' } |
+  ForEach-Object { Remove-Item -LiteralPath `$_.FullName -Recurse -Force -EA SilentlyContinue }
+New-Item -ItemType Directory -Path '$rootWin\$stageName\public' -Force | Out-Null
 'ready'
 "@ | ForEach-Object { "  $_" }
 
 Write-Host ''
-Write-Host 'Sending the site...'
-Push (Join-Path $App 'server.js') "$Root/server.js"
+Write-Host "Staging the site in $rootWin\$stageName..."
+# Into the stage, never over the running site. What goes is listed in $send
+# so the box can hold every file to its hash before anything is swapped.
+$send = [ordered]@{}
+Push (Join-Path $App 'server.js') "$stageFar/server.js"
+$send['server.js'] = Join-Path $App 'server.js'
 Write-Host '  server.js'
 # Everything in public\, by listing the folder rather than by a list kept here.
 # robots.txt was added and did not go up, because this was six named files and
@@ -199,11 +242,25 @@ $sentPublic = @()
 $samePublic = 0
 Get-ChildItem (Join-Path $App 'public') -File -EA SilentlyContinue | ForEach-Object {
   if ($publicThere[$_.Name] -eq (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash) { $samePublic++; return }
-  Push $_.FullName "$Root/public/$($_.Name)"
+  Push $_.FullName "$stageFar/public/$($_.Name)"
+  $send['public/' + $_.Name] = $_.FullName
   $sentPublic += $_.Name
 }
 if ($sentPublic.Count) { Write-Host ('  ' + ($sentPublic -join ', ')) }
 Write-Host ('  ' + $samePublic + ' public file(s) already the same up there, not sent')
+
+# The box checks the stage while the old site still runs: every file as it
+# left here, and server.js through node --check. A refusal clears the stage
+# and this stops, with the documents, the password and the task untouched.
+$hashes = Get-SwapHashes $send
+$checkOut = @(Remote ((ServiceSwapVars $Root $stageName $prevName $Wait $hashes @('server.js')) + $serviceCheckBlock) |
+              ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
+if ($checkOut -notcontains 'STAGE OK') {
+  Write-Host ''
+  Write-Host '  THE STAGE DID NOT CHECK OUT, so nothing was stopped or changed.' -ForegroundColor Red
+  Write-Host '  The site is still running exactly as it was. The lines above say why.' -ForegroundColor Red
+  exit 1
+}
 
 # The public pages are markdown like everything else, so they can be edited
 # from the site rather than redeployed. Same rule: only the missing ones go.
@@ -279,6 +336,7 @@ if ($SeedDocs -and $sent) {
   Write-Host '  file beside it on the VPS. Use -Site next time if you only meant the' -ForegroundColor Yellow
   Write-Host '  public pages, or -Boards if you only meant the runbook.' -ForegroundColor Yellow
 }
+}
 
 if ($Password) {
   Write-Host ''
@@ -323,9 +381,12 @@ if (Test-Path -LiteralPath `$f) {
 "@ | ForEach-Object { "  $_" }
 }
 
+if (-not $PutBack) {
 Write-Host ''
-Write-Host 'Opening the port and starting it...'
-Remote @"
+Write-Host 'Opening the port and setting up the task...'
+# The firewall, the account and the task definition. It stops and starts
+# nothing: the swap below does that, once this has said it is all in place.
+$setup = @(Remote @"
 `$ErrorActionPreference = 'Continue'
 
 # Once Setup-Domain has run, the site answers on loopback only and Caddy holds
@@ -466,15 +527,6 @@ if (`$principal) {
 }
 # ==== end thornswood site account ====
 
-Get-CimInstance Win32_Process |
-  Where-Object { `$_.Name -eq 'node.exe' -and `$_.CommandLine -like '*Thornswood-Docs*' } |
-  ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -EA SilentlyContinue }
-# Older installs ran it as plain 'server.js', which no command line filter can
-# see, so whatever is holding the port goes too.
-Get-NetTCPConnection -LocalPort $Port -State Listen -EA SilentlyContinue |
-  ForEach-Object { Stop-Process -Id `$_.OwningProcess -Force -EA SilentlyContinue }
-Start-Sleep -Seconds 1
-
 `$node = (Get-Command node -EA SilentlyContinue).Source
 if (-not `$node) { 'NODE NOT FOUND ON THIS MACHINE'; return }
 
@@ -568,36 +620,111 @@ if (`$who) {
   }
 }
 
-Start-ScheduledTask -TaskName '$Task'
-Start-Sleep -Seconds 4
-
-# The port is the real answer. A process list can miss it, a listening socket
-# cannot.
-`$listen = Get-NetTCPConnection -LocalPort $Port -State Listen -EA SilentlyContinue
-if (`$listen) {
-  'docs up, pid ' + (`$listen | Select-Object -First 1).OwningProcess
-} else {
-  'DOCS DID NOT START. Running it by hand to see why:'
-  `$o = Join-Path `$env:TEMP 'tw-docs-out.txt'
-  `$e = Join-Path `$env:TEMP 'tw-docs-err.txt'
-  Remove-Item `$o,`$e -Force -EA SilentlyContinue
-  `$h = Start-Process -FilePath `$node -ArgumentList 'server.js' -WorkingDirectory '$rootWin' ``
-        -RedirectStandardOutput `$o -RedirectStandardError `$e -PassThru -NoNewWindow
-  Start-Sleep -Seconds 4
-  if (`$h -and -not `$h.HasExited) {
-    'it runs fine by hand, so the scheduled task is what is wrong'
-    if (`$runAs -ne 'SYSTEM') { 'it runs as ' + `$runAs + ' now, so look first for a file that account cannot reach. -RunAs SYSTEM puts it back.' }
-    Stop-Process -Id `$h.Id -Force -EA SilentlyContinue
-  }
-  Get-Content `$o,`$e -EA SilentlyContinue | Select-Object -First 25
-  (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue | Get-ScheduledTaskInfo).LastTaskResult |
-    ForEach-Object { 'task last result: ' + `$_ }
+'SETUP DONE'
+"@ | ForEach-Object { "$_" })
+foreach ($l in $setup) { Write-Host "  $l" }
+# An account that does not resolve, or no node, ends that block early. Nothing
+# has been stopped, so the stage goes and the site keeps running as it was.
+if ($setup -notcontains 'SETUP DONE') {
+  Remote "Remove-Item -LiteralPath '$rootWin\$stageName' -Recurse -Force -EA SilentlyContinue" | Out-Null
+  Write-Host ''
+  Write-Host '  The task could not be set up, so nothing was stopped or swapped. The lines' -ForegroundColor Red
+  Write-Host '  above say why. The site is still running exactly as it was.' -ForegroundColor Red
+  exit 1
 }
-"@ | ForEach-Object { "  $_" }
+}
 
-# The site's files are in place: the box records that it runs this artifact,
-# read back at /api/deploys (Artifact.ps1).
-$null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root
+# ==== thornswood site hooks ====
+# What is particular to the site, for Swap.ps1's service swap: stopped by its
+# own folder on node's command line, and by its port, because older installs
+# ran it as plain 'server.js', which no command line filter can see. Started
+# by its task. Healthy when its front page answers, not merely when something
+# listens: a server.js that throws on its first request is not up.
+$siteHooks = @'
+function StopIt {
+  Stop-ScheduledTask -TaskName $Task -EA SilentlyContinue
+  $ids = @()
+  foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
+    if ($p.CommandLine -and $p.CommandLine.IndexOf($Root + '\', [StringComparison]::OrdinalIgnoreCase) -ge 0) { $ids += $p.ProcessId }
+  }
+  $ids += @(Get-NetTCPConnection -LocalPort $Port -State Listen -EA SilentlyContinue | Select-Object -ExpandProperty OwningProcess)
+  foreach ($id in @($ids | Where-Object { $_ -gt 0 -and $_ -ne $PID } | Sort-Object -Unique)) {
+    Stop-Process -Id $id -Force -EA SilentlyContinue
+    'stopped pid ' + $id
+  }
+  for ($i = 0; $i -lt 20 -and @(Get-NetTCPConnection -LocalPort $Port -State Listen -EA SilentlyContinue).Count; $i++) {
+    Start-Sleep -Milliseconds 500
+  }
+}
+function StartIt { Start-ScheduledTask -TaskName $Task }
+function Healthy {
+  $until = (Get-Date).AddSeconds($Wait)
+  while ($true) {
+    $code = 0
+    try {
+      $r = Invoke-WebRequest -Uri ('http://127.0.0.1:' + $Port + '/') -UseBasicParsing -TimeoutSec 5
+      $code = [int]$r.StatusCode
+    } catch {
+      if ($_.Exception.Response) { try { $code = [int]$_.Exception.Response.StatusCode } catch { } }
+    }
+    if ($code -gt 0 -and $code -lt 500) { return $true }
+    if ((Get-Date) -gt $until) { return $false }
+    Start-Sleep -Milliseconds 700
+  }
+}
+function Answer {
+  $l = @(Get-NetTCPConnection -LocalPort $Port -State Listen -EA SilentlyContinue)
+  $by = ''
+  if ($l.Count) { $by = ', pid ' + $l[0].OwningProcess }
+  'the site answers on ' + $Port + $by
+}
+# Run by hand, to see why: a task swallows what node prints.
+function Why {
+  $node = (Get-Command node -EA SilentlyContinue).Source
+  if (-not $node) { 'NODE NOT FOUND ON THIS MACHINE'; return }
+  'DOCS DID NOT START. Running it by hand to see why:'
+  $o = Join-Path $env:TEMP 'tw-docs-out.txt'
+  $e = Join-Path $env:TEMP 'tw-docs-err.txt'
+  Remove-Item $o, $e -Force -EA SilentlyContinue
+  $h = Start-Process -FilePath $node -ArgumentList 'server.js' -WorkingDirectory $Root `
+        -RedirectStandardOutput $o -RedirectStandardError $e -PassThru -NoNewWindow
+  Start-Sleep -Seconds 4
+  if ($h -and -not $h.HasExited) {
+    'it runs fine by hand, so the scheduled task is what is wrong. Look first for a file its account cannot reach.'
+    Stop-Process -Id $h.Id -Force -EA SilentlyContinue
+  }
+  Get-Content $o, $e -EA SilentlyContinue | Select-Object -First 25
+  (Get-ScheduledTask -TaskName $Task -EA SilentlyContinue | Get-ScheduledTaskInfo).LastTaskResult |
+    ForEach-Object { 'task last result: ' + $_ }
+}
+
+'@
+# ==== end thornswood site hooks ====
+
+Write-Host ''
+if ($PutBack) { Write-Host "Putting back the newest .prev folder in $rootWin..." }
+else { Write-Host 'Stopping, swapping in and starting...' }
+$vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) +
+        ("`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n")
+$pick = ''
+if ($PutBack) { $pick = $putBackPick }
+$eap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+  $swapOut = @(Remote ($vars + $siteHooks + $pick + $serviceSwapBlock) |
+               ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
+} finally { $ErrorActionPreference = $eap }
+if (-not (Show-SwapResult $swapOut "$rootWin\.prev-<stamp>")) { exit 1 }
+
+# The site's files are in place and it answers: the box records that it runs
+# this artifact, read back at /api/deploys (Artifact.ps1), and the record it
+# had goes into .prev with the files it describes (Swap.ps1). After -PutBack
+# the record that came back with the files is the one recorded.
+if ($PutBack) { Restore-SwapRecord "$User@$Vps" $ssh $Root $swapOut '' 'site' }
+else {
+  Save-SwapPreviousRecord "$User@$Vps" $ssh $Root $prevName
+  $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root
+}
 
 Write-Host ''
 Write-Host "  http://${Vps}:$Port" -ForegroundColor Green
