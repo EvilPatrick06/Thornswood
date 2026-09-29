@@ -43,6 +43,7 @@ $ErrorActionPreference = 'Continue'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\deploy\ServerBuild.ps1')
 $script:VpsAddress = Get-ThornswoodVpsAddress
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 $Dev = ($Channel -eq 'dev')
@@ -132,10 +133,12 @@ function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [st
 #   before anything is published when there is none (Get-ReleaseStub in
 #   Ship.ps1). What this machine's out\ holds does not go into a main
 #   installer.
-#   The server binary. Deploy-Gamemode and Deploy-Server follow a main Ship,
-#   and Deploy-Server refuses a scam_native.node that is not the one
-#   records\server-build.json names. They read the fork's build\dist\server
-#   unless given -Dist; out\_payload holds the one the last release sent.
+#   The server build. Deploy-Gamemode and Deploy-Server follow a main Ship,
+#   and Deploy-Server refuses any server file (the binary, the JavaScript
+#   half, the rest ServerBuild.ps1 names) that is not the build
+#   records\server-build.json names (#1214). They read the fork's
+#   build\dist\server unless given -Dist; out\_payload holds the one the last
+#   release sent.
 function Get-MainOnlyRows([string]$Channel, [string]$ServerRecord, [string[]]$ServerDists) {
   if ($Channel -ne 'main') { return @() }
   $rows = @()
@@ -144,12 +147,12 @@ function Get-MainOnlyRows([string]$Channel, [string]$ServerRecord, [string[]]$Se
     $rows += New-Row 'the server build record is in the repo' $false 'records\server-build.json' 'git pull brings it' 'either' 'warn'
     return $rows
   }
-  $want = ([string](Get-Content -LiteralPath $ServerRecord -Raw | ConvertFrom-Json).sha256).ToLowerInvariant()
+  $rec = $null
+  try { $rec = [IO.File]::ReadAllText($ServerRecord) | ConvertFrom-Json } catch { }
   $first = $ServerDists[0]
   $match = $null
   foreach ($d in $ServerDists) {
-    $bin = Join-Path $d 'scam_native.node'
-    if ((Test-Path -LiteralPath $bin) -and ((Get-FileHash -LiteralPath $bin -Algorithm SHA256).Hash.ToLowerInvariant() -eq $want)) { $match = $d; break }
+    if ((Test-Path -LiteralPath $d) -and -not @(Get-ThornswoodServerBuildProblems $rec (Get-ThornswoodServerFolderSums $d)).Count) { $match = $d; break }
   }
   $what = 'a server build that matches records\server-build.json, for Deploy-Gamemode and Deploy-Server after the Ship'
   if ($match -eq $first) {
@@ -159,7 +162,7 @@ function Get-MainOnlyRows([string]$Channel, [string]$ServerRecord, [string[]]$Se
       ('Copy ' + $match + ' to a scratch folder and pass it as -Dist to Deploy-Gamemode.ps1 and Deploy-Server.ps1 (Deploy-Gamemode writes into the folder it is given)') 'either' 'warn'
   } else {
     $rows += New-Row $what $false ('none in ' + ($ServerDists -join ' or ')) `
-      'Build the fork with .\scripts\release\Build-Engine.ps1, or pass Deploy-Gamemode.ps1 and Deploy-Server.ps1 -Dist with a server build whose scam_native.node matches' 'either' 'warn'
+      'Build the fork with .\scripts\release\Build-Engine.ps1, or pass Deploy-Gamemode.ps1 and Deploy-Server.ps1 -Dist with a server build whose files all match' 'either' 'warn'
   }
   return $rows
 }

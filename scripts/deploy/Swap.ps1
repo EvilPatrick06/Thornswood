@@ -71,6 +71,11 @@
 #
 # Keep them ASCII. A laptop on PowerShell 7 writes that file without a byte
 # order mark, and Windows PowerShell 5.1 at the far end then reads it as ANSI.
+#
+# $checkBlock calls ServerBuild.ps1, beside this file, whose text is put in
+# front of it below the end marker, so the stage's server files are held to
+# the record sent with them by the same lines that hold a payload and a build
+# (#1214).
 $checkBlock = @'
 $ProgressPreference = 'SilentlyContinue'
 $stageDir = Join-Path $Root $Stage
@@ -134,14 +139,21 @@ if ($sums.ContainsKey('gamemode.js') -and (Test-Path -LiteralPath $gm)) {
     }
   }
 }
+# Every server file sent is the build the record sent with it names, every
+# file the record names was sent, and a server file with no record beside it
+# does not go in (#1214). Deploy-Server sends them all together, so the box
+# never runs a binary of one build beside the JavaScript half of another.
+$forkSent = @($sums.Keys | Where-Object { Test-ThornswoodServerForkFile $_ })
 $rp = Join-Path $stageDir 'server-build.json'
-if ($sums.ContainsKey('scam_native.node') -and (Test-Path -LiteralPath $rp)) {
+if ($sums.ContainsKey('server-build.json') -and (Test-Path -LiteralPath $rp)) {
   try {
     $rec = [IO.File]::ReadAllText($rp) | ConvertFrom-Json
-    if ($sums['scam_native.node'] -ne ([string]$rec.sha256).ToLowerInvariant()) {
-      $bad += 'scam_native.node is not the build server-build.json records'
-    }
+    $forkSums = @{}
+    foreach ($k in $forkSent) { $forkSums[$k] = $sums[$k] }
+    $bad += @(Get-ThornswoodServerBuildProblems $rec $forkSums 'the stage' 'server-build.json')
   } catch { $bad += ('server-build.json does not parse: ' + $_.Exception.Message) }
+} elseif ($forkSent.Count) {
+  $bad += ('server files came with no server-build.json to hold them to: ' + ($forkSent -join ', '))
 }
 if ($bad.Count) {
   foreach ($x in $bad) { 'REFUSED: ' + $x }
@@ -381,6 +393,12 @@ function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [stri
   return (($lines -join "`r`n") + "`r`n")
 }
 # ==== end deploy-server remote blocks ====
+
+# What $checkBlock calls to hold the server files to their record (#1214),
+# in front of it, so the box has it. Outside the markers because it reads a
+# file beside this one: tests\test-deploy-server-swap.ps1 runs the blocks out
+# of the markers and puts the same text in front itself.
+$checkBlock = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'ServerBuild.ps1')) + "`r`n" + $checkBlock
 
 # ==== put-back pick ====
 #

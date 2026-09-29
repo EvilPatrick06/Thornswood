@@ -63,6 +63,9 @@ foreach ($name in 'New-Row', 'Get-ShipVerdict', 'Get-ClientRows', 'Get-MainOnlyR
     if ($f.Count -eq 1) { Invoke-Expression $f[0].Extent.Text }
 }
 if ($script:fail) { Write-Host "$($script:pass) passed, $($script:fail) failed"; exit 1 }
+# What Get-MainOnlyRows holds a server build with, which Check-ShipReady.ps1
+# dot-sources.
+. (Join-Path (Split-Path -Parent $Here) 'scripts\deploy\ServerBuild.ps1')
 
 function Sha([string]$p) { return (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant() }
 function Put([string]$root, [string]$rel, [string]$text) {
@@ -172,9 +175,19 @@ try {
     # -------------------------------------------------- 5. main-only rows --
     $srv = Join-Path $tmp 'engine\skymp\build\dist\server'
     $payload = Join-Path $tmp 'out\_payload'
-    Put $payload 'scam_native.node' 'the recorded server'
+    # Every server file the record holds (ServerBuild.ps1, #1214), the binary
+    # saying which server it is.
+    function Put-Server([string]$dir, [string]$binary) {
+        Put $dir 'scam_native.node' $binary
+        foreach ($rel in 'dist_back\skymp5-server.js', 'dist_back\skymp5-server.js.map', 'package.json', 'yarn.lock', 'launch_server.bat', 'data\scripts\A.pex') { Put $dir $rel ('the recorded ' + $rel) }
+    }
+    Put-Server $payload 'the recorded server'
+    $srvFiles = [ordered]@{}
+    foreach ($rel in 'scam_native.node', 'dist_back/skymp5-server.js', 'dist_back/skymp5-server.js.map', 'package.json', 'yarn.lock', 'launch_server.bat', 'data/scripts/A.pex') {
+        $srvFiles[$rel] = [ordered]@{ sha256 = (Sha (Join-Path $payload $rel)); bytes = 1; commit = 'abcdef0123456789abcdef0123456789abcdef01' }
+    }
     $srvRecord = Join-Path $tmp 'server-build.json'
-    (@{ binary = 'scam_native.node'; sha256 = (Sha (Join-Path $payload 'scam_native.node')) } | ConvertTo-Json) |
+    ([ordered]@{ binary = 'scam_native.node'; sha256 = (Sha (Join-Path $payload 'scam_native.node')); source = @{ commit = 'abcdef0123456789abcdef0123456789abcdef01' }; files = $srvFiles } | ConvertTo-Json -Depth 5) |
         Set-Content -LiteralPath $srvRecord -Encoding UTF8
     function Main-Rows([string]$chan) { return @(Get-MainOnlyRows $chan $srvRecord @($srv, $payload)) }
 
@@ -193,9 +206,15 @@ try {
     Yes '5. a fresh worktree on main with the warning is still READY' ($v.Ready)
     Yes '5. and lists the one warning' ($v.Warns.Count -eq 1)
 
-    Put $srv 'scam_native.node' 'the recorded server'
+    Put-Server $srv 'the recorded server'
     $m = @(Main-Rows 'main')
     Yes '5. a matching server build passes' (@($m | Where-Object { -not $_.Ok }).Count -eq 0)
+
+    # The binary right and the JavaScript half from another build (#1214).
+    Put $srv 'dist_back\skymp5-server.js' 'a JavaScript half from 24 Sep'
+    $b = @(Main-Rows 'main' | Where-Object { $_.What -like '*server build*' })[0]
+    Yes '5. a server build whose JavaScript half is another build''s does not match' (-not $b.Ok -and $b.Detail.Contains($payload + ' does'))
+    Put $srv 'dist_back\skymp5-server.js' 'the recorded dist_back\skymp5-server.js'
 
     Put $srv 'scam_native.node' 'an edited server'
     Put $payload 'scam_native.node' 'another edited server'
