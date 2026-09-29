@@ -164,6 +164,9 @@
     '#ts-select .line .turnrow{display:none;justify-content:center;margin-top:20px}',
     '#ts-select.turn .line .turnrow{display:flex}',
     '#ts-select .line .turn{font-size:20px;padding:10px 30px}',
+    // Back from being idle (#1142): why they are here, and a way to the slots.
+    '#ts-select .line .away{font-size:16px;line-height:1.55;color:#c6aa6d;margin:0 auto 16px;max-width:680px}',
+    '#ts-select .line .otherrow{justify-content:center;margin-top:18px}',
     '#ts-select.waiting .list,#ts-select.waiting .hint{display:none}',
     // Well below the hint and centred, so it is nowhere near the characters.
     '#ts-select .quitrow{display:flex;justify-content:center;margin-top:18px}',
@@ -261,8 +264,9 @@
       '<div class="head"><div><div class="eyebrow">Thornswood</div><div class="title">Who are you today?</div></div>' +
       '<div class="count"></div></div>' +
       '<div class="list"></div>' +
-      '<div class="line"><div class="place"></div><div class="why"></div>' +
-        '<div class="turnrow"><button class="btn2 turn" type="button">Join now</button></div></div>' +
+      '<div class="line"><div class="away" style="display:none"></div><div class="place"></div><div class="why"></div>' +
+        '<div class="turnrow"><button class="btn2 turn" type="button">Join now</button></div>' +
+        '<div class="otherrow" style="display:none"><button class="btn2 other" type="button">Choose another character</button></div></div>' +
       '<div class="foot"><div class="status"></div>' +
       '<div class="hint">Click a character to play. Click an empty slot for a new character. Delete forgets the one that is lit.</div>' +
       /*
@@ -816,7 +820,7 @@
       waiting = true;
       sent = true;
       root.className = 'waiting';
-      if (elTitle) elTitle.textContent = 'The world is full';
+      if (elTitle) elTitle.textContent = away ? 'You were away' : 'The world is full';
       elStatus.textContent = '';
       tell('line shown');
     }
@@ -847,6 +851,37 @@
     if (msg.go) { if (!turnUntil) tell('line: our turn'); turn(msg.secs); return; }
     lineSays(msg);
   }
+  /*
+    BACK FROM BEING AWAY (#1142). Patrick, 29 Sep: somebody who does not
+    answer "Are you still here?" is taken "to the main menu where they can
+    rechoose their character and they automatically rejoin the queue with the
+    same 1 minute to join rule". The front brings this page back with
+    LIST.away, the character they were, and the server has already put them
+    at the end of the line. So the page opens in that place, with the same
+    Join now on their turn, and Choose another character shows the slots:
+    the place is kept while they choose, and the one they pick takes it over
+    (the front hands it on).
+  */
+  var away = (LIST.away && Number(LIST.away.id) > 0) ? LIST.away : null;
+  var AWAY_WORDS = 'You were taken out of the world after 15 minutes with nothing from your keyboard, mouse or character. ' +
+                   'You have a place in line to come back in, as this character or any of your others.';
+  var elAway = root.querySelector('.line .away');
+  var elOtherRow = root.querySelector('.line .otherrow');
+  var elOther = root.querySelector('.line .other');
+  function chooseOther() {
+    if (!waiting || cleared) return;
+    turnOff();
+    waiting = false;
+    sent = false;
+    picked = 0;
+    root.className = '';
+    if (elTitle) elTitle.textContent = 'Who are you today?';
+    elStatus.textContent = 'Your place in line is kept while you choose. Click the character to wait with.';
+    draw();
+    tell('line: choosing another character');
+  }
+  if (elOther) elOther.addEventListener('click', chooseOther);
+
   var hooked = false;
   setInterval(function () {
     if (hooked || !waiting) return;
@@ -1070,6 +1105,14 @@
   };
   fit();
   draw();
+  // Back from being away: straight into the place the server keeps (see chooseOther).
+  if (away) {
+    picked = Number(away.id);
+    if (elAway) { elAway.textContent = AWAY_WORDS; elAway.style.display = 'block'; }
+    if (elOtherRow) elOtherRow.style.display = 'flex';
+    lineSays({ id: picked });
+    tell('away: back at the choice in the place kept for profile ' + picked);
+  }
   // When the page itself started, so the front log shows how long it sat
   // drawn but hidden before the plugins ran and showed the browser.
   var startedAt = '';
