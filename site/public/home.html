@@ -1675,12 +1675,23 @@ fetch('/api/public', { credentials:'same-origin' })
             : 'apply to be an alpha playtester in the Discord!';
           t.appendChild(apply);
         } else {
-          t.textContent = n === 1 ? '1 person in the world' : n + ' people in the world';
+          /* Out of the server's own number when it says one (#481). */
+          var most = d.status.max > 0 ? d.status.max : 0;
+          if (most && n >= most) {
+            t.textContent = 'The world is full, ' + n + ' of ' + most + ' people are in it';
+          } else if (most) {
+            t.textContent = n + ' of ' + most + ' people in the world';
+          } else {
+            t.textContent = n === 1 ? '1 person in the world' : n + ' people in the world';
+          }
         }
         var f = document.getElementById('figOnline');
         var w = document.getElementById('figOnlineWrap');
         // Only worth a tile of its own once there is somebody in it.
-        if (f && w && n > 0) { f.textContent = String(n); w.hidden = false; }
+        if (f && w && n > 0) {
+          f.textContent = d.status.max > 0 ? n + ' of ' + d.status.max : String(n);
+          w.hidden = false;
+        }
       } else {
         t.textContent = 'Server offline';
       }

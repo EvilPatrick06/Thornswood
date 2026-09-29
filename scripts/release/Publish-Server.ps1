@@ -183,6 +183,27 @@ if ($IsDev -and (Test-Path -LiteralPath $settingsPath)) {
         throw "Could not set the dev ports in $settingsPath : $_"
     }
 }
+<#
+  AND HOW MANY IT HOLDS AT ONCE, #481, whichever channel it goes to:
+  thornswoodMostOnline for the gamemode and maxPlayers, with the staff seats
+  on top, for the engine, from records\most-online.json by way of
+  MaxOnline.ps1. Into the DIST copy like the ports above, so what is packed
+  carries the one number, and only written when it moved.
+#>
+if (Test-Path -LiteralPath $settingsPath) {
+    . (Join-Path $PSScriptRoot '..\deploy\MaxOnline.ps1')
+    $mostOnline = Get-MostOnline
+    try {
+        $capJson = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $capWas = [string]$capJson.thornswoodMostOnline + '/' + [string]$capJson.maxPlayers
+        Set-MaxPlayers $capJson $mostOnline
+        if (([string]$capJson.thornswoodMostOnline + '/' + [string]$capJson.maxPlayers) -ne $capWas) {
+            [IO.File]::WriteAllText($settingsPath, ($capJson | ConvertTo-Json -Depth 20), (New-Object Text.UTF8Encoding($false)))
+        }
+    } catch {
+        throw "Could not set how many the server holds in $settingsPath : $_"
+    }
+}
 if (Test-Path -LiteralPath $settingsPath) {
     Head 'Where new characters start'
     $hallPlugin = 'Skyrim Unbound.esp'

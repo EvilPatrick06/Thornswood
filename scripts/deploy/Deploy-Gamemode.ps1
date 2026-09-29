@@ -133,10 +133,6 @@ param(
     #>
     [long[]]$Devs        = @(),
     [long[]]$Playtesters = @(),
-    # The launcher whose config.json holds MaxOnline, the number the live feed
-    # announces and this writes as maxPlayers. Empty means the one
-    # Publish-Update.ps1 would find. See MaxOnline.ps1.
-    [string]$LauncherRoot = '',
     # thornswoodRequirePass for the live server (#937): on ends a session that
     # shows no join pass from an up to date launcher, off only logs WOULD
     # REFUSE. Left off, the built settings keep what they have. Live goes on
@@ -252,12 +248,11 @@ if (-not (Test-Path -LiteralPath $Dist)) {
     )
 }
 
-# How many the server seats, read before anything is written, so a number the
-# engine would refuse stops this with the build untouched. MaxOnline.ps1 says
-# where the number lives and why there.
+# How many the server holds at once, read before anything is written, so a
+# number the engine would refuse stops this with the build untouched.
+# MaxOnline.ps1 says where the number lives (records\most-online.json) and why.
 . (Join-Path $Here 'MaxOnline.ps1')
-if (-not $LauncherRoot) { $LauncherRoot = Find-LauncherRoot }
-$maxOnline = Get-MaxOnline $LauncherRoot
+$maxOnline = Get-MostOnline
 
 # Syntax first, as Deploy-DevGamemode.ps1 does. A gamemode that does not parse
 # stops the live server at start, and a live deploy is not always preceded by a
@@ -534,8 +529,9 @@ $s | Add-Member -NotePropertyName name        -NotePropertyValue $ServerName -Fo
 $s | Add-Member -NotePropertyName port        -NotePropertyValue $Port       -Force
 $s | Add-Member -NotePropertyName offlineMode -NotePropertyValue $true       -Force
 $s | Add-Member -NotePropertyName dataDir     -NotePropertyValue 'data'      -Force
-# How many it seats: the engine's slot count, set from the MaxOnline the feed
-# announces rather than left at whatever the build put there (100).
+# How many it holds at once (#481): thornswoodMostOnline for the gamemode and
+# the engine's slot count a few seats above it for staff, from
+# records\most-online.json rather than whatever the build put there (100).
 Set-MaxPlayers $s $maxOnline
 
 <#
