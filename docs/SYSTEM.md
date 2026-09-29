@@ -152,7 +152,7 @@ when its check fails, three times an hour at most (`Watch-Services.ps1:631-671`)
 | Game server (live) | `C:\Thornswood-Server` | UDP and TCP 7777, resources TCP 3000 | `Thornswood Server` | `Deploy-Gamemode.ps1` builds it locally, `Deploy-Server.ps1` sends it; first install `Install-ThornswoodServer.ps1` | `Deploy-Server.ps1:41-42,228-230`, `Bootstrap-VPS.ps1:32-33,150-152`, `Install-ThornswoodServer.ps1:18-19` |
 | Dev game server | `C:\Thornswood-Server-Dev` | UDP and TCP 7787, resources TCP 7788 | `Thornswood Dev Server` | Made once by `vps-dev-instance.ps1` (runs on the VPS); gamemode by `Deploy-DevGamemode.ps1` | `vps-dev-instance.ps1:9-10,64-69,102-112`, `Deploy-DevGamemode.ps1:108-109` |
 | Voice (live) | `C:\Thornswood-Voice` | TCP 7778, and `/voice` through Caddy | `Thornswood Voice` | `Install-Voice.ps1` | `Install-Voice.ps1:34-35,66,345`, `voice-server.js:28` |
-| Dev voice | `C:\Thornswood-Voice-Dev` | TCP 7789, and `/voice-dev` through Caddy | `Thornswood Dev Voice` | Made by `vps-dev-instance.ps1`; `Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'` | `vps-dev-instance.ps1:11-12,77-97`, `voice/README.md:57-64` |
+| Dev voice | `C:\Thornswood-Voice-Dev` | TCP 7789 on 127.0.0.1 only, and `/voice-dev` through Caddy | `Thornswood Dev Voice` | Made by `vps-dev-instance.ps1`; `Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'` | `vps-dev-instance.ps1:11-12,77-97`, `voice/README.md:57-64` |
 | Site | `C:\Thornswood-Docs` | 127.0.0.1:3001 | `Thornswood Docs` | `Deploy-Docs.ps1`, `-Site` for the public pages | `Deploy-Docs.ps1:43-45`, `server.js:34-38` |
 | Caddy | `C:\Thornswood-Caddy` | 80, 443 | `Thornswood Web` (at startup and every five minutes) | `Setup-Domain.ps1`; the Caddyfile itself is kept in step with `scripts\deploy\Caddyfile` by hand | `Setup-Domain.ps1:30,183,248-266`, `scripts/deploy/Caddyfile:4-7` |
 | Discord bot | `C:\Thornswood-Bot` | none | none: the Windows service `ThornswoodBot`, as `NT SERVICE\ThornswoodBot` (issue #465) | `Install-Bot.ps1`, `-CodeOnly` for code and card art | `Install-Bot.ps1`, `Bot-Service.ps1`, `BotService.cs` |
@@ -162,7 +162,7 @@ when its check fails, three times an hour at most (`Watch-Services.ps1:631-671`)
 What the watchdog checks: `https://thornswood.net/` for Caddy, then TCP 3001,
 3000, 7778, 7788 and 7789, and a python process with `Thornswood-Bot` in its
 command line for the bot (`Watch-Services.ps1:595-679`). The bot writes
-`heartbeat.json` beside itself every minute, and a bot whose process runs but
+`heartbeat.json` in `C:\Thornswood-Bot\data` every minute (#1104), and a bot whose process runs but
 which is hung or off Discord for ten minutes is down too; that is told about
 and not restarted for (issue #449, `Watch-Services.ps1:217-300`,
 `bot/bot.py:2408-2510`). From outside the box, the bot also pings an uptime
