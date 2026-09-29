@@ -26,6 +26,11 @@
                                    the same, and end a session whose plugins
                                    are not the server's (#402); off only warns
 
+    .\Deploy-DevGamemode.ps1 -RequirePass on
+                                   the same, and end a session that shows no
+                                   join pass from an up to date launcher
+                                   (#937); off only logs WOULD REFUSE
+
     .\Deploy-DevGamemode.ps1 -Minutes 3
                                    a longer warning for the people on it
     .\Deploy-DevGamemode.ps1 -Mode restart
@@ -131,6 +136,11 @@ param(
   # tells the person and logs WOULD REFUSE. Left off, the box keeps what it has.
   [ValidateSet('', 'on', 'off')]
   [string]$LoadOrderRefuse = '',
+  # thornswoodRequirePass in the dev settings (#937): on ends a session that
+  # shows no join pass from an up to date launcher; off only logs WOULD
+  # REFUSE. Left off, the box keeps what it has.
+  [ValidateSet('', 'on', 'off')]
+  [string]$RequirePass = '',
   # Where Deploy-Gamemode.ps1 leaves the built server. Its server-settings.json
   # is the one authority on what the load order is and in what order.
   [string]$Dist = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
@@ -626,6 +636,11 @@ Write-Host 'Pointing the dev server at the dev voice service...'
 # false, and leaving the switch off keeps whatever the box has. This is the
 # only place the dev settings are edited, so the switch lives here.
 #
+# AND WHETHER A SESSION NEEDS A JOIN PASS, added 28 September for #937.
+# -RequirePass on sets thornswoodRequirePass true, off sets it false, and no
+# switch keeps what the box has. thornswoodServer is always dev here, so a pass
+# the site issued for the live server is refused on this one.
+#
 # This comment is HERE and not inside the here-string below on purpose. Anything
 # in that string is base64 encoded and sent as an ssh command line, where it
 # counts double and the far end truncates at about 8191 characters. Ten lines of
@@ -698,6 +713,14 @@ if ('$LoadOrderRefuse' -and `$s.thornswoodLoadOrderRefuse -ne `$refuse) {
   `$wantRefuse = `$true
   'thornswoodLoadOrderRefuse moves from ' + `$s.thornswoodLoadOrderRefuse + ' to ' + `$refuse
 }
+`$wantPass = `$false
+`$needPass = ('$RequirePass' -eq 'on')
+if ('$RequirePass' -and `$s.thornswoodRequirePass -ne `$needPass) {
+  `$wantPass = `$true
+  'thornswoodRequirePass moves from ' + `$s.thornswoodRequirePass + ' to ' + `$needPass
+}
+`$wantServer = (`$s.thornswoodServer -ne 'dev')
+if (`$wantServer) { 'thornswoodServer moves from ' + `$s.thornswoodServer + ' to dev' }
 
 # A byte order mark counts as needing a rewrite even when the number is
 # already right. The run on 18 September set the value AND wrote a mark, so
@@ -706,7 +729,7 @@ if ('$LoadOrderRefuse' -and `$s.thornswoodLoadOrderRefuse -ne `$refuse) {
 `$bom = `$false
 try { `$bom = ([IO.File]::ReadAllBytes(`$p)[0] -eq 0xEF) } catch { }
 if (`$bom) { 'the settings file starts with a byte order mark, rewriting it without one' }
-if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax -and -not `$wantNpc -and -not `$wantRefuse) {
+if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax -and -not `$wantNpc -and -not `$wantRefuse -and -not `$wantPass -and -not `$wantServer) {
   'thornswoodVoicePort is already $VoicePort, both equipment checks are already off, and the load order is already right'
 } else {
   Copy-Item `$p (`$p + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
@@ -719,6 +742,8 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
   if (`$wantMax) { `$s | Add-Member -NotePropertyName maxPlayers -NotePropertyValue $maxOnline -Force }
   if (`$wantNpc) { `$s.npcSettings.PSObject.Properties.Remove('default') }
   if (`$wantRefuse) { `$s | Add-Member -NotePropertyName thornswoodLoadOrderRefuse -NotePropertyValue `$refuse -Force }
+  if (`$wantPass) { `$s | Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue `$needPass -Force }
+  `$s | Add-Member -NotePropertyName thornswoodServer -NotePropertyValue 'dev' -Force
   `$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
   `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
@@ -757,6 +782,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
             ', most online ' + `$back.maxPlayers +
             ', npcSettings keys ' + @(`$back.npcSettings.PSObject.Properties).Count +
             ', load order refusal ' + `$back.thornswoodLoadOrderRefuse +
+            ', join pass required ' + `$back.thornswoodRequirePass + ' on ' + `$back.thornswoodServer +
             ', start point ' + @(`$back.startPoints)[0].worldOrCell }
   } catch {
     'THE FILE NO LONGER PARSES: ' + `$_.Exception.Message + '. Put the .before- copy back.'
