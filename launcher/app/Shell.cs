@@ -787,10 +787,10 @@ namespace Thornswood
               asked for; the dead Grids cost nothing and can be cut properly
               whenever the xaml is next opened on a machine with the compiler.
 
-              Mods stays wired on purpose even though its button is hidden:
-              a blocked Play still sends people to it (ShowPage(PageMods)) so
-              they can see the scan and press Fix. It just is not somewhere to
-              wander into from the rail any more.
+              A blocked Play sends people to Diagnostics (ShowPage(PageDiag)),
+              where Scan and Fix are since #607 and which the rail shows. Until
+              #982 it sent them to Mods, which by then had no Fix on it
+              and no rail button to come back to.
             */
             int[] hiddenNav = { PageSaves, PageServer, PageMods, PageBuild, PageLogs };
             foreach (int p in hiddenNav)
@@ -5246,7 +5246,12 @@ namespace Thornswood
                     Log("Not launching. " + blockers + " problem" + (blockers == 1 ? "" : "s") + " with your mod list would desync everyone.");
                     RunScan();
                     DrawStatus();
-                    ShowPage(PageMods);
+                    // Diagnostics, where Scan and Fix are since #607 and which
+                    // the rail still shows. It was the Mods page until #982,
+                    // which by then had no Fix on it and no rail button back.
+                    // tests\test-refused-play-page.js holds this to the page
+                    // that has BtnFix in ui.xaml.
+                    ShowPage(PageDiag);
 
                     // Two different problems wearing the same coat. A list in
                     // the wrong order is Fix's job. Plugins whose files are not
@@ -5255,20 +5260,29 @@ namespace Thornswood
                     // what happened sends them round in circles.
                     if (absent > 0)
                     {
-                        MessageBox.Show(
+                        // The collection's page is the one place that can put
+                        // the mods back, so the box offers it rather than
+                        // naming a page the rail no longer shows (#982).
+                        bool canOpen = !string.IsNullOrEmpty(cfg.CollectionUrl);
+                        MessageBoxResult open = MessageBox.Show(
                             (absent == 1 ? "A mod the server needs is not installed." : absent + " mods the server needs are not installed.") +
                             "\n\nThe usual reason is that a different profile is active in Vortex. Open Vortex, go to " +
                             "Profiles, and press Enable under Thornswood. Close Skyrim first if it is open.\n\n" +
-                            "If you have never installed the collection, the Add-ons page has a button that opens it.\n\n" +
-                            "Pressing Fix will not help with this one. Fix repairs the plugin list, it cannot install a mod.",
-                            "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            "Pressing Fix will not help with this one. Fix repairs the plugin list, it cannot install a mod." +
+                            (canOpen ? "\n\nIf you have never installed the collection, press Yes to open its page and install it in Vortex." : ""),
+                            "Thornswood", canOpen ? MessageBoxButton.YesNo : MessageBoxButton.OK, MessageBoxImage.Warning);
+                        if (canOpen && open == MessageBoxResult.Yes)
+                        {
+                            try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
+                            catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
+                        }
                     }
                     else
                     {
                         MessageBox.Show(
                             "Your mod list does not match the one this build shipped with.\n\n" +
                             "Joining like this desyncs the whole server, so the launcher will not start the game until it is sorted.\n\n" +
-                            "Press Fix on the Mods page, then try again.",
+                            "Press Fix on the Diagnostics page, which is open behind this box, then try again.",
                             "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                     return;
