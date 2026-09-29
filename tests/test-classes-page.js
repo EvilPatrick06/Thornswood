@@ -14,6 +14,13 @@
 // their sister half; and it promised a free tool when yours runs out, which
 // the server stopped doing on 21 September.
 //
+// Issue #1037, Patrick 29 September: "There should be no grace at all they
+// shouldn't be allowed to just make anything because they didn't choose a
+// profession." So with no profession the craft gate, the lab and the arcane
+// enchanter all refuse and say to press K, and the page and join.md say so.
+// Issue #1026: the page says a spell tome teaches only under the Mage rules,
+// and the rules it names are the ones learnFromTome runs.
+//
 // So this reads the gamemode's own tables and runs its own rules, then reads
 // the page, and fails when they disagree. Every claim about the game is
 // checked against the code that makes it true, not against a sentence copied
@@ -148,6 +155,10 @@ function nameOf(key) {
 }
 
 // The craft gate and the bench gate, cut out and run against the real rules.
+const noProfM = /^const NO_PROFESSION_AT_A_BENCH = '([^']*)';$/m.exec(gm);
+const NO_PROFESSION = noProfM ? noProfM[1] : null;
+yes('the gamemode has the one no-profession sentence, and it says to press K',
+    !!NO_PROFESSION && /Press K/.test(NO_PROFESSION));
 const helpers = ['function rankWord(', 'function aWord(', 'function professionName(']
   .map(cut);
 const craftSrc = cut('function craftAnswer(');
@@ -160,12 +171,12 @@ function gates(state) {
     __thornswoodProgression: P,
     __thornswoodCharacter: { stateOf: function () { return state; }, nameOf: nameOf }
   };
-  const fn = new Function('globalThis', 'log', 'raceGate', 'toldCraftingIsComing',
+  const fn = new Function('globalThis', 'log', 'raceGate', 'NO_PROFESSION_AT_A_BENCH',
                           'BENCH_BY_BASE', 'BENCH_ACCESS',
                           helpers.join('\n') + '\n' + craftSrc + '\n' + benchSrc +
                           '\nreturn { craftAnswer: craftAnswer, benchGate: benchGate };');
   const byBase = { lab: 'alchemy', enchanter: 'enchanting' };
-  return fn(g, function () {}, function () { return null; }, {}, byBase, BENCH_ACCESS);
+  return fn(g, function () {}, function () { return null; }, NO_PROFESSION, byBase, BENCH_ACCESS);
 }
 function made(state, r) { return gates(state).craftAnswer(1, r).refusal === null; }
 function smith(half, rank) {
@@ -325,24 +336,67 @@ yes('and the page says anybody can smelt and tan',
       sameSet(halves, want) && halves.every(function (h) { return para.indexOf('**' + h + '**') >= 0; }));
 });
 
-// No profession yet: nothing at a bench is held against you.
+// No profession: nothing that is somebody's work gets made (#1037).
 const newcomer = P.fresh();
-const openCraft = made(newcomer, steelCuirass) &&
-                  rows.filter(function (r) { return !r.race && !r.nobody; }).slice(0, 200)
-                    .every(function (r) { return made(newcomer, r); });
-const openBench = gates(newcomer).benchGate(1, 'lab') === null &&
-                  gates(newcomer).benchGate(1, 'enchanter') === null;
-const heldBench = gates(edge).benchGate(1, 'lab') !== null;
-yes('with no profession the craft gate lets anything through (as of this build: ' + openCraft + ')',
-    true);
-yes('the page says what happens with no profession, whichever way the gate answers',
-    openCraft
-      ? /The hold starts the day you pick a profession\. Until then nothing at a bench is held against you/i.test(text)
-      : !/Until then nothing at a bench is held against you/i.test(text));
-yes('the lab and the enchanter open for somebody with no profession and not for an Edgewright',
-    openBench && heldBench);
-yes('and the page says both are open to somebody who has not chosen a profession yet',
-    openBench && /Somebody who has not chosen a profession yet can use both/i.test(text));
+const sample = rows.filter(function (r) { return !r.race && !r.nobody; });
+const refusedAll = sample.every(function (r) {
+  return gates(newcomer).craftAnswer(1, r).refusal === NO_PROFESSION;
+});
+yes('ISSUE #1037: with no profession the craft gate refuses every owned row (' + sample.length +
+    ') with the press K sentence, the steel cuirass included',
+    !!NO_PROFESSION && refusedAll && !made(newcomer, steelCuirass));
+yes('  and no row lets them through with a note instead',
+    sample.every(function (r) { return gates(newcomer).craftAnswer(1, r).note === null; }));
+const shutLab = gates(newcomer).benchGate(1, 'lab');
+const shutEnch = gates(newcomer).benchGate(1, 'enchanter');
+yes('ISSUE #1037: the lab and the arcane enchanter refuse somebody with no profession, with the press K sentence',
+    shutLab === NO_PROFESSION && shutEnch === NO_PROFESSION);
+yes('  and still refuse an Edgewright, with the bench\'s own sentence',
+    gates(edge).benchGate(1, 'lab') !== null && gates(edge).benchGate(1, 'lab') !== NO_PROFESSION);
+yes('  and still open for an Alchemist',
+    gates(P.pickProfession(P.fresh(), 'alchemist', 'physicker').state).benchGate(1, 'lab') === null);
+const craftSrcNoComments = craftSrc.replace(/\/\*[\s\S]*?\*\//g, '');
+yes('the grace is gone from the gamemode: no toldCraftingIsComing, no "nothing is stopping you"',
+    gm.indexOf('toldCraftingIsComing') === -1 && !/nothing is stopping you/i.test(gm) &&
+    /if \(!s\.prof\) \{\s*out\.refusal = NO_PROFESSION_AT_A_BENCH;/.test(craftSrcNoComments));
+const recipelessSrc = cut('function recipelessCraft(');
+yes('and the brew and enchant gate refuses with the same sentence',
+    recipelessSrc !== null && /if \(!s\.prof\) \{[\s\S]{0,120}NO_PROFESSION_AT_A_BENCH[\s\S]{0,400}return false;/.test(recipelessSrc));
+yes('the page says nothing that is somebody\'s work is made until you pick a profession, and to press K',
+    /Until you pick a profession, you cannot make anything that is somebody's work/i.test(text) &&
+    /press K and choose one/i.test(text));
+yes('the page no longer promises the old grace',
+    !/Until then nothing at a bench is held against you/i.test(text) &&
+    !/can make whatever anybody can/i.test(text) &&
+    !/can use both, so nobody is shut out/i.test(text) &&
+    !/first evening/i.test(text));
+yes('and says the lab and the enchanter are shut to somebody with no profession',
+    /Somebody who has not chosen a profession yet can use neither/i.test(text));
+yes('join.md says you cannot make anything at a bench before a profession, beyond smelting and tanning',
+    /Until you pick a profession you cannot make anything at a bench beyond smelting and tanning/i.test(flat(join)));
+
+// Spell tomes (#1026): the page names the three rules learnFromTome runs.
+const tomes = section(page, '### Spell tomes');
+yes('the page has a Spell tomes section', tomes !== null);
+if (tomes) {
+  const t = flat(tomes);
+  yes('  naming the three rules: a spell point, the rank, a spell from the rank below',
+      /\*\*A spell point\*\*/.test(t) && /\*\*The rank\*\*/.test(t) && /\*\*A spell from the rank below\*\*/.test(t));
+  yes('  saying the tome is kept and chat says which is missing',
+      /you keep the tome/i.test(t) && /says which/i.test(t));
+  yes('  and that an Enchanter learns a staff spell the same way',
+      /An Enchanter learns the spell a staff binds the\s+same way/i.test(t));
+}
+if (P.learnFromTome) {
+  const smithState = smith('edgewright');
+  const fireball = P.spellAt('Fireball');
+  const tomeNo = P.learnFromTome(smithState, fireball);
+  yes('the rules the page names are the rules that run: a Smith reading Fireball misses all three',
+      !tomeNo.ok && !!tomeNo.missing && sameSet(tomeNo.missing.map(function (m) { return m.what; }), ['points', 'level', 'below']));
+  yes('  and Apprentice and Adept both map to Advanced, as the page says',
+      P.rankForLevel(25) === 'advanced' && P.rankForLevel(50) === 'advanced' &&
+      P.rankForLevel(75) === 'expert' && P.rankForLevel(100) === 'master' && P.rankForLevel(0) === 'novice');
+}
 
 // -------------------------------------------------------- creation
 
