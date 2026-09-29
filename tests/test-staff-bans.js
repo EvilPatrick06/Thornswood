@@ -299,7 +299,7 @@ const modlog = () => { try { return fs.readFileSync(path.join(PRIV, 'moderation.
     yes('lifting it from the hub works', r.status === 200 && r.j.was === true);
     r = await allowed();
     yes('and they are back on the door\'s list', r.j.profiles.indexOf(3003) >= 0);
-    const hubLog = fs.readFileSync(path.join(DATA, 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    const hubLog = fs.readFileSync(path.join(DATA, 'for-bot', 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     yes('what the hub did is in moderation.log for the staff channel: account ban, note, account lift',
         hubLog.map((l) => l.did).join(',') === 'banaccount,note,unbanaccount' && hubLog[0].byName === 'Aela' &&
         hubLog[0].whoName === 'Nobody' && /until .*: harassing people at the inn/.test(hubLog[0].why));

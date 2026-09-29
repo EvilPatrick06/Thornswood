@@ -104,3 +104,4 @@ voice/chat/
 # phase 10): the front build thornswood-front.zip, Audit-Mods' mod-audit.json
 # and a copy of the backup passphrase. The setup stub is build output, in out\.
 /local/
+bot/data/

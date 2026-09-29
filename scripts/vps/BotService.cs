@@ -17,7 +17,9 @@
 //   as its environment. Python is named in host.json beside this program, by
 //   its full path, so the service does not depend on the PATH it was booted
 //   with.
-//   Writes python's output to bot.log itself, byte for byte, and rolls it by
+//   Writes python's output to bot.log itself, byte for byte, in the bot's
+//   data folder (data under the bot's folder unless host.json names another,
+//   issue #1104), and rolls it by
 //   size while the bot runs: at 4 MB bot.log becomes bot.log.1, what was .1
 //   becomes .2, five kept. The same rule as Roll-Log.ps1 and the site's log.
 //   Nothing re-encodes the text on the way, which is what went wrong when
@@ -61,6 +63,10 @@ namespace Thornswood
     public class BotSettings
     {
         public string Root;
+        // Where bot.log and the bot's records go (issue #1104): the one
+        // folder the service's account may write. python is told it in
+        // THORNSWOOD_BOT_DATA. data under Root unless host.json says.
+        public string Data;
         public string Python;
         public string Script = "bot.py";
         public int FastSeconds = 30;
@@ -82,6 +88,7 @@ namespace Thornswood
                 IDictionary d = new JavaScriptSerializer().DeserializeObject(File.ReadAllText(file)) as IDictionary;
                 if (d == null) { s.Problem = file + " does not hold a JSON object"; return s; }
                 if (d.Contains("root")) s.Root = Convert.ToString(d["root"], CultureInfo.InvariantCulture);
+                if (d.Contains("data")) s.Data = Convert.ToString(d["data"], CultureInfo.InvariantCulture);
                 if (d.Contains("python")) s.Python = Convert.ToString(d["python"], CultureInfo.InvariantCulture);
                 if (d.Contains("script")) s.Script = Convert.ToString(d["script"], CultureInfo.InvariantCulture);
                 if (d.Contains("fastSeconds")) s.FastSeconds = Convert.ToInt32(d["fastSeconds"], CultureInfo.InvariantCulture);
@@ -91,6 +98,7 @@ namespace Thornswood
                 if (d.Contains("retrySeconds")) s.RetrySeconds = Convert.ToInt32(d["retrySeconds"], CultureInfo.InvariantCulture);
             }
             catch (Exception e) { s.Problem = "cannot read " + file + ": " + e.Message; }
+            if (String.IsNullOrEmpty(s.Data)) s.Data = Path.Combine(s.Root, "data");
             if (s.Keep < 1) s.Keep = 1;
             if (s.Problem == "" && String.IsNullOrEmpty(s.Python)) s.Problem = file + " names no python";
             return s;
@@ -418,6 +426,7 @@ namespace Thornswood
             psi.RedirectStandardOutput = true;
             psi.RedirectStandardError = true;
             foreach (KeyValuePair<string, string> kv in env) psi.EnvironmentVariables[kv.Key] = kv.Value;
+            psi.EnvironmentVariables["THORNSWOOD_BOT_DATA"] = s.Data;
             if (String.IsNullOrEmpty(psi.EnvironmentVariables["PYTHONIOENCODING"])) psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
             // Python's own folders first, then the machine's PATH as it is
             // now rather than as it was when the box booted.
@@ -556,7 +565,10 @@ namespace Thornswood
             string exeDir = AppDomain.CurrentDomain.BaseDirectory;
             BotSettings s = BotSettings.Load(exeDir);
             bool console = Array.IndexOf(args, "--console") >= 0;
-            RollingLog log = new RollingLog(Path.Combine(s.Root, "bot.log"), s.MaxBytes, s.Keep, s.RetrySeconds);
+            // Made here when it is missing, which only a run by hand meets:
+            // Install-Bot makes it and grants the account Modify on it.
+            try { Directory.CreateDirectory(s.Data); } catch (Exception) { }
+            RollingLog log = new RollingLog(Path.Combine(s.Data, "bot.log"), s.MaxBytes, s.Keep, s.RetrySeconds);
             BotRunner runner = new BotRunner(s, log);
             if (console)
             {

@@ -116,7 +116,32 @@ if ($errs -and $errs.Count) { $errs | Select-Object -First 5 | ForEach-Object { 
 Say '  vps-nightly-backup.ps1 parses' 'Green'
 
 Head 'Sending it up'
-Remote "if (-not (Test-Path '$Root')) { [void](New-Item -ItemType Directory -Path '$Root' -Force) }" | Out-Null
+# The folder holds the passphrase and every backup, and the backups hold every
+# secret on the box. Made under C:\, it would inherit the rule that lets
+# BUILTIN\Users read it, and every service account there is in Users (issue
+# #1173). So it takes nothing from C:\: SYSTEM, which the backup task runs as,
+# Administrators, and whoever runs this (Administrator over ssh). Any other
+# rule set on it by name, a deny for the build runner, stays. Every run, so a
+# box set up before this is put right by the next one.
+$locked = Remote @"
+if (-not (Test-Path '$Root')) { [void](New-Item -ItemType Directory -Path '$Root' -Force) }
+try {
+  `$broad = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-3-0')
+  `$acl = Get-Acl -LiteralPath '$Root'
+  `$acl.SetAccessRuleProtection(`$true, `$false)
+  foreach (`$r in @(`$acl.GetAccessRules(`$true, `$false, [Security.Principal.SecurityIdentifier]))) {
+    if (`$broad -contains `$r.IdentityReference.Value) { [void]`$acl.RemoveAccessRuleSpecific(`$r) }
+  }
+  foreach (`$s in @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)) {
+    `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier(`$s)), 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
+  }
+  # Only the access rules are written back (issue #1120).
+  (Get-Item -LiteralPath '$Root' -Force).SetAccessControl(`$acl)
+  'LOCKED'
+} catch { 'COULD NOT LOCK: ' + `$_.Exception.Message }
+"@
+if ("$locked" -notmatch 'LOCKED') { Die ("could not lock $Root to SYSTEM and Administrators: " + "$locked" + '. Nothing was sent.') }
+Say "  $Root is SYSTEM's and Administrators' only" 'Green'
 & scp @ssh $script "${target}:$($Root.Replace('\','/'))/vps-nightly-backup.ps1"
 if ($LASTEXITCODE -ne 0) { Die 'scp failed.' }
 Say "  $runner" 'Green'

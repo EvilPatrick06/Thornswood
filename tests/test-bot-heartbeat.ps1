@@ -82,8 +82,8 @@ $heart = ''
 foreach ($n in @('BotProcs', 'ReadBeat', 'Mins', 'BeatProblem', 'BotSilent')) { $heart += $fns[$n].Extent.Text + "`n" }
 Yes 'nothing that reads the heartbeat restarts or stops anything itself' (
     $heart -notmatch 'schtasks|ScheduledTask|Stop-Process|Restart-|Start-Process|taskkill|Kill\(')
-Yes 'the heartbeat is read from where the bot writes it, beside bot.py in C:\Thornswood-Bot' (
-    $text -match "(?m)^\`$botBeat = 'C:\\Thornswood-Bot\\heartbeat\.json'\r?$")
+Yes 'the heartbeat is read from where the bot writes it, the data folder under C:\Thornswood-Bot' (
+    $text -match "(?m)^\`$botBeat = 'C:\\Thornswood-Bot\\data\\heartbeat\.json'\r?$")
 Yes 'the bot''s check carries the heartbeat' ($text -match "Name = 'bot';[^\r\n]*Beat = \`$botBeat")
 Yes 'the webhook treats a bot off Discord as a bot that cannot post' ($fns['Deliver'].Extent.Text -match 'BotSilent \$botBeat')
 $staleAst = $inner.Find({ param($a) $a -is [System.Management.Automation.Language.AssignmentStatementAst] -and "$($a.Left)" -eq '$beatStale' }, $true)

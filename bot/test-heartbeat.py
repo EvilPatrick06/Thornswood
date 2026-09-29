@@ -66,12 +66,12 @@ real_log = bot.log
 bot.log = lambda *a: said.append(' '.join(str(x) for x in a))
 try:
     # ----------------------------------------------------------- where --
-    yes('by default the heartbeat is heartbeat.json beside bot.py, where the watchdog reads it',
-        os.path.normcase(bot.HEARTBEAT_FILE) == os.path.normcase(os.path.join(HERE, 'heartbeat.json')))
+    yes('by default the heartbeat is heartbeat.json in the bot\'s data folder, where the watchdog reads it',
+        os.path.normcase(bot.HEARTBEAT_FILE) == os.path.normcase(os.path.join(bot.DATA_DIR, 'heartbeat.json')))
     ps1 = open(os.path.join(HERE, '..', 'scripts', 'vps', 'Watch-Services.ps1'),
                encoding='utf-8').read()
-    yes('and the watchdog reads C:\\Thornswood-Bot\\heartbeat.json, the folder Install-Bot.ps1 puts bot.py in',
-        "$botBeat = 'C:\\Thornswood-Bot\\heartbeat.json'" in ps1)
+    yes('and the watchdog reads C:\\Thornswood-Bot\\data\\heartbeat.json, the data folder the service names (#1104)',
+        "$botBeat = 'C:\\Thornswood-Bot\\data\\heartbeat.json'" in ps1)
     yes('every minute by default', bot.HEARTBEAT_EVERY == 60)
 
     beat = os.path.join(TMP, 'heartbeat.json')

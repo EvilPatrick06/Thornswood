@@ -185,7 +185,7 @@ function BotAlive() {
 # A python process with the bot in its command line is not a bot that is
 # working (issue #449). It can be stuck logging in, hung, or cut off from
 # Discord and never getting back, and in every one of those it is still
-# running. So the bot writes heartbeat.json beside bot.py every minute
+# running. So the bot writes heartbeat.json in its data folder every minute
 # (heartbeat in bot\bot.py): its pid, when it started, when it wrote this,
 # whether it is connected to Discord, when it last was, and when it last
 # handled something Discord sent it. More than $beatStale seconds of any of
@@ -198,7 +198,10 @@ function BotAlive() {
 #
 # No file at all says nothing either way: that is a bot from before this
 # went in, and the process check above is all there is for it.
-$botBeat = 'C:\Thornswood-Bot\heartbeat.json'
+#
+# In data under the bot's folder since #1104, the one folder the bot's account
+# may write; the code beside it is read only to it.
+$botBeat = 'C:\Thornswood-Bot\data\heartbeat.json'
 # Ten minutes. The bot writes every minute and discord.py reconnects by
 # itself within a few, so ten is well past a blip and still inside two runs.
 $beatStale = 600
@@ -918,7 +921,7 @@ foreach (`$p in (Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -EA
 'bot svc   ' + `$(if (`$bs) { 'ThornswoodBot ' + `$bs.Status } else { 'NOT INSTALLED. Run Install-Bot.ps1' })
 # What the bot last said about itself (#449). The watcher's own rule is in
 # BeatProblem above; this is only what a person looking wants to see.
-`$hb = 'C:\Thornswood-Bot\heartbeat.json'
+`$hb = 'C:\Thornswood-Bot\data\heartbeat.json'
 if (Test-Path `$hb) {
   try {
     `$b = Get-Content `$hb -Raw -Encoding UTF8 | ConvertFrom-Json
