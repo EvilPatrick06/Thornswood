@@ -138,19 +138,26 @@
     }
 
     ws.onopen = function () {
-      tries = 0;
+      // Not tries = 0 here: a join the service refuses opens first and is
+      // closed straight after, and resetting on the open made that a retry
+      // every second for as long as the token was refused (issue #409). The
+      // welcome is what says we are in.
       joined = false;
+      heard = Date.now();
       try {
         ws.send(JSON.stringify({ t: 'join', profileId: ME, name: NAME, token: TOKEN }));
       } catch (e) { }
     };
 
     ws.onmessage = function (ev) {
+      heard = Date.now();
       var msg;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
       if (!msg || !msg.t) return;
+      if (msg.t === 'pong') return;
 
       if (msg.t === 'welcome') {
+        tries = 0;
         joined = true;
         peerId = Number(msg.peer) || 0;
         fanout(msg);
@@ -182,27 +189,63 @@
       // logged: they arrive several times a second.
     };
 
-    ws.onclose = function () {
-      if (joined && !renaming) note('Chat lost the server. Trying again.', C_WARN);
-      joined = false;
-      peerId = 0;
-      fanout({ t: '__closed' });
-      retry();
-    };
+    ws.onclose = function () { lost(); };
 
     ws.onerror = function () {
       try { ws.close(); } catch (e) { }
     };
   }
 
+  /* The socket is gone, however it went. */
+  function lost() {
+    if (joined && !renaming) note('Chat lost the server. Trying again.', C_WARN);
+    joined = false;
+    peerId = 0;
+    fanout({ t: '__closed' });
+    retry();
+  }
+
   function retry() {
     if (timer) return;
     // Backs off to half a minute and stays there. Somebody who alt tabs out
     // for an hour should not come back to a thousand failed connections.
-    var wait = Math.min(30000, 1000 * Math.pow(2, Math.min(tries, 5)));
+    // Somewhere in the second half of that, so a service restart does not
+    // bring every page in the world back in the same instant. Where in it
+    // comes from the profile id rather than from chance: no Math.random in
+    // this file, which tests/test-dice.js holds it to because the dice are
+    // the server's.
+    var cap = Math.min(30000, 1000 * Math.pow(2, Math.min(tries, 5)));
+    var spread = ((Math.abs(ME) % 1009) + tries * 389) % 1009 / 1009;
+    var wait = Math.round(cap / 2 + spread * cap / 2);
     tries++;
     timer = setTimeout(function () { timer = null; connect(); }, wait);
   }
+
+  /*
+    LISTENING FOR THE SERVER, issue #519.
+
+    The service pings every socket, and this browser answers without the page
+    ever hearing of it, so a socket that went half open, after a sleep or a
+    change of network, looked here exactly like a quiet room: the chat said
+    nothing was wrong and nothing typed went anywhere. Every twenty five
+    seconds this sends { t: 'ping' }, the service answers { t: 'pong' }, and
+    seventy seconds with nothing at all from it is a lost server, said and
+    retried like any other.
+  */
+  var PING_EVERY = 25000, SILENT_AFTER = 70000;
+  var heard = 0;
+  setInterval(function () {
+    if (!ws || ws.readyState !== 1 || !joined) return;
+    if (Date.now() - heard > SILENT_AFTER) {
+      var dead = ws;
+      ws = null;
+      dead.onopen = dead.onclose = dead.onerror = dead.onmessage = null;
+      try { dead.close(); } catch (e) { }
+      lost();
+      return;
+    }
+    try { ws.send(JSON.stringify({ t: 'ping' })); } catch (e) { }
+  }, PING_EVERY);
 
   // --------------------------------------------------------------- dice ---
   // /roll, because a shop full of haggling needs one and the front's own dice
