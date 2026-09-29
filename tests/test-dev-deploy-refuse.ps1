@@ -52,7 +52,7 @@ $body = $text.Substring($open + 'Remote @"'.Length, $close - $open - 'Remote @"'
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-dev-refuse-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null
 
-function Run-Block([string]$value, [hashtable]$settings) {
+function Run-Block([string]$value, $settings, [string]$npcValue = '') {
     $p = Join-Path $tmp 'server-settings.json'
     [IO.File]::WriteAllText($p, ($settings | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding $false))
     # The values the deploy would have put in; these names are what the block reads.
@@ -63,6 +63,7 @@ function Run-Block([string]$value, [hashtable]$settings) {
     $maxOnline = 0
     $LoadOrderRefuse = $value
     $RequirePass = ''
+    $Npcs = $npcValue
     $expanded = $ExecutionContext.InvokeCommand.ExpandString($body)
     $file = Join-Path $tmp 'block.ps1'
     [IO.File]::WriteAllText($file, $expanded, (New-Object Text.UTF8Encoding $true))
@@ -96,6 +97,29 @@ try {
 
     $r = Run-Block '' $base
     Yes 'no switch on a box without it adds nothing' (-not ($r.after.PSObject.Properties.Name -contains 'thornswoodLoadOrderRefuse'))
+
+    # -Npcs on|off, the before and after for #385.
+    $npcParam = $ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'Npcs' }
+    $npcSet = @()
+    if ($npcParam) {
+        $vs = $npcParam.Attributes | Where-Object { $_.TypeName.Name -eq 'ValidateSet' }
+        if ($vs) { $npcSet = @($vs.PositionalArguments | ForEach-Object { $_.Value }) }
+    }
+    Yes 'Deploy-DevGamemode.ps1 takes -Npcs on, off, or nothing' ((($npcSet | Sort-Object) -join ',') -eq ',off,on')
+
+    $withNpcs = [ordered]@{}; foreach ($k in $base.Keys) { $withNpcs[$k] = $base[$k] }
+    $withNpcs.npcEnabled = $true; $withNpcs.npcSettings = @{}
+    $r = Run-Block '' $withNpcs 'off'
+    Yes '-Npcs off sets npcEnabled false' ($r.after.npcEnabled -eq $false)
+    Yes 'and says so, and reads it back' ($r.said -match 'npcEnabled moves from True to False' -and $r.said -match 'NPCs False')
+    Yes 'and leaves npcSettings and the rest alone' (@($r.after.npcSettings.PSObject.Properties).Count -eq 0 -and $r.after.port -eq 7787)
+    $before = @(Get-ChildItem $tmp -Filter 'server-settings.json.before-*').Count
+    $r = Run-Block '' $r.after 'off'
+    Yes 'off when it is already off writes nothing' (@(Get-ChildItem $tmp -Filter 'server-settings.json.before-*').Count -eq $before)
+    $r = Run-Block '' $r.after 'on'
+    Yes '-Npcs on puts it back' ($r.after.npcEnabled -eq $true)
+    $r = Run-Block '' $r.after ''
+    Yes 'no switch keeps it as the box has it' ($r.after.npcEnabled -eq $true)
 
     $bytes = [IO.File]::ReadAllBytes((Join-Path $tmp 'server-settings.json'))
     Yes 'the file is written without a byte order mark' ($bytes[0] -ne 0xEF)

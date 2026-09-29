@@ -266,14 +266,116 @@ function voicePort() {
 /** Run fn, swallow and report anything it throws. Handlers must never escape. */
 function guard(name, fn) {
   return function () {
+    let began = null;
+    try { began = process.hrtime(); } catch (e) { began = null; }
     try {
       return fn.apply(null, arguments);
     } catch (e) {
       console.error('[thornswood] ' + name + ' threw: ' + (e && e.stack ? e.stack : e));
       return undefined;
+    } finally {
+      // Counted for the minute line below. Never allowed to throw: a finally
+      // that throws would replace what the handler returned.
+      try {
+        if (began) {
+          const d = process.hrtime(began);
+          const ms = d[0] * 1000 + d[1] / 1e6;
+          const row = gmSpent[name] || (gmSpent[name] = { ms: 0, runs: 0, worst: 0 });
+          row.ms += ms; row.runs++;
+          if (ms > row.worst) { row.worst = ms; }
+        }
+      } catch (e) { }
     }
   };
 }
+
+/*
+  WHERE THE SERVER'S TIME GOES, one line a minute in thornswood.log. Issue #385.
+
+  "Dev is laggy" had two suspects, the NPCs the server keeps alive and what it
+  sends about every actor, and no number from the server for either: the
+  engine times its own tick, but only behind /metrics, which answers 401 on
+  both servers. So the gamemode reports it, because it runs in the same
+  process as the engine:
+
+    process   the whole server's CPU as a share of one core: the engine's tick,
+              its NPCs and networking, and this file, all together
+    gamemode  the part of that spent inside guard(), which wraps every event
+              handler and most of the timers here
+    loop      how late the event loop ran, p50, p99 and worst. The engine's
+              tick runs on this loop, so a slow tick shows up here as delay
+    and the five costliest handlers, with their worst single call.
+
+  READ IT AS a before and after in one place: stand in the same spot with the
+  NPCs on and off, and the process and loop figures say whether the server
+  side moved. Process high with gamemode low is the engine. Loop worst high is
+  a tick that stalls, which people feel as others jumping about. Every minute
+  while somebody is on, every ten when nobody is, so an idle server still
+  leaves a baseline. Reads only; it changes nothing the server does.
+*/
+const gmSpent = {};
+try { (function () {
+  const EVERY_MS = 60000;
+  const IDLE_EVERY = 10;
+  let loop = null;
+  try {
+    loop = require('perf_hooks').monitorEventLoopDelay({ resolution: 5 });
+    loop.enable();
+  } catch (e) { loop = null; }
+
+  const g = globalThis;
+  if (g.__thornswoodServerBeat) {
+    try { clearInterval(g.__thornswoodServerBeat.timer); } catch (e) { }
+    try { if (g.__thornswoodServerBeat.loop) { g.__thornswoodServerBeat.loop.disable(); } } catch (e) { }
+  }
+  let cpuWas = process.cpuUsage();
+  let wasAt = Date.now();
+  let quiet = 0;
+
+  function beat() {
+    let on = 0;
+    try { on = (mp.get(0, 'onlinePlayers') || []).length; } catch (e) { on = 0; }
+    if (!on && ++quiet < IDLE_EVERY) { return; }
+    quiet = 0;
+    const now = Date.now();
+    const secs = Math.max(1, (now - wasAt) / 1000);
+    const cpu = process.cpuUsage(cpuWas);
+    cpuWas = process.cpuUsage();
+    wasAt = now;
+
+    const rows = [];
+    let gm = 0;
+    for (const k in gmSpent) {
+      if (!Object.prototype.hasOwnProperty.call(gmSpent, k)) { continue; }
+      const r = gmSpent[k];
+      if (r.runs) { rows.push({ k: k, ms: r.ms, runs: r.runs, worst: r.worst }); gm += r.ms; }
+      r.ms = 0; r.runs = 0; r.worst = 0;
+    }
+    rows.sort(function (a, b) { return b.ms - a.ms; });
+
+    const pct = function (ms) { return (ms / secs / 10).toFixed(1) + '%'; };
+    let lag = 'loop not measured';
+    if (loop) {
+      const q = function (p) { return (loop.percentile(p) / 1e6).toFixed(1); };
+      lag = 'loop late p50 ' + q(50) + 'ms p99 ' + q(99) + 'ms worst ' +
+            (loop.max / 1e6).toFixed(0) + 'ms';
+      loop.reset();
+    }
+    let rss = 0;
+    try { rss = Math.round(process.memoryUsage().rss / 1048576); } catch (e) { rss = 0; }
+
+    log('server: ' + Math.round(secs) + 's, ' + on + ' on, process ' +
+        pct((cpu.user + cpu.system) / 1000) + ' of one core, gamemode ' + pct(gm) +
+        ', ' + lag + ', ' + rss + ' MB; costliest: ' +
+        (rows.slice(0, 5).map(function (r) {
+          return r.k + ' ' + r.ms.toFixed(0) + 'ms/' + r.runs + ' worst ' + r.worst.toFixed(1) + 'ms';
+        }).join('; ') || 'nothing ran'));
+  }
+
+  g.__thornswoodServerBeat = { timer: setInterval(function () {
+    try { beat(); } catch (e) { }
+  }, EVERY_MS), loop: loop, beat: beat };
+})(); } catch (e) { log('the minute line is off: ' + e); }
 
 /** Runtime form id for a descriptor, or 0 if the plugin is not loaded. */
 function idOf(descriptor) {
@@ -26057,7 +26159,7 @@ log('gamemode loaded:',
   if (globalThis.__thornswoodVoiceFeed) {
     try { clearInterval(globalThis.__thornswoodVoiceFeed); } catch (e) { }
   }
-  globalThis.__thornswoodVoiceFeed = setInterval(function () {
+  globalThis.__thornswoodVoiceFeed = setInterval(guard('voiceFeed', function () {
     var who = [];
     try {
       var online = mp.get(0, 'onlinePlayers') || [];
@@ -26067,16 +26169,20 @@ log('gamemode loaded:',
           var pos = mp.get(id, 'pos');
           if (!pos) continue;
           var angle = mp.get(id, 'angle') || [0, 0, 0];
+          // Each read once: five times a second for everybody on, an
+          // appearance read twice was ten parses a person a second (#385).
+          var pid = mp.get(id, 'profileId');
+          var look = mp.get(id, 'appearance');
           who.push({
-            profileId: mp.get(id, 'profileId'),
+            profileId: pid,
             pos: pos,
             angleZ: angle[2],
             // Two people in the same room share this string. Two people either
             // side of a loading door do not, which is exactly the line voice
             // should stop at.
             cell: String(mp.get(id, 'worldOrCellDesc') || ''),
-            name: String(mp.get(id, 'appearance') && mp.get(id, 'appearance').name || ''),
-            party: partyFor(mp.get(id, 'profileId'))
+            name: String(look && look.name || ''),
+            party: partyFor(pid)
           });
         } catch (e) { }
       }
@@ -26084,7 +26190,7 @@ log('gamemode loaded:',
 
     if (who.length === 0) return;
     try { send({ who: who }); } catch (e) { }
-  }, EVERY_MS);
+  }), EVERY_MS);
 
   // ------------------------------------------------------------- online ---
   // How many people are awake, written where the launcher can read it.
@@ -39750,7 +39856,28 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
     return { friends: {}, muted: {}, journals: [], at: 0 };
   }
 
+  /*
+    ONE READ PER PERSON PER TICK, issue #385. The tick builds every person's
+    panel, and each panel used to ask the engine for every other person's
+    name, profile id and journals: at twenty people that was about 1,270
+    engine reads a second, an appearance parsed 547 times a second, all to
+    learn the same twenty names. While a tick runs, tickMemo holds what was
+    read, so each fact is read once; outside a tick it is null and nothing is
+    held, so a command always reads fresh. tests\test-server-tick-cost.js.
+  */
+  var tickMemo = null;
+
+  function memo(key, get) {
+    if (!tickMemo) { return get(); }
+    if (Object.prototype.hasOwnProperty.call(tickMemo, key)) { return tickMemo[key]; }
+    return (tickMemo[key] = get());
+  }
+
   function read(actorId) {
+    return memo('s' + actorId, function () { return readNow(actorId); });
+  }
+
+  function readNow(actorId) {
     var v = null;
     try { v = mp.get(actorId, SOCIAL_PROPERTY); } catch (e) { v = null; }
     if (!v || typeof v !== 'object') { return null; }
@@ -39770,6 +39897,7 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
 
   function write(actorId, s) {
     s.at = Date.now();
+    if (tickMemo) { tickMemo['s' + actorId] = s; }
     try { mp.set(actorId, SOCIAL_PROPERTY, s); return true; }
     catch (e) { return false; }
   }
@@ -39783,20 +39911,26 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   // ------------------------------------------------------------- people --
 
   function profileOf(actorId) {
-    try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+    return memo('p' + actorId, function () {
+      try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+    });
   }
 
   function nameOfPerson(actorId) {
-    try {
-      var ap = mp.get(actorId, 'appearance');
-      var n = String((ap && ap.name) || '');
-      if (n) { return n; }
-    } catch (e) { }
-    return 'somebody';
+    return memo('n' + actorId, function () {
+      try {
+        var ap = mp.get(actorId, 'appearance');
+        var n = String((ap && ap.name) || '');
+        if (n) { return n; }
+      } catch (e) { }
+      return 'somebody';
+    });
   }
 
   function online() {
-    try { return mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+    return memo('online', function () {
+      try { return mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+    });
   }
 
   function actorForProfile(pid) {
@@ -40411,6 +40545,11 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   // ------------------------------------------------------------ the tick --
 
   function tick() {
+    tickMemo = {};
+    try { tickBody(); } finally { tickMemo = null; }
+  }
+
+  function tickBody() {
     try { nearTick(); } catch (e) { slog('near tick:', e); }
     try { partyTick(); } catch (e) { slog('party tick:', e); }
     var all = online();
