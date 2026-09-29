@@ -580,7 +580,7 @@ tr.adder .plus{color:var(--faint);font-size:16px;line-height:38px}
 var S = {
   me:{member:false,admin:false,dev:false,name:''}, titles:{}, level:{},
   docs:{}, boards:{}, results:{}, files:[], uploads:[], inbox:[], linked:[],
-  sessions:[],
+  sessions:[], records:{bans:{}, notes:{}},
   news:{news:[]}, invite:'', at:'home', editing:false, discord:false
 };
 
@@ -730,6 +730,7 @@ function start() {
     S.uploads = d.uploads || []; S.inbox = d.inbox || [];
     S.linked = d.linked || []; S.invite = d.invite || '';
     S.sessions = d.sessions || [];
+    S.records = d.records || { bans: {}, notes: {} };
     S.news = d.news || { news: [] };
     el('gate').style.display = 'none';
     el('shell').style.display = 'grid';
@@ -744,6 +745,7 @@ function refresh() {
     S.results = d.results || {}; S.files = d.files || [];
     S.uploads = d.uploads || []; S.inbox = d.inbox || [];
     S.linked = d.linked || []; S.sessions = d.sessions || [];
+    S.records = d.records || { bans: {}, notes: {} };
   }).catch(function () { });
 }
 
@@ -833,15 +835,113 @@ function drawLinked() {
           (u.first ? new Date(u.first).toLocaleDateString() : '') + '</div></td>' +
         '<td data-label="Last played"><div class="cell">' +
           (u.played ? new Date(u.played).toLocaleString() : 'never') + '</div></td>' +
-      '</tr>';
+      '</tr>' +
+      '<tr class="notesrow"><td colspan="5" data-label="Notes"><div class="cell">' +
+        linkedNotes(u, S.records, Date.now()) + linkedControls(u, S.records, Date.now()) +
+      '</div></td></tr>';
     });
     out += '</tbody></table></div>';
   }
-  out += '<p class="lede" style="margin-top:20px">Banning somebody is a Discord ' +
-    'job, not a job here. Give them the <b>Banned</b> role, or remove them from ' +
-    'the server, and the next time they press Play they are turned away. Nothing ' +
-    'on this page needs touching.</p>';
+  var loose = looseBans(S.records, Date.now());
+  if (loose) out += '<h3 style="margin-top:22px">Banned by profile</h3>' + loose;
+  out += '<p class="lede" style="margin-top:20px">A ban from here or from /ban in ' +
+    'the game keeps every character on that account out of both worlds until it ' +
+    'ends, and ends the session of anybody banned who is in the world. The ' +
+    '<b>Banned</b> role in Discord still works too, for good. Notes are for staff ' +
+    'and nobody else sees them.</p>';
   el('page').innerHTML = out;
+  wireLinked();
+}
+
+/* When a ban ends, in words. */
+function banUntil(b) {
+  return Number(b && b.until) > 0 ? 'until ' + new Date(Number(b.until)).toLocaleString() : 'for good';
+}
+
+/* The Notes line under one account (#412): the ban if there is one, then
+   every staff note, newest first, each with who wrote it and when. */
+function linkedNotes(u, rec, now) {
+  rec = rec || { bans: {}, notes: {} };
+  var id = String(u && u.id || '');
+  var b = (rec.bans || {})[id];
+  var notes = (rec.notes || {})[id] || [];
+  var out = '<div class="notes"><b>Notes</b>';
+  if (b && b.active) {
+    out += '<div class="ban pill fail">Banned ' + esc(banUntil(b)) + ': ' + esc(b.why || '') +
+      ' (by ' + esc(b.by || 'staff') + (b.from ? ', from ' + esc(b.from) : '') +
+      (b.at ? ', ' + esc(new Date(Number(b.at)).toLocaleString()) : '') + ')</div>';
+  } else if (b) {
+    out += '<div class="said">A ban ' + esc(banUntil(b)) + ' has ended: ' + esc(b.why || '') +
+      ' (by ' + esc(b.by || 'staff') + ')</div>';
+  }
+  if (!notes.length && !b) out += ' <span class="said">nothing yet</span>';
+  notes.forEach(function (n) {
+    out += '<div class="note">' + esc(n.text || '') + ' <span class="said">(' +
+      esc(n.by || 'staff') + ', ' + esc(new Date(Number(n.at) || 0).toLocaleString()) +
+      (n.from ? ', ' + esc(n.from) : '') + ')</span></div>';
+  });
+  return out + '</div>';
+}
+
+/* Ban, lift the ban, and add a note, for one account. */
+function linkedControls(u, rec, now) {
+  var id = esc(String(u && u.id || ''));
+  var b = ((rec || {}).bans || {})[String(u && u.id || '')];
+  var lengths = [['30', '30 minutes'], ['120', '2 hours'], ['1440', '1 day'], ['4320', '3 days'],
+                 ['10080', '1 week'], ['43200', '30 days'], ['0', 'for good']];
+  return '<div class="bar notesbar">' +
+    '<input class="notetext" data-id="' + id + '" placeholder="A note for staff">' +
+    '<button class="btn small" data-act="note" data-id="' + id + '">Add note</button>' +
+    '<select class="banlen" data-id="' + id + '">' +
+      lengths.map(function (l) { return '<option value="' + l[0] + '">' + l[1] + '</option>'; }).join('') +
+    '</select>' +
+    '<input class="banwhy" data-id="' + id + '" placeholder="Why they are banned">' +
+    '<button class="btn small" data-act="ban" data-id="' + id + '">Ban</button>' +
+    (b && b.active ? '<button class="btn small" data-act="unban" data-id="' + id + '">Lift ban</button>' : '') +
+    '</div>';
+}
+
+/* Bans held against a profile no Discord account holds (made in the game). */
+function looseBans(rec, now) {
+  var bans = (rec || {}).bans || {};
+  var out = '';
+  Object.keys(bans).forEach(function (k) {
+    var b = bans[k];
+    if (k.indexOf('p:') !== 0 || !b || !b.active) return;
+    out += '<div class="note">Profile ' + esc(k.slice(2)) + (b.name ? ' (' + esc(b.name) + ')' : '') +
+      ': banned ' + esc(banUntil(b)) + ': ' + esc(b.why || '') + ' <span class="said">(by ' +
+      esc(b.by || 'staff') + ')</span></div>';
+  });
+  return out;
+}
+
+function wireLinked() {
+  var page = el('page');
+  if (!page || !page.querySelectorAll) return;
+  var pick = function (cls, id) {
+    var all = page.querySelectorAll('.' + cls);
+    for (var i = 0; i < all.length; i++) if (all[i].getAttribute('data-id') === id) return all[i];
+    return null;
+  };
+  var bs = page.querySelectorAll('button[data-act]');
+  for (var i = 0; i < bs.length; i++) {
+    bs[i].onclick = function () {
+      var act = this.getAttribute('data-act'), id = this.getAttribute('data-id');
+      var bodyOf = { id: id };
+      if (act === 'note') bodyOf.text = (pick('notetext', id) || {}).value || '';
+      if (act === 'ban') {
+        bodyOf.minutes = Number((pick('banlen', id) || {}).value || 0);
+        bodyOf.why = (pick('banwhy', id) || {}).value || '';
+        if (!bodyOf.why.trim()) { alert('Say why they are banned.'); return; }
+      }
+      if (act === 'note' && !bodyOf.text.trim()) return;
+      api('/api/staff/' + act, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify(bodyOf) })
+        .then(function (r) { if (!r.ok) throw 0; return refresh(); })
+        .then(function () { drawLinked(); })
+        .catch(function () { alert('The site did not take that.'); });
+    };
+  }
 }
 
 /* ------------------------------------------------------- play sessions -- */

@@ -27272,6 +27272,10 @@ log('gamemode loaded:',
               adminProfiles: Array.isArray(doc.adminProfiles) ? doc.adminProfiles : [],
               jarlProfiles: Array.isArray(doc.jarlProfiles) ? doc.jarlProfiles : [],
               people: doc.people || [],
+              // Staff bans with why and until (#412), from the site's own
+              // file rather than Discord, so they are fresh even when the
+              // lists above were kept. The staff block ends a banned session.
+              bans: Array.isArray(doc.bans) ? doc.bans : [],
               at: new Date().toISOString(),
               note: 'Written by the gamemode from the site. Set enforce true to turn the door on.'
             }, null, 2));
@@ -35073,7 +35077,7 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // Staff's, gated on the staff roles and left out of
                // PLAYER_WORDS for the same reason. See the staff block.
                '/kick', '/freeze', '/unfreeze', '/bring', '/silence',
-               '/unsilence', '/warn', '/spawnat',
+               '/unsilence', '/warn', '/spawnat', '/ban', '/unban', '/note',
                /*
                  NOT A COMMAND ANYBODY TYPES. The client reports each fall of
                  the axe with it, because the server sees a press and Skyrim's
@@ -42027,6 +42031,19 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   /give, /spawn and /tp that name no person are left to those branches, which
   is how a playtester's /give iron ore still works.
 
+    /ban <person> <how long> <why>        30m, 2h, 3d, 1w, or forever
+    /unban <person>
+    /note <person> <text>                 kept against them, for staff to read
+
+  Bans and notes are kept on the site (Patrick, 28 September: "put the bans
+  and notes on the site"), through its keyed /api/staff/game routes with the
+  door's key, the way /report reaches it. The site leaves a banned person out
+  of the door's list and sends the bans with why and until; the sweep below
+  ends the session of anybody banned who is online, whenever the ban was
+  made, and tells them both. A ban made here also ends their session at once.
+  A person for these can be a profile number, so somebody who has left can
+  still be banned or noted.
+
   A person is a name (the start of it is enough while it is unique), the form
   id the crosshair gives, or a profile number. Every one answers the moderator
   in their own chat, tells the person it was done to, writes one line to
@@ -42058,7 +42075,10 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   try { fs = require('fs'); path = require('path'); http = require('http'); } catch (e) { }
 
   var WORDS_STAFF = ['/kick', '/freeze', '/unfreeze', '/bring', '/goto',
-                     '/silence', '/unsilence', '/warn', '/spawnat'];
+                     '/silence', '/unsilence', '/warn', '/spawnat',
+                     '/ban', '/unban', '/note'];
+  var BAN_SWEEP_MS = 10000;         // how often online people are checked against bans
+  var SITE_WAIT_MS = 8000;
   // Everybody's (or a playtester's) words that staff can also aim at a person.
   var AIMED = ['/give', '/spawn', '/tp'];
   var GIVE_MOST = 100000;           // the same caps as /give and /spawn
@@ -42079,6 +42099,10 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   // On globalThis, so a hot reload keeps who is frozen and who is silenced.
   if (!g.__thornswoodStaffState) { g.__thornswoodStaffState = { frozen: {}, silenced: {} }; }
   var state = g.__thornswoodStaffState;
+  // Bans made here, until the door's next list carries them; and who is
+  // already on their way out, so the sweep tells them once.
+  if (!state.banned) { state.banned = {}; }
+  if (!state.ending) { state.ending = {}; }
 
   function settings() {
     try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
@@ -42375,6 +42399,168 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
     return true;
   }
 
+  // ------------------------------------------------------ bans and notes --
+  /*
+    One keyed call to the site's /api/staff/game/<what>. done(true, answer)
+    on a 200, done(false, why) for anything else, once. The key goes in a
+    header and never the address, like the door's own fetch; door.json names
+    the site with /dev on the end on the dev server.
+  */
+  function siteCall(what, row, done) {
+    var once = false;
+    function end(ok, v) { if (!once) { once = true; done(ok, v); } }
+    var conf = null;
+    try {
+      conf = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'door.json'), 'utf8')
+                          .replace(/^﻿/, ''));
+    } catch (e) { conf = null; }
+    if (!conf || !conf.site || !conf.key) { end(false, 'this server has no door.json naming the site'); return; }
+    var url;
+    try { url = new URL(String(conf.site).replace(/\/+$/, '') + '/api/staff/game/' + what); }
+    catch (e) { end(false, 'the site address in door.json is not an address'); return; }
+    var lib;
+    try { lib = require(url.protocol === 'http:' ? 'http' : 'https'); } catch (e) { end(false, 'no ' + url.protocol); return; }
+    var body = JSON.stringify(row);
+    var req;
+    try {
+      req = lib.request(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body),
+                   'X-Thornswood-Key': String(conf.key) }
+      }, function (resp) {
+        var buf = '';
+        resp.on('data', function (d) { buf += d; });
+        resp.on('end', function () {
+          var j = null;
+          try { j = JSON.parse(buf); } catch (e) { j = null; }
+          if (resp.statusCode === 200 && j && j.ok) { end(true, j); return; }
+          end(false, 'the site answered ' + resp.statusCode + (j && j.error ? ' (' + j.error + ')' : ''));
+        });
+      });
+    } catch (e) { end(false, String((e && e.message) || e)); return; }
+    req.on('error', function (e) { end(false, String((e && e.message) || e)); });
+    try { req.setTimeout(SITE_WAIT_MS, function () { req.destroy(); end(false, 'the site took too long'); }); } catch (e) { }
+    req.end(body);
+  }
+
+  /* "30m", "2h", "3d", "1w", a bare number of minutes, or "forever": minutes,
+     0 for good, or -1 when it is none of those. */
+  function banLength(word) {
+    var w = String(word || '').toLowerCase();
+    if (w === 'forever' || w === 'perm' || w === 'permanent' || w === 'permanently') { return 0; }
+    var m = /^(\d+)(m|min|mins|h|hr|hrs|d|day|days|w|wk|wks)?$/.exec(w);
+    if (!m || !(Number(m[1]) > 0)) { return -1; }
+    var u = (m[2] || 'm').charAt(0);
+    return Number(m[1]) * (u === 'h' ? 60 : u === 'd' ? 1440 : u === 'w' ? 10080 : 1);
+  }
+  function untilText(until) {
+    if (!(Number(until) > 0)) { return 'for good'; }
+    return 'until ' + new Date(Number(until)).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+  }
+
+  /* Every active ban the door's last list carried, and the ones made here since. */
+  var bansRead = { at: 0, list: [] };
+  function bansNow(now) {
+    if (now - bansRead.at >= BAN_SWEEP_MS) {
+      bansRead.at = now;
+      var list = [];
+      try {
+        var doc = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'allowed.json'), 'utf8')
+                               .replace(/^﻿/, ''));
+        if (doc && Array.isArray(doc.bans)) { list = doc.bans; }
+      } catch (e) { list = []; }
+      bansRead.list = list;
+    }
+    var out = {};
+    for (var i = 0; i < bansRead.list.length; i++) {
+      var b = bansRead.list[i] || {};
+      var until = Number(b.until) || 0;
+      if (until && until <= now) { continue; }
+      var ps = Array.isArray(b.profiles) ? b.profiles : [];
+      for (var j = 0; j < ps.length; j++) {
+        if (Number(ps[j]) > 0) { out[Number(ps[j])] = { why: String(b.why || ''), until: until }; }
+      }
+    }
+    for (var k in state.banned) {
+      if (!Object.prototype.hasOwnProperty.call(state.banned, k)) { continue; }
+      var s = state.banned[k];
+      if (s.until && s.until <= now) { delete state.banned[k]; continue; }
+      out[Number(k)] = s;
+    }
+    return out;
+  }
+
+  /* Tell them why and until when, then end the session a few seconds later. */
+  function endBanned(pid, actorId, ban, now) {
+    if (state.ending[pid] && now - state.ending[pid] < 60000) { return; }
+    state.ending[pid] = now;
+    tell(pid, 'You are banned from Thornswood ' + untilText(ban.until) +
+              (ban.why ? ': ' + ban.why : '') + '. Your session is being ended.');
+    log('staff: ending the session of profile ' + pid + ', banned ' + untilText(ban.until));
+    setTimeout(function () {
+      var userId = -1;
+      try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
+      if (userId === undefined || userId === null || userId < 0) { return; }
+      try { mp.kick(userId); } catch (e) { log('staff: could not end the session of profile ' + pid + ': ' + e); }
+    }, KICK_AFTER_MS);
+  }
+
+  /* Anybody banned who is online, whoever banned them and wherever. */
+  function banSweep() {
+    var now = Date.now();
+    var bans = bansNow(now);
+    var all = online();
+    for (var i = 0; i < all.length; i++) {
+      var pid = profileOf(all[i]);
+      if (pid && bans[pid]) { endBanned(pid, all[i], bans[pid], now); }
+    }
+  }
+
+  function banOrNote(word, words, pid, me, them) {
+    if (!them.pid) { tell(pid, them.why); return true; }
+    var rest = them.rest || [];
+    if (word === '/ban') {
+      if (them.pid === pid) { tell(pid, 'That is you.'); return true; }
+      var minutes = banLength(rest[0]);
+      var why = rest.slice(1).join(' ').trim();
+      if (minutes < 0 || !why) {
+        tell(pid, 'Say how long and why: /ban ' + them.name + ' 3d spamming the market. ' +
+                  'How long is 30m, 2h, 3d, 1w or forever.');
+        return true;
+      }
+      siteCall('ban', { profileId: them.pid, name: them.name, byProfileId: pid, byName: me,
+                        why: why, minutes: minutes }, function (ok, v) {
+        if (!ok) { tell(pid, 'The site did not take the ban, so nothing changed: ' + v + '.'); return; }
+        var until = Number(v.until) || 0;
+        state.banned[them.pid] = { why: why, until: until };
+        tell(pid, 'Banned ' + them.name + ' ' + untilText(until) + '.');
+        record('ban', pid, me, them.pid, them.name, untilText(until) + ': ' + why, 0);
+        var a = them.actorId || actorFor(them.pid);
+        if (a) { endBanned(them.pid, a, { why: why, until: until }, Date.now()); }
+      });
+      return true;
+    }
+    if (word === '/unban') {
+      siteCall('unban', { profileId: them.pid, name: them.name, byProfileId: pid, byName: me }, function (ok, v) {
+        if (!ok) { tell(pid, 'The site did not take that, so nothing changed: ' + v + '.'); return; }
+        delete state.banned[them.pid];
+        delete state.ending[them.pid];
+        tell(pid, v.was ? (them.name + ' is not banned any more.') : (them.name + ' was not banned.'));
+        if (v.was) { record('unban', pid, me, them.pid, them.name, '', 0); }
+      });
+      return true;
+    }
+    var text = rest.join(' ').trim();
+    if (!text) { tell(pid, 'Note what? /note ' + them.name + ' <what staff should know>.'); return true; }
+    siteCall('note', { profileId: them.pid, name: them.name, byProfileId: pid, byName: me, text: text },
+      function (ok, v) {
+        if (!ok) { tell(pid, 'The site did not keep the note: ' + v + '.'); return; }
+        tell(pid, 'Noted against ' + them.name + '. Staff see it on the site.');
+        record('note', pid, me, them.pid, them.name, text, 0);
+      });
+    return true;
+  }
+
   // ------------------------------------------------------------ command --
   /*
     Called from handle() with the queued command, its word and parts, the
@@ -42440,6 +42626,9 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
     if (word === '/spawnat') {
       if (!look) { tell(pid, 'The server has no creature list to spawn from right now.'); return true; }
       return doAimed(aimed(word, words), pid, actorId, me, look);
+    }
+    if (word === '/ban' || word === '/unban' || word === '/note') {
+      return banOrNote(word, words, pid, me, takePerson(words));
     }
     var them = takePerson(words);
     var reason = (them.rest || []).join(' ').trim();
@@ -42552,6 +42741,8 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
 
   if (g.__thornswoodStaffTimer) { try { clearInterval(g.__thornswoodStaffTimer); } catch (e) { } }
   g.__thornswoodStaffTimer = setInterval(guard('staffFreezeTick', freezeTick), FREEZE_EVERY_MS);
+  if (g.__thornswoodBanTimer) { try { clearInterval(g.__thornswoodBanTimer); } catch (e) { } }
+  g.__thornswoodBanTimer = setInterval(guard('staffBanSweep', banSweep), BAN_SWEEP_MS);
   if (g.__thornswoodSilenceTimer) { try { clearInterval(g.__thornswoodSilenceTimer); } catch (e) { } }
   g.__thornswoodSilenceTimer = setInterval(guard('staffSilencePush', pushSilenced), SILENCE_PUSH_MS);
   // Once at load, so a voice service that restarted, or a reload, hears the list.
@@ -42560,6 +42751,7 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   g.__thornswoodStaff = {
     command: command, find: find, takePerson: takePerson, unproven: unproven,
     freezeTick: freezeTick, pushSilenced: pushSilenced, silencedFor: silencedFor,
+    banSweep: banSweep, banLength: banLength, bansNow: bansNow,
     state: state, REFUSED: REFUSED, WORDS: WORDS_STAFF
   };
   log('staff commands ready: ' + WORDS_STAFF.join(', ') + ', and ' + AIMED.join(', ') +

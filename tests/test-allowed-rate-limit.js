@@ -140,7 +140,7 @@ async function ask(linked, api, budget) {
     : undefined;
   const run = new Function(
     'route', 'devDoor', 'req', 'res', 'cfg', 'url', 'sameSecret', 'sendJson',
-    'jsonFile', 'LINKED', 'standingCached', 'keyInAddress', 'standingsForDoor',
+    'jsonFile', 'LINKED', 'standingCached', 'keyInAddress', 'standingsForDoor', 'activeBans',
     'return (async function () {\n' + route + '\n})();');
   const t0 = Date.now();
   await run('/api/allowed', false,
@@ -149,7 +149,8 @@ async function ask(linked, api, budget) {
     function (a, b) { return a === b; },
     function (res, code, body) { sent = { code: code, body: JSON.parse(JSON.stringify(body)) }; },
     function () { return linked; }, 'linked.json',
-    api.standingCached, new Set(), standingsForDoor);
+    // No staff bans here (#412); test-staff-bans.js runs them.
+    api.standingCached, new Set(), standingsForDoor, function () { return []; });
   if (sent) sent.ms = Date.now() - t0;
   return sent;
 }
