@@ -366,7 +366,13 @@ log level and text window; the actor draw distance in `SkyrimPrefs.ini`), ThornI
 name and voice address in `Thornswood.ini`), Display.cs
 (`SSEDisplayTweaks.ini`, `SkyrimPrefs.ini`, SkyUI's `config.txt`), and Keys.cs
 (key binds, from the Controls page). All in Game except `SkyrimPrefs.ini`,
-which is in `Profile\MyGames`.
+which is in `Profile\MyGames`. CrashDump.cs (#1191) writes Crash Logger's
+own `Crash Log Write Minidump` in `CrashLogger.ini`: on for the dev build
+and for a linked account the site says is staff (the `dev` answer of
+`/api/play/join`, `dev-allowed.txt`), off for everybody else. The snapshot
+it turns on is the game's whole memory, about 1 GB, written beside the
+crash log in `Profile\MyGames\SKSE`; only the newest is kept, and nothing
+ever sends one anywhere.
 
 **SkyMp** (SkyMp.cs). Whether the server answers (`SkyMp.cs:74 Up()`, a TCP
 connect to the resources port), and on a machine whose address is this
@@ -465,7 +471,7 @@ configured at all, which is a developer's own build and never a tester's.
 | 12 | `Shell.cs:3899 Verify.Run` | Under Waiting. Reads the plugin list, the server's manifest and the plugins' bytes. Any problem that would get the person refused: the Diagnostics page (Scan and Fix) opens with a message saying what to do, and Play stops. | nothing |
 | 13 | `Shell.cs:3943 Verify.DeployPersonal` | `<Root>\Your Mods` copied into `Game\Data`, never a plugin. | those files in `Game\Data` |
 | 14 | `Shell.cs:3957 Display.MatchScreen` | Skipped when Lock resolution is ticked. The game's window size and Display Tweaks' resolution follow the screen, then `Shell.cs:3959 Display.ScaleMenus`. | `Game\Data\SKSE\Plugins\SSEDisplayTweaks.ini`, `Profile\MyGames\SkyrimPrefs.ini`, `Game\Data\Interface\skyui\config.txt` and `config.shipped.txt`, each only when it changes |
-| 15 | `Shell.cs:3962 Enforce.Apply` | Settings two mods rewrite on the way out, put back; SkyrimPlatform at its normal log level with no text window; one actor draw distance for everybody (#963). | `Game\Data\SKSE\Plugins\SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`, `SkyrimPlatform.ini`, `Profile\MyGames\SkyrimPrefs.ini` |
+| 15 | `Shell.cs:3962 Enforce.Apply` | Settings two mods rewrite on the way out, put back; SkyrimPlatform at its normal log level with no text window; one actor draw distance for everybody (#963). Then `Shell.cs:3964 CrashDump.Apply`: the full crash snapshot on for the dev build and staff, off for everybody else, and snapshots it should not keep deleted (#1191). | `Game\Data\SKSE\Plugins\SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`, `SkyrimPlatform.ini`, `CrashLogger.ini`, `Profile\MyGames\SkyrimPrefs.ini`; old `crash-*.dmp` in `Profile\MyGames\SKSE` deleted |
 | 16 | `Shell.cs:3969 AutoJoin.Apply` | `AutoJoin.cs:124 Apply()`: the server address and port, and where the client fetches the server's load order, through Hold.Around. SkyMP has no join screen; this file is the whole of joining. | `skymp5-client-settings.txt` when it changes |
 | 17 | `Shell.cs:3978 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
 | 18 | `Shell.cs:3981 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
@@ -552,7 +558,9 @@ when their launcher has already written a new copy),
 `Shell.cs:1557 Stats.StoppedPlaying`, then on a pool thread
 `Shell.cs:1568 Discord.SessionEnd` and `Shell.cs:1575 Discord.SessionLogs`
 (the session's logs up to the site before the next start truncates them),
-`Shell.cs:1583 Chars.AddPlaytime`, `Shell.cs:1592 Checks.LastRunFrom` (a
+`Shell.cs:1583 Chars.AddPlaytime`, `Shell.cs:1588 CrashDump.AfterSession`
+(when a crash log was written this session, a line naming it and the
+snapshot beside it), `Shell.cs:1592 Checks.LastRunFrom` (a
 warning if that session ran some other Skyrim), and `Shell.cs:1605 Verify.Run`
 on a pool thread. A game closed for an update then fetches and installs it
 (`Shell.cs:1640 CheckUpdatesBackground`).
