@@ -145,6 +145,19 @@ function Remove-ThornswoodBotLoop([string]$Root, [string]$Task) {
 #     sessions.json among them; see the issue filed for it.
 #   each game server's private\moderation.log, read, on that file only,
 #     because private\ also holds door.json and its key.
+# Writes back only the access rules of an ACL from Get-Acl. Set-Acl can also
+# try to write the audit part, which needs SeSecurityPrivilege: Administrator
+# has it, and the build runner's account does not, so on the runner Set-Acl
+# refused the grant on bot.env.json (issue #1120). Nothing here changes
+# auditing, so .NET is asked to persist what changed, the access rules.
+function Set-ThornswoodAclAccess([string]$Path, $Acl) {
+  $item = Get-Item -LiteralPath $Path -Force
+  if ($PSVersionTable.PSEdition -eq 'Core') {
+    if ($item -is [IO.DirectoryInfo]) { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$Acl) }
+    else { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, [Security.AccessControl.FileSecurity]$Acl) }
+  } else { $item.SetAccessControl($Acl) }
+}
+
 # Given again at every install; the same rule added twice is kept once.
 # Built in .NET rather than with icacls, because icacls will not name an
 # account Windows cannot look up, and the service's is granted in the tests
@@ -163,7 +176,7 @@ function Grant-ThornswoodBotAccess {
       $acl = Get-Acl -LiteralPath $path
       $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
         (New-Object Security.Principal.SecurityIdentifier($Sid)), $rights, $inherit, $prop, 'Allow')))
-      Set-Acl -LiteralPath $path -AclObject $acl -ErrorAction Stop
+      Set-ThornswoodAclAccess $path $acl
       return ('granted ' + $what + ' on ' + $path)
     } catch { return ('COULD NOT GRANT ' + $what + ' on ' + $path + ': ' + $_.Exception.Message) }
   }
@@ -184,7 +197,7 @@ function Grant-ThornswoodBotAccess {
       }
       $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
         (New-Object Security.Principal.SecurityIdentifier($Sid)), 'ReadAndExecute', $inherit, $none, 'Allow')))
-      Set-Acl -LiteralPath $svc -AclObject $acl -ErrorAction Stop
+      Set-ThornswoodAclAccess $svc $acl
       'the service program''s folder is read only to the bot''s account: ' + $svc
     } catch { 'COULD NOT LOCK ' + $svc + ': ' + $_.Exception.Message }
   }

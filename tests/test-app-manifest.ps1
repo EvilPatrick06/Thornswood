@@ -140,6 +140,20 @@ Yes 'the setup program fits its window before centring it' ($boot.IndexOf('Thorn
 Yes 'the maximized frame is measured at the monitor''s own scale' ($shell.Contains('WindowFit.FramePixels(scale)') -and $shell -notmatch 'GetSystemMetrics\(32\)')
 
 # ---- 2. the manifest inside the built exes --------------------------------------
+# With no -Exe and no -Root: the build step's exe on the runner when there is
+# one, and otherwise a build of its own in the temp folder. The nightly runs
+# every harness before its build step, and a person runs this bare, so until
+# then both ended red on an exe that had not been built yet (issue #1120).
+$ownRoot = $null
+if (-not $Exe -and -not $Root) {
+    $runnerExe = if ($env:RUNNER_TEMP) { Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe' } else { '' }
+    if ($runnerExe -and (Test-Path -LiteralPath $runnerExe)) { $Exe = $runnerExe }
+    else {
+        $ownRoot = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-test-app-manifest-build-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+        $null = New-Item -ItemType Directory -Force -Path (Join-Path $ownRoot 'Launcher')
+        $Root = $ownRoot
+    }
+}
 if (-not $Exe -and $Root) {
     Write-Host "      building into $Root"
     & pwsh -NoProfile -File (Join-Path $repo 'scripts\release\Build-Launcher.ps1') -Root $Root -NoPause | Out-Null
@@ -307,6 +321,8 @@ if (Test-Path -LiteralPath $fitExe) {
             $f = $_ -split ' '; ([double]::Parse($f[5], $inv) -eq $sz.Width) -and ([double]::Parse($f[6], $inv) -eq $sz.Height) }) -contains $true)
     }
 }
+
+if ($ownRoot) { Remove-Item -LiteralPath $ownRoot -Recurse -Force -ErrorAction SilentlyContinue }
 
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)

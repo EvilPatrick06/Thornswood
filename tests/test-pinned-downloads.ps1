@@ -276,11 +276,14 @@ Yes 'requirements.txt goes up to the VPS with the code' ($ibText -match "foreach
 $pipBlocks = @(HereStrings $ib.Ast | Where-Object { $_.Extent.Text -match 'pip install' })
 Yes 'there is exactly one remote block that runs pip install' ($pipBlocks.Count -eq 1)
 if ($pipBlocks.Count -eq 1) {
-    $sent = Expand $pipBlocks[0].Extent.Text @{ rootWin = 'C:\Thornswood-Bot' }
+    # Since #1093 every file goes up into a stage folder first (stage, check,
+    # swap), so pip installs from the requirements.txt staged beside the
+    # staged bot.py, which is what the swap then puts in place.
+    $sent = Expand $pipBlocks[0].Extent.Text @{ rootWin = 'C:\Thornswood-Bot'; stageName = '.stage-20260929-000000' }
     $errs = ParseErrors $sent
     Yes ('the pip block parses as it would be sent to the VPS' +
          $(if ($errs.Count) { ': ' + $errs[0].Message } else { '' })) ($errs.Count -eq 0)
-    Yes '  and installs from requirements.txt beside bot.py' ($sent -match "pip install [^\r\n]*-r 'C:\\Thornswood-Bot\\requirements\.txt'")
+    Yes '  and installs from the requirements.txt staged beside bot.py' ($sent -match "pip install [^\r\n]*-r 'C:\\Thornswood-Bot\\\.stage-20260929-000000\\requirements\.txt'")
     Yes '  and no longer installs any of the three by name' ($sent -notmatch 'pip install[^\r\n]*\b(discord\.py|pillow|certifi)\b')
 }
 
