@@ -41,6 +41,57 @@ namespace Thornswood
 
         static Dictionary<int, Row> cache = new Dictionary<int, Row>();
         static DateTime cachedAt = DateTime.MinValue;
+
+        // This account's characters that the server this build plays on
+        // looked up and does not hold (#955), and when it looked, in UTC.
+        // Empty when the site had no recent answer from that server.
+        static HashSet<int> gone = new HashSet<int>();
+        static DateTime goneAt = DateTime.MinValue;
+
+        /// <summary>
+        /// True when the server said it has no character under this profile,
+        /// and said so after the character was last played here. Played is
+        /// local time, as profiles.txt keeps it. A character made or played
+        /// after the server's last look is never called gone on that look.
+        /// </summary>
+        public static bool Gone(int profileId, DateTime lastPlayedLocal)
+        {
+            lock (gate)
+            {
+                if (!gone.Contains(profileId) || goneAt == DateTime.MinValue) return false;
+                return Played(lastPlayedLocal) < goneAt;
+            }
+        }
+
+        /// <summary>A local time from profiles.txt in UTC; MinValue stays MinValue.</summary>
+        public static DateTime Played(DateTime local)
+        {
+            if (local == DateTime.MinValue) return DateTime.MinValue;
+            try { return DateTime.SpecifyKind(local, DateTimeKind.Local).ToUniversalTime(); }
+            catch { return DateTime.MinValue; }
+        }
+
+        /// <summary>
+        /// The site's "gone" and "goneAt" out of a /api/play/roster answer:
+        /// the ids, and the moment in UTC, or MinValue when either is missing.
+        /// </summary>
+        public static HashSet<int> ReadGone(string text, out DateTime at)
+        {
+            var ids = new HashSet<int>();
+            at = DateTime.MinValue;
+            if (string.IsNullOrEmpty(text)) return ids;
+            Match g = Regex.Match(text, "\"gone\"\\s*:\\s*\\[([^\\]]*)\\]");
+            Match t = Regex.Match(text, "\"goneAt\"\\s*:\\s*(\\d+)");
+            long ms;
+            if (!g.Success || !t.Success || !long.TryParse(t.Groups[1].Value, out ms) || ms <= 0) return ids;
+            foreach (string part in g.Groups[1].Value.Split(','))
+            {
+                int id;
+                if (int.TryParse(part.Trim(), out id) && id > 0) ids.Add(id);
+            }
+            at = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(ms);
+            return ids;
+        }
         // Separate from cachedAt on purpose. A server that is down never moves
         // cachedAt, so without this a launcher left open would queue a fetch
         // every time the cards were drawn and never stop.
@@ -91,12 +142,28 @@ namespace Thornswood
             {
                 if (!Discord.Linked) return false;
                 string reply;
+                // The channel says which server's answer about gone
+                // characters this build wants (#955).
+                string channel = string.IsNullOrEmpty(Discord.Channel) ? "main" : Discord.Channel;
                 int code = Discord.PostJson(Discord.Site + "/api/play/roster",
-                                            "{\"ticket\":\"" + Discord.Escape(Discord.Ticket) + "\"}", out reply);
+                                            "{\"ticket\":\"" + Discord.Escape(Discord.Ticket) + "\"" +
+                                            ",\"channel\":\"" + Discord.Escape(channel) + "\"}", out reply);
                 if (code != 200 || string.IsNullOrEmpty(reply)) return false;
                 text = reply;
             }
             catch { return false; }
+
+            // Before the rows, which return early when there are none: a
+            // character the server does not hold may have no row at all.
+            DateTime goneWhen;
+            HashSet<int> goneNow = ReadGone(text, out goneWhen);
+            bool goneChanged;
+            lock (gate)
+            {
+                goneChanged = goneWhen != goneAt || !goneNow.SetEquals(gone);
+                gone = goneNow;
+                goneAt = goneWhen;
+            }
 
             var got = new Dictionary<int, Row>();
             try
@@ -128,12 +195,12 @@ namespace Thornswood
             }
             catch { return false; }
 
-            if (got.Count == 0) return false;
+            if (got.Count == 0) return goneChanged;
 
             bool changed;
             lock (gate)
             {
-                changed = got.Count != cache.Count;
+                changed = goneChanged || got.Count != cache.Count;
                 if (!changed)
                 {
                     foreach (var kv in got)

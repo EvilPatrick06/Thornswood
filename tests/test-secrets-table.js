@@ -175,7 +175,7 @@ yes('Install-Bot.ps1 still has -RotateKey and still writes the key into the site
 yes('Set-Door.ps1 still copies the site botKey into door.json',
     /\$c\.botKey/.test(setDoor) && /'door\.json'/.test(setDoor));
 yes('the site still checks botKey on /api/ticket, /api/roster and /api/allowed',
-    /route === '\/api\/ticket'/.test(site) && /p === '\/api\/roster'/.test(site) && /route === '\/api\/allowed'/.test(site) &&
+    /route === '\/api\/ticket'/.test(site) && /(p|route) === '\/api\/roster'/.test(site) && /route === '\/api\/allowed'/.test(site) &&
     site.split('\n').filter(function (l) { return /sameSecret\(.*String\(cfg\.botKey\)\)/.test(l); }).length >= 3);
 
 // Who actually gets in, said once under the table.

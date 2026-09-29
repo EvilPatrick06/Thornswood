@@ -126,6 +126,8 @@
     '#ts-select .slot.empty.at{background:rgba(120,94,44,.22)}',
     '#ts-select .slotno{font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:rgba(198,170,109,.7);margin-bottom:8px;display:flex;gap:14px}',
     '#ts-select .slotno .tag{color:#e9d19b}',
+    '#ts-select .slotno .tag.gone{color:#f6c9b0}',
+    '#ts-select .slot.gone{border-style:dashed}',
     '#ts-select .name{font-size:32px;color:#f6e9c8;line-height:1.1;padding-right:56px}',
     '#ts-select .name.faint{color:rgba(246,233,200,.62);font-style:italic}',
     '#ts-select .stats{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:18px;margin-top:14px}',
@@ -600,15 +602,28 @@
     var taken = list.filter(function (e) { return !!e.c; }).length;
     elCount.textContent = taken + ' of ' + SLOTS + ' slots';
     list.forEach(function (e, i) {
-      var card = el('div', 'slot' + (i === at ? ' at' : '') + (e.c ? '' : ' empty'));
+      var card = el('div', 'slot' + (i === at ? ' at' : '') + (e.c ? '' : ' empty') + (e.c && e.c.gone ? ' gone' : ''));
       var no = el('div', 'slotno', 'Slot ' + e.n);
       if (e.c && e.id === last) no.appendChild(el('span', 'tag', 'last played'));
+      if (e.c && e.c.gone) no.appendChild(el('span', 'tag gone', 'not on this server'));
       if (!e.c) no.appendChild(el('span', '', 'empty'));
       card.appendChild(no);
       if (e.c) {
         var c = e.c;
-        card.appendChild(el('div', 'name' + (c.name ? '' : ' faint'), c.name || 'Unnamed character'));
+        card.appendChild(el('div', 'name' + (c.name && !c.gone ? '' : ' faint'), c.name || 'Unnamed character'));
+        /*
+          THE SERVER SAID IT HAS NO CHARACTER UNDER THIS ID (#955). Its world
+          started over since this character was played, or it could not load
+          it. Picking the slot makes a new character on it, so the card says
+          that in place of the stats of a character that will not come back.
+          The bin stays, so the slot can be cleared.
+        */
+        if (c.gone) {
+          card.appendChild(el('div', 'sub',
+            'The server no longer has this character. Playing this slot makes a new character in the creation hall.'));
+        }
         var stats = el('div', 'stats');
+        if (c.gone) stats.style.display = 'none';
         var s1 = el('div', 'stat'); s1.appendChild(el('div', 'k', 'Last location'));
         s1.appendChild(el('div', 'v' + (c.where ? '' : ' dim'), c.where || 'Not seen in the world yet'));
         var s2 = el('div', 'stat'); s2.appendChild(el('div', 'k', 'Hours played'));
@@ -705,7 +720,7 @@
     if (!e || !e.id) return;
     sent = true;
     picked = e.id;
-    elStatus.textContent = e.c ? 'Joining as ' + (e.c.name || 'your character') + '. The world is loading.' : 'Off to the creation hall. The world is loading.';
+    elStatus.textContent = e.c && !e.c.gone ? 'Joining as ' + (e.c.name || 'your character') + '. The world is loading.' : 'Off to the creation hall. The world is loading.';
     draw();
     sendPick();
     tell('picked');
