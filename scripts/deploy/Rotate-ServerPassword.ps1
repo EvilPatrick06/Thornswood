@@ -57,6 +57,7 @@ $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
 function Remote($script) {
@@ -129,15 +130,17 @@ if (-not $Password) {
   $Password = NewKey 28
 }
 
-$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Password))
 $docsWin = $DocsRoot.Replace('/','\')
 $srvWin  = $ServerRoot.Replace('/','\')
 
 Write-Host ''
 Write-Host 'Handing it to the site...'
-Remote @"
+# The password goes on ssh's standard input, never in the script or on a
+# command line on either machine (Send-Secret.ps1, issue #451).
+Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $Password -Script @"
 `$ErrorActionPreference = 'Stop'
-`$pw = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64'))
+`$pw = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+if (-not `$pw) { 'NOTHING ARRIVED on standard input. Nothing written, the password is unchanged.'; return }
 `$f = '$docsWin\config.json'
 `$cfg = @{}
 if (Test-Path `$f) {
@@ -158,6 +161,7 @@ Start-Sleep -Seconds 3
 if (Get-NetTCPConnection -LocalPort 3001 -State Listen -EA SilentlyContinue) { 'site restarted' }
 else { 'SITE DID NOT COME BACK' }
 "@ | ForEach-Object { "  $_" }
+$Password = $null
 
 # The game server settings used to be written here. They are not any more.
 # There is no sPassword in server-settings.json, nothing in gamemode.js reads

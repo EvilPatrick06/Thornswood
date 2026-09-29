@@ -68,6 +68,7 @@ $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 # The bot sources live at the repo root, in bot\. This script sits two levels
 # down, in scripts\deploy, since #440 sorted the scripts into scripts\<area> on
@@ -331,9 +332,10 @@ function NewKey([int]$n) {
 $botKey = NewKey 32
 $KeyMode = if ($RotateKey) { 'new' } else { 'keep' }
 
+# The token and the key go on ssh's standard input, never in the script or on
+# a command line on either machine (Send-Secret.ps1, issue #451).
 $payload = @{ token = $token; key = $botKey } | ConvertTo-Json -Compress
-$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
-$token = $null; $payload = $null
+$token = $null
 
 # The one writer of the token, which puts it in bot.env.json and the site's
 # config.json together or in neither (issue #466). It goes up in front of the
@@ -342,10 +344,13 @@ $writer = Join-Path $Here '..\vps\Write-BotToken.ps1'
 if (-not (Test-Path -LiteralPath $writer)) { Die "missing: $writer" }
 
 Head 'Settings, and the key the site will check'
-$settings = Remote ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
+$settings = Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $payload -Script ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Stop'
 `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')
-`$p = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64')) | ConvertFrom-Json
+`$p = `$null
+try { `$p = `$ThornswoodSecret | ConvertFrom-Json } catch { }
+`$ThornswoodSecret = `$null
+if (-not `$p) { 'NOTHING ARRIVED on standard input. Nothing written.'; return }
 
 # The bot's own env file. Kept out of the repo and readable by this account only.
 `$f = '$rootWin\bot.env.json'
@@ -441,6 +446,7 @@ if (`$changed -or `$tokenChanged) {
   Restart-ThornswoodSite -Root '$docsWin' -Task '$SiteTask'
 } else { 'key and token unchanged, the site does not need restarting' }
 "@)
+$payload = $null; $botKey = $null
 $settings | ForEach-Object { Say "  $_" }
 
 # -------------------------------------------------------------- runner ---
