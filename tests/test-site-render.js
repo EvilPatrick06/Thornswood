@@ -35,7 +35,7 @@
 //
 // Not strict, on purpose: the render block is eval'd here, and strict eval
 // would keep its two functions to itself.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -44,7 +44,7 @@ const crypto = require('crypto');
 const vm = require('vm');
 const { spawn } = require('child_process');
 
-const APP = path.join(TOOLS_DIR, '..', 'site');
+const APP = path.join(REPO_DIR, 'site');
 const PUBLIC = path.join(APP, 'public');
 const MARKED = 'marked-12.0.2.min.js';
 

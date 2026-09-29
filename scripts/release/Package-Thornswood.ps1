@@ -155,7 +155,7 @@ if (-not (Test-Path -LiteralPath $vLive)) {
 # ==== end thornswood release feed ====
 
 # ==== thornswood setup stub ====
-# The setup program is compiled by Build-Launcher.ps1 into tools\setup-stub.exe,
+# The setup program is compiled by Build-Launcher.ps1 into out\setup-stub.exe,
 # which git ignores, and this only copies it (Building the installer, below).
 # So it is as new as the last Build-Launcher on this machine, whatever
 # setup\Bootstrap.cs now says. On 25 September the installer went on the site
@@ -177,7 +177,7 @@ function Get-StubRefusal([string]$stub, [string]$src) {
             'with is left alone. From PowerShell 7 in the repo folder, the way Ship runs it: ' +
             '.\scripts\release\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause and then run this again.')
 }
-$stubNow = @((Join-Path $Here '..\..\tools\setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
+$stubNow = @((Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
            Where-Object { Test-Path $_ } | Select-Object -First 1
 $stubWhy = Get-StubRefusal $stubNow (Join-Path $Here '..\..\installer\setup\Bootstrap.cs')
 if ($stubWhy) { Die $stubWhy }
@@ -584,7 +584,7 @@ if (Test-Path $lexe) {
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRST.txt') {
-    # In installer\ beside tools\ since the reorganisation's phase 7 (issue #440).
+    # In installer\ since the reorganisation's phase 7 (issue #440).
     $s = Join-Path (Join-Path $here '..\..\installer') $f
     # All four are in the repository, so a missing one is a wrong path, and an
     # installer without it is broken for everybody (issue #440, phase 0).
@@ -1001,7 +1001,7 @@ $zip = Join-Path $OutDir 'Thornswood-Setup.zip'
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Move-Item $blob $zip
 
-$stub = @((Join-Path $here '..\..\tools\setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
+$stub = @((Join-Path (& (Join-Path $here 'Where.ps1') Out) 'setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
         Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $stub) {
     Head 'Done, but incomplete'
@@ -1022,7 +1022,7 @@ Say "  stub: $stub" 'DarkGray'
 
 # A signed stub cannot take the OneFile payload. Build-Launcher leaves the stub
 # unsigned for that reason; strip here anyway so a hand-signed stub or an older
-# tools\setup-stub.exe does not break Package the way Main did on 27 September
+# out\setup-stub.exe does not break Package the way Main did on 27 September
 # (signtool 0x800700C1 after attach). Sign-Artifact below signs the final Setup.
 $preSig = Get-AuthenticodeSignature -LiteralPath $exe
 if ($preSig -and $preSig.Status -ne 'NotSigned' -and $preSig.SignerCertificate) {
@@ -1076,7 +1076,7 @@ if ($OneFile) {
 # exactly why its loader scans backwards for TWSFX001 rather than reading a
 # fixed offset from the end.
 #
-# Does nothing without tools\signing.json, so a machine with no certificate
+# Does nothing without records\signing\signing.json, so a machine with no certificate
 # still produces a working, unsigned installer.
 $signer = Join-Path $here 'Sign-Artifact.ps1'
 if (Test-Path -LiteralPath $signer) {

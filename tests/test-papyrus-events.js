@@ -21,15 +21,15 @@
 // it runs the real audit too and checks nothing in it was unreadable.
 //
 // Read only apart from its own temp folder, which it removes.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
 const { spawnSync } = require('child_process');
 
-const TOOLS = TOOLS_DIR;
-const AUDIT = path.join(TOOLS, '..', 'scripts', 'dev', 'Audit-PapyrusEvents.py');
+const REPO = REPO_DIR;
+const AUDIT = path.join(REPO, 'scripts', 'dev', 'Audit-PapyrusEvents.py');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

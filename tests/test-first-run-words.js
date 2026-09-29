@@ -19,17 +19,17 @@
 // two different stories, so this reads both files and checks they agree.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 function read(rel) {
-  return fs.readFileSync(path.join(TOOLS_DIR, rel), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join(REPO_DIR, rel), 'utf8').split(CR).join('');
 }
-const xaml = read('../launcher/ui.xaml');
-const help = read(path.join('..', 'launcher', 'app', 'Help.cs'));
-const site = read(path.join('..', 'site', 'data', 'help.md'));
-const shell = read(path.join('..', 'launcher', 'app', 'Shell.cs'));
+const xaml = read('launcher/ui.xaml');
+const help = read(path.join('launcher', 'app', 'Help.cs'));
+const site = read(path.join('site', 'data', 'help.md'));
+const shell = read(path.join('launcher', 'app', 'Shell.cs'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

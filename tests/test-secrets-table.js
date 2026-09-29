@@ -26,12 +26,12 @@
 // row, this fails and says which row to rewrite.
 //
 // Read only. It reads the doc and the source, never a secret file.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const ROOT = path.join(TOOLS_DIR, '..');
+const ROOT = REPO_DIR;
 const CR = String.fromCharCode(13);
 const BS = String.fromCharCode(92);
 
@@ -258,7 +258,7 @@ const scripts = {};
 const missing = Object.keys(scripts).filter(function (s) {
   return !['release', 'deploy', 'vps', 'ops', 'mods', 'dev'].some(function (a) { return exists('scripts/' + a + '/' + s); }) && !exists('bot/' + s);
 });
-missing.forEach(function (s) { console.log('      named but not in tools: ' + s); });
+missing.forEach(function (s) { console.log('      named but not in scripts: ' + s); });
 yes('every script the section names is in scripts, ' + Object.keys(scripts).length + ' of them',
     Object.keys(scripts).length >= 10 && missing.length === 0);
 
@@ -269,7 +269,7 @@ function ticks(text) {
 const local = [];
 rows.forEach(function (r) {
   ticks(r[1]).forEach(function (t) {
-    if (t.indexOf('tools' + BS) === 0 || t.indexOf('bot' + BS) === 0 || t === 'server-secret.txt') local.push(t);
+    if (t.indexOf('local' + BS) === 0 || t.indexOf('bot' + BS) === 0 || t === 'records' + BS + 'signing' + BS + 'signing.json' || t === 'server-secret.txt') local.push(t);
   });
 });
 let gitOk = true;
@@ -311,7 +311,7 @@ const unknown = [];
 let placed = 0;
 rows.forEach(function (r) {
   ticks(r[1]).forEach(function (t) {
-    if (t.indexOf(BS) < 0 || t.indexOf('tools' + BS) === 0) return;
+    if (t.indexOf(BS) < 0 || t.indexOf('local' + BS) === 0 || t.indexOf('records' + BS) === 0) return;
     const parts = t.split(BS);
     placed++;
     if (/^[A-Za-z]:$/.test(parts[0])) {

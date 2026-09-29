@@ -51,10 +51,10 @@ param()
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-$installer = [IO.Path]::GetFullPath((Join-Path $Here '..\scripts\deploy\Install-ThornswoodServer.ps1'))
-$publish   = [IO.Path]::GetFullPath((Join-Path $Here '..\scripts\release\Publish-Server.ps1'))
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+$installer = [IO.Path]::GetFullPath((Join-Path $Here 'scripts\deploy\Install-ThornswoodServer.ps1'))
+$publish   = [IO.Path]::GetFullPath((Join-Path $Here 'scripts\release\Publish-Server.ps1'))
 
 $script:pass = 0
 $script:fail = 0

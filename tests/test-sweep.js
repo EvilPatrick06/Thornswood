@@ -12,7 +12,7 @@
 // later, which is exactly why they are worth a harness rather than a commit.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
@@ -36,13 +36,13 @@ function yes(what, cond) {
 */
 const CR = String.fromCharCode(13);
 function read(...bits) {
-  return fs.readFileSync(path.join(TOOLS_DIR, ...bits), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join(REPO_DIR, ...bits), 'utf8').split(CR).join('');
 }
 
-const gm = read('..', 'game', 'gamemode.js');
-const chat = read('..', 'game', 'ui', 'thornswood-chat.js');
-const voice = read('..', 'game', 'ui', 'thornswood-voice.js');
-const svc = read('..', 'voice', 'voice-server.js');
+const gm = read('game', 'gamemode.js');
+const chat = read('game', 'ui', 'thornswood-chat.js');
+const voice = read('game', 'ui', 'thornswood-voice.js');
+const svc = read('voice', 'voice-server.js');
 
 /* Comments in this repo quote old code on purpose, so a check that reads them
    as code is a check that punishes writing them. */

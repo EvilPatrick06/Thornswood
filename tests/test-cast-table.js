@@ -67,7 +67,7 @@
 //   - a patch deleting a placement and keeping nothing of it but the flag
 //
 // Read only apart from a folder in the temp directory, removed at the end.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -80,7 +80,7 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const TOOL = process.env.CAST_TOOL || path.join(TOOLS_DIR, '..', 'scripts', 'dev', 'Build-CastTable.py');
+const TOOL = process.env.CAST_TOOL || path.join(REPO_DIR, 'scripts', 'dev', 'Build-CastTable.py');
 yes('scripts/dev/Build-CastTable.py is in the repo', fs.existsSync(TOOL));
 
 // ------------------------------------------------------------ plugin bytes
@@ -599,7 +599,7 @@ try {
 
 // ------------------------------------------------ the committed list, by eye
 {
-  const CAST = path.join(TOOLS_DIR, '..', 'game', 'data', 'cast.json');
+  const CAST = path.join(REPO_DIR, 'game', 'data', 'cast.json');
   let j = null;
   try { j = JSON.parse(fs.readFileSync(CAST, 'utf8')); } catch (e) { j = null; }
   yes('game/data/cast.json is in the repo, written by the script', j !== null && j.builtBy === 'scripts/dev/Build-CastTable.py');

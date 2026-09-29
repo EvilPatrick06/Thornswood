@@ -51,9 +51,9 @@ param([string]$Src)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $Src) { $Src = Join-Path $Here '..\launcher\app' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $Src) { $Src = Join-Path $Here 'launcher\app' }
 
 # ---- the launcher's runtime, not pwsh's --------------------------------------
 if ($PSVersionTable.PSEdition -eq 'Core') {
@@ -116,7 +116,7 @@ function Find-Ref([string]$name) {
 
 # The names are read off the build script rather than copied, so a reference
 # the launcher gains there is one this compile gains too.
-$builder = Join-Path $Here '..\scripts\release\Build-Launcher.ps1'
+$builder = Join-Path $Here 'scripts\release\Build-Launcher.ps1'
 $tokens = $null; $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($builder, [ref]$tokens, [ref]$errors)
 $assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
@@ -146,7 +146,7 @@ function Run {
     foreach ($n in $wv2) {
         # Where Build-Launcher.ps1 reads them, launcher\lib\webview2, since the
         # launcher moved out of tools\.
-        $p = Join-Path $Here ('..\launcher\lib\webview2\' + $n)
+        $p = Join-Path $Here ('launcher\lib\webview2\' + $n)
         if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n }
     }
     Yes ('every one of them is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) (

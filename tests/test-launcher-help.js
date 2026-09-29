@@ -20,13 +20,13 @@
 // here.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 function read() {
   const bits = Array.prototype.slice.call(arguments);
-  return fs.readFileSync(path.join.apply(path, [TOOLS_DIR].concat(bits)), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join.apply(path, [REPO_DIR].concat(bits)), 'utf8').split(CR).join('');
 }
 
 let pass = 0, fail = 0;
@@ -37,25 +37,25 @@ function yes(what, cond) {
 
 const helpSrc = process.env.HELP
   ? fs.readFileSync(process.env.HELP, 'utf8').split(CR).join('')
-  : read('..', 'launcher', 'app', 'Help.cs');
-const gm      = read('..', 'game', 'gamemode.js');
-const emotes  = read('..', 'game', 'plugins', 'thornswood-emotes.js');
-const front   = read('..', 'game', 'plugins', 'thornswood-front.js');
-const vplug   = read('..', 'game', 'plugins', 'thornswood-voice.js');
-const vpage   = read('..', 'game', 'ui', 'thornswood-voice.js');
-const vserver = read('..', 'voice', 'voice-server.js');
-const vinstall = read('../scripts/deploy/Install-Voice.ps1');
-const keys    = read('..', 'launcher', 'app', 'Keys.cs');
+  : read('launcher', 'app', 'Help.cs');
+const gm      = read('game', 'gamemode.js');
+const emotes  = read('game', 'plugins', 'thornswood-emotes.js');
+const front   = read('game', 'plugins', 'thornswood-front.js');
+const vplug   = read('game', 'plugins', 'thornswood-voice.js');
+const vpage   = read('game', 'ui', 'thornswood-voice.js');
+const vserver = read('voice', 'voice-server.js');
+const vinstall = read('scripts/deploy/Install-Voice.ps1');
+const keys    = read('launcher', 'app', 'Keys.cs');
 // Shell is one partial class across Shell.cs and the Shell*.cs files since
 // the split (#500), so the update code the address check reads is in
 // ShellUpdate.cs now. All of them, read as the one class they compile to.
-const shell   = fs.readdirSync(path.join(TOOLS_DIR, '..', 'launcher', 'app'))
+const shell   = fs.readdirSync(path.join(REPO_DIR, 'launcher', 'app'))
   .filter(function (f) { return /^Shell\w*\.cs$/.test(f); })
   .sort()
-  .map(function (f) { return read('..', 'launcher', 'app', f); })
+  .map(function (f) { return read('launcher', 'app', f); })
   .join('\n');
-const enforce = read('..', 'launcher', 'app', 'Enforce.cs');
-const ini     = read('..', 'launcher', 'Thornswood.ini');
+const enforce = read('launcher', 'app', 'Enforce.cs');
+const ini     = read('launcher', 'Thornswood.ini');
 
 // ------------------------------------------------------------- the items
 /*
@@ -497,12 +497,12 @@ function tableNames(src, name) {
   The second rebuild: what somebody needs today to get in, find a key, reach
   staff and send a log, read from the files that decide each of them.
 */
-const xaml    = read('..', 'launcher', 'ui.xaml');
-const discord = read('..', 'launcher', 'app', 'Discord.cs');
-const verify  = read('..', 'launcher', 'app', 'Verify.cs');
-const diag    = read('..', 'launcher', 'app', 'Diag.cs');
-const paths   = read('..', 'launcher', 'app', 'Paths.cs');
-const site    = read('..', 'site', 'server.js');
+const xaml    = read('launcher', 'ui.xaml');
+const discord = read('launcher', 'app', 'Discord.cs');
+const verify  = read('launcher', 'app', 'Verify.cs');
+const diag    = read('launcher', 'app', 'Diag.cs');
+const paths   = read('launcher', 'app', 'Paths.cs');
+const site    = read('site', 'server.js');
 
 // ------------------------------------------------------------ getting in
 {
@@ -516,7 +516,7 @@ const site    = read('..', 'site', 'server.js');
       /'Playtester'/.test(playList) && /Playtester role, and that role is what unlocks Play/.test(alpha));
   yes('the page says to apply in a Discord ticket, as the join page does',
       /open a ticket/.test(alpha) &&
-      /open a ticket/.test(read('..', 'site', 'data', 'site', 'join.md')));
+      /open a ticket/.test(read('site', 'data', 'site', 'join.md')));
   yes('the site answers "no role that lets it in yet", and the page uses the same words',
       /has no role that lets it in yet/.test(site) &&
       /no role that lets it in yet/.test(item('Joining', 'Connect Discord once')));
@@ -638,7 +638,7 @@ function between(src, from, to) {
   what this page says about getting in, staff, Fix and the logs.
 */
 {
-  const md = read('..', 'site', 'data', 'help.md').replace(/\*\*/g, '');
+  const md = read('site', 'data', 'help.md').replace(/\*\*/g, '');
   yes('help.md says the Playtester role unlocks Play', /Playtester role, and that role is what unlocks Play/.test(md));
   yes('help.md names /helpme and /report', /\/helpme\b/.test(md) && /\/report\b/.test(md));
   yes('help.md sends people to Diagnostics for Scan and Fix', /open Diagnostics in the launcher and press Scan/.test(md));

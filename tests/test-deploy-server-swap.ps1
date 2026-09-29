@@ -42,8 +42,8 @@ param()
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
 
 $script:pass = 0
 $script:fail = 0
@@ -61,8 +61,8 @@ function Done {
 # ---- the blocks, out of the script itself -----------------------------------
 # Swap.ps1 since issue #446, which Deploy-Server.ps1 and Deploy-DevGamemode.ps1
 # both load.
-$src = Get-Content -LiteralPath (Join-Path $Here '..\scripts\deploy\Deploy-Server.ps1') -Raw
-$lib = Get-Content -LiteralPath (Join-Path $Here '..\scripts\deploy\Swap.ps1') -Raw
+$src = Get-Content -LiteralPath (Join-Path $Here 'scripts\deploy\Deploy-Server.ps1') -Raw
+$lib = Get-Content -LiteralPath (Join-Path $Here 'scripts\deploy\Swap.ps1') -Raw
 $a = $lib.IndexOf('# ==== deploy-server remote blocks ====')
 $b = $lib.IndexOf('# ==== end deploy-server remote blocks ====')
 Yes 'Swap.ps1 keeps the blocks that run on the box between their markers' ($a -ge 0 -and $b -gt $a)

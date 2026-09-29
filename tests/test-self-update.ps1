@@ -35,12 +35,10 @@
       start on a missing file puts up a "Windows cannot find" box and waits
       start leaves errorlevel as it found it when it works
 
-  Issue #497 adds the install made before the rename, laid out as
-  <case>\Launcher\SkyrimTogether.exe: the update goes in as Thornswood.exe and
-  the old name is gone, or on a failed start the old one is back under its old
-  name. It also checks that SelfSwap.cs is the only launcher or script file
-  that still names the old exe (tests\test-old-name-gone.js checks the whole
-  tree).
+  Issue #497, 29 Sep: the launcher's name from before the rename is gone from
+  the update path too, so the new build always goes in at the running
+  launcher's own path and nothing renames or repoints anything.
+  tests\test-old-name-gone.js checks that no tracked file names it at all.
 
   Not driven: start failing on a file that is there (Defender blocking it, a
   file that is not a program). Windows puts up a box for those too, on the
@@ -56,9 +54,8 @@ param()
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-$App = Join-Path $Here '..\launcher\app'
+$Repo = Split-Path -Parent $Here
+$App = Join-Path $Repo 'launcher\app'
 
 $script:pass = 0
 $script:fail = 0
@@ -94,28 +91,18 @@ Yes 'SelfUpdate no longer moves the new exe over the old one itself' ($upd -notm
 $shell = Get-Content -LiteralPath (Join-Path $App 'Shell.cs') -Raw
 Yes 'the launcher clears the kept copy once its window has drawn' ($shell -match '(?s)ContentRendered\s*\+=\s*delegate\s*\{.{0,800}?SelfSwap\.Settle\(')
 
-# ---- issue #497: the files still carrying the launcher's old name ----------
-# The count from the issue, with its paths as they are now (tools\app is
-# launcher\app, tools\setup is installer\setup, the scripts are under
-# scripts\ and installer\). Thirteen files before release 1. Every fallback
-# went on 28 September; what is left is the update path itself, SelfSwap.cs,
-# which renames an install still under the old exe name. A second file here
-# fails: a fallback to the old name does not come back.
-$Repo = Split-Path -Parent $Here
-$OldExeName = 'SkyrimTogether.exe'
-$known = @('launcher\app\SelfSwap.cs')
-$paths = @('launcher\app\*.cs', 'installer\setup\*.cs', 'installer\*.ps1', 'scripts\*\*.ps1', 'scripts\*\*.cmd', 'tools\*.ps1') |
-    ForEach-Object { Join-Path $Repo $_ }
-# The exe name, the bare process name, and the shortcut's two-word name.
-$oldBase = [IO.Path]::GetFileNameWithoutExtension($OldExeName)
-$oldPattern = [regex]::Escape($OldExeName) + '|"' + $oldBase + '"|' + ($oldBase -creplace '([a-z])([A-Z])', '$1 $2') + '\.lnk'
-$carry = @(Select-String -Path $paths -Pattern $oldPattern |
-    Select-Object -ExpandProperty Path -Unique | ForEach-Object { $_.Substring($Repo.Length + 1) })
-Write-Host ("      #497 count: " + $carry.Count + " file(s) carry the old name (13 before release 1; SelfSwap.cs, the update path, after)")
-$stray = @($carry | Where-Object { $known -notcontains $_ })
-Yes ('#497: only SelfSwap.cs, the update path, names the old exe' + $(if ($stray.Count) { ': ' + ($stray -join ', ') } else { '' })) ($stray.Count -eq 0)
-Yes '#497: the updater does not name the old exe itself, SelfSwap does' ($upd -notmatch $oldBase)
-Yes '#497: Icons repoints shortcuts aimed at the old exe' ((Get-Content -LiteralPath (Join-Path $App 'Icons.cs') -Raw) -match 'SelfSwap\.AimsAtOld\(target, exe\)')
+# ---- issue #497: the update path renames nothing -----------------------------
+# Release 1 (#901) taught the update to rename an install still under the
+# launcher's name from before the rename, and Icons to repoint its shortcuts.
+# Patrick, 29 Sep: nobody has those old files any more, so both went. The
+# update puts the new build at the running exe's own path, as before #901.
+$icons = Get-Content -LiteralPath (Join-Path $App 'Icons.cs') -Raw
+$swapAll = ''
+if ($haveSwap) { $swapAll = Get-Content -LiteralPath $swapCs -Raw }
+Yes '#497: SelfSwap has no Target, AimsAtOld, OldName or NewName' ($swapAll -cnotmatch '\b(Target|AimsAtOld|OldName|NewName)\b')
+Yes '#497: SelfSwap names no exe file at all' ($swapAll -notmatch '"[^"]*\.exe"')
+Yes '#497: the updater asks SelfSwap for no other destination' ($upd -cnotmatch 'SelfSwap\.(Target|NewName)')
+Yes '#497: Icons repoints no shortcut aimed at another exe' ($icons -cnotmatch 'AimsAtOld|SelfSwap\.(OldName|NewName)')
 
 if (-not $haveSwap) { Finish }
 $swapSrc = Get-Content -LiteralPath $swapCs -Raw
@@ -217,11 +204,8 @@ class Driver
     // What Updater.SelfUpdate does once the new exe is at exe.new: write the
     // script, start it hidden through the shell.
     // Arguments: bat exe neu pid checks|- [--write-only]
-    //       or: --target exe, --aims target exe (prints the answer)
     static int Main(string[] a)
     {
-        if (a[0] == "--target") { Console.WriteLine(Thornswood.SelfSwap.Target(a[1])); return 0; }
-        if (a[0] == "--aims") { Console.WriteLine(Thornswood.SelfSwap.AimsAtOld(a[1], a[2]) ? "yes" : "no"); return 0; }
         string bat = a[0], exe = a[1], neu = a[2];
         int pid = int.Parse(a[3]);
         string text = a[4] == "-"
@@ -306,7 +290,7 @@ function PidOf($ev, [string]$pattern) {
 function Alive([int]$id) {
     if ($id -le 0) { return $false }
     $p = Get-Process -Id $id -ErrorAction SilentlyContinue
-    return ($null -ne $p) -and (-not $p.HasExited) -and ($p.ProcessName -eq 'Thornswood' -or ($p.ProcessName + '.exe') -eq $OldExeName)
+    return ($null -ne $p) -and (-not $p.HasExited) -and ($p.ProcessName -eq 'Thornswood')
 }
 # The condition is run from here, so it sees the caller's variables by
 # PowerShell's dynamic scoping. GetNewClosure would cut it off from the
@@ -338,10 +322,10 @@ function Stop-Stubs {
 #>
 function Update-Case {
     param([string]$name, [string]$kind, [int]$checks = 0, [scriptblock]$before = $null,
-          [scriptblock]$during = $null, [int]$timeoutMs = 120000, [string]$exeName = 'Thornswood.exe')
+          [scriptblock]$during = $null, [int]$timeoutMs = 120000)
     $dir = Join-Path (Join-Path $root $name) 'Launcher'
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    $exe = Join-Path $dir $exeName
+    $exe = Join-Path $dir 'Thornswood.exe'
     $neu = $exe + '.new'
     Copy-Item -LiteralPath (Join-Path $bin 'old.exe') -Destination $exe
     if ($kind) { Copy-Item -LiteralPath (Join-Path $bin ($kind + '.exe')) -Destination $neu }
@@ -357,12 +341,8 @@ function Update-Case {
     if ($during) { $held = & $during $dir $exe $neu }
     $gone = Wait-For { -not (Test-Path -LiteralPath $bat) } $timeoutMs
     if ($held -is [IDisposable]) { $held.Dispose() }
-    # Where the new one goes: the same path, or Thornswood.exe beside an exe
-    # that still has the old name. The .old is kept under the new name,
-    # because that is what the new launcher clears; the .bad under the old.
-    $dest = Join-Path $dir 'Thornswood.exe'
     return [pscustomobject]@{
-        Dir = $dir; Exe = $exe; Dest = $dest; Neu = $neu; Old = $dest + '.old'; Bad = $exe + '.bad'
+        Dir = $dir; Exe = $exe; Neu = $neu; Old = $exe + '.old'; Bad = $exe + '.bad'
         Drove = $drove; Gone = $gone; Closing = $closing.Id
     }
 }
@@ -387,30 +367,13 @@ try {
     while ($i -ge 0) { if ($i -eq 0 -or $text[$i - 1] -ne '"') { $bare++ }; $i = $text.IndexOf($tdir, $i + 1) }
     Yes 'every path in it is quoted' ($bare -eq 0)
     Yes 'it renames the old exe to .old before the new one goes in' ($text.IndexOf('move /y "' + $texe + '" "' + $texe + '.old"') -ge 0 -and $text.IndexOf('move /y "' + $texe + '" "' + $texe + '.old"') -lt $text.IndexOf('move /y "' + $texe + '.new" "' + $texe + '"'))
-    Yes 'for Thornswood.exe it never names the old launcher or the new-name branch' ((-not $text.Contains($oldBase)) -and (-not $text.Contains(':runnew')))
-
-    # ---- issue #497: an install still called SkyrimTogether.exe -------------
-    $sexe = Join-Path $tdir 'SkyrimTogether.exe'
-    $sbat = Join-Path $tdir 'thornswood-update-4343.cmd'
-    & $driver $sbat $sexe ($sexe + '.new') 4343 '-' '--write-only' | Out-Null
-    $stext = [IO.File]::ReadAllText($sbat)
-    Yes '#497: the old exe is kept as Thornswood.exe.old, the name the new launcher clears' ($stext.Contains('move /y "' + $sexe + '" "' + $texe + '.old"'))
-    Yes '#497: the new one goes in as Thornswood.exe' ($stext.Contains('move /y "' + $sexe + '.new" "' + $texe + '"'))
-    Yes '#497: and it is Thornswood.exe that is started and watched' ($stext.Contains('start "" "' + $texe + '"') -and $stext.Contains('>>"' + $texe + '" (call )'))
-    Yes '#497: the way back puts the old one back under its own name' ($stext.Contains('move /y "' + $texe + '.old" "' + $sexe + '"'))
-    Yes '#497: with the failed build at SkyrimTogether.exe.bad, where the old one looks' ($stext.Contains('move /y "' + $texe + '" "' + $sexe + '.bad"'))
-    Yes '#497: SkyrimTogether.exe is never the destination of the new build' (-not $stext.Contains('.new" "' + $sexe + '"'))
-    $tgt = @(& $driver '--target' $sexe)[0]
-    Yes '#497: Target of SkyrimTogether.exe is Thornswood.exe beside it' ($tgt -eq $texe)
-    $tgt = @(& $driver '--target' $texe)[0]
-    Yes '#497: Target of Thornswood.exe is itself' ($tgt -eq $texe)
-    $tgt = @(& $driver '--target' (Join-Path $tdir 'skyrimtogether.EXE'))[0]
-    Yes '#497: the old name matches in any case' ($tgt -eq $texe)
-    $client = Join-Path $tdir 'Data\OtherMod\SkyrimTogether.exe'
-    Yes '#497: a shortcut to the old exe beside the launcher is ours' ((@(& $driver '--aims' $sexe $texe)[0]) -eq 'yes')
-    Yes '#497: a shortcut to an exe of the old name under Data is not' ((@(& $driver '--aims' $client $texe)[0]) -eq 'no')
-    Yes '#497: a shortcut to the running launcher is not repointed' ((@(& $driver '--aims' $texe $texe)[0]) -eq 'no')
-    Yes '#497: a launcher still running as the old name repoints nothing' ((@(& $driver '--aims' $sexe $sexe)[0]) -eq 'no')
+    # Issue #497: the new build goes in at the running launcher's own path and
+    # nowhere else, so every move and start in the script names that exe, its
+    # .new, .old or .bad, and no other file.
+    $named = @([regex]::Matches($text, '"([^"]*\.exe[^"]*)"') | ForEach-Object { $_.Groups[1].Value } |
+        Where-Object { $_ -ne $texe -and $_ -ne ($texe + '.new') -and $_ -ne ($texe + '.old') -and $_ -ne ($texe + '.bad') })
+    Yes ('#497: the script names no exe but the running one and its .new, .old and .bad' + $(if ($named.Count) { ': ' + ($named -join ', ') } else { '' })) ($named.Count -eq 0)
+    Yes '#497: and has no second branch for starting another name' (-not $text.Contains(':runnew'))
 
     # ---- a good new launcher ------------------------------------------------
     $r = Update-Case 'good' 'new-good'
@@ -523,40 +486,6 @@ try {
     $ev = Events $r.Dir
     Yes 'outside ASCII, broken: the old exe is back and running' ($ok -and ((HashOf $r.Exe) -eq $hash['old']) -and (Alive (PidOf $ev '^old started (\d+)')))
     Yes 'outside ASCII, broken: no .old and no .bad left' ((-not (Test-Path -LiteralPath $r.Old)) -and (-not (Test-Path -LiteralPath $r.Bad)))
-
-    # ---- #497: an install still called SkyrimTogether.exe, good update -------
-    $r = Update-Case 'rename good' 'new-good' 0 $null $null 120000 'SkyrimTogether.exe'
-    Yes 'rename good: the script finished and deleted itself' $r.Gone
-    $ok = Wait-For { (At (Events $r.Dir) '^new-good settled') -ge 0 } 30000
-    $ev = Events $r.Dir
-    Yes 'rename good: the new launcher started and settled' $ok
-    Yes 'rename good: it went in as Thornswood.exe' ((HashOf $r.Dest) -eq $hash['new-good'])
-    Yes 'rename good: SkyrimTogether.exe is gone' (-not (Test-Path -LiteralPath $r.Exe))
-    Yes 'rename good: the kept Thornswood.exe.old is gone, cleared by the new launcher' (-not (Test-Path -LiteralPath $r.Old))
-    Yes 'rename good: no .bad and no .new left' ((-not (Test-Path -LiteralPath $r.Bad)) -and (-not (Test-Path -LiteralPath $r.Neu)) -and (-not (Test-Path -LiteralPath ($r.Dest + '.bad'))))
-    Yes 'rename good: the old launcher was not started again' ((At $ev '^old started') -lt 0)
-    Yes 'rename good: the new launcher is running as Thornswood.exe' (Alive (PidOf $ev '^new-good started (\d+)'))
-
-    # ---- #497: an install still called SkyrimTogether.exe, broken update -----
-    $r = Update-Case 'rename broken' 'new-broken' 0 $null $null 120000 'SkyrimTogether.exe'
-    Yes 'rename broken: the script finished and deleted itself' $r.Gone
-    $ok = Wait-For { (At (Events $r.Dir) '^old settled') -ge 0 } 30000
-    $ev = Events $r.Dir
-    Yes 'rename broken: the new launcher ran and failed' ((At $ev '^new-broken started') -ge 0)
-    Yes 'rename broken: then the old launcher was started again' ($ok -and ((At $ev '^old started') -gt (At $ev '^new-broken started')))
-    Yes 'rename broken: the old exe is back under its old name, where the shortcuts point' ((HashOf $r.Exe) -eq $hash['old'])
-    Yes 'rename broken: no Thornswood.exe and no Thornswood.exe.old left' ((-not (Test-Path -LiteralPath $r.Dest)) -and (-not (Test-Path -LiteralPath $r.Old)))
-    Yes 'rename broken: the launcher that came back named the build that failed' ((At $ev '^old settled \d+: Launcher 2\.0\.0 did not start on this machine') -ge 0)
-    Yes 'rename broken: and cleared the SkyrimTogether.exe.bad it was kept in' (-not (Test-Path -LiteralPath $r.Bad))
-    Yes 'rename broken: the old launcher is running afterwards' (Alive (PidOf $ev '^old started (\d+)'))
-
-    # ---- #497: SkyrimTogether.exe, the new exe held open the whole minute ----
-    $r = Update-Case 'rename held' 'new-good' 0 $null $always 240000 'SkyrimTogether.exe'
-    Yes 'rename held: the script gave up on the swap and deleted itself' $r.Gone
-    $ok = Wait-For { (At (Events $r.Dir) '^old settled') -ge 0 } 30000
-    $ev = Events $r.Dir
-    Yes 'rename held: the old exe is back under its old name and was started' ($ok -and ((HashOf $r.Exe) -eq $hash['old']) -and (Alive (PidOf $ev '^old started (\d+)')))
-    Yes 'rename held: nothing at Thornswood.exe, the .new still waiting' ((-not (Test-Path -LiteralPath $r.Dest)) -and ((HashOf $r.Neu) -eq $hash['new-good']) -and (-not (Test-Path -LiteralPath $r.Old)))
 }
 finally {
     Stop-Stubs

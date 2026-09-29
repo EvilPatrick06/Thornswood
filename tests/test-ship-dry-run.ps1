@@ -58,9 +58,9 @@ param([string]$ShipPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ShipPath) { $ShipPath = Join-Path $Here '..\scripts\release\Ship.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $ShipPath) { $ShipPath = Join-Path $Here 'scripts\release\Ship.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -113,7 +113,7 @@ $shipSrc = [IO.File]::ReadAllText($ShipPath)
 $ship = Parse $ShipPath
 Yes 'Ship.ps1 parses' ($ship.Errors.Count -eq 0)
 
-$pkg = Parse (Join-Path $Here '..\scripts\release\Package-Thornswood.ps1')
+$pkg = Parse (Join-Path $Here 'scripts\release\Package-Thornswood.ps1')
 $noPub = @($pkg.Ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'NoPublish' })
 Yes 'Package-Thornswood.ps1 has a -NoPublish switch' ($noPub.Count -eq 1)
 $pubIf = @($pkg.Ast.FindAll({ param($n) $n -is $IfAst -and $n.Clauses[0].Item1.Extent.Text -eq '-not $NoPublish' }, $true))
@@ -126,7 +126,7 @@ if ($pubIf.Count -eq 1) {
 }
 Yes ("  and Publish-Installer.ps1 is named only inside it ({0} time(s)), so without -NoPublish it publishes and with it it does not" -f $named.Count) ($named.Count -ge 1 -and $pubIf.Count -eq 1 -and $outside.Count -eq 0)
 
-$pu = Parse (Join-Path $Here '..\scripts\release\Publish-Update.ps1')
+$pu = Parse (Join-Path $Here 'scripts\release\Publish-Update.ps1')
 $away = @($pu.Ast.FindAll({ param($n) $n -is $CmdAst }, $true) | Where-Object {
     $name = $_.GetCommandName()
     $words = @($_.CommandElements | ForEach-Object { $_.Extent.Text })
@@ -149,7 +149,6 @@ Yes '  and Ship always gives it the working folder' ($shipSrc -match '\$pubArgs 
 # ---- a repository, a releases clone and two installs, all stand-ins --------------
 $T = Join-Path ([IO.Path]::GetTempPath()) ('ts-ship-dry-' + [Guid]::NewGuid().ToString('N'))
 $repo = Join-Path $T 'Thornswood'
-$tools = Join-Path $repo 'tools'
 $appdata = Join-Path $T 'appdata'
 # This machine's working copies of the feeds (Feed-Store.ps1, #907), and the
 # folder standing in for the VPS store beside the site's feeds.
@@ -182,7 +181,7 @@ function Stub([string]$name, [string]$params, [string]$body) {
     $area = 'release'
     if ($name -in 'Publish-News', 'Publish-Discord') { $area = 'ops' }
     if ($name -eq 'Request-Restart') { $area = 'vps' }
-    $dir = Join-Path $tools ('..\scripts\' + $area)
+    $dir = Join-Path $repo ('scripts\' + $area)
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     [IO.File]::WriteAllText((Join-Path $dir ($name + '.ps1')), $text)
 }
@@ -201,7 +200,7 @@ function Invoke-Ship([string[]]$shipArgs) {
     if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force }
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
-        $out = & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools '..\scripts\release\Ship.ps1') @shipArgs 2>&1 | Out-String
+        $out = & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'scripts\release\Ship.ps1') @shipArgs 2>&1 | Out-String
         $code = $LASTEXITCODE
     } finally { $ErrorActionPreference = $old }
     $calls = @()
@@ -235,43 +234,43 @@ function Read-Version([string]$path) {
 }
 
 try {
-    foreach ($d in @($tools, (Join-Path $tools '..\launcher\app'), (Join-Path $tools '..\scripts\release'), $rel, $relDev, $bin,
+    foreach ($d in @((Join-Path $repo 'launcher\app'), (Join-Path $repo 'scripts\release'), $rel, $relDev, $bin,
                      (Join-Path $root 'Launcher'), (Join-Path $rootDev 'Launcher'), $dist, (Join-Path $appdata 'Thornswood'))) {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
-    Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $tools '..\scripts\release\Ship.ps1') -Force
+    Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $repo 'scripts\release\Ship.ps1') -Force
     # The real files Ship dot-sources, beside it, so it runs as it does for real.
     $realRel = Split-Path -Parent $ShipPath
     foreach ($n in 'Ship-Rules.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1') {
-        Copy-Item -LiteralPath (Join-Path $realRel $n) -Destination (Join-Path $tools ('..\scripts\release\' + $n)) -Force
+        Copy-Item -LiteralPath (Join-Path $realRel $n) -Destination (Join-Path $repo ('scripts\release\' + $n)) -Force
     }
-    Copy-Item -LiteralPath (Join-Path $realRel '..\..\layout.json') -Destination (Join-Path $tools '..\layout.json') -Force
-    New-Item -ItemType Directory -Force -Path (Join-Path $tools '..\scripts\mods') | Out-Null
-    Copy-Item -LiteralPath (Join-Path $realRel '..\mods\LoadOrder.ps1') -Destination (Join-Path $tools '..\scripts\mods\LoadOrder.ps1') -Force
+    Copy-Item -LiteralPath (Join-Path $realRel '..\..\layout.json') -Destination (Join-Path $repo 'layout.json') -Force
+    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'scripts\mods') | Out-Null
+    Copy-Item -LiteralPath (Join-Path $realRel '..\mods\LoadOrder.ps1') -Destination (Join-Path $repo 'scripts\mods\LoadOrder.ps1') -Force
     # What Ship.ps1 dot-sources, which a stand-in cannot write down because it
     # is not called, only read. The two rule files are the real ones: they
     # only define functions, and the notes below are held to Note-Rules the
     # way a real Ship holds them.
     $realRelease = Split-Path -Parent (Resolve-Path -LiteralPath $ShipPath).Path
     foreach ($f in 'Ship-Rules.ps1', 'Note-Rules.ps1') {
-        Copy-Item -LiteralPath (Join-Path $realRelease $f) -Destination (Join-Path $tools '..\scripts\release') -Force
+        Copy-Item -LiteralPath (Join-Path $realRelease $f) -Destination (Join-Path $repo 'scripts\release') -Force
     }
     # The publish sign gate (#826) and the load order check (#557) read this
     # machine's signing setup, its signed exe and Vortex, none of which a
     # temp folder has. Their stand-ins pass, so what is measured here is
     # still what Ship calls and what leaves the machine; the gate itself has
     # tests\test-publish-sign-gate.ps1.
-    [IO.File]::WriteAllText((Join-Path $tools '..\scripts\release\Assert-PublishSigned.ps1'), @'
+    [IO.File]::WriteAllText((Join-Path $repo 'scripts\release\Assert-PublishSigned.ps1'), @'
 function Get-SigningConfigRefusal { param([string]$ConfigPath, [string]$RepoRoot) return '' }
 function Get-ExpectedSignerFragment { param([string]$RepoRoot) return 'CN=Thornswood' }
 function Get-PublishSignRefusal { param([string]$Path, [string]$ExpectedSigner) return '' }
 '@)
-    New-Item -ItemType Directory -Force -Path (Join-Path $tools '..\scripts\mods') | Out-Null
-    [IO.File]::WriteAllText((Join-Path $tools '..\scripts\mods\LoadOrder.ps1'), @'
+    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'scripts\mods') | Out-Null
+    [IO.File]::WriteAllText((Join-Path $repo 'scripts\mods\LoadOrder.ps1'), @'
 function Assert-VortexProfile([string]$Name = 'Thornswood') { return (Join-Path $env:LOCALAPPDATA 'Vortex-Thornswood') }
 function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
 '@)
-    $updaterCs = Join-Path $tools '..\launcher\app\Updater.cs'
+    $updaterCs = Join-Path $repo 'launcher\app\Updater.cs'
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.93`";`r`n")
     # The VPS store (Feed-Store.ps1, #907), stood in for by a folder, and this
     # machine's working copies of it as the last run left them.

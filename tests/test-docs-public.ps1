@@ -19,9 +19,9 @@ param([string]$Path)
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$here = Join-Path (Split-Path -Parent $here) 'tools'
-if (-not $Path) { $Path = Join-Path $here '..\scripts\deploy\Deploy-Docs.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$here = Split-Path -Parent $here
+if (-not $Path) { $Path = Join-Path $here 'scripts\deploy\Deploy-Docs.ps1' }
 
 $pass = 0; $fail = 0
 function yes([string]$what, [bool]$cond) {

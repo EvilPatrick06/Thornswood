@@ -169,8 +169,8 @@ try {
     Yes 'no record: the record row fails as a need' ($rows.Count -eq 1 -and -not $rows[0].Ok -and $rows[0].Level -eq 'need')
 
     # -------------------------------------------------- 5. main-only rows --
-    $tools = Join-Path $tmp 'tools'
-    $stub = Join-Path $tools 'setup-stub.exe'
+    $outDir = Join-Path $tmp 'out'
+    $stub = Join-Path $outDir 'setup-stub.exe'
     $pkgStub = Join-Path $tmp 'out\dist\Thornswood\_dist\setup-stub.exe'
     $boot = Join-Path $tmp 'installer\setup\Bootstrap.cs'
     Put $tmp 'installer\setup\Bootstrap.cs' 'class Bootstrap {}'
@@ -201,7 +201,7 @@ try {
     Yes '5. a fresh worktree on main with both warnings is still READY' ($v.Ready)
     Yes '5. and lists the two warnings' ($v.Warns.Count -eq 2)
 
-    Put $tools 'setup-stub.exe' 'stub'
+    Put $outDir 'setup-stub.exe' 'stub'
     Put $srv 'scam_native.node' 'the recorded server'
     $m = @(Main-Rows 'main')
     Yes '5. a stub newer than Bootstrap.cs and a matching server build pass' (@($m | Where-Object { -not $_.Ok }).Count -eq 0)

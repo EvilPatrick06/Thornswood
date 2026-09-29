@@ -26,13 +26,13 @@
   name a different server.js and Door.cs, so it can be pointed at the
   versions from before the fix to watch it fail.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const SRC = process.argv[2] || path.join(TOOLS_DIR, '..', 'site', 'server.js');
+const SRC = process.argv[2] || path.join(REPO_DIR, 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8');
-const DOOR = fs.readFileSync(process.argv[3] || path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Door.cs'), 'utf8');
+const DOOR = fs.readFileSync(process.argv[3] || path.join(REPO_DIR, 'launcher', 'app', 'Door.cs'), 'utf8');
 
 function braced(at, what) {
   const b = src.indexOf('{', at);

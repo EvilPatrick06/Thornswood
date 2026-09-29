@@ -6,7 +6,7 @@
 
       .\scripts\mods\Audit-Mods.ps1
 
-  Reads only. Writes one report, tools\mod-audit.json, and prints a summary.
+  Reads only. Writes one report, local\mod-audit.json, and prints a summary.
 
   Why this exists. SkyMP's client compares the server's manifest against the
   plugin list POSITIONALLY, index by index. One plugin missing shifts every
@@ -146,10 +146,13 @@ $report = [pscustomobject]@{
     looseTotal = [long]$looseTotal
     bsaModTotal = [long]$bsaModTotal
 }
-$out = Join-Path $Here '..\..\tools\mod-audit.json'
+# local\ is what this machine keeps and git ignores (tools\ until 29 Sep, #440).
+$outDir = Join-Path $Here '..\..\local'
+New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+$out = Join-Path $outDir 'mod-audit.json'
 [IO.File]::WriteAllText($out, ($report | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
 
 Write-Host ''
-Say "  Written to tools\mod-audit.json. Tell Claude it is done." 'Green'
+Say "  Written to local\mod-audit.json. Tell Claude it is done." 'Green'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

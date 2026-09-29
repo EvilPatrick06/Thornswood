@@ -37,14 +37,14 @@
   Read only apart from files under its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$ToolsPath)
+param([string]$RepoPath)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsPath) { $ToolsPath = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoPath) { $RepoPath = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -53,9 +53,9 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$Checker  = Join-Path $ToolsPath '..\scripts\dev\Check-Swallow.ps1'
-$Baseline = Join-Path $ToolsPath '..\scripts\dev\swallow-baseline.txt'
-$AppDir   = Join-Path $ToolsPath '..\launcher\app'
+$Checker  = Join-Path $RepoPath 'scripts\dev\Check-Swallow.ps1'
+$Baseline = Join-Path $RepoPath 'scripts\dev\swallow-baseline.txt'
+$AppDir   = Join-Path $RepoPath 'launcher\app'
 $SwallowCs = Join-Path $AppDir 'Swallow.cs'
 
 Yes 'Check-Swallow.ps1 is there' (Test-Path -LiteralPath $Checker)

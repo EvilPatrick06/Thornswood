@@ -70,14 +70,14 @@
   removed before this ends. Never connects to anything.
 #>
 [CmdletBinding()]
-param([string]$ToolsPath)
+param([string]$RepoPath)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsPath) { $ToolsPath = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoPath) { $RepoPath = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -92,7 +92,7 @@ function Done {
     exit 0
 }
 
-$deploy = Join-Path $ToolsPath '..\scripts\deploy\Deploy-Docs.ps1'
+$deploy = Join-Path $RepoPath 'scripts\deploy\Deploy-Docs.ps1'
 $errs = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($deploy, [ref]$null, [ref]$errs)
 Yes 'Deploy-Docs.ps1 parses' ($errs.Count -eq 0)
@@ -257,7 +257,7 @@ foreach ($account in @('', 'SYSTEM', 'LOCAL SERVICE')) {
 # the day the site stops being SYSTEM, with nothing in any log to say why.
 $real = BlockOf (Build 'LOCAL SERVICE' 'C:\Thornswood-Docs')
 Yes 'LOCAL SERVICE: its own folder gets Modify' ($real -and $real.Contains("@('C:\Thornswood-Docs', '(OI)(CI)M')"))
-$serverJs = Get-Content -LiteralPath (Join-Path $ToolsPath '..\site\server.js') -Raw
+$serverJs = Get-Content -LiteralPath (Join-Path $RepoPath 'site\server.js') -Raw
 $outside = @()
 foreach ($m in [regex]::Matches($serverJs, "'([A-Za-z]:(?:\\\\|/)[^']*)'")) {
     $p = $m.Groups[1].Value.Replace('\\', '\').Replace('/', '\')

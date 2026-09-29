@@ -172,7 +172,9 @@ How to use it:
   `local`, ignored too. Scripts ask `scripts\release\Where.ps1` where each of these is
   rather than naming a path. It no longer falls back to `C:\Thornswood-Dev`:
   no machine has that folder any more, and the fallback went on 28 Sep
-  (issue #440), along with the forwarding copies in `tools\`.
+  (issue #440), along with the forwarding copies in `tools\`. The files a
+  machine kept in `tools\` moved on 29 Sep (signing.json to `records\signing`,
+  the setup stub to `out`, the rest to `local`) and the folder is gone.
 - Launcher code is C# 5 only: no string interpolation, no ?., no nameof,
   no expression bodied members, no out var.
 - Every change goes out as one complete release: launcher, game files and
@@ -310,7 +312,7 @@ the team before code; nobody settles it alone, and a Claude never does.
   is set, so every launcher from dev 1.1.101.17 on refuses an update that is
   not signed by that certificate. **Only a machine that signs may Ship, dev
   included.** `Ship.ps1` and `Publish-Installer.ps1` refuse (non-zero exit) when
-  `tools\signing.json` is missing or disabled, or when the launcher / Setup tip
+  `records\signing\signing.json` is missing or disabled, or when the launcher / Setup tip
   is not Authenticode Valid under `ExpectedSigner`. Local `Build-Launcher` /
   `Package -NoPublish` may still print "not signing" and leave an unsigned
   intermediate; that soft skip must not reach the site or the feed. The live main launcher,

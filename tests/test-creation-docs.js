@@ -32,12 +32,12 @@
 // so a page that goes stale again fails here rather than in front of a tester.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 function read(rel) {
-  return fs.readFileSync(path.join(TOOLS_DIR, rel), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join(REPO_DIR, rel), 'utf8').split(CR).join('');
 }
 
 let pass = 0, fail = 0;
@@ -46,11 +46,11 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const gm = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const skills = read(path.join('..', 'game', 'ui', 'thornswood-skills.js'));
-const known = read(path.join('..', 'site', 'data', 'known.md'));
-const help = read(path.join('..', 'site', 'data', 'help.md'));
+const skills = read(path.join('game', 'ui', 'thornswood-skills.js'));
+const known = read(path.join('site', 'data', 'known.md'));
+const help = read(path.join('site', 'data', 'help.md'));
 
 /** From a start marker to the first end marker after it, or null. */
 function slice(src, start, end) {
@@ -64,7 +64,7 @@ function slice(src, start, end) {
 
 // The launcher has no creation step. Creation.cs was the dialog; nothing in
 // launcher/app declares a class of that name now.
-const appDir = path.join(TOOLS_DIR, '..', 'launcher', 'app');
+const appDir = path.join(REPO_DIR, 'launcher', 'app');
 const csFiles = fs.readdirSync(appDir).filter(function (f) { return /\.cs$/i.test(f); });
 const launcherCreates = csFiles.some(function (f) {
   return /\bclass\s+Creation\b/.test(fs.readFileSync(path.join(appDir, f), 'utf8'));
@@ -151,9 +151,9 @@ function launcherChooses(s) {
 
 // The public site pages are not this entry's to rewrite, but they say the
 // same thing and must go on agreeing with the game. They do today.
-const siteDir = path.join(TOOLS_DIR, '..', 'site', 'data', 'site');
+const siteDir = path.join(REPO_DIR, 'site', 'data', 'site');
 fs.readdirSync(siteDir).filter(function (f) { return /\.md$/.test(f); }).forEach(function (f) {
-  const wrong = sentences(read(path.join('..', 'site', 'data', 'site', f))).filter(launcherChooses);
+  const wrong = sentences(read(path.join('site', 'data', 'site', f))).filter(launcherChooses);
   if (wrong.length) { yes('site/' + f + ' puts a choice in the launcher: "' + wrong[0] + '"', false); }
 });
 

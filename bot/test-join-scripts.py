@@ -39,7 +39,6 @@ import tempfile
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TOOLS = os.path.join(os.path.dirname(HERE), 'tools')
 sys.path.insert(0, HERE)
 # The scripts and bot.py refuse to load without one, and nothing here lets
 # any of them use it.

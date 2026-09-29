@@ -31,9 +31,9 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\; $Tools is the tools folder beside them, which is
 # how every harness here finds the repository.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
+$Here = Split-Path -Parent $Here
 if (-not $Tools) { $Tools = $Here }
-$realRepo = Split-Path -Parent $Tools
+$realRepo = $Tools
 
 $script:pass = 0
 $script:fail = 0
@@ -91,15 +91,14 @@ try {
     Yes 'and ClientDist under it is the engine''s client build' (Same $strictSaid['ClientDist'] (Join-Path $newEngine 'build\dist\client'))
 
     # 2. An old folder full of what the old layout held, beside the scratch
-    #    repository, and an old tools\discord in it: nothing changes.
+    #    repository: nothing changes.
     New-Item -ItemType Directory -Force -Path (Join-Path $old 'skymp\build\dist\server') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $old 'dist\Thornswood\_dist') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $old '_payload') | Out-Null
     [IO.File]::WriteAllText((Join-Path $old 'skymp\CMakeLists.txt'), 'project(skymp)')
-    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'tools\discord') | Out-Null
     Yes 'an old folder full of the old layout does not change the engine' (Same (Ask 'Engine') $newEngine)
     Yes 'nor the output' (Same (Ask 'Out') $newOut)
-    Yes 'bot is bot, even with an old tools\discord and no bot folder' (Same (Ask 'bot') (Join-Path $repo 'bot'))
+    Yes 'bot is bot, even with no bot folder' (Same (Ask 'bot') (Join-Path $repo 'bot'))
     $oldRootTaken = $true
     try { & $w 'Engine' -OldRoot $old | Out-Null } catch { $oldRootTaken = $false }
     Yes 'Where.ps1 takes no -OldRoot any more' (-not $oldRootTaken)

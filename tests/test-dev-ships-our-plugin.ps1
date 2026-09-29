@@ -13,9 +13,9 @@
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$here = Join-Path (Split-Path -Parent $here) 'tools'
-$src = Join-Path $here '..\scripts\release\Publish-Update.ps1'
+# The tests are in tests\, the repository is one folder up.
+$here = Split-Path -Parent $here
+$src = Join-Path $here 'scripts\release\Publish-Update.ps1'
 
 $pass = 0; $fail = 0
 function yes([string]$what, [bool]$cond) {
@@ -57,7 +57,7 @@ if ($fn -and $list) {
 }
 
 $code = Get-Content -LiteralPath $src -Raw
-yes 'the launcher side it relies on is still there: Updater unshares before it extracts' ((Get-Content -LiteralPath (Join-Path $here '..\launcher\app\Updater.cs') -Raw) -match 'OwnGame\.Unshare\(full\);\s*\r?\n\s*e\.ExtractToFile\(full, true\);')
+yes 'the launcher side it relies on is still there: Updater unshares before it extracts' ((Get-Content -LiteralPath (Join-Path $here 'launcher\app\Updater.cs') -Raw) -match 'OwnGame\.Unshare\(full\);\s*\r?\n\s*e\.ExtractToFile\(full, true\);')
 
 Write-Host ''
 Write-Host ('{0} passed, {1} failed' -f $pass, $fail)

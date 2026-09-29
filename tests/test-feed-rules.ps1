@@ -32,8 +32,8 @@ $ErrorActionPreference = 'Stop'
 
 $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$here = Join-Path (Split-Path -Parent $here) 'tools'
+# The tests are in tests\, the repository is one folder up.
+$here = Split-Path -Parent $here
 
 $script:pass = 0
 $script:fail = 0
@@ -42,7 +42,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" -ForegroundColor Red }
 }
 
-$rules = Join-Path $here '..\scripts\release\Feed-Rules.ps1'
+$rules = Join-Path $here 'scripts\release\Feed-Rules.ps1'
 if (-not (Test-Path -LiteralPath $rules)) {
     Write-Host 'FAIL  Feed-Rules.ps1 is not in tools' -ForegroundColor Red
     Write-Host ''
@@ -150,7 +150,7 @@ Yes 'dropped: private source only' ((Ids ($hs.Drop | ForEach-Object { $_.Pack })
 Write-Host ''
 Write-Host 'Publish-Update adding packs'
 
-$pubSrc = Get-Content -LiteralPath (Join-Path $here '..\scripts\release\Publish-Update.ps1') -Raw
+$pubSrc = Get-Content -LiteralPath (Join-Path $here 'scripts\release\Publish-Update.ps1') -Raw
 $a = $pubSrc.IndexOf('# ==== thornswood feed append ====')
 $b = $pubSrc.IndexOf('# ==== end thornswood feed append ====')
 Yes 'the feed append block is marked in Publish-Update.ps1' (($a -ge 0) -and ($b -gt $a))
@@ -260,7 +260,7 @@ Write-Host ''
 Write-Host 'Repair-Manifest'
 
 $ps = (Get-Process -Id $PID).Path
-$repair = Join-Path $here '..\scripts\release\Repair-Manifest.ps1'
+$repair = Join-Path $here 'scripts\release\Repair-Manifest.ps1'
 function Run-Repair([string[]]$more) {
     $args2 = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $repair) + $more
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -360,7 +360,7 @@ finally {
 Write-Host ''
 Write-Host 'where applied.txt is looked for'
 
-$pubUpd = Join-Path $here '..\scripts\release\Publish-Update.ps1'
+$pubUpd = Join-Path $here 'scripts\release\Publish-Update.ps1'
 function Get-Fn([string]$path, [string]$name) {
     $t = $null; $e = $null
     $a = [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $path).Path, [ref]$t, [ref]$e)
@@ -432,9 +432,9 @@ if ($repairFind -ne '') {
 # Sync-Client, Go and Deploy-Gamemode find the install the same way now (#546).
 # Their Find-Root is the Publish-Update one word for word, and each fills its
 # path default from it when the caller did not pass one. No shared helper yet.
-$sync = Join-Path $here '..\scripts\release\Sync-Client.ps1'
-$go = Join-Path $here '..\scripts\release\Go.ps1'
-$deploy = Join-Path $here '..\scripts\deploy\Deploy-Gamemode.ps1'
+$sync = Join-Path $here 'scripts\release\Sync-Client.ps1'
+$go = Join-Path $here 'scripts\release\Go.ps1'
+$deploy = Join-Path $here 'scripts\deploy\Deploy-Gamemode.ps1'
 $syncFind = Get-Fn $sync 'Find-Root'
 $goFind = Get-Fn $go 'Find-Root'
 $deployFind = Get-Fn $deploy 'Find-Root'

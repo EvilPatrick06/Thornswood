@@ -24,7 +24,7 @@
 // REAL functions out of the page rather than reading them.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
@@ -34,10 +34,10 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const UI = path.join(TOOLS_DIR, '..', 'game', 'ui');
+const UI = path.join(REPO_DIR, 'game', 'ui');
 const overlay = fs.readFileSync(path.join(UI, 'thornswood-voice.js'), 'utf8');
 const chat = fs.readFileSync(path.join(UI, 'thornswood-chat.js'), 'utf8');
-const plain = fs.readFileSync(path.join(TOOLS_DIR, '..', 'voice', 'public', 'voice.js'), 'utf8');
+const plain = fs.readFileSync(path.join(REPO_DIR, 'voice', 'public', 'voice.js'), 'utf8');
 
 /* Lift a function out of a page by name, braces balanced. */
 function lift(src, head) {

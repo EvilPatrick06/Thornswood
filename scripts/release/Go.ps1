@@ -172,9 +172,11 @@ function Update-KeptCopies([string]$GameDir, [string[]]$Installed, [string[]]$Re
 
 # ------------------------------------------------------------------- front --
 Head 'Front'
-$zip = Join-Path $Here '..\..\tools\thornswood-front.zip'
+# The front build, made outside the repository and kept in local\, which git
+# ignores (in tools\ until 29 September, issue #440 phase 10).
+$zip = Join-Path $Here '..\..\local\thornswood-front.zip'
 if (-not (Test-Path -LiteralPath $zip)) {
-  Bad 'thornswood-front.zip is not next to this script'
+  Bad 'thornswood-front.zip is not in local\ in the repository folder'
 } else {
   New-Item -ItemType Directory -Force -Path $ui | Out-Null
   Expand-Archive -LiteralPath $zip -DestinationPath $ui -Force

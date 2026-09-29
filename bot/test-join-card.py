@@ -31,8 +31,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TOOLS = os.path.join(os.path.dirname(HERE), 'tools')
-ROOT = os.path.dirname(TOOLS)
+ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 # bot.py refuses to load without one, and never uses it unless client.run is
 # called, which nothing here does.

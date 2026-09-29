@@ -8023,7 +8023,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 */
   // ==== RECIPES_BY_ID ====
   /* Built by scripts\dev\Build-RecipeTable.ps1 out of the game's own records. Do not hand edit.
-     1888 crafting recipes, out of 4525 in tools\recipes.json.
+     1888 crafting recipes, out of 4525 in game\data\recipes.json.
 
      Recipe desc -> what it makes, what kind of record that is, how many it
      makes, which profession and which half of it owns the recipe, and which
