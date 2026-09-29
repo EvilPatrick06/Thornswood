@@ -26610,6 +26610,57 @@ log('gamemode loaded:',
     nobody else's (POST /api/play/roster with the Discord ticket). Sent when
     the book changes, and once after a start so a restart is not a blank.
   */
+  /*
+    WHICH OF THE LAUNCHERS' CHARACTERS THIS WORLD STILL HOLDS (#955).
+
+    Patrick picked his character on dev on 28 Sep and was sent to creation.
+    The dev server's log: "Creating character ff000005", "1 logged as
+    902356861". The engine found no actor under that profile and made a new
+    one, so the gamemode was right to treat it as new. The character had been
+    made on 20 Sep in a dev world that started over on 23 Sep, and since 26 Sep
+    the engine also skips any character whose saved race no longer loads
+    ("Skipping ChangeForm ...: bad raceId in appearanceDump"). The launcher
+    still listed it, with its old name off the site's roster, which never
+    forgets a row.
+
+    So the server says which characters it has. Every profile the site allows
+    in (allowed.json, which the door refreshes) is looked up in this world, and
+    the answer goes to the site with the roster: checked is the list looked
+    at, held the ones with a character here. The site tells each launcher
+    which of its own characters this server does not have, and the menu marks
+    them. Sent once after a start and every HELD_EVERY_MS.
+  */
+  var HELD_EVERY_MS = 300000;
+  var serverName = 'main';
+  try {
+    var cfgS = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+    serverName = String((cfgS && cfgS.thornswoodServer) || '').trim().toLowerCase() || 'main';
+  } catch (e) { }
+  var heldSaid = false;
+  function heldReport() {
+    if (typeof mp === 'undefined' || !mp || typeof mp.getActorsByProfileId !== 'function') {
+      if (!heldSaid) { heldSaid = true; console.log('[thornswood] roster: this server cannot look characters up by profile, so the menu is not told which are gone'); }
+      return null;
+    }
+    var ids = [];
+    try {
+      var doc = JSON.parse(fs.readFileSync(path.join(privDir, 'allowed.json'), 'utf8').replace(/^﻿/, ''));
+      var list = (doc && Array.isArray(doc.profiles)) ? doc.profiles : [];
+      for (var i = 0; i < list.length; i++) {
+        var n = Number(list[i]);
+        if (n > 0 && ids.indexOf(n) < 0) ids.push(n);
+      }
+    } catch (e) { return null; }
+    if (!ids.length) return null;
+    var held = [];
+    for (var j = 0; j < ids.length; j++) {
+      var got;
+      try { got = mp.getActorsByProfileId(ids[j]); } catch (e) { return null; }
+      if (got && got.length) held.push(ids[j]);
+    }
+    return { checked: ids, held: held };
+  }
+
   var pushSaid = false;
   function push() {
     var conf;
@@ -26621,7 +26672,10 @@ log('gamemode loaded:',
     try { https = require('https'); } catch (e) { return; }
     var u;
     try { u = new URL(String(conf.site).replace(/\/+$/, '') + '/api/roster'); } catch (e) { return; }
-    var body = JSON.stringify({ key: String(conf.key), who: book });
+    var msg = { key: String(conf.key), who: book, server: serverName };
+    var rep = heldReport();
+    if (rep) { msg.checked = rep.checked; msg.held = rep.held; }
+    var body = JSON.stringify(msg);
     try {
       var req = https.request({
         host: u.hostname, port: u.port || 443, path: u.pathname, method: 'POST', timeout: 5000,
@@ -26644,6 +26698,12 @@ log('gamemode loaded:',
     } catch (e) { }
   }
   setTimeout(push, 15000);
+  // The held report goes again every five minutes, a new character included.
+  // Stored so a hot reload replaces it rather than adding another.
+  if (globalThis.__thornswoodHeldPush) {
+    try { clearInterval(globalThis.__thornswoodHeldPush); } catch (e) { }
+  }
+  globalThis.__thornswoodHeldPush = setInterval(push, HELD_EVERY_MS);
 
   var dirty = false;
 
