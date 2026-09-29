@@ -81,8 +81,12 @@ $rec = $null
 try { $rec = [IO.File]::ReadAllText($Record) | ConvertFrom-Json } catch { throw "$Record does not parse: $($_.Exception.Message). Nothing was packed." }
 $why = @(Get-ThornswoodServerBuildProblems $rec (Get-ThornswoodServerFolderSums $Dist) $Dist $Record)
 if ($why.Count) {
-    throw ("the server files in $Dist are not the build $Record names: " + ($why -join '; ') + '. ' +
-           'If it was rebuilt on purpose, record it with .\scripts\release\New-ServerBuildRecord.ps1 and commit that; if not, find out what changed. Nothing was packed.')
+    # Said a line each rather than inside the error, which Windows PowerShell
+    # wraps at the window's width, words cut in half.
+    Write-Host "the server files in $Dist are not the build $Record names:" -ForegroundColor Red
+    foreach ($w in $why) { Write-Host ('  ' + $w) -ForegroundColor Red }
+    Write-Host '  If it was rebuilt on purpose, record it with .\scripts\release\New-ServerBuildRecord.ps1 and commit that; if not, find out what changed.' -ForegroundColor Yellow
+    throw 'the server files are not the recorded build; the lines above say which. Nothing was packed.'
 }
 $recFiles = Get-ThornswoodServerRecordFiles $rec
 Write-Host ('every server file is the recorded build of ' + ([string]$rec.source.commit).Substring(0, 8) + ': ' + $recFiles.Count + ' files, scam_native.node ' + ([string]$rec.sha256).Substring(0, 12)) -ForegroundColor Cyan
@@ -108,7 +112,7 @@ Copy-Item -LiteralPath $Record -Destination (Join-Path $OutDir 'server-build.jso
 $distFull = (Get-Item -LiteralPath $Dist).FullName.TrimEnd('\')
 $left = @(Get-ChildItem -LiteralPath $distFull -Recurse -File -Force | ForEach-Object { ConvertTo-ThornswoodServerRel ($_.FullName.Substring($distFull.Length)) } |
           Where-Object { -not $taken.ContainsKey($_) -and $_ -ne 'server-settings.json' -and $_ -ne 'scam_native.pdb' -and $_ -notlike 'world/*' })
-Write-Host ("server files copied: the {0} recorded, gamemode.js, the build stamp and the record" -f $recFiles.Count) -ForegroundColor Cyan
+Write-Host ("server files copied: the {0} recorded, {1}and the record" -f $recFiles.Count, (@($own | Where-Object { $taken.ContainsKey($_) } | ForEach-Object { $_ + ', ' }) -join '')) -ForegroundColor Cyan
 if ($left.Count) { Write-Host ('  left in the build, not part of a server release: ' + ($left -join ', ')) -ForegroundColor DarkGray }
 
 # ---- the plugins its load order names --------------------------------------
