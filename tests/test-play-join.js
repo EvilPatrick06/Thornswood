@@ -217,6 +217,8 @@ async function allowed(table, over) {
     standingsForDoor: forDoor(standingFrom(over)),
     jsonFile: function (f, fallback) { return f === 'linked.json' ? clone(table) : fallback; },
     LINKED: 'linked.json',
+    // Staff bans kept on the site (#412); none here. test-staff-bans.js runs them.
+    activeBans: function () { return []; },
     sendJson: null
   });
 }
