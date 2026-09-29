@@ -186,8 +186,12 @@ jobs:
             Write-Host '::error file=tests/test-architecture.js::no node on this runner, so the architecture page was not checked'
             exit 1
           }
+          # Issue #454 added the seventh: the new-box runbook read against the
+          # scripts it names, about twenty seconds, so a renamed script or
+          # parameter fails here rather than on the day the box is gone.
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
-                 'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1'
+                 'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
+                 'test-new-box-runbook.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
@@ -199,7 +203,7 @@ jobs:
             if ($code -ne 0) { $failed += $n; Write-Host ("::error file=tests/{0}::harness failed, the FAIL lines above say what" -f $n) }
           }
           if ($failed.Count) { Write-Host ("{0} harness(es) failed: {1}" -f $failed.Count, ($failed -join ', ')); exit 1 }
-          Write-Host 'all six passed'
+          Write-Host ('all {0} passed' -f $six.Count)
 
       - name: Check the launcher window
         shell: powershell
