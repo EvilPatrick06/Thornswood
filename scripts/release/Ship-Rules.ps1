@@ -543,12 +543,34 @@ function Test-ShipRetired([string]$rel) {
     return $false
 }
 
+# Body shape sliders and jiggle, issue #993. Patrick, 28 September: no jiggle
+# physics and nothing in creation that changes breasts, seat, genitals or
+# nipples, for men and women alike; height and weight stay. CBPC's cbp.dll is
+# all of the jiggle, and the three scripts are RaceMenu's body slider pages.
+# The launcher leaves them out of its own game folder (OwnGame.BodyShape,
+# rules 9), so, like the retired files above, a pack never carries them and
+# never lists them as removed. Change the two lists together.
+$ShipBodyShapeFiles = @(
+    'Data\SKSE\Plugins\cbp.dll',
+    'Data\Scripts\RaceMenuMorphsCBBE.pex',
+    'Data\Scripts\_RaceMenuMorphsHIMBO.pex',
+    'Data\Scripts\RaceMenuPluginSoS.pex'
+)
+
+function Test-ShipBodyShape([string]$rel) {
+    foreach ($f in $ShipBodyShapeFiles) {
+        if ($rel -ieq $f) { return $true }
+    }
+    return $false
+}
+
 # One machine's own, never shipped and never listed as removed. Other servers'
 # files count as the machine's here, so a release never strips another
 # server's install off a tester.
 function Test-ShipMachine([string]$rel) {
     if (Test-ShipOtherServer $rel) { return $true }
     if (Test-ShipRetired $rel) { return $true }
+    if (Test-ShipBodyShape $rel) { return $true }
     # So do Bethesda's files and other people's frameworks and tools, for the
     # same reason. See the note over $ShipVanillaDataFiles for the 90 files
     # that needed it on 24 September, and the one over $ShipBethesdaLeftAlone

@@ -454,8 +454,11 @@ namespace Thornswood
         ///    collection installer left in the Steam copy are left out, so a
         ///    refresh cannot link them back after a pack deletes them. See
         ///    Foreign, issue #960.
+        /// 9: body shape sliders and jiggle (CBPC's cbp.dll and the three
+        ///    RaceMenu body slider scripts) are left out, and taken out of a
+        ///    folder that already has them. See BodyShape, issue #993.
         /// </summary>
-        const int Rules = 8;
+        const int Rules = 9;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -710,6 +713,18 @@ namespace Thornswood
                     if (File.Exists(dest)) { DropName(dest); removed++; }
                 }
                 catch (Exception ex) { Swallow.Note("OwnGame.Refresh, drop retired", ex); }
+            }
+
+            // So do the body shape sliders and jiggle (#993). A link removed
+            // here is this folder's name for the file; Vortex's copy stays.
+            foreach (string r in BodyShapeFiles)
+            {
+                try
+                {
+                    string dest = Path.Combine(Folder, r);
+                    if (File.Exists(dest)) { DropName(dest); removed++; }
+                }
+                catch (Exception ex) { Swallow.Note("OwnGame.Refresh, drop body shape", ex); }
             }
 
             File.WriteAllLines(FilesList, lines.ToArray());
@@ -1102,6 +1117,7 @@ namespace Thornswood
             if (UnwantedCreation(rel)) return "a Creation Club plugin the server does not load";
             if (CrashesUs(rel)) return "it crashes the quick favourites menu";
             if (Retired(rel)) return "Start On Save is no longer part of Thornswood";
+            if (BodyShape(rel)) return "body shape sliders and jiggle are not part of Thornswood";
             return null;
         }
 
@@ -1135,6 +1151,50 @@ namespace Thornswood
         static bool Retired(string rel)
         {
             foreach (string r in RetiredFiles)
+                if (rel.Equals(r, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Body shape sliders and jiggle, kept out of this folder even while
+        /// the collection still deploys them (#993).
+        /// </summary>
+        /// <remarks>
+        /// Patrick, 28 Sep: "I don't want jiggle physics or the ability to
+        /// change boob/pussy/dick/ass/nipple related stuff during creation."
+        /// For men and women alike; height and weight stay.
+        ///
+        /// cbp.dll is CBPC (Nexus 21224), the one thing that moves the breast,
+        /// belly and seat bones. Its config files do nothing without it, and
+        /// no body mesh here carries an SMP physics block, so this is all of
+        /// the jiggle, on people and NPCs alike. FSMP (hdtsmp64.dll) stays: it
+        /// moves hair and capes, not bodies.
+        ///
+        /// The three scripts are the slider pages RaceMenu shows for the body:
+        /// the women's body morphs (3BA's or CBBE's RaceMenuMorphsCBBE, breast,
+        /// nipple and genital shapes among them), the men's (HIMBO), and the
+        /// skeleton's genital sliders (XPMSE's RaceMenuPluginSoS). Each is the
+        /// script on a quest in a plugin that stays loaded and inert, the same
+        /// as I4IconAddon.esp beside CrashesUs, so the load order does not
+        /// move. RaceMenu's own breast and glute sliders sit in its archive
+        /// beside Height and cannot be left out; the front plugin undoes them
+        /// ("body shape" in thornswood-front.js).
+        ///
+        /// Refresh also deletes them from a folder that has them, as it does
+        /// RetiredFiles; Rules 9 makes every folder refresh once to do it.
+        /// Ship-Rules.ps1 keeps the same four out of every pack and the
+        /// installer ($ShipBodyShapeFiles); change the two together.
+        /// </remarks>
+        static readonly string[] BodyShapeFiles = {
+            "Data\\SKSE\\Plugins\\cbp.dll",
+            "Data\\Scripts\\RaceMenuMorphsCBBE.pex",
+            "Data\\Scripts\\_RaceMenuMorphsHIMBO.pex",
+            "Data\\Scripts\\RaceMenuPluginSoS.pex",
+        };
+
+        static bool BodyShape(string rel)
+        {
+            foreach (string r in BodyShapeFiles)
                 if (rel.Equals(r, StringComparison.OrdinalIgnoreCase)) return true;
             return false;
         }

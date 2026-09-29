@@ -105,6 +105,12 @@ stages kept in the actor property `thornswoodChargen` (`gamemode.js:3668`):
 An old `arriving` state is folded into `done` (`gamemode.js:4668-4671`).
 `"thornswoodChargen": false` in `server-settings.json` switches the hall off.
 
+Body shape is height and weight only (#993, "BODY SHAPE" in `gamemode.js`).
+`mp.onUpdateAppearanceAttempt` holds the weight in a sent appearance to 0 to
+100 and drops any field the engine does not know. `thornswoodBodyReset` in
+`server-settings.json` puts every character made before this through the same
+check once when it comes online; it is on unless it is `false`.
+
 ## The door
 
 `gamemode.js:10994`. It compares each connection's profile id with
