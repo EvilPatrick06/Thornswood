@@ -328,6 +328,8 @@ texconv.exe -nologo -y -f BC7_UNORM -bc x -m 13 -if CUBIC -o <outdir> Mainmenuwa
 
 **This invocation is unverified.** `texconv.exe` is not on this machine (`where texconv` returns nothing), and Pillow is not installed under any of the three Python installs here, so `Build-Backdrop.py` cannot run on this machine as written today either. The expected output size, 22,369,796 bytes, is measured against the 39 BC7 files already on disk.
 
+Done on 28 Sep (issue #994), a little differently. The script makes the 13 levels itself with Lanczos, as the DXT1 build did, and hands them to texconv in one uncompressed R8G8B8A8_UNORM DDS rather than a PNG, so no PNG gamma note can move the colours and `-if CUBIC` is not needed; texconv keeps a chain it is handed. The command is `texconv -nologo -y -nogpu -bc x -dx10 -f BC7_UNORM -m 13 -o <outdir> Mainmenuwallpaper.dds`, with `-nogpu` so every machine writes the same bytes. texconv is DirectXTex `may2026`, fetched by the script and pinned by sha256 (THIRD-PARTY.md). The file came out at 22,369,796 bytes, as predicted.
+
 ### 5. The default output path, lines 41 and 42
 
 Today:
@@ -357,7 +359,7 @@ Changing where a shipped file lands is a few lines in #staff-general before the 
 
 **4. Whether BC7 loads for an interface texture in this install.** Measured: 353 BC7 files work here, including Cathedral Weathers' 13 sunset gradients at 4096 x 1024 with full chains and an 8192 x 4096 galaxy, which is the same job as this backdrop. Also measured: there is zero BC7 anywhere under `interface`, the only loose texture in that folder is this one, and vanilla `Skyrim - Interface.bsa` is 145 DXT3 and 2 DXT1 with no DX10 headers at all. One dev Ship and one look at the menu settles it.
 
-**5. The texconv command line.** No texconv on this machine, so no flag has been checked against its own help output.
+**5. The texconv command line.** No texconv on this machine, so no flag has been checked against its own help output. Settled on 28 Sep: see the end of D.4.
 
 **6. Which of the mesh and the script is authoritative.** They disagree by 1.282945 percent and somebody has to pick. `logo.nif` was edited by hand on 16 Sep, two hours before the texture was built: 13 bytes changed, all inside the shape's translation and rotation (offsets 0x187 to 0x1B1), and the quarantined copy at `C:\Thornswood\_quarantine\20260916-0112` has no non-uniform scale at all and drew at 1.3605005277. Somebody was pushing the plane toward 3:2 by eye and stopped 1.283 percent short. There are two ways to close it: re-fit two floats in the mesh to make the plane exactly 3:2 and keep a 3:2 source, or leave the mesh and make the script match it as specified above. That is a Patrick and Djinn decision in #staff-general, not one for me to settle. Everything in this document assumes the second.
 
