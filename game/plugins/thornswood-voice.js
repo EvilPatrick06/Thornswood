@@ -705,12 +705,14 @@ sp.on('buttonEvent', guard('keys', (e) => {
     return;
   }
 
-  // While the chat box holds the keyboard the browser has focus, DirectInput
-  // is withheld from the game, and this handler is not called at all. Nothing
-  // to guard against there. This guards the other order: the box was opened
-  // and the flag is still up on the tick the key arrives.
+  // While the chat box holds the keyboard the browser has focus and the game
+  // is sent no key downs, so a press never reaches this handler. It is sent
+  // the key up of a key it holds (issue 898, HeldKeyRelease in the fork's
+  // DInputHook), so talk held when the box opened stops when it is let go:
+  // a key up always goes through. This guards the other order: the box was
+  // opened and the flag is still up on the tick a press arrives.
   const T = globalThis.Thornswood;
-  if (T && T.isTyping && T.isTyping()) {
+  if (T && T.isTyping && T.isTyping() && !e.isUp) {
     if (e.code === PTT_KEY || e.code === MODE_KEY) {
       once('typing-' + e.code, 'key ' + e.code + ' ignored, the chat box has the keyboard');
     }
