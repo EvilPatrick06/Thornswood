@@ -20,6 +20,11 @@
     list every five minutes and keeps it in data\allowed.json. Its door reads
     that list and, when enforcing, turns away anybody not on it.
 
+  -Connect also copies the site's join pass key (passKey in the site's
+  config.json, which the site makes itself) into door.json, so the gamemode
+  can check the join pass a launcher hands the game (#937). The key is read and
+  written on the VPS and never crosses this machine or its screen.
+
   The safe order is -Connect, then leave it watching for a day, then read the
   log, then -Enforce. Turning it on before the list has filled up would turn
   away people who have simply not pressed Play since the launcher started
@@ -137,16 +142,22 @@ try {
 `$priv = Join-Path `$root `$privDir
 
 `$key = ''
+`$pass = ''
 try {
   `$c = Get-Content '$docsWin\config.json' -Raw | ConvertFrom-Json
   `$key = [string]`$c.botKey
+  `$pass = [string]`$c.passKey
 } catch { }
 if (-not `$key) { 'NO BOT KEY in $docsWin\config.json. Run Install-Bot.ps1 first.'; exit }
 
-`$doc = @{ site = '$Site'; key = `$key } | ConvertTo-Json
+`$doc = @{ site = '$Site'; key = `$key }
+if (`$pass) { `$doc.passKey = `$pass }
+`$doc = `$doc | ConvertTo-Json
 if (-not (Test-Path `$priv)) { New-Item -ItemType Directory -Path `$priv -Force | Out-Null }
 [IO.File]::WriteAllText((Join-Path `$priv 'door.json'), `$doc, (New-Object Text.UTF8Encoding(`$false)))
 'door.json written, pointing at $Site'
+if (`$pass) { 'with the join pass key, so this server can check join passes' }
+else { 'WITHOUT a join pass key: the site has not made one yet. Deploy-Docs.ps1, then -Connect again.' }
 'The gamemode picks it up within five minutes, or restart the server to be sure.'
 "@
   $out | ForEach-Object { Say "  $_" }
@@ -207,6 +218,9 @@ if (-not (Test-Path `$f)) {
 }
 `$j = Join-Path `$priv 'door.json'
 'refreshing ' + `$(if (Test-Path `$j) { 'yes, from the site' } else { 'NO. Run -Connect, or the list never updates.' })
+`$pk = `$false
+try { `$pk = [bool]([string](Get-Content `$j -Raw | ConvertFrom-Json).passKey) } catch { }
+'join pass key ' + `$(if (`$pk) { 'yes' } else { 'NO. Run -Connect once the site has made one (#937).' })
 "@
 $out | ForEach-Object { Say "  $_" }
 
