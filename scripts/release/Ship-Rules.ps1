@@ -26,6 +26,7 @@
       Test-ShipRetired $rel        a mod Thornswood took out; never shipped, never removed (the launcher drops it)
       Test-ShipBethesdaTool $rel   the Creation Kit, its script sources, or a copy of one of the game's programs; never shipped, never recorded, never removed (the launcher drops it)
       Test-ShipBackup $rel         any *.bak; never shipped, never removed
+      Test-ShipBethesda $rel       Bethesda's by any of the three rules above (vanilla, Creation Kit, left alone); never packed, recorded or on the site
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
       Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
@@ -647,6 +648,25 @@ function Test-ShipBethesdaTool([string]$rel) {
 # at its end, or followed by a dash or a dot. Never shipped, never removed.
 function Test-ShipBackup([string]$rel) {
     return ((Split-Path $rel -Leaf) -match '\.bak($|[-.])')
+}
+
+# BETHESDA'S, ASKED ONE WAY EVERYWHERE (#1229). The game and its archives
+# (Test-ShipVanilla), the Creation Kit, its script sources and copies of the
+# game's programs (Test-ShipBethesdaTool), and Bethesda's files a pack once
+# carried (Test-ShipBethesdaLeftAlone, MarketplaceTextures.bsa). Check-Secrets
+# asked all three; the record guard in Publish-Update and the rollback filter in
+# Rollback-Feed asked only the first two, so a record naming
+# MarketplaceTextures.bsa, as a file or as gone, went through both. Every place
+# that asks whether a path is Bethesda's asks this, so they cannot drift again;
+# Scrub-Feed.ps1 takes exactly these out of what is already on the site.
+# The launcher's own folder is the other side of it and keeps
+# MarketplaceTextures.bsa: SkyrimSE.exe opens it by name (two references in the
+# 1.6.1170 exe, read 29 September), so there it is the game's own file, like
+# Skyrim.esm, and never one of the Creation Kit's that OwnGame.BethesdaTool
+# drops. Measured the same day, no pack, record or loose file on the site names
+# it.
+function Test-ShipBethesda([string]$rel) {
+    return ((Test-ShipBethesdaTool $rel) -or (Test-ShipVanilla $rel) -or (Test-ShipBethesdaLeftAlone $rel))
 }
 
 # One machine's own, never shipped and never listed as removed. Other servers'

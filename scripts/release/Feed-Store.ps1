@@ -52,6 +52,9 @@
       Get-FeedStoreLaunchers main|dev    launchers.txt, one version a line
       Get-FeedStoreReleases main|dev     releases.txt, one release a line
       Read-SiteFeed main|dev             the feed as the public reads it
+      Remove-FeedStoreAssets main|dev -Shas -Expect
+                                         delete assets no feed names any more,
+                                         refusing if either feed moved (#1152)
 
   -SiteDir <folder>, or $env:THORNSWOOD_TEST_SITE_DIR, stands in for
   C:\Thornswood-Docs on this machine: every read, send and rename happens in
@@ -147,6 +150,33 @@ if ($op -eq 'releases') {
   $rel = Join-Path $dir 'releases.txt'
   if (Test-Path -LiteralPath $rel) {
     foreach ($l in @(Get-Content -LiteralPath $rel)) { if ($l.Trim()) { 'R|' + $l } }
+  }
+  'DONE'
+  return
+}
+if ($op -eq 'forget') {
+  # Deletes assets\<sha256> for each name, and only while both channels' feeds
+  # are the bytes the caller read and found them missing from ($expect, keyed
+  # 'feed\version.json' and 'feed-dev\version.json'). A name either feed or
+  # either baseline still spells out is kept whatever the caller thought.
+  $moved = @()
+  foreach ($k in @($expect.Keys)) {
+    $now = Sha (Join-Path $root $k)
+    if ($now -ne [string]$expect[$k]) { $moved += ($k + ' was ' + ([string]$expect[$k]).Substring(0, 12) + ' and is ' + $(if ($now) { $now.Substring(0, 12) } else { 'absent' })) }
+  }
+  if ($moved.Count) { 'MOVED|' + ($moved -join '; '); return }
+  $said = ''
+  foreach ($f in @('feed\version.json', 'feed-dev\version.json', 'feed\published.json', 'feed-dev\published.json')) {
+    $p = Join-Path $root $f
+    if (Test-Path -LiteralPath $p -PathType Leaf) { $said += [IO.File]::ReadAllText($p) }
+  }
+  $assets = Join-Path $dir 'assets'
+  foreach ($n in $names) {
+    if ($n -notmatch '^[0-9a-f]{64}$') { 'BAD|' + $n; continue }
+    if ($said.Contains($n)) { 'NAMED|' + $n; continue }
+    $p = Join-Path $assets $n
+    if (Test-Path -LiteralPath $p -PathType Leaf) { Remove-Item -LiteralPath $p -Force; 'GONE|' + $n }
+    else { 'NONE|' + $n }
   }
   'DONE'
   return
@@ -437,6 +467,36 @@ function Get-FeedStoreReleases([string]$Channel, [string]$SiteDir, [hashtable]$T
         [pscustomobject]@{ Id = $f[0]; Channel = $f[1]; LauncherVersion = $f[2]; Packs = @($f[3].Split(',') | Where-Object { $_ })
                            Baseline = $f[4]; Commit = $f[5]; Tag = $f[6] }
     })
+}
+
+# Deletes /feed[-dev]/assets/<sha256> for each of $Shas (#1152). Nothing else
+# here ever deletes an asset: an asset stays while any feed may name it. This is
+# for Scrub-Feed.ps1, once it has replaced what must never have been published
+# and worked out that no feed, baseline or record names these any more. $Expect
+# is the sha256 of both channels' version.json as the caller read them
+# (@{ main = <sha>; dev = <sha> }); if either has moved since, nothing is deleted
+# and this throws, and a name either feed or either baseline still spells out is
+# kept, as is anything that is not 64 hex digits. Returns @{ Gone; None; Named; Bad }.
+function Remove-FeedStoreAssets([string]$Channel, [string[]]$Shas, [hashtable]$Expect, [string]$SiteDir, [hashtable]$To) {
+    if (-not $Expect -or -not $Expect.ContainsKey('main') -or -not $Expect.ContainsKey('dev')) {
+        throw 'Remove-FeedStoreAssets needs the sha256 of both feeds as they were read. Nothing was deleted.'
+    }
+    $e = @{ 'feed\version.json' = [string]$Expect['main']; 'feed-dev\version.json' = [string]$Expect['dev'] }
+    $lines = @(Invoke-FeedStoreOp $Channel 'forget' @($Shas) $e @{} $SiteDir $To)
+    $moved = @($lines | Where-Object { $_ -like 'MOVED|*' })
+    if ($moved.Count) {
+        throw ("A feed changed on the VPS after it was read (" + $moved[0].Substring(6) + "). Nothing was deleted. Run it again.")
+    }
+    if ($lines -notcontains 'DONE') { throw ("The VPS did not confirm what it deleted: " + (($lines | Select-Object -Last 3) -join ' ').Trim()) }
+    $o = @{ Gone = @(); None = @(); Named = @(); Bad = @() }
+    foreach ($l in $lines) {
+        $p = $l.Split('|')
+        if ($p[0] -eq 'GONE') { $o.Gone += $p[1] }
+        elseif ($p[0] -eq 'NONE') { $o.None += $p[1] }
+        elseif ($p[0] -eq 'NAMED') { $o.Named += $p[1] }
+        elseif ($p[0] -eq 'BAD') { $o.Bad += $p[1] }
+    }
+    return $o
 }
 
 # The feed as a launcher reads it: https://thornswood.net/feed[-dev]/version.json,
