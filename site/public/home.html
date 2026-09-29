@@ -1048,12 +1048,23 @@ if (AGE_PATHS[here] && !ageOk()) {
   /* Public approved shots and a themed submit form for signed-in members.
      Staff Accept and Delete live on the hub Gallery page.
      Public report is the per-image flag on live shots; bug reports go to Inbox. */
-  Promise.all([
-    fetch('/api/public').then(function (r) { return r.json(); }),
-    fetch('/api/gallery/who', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).catch(function () { return {}; })
-  ]).then(function (pair) {
-    var d = pair[0] || {};
-    var who = pair[1] || {};
+  /* The pictures are drawn as soon as /api/public answers, and drawn again
+     with the Send and Report parts once /api/gallery/who has said who is
+     asking (#1096). They used to wait for both, so a signed in visitor saw
+     nothing while the site asked Discord who they were. */
+  var galData = null, galWho = null;
+  fetch('/api/gallery/who', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .catch(function () { return {}; })
+    .then(function (w) { galWho = w || {}; if (galData) drawGallery(); });
+  fetch('/api/public').then(function (r) { return r.json(); }).then(function (d) {
+    galData = d || {};
+    drawGallery();
+  }).catch(function () { show('<h1>From the world</h1><p>Could not load it.</p>'); });
+  function drawGallery() {
+    var d = galData;
+    var waiting = !galWho;
+    var who = galWho || {};
     var shots = d.gallery || [];
     var out = '<h1>From the world</h1><p>Every picture here was taken by ' +
       'somebody playing. Send yours in and it waits for staff to put it up.</p>';
@@ -1085,6 +1096,11 @@ if (AGE_PATHS[here] && !ageOk()) {
         '<div><button class="btn first" type="button" id="galSend">Send it</button></div>' +
         '<p class="said" id="galSaid" hidden></p>' +
         '</div></div>';
+    } else if (waiting) {
+      out += '<div class="gal-box"><p class="hint">Checking who you are.</p></div>';
+    } else if (who.signed && who.asked === false) {
+      out += '<div class="gal-box"><p class="hint">Thornswood could not ask Discord about your ' +
+        'account just now, so sending a picture has to wait. Try again in a minute.</p></div>';
     } else if (who.signed) {
       out += '<div class="gal-box"><p class="hint">Your Discord account is signed in, ' +
         'but it does not have a role that can send pictures yet.</p></div>';
@@ -1318,7 +1334,7 @@ if (AGE_PATHS[here] && !ageOk()) {
           .catch(function () { b.disabled = false; window.alert('Could not report it.'); });
       });
     });
-  }).catch(function () { show('<h1>From the world</h1><p>Could not load it.</p>'); });
+  }
 } else if (here === '/downloads') {
   /* This is the How to join section off the front page. It lived there and on
      this page in two different shapes, which meant two places to keep right
@@ -1559,22 +1575,38 @@ if (AGE_PATHS[here] && !ageOk()) {
       '<input id="rWho" type="text" maxlength="60">' +
       '<p id="rSign" class="hint" hidden>Reporting somebody needs you signed in, so staff ' +
       'can come back to you about it. <a href="/auth/discord?back=/report">Sign in with ' +
-      'Discord</a>. In the game, /report does the same.</p></div>' +
+      'Discord</a>. In the game, /report does the same.</p>' +
+      '<p id="rNo" class="hint" hidden></p></div>' +
     '<div><button class="btn first" type="submit">Send it</button></div>' +
     '<p id="rSaid" class="said" hidden></p>' +
     '</form>');
   var form = document.getElementById('rep');
-  var signedIn = false;
+  /* Who is asking, told apart (#1097): not signed in gets the sign in link;
+     signed in but not let in, banned, or Discord not answering gets the
+     site's own sentence (personSays, what /api/report would answer) and no
+     link, because they are signed in already. letIn is null until the site
+     answers, and the button waits for it. */
+  var letIn = null, personSays = '', needsSignIn = true;
   fetch('/api/gallery/who', { credentials: 'same-origin' })
     .then(function (r) { return r.json(); })
-    .then(function (d) { signedIn = !!(d && d.canSubmit); personBox(); })
-    .catch(function () { });
+    .then(function (d) {
+      d = d || {};
+      letIn = !d.personWhy;
+      needsSignIn = d.personWhy === 'sign in';
+      personSays = d.personSays || '';
+      personBox();
+    })
+    .catch(function () { letIn = false; personBox(); });
   function personBox() {
     var on = document.getElementById('rPerson').checked;
+    var sign = document.getElementById('rSign');
+    var no = document.getElementById('rNo');
     document.getElementById('rWhoBox').hidden = !on;
-    document.getElementById('rSign').hidden = !on || signedIn;
+    sign.hidden = !on || letIn !== false || !needsSignIn;
+    no.hidden = !on || letIn !== false || needsSignIn || !personSays;
+    no.textContent = personSays;
     document.getElementById('rIdea').disabled = on;
-    form.querySelector('button').disabled = on && !signedIn;
+    form.querySelector('button').disabled = on && !letIn;
   }
   document.getElementById('rPerson').addEventListener('change', personBox);
   form.addEventListener('submit', function (e) {
