@@ -120,7 +120,11 @@ namespace Thornswood
         /// </summary>
         public static bool Needed(Config cfg)
         {
-            if (Paths.Collection) return Wrong(cfg, Paths.Exe) && Downloaded(cfg) == null;
+            // Before the folder exists it is the Steam copy's build that counts,
+            // because that is what Make takes the game from. Paths.Exe is not
+            // it when the folder was chosen at install: Game is Profile\Payload
+            // until the folder is made (#1226).
+            if (Paths.Collection) return Wrong(cfg, Path.Combine(Paths.SteamCopy, "SkyrimSE.exe")) && Downloaded(cfg) == null;
             return Wrong(cfg, Paths.Exe) || (OwnGame.Active && OwnGame.Changed().Count > 0);
         }
 
@@ -375,11 +379,13 @@ namespace Thornswood
                 return Stop("Skyrim is running. Close it, then press the button again.", log, status);
 
             // Where the files go: the folder the game runs from, Thornswood's
-            // own. Before that folder exists Paths.Game is the Steam copy, and
-            // the Steam copy is never written (#1218): the download is kept for
-            // OwnGame.Make instead.
+            // own. Before that folder exists nothing is written anywhere: the
+            // Steam copy is never written (#1218) and the download is kept for
+            // OwnGame.Make instead, so target is only the Steam copy the
+            // sentences name. Not Paths.Game, which is Profile\Payload when
+            // the folder was chosen at install (#1226).
             bool first = Paths.Collection;
-            string target = Paths.Game;
+            string target = first ? Paths.SteamCopy : Paths.Game;
             string targetExe = Path.Combine(target, "SkyrimSE.exe");
             if (first && Downloaded(cfg) != null)
             {

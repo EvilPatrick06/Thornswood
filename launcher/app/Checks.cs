@@ -1102,15 +1102,21 @@ namespace Thornswood
         }
         public static List<Check> All(Config cfg)
         {
+            // The game these rows are about. With the own folder chosen and not
+            // made yet (#1226) Paths.Game is Profile\Payload, Thornswood's own
+            // files only, and the game and the script extender it will be made
+            // with are the Steam copy's and Vortex's, so those are read there.
+            string game = Paths.OwnFirst ? Paths.SteamCopy : Paths.Game;
+            string exe = Path.Combine(game, "SkyrimSE.exe");
             long bytes = 0;
-            try { if (File.Exists(Paths.Exe)) bytes = new FileInfo(Paths.Exe).Length; } catch (Exception ex) { Swallow.Note("Checks.All, exe size", ex); }
+            try { if (File.Exists(exe)) bytes = new FileInfo(exe).Length; } catch (Exception ex) { Swallow.Note("Checks.All, exe size", ex); }
             int plugins = EnabledPlugins();
 
             var l = new List<Check>();
-            l.Add(new Check("Game build", bytes == cfg.ExpectedExeBytes, Downgrade.Describe(cfg)));
-            l.Add(new Check("Script Extender", File.Exists(Path.Combine(Paths.Game, "skse64_1_6_1170.dll")), "skse64 2.2.6"));
+            l.Add(new Check("Game build", bytes == cfg.ExpectedExeBytes, Downgrade.Describe(cfg, exe)));
+            l.Add(new Check("Script Extender", File.Exists(Path.Combine(game, "skse64_1_6_1170.dll")), "skse64 2.2.6"));
             // Advisory, so it warns and never shuts Play. See AddressLibraryRow.
-            l.Add(AddressLibraryRow(Paths.Game, bytes == cfg.ExpectedExeBytes));
+            l.Add(AddressLibraryRow(game, bytes == cfg.ExpectedExeBytes));
             l.Add(new Check("Multiplayer", File.Exists(Paths.MpClient), "SkyMP client"));
             // The other half of the client, and the half that connects.
             // See ClientRuntime: every row above this one asks whether a

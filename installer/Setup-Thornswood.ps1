@@ -8,13 +8,20 @@
   disk twice (launcher\app\OwnGame.cs).
 
   Two shapes, decided by a collection.txt the build leaves in the payload.
-  With it, this script lays the launcher down under -Root and Thornswood's own
-  content where Vortex deploys the collection, which is the Steam copy, and
-  makes no copy of the base game: the payload is built with the collection's
-  files left out, and Bethesda's archives are already on the disk. It keeps a
-  list of what it wrote there so an uninstall can take it back out again.
-  Without it, the old behaviour: a standalone copy under -Root built out of
-  the Steam one, which is then only ever read.
+  With it, this script lays the launcher down under -Root and makes no copy of
+  the base game: the payload is built with the collection's files left out,
+  and Bethesda's archives are already on the disk. Where Thornswood's own
+  content goes is the person's choice in the setup window (#1226, Patrick,
+  29 Sep):
+    - Thornswood's own folder chosen (-MakeOwnGame): into Root\Profile\Payload.
+      Nothing at all is written into the Steam copy; the launcher makes
+      Root\Game from the Steam copy's game, what Vortex deployed and Payload,
+      and removes Payload.
+    - Not chosen: where Vortex deploys the collection, which is the Steam
+      copy, with a list of what it wrote there so an uninstall, or turning the
+      own folder on later, can take it back out again.
+  Without collection.txt, the old behaviour: a standalone copy under -Root
+  built out of the Steam one, which is then only ever read.
 
   Bethesda's own files are never renamed or deleted either way.
 #>
@@ -55,7 +62,10 @@ $TARGET_EXE_BYTES = 37157144          # 1.6.1170
 # Out here rather than beside the downgrade step. A function declared
 # inside an if branch only exists when that branch runs, and a collection
 # install skips that whole half while the checks at the end still call it.
-function Get-ExeBytes { $p = Join-Path $GameDir 'SkyrimSE.exe'; if (Test-Path $p) { (Get-Item $p).Length } else { 0 } }
+# $ExeDir is the game the build is read from: the game folder, except with
+# Thornswood's own folder chosen, where the payload goes to Profile\Payload
+# and the game it will be made from is the Steam copy (#1226).
+function Get-ExeBytes { $p = Join-Path $ExeDir 'SkyrimSE.exe'; if (Test-Path $p) { (Get-Item $p).Length } else { 0 } }
 $AppId  = '489830'
 $Depots = [ordered]@{
     '489831' = '8442952117333549665'
@@ -220,8 +230,10 @@ function Get-Libraries($steam) {
 
 Head 'Finding Skyrim'
 $steamRoot = Get-SteamRoot
-if (-not $steamRoot) { Die 'Steam is not installed on this PC.' }
-$libs = @(Get-Libraries $steamRoot)
+# Steam's own folder is what finds Skyrim when nobody named it, and what the
+# depot download needs; a Skyrim named with -SteamGamePath is found already.
+if (-not $steamRoot -and -not $SteamGamePath) { Die 'Steam is not installed on this PC.' }
+$libs = @(if ($steamRoot) { Get-Libraries $steamRoot })
 
 if (-not $SteamGamePath) {
     foreach ($l in $libs) {
@@ -244,11 +256,25 @@ Say "  $SteamGamePath" 'Green'
 # reads its own empty profile, counts zero plugins, and reports a broken
 # install over a collection that installed perfectly.
 $Collection = Test-Path -LiteralPath (Join-Path $Here 'collection.txt')
+# Thornswood's own folder, chosen in the setup window (#1226). Its files go to
+# Profile\Payload and the Steam copy is only read. The launcher tells this
+# shape by that folder (Paths.OwnFirst) and makes Root\Game from it.
+$OwnFirst = $Collection -and $MakeOwnGame
+$ExeDir = $GameDir
 
 if ($Collection) {
-    $GameDir = $SteamGamePath
-    Say '  Thornswood installs into this copy. The mods come from the collection' 'DarkGray'
-    Say '  in Vortex, which deploys into it too.' 'DarkGray'
+    if ($OwnFirst) {
+        $GameDir = Join-Path $ProfileDir 'Payload'
+        $ExeDir = $SteamGamePath
+        Say '  Thornswood''s own Skyrim folder is chosen, so nothing is written into' 'DarkGray'
+        Say '  this copy. The launcher makes the folder from it and from what Vortex' 'DarkGray'
+        Say '  deploys into it, and your Steam copy stays yours.' 'DarkGray'
+    } else {
+        $GameDir = $SteamGamePath
+        $ExeDir = $GameDir
+        Say '  Thornswood installs into this copy. The mods come from the collection' 'DarkGray'
+        Say '  in Vortex, which deploys into it too.' 'DarkGray'
+    }
 
     # A Game folder left over from an older install is not harmless. The
     # launcher decides which Skyrim it is looking at by whether that folder
@@ -347,9 +373,10 @@ $freeGB = [math]::Round((Get-PSDrive $dl).Free / 1GB, 1)
 Say "  Installing to $Root"
 Say "  $freeGB GB free on $dl`:"
 if ($freeGB -lt $needGB) { Die "You need about $needGB GB free on $dl`:. Close this, run the setup program again and pick a different drive." }
-if ($Collection) {
+if ($Collection -and -not $OwnFirst) {
     # The mods land on whichever drive Steam keeps Skyrim on, which is not
-    # necessarily the one just checked.
+    # necessarily the one just checked. With the own folder chosen they land
+    # under -Root, which is the drive just checked.
     $sd = (Split-Path -Qualifier $SteamGamePath) -replace ':', ''
     if ($sd -and $sd -ne $dl) {
         $sf = [math]::Round((Get-PSDrive $sd).Free / 1GB, 1)
@@ -365,7 +392,8 @@ if ($Collection) {
 # of writing a file over itself.
 if ($Collection) {
     Head 'The base game'
-    Say '  Already here, this is your Steam copy.' 'DarkGray'
+    if ($OwnFirst) { Say '  Your Steam copy. Thornswood''s own folder is made from it by the launcher.' 'DarkGray' }
+    else { Say '  Already here, this is your Steam copy.' 'DarkGray' }
     $null = New-Item -ItemType Directory -Force -Path $ProfileDir, $LaunchDir
 } else {
 
@@ -407,6 +435,7 @@ Say "  $bsaCount archives, 5 masters" 'Green'
 # alone. It is the fix for a copy that is too new and for one that another mod
 # setup has patched, so it lives in a function and gets called for both.
 function Invoke-DepotRepair($reason) {
+    if (-not $steamRoot) { Die 'Steam is not installed on this PC, so the 1.6.1170 files cannot be downloaded.' }
     Head 'Getting clean 1.6.1170 files from Steam'
     Say "  $reason"
     Say '  Steam downloads them under your own account. Your installed game is not touched.' 'DarkGray'
@@ -535,8 +564,12 @@ Say '  Several thousand files, a few minutes. The window looks still while it wo
 # Thornswood's own content stayed behind forever and an uninstall left the
 # folder bigger than it found it.
 #
-# Written before the copy, because -MovePayload empties the source.
-if ($Collection) {
+# Written before the copy, because -MovePayload empties the source. Not with
+# Thornswood's own folder chosen: nothing goes into the Steam copy then, and a
+# list an earlier install left stays as it is, because it is what the
+# launcher takes back out of the Steam copy once the folder is made
+# (OwnGame.CleanSteamCopy).
+if ($Collection -and -not $OwnFirst) {
     $listed = @()
     $pfx = $Payload.TrimEnd('\') + '\'
     foreach ($f in (Get-ChildItem -LiteralPath $Payload -Recurse -File -Force -EA SilentlyContinue)) {
@@ -723,11 +756,14 @@ Head 'Checking'
 # plugins.txt into the person's own AppData, which is exactly what the launcher
 # reads once there is no Game folder to look at instead.
 $winLocalAD = Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition'
+# The script extender and the address library are read where the game is:
+# with the own folder chosen that is the Steam copy Vortex deploys into, and
+# the multiplayer client is Thornswood's own, in Profile\Payload.
 $checks = [ordered]@{
     'Game 1.6.1170'    = ((Get-ExeBytes) -eq $TARGET_EXE_BYTES)
-    'Script Extender'  = (Test-Path (Join-Path $GameDir 'skse64_1_6_1170.dll'))
+    'Script Extender'  = (Test-Path (Join-Path $ExeDir 'skse64_1_6_1170.dll'))
     'Multiplayer'      = (Test-Path (Join-Path $GameDir 'Data\SKSE\Plugins\MpClientPlugin.dll'))
-    'Address library'  = (Test-Path (Join-Path $GameDir 'Data\SKSE\Plugins\versionlib-1-6-1170-0.bin'))
+    'Address library'  = (Test-Path (Join-Path $ExeDir 'Data\SKSE\Plugins\versionlib-1-6-1170-0.bin'))
     'Load order'       = $(if ($Collection) { Test-Path (Join-Path $winLocalAD 'plugins.txt') }
                            else            { Test-Path (Join-Path $pLocalAD 'plugins.txt') })
     'Launcher'         = (Test-Path (Get-LauncherExe $LaunchDir))
@@ -831,6 +867,9 @@ if ($bad) {
         if ($ownGame.Contains('MakeOwnGame')) {
             Say "Once Vortex has deployed it, the launcher makes Thornswood's own" 'DarkGray'
             Say 'Skyrim folder by itself and restarts.' 'DarkGray'
+        }
+        if ($OwnFirst) {
+            Say 'Nothing was written into your Steam copy of Skyrim.' 'DarkGray'
         }
     } else {
         Say 'Your Steam copy of Skyrim was not modified.' 'DarkGray'

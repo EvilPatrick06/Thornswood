@@ -148,6 +148,17 @@ How to use it:
   read. Scan names the folder, Fix and Settings point the launcher at it,
   and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
   Gather, tests\test-vortex-folder.ps1). Djinn to agree it in #staff-general.
+  Decided by Patrick on 29 Sep (#1218, #1226): the Steam copy is the
+  person's, to play vanilla at any build with their own mods, and Thornswood
+  runs entirely from its own folder. With the own folder chosen in the setup
+  window, first setup never writes into the Steam copy: the installer's
+  payload and everything the launcher writes before the folder exists go to
+  `Profile\Payload` (Paths.OwnFirst), and Make takes them in. Not chosen, the
+  install uses the Steam copy as it always did, and once the folder is turned
+  on and made the next start takes Thornswood's files back out of the Steam
+  copy, once (OwnGame.CleanSteamCopy); an existing own folder gets the same
+  from its next update. Steam's "Wait until I launch the game" is set only
+  until the folder exists (tests\test-own-folder-first.ps1).
 - Whichever folder the game runs from, the launcher looks after its own
   files: Keep puts its files back before Play and parks any plugin in
   `Data\Platform\Plugins` that is not ours; Hold keeps its files open read

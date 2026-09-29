@@ -535,6 +535,13 @@ namespace ThornswoodSetup
         // will not start out of a shared Skyrim either way (OwnGameRequired),
         // which is why the off line says Play asks for it too.
         //
+        // The tick also decides where Thornswood's own files go (#1226,
+        // Patrick, 29 Sep). Ticked, Setup-Thornswood.ps1 puts them in
+        // Profile\Payload and nothing is written into the Steam copy; the
+        // launcher makes the folder from them. Not ticked, they go into the
+        // Steam copy as they always have, and the launcher takes them back
+        // out once the folder is turned on and made (OwnGame.CleanSteamCopy).
+        //
         // Choose Vortex's folder is the Settings button of the same name,
         // taken early: the same check as OwnGame.PointAt, saved into
         // config.json as the same VortexGame field.
@@ -564,13 +571,15 @@ namespace ThornswoodSetup
                 text = "On. Thornswood will run from " + Path.Combine(installRoot, "Game") +
                        ", made from what Vortex has deployed" + (vortexGame.Length > 0 ? " in " + vortexGame : "") +
                        ". The launcher makes it by itself once Vortex has deployed the Thornswood collection, " +
-                       "and restarts when it is done.";
+                       "and restarts when it is done. Nothing is written into your Steam copy of Skyrim: " +
+                       "Thornswood's own files wait beside the launcher until the folder is made.";
             }
             else
             {
-                text = "Off for now. The launcher asks before it makes the folder, and Settings, Maintenance has " +
-                       "the button. Thornswood will not start out of a Skyrim shared with other servers, so Play " +
-                       "asks for it too.";
+                text = "Off for now. Thornswood's own files go into your Steam copy of Skyrim, and the launcher asks " +
+                       "before it makes the folder; Settings, Maintenance has the button, and once the folder is made " +
+                       "the launcher takes Thornswood's files back out of the Steam copy. Thornswood will not start out " +
+                       "of a Skyrim shared with other servers, so Play asks for it too.";
             }
 
             // The same drive logic as the line under the drive buttons: the
@@ -998,7 +1007,7 @@ namespace ThornswoodSetup
         <TextBlock x:Name=""TxtBody""
                    Foreground=""{StaticResource Muted}"" FontSize=""13"" LineHeight=""21""
                    TextWrapping=""Wrap""
-                   Text=""This puts the launcher, the script extender and Thornswood's own content into a folder of its own. It does not install into the Skyrim you already have on Steam, and that copy is left as it is.&#10;&#10;Thornswood runs from its own game folder. The launcher builds it out of your Steam copy and what Vortex has deployed there, most of it as hard links that take no extra space, and copies of the few files other programs rewrite. Hard links only work inside one drive, so Thornswood goes on the same drive as Skyrim.&#10;&#10;The mods themselves come from a collection on Nexus. Vortex installs them into a profile of their own, so switching back to your usual profile and running Purge Mods leaves your Skyrim where you started. The launcher has the link and walks you through it.&#10;&#10;Nothing of Bethesda's is renamed or deleted. You need Steam running and Skyrim on build 1.6.1170.""/>
+                   Text=""This puts the launcher and Thornswood's own content on your PC. With Thornswood's own Skyrim folder chosen below, it does not install into the Skyrim you already have on Steam, and that copy is left as it is, for you to play and mod however you like. Without it, Thornswood's own content goes into that copy until you turn the folder on in the launcher, which then takes it back out.&#10;&#10;Thornswood runs from its own game folder. The launcher builds it out of your Steam copy and what Vortex has deployed there, most of it as hard links that take no extra space, and copies of the few files other programs rewrite. Hard links only work inside one drive, so Thornswood goes on the same drive as Skyrim.&#10;&#10;The mods themselves come from a collection on Nexus. Vortex installs them into a profile of their own, so switching back to your usual profile and running Purge Mods leaves your Skyrim where you started. The launcher has the link and walks you through it.&#10;&#10;Nothing of Bethesda's is renamed or deleted. You need Steam running and Skyrim on build 1.6.1170.""/>
 
         <Border x:Name=""RootBox"" Grid.Row=""1"" Margin=""0,20,0,0"" Padding=""17,14"" CornerRadius=""2""
                 Background=""{StaticResource Card}"" BorderBrush=""{StaticResource Line}"" BorderThickness=""1"">

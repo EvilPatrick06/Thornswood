@@ -222,11 +222,17 @@ jobs:
           # written, and a shared archive written over there is caught before
           # Play. It compiles the launcher's OwnGame and Downgrade code and runs
           # it on a pretend machine in a temp folder, a few seconds.
+          # Issue #1226 added one: with Thornswood's own folder chosen in the
+          # setup window, the installer, the launcher's first start, packs and
+          # Make never write into the Steam copy; not chosen, the folder turned
+          # on later takes Thornswood's files back out of it. It runs the real
+          # Setup-Thornswood.ps1 and the whole launcher on a pretend Steam in a
+          # temp folder, about twenty seconds.
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1',
                  'test-vps-defaults.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
-                 'test-own-folder-alone.ps1'
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
