@@ -128,7 +128,7 @@
     the planter sacks and the coin purses are. The cheese is nobody's, which is
     what Patrick asked for, and a base in no table falls through to the engine.
     The churn is the farmer's: Patrick, 21 September, "give milk and butter to
-    farmers", so churn() in tools\gamemode.js answers it with the farm verb as
+    farmers", so churn() in game\gamemode.js answers it with the farm verb as
     of 24 September, and Build-RecipeTable.ps1 reads that verb, so BUTTER, 46 OF
     THE COOK'S INPUTS, is a farmer's to supply.
 
@@ -2204,10 +2204,10 @@ if ($fail -gt 0) {
 
 $lines = New-Object 'System.Collections.Generic.List[string]'
 $lines.Add('/* Built by scripts\dev\Build-HarvestTable.ps1 out of the FLOR and TREE records of this build.')
-$lines.Add('     ' + $table.Count + ' plants, the same table as tools\harvests.json.')
+$lines.Add('     ' + $table.Count + ' plants, the same table as game\data\harvests.json.')
 $lines.Add('     The key is the plant''s base record. The server already picks a FLOR or TREE on')
 $lines.Add('     its own, so onActivate only has to look the base up here and decide.')
-$lines.Add('     Paste it between the HARVESTS_BY_BASE markers in tools\gamemode.js. Do not hand edit. */')
+$lines.Add('     Paste it between the HARVESTS_BY_BASE markers in game\gamemode.js. Do not hand edit. */')
 $lines.Add('  var HARVESTS_BY_BASE = {')
 $n = 0
 foreach ($d in $table.Keys) {
@@ -2228,7 +2228,7 @@ $literal = $lines -join [Environment]::NewLine
 
 $cropLines = New-Object 'System.Collections.Generic.List[string]'
 $cropLines.Add('/* Built by scripts\dev\Build-HarvestTable.ps1 out of the same records as the harvests.')
-$cropLines.Add('     ' + $crops.Count + ' farm crops, the same table as the crops map in tools\harvests.json.')
+$cropLines.Add('     ' + $crops.Count + ' farm crops, the same table as the crops map in game\data\harvests.json.')
 $cropLines.Add('     A crop is a plot somebody works rather than a plant anybody finds: a plant of')
 $cropLines.Add('     either record type whose produce carries the ALCH food bit and which is not')
 $cropLines.Add('     hanging game and not a prop, plus wheat, which gives an')
@@ -2237,7 +2237,7 @@ $cropLines.Add('     growMinutes is how long after a pick the server counts the 
 $cropLines.Add('     The engine reloots a FLOR or TREE an hour after a pick and the gamemode cannot')
 $cropLines.Add('     set isHarvested or a reloot time, so the plant looks ready before it is: the')
 $cropLines.Add('     server refuses the pick until growMinutes is up and says how long is left.')
-$cropLines.Add('     Paste it between the CROPS_BY_BASE markers in tools\gamemode.js. Do not hand edit. */')
+$cropLines.Add('     Paste it between the CROPS_BY_BASE markers in game\gamemode.js. Do not hand edit. */')
 $cropLines.Add('  var CROPS_BY_BASE = {')
 $n = 0
 foreach ($d in $crops.Keys) {
@@ -2256,13 +2256,13 @@ $cropLiteral = $cropLines -join [Environment]::NewLine
 
 $fishLines = New-Object 'System.Collections.Generic.List[string]'
 $fishLines.Add('/* Built by scripts\dev\Build-HarvestTable.ps1 out of the same records as the harvests.')
-$fishLines.Add('     ' + $fish.Count + ' water records, the same table as the fish map in tools\harvests.json.')
+$fishLines.Add('     ' + $fish.Count + ' water records, the same table as the fish map in game\data\harvests.json.')
 $fishLines.Add('     These are the fisher''s and not the gatherer''s, and they are named one at a time')
 $fishLines.Add('     in FISH_BY_EDITOR_ID at the top of the script because nothing in a salmon''s record')
 $fishLines.Add('     says water. "from" is what stands in the world, "name" is what it gives.')
 $fishLines.Add('     The rank is named one at a time too: every one of these produce records is priced')
 $fishLines.Add('     at 2 or 3 gold, so the gold rule that ranks a plant puts all of them on one rung.')
-$fishLines.Add('     Paste it between the FISH_BY_BASE markers in tools\gamemode.js. Do not hand edit. */')
+$fishLines.Add('     Paste it between the FISH_BY_BASE markers in game\gamemode.js. Do not hand edit. */')
 $fishLines.Add('  var FISH_BY_BASE = {')
 $n = 0
 foreach ($d in $fish.Keys) {
@@ -2281,7 +2281,7 @@ $fishLiteral = $fishLines -join [Environment]::NewLine
 
 $gameLines = New-Object 'System.Collections.Generic.List[string]'
 $gameLines.Add('/* Built by scripts\dev\Build-HarvestTable.ps1 out of the same records as the harvests.')
-$gameLines.Add('     ' + $game.Count + ' hanging game records, the same table as the game map in tools\harvests.json.')
+$gameLines.Add('     ' + $game.Count + ' hanging game records, the same table as the game map in game\data\harvests.json.')
 $gameLines.Add('     These are the hunter''s and not the gatherer''s. A plant whose produce is food is')
 $gameLines.Add('     not a thing a gatherer gathers, and these seven are the food rows that are an')
 $gameLines.Add('     animal somebody hung up rather than a crop somebody grew. They are not rows in')
@@ -2291,7 +2291,7 @@ $gameLines.Add('     "from" is what hangs in the world, "name" is what it gives.
 $gameLines.Add('     The rank is named one at a time in GAME_RANK_BY_EDITOR_ID in the script: the')
 $gameLines.Add('     three produce records are priced at 2, 3 and 4 gold, so the gold rule that ranks')
 $gameLines.Add('     a plant puts all seven on one rung and the ladder would do nothing.')
-$gameLines.Add('     Paste it between the GAME_BY_BASE markers in tools\gamemode.js. Do not hand edit. */')
+$gameLines.Add('     Paste it between the GAME_BY_BASE markers in game\gamemode.js. Do not hand edit. */')
 $gameLines.Add('  var GAME_BY_BASE = {')
 $n = 0
 foreach ($d in $game.Keys) {
@@ -2311,7 +2311,7 @@ $gameLiteral = $gameLines -join [Environment]::NewLine
 # ---------------------------------------------------------------- install --
 #
 # The gamemode carries the table, because the server is deployed as one file
-# and cannot read tools\harvests.json. Nothing hand edits that block: this
+# and cannot read game\data\harvests.json. Nothing hand edits that block: this
 # writes it between its own markers, the way the other generated blocks in
 # this repo are written. -NoInstall prints it and leaves the file alone.
 #

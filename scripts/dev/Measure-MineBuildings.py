@@ -53,7 +53,7 @@ is the only road into the Forgotten Vale's 50 veins and was listed as shutting
 WHAT IT READS. The plugins in load order, the five masters and then
 plugins.txt, last one wins, which is the rule Build-DoorTable.py uses and whose
 plugin reader this borrows rather than copies. ORES_BY_BASE, BUILDING_BY_DOOR
-and BUILDING_NAME out of tools\\gamemode.js. tools\\doors.json.
+and BUILDING_NAME out of game\\gamemode.js. game\\data\\doors.json.
 
 WHAT IT WRITES. Nothing, unless --out names a file, and then that one file. It
 changes no rule and touches neither the gamemode nor the claim.

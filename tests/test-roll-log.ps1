@@ -36,14 +36,14 @@
   its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$ToolsPath)
+param([string]$RepoPath)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsPath) { $ToolsPath = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoPath) { $RepoPath = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -52,7 +52,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$roller = Join-Path $ToolsPath '..\scripts\vps\Roll-Log.ps1'
+$roller = Join-Path $RepoPath 'scripts\vps\Roll-Log.ps1'
 $winps  = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe'
 $node   = $null
@@ -195,7 +195,7 @@ try {
     Yes 'once the holder is gone it rolls' ((Size ($held + '.1')) -gt 0 -and (Get ($held + '.1')) -ne 'OLDER' -and (Get ($held + '.2')) -eq 'OLDER')
 
     # ======================================================= the game server task
-    $inst = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\deploy\Install-ThornswoodServer.ps1') -Raw
+    $inst = Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\deploy\Install-ThornswoodServer.ps1') -Raw
     $m = [regex]::Match($inst, '\$cmd = \(''(/c [^\r\n]*?skymp5-server\.js[^\r\n]*?)'' -f ([^\r\n]+)\)')
     Yes 'the server task line is in Install-ThornswoodServer.ps1' $m.Success
 
@@ -231,7 +231,7 @@ try {
     }
 
     # ============================================================ the voice task
-    $vtext = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\deploy\Install-Voice.ps1') -Raw
+    $vtext = Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\deploy\Install-Voice.ps1') -Raw
     $m = [regex]::Match($vtext, '`\$cmd = \(''(/c "set THORNSWOOD_SITE=[^\r\n]*?)'' -f ([^\r\n]+)\)')
     Yes 'the voice task line is in Install-Voice.ps1' $m.Success
     if ($node -and $m.Success) {
@@ -261,7 +261,7 @@ try {
         $vtext -notmatch 'Remove-Item -LiteralPath `\$log\b' -and $vtext -match '& `\$roll -Path `\$log -Force')
 
     # ============================================================ the dev voice
-    $dtext = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\vps\vps-dev-instance.ps1') -Raw
+    $dtext = Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\vps\vps-dev-instance.ps1') -Raw
     $lb = $dtext.IndexOf('$lines = @(')
     $le = if ($lb -ge 0) { $dtext.IndexOf("`n    )", $lb) } else { -1 }
     Yes 'the dev voice run file is in vps-dev-instance.ps1' ($lb -ge 0 -and $le -gt $lb)
@@ -286,7 +286,7 @@ try {
         ([regex]::Matches($dtext, '& robocopy [^\r\n]*/XF [^\r\n]*\*\.log\.\*')).Count -eq 2)
 
     # ================================================================== the bot
-    $btext = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\deploy\Install-Bot.ps1') -Raw
+    $btext = Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\deploy\Install-Bot.ps1') -Raw
     # The bot is a Windows service since #465 and its program rolls bot.log
     # by size while it runs, which tests\test-bot-service.ps1 drives. So there
     # is no run.ps1 loop to roll it and no roller to send.
@@ -318,7 +318,7 @@ try {
 
     # ===================================================== the server installer
     Yes 'Publish-Server sends the roller beside the installer' (
-        (Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\release\Publish-Server.ps1') -Raw) -match 'scp (@ssh )?\$rollLog "\$\{target\}:C:/Roll-Log\.ps1"')
+        (Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\release\Publish-Server.ps1') -Raw) -match 'scp (@ssh )?\$rollLog "\$\{target\}:C:/Roll-Log\.ps1"')
     # Same folder first (Publish layout on C:\), then scripts\vps (repo layout).
     $besideAt = $inst.IndexOf("Join-Path `$here 'Roll-Log.ps1'")
     $vpsAt = $inst.IndexOf("Join-Path `$here '..\vps\Roll-Log.ps1'")

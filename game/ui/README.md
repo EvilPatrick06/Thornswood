@@ -5,7 +5,7 @@
 What the game's browser shows: the page Skyrim Platform opens over the game
 and the overlays drawn into it, plain JavaScript and HTML with nothing built.
 `index.html` is the page. It is the front's own page, whose `build.js` comes
-from `tools\thornswood-front.zip`, plus `thornswood-bridge.js`, which supplies
+from `local\thornswood-front.zip`, plus `thornswood-bridge.js`, which supplies
 what that page expects from a browser this one is not, and the character
 choice at the main menu, `thornswood-select.js`, which draws itself before any
 plugin runs. `thornswood-front.js` in `game\plugins` then fetches the
@@ -23,7 +23,7 @@ From the repo folder, with the game closed:
 .\scripts\release\Go.ps1 -SkipServer
 ```
 
-unpacks the front from `tools\thornswood-front.zip` into
+unpacks the front from `local\thornswood-front.zip` into
 `C:\Thornswood\Game\Data\Platform\UI` (`-Game` names another game folder),
 copies every `.js`, every `.mp3` and `index.html` from here over it so ours
 wins, and copies the site's banner from `site\public` in as the

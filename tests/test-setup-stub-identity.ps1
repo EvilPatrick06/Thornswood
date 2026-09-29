@@ -37,8 +37,6 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # This test lives in tests\; repo root is one level up.
 $repoRoot = Split-Path -Parent $Here
-# Legacy: some older checks still resolve Bootstrap via tools\.
-$toolsDir = Join-Path $repoRoot 'tools'
 if (-not $BootstrapPath) { $BootstrapPath = Join-Path $repoRoot 'installer\setup\Bootstrap.cs' }
 
 $script:pass = 0
@@ -114,7 +112,7 @@ Yes 'and the else-branch that enables it when the control is missing is intact' 
 # ---- 5. the build wiring: shipped name, icon, version stamp from Updater ------
 # OriginalFilename and InternalName come off the /out leaf, and the shipped exe
 # is Thornswood-Setup.exe, so the stub is compiled under that name and then
-# moved onto tools\setup-stub.exe, which packaging copies without recompiling.
+# moved onto out\setup-stub.exe, which packaging copies without recompiling.
 # A file icon (/win32icon) keeps the download from arriving as a blank mark.
 # FileVersion/ProductVersion come from a generated ThornswoodSetupVersion.cs
 # stamped from Updater.cs ($ver / $verFour), not from hardcoded Bootstrap attrs.

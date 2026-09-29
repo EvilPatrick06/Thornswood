@@ -11,8 +11,9 @@
   reaches main through a pull request like any other change: main refuses a
   push from everybody, the owner included. Ship only reads this repository and
   writes nothing back to it. A main release is refused if anything is
-  uncommitted or unpushed, or if a file under tools is one git does not know,
-  so what ships and what is written down are the same thing.
+  uncommitted or unpushed, or if a file in a folder a release is built from is
+  one git does not know, so what ships and what is written down are the same
+  thing.
 
       .\scripts\release\Bump-Version.ps1        then the branch and pull request it prints
       git checkout main; git pull     once that pull request is merged
@@ -191,8 +192,9 @@
   main is the build everybody plays on, and ships only what is already on
   GitHub. It refuses a release that is not on main or on a hotfix/ branch,
   that is behind or ahead of the same branch on origin, that has anything
-  uncommitted, that has a file under tools git does not know about (the
-  build and Go.ps1 would take it anyway), or that asks for a new number with
+  uncommitted, that has a file in a folder a release is built from that git
+  does not know about (the build and Go.ps1 would take it anyway), or that
+  asks for a new number with
   -Version. A hotfix/ branch is the live build plus one fix and its version
   bump, cut from the commit the live release was built from. Ship refuses
   one that is not on GitHub, and it is Patrick's call like any live release.
@@ -399,7 +401,7 @@ function Get-LauncherDrift([string]$repoDir, [string]$tag) {
 # hour before the publish sign gate existed. Since then the gate refuses it,
 # which is safe but means no main Ship can go out at all.
 # So a main Ship signs the verified download here, with the same Sign-Artifact
-# and tools\signing.json a dev build signs with, -Required so a machine that
+# and records\signing\signing.json a dev build signs with, -Required so a machine that
 # cannot sign stops, and reads it back against ExpectedSigner before a byte of
 # it is installed or packed. Already signed by us: left alone. Returns '' when
 # the exe is signed by ExpectedSigner, or a sentence saying why not.
@@ -420,7 +422,7 @@ function Set-ReleaseLauncherSignature([string]$exe, [string]$signer, [string]$ex
     $rc = $LASTEXITCODE
     if ($rc -ne 0) {
         return ("Signing the launcher CI built stopped with exit code $rc. A main release has to be signed, " +
-                'the same as a dev one: Ship from the machine that holds tools\signing.json. Nothing was published.')
+                'the same as a dev one: Ship from the machine that holds records\signing\signing.json. Nothing was published.')
     }
     $why = Get-PublishSignRefusal -Path $exe -ExpectedSigner $expectedSigner
     if ($why) { return ('Signing said it worked, but ' + $why) }
@@ -634,17 +636,15 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
     $oldEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     $branch = (& git -C $RepoDir rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim()
     $dirty = @(& git -C $RepoDir status --porcelain --untracked-files=no 2>$null | Where-Object { $_ })
-    # And the files under tools that git has never been told about, which the
-    # line above leaves out. Ignored ones are not counted: measured 24 Sep, all
-    # 14 files under tools on Patrick's machine that git does not track are
-    # ignored (the webhooks, signing.json, __pycache__, a log, the front's zip),
-    # and counting them would stop every main release.
-    # tools, and every other folder a release is built from as the
-    # reorganisation moves them out of it (issue #440): the site's art goes
-    # into the menu, and game, launcher and installer are where the plugins,
-    # the launcher source and the installer are going.
+    # And the files git has never been told about, which the line above
+    # leaves out, in every folder a release is built from: the site's art goes
+    # into the menu, and game, launcher and installer hold the plugins, the
+    # launcher source and the installer. Ignored ones are not counted (the
+    # webhooks, records\signing\signing.json, __pycache__, a log), because
+    # counting them would stop every main release. tools\ went on 29 September
+    # (issue #440, phase 10).
     $moreRoots = @(@('scripts', 'records', 'site', 'game', 'launcher', 'installer') | Where-Object { Test-Path -LiteralPath (Join-Path $RepoDir $_) })
-    $loose = @(& git -C $RepoDir ls-files --others --exclude-standard -- tools @moreRoots 2>$null | Where-Object { $_ })
+    $loose = @(& git -C $RepoDir ls-files --others --exclude-standard -- @moreRoots 2>$null | Where-Object { $_ })
     & git -C $RepoDir fetch --quiet origin 2>$null | Out-Null
     $behind = 0
     $ahead = 0
@@ -660,7 +660,8 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
         # hotfix/... starts from the commit the live release was built from and
         # carries only the fix and its version bump; 1.1.93 went out that way.
         # Every other check below still applies to it: nothing uncommitted,
-        # nothing unknown under tools, nothing that is not on GitHub.
+        # nothing unknown in a folder a release is built from, nothing that is
+        # not on GitHub.
         $hotfix = $branch -like 'hotfix/*'
         if ($branch -ne 'main' -and -not $hotfix) { Die "A main release ships from main. This is $branch. Merge it into main first, or use -Channel dev to try it on the dev server." }
         if ($hotfix) {
@@ -702,13 +703,13 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
         # next", had moved to once Ship stopped committing. Found in the
         # review of entry 205 on 24 Sep.
         #
-        # One ignored file does ship and is not counted: tools\thornswood-
-        # front.zip, which Go.ps1 unpacks into Data\Platform\UI. *.zip keeps it
+        # One ignored file does ship and is not counted: local\thornswood-
+        # front.zip, which Go.ps1 unpacks into Data\Platform\UI. local\ keeps it
         # out of git and it has never been committed. Whether it should be is
         # not a question this gate can settle.
         if ($loose.Count) {
             foreach ($d in $loose | Select-Object -First 10) { Say "    $d" 'Yellow' }
-            Die ("There are $($loose.Count) file(s) under tools, or another folder a release is built from, that git does not know about. The build " +
+            Die ("There are $($loose.Count) file(s) in a folder a release is built from that git does not know about. The build " +
                  "and Go.ps1 take them anyway, so they would go out in this release without being on GitHub. " +
                  "Put them through a pull request, delete them, or add them to .gitignore, then Ship.")
         }
@@ -1047,7 +1048,7 @@ if (-not $ModsOnly) {
     # Keep matching .pdb beside this release's version on the shipping machine.
     # Packs, the installer and public release assets never carry them (#462).
     $kept = @(Save-ShipSymbols $buildOut $target)
-    $stubPdb = Join-Path $Here '..\..\tools\setup-stub.pdb'
+    $stubPdb = Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'setup-stub.pdb'
     if (Test-Path -LiteralPath $stubPdb) {
         $extra = @(Save-ShipSymbols (Split-Path -Parent (Resolve-Path $stubPdb)) $target)
         if ($extra.Count -gt 0) { $kept = $kept + $extra }
@@ -1323,7 +1324,7 @@ if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
 # CONTRIBUTING: only a signing machine may Ship, dev included. Soft skip is for
 # build machines, not for publish. Assert-PublishSigned.ps1 is dot-sourced at
 # the top, beside Ship-Rules.ps1.
-$signCfg = Join-Path $Here '..\..\tools\signing.json'
+$signCfg = Join-Path $Here '..\..\records\signing\signing.json'
 $signWhy = Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir
 if ($signWhy) {
     Unbump 'this machine cannot sign'

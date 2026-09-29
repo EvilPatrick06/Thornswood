@@ -35,11 +35,11 @@
 //
 // Set KNOWN to another copy of the page to check that instead, the live one
 // saved to a file for instance. Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const PAGE = process.env.KNOWN || path.join(TOOLS_DIR, '..', 'site', 'data', 'known.md');
+const PAGE = process.env.KNOWN || path.join(REPO_DIR, 'site', 'data', 'known.md');
 const CR = String.fromCharCode(13);
 let text = null;
 try { text = fs.readFileSync(PAGE, 'utf8').split(CR).join(''); } catch (e) { text = null; }

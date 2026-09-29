@@ -20,14 +20,14 @@
   a loopback port, against files in a temp folder. Nothing is read from or
   written to the site's own folders, and no other port is touched.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const http = require('http');
 
 const CR = String.fromCharCode(13);
-const SRC = path.join(TOOLS_DIR, '..', 'site', 'server.js');
+const SRC = path.join(REPO_DIR, 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
 let pass = 0, fail = 0;

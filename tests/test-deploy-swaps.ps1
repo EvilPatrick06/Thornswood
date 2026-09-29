@@ -50,9 +50,9 @@ param()
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-$scripts = [IO.Path]::GetFullPath((Join-Path $Here '..\scripts'))
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+$scripts = [IO.Path]::GetFullPath((Join-Path $Here 'scripts'))
 
 $script:pass = 0
 $script:fail = 0

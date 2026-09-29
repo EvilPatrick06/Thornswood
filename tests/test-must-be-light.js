@@ -23,7 +23,7 @@
 // This harness fails on the old hand-list-only behaviour and passes on the new.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
@@ -33,7 +33,7 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const appDir = path.join(TOOLS_DIR, '..', 'launcher', 'app');
+const appDir = path.join(REPO_DIR, 'launcher', 'app');
 const checks = fs.readFileSync(path.join(appDir, 'Checks.cs'), 'utf8');
 const verify = fs.readFileSync(path.join(appDir, 'Verify.cs'), 'utf8');
 
@@ -78,7 +78,7 @@ yes('FlagLight separates the file from Vortex\u2019s copy before it writes',
 // in this checkout, check it; otherwise say so rather than pass silently.
 let order = [];
 try {
-  order = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'version.json'), 'utf8')).loadOrder || [];
+  order = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'version.json'), 'utf8')).loadOrder || [];
 } catch (e) { order = []; }
 if (!order.length) {
   console.log('SKIP  no server load order in this checkout to compare the list against');

@@ -48,7 +48,19 @@ build, so a machine that only copies server binaries can leave it unfetched.
 Its configured build tree and toolchain (`engine\skymp\build`) are on
 Patrick's machine alone for now. The release output is `out` in the repository
 folder, ignored by git. `scripts\release\Where.ps1` says where each of these is on the
-machine it runs on. Who holds each thing Thornswood cannot run without, and who the
+machine it runs on.
+
+What one machine keeps and git never sees has a home of its own since
+29 September (issue #440, phase 10), when the last of it left `tools\` and that
+folder went:
+
+| File | Where | What it is | Read by |
+| --- | --- | --- | --- |
+| `signing.json` | `records\signing` | Whether this machine signs, and with what. No key in it | Sign-Artifact, Ship, Publish-Installer, Setup-ShipMachine |
+| `setup-stub.exe`, `setup-stub.pdb` | `out` | The setup program, compiled by Build-Launcher | Package-Thornswood, Ship |
+| `thornswood-front.zip` | `local` | The front build, made outside the repository | Go |
+| `mod-audit.json` | `local` | What Audit-Mods found last time | Audit-Mods |
+| `backup-key.txt` | `local` | A copy of the backup passphrase, a secret. Documents is where it really lives | Restore-Backup | Who holds each thing Thornswood cannot run without, and who the
 second holder is, is `docs\OWNERSHIP.md`.
 
 ## How a release goes out
@@ -333,7 +345,7 @@ by hand, and no secret is written into the repository.
 | The feed, its baseline, the launcher list and history | the VPS store, with a working copy in `%LOCALAPPDATA%\Thornswood\feed\<channel>` | Nothing to copy: every Ship receives them from the VPS first (`scripts\release\Feed-Store.ps1`, #907). The working copy is made on the first Ship |
 | The release webhooks, dev and #news | the VPS, `C:\Thornswood-Bot\webhooks`; One has no local copy | Nothing to copy: Ship reads them over ssh (`scripts\ops\Discord-Hook.ps1`) |
 | VPS access | One's own key, `.ssh\thornswood_ed25519` | Its own key: `.\scripts\vps\Setup-SshKey.ps1 -KeyOnly`, and somebody the VPS already knows runs `.\scripts\vps\Add-VpsKey.ps1 -PublicKey '<the line>'`. With no such machine left, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md`) |
-| Signing: `tools\signing.json` | enabled, naming `C:\tools\metadata.json` and the client under `records\signing\client\client`, paths only One has. Never copy it | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
+| Signing: `records\signing\signing.json` | enabled, naming `C:\tools\metadata.json` and the client under `records\signing\client\client`, paths only One has. Never copy it | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
 | Signing: Microsoft's signing client | `records\signing\client`, ignored by git | The same script fetches `Microsoft.ArtifactSigning.Client` 1.0.128 from nuget.org and refuses it unless its sha256 is the pinned one, which is the package One has |
 | Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as Patrick. Only Patrick's Azure account has signing access (the Certificate Profile Signer role on the ThornswoodSigning account, profile ThornswoodRelease), so a second machine signs only while it is signed in as him (Patrick, 29 Sep). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins. Signing in is the one step only Patrick can do |
 | The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | The script fetches the zip of the recorded commit from the site's feed (`clientRuntime` in `/feed-dev/version.json` or `/feed/version.json`), checks it against the feed's sha256 and every file against the record, and puts the six files in the build folder. A commit on neither feed is built: `.\scripts\release\Setup-ShipMachine.ps1 -Rebuild`, or `.\scripts\release\Build-Engine.ps1` |
@@ -356,12 +368,12 @@ nothing.
 
 checks the tools a Ship calls (git, gh, PowerShell 7, node, ssh, the .NET
 Framework compiler, signtool, az, the .NET 8 runtime), fetches the signing
-client, writes `tools\signing.json`, checks the Azure sign in, fetches the
+client, writes `records\signing\signing.json`, checks the Azure sign in, fetches the
 recorded client, and then runs `.\scripts\release\Check-ShipReady.ps1 -Channel dev`
 for everything else Ship asks: the dev build, its game folder, the Vortex
 profile, the VPS and the feed store. Each gap prints the command that closes
 it and says when it is Patrick's. It never turns signing off, never edits a
-`tools\signing.json` that is there, and never ships. Signing needs Patrick in
+`records\signing\signing.json` that is there, and never ships. Signing needs Patrick in
 person: only his Azure account has signing access, so the `az login` on the
 second machine is his, and that machine signs only while it is signed in as
 him. When both say READY:
@@ -383,7 +395,7 @@ the pinned or recorded bytes.
 
 None of these is tracked by git. Four of them sit inside the repo folder on
 the machine that holds them and are kept out by `.gitignore`: the two webhooks,
-`tools\signing.json` and the retired `server-secret.txt`. The rest are on the VPS or in
+`records\signing\signing.json` and the retired `server-secret.txt`. The rest are on the VPS or in
 your own profile. Each row says what the thing actually protects today, and
 says **not enforced** where nothing checks it.
 
@@ -405,7 +417,7 @@ says **not enforced** where nothing checks it.
 | GitHub access | your own `gh auth login`, kept in Windows' credential store | Pushing branches and opening pull requests here, and a main Ship's download of the launcher CI built. Releases go to the VPS, not GitHub, since #897 and #907. | You: `gh auth logout`, then `gh auth login`, or revoke it on GitHub under Settings, Applications. Collaborator access to the source repo is Patrick's to give or take away. |
 | VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, and its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. None of the scripts needs the Administrator password; `Add-VpsKey.ps1` exists so nobody else has to hold it. | You. First move the old key aside: rename both `.ssh\thornswood_ed25519` and `.ssh\thornswood_ed25519.pub`, say by adding `.old`. While the old key still opens the VPS, `Setup-SshKey.ps1` says it already works and stops, and while the `.pub` is there it uses that one again rather than making a new one. Passing `-KeyPath` a new file does not get round this, because that first check goes through your ssh config, which still names the old key. Then `Setup-SshKey.ps1 -KeyOnly` makes a new key at the same path and prints its public line. Patrick adds it with `Add-VpsKey.ps1 -PublicKey '<the new line>'` and takes the old one off with `Add-VpsKey.ps1 -PublicKey '<the line in the .old .pub>' -Remove`. For his own key, Patrick runs `Setup-SshKey.ps1` without `-KeyOnly`, which asks for the Administrator password once and puts the new key on itself, and then removes the old line the same way. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes and the old line is off. |
 | VirusTotal API key | the environment variable `VT_API_KEY` on the machine that runs the optional manual upload, and nowhere in this repository: `Publish-VirusTotal.ps1` reads it from there only, so it has no file to be committed in and no parameter to be typed on a command line | Reading and uploading under our VirusTotal account when somebody runs the manual tool. Publish, Package, and Ship do not call it (#802). | Whoever owns the VirusTotal account, in the account's own API key page, then sets the variable on that machine. A machine without it skips a manual run; publish does not need the key. |
-| Code signing | `tools\signing.json` on a machine that signs, written from `records\signing\signing.template.json` by `Setup-ShipMachine.ps1`. It names the setup and holds no key: the credential is the `az login` on that machine, as Patrick, whose Azure account is the only one with signing access (the Certificate Profile Signer role on the Artifact Signing profile), or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Patrick, in Azure: the signing account is his, and a second machine signs only while `az` on it is signed in as him. Without the file `Sign-Artifact.ps1` signs nothing and a local build carries on unsigned. Ship and Publish-Installer refuse that soft skip before anything reaches the site or the feed. |
+| Code signing | `records\signing\signing.json` on a machine that signs, written from `records\signing\signing.template.json` by `Setup-ShipMachine.ps1`. It names the setup and holds no key: the credential is the `az login` on that machine, as Patrick, whose Azure account is the only one with signing access (the Certificate Profile Signer role on the Artifact Signing profile), or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Patrick, in Azure: the signing account is his, and a second machine signs only while `az` on it is signed in as him. Without the file `Sign-Artifact.ps1` signs nothing and a local build carries on unsigned. Ship and Publish-Installer refuse that soft skip before anything reaches the site or the feed. |
 | The domain, thornswood.net | Registered at Cloudflare, in Patrick's own Cloudflare login, which he signs in to with GitHub (`docs\OWNERSHIP.md`). Nothing about it is kept on a machine or in this repository | The address everybody reaches the site, the feed and the launcher downloads at. Whoever holds the login can point it anywhere or let it lapse. | Patrick, in that Cloudflare login: renewing, moving or changing the records. Nobody else holds it. |
 
 **The rule for this table.** A control that does not exist is listed as

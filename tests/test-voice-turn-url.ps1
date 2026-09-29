@@ -38,14 +38,14 @@
   folder.
 #>
 [CmdletBinding()]
-param([string]$ToolsPath)
+param([string]$RepoPath)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsPath) { $ToolsPath = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoPath) { $RepoPath = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -76,7 +76,7 @@ Yes 'node is here to run the voice service' ([bool]$nodeExe)
 if (-not $nodeExe) { Done }
 
 # ---- the script, parsed ----------------------------------------------------
-$installPath = Join-Path $ToolsPath '..\scripts\deploy\Install-Voice.ps1'
+$installPath = Join-Path $RepoPath 'scripts\deploy\Install-Voice.ps1'
 $tokens = $null; $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($installPath, [ref]$tokens, [ref]$errors)
 Yes 'Install-Voice.ps1 parses' ($errors.Count -eq 0)
@@ -156,7 +156,7 @@ $logPath = Join-Path $root 'voice.log'
 # reach node through the whole line the box runs and not a line without it.
 $psExePath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $rollPath = Join-Path $root 'roll-log.ps1'
-Copy-Item -LiteralPath (Join-Path $ToolsPath '..\scripts\vps\Roll-Log.ps1') -Destination $rollPath
+Copy-Item -LiteralPath (Join-Path $RepoPath 'scripts\vps\Roll-Log.ps1') -Destination $rollPath
 # Stands in for the service: writes down what cmd.exe handed it and stops.
 $seenPath = Join-Path $root 'seen.json'
 Set-Content -LiteralPath (Join-Path $root 'voice-server.js') -Encoding ASCII -Value @'
@@ -254,7 +254,7 @@ $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($full))
 function StartVoice([int]$port, [hashtable]$vars, [string]$key) {
     $dir = Join-Path $script:temp ('voice-' + $port)
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    Copy-Item -LiteralPath (Join-Path $ToolsPath '..\voice\voice-server.js') -Destination (Join-Path $dir 'voice-server.js')
+    Copy-Item -LiteralPath (Join-Path $RepoPath 'voice\voice-server.js') -Destination (Join-Path $dir 'voice-server.js')
     Set-Content -LiteralPath (Join-Path $dir 'token-key.txt') -Value 'a join token key for this test only' -Encoding ASCII
     if ($key) { Set-Content -LiteralPath (Join-Path $dir 'turn-key.txt') -Value $key -Encoding ASCII }
     $psi = New-Object System.Diagnostics.ProcessStartInfo

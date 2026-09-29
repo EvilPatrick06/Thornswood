@@ -33,9 +33,9 @@ param([string]$WatchPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $WatchPath) { $WatchPath = Join-Path $Here '..\scripts\vps\Watch-Services.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $WatchPath) { $WatchPath = Join-Path $Here 'scripts\vps\Watch-Services.ps1' }
 
 $script:pass = 0
 $script:fail = 0

@@ -43,7 +43,7 @@
   machine's own, and nothing asks Discord: the sample is checked for empty
   Discord settings before any copy that reads it is started.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -52,8 +52,8 @@ const http = require('http');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
-const ROOT = path.join(TOOLS_DIR, '..');
-const APP = path.join(TOOLS_DIR, '..', 'site');
+const ROOT = REPO_DIR;
+const APP = path.join(REPO_DIR, 'site');
 const CR = String.fromCharCode(13);
 // A backslash, built rather than typed, so no tool on the way can eat it.
 const BS = String.fromCharCode(92);

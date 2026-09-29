@@ -32,9 +32,9 @@ param([string]$DeployPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $DeployPath) { $DeployPath = Join-Path $Here '..\scripts\deploy\Deploy-Gamemode.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $DeployPath) { $DeployPath = Join-Path $Here 'scripts\deploy\Deploy-Gamemode.ps1' }
 
 $script:pass = 0
 $script:fail = 0

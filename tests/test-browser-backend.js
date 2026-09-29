@@ -28,12 +28,12 @@
 // config.json across a restart, and a line on the Settings page.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const TOOLS = TOOLS_DIR;
-function read(rel) { return fs.readFileSync(path.join(TOOLS, rel), 'utf8'); }
+const REPO = REPO_DIR;
+function read(rel) { return fs.readFileSync(path.join(REPO, rel), 'utf8'); }
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -66,11 +66,11 @@ function comments(src) {
   return out.join(' ').replace(/\s+/g, ' ');
 }
 
-const checks = read('../launcher/app/Checks.cs');
-const chars = read('../launcher/app/Chars.cs');
-const ownGame = read('../launcher/app/OwnGame.cs');
-const shipRules = read('../scripts/release/Ship-Rules.ps1');
-const front = read('../game/plugins/thornswood-front.js');
+const checks = read('launcher/app/Checks.cs');
+const chars = read('launcher/app/Chars.cs');
+const ownGame = read('launcher/app/OwnGame.cs');
+const shipRules = read('scripts/release/Ship-Rules.ps1');
+const front = read('game/plugins/thornswood-front.js');
 
 // The note on ForeignNames: from its warning line to the ForeignPaths array.
 const noteFrom = checks.indexOf('NirnLabUIPlugin.dll WAS on this list');
@@ -161,11 +161,11 @@ yes('Chars.Prepare keeps the answer in Chars.BrowserBackend',
 yes('Chars.BrowserBackend is readable from Shell',
   /public static string BrowserBackend \{ get; private set; \}/.test(chars));
 
-const config = read('../launcher/app/Config.cs');
+const config = read('launcher/app/Config.cs');
 yes('config.json has a BrowserBackend field, so the answer survives a restart',
   /\[DataMember\] public string BrowserBackend = "";/.test(config));
 
-const shellChars = read('../launcher/app/ShellChars.cs');
+const shellChars = read('launcher/app/ShellChars.cs');
 const startPlay = body(shellChars, 'static void StartPlay()');
 yes('StartPlay records the backend right after Chars.Prepare',
   /Chars\.Prepare\(cfg\)[\s\S]{0,300}RecordBrowserBackend\(\);/.test(startPlay));
@@ -182,11 +182,11 @@ yes('the Settings line is redrawn after a Play', /DrawInGameBrowser\(\);/.test(r
 const draw = body(shellChars, 'static void DrawInGameBrowser()');
 yes('DrawInGameBrowser looks up TxtInGameBrowser', /F<[\w.]*TextBlock>\("TxtInGameBrowser"\)/.test(draw));
 yes('the Settings line reads "In-game browser: <name>"', /"In-game browser: " \+ b/.test(draw));
-const ui = read('../launcher/ui.xaml');
+const ui = read('launcher/ui.xaml');
 const settingsPage = ui.slice(ui.indexOf('x:Name="PageSettings"'));
 yes('ui.xaml has TxtInGameBrowser on the Settings page',
   ui.indexOf('x:Name="PageSettings"') >= 0 && /x:Name="TxtInGameBrowser"/.test(settingsPage));
-const shell = read('../launcher/app/Shell.cs');
+const shell = read('launcher/app/Shell.cs');
 yes('the Settings line is drawn at startup with the folder rows',
   /DrawInGameBrowser\(\);/.test(body(shell, 'static void BuildPathRows()')));
 

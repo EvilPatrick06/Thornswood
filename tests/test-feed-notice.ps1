@@ -48,10 +48,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppDir) { $AppDir = Join-Path $Here '..\launcher\app' }
-if (-not $Xaml) { $Xaml = Join-Path $Here '..\launcher\ui.xaml' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $AppDir) { $AppDir = Join-Path $Here 'launcher\app' }
+if (-not $Xaml) { $Xaml = Join-Path $Here 'launcher\ui.xaml' }
 
 # The launcher's compiler and serializer are the .NET Framework's, so the
 # answer has to come from there and not from .NET under pwsh.

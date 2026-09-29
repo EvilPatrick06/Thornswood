@@ -56,8 +56,8 @@ param([string]$Fork = (& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1'
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
 
 $script:pass = 0
 $script:fail = 0
@@ -70,12 +70,12 @@ function Read-Json([string]$p) {
 }
 function Leaf([string]$p) { return $p.Substring($p.LastIndexOf('\') + 1) }
 
-$clientPath  = Join-Path $Here '..\records\client-build.json'
-$serverPath  = Join-Path $Here '..\records\server-build.json'
-$packagePath = Join-Path $Here '..\scripts\release\Package-Thornswood.ps1'
-$setupPath   = Join-Path $Here '..\installer\Setup-Thornswood.ps1'
-$creditsPath = Join-Path $Here '..\site\data\site\credits.md'
-$homePath    = Join-Path $Here '..\site\public\home.html'
+$clientPath  = Join-Path $Here 'records\client-build.json'
+$serverPath  = Join-Path $Here 'records\server-build.json'
+$packagePath = Join-Path $Here 'scripts\release\Package-Thornswood.ps1'
+$setupPath   = Join-Path $Here 'installer\Setup-Thornswood.ps1'
+$creditsPath = Join-Path $Here 'site\data\site\credits.md'
+$homePath    = Join-Path $Here 'site\public\home.html'
 
 $client = Read-Json $clientPath
 $server = Read-Json $serverPath
@@ -269,12 +269,12 @@ Yes 'Setup-Thornswood.ps1 copies SOURCE CODE.txt into the install folder' `
 # And the uninstall takes it out again. Finish ends with a plain rmdir of the
 # install folder, which only works on an empty one, and the farewell calls
 # anything it does not know "not Thornswood's".
-$uninstall = Get-Content -LiteralPath (Join-Path $Here '..\launcher\app\Uninstall.cs') -Raw
+$uninstall = Get-Content -LiteralPath (Join-Path $Here 'launcher\app\Uninstall.cs') -Raw
 Yes 'Uninstall.cs removes SOURCE CODE.txt from the install folder' `
     ($uninstall -match 'leave\.Add\(Path\.Combine\(Paths\.Root, "SOURCE CODE\.txt"\)\)')
 
 # Full GPL / AGPL / WebView2 texts beside the note (issue #421).
-$licenceDir = Join-Path $Here '..\installer\licences'
+$licenceDir = Join-Path $Here 'installer\licences'
 Yes 'installer\licences holds GPL-3.0.txt' (Test-Path -LiteralPath (Join-Path $licenceDir 'GPL-3.0.txt'))
 Yes 'installer\licences holds AGPL-3.0.txt' (Test-Path -LiteralPath (Join-Path $licenceDir 'AGPL-3.0.txt'))
 Yes 'installer\licences holds WebView2-LICENSE.txt' (Test-Path -LiteralPath (Join-Path $licenceDir 'WebView2-LICENSE.txt'))
@@ -296,9 +296,9 @@ Yes 'SOURCE CODE.txt notice names the three licence files beside it' `
     ($note -match 'AGPL-3\.0\.txt' -and $note -match 'GPL-3\.0\.txt' -and $note -match 'WebView2-LICENSE\.txt')
 
 # ---- where release pages said source is (#421, #907) ----------------------
-$publishUpdatePath = Join-Path $Here '..\scripts\release\Publish-Update.ps1'
-$publishPackPath   = Join-Path $Here '..\scripts\release\Publish-Pack.ps1'
-$releaseYmlPath    = Join-Path $Here '..\.github\workflows\release.yml'
+$publishUpdatePath = Join-Path $Here 'scripts\release\Publish-Update.ps1'
+$publishPackPath   = Join-Path $Here 'scripts\release\Publish-Pack.ps1'
+$releaseYmlPath    = Join-Path $Here '.github\workflows\release.yml'
 $publishUpdate = Get-Content -LiteralPath $publishUpdatePath -Raw
 $publishPack   = Get-Content -LiteralPath $publishPackPath -Raw
 $releaseYml    = Get-Content -LiteralPath $releaseYmlPath -Raw

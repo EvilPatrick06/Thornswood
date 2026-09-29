@@ -142,7 +142,7 @@ typed on a command line or written on this page.
 | The staff channel webhook | Discord: the staff channel, Edit Channel, Integrations, Webhooks, Copy Webhook URL | pasted at Watch-Services' prompt, step 21 |
 | Patrick's GitHub sign in | `gh auth login` on One | the build runner's registration, step 24 |
 | The DNS records | Patrick's own Cloudflare login, which he signs in to with GitHub, where thornswood.net is registered | step 18 |
-| Code signing | `tools\signing.json` on One and the Azure account behind it | the installer, step 17, and the main Ship, step 29 |
+| Code signing | `records\signing\signing.json` on One and the Azure account behind it | the installer, step 17, and the main Ship, step 29 |
 
 ### Standing it up, while the old box still serves
 

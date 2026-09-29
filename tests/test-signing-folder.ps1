@@ -34,9 +34,9 @@ param()
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-$repo = Split-Path -Parent $Here
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+$repo = $Here
 $shell = (Get-Process -Id $PID).Path
 
 $script:pass = 0
@@ -46,7 +46,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$meta = Join-Path $Here '..\records\signing\metadata.json'
+$meta = Join-Path $Here 'records\signing\metadata.json'
 Yes 'records\signing\metadata.json is in the repository' (Test-Path -LiteralPath $meta)
 $m = $null
 try { $m = Get-Content -LiteralPath $meta -Raw | ConvertFrom-Json } catch { }
@@ -67,7 +67,7 @@ try {
     New-Item -ItemType Directory -Force -Path $decoyDir | Out-Null
     $decoy = Join-Path $decoyDir 'metadata.json'
     [IO.File]::WriteAllText($decoy, '{"Endpoint":"https://wus2.codesigning.azure.net","CodeSigningAccountName":"ThornswoodSigning","CertificateProfileName":"FILL THIS IN"}')
-    $sign = Join-Path $Here '..\scripts\release\Sign-Artifact.ps1'
+    $sign = Join-Path $Here 'scripts\release\Sign-Artifact.ps1'
 
     $cfg = Join-Path $work 'signing.json'
     [IO.File]::WriteAllText($cfg, '{"method":"artifactsigning","dlib":"records\\signing\\client\\Azure.CodeSigning.Dlib.dll","metadata":"records\\signing\\metadata.json"}')

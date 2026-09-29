@@ -25,9 +25,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Here0 = $PSScriptRoot
 if (-not $Here0) { $Here0 = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here0 = Join-Path (Split-Path -Parent $Here0) 'tools'
-if (-not $PackagePath) { $PackagePath = Join-Path $Here0 '..\scripts\release\Package-Thornswood.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here0 = Split-Path -Parent $Here0
+if (-not $PackagePath) { $PackagePath = Join-Path $Here0 'scripts\release\Package-Thornswood.ps1' }
 
 $script:pass = 0
 $script:fail = 0

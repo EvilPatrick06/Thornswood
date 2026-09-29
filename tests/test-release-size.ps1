@@ -27,10 +27,10 @@ param([string]$PublishPath, [string]$ShipPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $PublishPath) { $PublishPath = Join-Path $Here '..\scripts\release\Publish-Update.ps1' }
-if (-not $ShipPath) { $ShipPath = Join-Path $Here '..\scripts\release\Ship.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $PublishPath) { $PublishPath = Join-Path $Here 'scripts\release\Publish-Update.ps1' }
+if (-not $ShipPath) { $ShipPath = Join-Path $Here 'scripts\release\Ship.ps1' }
 
 $script:pass = 0
 $script:fail = 0

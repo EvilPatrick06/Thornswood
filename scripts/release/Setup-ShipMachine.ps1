@@ -8,7 +8,7 @@
   survive". Since #907 the feed and the Ship baseline live on the VPS and the
   release webhooks are read from there too, so most of what a Ship needs is
   already off Patrick's machine (One). What was still only on One, measured on
-  29 September: the signing setup (tools\signing.json, which names a metadata
+  29 September: the signing setup (records\signing\signing.json, which names a metadata
   file outside the repository, Microsoft's signing client, and the az sign in
   behind it) and the client runtime build the record names. No copy of the
   recorded client sat anywhere on One but the dev game folder; the site's feed
@@ -22,7 +22,7 @@
     2. Microsoft's signing client in records\signing\client. When it is not
        there it is fetched from nuget.org at the version pinned below and
        refused unless its sha256 is the pinned one.
-    3. tools\signing.json. When there is none it is written from
+    3. records\signing\signing.json. When there is none it is written from
        records\signing\signing.template.json, which holds paths and "enabled": true, no key. An
        existing one is never changed: it is read, and anything wrong with it
        is said.
@@ -45,10 +45,10 @@
        the VPS and the feed store) and gives the verdict.
 
   WHAT IT NEVER DOES. It writes no secret anywhere, never turns signing off
-  or writes "enabled": false, never edits an existing tools\signing.json,
+  or writes "enabled": false, never edits an existing records\signing\signing.json,
   never ships, publishes or deploys, and does not sign anything. The only
   files it writes are the signing client under records\signing\client, a new
-  tools\signing.json, the six client files in the build folder
+  records\signing\signing.json, the six client files in the build folder
   (Where.ps1 ClientDist), and its downloads under out\ship-machine, all
   ignored by git.
 
@@ -167,7 +167,7 @@ function Save-SigningClient([string]$Repo, $Pin, [scriptblock]$Fetch, [string]$W
   return ''
 }
 
-# Writes tools\signing.json from the template when there is none. Never
+# Writes records\signing\signing.json from the template when there is none. Never
 # touches one that exists, and never writes one that turns signing off: a
 # template whose "enabled" is anything but true is refused. The key is there
 # at all because Ship runs under Set-StrictMode -Version Latest, where
@@ -412,15 +412,15 @@ if ($dlibRel) {
 }
 
 # ------------------------------------------------------ 3. signing.json --
-Head '3. tools\signing.json'
+Head '3. records\signing\signing.json'
 $template = Join-Path $RepoDir 'records\signing\signing.template.json'
-$cfgPath = Join-Path $RepoDir 'tools\signing.json'
+$cfgPath = Join-Path $RepoDir 'records\signing\signing.json'
 if (-not (Test-Path -LiteralPath $cfgPath)) {
   if ($Check) {
-    Plan ('write tools\signing.json from records\signing\signing.template.json' + $(if ($dlibRel) { ', naming ' + $dlibRel } else { '' }))
+    Plan ('write records\signing\signing.json from records\signing\signing.template.json' + $(if ($dlibRel) { ', naming ' + $dlibRel } else { '' }))
   } else {
     $r = New-SigningConfig $template $cfgPath $dlibRel
-    if ($r.Wrote) { Say '  wrote tools\signing.json from the template (paths, no key)' 'Green' }
+    if ($r.Wrote) { Say '  wrote records\signing\signing.json from the template (paths, no key)' 'Green' }
     else { Say ('  ' + $r.Why) 'Red' }
   }
 }
@@ -430,9 +430,9 @@ if (Test-Path -LiteralPath $cfgPath) {
   Row 'Ship would accept it' (-not $refuse) $refuse 'Fix what it says. Never set "enabled": false to get past it: a Ship from a machine that cannot sign is refused, on purpose'
   $miss = @(Get-SigningPathsMissing $cfgPath $RepoDir)
   Row 'the dlib and metadata it names are here' ($miss.Count -eq 0) ($miss -join '; ') `
-    'It was copied from another machine and names that machine''s paths. Move it aside (rename it tools\signing.json.old) and run this again: it writes one from the template'
+    'It was copied from another machine and names that machine''s paths. Move it aside (rename it records\signing\signing.json.old) and run this again: it writes one from the template'
 } else {
-  Row 'tools\signing.json is here' $false '' '.\scripts\release\Setup-ShipMachine.ps1   (without -Check) writes it from the template'
+  Row 'records\signing\signing.json is here' $false '' '.\scripts\release\Setup-ShipMachine.ps1   (without -Check) writes it from the template'
 }
 
 # ------------------------------------------------------ 4. the az sign in --

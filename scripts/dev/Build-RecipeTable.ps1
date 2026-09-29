@@ -2055,7 +2055,7 @@ function RememberProducer([string]$desc, [string]$rank, [int]$at, [string]$who, 
 }
 
 
-# THE STATIONS, READ OUT OF tools\gamemode.js. Argued for at STATION_VERBS: this
+# THE STATIONS, READ OUT OF game\gamemode.js. Argued for at STATION_VERBS: this
 # is a reader and not a copy, so the index cannot drift from what the server
 # actually hands over without the build saying so.
 #
@@ -4974,7 +4974,7 @@ $doc.Add('  "readFrom": ' + (JsonStr 'BNAM is the workbench keyword, CNAM is the
 $doc.Add('  "event": ' + (JsonStr 'mp.onCraft(actorFormId, craftedItemBaseId, count, recipeId). All four arguments are numbers. The keys of this table are desc strings, so look a row up with RECIPES_BY_ID[mp.getDescFromId(recipeId)] and never with recipeId itself, which matches nothing. Returning false refuses the craft outright: CraftEvent::OnFireSuccess is what removes the inputs and adds the output, and GameModeEvent::Fire only calls it when nobody blocked.') + ',')
 $doc.Add('  "key": ' + (JsonStr 'the recipe''s form id in lower case hex, a colon, and the file it belongs to. mp.getDescFromId turns onCraft''s fourth argument into one.') + ',')
 $doc.Add('  "rank": ' + (JsonStr 'which of classes.md''s four ranks the row asks for: novice, advanced, expert or master. Ranked by WHAT ITS INPUTS COST A PRODUCER, taking the dearest thing it asks for, because that is the rung somebody has to have reached before they could gather the makings at all. Where part of the list is produced by nobody, that dearest placed input is a FLOOR and not the answer: it can raise the row above what the output sells for and never lower it, because an item nothing produces is an unknown cost rather than a free one. A row whose inputs no class produces at all falls back to what the output sells for, ranked inside its own half. rankFrom says which of the three answered. classes.md sets no numbers for any of this and nothing in the game records ranks a recipe, so every judgement is a knob at the top of the script: RANK_FROM_INPUT_COST, PRODUCER_TABLES, SERVER_PRODUCERS, PRODUCER_RANK_IS_LOWEST, INPUT_RANK_IS_THE_DEAREST, UNPLACED_INPUT_RULE, RANK_SHARE and SECOND_RULE_KEY.') + ',')
-$doc.Add('  "inputItems": ' + (JsonStr 'every CNTO the record carried: what the recipe wants, how many, and which class produces that item at which rank. producedBy is the class that gets it at the LOWEST rank, because that is what the thing costs to get hold of; alsoProducedBy, where it is present, is every OTHER class that produces the same item, at the rank that class produces it at, whether that is higher than producedAt or exactly level with it. A tied class was dropped from this field until 21 September, which made the farmer invisible for wheat in every consumer of this file. producedBy null means nothing in this repository hands that item over: no table in this folder and no verb in tools\gamemode.js. Read out of the recipe''s own CNTO subrecords, eight bytes each, a form id then a count.') + ',')
+$doc.Add('  "inputItems": ' + (JsonStr 'every CNTO the record carried: what the recipe wants, how many, and which class produces that item at which rank. producedBy is the class that gets it at the LOWEST rank, because that is what the thing costs to get hold of; alsoProducedBy, where it is present, is every OTHER class that produces the same item, at the rank that class produces it at, whether that is higher than producedAt or exactly level with it. A tied class was dropped from this field until 21 September, which made the farmer invisible for wheat in every consumer of this file. producedBy null means nothing in this repository hands that item over: no table in this folder and no verb in game\gamemode.js. Read out of the recipe''s own CNTO subrecords, eight bytes each, a form id then a count.') + ',')
 $doc.Add('  "suppliedBy": ' + (JsonStr 'on each input beside producedBy, and a different question: producedBy is the class that digs it out of the ground, and suppliedBy is the class the input rests on however many benches away it is. Steel Ingot reads producedBy null and suppliedBy miner, because a smelter row makes it out of ore. hops is how many recipes stand between the class and the input, 0 for handed straight over and 1 for a smelter or a tanning rack away, and suppliedVia names the recipe of the last of those steps. suppliedBy null means nothing in this world supplies it at all, directly or through any bench: it is bought, looted or dropped. What ranks a row is suppliedAt and not producedAt.') + ',')
 $doc.Add('  "theHop": ' + (JsonStr 'how suppliedBy is worked out. An input that is itself the output of a recipe costs what that recipe''s dearest input costs, taken over all 5116 recipes and not just the 3437 with an owner, because the smelter and the tanning rack are among the 1679 nobody owns. It is a fixpoint: every item starts unknown, every recipe is asked again each round, and a cost only ever moves from unknown to a rank or from a rank to a cheaper one, so it settles, and it settles in three rounds on this build. A recipe says nothing about its output while any part of its own list is unknown, for the reason written at UNPLACED_INPUT_RULE. A row that turns a finished good back into stock, a fur hood into a Steel Ingot, is a refund and not a source and sets nothing; 1072 rows have that shape.') + ',')
 $doc.Add('  "inputsWithNoProducer": ' + (JsonStr 'how many of the row''s inputs nothing in this repository produces. Read it with inputRank: "the dearest input is novice" means one thing on a row where that is the whole list and another on a row with four unknowns beside it, and not reading it is how a 3100 gold dragonbone plate went out at novice on 21 September off one novice hunter''s fox pelt.') + ',')
@@ -5308,7 +5308,7 @@ $secondRuleHalves = @($secondRuleUsed.Keys)
 
 $lines = New-Object 'System.Collections.Generic.List[string]'
 $lines.Add('  /* Built by scripts\dev\Build-RecipeTable.ps1 out of the game''s own records. Do not hand edit.')
-$lines.Add('     ' + $blockRows.Count + ' crafting recipes, out of ' + ($owned.Count + $unowned.Count) + ' in tools\recipes.json.')
+$lines.Add('     ' + $blockRows.Count + ' crafting recipes, out of ' + ($owned.Count + $unowned.Count) + ' in game\data\recipes.json.')
 $lines.Add('')
 $lines.Add('     Recipe desc -> what it makes, what kind of record that is, how many it')
 $lines.Add('     makes, which profession and which half of it owns the recipe, and which')
@@ -5340,7 +5340,7 @@ $lines.Add('     the shopping list is. That last rule is used for a whole half a
 if ($secondRuleHalves.Count -gt 0) {
     $lines.Add('     and only where the first two leave a rung with nothing on it, which here')
     $lines.Add('     is ' + ($secondRuleHalves -join ', ') + '. A rank there means how long the list is and')
-    $lines.Add('     nothing else, and the half says so in tools\recipes.json.')
+    $lines.Add('     nothing else, and the half says so in game\data\recipes.json.')
 } else {
     $lines.Add('     and only where the first two leave a rung with nothing on it, which no')
     $lines.Add('     half in this build did.')
@@ -5385,7 +5385,7 @@ $literal = $lines -join [Environment]::NewLine
 # ---------------------------------------------------------------- install --
 #
 # The gamemode carries the table, because the server is deployed as one file and
-# cannot read tools\recipes.json. Nothing hand edits that block: this writes it
+# cannot read game\data\recipes.json. Nothing hand edits that block: this writes it
 # between its own markers, the way the ore table does. -NoInstall prints it and
 # leaves the file alone, and so does a gamemode.js that has no markers yet: this
 # never invents a place to put it.

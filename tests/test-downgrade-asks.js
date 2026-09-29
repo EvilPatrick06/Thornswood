@@ -25,14 +25,14 @@
 
   Read only. It reads launcher\app\*.cs and launcher\ui.xaml and nothing else.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const APP = path.join(TOOLS_DIR, '..', 'launcher', 'app');
+const APP = path.join(REPO_DIR, 'launcher', 'app');
 const SHELL = fs.readFileSync(path.join(APP, 'Shell.cs'), 'utf8');
 const DOWN = fs.readFileSync(path.join(APP, 'Downgrade.cs'), 'utf8');
-const XAML = fs.readFileSync(path.join(TOOLS_DIR, '..', 'launcher', 'ui.xaml'), 'utf8');
+const XAML = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'ui.xaml'), 'utf8');
 
 let pass = 0, fail = 0;
 const yes = (w, c) => {

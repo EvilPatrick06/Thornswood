@@ -128,7 +128,7 @@ function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [st
 # WHAT ONLY A MAIN RELEASE ASKS FOR (issue #932), as warnings: neither stops
 # Ship.ps1 itself.
 #   The setup stub. A main Ship takes the launcher CI built and never runs
-#   Build-Launcher, which is what compiles tools\setup-stub.exe. So -Package,
+#   Build-Launcher, which is what compiles out\setup-stub.exe. So -Package,
 #   which a main Ship needs whenever the installer is behind, stops on
 #   "setup-stub.exe is missing" after the release is already published.
 #   Package-Thornswood also refuses a stub older than installer\setup\Bootstrap.cs.
@@ -149,7 +149,7 @@ function Get-MainOnlyRows([string]$Channel, [string[]]$StubPlaces, [string]$Boot
   }
   else { $stubOk = $true; $stubDetail = $stub }
   $rows += New-Row 'the setup stub is built, which Ship -Package needs' $stubOk $stubDetail `
-    '.\scripts\release\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause     compiles it into tools\ and leaves the launcher you play with alone' 'either' 'warn'
+    '.\scripts\release\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause     compiles it into out\ and leaves the launcher you play with alone' 'either' 'warn'
 
   if (-not (Test-Path -LiteralPath $ServerRecord)) {
     $rows += New-Row 'the server build record is in the repo' $false 'records\server-build.json' 'git pull brings it' 'either' 'warn'
@@ -176,7 +176,7 @@ function Get-MainOnlyRows([string]$Channel, [string[]]$StubPlaces, [string]$Boot
 }
 
 # WHETHER THIS MACHINE SIGNS (issue #458). Ship refuses every release, dev and
-# mods only included, when tools\signing.json is missing, disabled or names a
+# mods only included, when records\signing\signing.json is missing, disabled or names a
 # profile that is not filled in (Get-SigningConfigRefusal, Assert-PublishSigned.ps1),
 # and a launcher build stops at Sign-Artifact.ps1 when the dlib or metadata it
 # names is not there or signtool is not installed. This map asked none of it,
@@ -184,13 +184,13 @@ function Get-MainOnlyRows([string]$Channel, [string[]]$StubPlaces, [string]$Boot
 # Get-SigningConfigRefusal said ('' when it accepts), so this stays testable
 # without dot-sourcing anything.
 function Get-SigningRows([string]$ConfigPath, [string]$RepoRoot, [string]$Refuse, [string]$Signtool) {
-  $setup = '.\scripts\release\Setup-ShipMachine.ps1     fetches the signing client and writes tools\signing.json from records\signing\signing.template.json'
+  $setup = '.\scripts\release\Setup-ShipMachine.ps1     fetches the signing client and writes records\signing\signing.json from records\signing\signing.template.json'
   $rows = @()
   if (-not (Test-Path -LiteralPath $ConfigPath)) {
-    $rows += New-Row 'this machine signs (tools\signing.json)' $false 'there is none' $setup
+    $rows += New-Row 'this machine signs (records\signing\signing.json)' $false 'there is none' $setup
     return $rows
   }
-  $rows += New-Row 'this machine signs (tools\signing.json)' (-not $Refuse) $Refuse $setup
+  $rows += New-Row 'this machine signs (records\signing\signing.json)' (-not $Refuse) $Refuse $setup
   $missing = @()
   try {
     $cfg = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
@@ -202,7 +202,7 @@ function Get-SigningRows([string]$ConfigPath, [string]$RepoRoot, [string]$Refuse
     }
   } catch { $missing += 'the file itself, which is not valid JSON' }
   $rows += New-Row 'the signing client and metadata it names are here' ($missing.Count -eq 0) $(if ($missing.Count) { 'missing: ' + ($missing -join ', ') } else { '' }) `
-    'Move tools\signing.json aside and run .\scripts\release\Setup-ShipMachine.ps1, which writes one naming what this machine has'
+    'Move records\signing\signing.json aside and run .\scripts\release\Setup-ShipMachine.ps1, which writes one naming what this machine has'
   $rows += New-Row 'signtool, from the Windows SDK' ([bool]$Signtool) $Signtool 'winget install --id Microsoft.WindowsSDK.10.0.26100 -e'
   return $rows
 }
@@ -320,7 +320,7 @@ Ready 'node is on the path' ($null -ne $node) $(if ($node) { (& node --version 2
 # ------------------------------------------------------------- the signing --
 Head 'Signing'
 . (Join-Path $Here 'Assert-PublishSigned.ps1')
-$signCfg = Join-Path $RepoDir 'tools\signing.json'
+$signCfg = Join-Path $RepoDir 'records\signing\signing.json'
 $signRefuse = ''
 if (Test-Path -LiteralPath $signCfg) { $signRefuse = Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir }
 $signtool = ''
@@ -412,7 +412,7 @@ if (-not $Dev) {
   Head 'For -Package and the live deploys'
   $pkgOut = Join-Path (Join-Path (& $where Dist) (Split-Path -Leaf $Root.TrimEnd('\'))) '_dist'
   foreach ($r in @(Get-MainOnlyRows $Channel `
-                     @((Join-Path $RepoDir 'tools\setup-stub.exe'), (Join-Path $pkgOut 'setup-stub.exe')) `
+                     @((Join-Path (& $where Out) 'setup-stub.exe'), (Join-Path $pkgOut 'setup-stub.exe')) `
                      (Join-Path $RepoDir 'installer\setup\Bootstrap.cs') `
                      (Join-Path $RepoDir 'records\server-build.json') `
                      @((& $where ServerDist), (& $where Payload)))) { Show-Row $r }

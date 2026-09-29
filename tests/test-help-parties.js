@@ -19,19 +19,19 @@
 // lapse, the logout rule and the bonus do what the page says they do.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 function read(...bits) {
-  return fs.readFileSync(path.join(TOOLS_DIR, ...bits), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join(REPO_DIR, ...bits), 'utf8').split(CR).join('');
 }
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const helpCs = read('..', 'launcher', 'app', 'Help.cs');
-const keysCs = read('..', 'launcher', 'app', 'Keys.cs');
-const front = read('..', 'game', 'plugins', 'thornswood-front.js');
-const panel = read('..', 'game', 'ui', 'thornswood-party.js');
+const helpCs = read('launcher', 'app', 'Help.cs');
+const keysCs = read('launcher', 'app', 'Keys.cs');
+const front = read('game', 'plugins', 'thornswood-front.js');
+const panel = read('game', 'ui', 'thornswood-party.js');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

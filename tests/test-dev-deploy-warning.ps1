@@ -47,8 +47,8 @@ $ErrorActionPreference = 'Stop'
 
 $tools = $PSScriptRoot
 if (-not $tools) { $tools = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$tools = Join-Path (Split-Path -Parent $tools) 'tools'
+# The tests are in tests\, the repository is one folder up.
+$tools = Split-Path -Parent $tools
 
 $script:pass = 0
 $script:fail = 0
@@ -63,8 +63,8 @@ function Done {
     exit 0
 }
 
-$deployPath = Join-Path $tools '..\scripts\deploy\Deploy-DevGamemode.ps1'
-$askPath    = Join-Path $tools '..\scripts\vps\Request-Restart.ps1'
+$deployPath = Join-Path $tools 'scripts\deploy\Deploy-DevGamemode.ps1'
+$askPath    = Join-Path $tools 'scripts\vps\Request-Restart.ps1'
 $src = Get-Content -LiteralPath $deployPath -Raw
 
 # ---- the block is there to test -------------------------------------------

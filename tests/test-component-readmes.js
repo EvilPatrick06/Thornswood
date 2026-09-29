@@ -50,12 +50,12 @@
 // file in every pack.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const ROOT = path.join(TOOLS_DIR, '..');
+const ROOT = REPO_DIR;
 const CR = String.fromCharCode(13);
 // A backslash, built rather than typed, so no tool on the way can eat it.
 const BS = String.fromCharCode(92);
@@ -300,8 +300,8 @@ SIX.forEach(function (d) {
   yes('overlays: thornswood-front.js still has the OVERLAYS list a new overlay has to join',
       /const OVERLAYS = \[/.test(front) && t.indexOf('`OVERLAYS`') >= 0);
   yes('overlays: Go.ps1 still takes the front from thornswood-front.zip, as the README says',
-      go.indexOf("tools" + BS + "thornswood-front.zip'") >= 0 && t.indexOf('thornswood-front.zip') >= 0);
-  const zip = tracked('tools/thornswood-front.zip');
+      go.indexOf("local" + BS + "thornswood-front.zip'") >= 0 && t.indexOf('thornswood-front.zip') >= 0);
+  const zip = tracked('local/thornswood-front.zip');
   yes('overlays: and that zip is not in git, as the README says', zip === false);
 }
 

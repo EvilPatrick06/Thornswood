@@ -1695,7 +1695,7 @@ $log = @()
 foreach ($c in @($changed | Sort-Object)) { $log += $c }
 foreach ($r in @($removed | Sort-Object)) { $log += '- ' + $r }
 foreach ($p in @($profileChanged | Sort-Object)) { $log += ($p -replace '^:profile:', '') + '  (load order)' }
-foreach ($p in @($srcChanged | Sort-Object)) { $log += 'tools\' + ($p -replace '^:src:', '') + '  (launcher)' }
+foreach ($p in @($srcChanged | Sort-Object)) { $log += 'launcher\' + ($p -replace '^:src:', '') + '  (launcher)' }
 if ($log.Count -gt $Cap) {
     $rest = $log.Count - $Cap
     $log  = @($log[0..($Cap - 1)]) + ('... and {0:n0} more file{1}' -f $rest, $(if ($rest -eq 1) { '' } else { 's' }))

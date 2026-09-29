@@ -28,15 +28,15 @@
 // door reaches (Japhet's Folly, by boat) has to be open ground and said by name.
 //
 // Read only apart from its own temp folder, which it removes.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
 const { spawnSync } = require('child_process');
 
-const TOOLS = TOOLS_DIR;
-const MEASURE = path.join(TOOLS, '..', 'scripts', 'dev', 'Measure-MineBuildings.py');
+const REPO = REPO_DIR;
+const MEASURE = path.join(REPO, 'scripts', 'dev', 'Measure-MineBuildings.py');
 const CR = String.fromCharCode(13);
 const LF = String.fromCharCode(10);
 const CRLF = CR + LF;
@@ -351,12 +351,12 @@ fs.rmSync(ROOT, { recursive: true, force: true });
 // ---------------------------------------------------------------------------
 // The committed measurement against the real gamemode
 
-const COMMITTED = path.join(TOOLS, '..', 'game', 'data', 'mine-buildings.json');
+const COMMITTED = path.join(REPO, 'game', 'data', 'mine-buildings.json');
 let real = null;
 try { real = JSON.parse(fs.readFileSync(COMMITTED, 'utf8')); } catch (e) { real = null; }
 yes('game/data/mine-buildings.json is committed and reads', !!real);
 if (!real) done();
-const gm = fs.readFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'), 'utf8');
+const gm = fs.readFileSync(path.join(REPO, 'game', 'gamemode.js'), 'utf8');
 function table(name) {
   const m = new RegExp('^const ' + name + ' = (\\{.*\\});[ \\t\\r]*$', 'm').exec(gm);
   return m ? JSON.parse(m[1]) : null;

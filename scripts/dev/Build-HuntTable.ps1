@@ -1571,7 +1571,7 @@ if ($fail -gt 0) {
 
 $lines = New-Object 'System.Collections.Generic.List[string]'
 $lines.Add('/* Built by scripts\dev\Build-HuntTable.ps1 out of the NPC_ records of this build.')
-$lines.Add('     ' + $table.Count + ' animals, the same table as tools\hunts.json.')
+$lines.Add('     ' + $table.Count + ' animals, the same table as game\data\hunts.json.')
 $lines.Add('     The key is the body''s base record, which is what mp.get(refrId, ''baseDesc'')')
 $lines.Add('     hands back for a dead actor. A base that is not in here is not an animal and')
 $lines.Add('     the hunter walks past it, the same as everybody else.')
@@ -1580,7 +1580,7 @@ $lines.Add('     body''s inventory: they come from a levelled list the client re
 $lines.Add('     server hands them over itself. yield is four pairs, novice first: the least and')
 $lines.Add('     the most of EACH of those things a hunter of that rank takes, and a pair of')
 $lines.Add('     zeroes is a rank that may not work that body at all.')
-$lines.Add('     Paste it between the HUNTS_BY_BASE markers in tools\gamemode.js. Do not hand edit. */')
+$lines.Add('     Paste it between the HUNTS_BY_BASE markers in game\gamemode.js. Do not hand edit. */')
 $lines.Add('  var HUNTS_BY_BASE = {')
 $n = 0
 foreach ($d in $table.Keys) {
@@ -1602,7 +1602,7 @@ $literal = $lines -join [Environment]::NewLine
 # ---------------------------------------------------------------- install --
 #
 # The gamemode carries the table, because the server is deployed as one file
-# and cannot read tools\hunts.json. Nothing hand edits that block: this writes
+# and cannot read game\data\hunts.json. Nothing hand edits that block: this writes
 # it between its own markers, the way the other generated blocks in this repo
 # are written. -NoInstall prints it and leaves the file alone.
 #
