@@ -709,8 +709,12 @@ $srcChanged     = @($changed | Where-Object { $_ -like ':src:*' })
 # arrived has nothing to compare, and saying "start over" then would be the
 # same false alarm this exists to stop. See Get-ActiveOrderKey.
 $orderMoved     = $prev.ContainsKey(':order:plugins') -and $now.ContainsKey(':order:plugins') -and ($prev[':order:plugins'] -ne $now[':order:plugins'])
-$changed        = @($changed | Where-Object { $_ -notlike ':profile:*' -and $_ -notlike ':src:*' -and $_ -notlike ':order:*' })
-$removed        = @($removed | Where-Object { $_ -notlike ':profile:*' -and $_ -notlike ':src:*' -and $_ -notlike ':order:*' -and -not (Test-Machine $_) })
+# Every key that starts with ':' is about the release, not a file in the game
+# folder: the plugin list, the launcher's source, and since #1050 what the
+# record says about itself (:record:), the plugin list as shipped (:golden:)
+# and what is gone (:gone:). None of them is ever packed or deleted.
+$changed        = @($changed | Where-Object { -not $_.StartsWith(':') })
+$removed        = @($removed | Where-Object { -not $_.StartsWith(':') -and -not (Test-Machine $_) })
 # ==== thornswood travels with ====
 # A page's own pictures ride in any pack that carries the page, changed or not:
 # see $ShipTravelsWith in Ship-Rules.ps1 (issue #883, the scroll's pictures).
@@ -892,6 +896,9 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $ChunkCap = 1800MB
 
 $chunks = @()
+# The reference plugin list as a pack carries it, kept for the release record.
+$goldenDir = Join-Path $DistDir ('record-golden-' + $Id)
+if (Test-Path -LiteralPath $goldenDir) { Remove-Item -LiteralPath $goldenDir -Recurse -Force }
 if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
     Head 'Building the pack'
 
@@ -987,6 +994,10 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
                     # never written.
                     if ($f -eq 'plugins.txt') { $src = Get-ReferenceInServerOrder $src }
                     [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $src, "profile/$f", 'Optimal')
+                    # The same bytes go in the release record (#1050), so a
+                    # launcher that syncs to it gets the list the pack carries.
+                    New-Item -ItemType Directory -Force -Path $goldenDir | Out-Null
+                    Copy-Item -LiteralPath $src -Destination (Join-Path $goldenDir $f) -Force
                 }
             }
         } finally {
@@ -1192,6 +1203,135 @@ if (-not $NoUpload) {
     if ($exeUrl) { Say '  launcher on the site' 'Green' }
     # ==== end thornswood site upload ====
 }
+
+# ==== thornswood record files ====
+# tests\test-record-sync.ps1 runs the real Publish-Update through this block.
+#
+# EVERY FILE OF THIS RELEASE IS ON THE SITE BY ITS OWN SHA256 (#1050), so a
+# launcher can sync the install to the record below instead of replaying the
+# packs: it compares each file of ours with the record and downloads only the
+# ones that differ, from /feed[-dev]/assets/<sha256>, beside the record. Every
+# file of ours goes up the first time (the dev record of 29 Sep: 2,515 files,
+# 463.5 MB, 449.0 MB once files with the same bytes are counted once, stored
+# as they are, not zipped); after that only what a release changes, because
+# the send skips any asset already there. Release-Baseline.ps1 says what each
+# key of the record means. The record says ':record:files' only once they are
+# all up, and a launcher takes the packs from a record that does not.
+#
+# The plugin list the pack carries goes in as ':golden:'. A release that built
+# no pack did not move it, so the last record's goes forward.
+$recordSend = @{}
+foreach ($f in 'plugins.txt', 'loadorder.txt') {
+    $gf = Join-Path $goldenDir $f
+    if (Test-Path -LiteralPath $gf) { $now[":golden:$f"] = Get-BaselineEntry $gf; $recordSend[":golden:$f"] = $gf }
+}
+$prevPtr = $null
+if (Get-Variable -Name resolved -Scope Script -ErrorAction SilentlyContinue) { $prevPtr = $resolved.Pointer }
+if (-not $recordSend.Count) {
+    foreach ($k in @($prev.Keys | Where-Object { $_ -like ':golden:*' })) {
+        $now[$k] = [string]$prev[$k]
+        if ($NoUpload) { continue }
+        # Its bytes, for a feed on another channel's folder (dev after a main Ship).
+        $gsha = ([string]$prev[$k]).Split(':')[1]
+        $gfile = Join-Path $goldenDir $k.Substring(8)
+        try {
+            if ($null -eq $prevPtr) { throw 'the last record is not on the site' }
+            [void](Get-FeedAssetFile (Get-RecordFileUrl ([string]$prevPtr.url) $gsha) $gsha $gfile (Get-FeedStoreSiteDir $SiteDir) $SiteUrl)
+            $recordSend[$k] = $gfile
+        } catch {
+            $now.Remove($k)
+            Say "  the plugin list of the last release could not be read back ($($_.Exception.Message)), so this record carries none" 'Yellow'
+        }
+    }
+}
+
+# What is gone: every file of ours a release has stopped shipping, carried from
+# record to record, so a launcher that never replayed the pack that deleted it
+# still takes it out. The first record on a channel starts the list from what
+# the packs already on the feed took out (read off each pack's delete.txt on the
+# site, not the whole pack). Anything back in the build, the collection's, or
+# not ours by Ship-Rules comes off the list, except Ship-Rules' own delete list,
+# which goes from every install whatever put it there.
+$gone = @{}
+foreach ($k in @($prev.Keys)) { if ($k.StartsWith(':gone:')) { $gone[$k.Substring(6)] = [string]$prev[$k] } }
+if (-not $prev.ContainsKey($RecordFilesKey) -and -not $gone.Count) {
+    try {
+        foreach ($d in @(Get-FeedPackDeletes $doc (Get-FeedStoreSiteDir $SiteDir) $SiteUrl { param($m) Say $m 'DarkGray' })) { $gone[$d] = 'removed' }
+    } catch {
+        Say "  what earlier packs took out could not be read: $($_.Exception.Message)" 'Yellow'
+        Say '  The record starts its list of removed files from this release; the packs stay on the feed for older installs.' 'Yellow'
+    }
+}
+foreach ($r in $removed) { $gone[$r] = 'removed' }
+foreach ($a in $alwaysGone) { $gone[$a] = 'always' }
+foreach ($k in @($gone.Keys)) {
+    if ($now.ContainsKey($k)) { $gone.Remove($k); continue }
+    if ($gone[$k] -eq 'always') { continue }
+    if ((Test-FromCollection $k) -or (Test-Vanilla $k) -or (Test-Runtime $k) -or (Test-Machine $k) -or (Test-OtherServer $k)) { $gone.Remove($k) }
+}
+foreach ($k in @($gone.Keys)) { $now[':gone:' + $k] = [string]$gone[$k] }
+
+if (-not $NoUpload) {
+    $recordFiles = @()
+    foreach ($k in @($now.Keys)) {
+        if ($k.StartsWith(':')) { continue }
+        $recordFiles += (Join-Path $GameDir $k)
+    }
+    $recordFiles += @($recordSend.Values)
+    # Nothing that must never ship goes up loose either (Check-Secrets, entry
+    # 236). What this release changed is in its pack and was read above; the
+    # rest went up, and was read, with an earlier record. Only the first record
+    # on a channel sends files no pack carried, so only then is the rest read.
+    if (-not $prev.ContainsKey($RecordFilesKey)) {
+        Head 'Checking the files of this release for secrets'
+        $inPack = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+        foreach ($c in $changed) { [void]$inPack.Add([string]$c) }
+        $checkZip = Join-Path $DistDir ("record-check-$Id.zip")
+        if (Test-Path -LiteralPath $checkZip) { Remove-Item -LiteralPath $checkZip -Force }
+        $cz = [IO.Compression.ZipFile]::Open($checkZip, 'Create')
+        try {
+            foreach ($k in @($now.Keys)) {
+                if ($k.StartsWith(':') -or $inPack.Contains($k)) { continue }
+                [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($cz, (Join-Path $GameDir $k), ('game/' + ($k -replace '\\', '/')), 'NoCompression')
+            }
+        } finally { $cz.Dispose() }
+        & (Join-Path $Here '..\dev\Check-Secrets.ps1') -Zip @($checkZip)
+        $secretsRc = $LASTEXITCODE
+        Remove-Item -LiteralPath $checkZip -Force -ErrorAction SilentlyContinue
+        if ($secretsRc -ne 0) { Die 'Something that must never ship is among the files of this release. The lines above name each file and rule. Nothing was sent, and version.json has not been touched.' }
+    }
+    $sendArgs = @{ Dev = $Dev; Send = $recordFiles; Quiet = $true; WorkDir = $DistDir }
+    if ($SiteDir) { $sendArgs['SiteDir'] = $SiteDir }
+    $global:LASTEXITCODE = 0
+    $sendWhy = ''
+    try { & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @sendArgs }
+    catch { $sendWhy = $_.Exception.Message }
+    if (-not $sendWhy -and $LASTEXITCODE -ne 0) { $sendWhy = "Remirror-Site-Feed.ps1 -Send exited $LASTEXITCODE" }
+    # And every one of them is there under the sha256 the record names: a file
+    # rewritten between the scan and the send would be up under another name.
+    if (-not $sendWhy) {
+        $haveArgs = @{ Dev = $Dev; Have = $true }
+        if ($SiteDir) { $haveArgs['SiteDir'] = $SiteDir }
+        try {
+            $there = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+            foreach ($h in @(& (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @haveArgs)) { [void]$there.Add([string]$h) }
+            $wanted = Get-RecordFileShas $now
+            $absent = @($wanted.Keys | Where-Object { -not $there.Contains($_) })
+            if ($absent.Count) { $sendWhy = ("{0} file(s) of this release are not on the site under the sha256 the record names; one changed while this ran?" -f $absent.Count) }
+            else {
+                $recordBytes = [int64]0; foreach ($v in $wanted.Values) { $recordBytes += $v }
+                Say ("  every file of this release is on the site by its sha256: {0:n0} file(s), {1:n1} MB" -f $wanted.Count, ($recordBytes / 1MB)) 'Green'
+            }
+        } catch { $sendWhy = $_.Exception.Message }
+    }
+    if ($sendWhy) {
+        Say "  $sendWhy" 'Red'
+        Die ('The files of this release did not all reach the site, so version.json has not been touched. ' +
+             'Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test, then run Ship again.')
+    }
+    $now[$RecordFilesKey] = '1'
+}
+# ==== end thornswood record files ====
 
 # ==== thornswood release manifest ====
 # tests\test-release-baseline.ps1 runs this block on its own. If the markers

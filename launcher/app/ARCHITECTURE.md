@@ -171,6 +171,15 @@ the releases repository on GitHub. `Updater.cs:479 ApplyPack()` downloads a pack
 names dropped first), `profile\...` entries into `Profile\Default`, the list of
 what it wrote into `Profile\Packs\<pack id>.files`, the id into
 `Profile\applied.txt`, and every Data\Platform file it wrote into Keep.
+Since #1050, when the feed names a release record whose files are on the site
+(`:record:files`), `Pending()` offers that release as one update instead of
+its packs, and `ApplyPack()` hands it to `SyncRecord()` in Sync.cs: the record
+is read, every file of ours is compared with it by size and sha256, only the
+ones that differ are fetched from beside the record (resumed with a Range
+request, each checked against its sha256) into `Profile\Sync`, then put in
+place, the plugin list settled, what the record says is gone taken out, and
+the release written into `Profile\release.txt` (docs\FEED.md, "Syncing to the
+release record").
 `Updater.cs:945 SelfUpdate()` writes `Launcher\Thornswood.exe.new` and a
 script in the temp folder, `thornswood-update-<process id>.cmd`, that swaps it in once
 this process has gone and keeps the old one until the new one has started
