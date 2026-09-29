@@ -112,5 +112,6 @@ expected, and what happened instead, or use the [report](/report) page.
 
 The launcher's own log is at `C:\Thornswood\Profile\launcher.log`. Crash logs,
 if the game closed itself, are in `C:\Thornswood\Profile\MyGames\SKSE`,
-because Thornswood keeps its own My Games folder. The launcher's Logs page
-lists them and opens them. Drag either straight into the channel.
+because Thornswood keeps its own My Games folder. In the launcher,
+**Diagnostics** then **Build the report** puts them in one zip and opens the
+folder it is in: drag that zip into your ticket in the Discord.
