@@ -129,17 +129,20 @@ function refusedCase(what, send) {
   if (send) yes(what + ': the pass is not taken', !!got && got.ok !== true);
   r.sweep(T0 + 170000);
   r.fire();
-  yes(what + ': nothing happens inside the grace', r.kicked.length === 0 && r.told.length === 0);
+  // Inside the grace nothing ends, and it is told once why nothing it does
+  // counts yet (#410, test-join-pass-trust.js).
+  yes(what + ': nothing ends inside the grace, and it is told once why it is held',
+      r.kicked.length === 0 && r.told.length === 1 && r.told[0] === '700: ' + r.jp.waiting);
   const judged = r.sweep(T0 + 181000);
   yes(what + ': at three minutes it is judged', judged.length === 1 && judged[0] === 700);
   yes(what + ': and told the one line, to update or start from the launcher',
-      r.told.length === 1 && r.told[0].indexOf('700: ') === 0 && /Thornswood launcher/.test(r.told[0]) && /update/.test(r.told[0]));
+      r.told.length === 2 && r.told[1].indexOf('700: ') === 0 && /Thornswood launcher/.test(r.told[1]) && /update/.test(r.told[1]));
   yes(what + ': not before the line is on screen', r.kicked.length === 0);
   r.fire();
   yes(what + ': then the connection is ended', r.kicked.length === 1 && r.kicked[0] === 7);
   r.sweep(T0 + 300000);
   r.fire();
-  yes(what + ': once', r.kicked.length === 1 && r.told.length === 1);
+  yes(what + ': once', r.kicked.length === 1 && r.told.length === 2);
   return r;
 }
 
@@ -270,7 +273,7 @@ door(null);
 {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   yes('dispatch() hands /joinpass to the block before anything else, with the relay\'s profile',
-      /var word = parts\[0\]\.toLowerCase\(\);\s*if \(word === '\/joinpass'\) \{[\s\S]{0,200}jp\.take\(profileId, parts\[1\], Date\.now\(\)\)[\s\S]{0,120}return;\s*\}\s*(if \(word === '\/line'\) \{[\s\S]{0,1400}?return;\s*\}\s*)?(if \(word === '\/afk'\) \{[\s\S]{0,500}?return;\s*\}\s*)?if \(!profileId \|\| runsNow\(word, parts\)\)/.test(code));
+      /var word = parts\[0\]\.toLowerCase\(\);\s*if \(word === '\/joinpass'\) \{[\s\S]{0,200}jp\.take\(profileId, parts\[1\], Date\.now\(\)\)[\s\S]{0,120}return;\s*\}\s*(var jpNow = [\s\S]{0,900}?if \(enforcing && profileId && cmd\.proven !== true\) \{[\s\S]{0,500}?return;\s*\}\s*)?(if \(word === '\/line'\) \{[\s\S]{0,1400}?return;\s*\}\s*)?(if \(word === '\/afk'\) \{[\s\S]{0,500}?return;\s*\}\s*)?(if \(enforcing && profileId && passHeld\(profileId\)\) \{[\s\S]{0,900}?return;\s*\}\s*)?if \(!profileId \|\| runsNow\(word, parts\)\)/.test(code));
 }
 
 // ------------------------------------------------------------ the voice log

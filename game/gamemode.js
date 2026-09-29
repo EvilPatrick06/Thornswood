@@ -265,7 +265,30 @@ function voicePort() {
 
 /** Run fn, swallow and report anything it throws. Handlers must never escape. */
 function guard(name, fn) {
+  /*
+    WHO DOES WHAT IN EACH ENGINE EVENT, for the join pass (#410). With
+    thornswoodRequirePass on, a session that has not shown its launcher's pass
+    is in the world under a profile number it picked itself, so nothing it
+    does may count yet: every event below raised by it is refused (false
+    blocks the engine's own handling, the same as every refusal in this file)
+    until the pass arrives, and the join pass block ends the session if it
+    never does. The number is the argument that is the person acting; the
+    others are the thing acted on. onDeath and onRespawn are not a person
+    acting and are left. Inside guard() so it goes wherever guard() does.
+  */
+  const ACTS_AS = { onActivate: 1, onCraft: 0, onReadBook: 0, onPutItem: 1, onTakeItem: 1,
+                    onDropItem: 0, onUpdateAppearanceAttempt: 0 };
+  const acts = Object.prototype.hasOwnProperty.call(ACTS_AS, name) ? ACTS_AS[name] : -1;
   return function () {
+    if (acts >= 0) {
+      const held = globalThis.__thornswoodPassHeld;
+      const actorId = arguments[acts];
+      if (typeof held === 'function' && actorId) {
+        let pid = 0;
+        try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+        if (pid > 0 && held(pid)) { return false; }
+      }
+    }
     let began = null;
     try { began = process.hrtime(); } catch (e) { began = null; }
     try {
@@ -26310,8 +26333,12 @@ log('gamemode loaded:',
       }
     } catch (e) { return; }
 
-    if (who.length === 0) return;
-    try { send({ who: who }); } catch (e) { }
+    // Sent with nobody in the world too, because it also carries the join
+    // pass switch, which the voice service follows for the connections of
+    // people still at the menu (#410).
+    var jp = globalThis.__thornswoodJoinPass;
+    var requirePass = !!(jp && jp.requiring && jp.requiring());
+    try { send({ who: who, requirePass: requirePass }); } catch (e) { }
   }), EVERY_MS);
 
   // ------------------------------------------------------------- online ---
@@ -27003,18 +27030,29 @@ log('gamemode loaded:',
     entirely (no door.json) rather than a reason to trust nobody: it is a
     ceiling raised for people who already hold a role, never a floor.
   */
+  /*
+    And only for a profile the join pass has proved, once
+    thornswoodRequirePass is on (#410): every role below is keyed on a profile
+    number, which on its own is one the client picked. The door's own check
+    of who may connect reads the list directly and is not changed by this;
+    it has to run before any pass can have arrived.
+  */
+  function passProved(profileId) {
+    var t = globalThis.__thornswoodPassTrusts;
+    return typeof t !== 'function' || !!t(profileId);
+  }
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsDev = function (profileId) {
     var l = load();
-    return !!(l && l.devIds && l.devIds[Number(profileId)]);
+    return passProved(profileId) && !!(l && l.devIds && l.devIds[Number(profileId)]);
   };
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsAdmin = function (profileId) {
     var l = load();
-    return !!(l && l.adminIds && l.adminIds[Number(profileId)]);
+    return passProved(profileId) && !!(l && l.adminIds && l.adminIds[Number(profileId)]);
   };
   // A Discord staff role on the account, for the staff seats (#481).
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodHoldsStaffRole = function (profileId) {
     var l = load();
-    return !!(l && l.staffRoleIds && l.staffRoleIds[Number(profileId)]);
+    return passProved(profileId) && !!(l && l.staffRoleIds && l.staffRoleIds[Number(profileId)]);
   };
 
   /*
@@ -27024,7 +27062,7 @@ log('gamemode loaded:',
   */
 (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsJarl = function (profileId) {
     var l = load();
-    return !!(l && l.jarlIds && l.jarlIds[Number(profileId)]);
+    return passProved(profileId) && !!(l && l.jarlIds && l.jarlIds[Number(profileId)]);
   };
 
   /*
@@ -27038,7 +27076,7 @@ log('gamemode loaded:',
   */
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsAllowed = function (profileId) {
     var l = load();
-    return !!(l && l.ids && l.ids[Number(profileId)]);
+    return passProved(profileId) && !!(l && l.ids && l.ids[Number(profileId)]);
   };
 
   /*
@@ -27979,6 +28017,10 @@ log('gamemode loaded:',
   var SENTENCE = 'This game was not started from an up to date Thornswood launcher, so ' +
                  'the session is being ended. Open the Thornswood launcher, let it update, ' +
                  'then press Play.';
+  var WAIT_SAY_MS = 15000;    // held this long with no pass: told why nothing works (#410)
+  var WAITING = 'Your launcher\'s pass has not reached the server yet, so nothing you do ' +
+                'counts until it does. Keep the Thornswood launcher open; if this does not ' +
+                'clear in a minute, restart the game from the launcher.';
 
   // On globalThis, so a hot reload keeps who has shown a pass.
   // passes: profile -> { at, x, v }; online: profile -> { joined, judged, actorId }.
@@ -28095,6 +28137,12 @@ log('gamemode loaded:',
       if (e.judged) { continue; }
       var had = seen.passes[pid];
       if (had && had.at >= e.joined - BEFORE_MS) { e.judged = true; continue; }
+      // Held until then (#410): said once, after long enough that a pass on
+      // its way has had time to arrive.
+      if (requiring() && !e.told && now - e.joined >= WAIT_SAY_MS) {
+        e.told = true;
+        tell(pid, WAITING);
+      }
       if (now - e.joined < GRACE_MS) { continue; }
       e.judged = true;
       judged.push(pid);
@@ -28123,8 +28171,73 @@ log('gamemode loaded:',
     return judged;
   }
 
+  /*
+    NOTHING TRUSTS A PROFILE NUMBER THE PASS HAS NOT PROVED (#410).
+
+    The pass ends a session that never shows one, but only after GRACE_MS, and
+    until then the rest of this file took the number the client logged in
+    under at its word: that character's inventory, trades and crafting, its
+    roles (admin, staff, playtester, Jarl), its place in the line, its
+    commands. So with thornswoodRequirePass on, a profile is taken at its word
+    only once this block has a pass for it:
+
+      shown(pid)    a valid pass for the session it is in now: received since
+                    it was first seen online, or in the minute before. A
+                    profile not yet seen online (at the menu, or joined since
+                    the last sweep) counts a pass that has not expired.
+      proven(pid)   shown, and the pass has not expired: what a role needs.
+                    The launcher renews it every four minutes while it is open.
+      held(pid)     enforcement is on and pid has not shown one: the session
+                    is in the world, but nothing it does counts yet.
+      trusts(pid)   what a role check asks: proven when enforcement is on,
+                    and anything while it is only watched.
+
+    Watch-only changes nothing here, so the server can run like this before
+    it is switched on. What must work before a pass arrives, and how it stays
+    safe: the pass itself ("/joinpass", checked against its own signature),
+    the line ("/line", which already asks for a pass before it seats anybody),
+    and the game session existing at all, which cannot act (every engine event
+    it raises is refused by guard(), and its commands wait in the dispatcher's
+    queue) until the pass comes, and is ended at GRACE_MS if it never does.
+  */
+  function shown(pid, now) {
+    pid = Number(pid) || 0;
+    if (!pid) { return false; }
+    var had = seen.passes[pid];
+    if (!had) { return false; }
+    var e = seen.online[pid];
+    if (e) { return had.at >= e.joined - BEFORE_MS; }
+    return Number(had.x) > now;
+  }
+  function proven(pid, now) {
+    if (!shown(pid, now)) { return false; }
+    return Number(seen.passes[Number(pid)].x) > now;
+  }
+  function held(pid, now) { return requiring() && !shown(pid, now); }
+  function trusts(pid, now) { return !requiring() || proven(pid, now); }
+
   g.__thornswoodJoinPass = { take: take, sweep: sweep, readPass: readPass,
-                             grace: GRACE_MS, sentence: SENTENCE };
+                             grace: GRACE_MS, sentence: SENTENCE, waiting: WAITING,
+                             shown: shown, proven: proven, held: held, trusts: trusts,
+                             requiring: requiring };
+
+  /*
+    The one question every other block asks, safe to call before this block
+    has loaded (a block above it in this file, or a hot reload half way):
+    with no join pass block there is nothing to require, so it trusts.
+  */
+  // A throw here is a bug, and it answers the secure way (not trusted, held)
+  // and says so, rather than letting the number through.
+  g.__thornswoodPassTrusts = function (pid) {
+    var jp = g.__thornswoodJoinPass;
+    try { return !jp || !jp.trusts || jp.trusts(pid, Date.now()); }
+    catch (e) { console.log('[thornswood] join pass trusts() threw, so profile ' + pid + ' is not trusted: ' + e); return false; }
+  };
+  g.__thornswoodPassHeld = function (pid) {
+    var jp = g.__thornswoodJoinPass;
+    try { return !!(jp && jp.held && jp.held(pid, Date.now())); }
+    catch (e) { console.log('[thornswood] join pass held() threw, so profile ' + pid + ' is held: ' + e); return true; }
+  };
 
   if (g.__thornswoodPassTimer) { clearInterval(g.__thornswoodPassTimer); }
   g.__thornswoodPassTimer = setInterval(function () {
@@ -37323,6 +37436,18 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   var HOLD_FOR = 90000;
   var HOLD_MAX = 20;
   var HOLD_ALL = 200;
+  // The client's reports of a moment, never kept for later (see runsNow).
+  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu'];
+  // Lines from a chat connection that did not prove who it is, logged at most
+  // this often per profile (#410).
+  var unprovenSaid = {};
+  var UNPROVEN_SAY_MS = 600000;
+
+  /* With thornswoodRequirePass on, no pass shown yet for this profile (#410). */
+  function passHeld(profileId) {
+    var h = g.__thornswoodPassHeld;
+    return typeof h === 'function' && h(profileId);
+  }
 
   function runsNow(word, parts) {
     if (word === '/help' || word === '/commands' ||
@@ -37359,6 +37484,24 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
       return;
     }
+    // NOTHING TRUSTS AN UNPROVEN NUMBER (#410). With thornswoodRequirePass
+    // on, a line counts only from a relay connection whose join token the
+    // voice service checked (cmd.proven): any other arrived under a number the
+    // page picked for itself, and could be anybody's, so it is not run and
+    // not answered (an answer would go to whoever really holds that number).
+    // The pass above needs no such proof: it is checked against its own
+    // signature and must name the profile it arrives under.
+    var jpNow = g.__thornswoodJoinPass;
+    var enforcing = false;
+    try { enforcing = !!(jpNow && jpNow.requiring && jpNow.requiring()); } catch (eReq) { enforcing = true; }
+    if (enforcing && profileId && cmd.proven !== true) {
+      var sayKey = 'unproven ' + profileId;
+      if (!unprovenSaid[sayKey] || Date.now() - unprovenSaid[sayKey] >= UNPROVEN_SAY_MS) {
+        unprovenSaid[sayKey] = Date.now();
+        log('not run: ' + word + ' under profile ' + profileId + ' from a chat connection that did not prove who it is (#410)');
+      }
+      return;
+    }
     // The line at the menu while the world is full (#481), from the front
     // plugin: "/line" to wait or say they still are, "/line leave" to go,
     // "/line hand <profile>" to give the place to another of the same game's
@@ -37386,6 +37529,25 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         try { idleApi.heard(profileId, String(parts[1] || '').toLowerCase(), Date.now(), idleApi.liveHow()); }
         catch (eAfk) { log('/afk failed:', eAfk); }
       }
+      return;
+    }
+    // A session that has not shown its pass yet (#410): its lines wait in the
+    // same queue as a line waiting for its character, and run once the pass
+    // is here. The client's reports of a moment are dropped rather than kept,
+    // as they would describe a moment long gone. If the pass never comes the
+    // join pass block ends the session, and what waited is dropped unrun.
+    if (enforcing && profileId && passHeld(profileId)) {
+      if (MOMENTS.indexOf(word) !== -1) { return; }
+      var hq = held[profileId];
+      if (!hq) {
+        hq = held[profileId] = { lines: [], told: false };
+        log('holding', word, 'for profile', profileId, 'until its launcher\'s pass arrives');
+      }
+      if (hq.lines.length >= HOLD_MAX || heldCount() >= HOLD_ALL) {
+        log('dropped', word, 'for profile', profileId, ': no pass yet and the queue is full');
+        return;
+      }
+      hq.lines.push({ cmd: cmd, at: Date.now() });
       return;
     }
     if (!profileId || runsNow(word, parts)) { handle(cmd); return; }
@@ -37416,7 +37578,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (!Object.prototype.hasOwnProperty.call(held, key)) { continue; }
       var q = held[key];
       var run = [];
-      if (actorOf(Number(key))) {
+      // Waiting for the launcher's pass (#410): nothing runs until it is here,
+      // and a line that waited too long is dropped, never run unproven.
+      var noPass = passHeld(Number(key));
+      if (actorOf(Number(key)) && !noPass) {
         run = q.lines;
         delete held[key];
         log('running', run.length, 'held line(s) for profile', key, 'after',
@@ -37424,6 +37589,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       } else {
         while (q.lines.length && now - q.lines[0].at >= HOLD_FOR) { run.push(q.lines.shift()); }
         if (!q.lines.length) { delete held[key]; }
+        if (run.length && noPass) {
+          log('dropped', run.length, 'held line(s) for profile', key, ': its launcher\'s pass never arrived');
+          run = [];
+        }
         if (run.length) { log('gave up on', run.length, 'held line(s) for profile', key); }
       }
       // Out of the queue before it runs, so a line that throws is not run
@@ -39025,10 +39194,27 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       var list = cfg.thornswoodAdmins;
       if (Array.isArray(list) && list.length) { return list.map(Number); }
     } catch (e) { }
-    return [816507994];
+    // No written list, no written admin (#410). This used to fall back to one
+    // profile number in the source, which anybody could log in under; admin
+    // comes from thornswoodAdmins or the site's admin roles, and nothing else.
+    return [];
+  }
+
+  /*
+    Every role below needs the profile proved (#410): with
+    thornswoodRequirePass on, a role is held only by a profile whose
+    launcher's pass is on hand (__thornswoodPassTrusts, the join pass block),
+    because the number a command or a character arrives under is otherwise
+    one the client picked. The staff commands ask for the pass and the proven
+    chat connection themselves, whatever the switch says (the staff block).
+  */
+  function passTrusts(profileId) {
+    var t = g.__thornswoodPassTrusts;
+    return typeof t !== 'function' || !!t(profileId);
   }
 
   function isAdmin(profileId) {
+    if (!passTrusts(profileId)) { return false; }
     if (admins().indexOf(Number(profileId)) !== -1) { return true; }
     // The site's admins, the Owner and Dev roles, by every profile they have
     // checked in with; see the door block. The written list stays for the
@@ -39099,6 +39285,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   }
 
   function isDev(profileId) {
+    if (!passTrusts(profileId)) { return false; }
     if (isAdmin(profileId)) { return true; }
     if (rolelist('thornswoodDevs').indexOf(Number(profileId)) !== -1) { return true; }
     return roleFromDoor('Dev', profileId);
@@ -39115,6 +39302,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   }
 
   function isPlaytester(profileId) {
+    if (!passTrusts(profileId)) { return false; }
     if (isDev(profileId)) { return true; }
     if (rolelist('thornswoodPlaytesters').indexOf(Number(profileId)) !== -1) { return true; }
     return roleFromDoor('Allowed', profileId);
