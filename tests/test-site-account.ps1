@@ -687,7 +687,12 @@ try {
     if (-not $elevated) {
         Write-Host 'SKIP  not elevated, so the account changes were not applied to a real task'
     } else {
-        $scratchTask = 'Thornswood test-site-account ' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
+        # Not 'Thornswood test...': test-deploy-swaps and test-install-server
+        # clear away every task named 'Thornswood Test*', and task names match
+        # without case, so one of them running beside this deleted its task
+        # half way and the update said "The system cannot find the file
+        # specified" (issue #1135).
+        $scratchTask = 'Thornswood site-account harness ' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
         # From the settings set to the read-back of the account, and not the
         # Start-ScheduledTask after it. The account does not change this part
         # of the script, only the task name does.
