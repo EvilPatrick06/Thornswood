@@ -110,17 +110,19 @@ $disk = Join-Path ([IO.Path]::GetTempPath()) ('ts-far-' + [Guid]::NewGuid().ToSt
 $global:TsFar = @{
     Temp    = 'C:/Windows/Temp/'
     Disk    = $disk
-    DiskFwd = $disk.Replace('\', '/') + '/'
     Target  = $target
     Scripts = @($big, $short)
 }
 $global:TsRemoteCalls = New-Object System.Collections.ArrayList
 
-# The far paths go bare, so the stand-in folder has to be as bare as
-# C:/Windows/Temp is, or a space in it would fail a line for a reason the real
-# path cannot have.
-Yes 'the stand-in folder for C:/Windows/Temp has no spaces in its path, as the real one has none' (-not $disk.Contains(' '))
-if ($script:fail) { Done }
+# The far paths go bare, so what stands in for C:/Windows/Temp on the line has
+# to be as bare as it is: a space or an & in it would fail a line for a reason
+# the real path cannot have. The temp folder here may hold either (every temp
+# file on the shipping machine goes under C:\ThornswoodTemps&Worktrees, and
+# cmd.exe ends a command at a bare &, issues #1042 and #1115). So the line
+# names the stand-in folder as ./, and the shell runs in it: the folder's own
+# path is never on a command line.
+$global:TsFar.DiskFwd = './'
 
 function global:Invoke-TsFarEnd([string]$command, [string]$shell) {
     $far = $global:TsFar
@@ -158,8 +160,8 @@ function global:Invoke-TsFarEnd([string]$command, [string]$shell) {
         return [pscustomobject]@{ Out = @($said); Code = 1 }
     }
 
-    # The line as it would arrive, the far folder swapped for the stand-in.
-    # Under cmd.exe, /d leaves out this machine's AutoRun, which belongs to
+    # The line as it would arrive, the far folder swapped for ./ and the shell
+    # started in the stand-in folder. Under cmd.exe, /d leaves out this machine's AutoRun, which belongs to
     # this machine and not to any server. Under Windows PowerShell the whole
     # line is its command; the shapes above hold no double quote to break the
     # one round it. Either way PSModulePath is dropped so the Windows
@@ -175,6 +177,7 @@ function global:Invoke-TsFarEnd([string]$command, [string]$shell) {
         $psi.FileName = Join-Path $env:SystemRoot 'System32\cmd.exe'
         $psi.Arguments = '/d /c ' + $line
     }
+    $psi.WorkingDirectory = $far.Disk
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
     $psi.RedirectStandardOutput = $true

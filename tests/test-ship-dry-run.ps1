@@ -191,7 +191,6 @@ $oldAppData = $env:LOCALAPPDATA
 $oldTemp = $env:TEMP
 $oldTmp = $env:TMP
 $oldCalls = $env:TS_DRY_CALLS
-$oldGhPwsh = $env:TS_GH_PWSH
 $oldGhDl = $env:TS_GH_DL
 $oldSite = $env:THORNSWOOD_TEST_SITE_DIR
 $ps = (Get-Process -Id $PID).Path
@@ -342,8 +341,17 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     # so this hands back 0 like the rest.
     Stub 'Publish-PostShip' ('[string]$Channel, [string]$Root, [string]$DistRoot, [string]$Only, ' +
                              '[string]$Installer, [switch]$AlsoLauncher, [switch]$NoPause') ''
-    foreach ($n in 'git', 'gh', 'ssh', 'scp') {
-        [IO.File]::WriteAllText((Join-Path $bin ($n + '.cmd')), "@echo off`r`n>>`"%TS_DRY_CALLS%`" echo %~n0 %*`r`nexit /b 0`r`n")
+    # The stand-ins are .ps1, not .cmd (issue #1013). PowerShell finds a .ps1 on
+    # PATH before an .exe further along it and runs it with every argument
+    # whole. A .cmd gets its arguments through cmd.exe, which ends a command at
+    # a bare &, so under C:\ThornswoodTemps&Worktrees (where every temp file on
+    # the shipping machine goes) the gh download's --dir was cut in two and the
+    # real main Ship case went red.
+    $standIn = @'
+[IO.File]::AppendAllText($env:TS_DRY_CALLS, ((@('NAME') + @($args | ForEach-Object { [string]$_ })) -join ' ') + "`r`n")
+'@
+    foreach ($n in 'git', 'ssh', 'scp') {
+        [IO.File]::WriteAllText((Join-Path $bin ($n + '.ps1')), $standIn.Replace('NAME', $n) + "`r`nexit 0`r`n")
     }
     # gh needs one thing more than logging: on a real main Ship the launcher is
     # not compiled here, it is downloaded from the release CI built and checked
@@ -364,10 +372,8 @@ if ($dir) {
     Set-Content -LiteralPath (Join-Path $dir 'SHA256SUMS') -Value ("$h  Thornswood.exe") -Encoding ascii
 }
 '@)
-    [IO.File]::WriteAllText((Join-Path $bin 'gh.cmd'),
-        "@echo off`r`n>>`"%TS_DRY_CALLS%`" echo gh %*`r`n" +
-        "if /I `"%~1`"==`"release`" if /I `"%~2`"==`"download`" `"%TS_GH_PWSH%`" -NoProfile -ExecutionPolicy Bypass -File `"%TS_GH_DL%`" %*`r`n" +
-        "exit /b 0`r`n")
+    [IO.File]::WriteAllText((Join-Path $bin 'gh.ps1'), $standIn.Replace('NAME', 'gh') + "`r`n" +
+        "if (`$args.Count -ge 2 -and `$args[0] -eq 'release' -and `$args[1] -eq 'download') { & `$env:TS_GH_DL @args }`r`nexit 0`r`n")
 
     $env:PATH = $bin + ';' + $oldPath
     $env:LOCALAPPDATA = $appdata
@@ -377,7 +383,6 @@ if ($dir) {
     $env:TMP = $env:TEMP
     New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
     $env:TS_DRY_CALLS = $log
-    $env:TS_GH_PWSH = $ps
     $env:TS_GH_DL = $ghDl
     $env:THORNSWOOD_TEST_SITE_DIR = $site
 
@@ -435,6 +440,8 @@ if ($dir) {
     # ---- R: a real Ship -Package on main ----------------------------------------------
     $r = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Package', '-Root', $root, '-DistRoot', $dist, '-NoPause')
     Yes ("R a real main Ship -Package runs to the end (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'Everyone in the world has')
+    # When it stops, what it said and what it called, so the FAIL says why.
+    if ($r.Code -ne 0) { $r.Out -split "`r?`n" | Select-Object -Last 25 | ForEach-Object { Write-Host ("      " + $_) }; $r.Calls | ForEach-Object { Write-Host ("      call: " + $_) } }
     $pub = Called $r 'Publish-Update'
     Yes 'R the publisher ran, and was not told to hold anything back' ($pub.Count -eq 1 -and $pub[0] -notmatch ' -NoUpload\b' -and $pub[0] -notmatch ' -NoPush\b')
     $pk = Called $r 'Package-Thornswood'
@@ -509,7 +516,6 @@ finally {
     $env:TEMP = $oldTemp
     $env:TMP = $oldTmp
     $env:TS_DRY_CALLS = $oldCalls
-    $env:TS_GH_PWSH = $oldGhPwsh
     $env:TS_GH_DL = $oldGhDl
     $env:THORNSWOOD_TEST_SITE_DIR = $oldSite
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
