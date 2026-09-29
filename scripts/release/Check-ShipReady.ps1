@@ -175,6 +175,38 @@ function Get-MainOnlyRows([string]$Channel, [string[]]$StubPlaces, [string]$Boot
   return $rows
 }
 
+# WHETHER THIS MACHINE SIGNS (issue #458). Ship refuses every release, dev and
+# mods only included, when tools\signing.json is missing, disabled or names a
+# profile that is not filled in (Get-SigningConfigRefusal, Assert-PublishSigned.ps1),
+# and a launcher build stops at Sign-Artifact.ps1 when the dlib or metadata it
+# names is not there or signtool is not installed. This map asked none of it,
+# so a second machine found out at the end of a Ship. $Refuse is what
+# Get-SigningConfigRefusal said ('' when it accepts), so this stays testable
+# without dot-sourcing anything.
+function Get-SigningRows([string]$ConfigPath, [string]$RepoRoot, [string]$Refuse, [string]$Signtool) {
+  $setup = '.\scripts\release\Setup-ShipMachine.ps1     fetches the signing client and writes tools\signing.json from records\signing\signing.template.json'
+  $rows = @()
+  if (-not (Test-Path -LiteralPath $ConfigPath)) {
+    $rows += New-Row 'this machine signs (tools\signing.json)' $false 'there is none' $setup
+    return $rows
+  }
+  $rows += New-Row 'this machine signs (tools\signing.json)' (-not $Refuse) $Refuse $setup
+  $missing = @()
+  try {
+    $cfg = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+    foreach ($k in 'dlib', 'metadata') {
+      $v = ''
+      if ($cfg.PSObject.Properties[$k]) { $v = [string]$cfg.$k }
+      if ($v -and -not [IO.Path]::IsPathRooted($v)) { $v = Join-Path $RepoRoot $v }
+      if (-not $v -or -not (Test-Path -LiteralPath $v)) { $missing += $k }
+    }
+  } catch { $missing += 'the file itself, which is not valid JSON' }
+  $rows += New-Row 'the signing client and metadata it names are here' ($missing.Count -eq 0) $(if ($missing.Count) { 'missing: ' + ($missing -join ', ') } else { '' }) `
+    'Move tools\signing.json aside and run .\scripts\release\Setup-ShipMachine.ps1, which writes one naming what this machine has'
+  $rows += New-Row 'signtool, from the Windows SDK' ([bool]$Signtool) $Signtool 'winget install --id Microsoft.WindowsSDK.10.0.26100 -e'
+  return $rows
+}
+
 Write-Host ''
 Write-Host ("  THORNSWOOD  -  can this machine ship? (" + $Channel + " channel)") -ForegroundColor White
 
@@ -254,6 +286,12 @@ try {
         Say '  note  could not read the collection revision from Vortex, so it was not checked' 'DarkGray'
     }
 } catch { Say '  note  the collection revision check did not run' 'DarkGray' }
+# Ship stops on this too (Assert-VortexProfile, #557): it reads the load order
+# from the Vortex profile named Thornswood and no other.
+$vpDir = $null
+try { $vpDir = Get-VortexProfileDir 'Thornswood' } catch { $vpDir = $null }
+Ready 'Vortex has a profile named Thornswood' ([bool]$vpDir) $(if ($vpDir) { $vpDir } else { '' }) `
+  'In Vortex: Profiles, add one named Thornswood, switch to it, install the Thornswood collection and let it deploy'
 Ready 'it has its own game folder' $hasGame $GameDir `
   'Open the launcher and press Play once; it builds the folder from what Vortex has deployed'
 
@@ -278,6 +316,22 @@ $node = $null
 try { $node = (Get-Command node -EA Stop).Source } catch { }
 Ready 'node is on the path' ($null -ne $node) $(if ($node) { (& node --version 2>$null) } else { '' }) `
   'Install Node from nodejs.org; the gamemode and the site are checked with it'
+
+# ------------------------------------------------------------- the signing --
+Head 'Signing'
+. (Join-Path $Here 'Assert-PublishSigned.ps1')
+$signCfg = Join-Path $RepoDir 'tools\signing.json'
+$signRefuse = ''
+if (Test-Path -LiteralPath $signCfg) { $signRefuse = Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir }
+$signtool = ''
+foreach ($sr in @("${env:ProgramFiles(x86)}\Windows Kits\10\bin", "$env:ProgramFiles\Windows Kits\10\bin")) {
+  if ($signtool -or -not (Test-Path -LiteralPath $sr)) { continue }
+  $st = Get-ChildItem -LiteralPath $sr -Recurse -Filter 'signtool.exe' -EA SilentlyContinue |
+        Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+  if ($st) { $signtool = $st.FullName }
+}
+foreach ($r in @(Get-SigningRows $signCfg $RepoDir $signRefuse $signtool)) { Show-Row $r }
+Say '  note  the Azure sign in behind it is asked by .\scripts\release\Setup-ShipMachine.ps1 -Check' 'DarkGray'
 
 # ------------------------------------------------------------- the plugins --
 Head 'The game plugins'
