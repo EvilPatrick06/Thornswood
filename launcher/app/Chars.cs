@@ -614,7 +614,13 @@ namespace Thornswood
                   .Append("\",\"where\":\"").Append(Json(who == null ? "" : who.Where))
                   .Append("\",\"played\":\"").Append(Json(PlayedText(r.Seconds)))
                   .Append("\",\"lastPlayed\":\"").Append(Iso(r.Played))
-                  .Append("\"}");
+                  .Append("\"");
+                // The server said it has no character under this id (#955):
+                // the menu marks the card, since picking it makes a new one.
+                bool isGone = false;
+                try { isGone = Roster.Gone(r.Id, r.Played); } catch { isGone = false; }
+                if (isGone) sb.Append(",\"gone\":true");
+                sb.Append("}");
             }
             sb.Append("]}");
 

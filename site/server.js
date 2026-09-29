@@ -1305,6 +1305,9 @@ const BANS = path.join(DATA, 'bans.json');
 // door key (POST /api/roster) and handed back per person (POST /api/play/roster).
 // Keyed by profile id; live and dev both push into it, their ids never meet.
 const ROSTER = path.join(DATA, 'roster.json');
+// How old a server's report of which characters it holds may be and still be
+// passed on (#955). It is sent every five minutes; an hour covers a restart.
+const ROSTER_HELD_FRESH_MS = 60 * 60 * 1000;
 
 /* How many character slots this person gets at the game's main menu. */
 function slotsFor(st) {
@@ -3958,7 +3961,10 @@ async function handle(req, res) {
     characters.json off the resource port, which has been a 404 since the
     file moved into the private folder on the 18th.
   */
-  if (p === '/api/roster' && req.method === 'POST') {
+  // The dev server's door.json names the site as https://thornswood.net/dev,
+  // so its roster lands on /dev/api/roster (#955). Until that route was here
+  // the dev server's pushes had no door to come in by.
+  if ((route === '/api/roster' || route === '/dev/api/roster') && req.method === 'POST') {
     if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
     let o = {};
     try { o = JSON.parse(await body(req, 4 * 1024 * 1024)) || {}; } catch (e) { }
@@ -3966,6 +3972,14 @@ async function handle(req, res) {
     const who = (o.who && typeof o.who === 'object') ? o.who : {};
     const store = jsonFile(ROSTER, { who: {} });
     if (!store.who || typeof store.who !== 'object') store.who = {};
+    // Which of the profiles it looked at that server holds a character for,
+    // kept per server (#955). /api/play/roster reads it back as "gone".
+    if (Array.isArray(o.checked) && Array.isArray(o.held)) {
+      const srv = (String(o.server || '') === 'dev' || route.indexOf('/dev/') === 0) ? 'dev' : 'main';
+      const ints = (a) => a.map(Number).filter((x) => x > 0 && Number.isInteger(x)).slice(0, 100000);
+      if (!store.servers || typeof store.servers !== 'object') store.servers = {};
+      store.servers[srv] = { at: Date.now(), checked: ints(o.checked), held: ints(o.held) };
+    }
     let n = 0;
     for (const pid of Object.keys(who)) {
       if (!/^\d+$/.test(pid)) continue;
@@ -3997,7 +4011,21 @@ async function handle(req, res) {
       const row = store.who && store.who[String(pid)];
       if (row) rows[String(pid)] = row;
     }
-    return sendJson(res, 200, { ok: true, rows });
+    /* This account's characters that the asking launcher's server looked up
+       and does not hold (#955), from its last report if that is recent. The
+       launcher marks them on the menu; it trusts the answer only for a
+       character last played before goneAt. */
+    const srv = String(o.channel || '') === 'dev' ? 'dev' : 'main';
+    const rep = store.servers && store.servers[srv];
+    let gone = [], goneAt = 0;
+    if (rep && Array.isArray(rep.checked) && Array.isArray(rep.held) &&
+        Date.now() - (Number(rep.at) || 0) < ROSTER_HELD_FRESH_MS) {
+      const looked = new Set(rep.checked.map(Number));
+      const held = new Set(rep.held.map(Number));
+      gone = mine.filter((pid) => looked.has(pid) && !held.has(pid));
+      goneAt = Number(rep.at) || 0;
+    }
+    return sendJson(res, 200, { ok: true, rows, gone, goneAt });
   }
 
   /*
