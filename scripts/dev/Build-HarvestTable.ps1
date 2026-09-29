@@ -184,6 +184,9 @@
     - then takes the food out of them, by the food bit, and routes each row to
       the farmer, to the hunter's game table or to the excluded list, except
       the ones named as staying the gatherer's
+    - then takes the farmyard out, by name (FARMYARD_BY_EDITOR_ID): a plant
+      whose produce is a reagent and which is still the farmer's, the chicken
+      nest (#628), which collectEgg() in game\gamemode.js answers
     - sorts each plant that is left into one of classes.md's four ranks by what
       its produce is worth (see the knobs below)
     - runs the crops pass over the rows it routed to the farmer, gives each one
@@ -229,7 +232,8 @@
   this build or has no Hunter rank set for it, if no game record is a novice's,
   if a row the food rule routed to the farmer did not reach the crops table, if
   a food row is left in the gatherer's table without being named as staying
-  there, if the first rung of the gatherer's ladder or the farmer's is empty,
+  there, if a name in FARMYARD_BY_EDITOR_ID is carried by no plant in this
+  build, if the first rung of the gatherer's ladder or the farmer's is empty,
   or if the game folder changed underneath it.
 #>
 param(
@@ -585,6 +589,20 @@ $FOOD_PROP_BY_EDITOR_ID = @('MammothCheese01', 'BYOHButterChurn')
 # It is a wild plant somebody picks. That is the gatherer's verb, and the food
 # bit on it is the record saying it can be eaten rather than that it was farmed.
 $FOOD_STAYS_THE_GATHERERS = @('DLC01SoulHusk01', 'DLC01SoulHusk02')
+#
+# FARMYARD_BY_EDITOR_ID: plants whose produce is a reagent, so the food rule
+# above never sees them, and which are still not the gatherer's. Issue #628,
+# "Gather can get eggs": ChickenNest gives Chicken's Egg, which is an INGR, so
+# it was ranked into the gatherer's table like a flower, and a gatherer pressing
+# a nest in a farmyard was handed the egg the Cook's bread and pies ask for.
+# A nest is kept, not found in the wild: it is the farmer's, the same way the
+# churn and the living cow are. collectEgg() in game\gamemode.js answers it with
+# the farm verb, and Build-RecipeTable.ps1 reads that verb, so Chicken's Egg is
+# a farmer's to supply. It is not a crop either (nobody sows a nest), so it goes
+# in the json's unranked list with the reason, the way the churn does, and in no
+# table here. Wild bird nests (pine thrush, rock warbler, hawk) are found in the
+# wild and stay the gatherer's, which is why this is a name and not a rule.
+$FARMYARD_BY_EDITOR_ID = @('ChickenNest')
 #
 # ------------------------------------------------------ the crop knobs ------
 #
@@ -1444,6 +1462,21 @@ foreach ($d in ($plants.Keys | Sort-Object)) {
         }
     }
 
+    # A farmyard plant whose produce is a reagent (issue #628): out before it
+    # is ranked, for the same reason as the fish and the food. The argument is
+    # over FARMYARD_BY_EDITOR_ID at the top.
+    if ($FARMYARD_BY_EDITOR_ID -contains [string]$p.Edid) {
+        $unranked[$d] = [ordered]@{
+            editorId    = $p.Edid
+            name        = $p.Full
+            produce     = $q.Desc
+            produceName = $q.Full
+            produceType = $q.Type
+            why         = 'it is kept in a farmyard rather than found in the wild, so it is the farmer''s and not the gatherer''s, and it is named in FARMYARD_BY_EDITOR_ID at the top of this script: collectEgg() in game\gamemode.js answers it with the farm verb, so it is in none of the tables this script writes'
+        }
+        continue
+    }
+
     $why = ''
     if ($creation.ContainsKey([string]$d) -or $creation.ContainsKey([string]$q.Desc)) {
         $why = 'it or its produce is a Creation Club record: every Special Edition has it, but its art comes with the Creation Club files Thornswood leaves out, so nobody is handed one'
@@ -1574,6 +1607,16 @@ foreach ($e in $FOOD_STAYS_THE_GATHERERS) {
     foreach ($d in $plants.Keys) { if ([string]$plants[$d].Edid -eq [string]$e) { $found = $true } }
     if (-not $found) { Bad ("{0} is named in FOOD_STAYS_THE_GATHERERS and no plant in this build carries that editor id" -f $e) }
 }
+# The farmyard list (#628) is checked the same way, and said out loud: a nest
+# renamed out from under it would drop back into the gatherer's table quietly.
+$farmyardRows = 0
+foreach ($e in $FARMYARD_BY_EDITOR_ID) {
+    $found = $false
+    foreach ($d in $plants.Keys) { if ([string]$plants[$d].Edid -eq [string]$e) { $found = $true } }
+    if (-not $found) { Bad ("{0} is named in FARMYARD_BY_EDITOR_ID and no plant in this build carries that editor id" -f $e) }
+    foreach ($d in $unranked.Keys) { if ([string]$unranked[$d].editorId -eq [string]$e) { $farmyardRows++ } }
+}
+Note ("{0,3} give a reagent and are the farmer's farmyard, in none of these tables: {1}" -f $farmyardRows, ($FARMYARD_BY_EDITOR_ID -join ', '))
 
 # --------------------------------------------------------------- the fish ---
 #
@@ -2068,7 +2111,8 @@ $docLines.Add('  "language": ' + (JsonStr $LANGUAGE) + ',')
 $docLines.Add('  "rankedBy": ' + (JsonStr 'the gold value of the produce, the thresholds in RANK_MAX_VALUE at the top of the script') + ',')
 $docLines.Add('  "harvestsAre": ' + (JsonStr ('the plants whose produce is an alchemy reagent. A plant whose produce is food is not the gatherer''s: ' +
     'food is bit 0x2 of an ALCH record''s ENIT flag word, proved in scripts\dev\Build-RecipeTable.ps1, and those rows are in crops, game or unranked instead, ' +
-    'but for the ones named in FOOD_STAYS_THE_GATHERERS at the top of the script')) + ',')
+    'but for the ones named in FOOD_STAYS_THE_GATHERERS at the top of the script. A plant named in FARMYARD_BY_EDITOR_ID (the chicken nest) gives a reagent ' +
+    'and is still the farmer''s, so it is in unranked and not here')) + ',')
 $docLines.Add('  "cropsRankedBy": ' + (JsonStr ('how hard the crop is to grow, named one at a time in CROP_RANK_BY_EDITOR_ID at the top of the script, ' +
     'because the gold value is the gatherer''s ladder and ranking a farm by it put every crop at advanced and left a new farmer nothing to sow')) + ',')
 $thr = New-Object 'System.Collections.Generic.List[string]'

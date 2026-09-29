@@ -833,7 +833,13 @@ $STATION_VERBS = @(
        What = 'the butter churn in HearthFires.esm, BYOHButterChurn, which is a farmer''s verb: classGate(actorId, ''farm'')' },
     # Added for #396: living cows give Jug of Milk to a farmer. Goats wait on Patrick.
     @{ Fn = 'milk';         Who = 'farmer';
-       What = 'a living cow, the Cow rows in hunts.json, which is a farmer''s verb: classGate(actorId, ''farm'') and null for everybody else so the living-actor fall through stays' }
+       What = 'a living cow, the Cow rows in hunts.json, which is a farmer''s verb: classGate(actorId, ''farm'') and null for everybody else so the living-actor fall through stays' },
+    # Added for #628: the chicken nest gives Chicken's Egg to a farmer. The
+    # harvest table's FARMYARD_BY_EDITOR_ID took the nest off the gatherer, so
+    # without this line the egg, which the Cook's breads and pies ask for, would
+    # have no producer at all.
+    @{ Fn = 'collectEgg';   Who = 'farmer';
+       What = 'the chicken nest, ChickenNest in Skyrim.esm, which is a farmer''s verb: classGate(actorId, ''farm'')' }
 )
 
 # WHERE THE STATIONS ARE READ FROM. The shipped gamemode, in this folder, which

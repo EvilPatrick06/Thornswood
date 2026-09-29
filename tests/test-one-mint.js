@@ -538,6 +538,7 @@ function goldDescriptors(text) {
     'ITEMS[grade]': 'charcoal, ITEMS',
     'ITEMS.butter': 'butter off the churn, ITEMS',
     'ITEMS.milk': 'milk off a living cow, ITEMS (#396)',
+    'ITEMS.chickenEgg': 'an egg off a chicken nest, ITEMS (#628)',
     'plant.produce': 'a plant, HARVESTS_BY_BASE',
     'caught.produce': 'a fish, FISH_BY_BASE',
     'hung.produce': 'game, GAME_BY_BASE',

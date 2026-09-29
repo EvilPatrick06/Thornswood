@@ -107,7 +107,12 @@ Yes 'the chopping blocks still give Firewood at novice' (
 $milk = @($res.Rows | Where-Object { $_.Fn -eq 'milk' })
 Yes 'milking a cow gives the farmer Milk at novice' (
     $milk.Count -eq 1 -and $milk[0].Key -eq 'milk' -and $milk[0].Who -eq 'farmer' -and $milk[0].At -eq 0)
-Yes 'and nothing but those five verbs is read' (
-    @($res.Rows | Where-Object { @('mineSalt', 'burnCharcoal', 'chopWood', 'churn', 'milk') -notcontains $_.Fn }).Count -eq 0)
+# collectEgg() since #628: a farmer takes a Chicken's Egg off a chicken nest,
+# the sixth verb in STATION_VERBS.
+$egg = @($res.Rows | Where-Object { $_.Fn -eq 'collectEgg' })
+Yes 'a chicken nest gives the farmer Chicken''s Egg at novice' (
+    $egg.Count -eq 1 -and $egg[0].Key -eq 'chickenEgg' -and $egg[0].Who -eq 'farmer' -and $egg[0].At -eq 0)
+Yes 'and nothing but those six verbs is read' (
+    @($res.Rows | Where-Object { @('mineSalt', 'burnCharcoal', 'chopWood', 'churn', 'milk', 'collectEgg') -notcontains $_.Fn }).Count -eq 0)
 
 Done
