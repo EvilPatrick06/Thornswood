@@ -202,65 +202,49 @@ pastes your invite link anywhere, so it is worth more than it looks:
 ## Onboarding
 
 Server Settings, Onboarding. This is the thing that turns a wall of channels
-into a door, and it is also the tidiest way to hand out the hold roles without
-anybody asking a moderator.
+into a door. `Build-Onboarding.py` sets it with the bot, from the rows it was
+written out in (issue #427, the board's "Discord onboarding, field by field"),
+so the words live in one file and every role and channel is looked up by name
+on the server when it runs:
 
-Discord will not let you finish until you have **at least 7 default channels
-and at least 5 of them let everybody post**. That trips most people up, because
-a server full of announcement channels fails the check.
+    .\scripts\deploy\Set-DiscordOnboarding.ps1 -Check    says what it would set, changes nothing
+    .\scripts\deploy\Set-DiscordOnboarding.ps1 -Off      writes it, leaves it off for Preview
+    .\scripts\deploy\Set-DiscordOnboarding.ps1           writes it and switches it on
 
-### Default channels
+Run `-Check` first, every time. It names every channel Discord would refuse
+and why, and sends nothing while anything fails. The bot needs Manage Server
+and Manage Roles for the write: tick Administrator on its role for the run and
+untick it after.
 
-The ones everybody lands in:
+Discord will not switch onboarding on until it has **at least 7 default
+channels and at least 5 of them that everybody can post in**, and it only
+takes channels everybody can see. Read only channels do not count toward the
+five.
 
-`#welcome` `#rules` `#start-here` `#general` `#screenshots`
-`#character-introductions` `#clips` `#logs-and-crashes` `#tickets-and-applications`
+What it sets:
 
-Nine, six of which anybody can post in, so it passes with room to spare.
+- **Default channels**: `#welcome` `#rules` `#start-here` `#news`, read only,
+  and `#general` `#media` `#character-introductions` `#tales`
+  `#rp-appreciation`, where people talk. Nine, five writable, which is exactly
+  the minimum.
+- **What are you here for?** Pick several, optional, channels only: Roleplay
+  shows `#tales`, Just playing `#general`, I want to help test
+  `#tickets-and-applications` (testing starts with an application), I make
+  videos `#media`.
+- **Which hold does your character call home?** Only with `-GrantMember`. Pick
+  one, members must answer. Each hold gives Member and its own Citizen role,
+  which opens that hold's channel; Not decided yet gives Member only. Off by
+  default, because Member is what staff give once an application is accepted
+  (the gate in `Build-Discord.py`), and a hold is picked in `#choose-your-hold`
+  after that.
+- **Rules and age.** `-Rules` and `-Age` each add one required question, off
+  by default until it is decided that they belong here (entry 181).
 
-### Question one: where your character is from
+It never hands out anything but Member and the Citizen roles, and refuses one
+that carries a power such as Administrator or Manage Roles. The role that opens
+the game is given by a person when an application is accepted. The Server
+Guide (the welcome sign, the to do list and the resource pages) has no bot
+side, so it stays a by hand step.
 
-Set it to **pick one**, and mark it as a question everybody answers.
-
-> **Which hold does your character call home?**
-> You can change this later, and it does not stop you going anywhere.
-
-Nine options, each granting the matching `Citizen of` role:
-
-| Option | Grants | Worth saying |
-|---|---|---|
-| Whiterun | Citizen of Whiterun | The middle of everything |
-| Solitude | Citizen of Solitude | Court, trade, and the embassy |
-| Windhelm | Citizen of Windhelm | The High King's seat |
-| Riften | Citizen of Riften | Ask no questions |
-| Markarth | Citizen of Markarth | Stone, silver and old grudges |
-| Dawnstar | Citizen of Dawnstar | Cold, and the ships come in |
-| Morthal | Citizen of Morthal | Quiet. Too quiet |
-| Falkreath | Citizen of Falkreath | More graves than people |
-| Winterhold | Winterhold | What is left of it |
-
-Nobody has to be from anywhere yet, so an "I have not decided" option granting
-nothing is worth adding as a tenth.
-
-### Question two: what you are here for
-
-Set it to **pick as many as you like**, and optional.
-
-> **What are you here for?**
-
-| Option | Shows them |
-|---|---|
-| Roleplay | `#character-introductions`, `#tales` |
-| Just playing | `#general`, your hold's channel |
-| I want to help test | `#bugs`, `#tickets-and-applications` |
-| I make videos | `#clips`, `#screenshots` |
-
-None of these grant a role. Playtester, Loremaster and Content Creator are
-given out by a person, because each one is somebody being trusted with
-something rather than somebody clicking a button.
-
-### What onboarding cannot do
-
-It cannot hand out `Member`. That is the default role setting in Server
-Settings, Roles, and it has to be on or somebody who answered the questions
-still cannot get into the game.
+Then walk it: Server Settings, Onboarding, **Preview** at the top right, and
+check every answer gives the role you meant.
