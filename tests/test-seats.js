@@ -183,6 +183,8 @@ r.tick();
 yes('the 27th is still 2nd after asking again and again', r.lastLine(127).place === 2);
 r.want(128); r.tick();
 yes('a later ask goes to the back: 3rd', r.lastLine(128).place === 3);
+yes('those ahead are told the new count at once, not after ten seconds',
+    r.lastLine(126).place === 1 && r.lastLine(126).of === 3 && r.lastLine(127).of === 3);
 r.join(128); r.tick();
 yes('coming into the world past the line is refused with the sentence',
     r.saidTo(128).length === 1 && r.saidTo(128)[0].text === SENTENCE);
@@ -224,10 +226,13 @@ r = rig(SEATS); r.tick();
 r.fill(300, 25);
 r.want(326); r.tick(1000); r.want(327); r.tick();
 r.leave(300); r.tick();
-yes('the seat is held for the first', r.lastLine(326).go === true);
-for (let s = 0; s < 13; s++) { r.tick(10000); r.want(327); }
-yes('held for two minutes and not taken, it goes to the next in line',
-    /the seat held for profile 326 went unused for 120s/.test(r.log()) && r.lastLine(327).go === true);
+yes('the seat is held for the first, with the 60 seconds to press Join now', r.lastLine(326).go === true && r.lastLine(326).secs === 60);
+for (let s = 0; s < 5; s++) { r.tick(10000); r.want(327); }
+yes('a held seat is still held just under a minute on',
+    !/the seat held for profile 326 went unused/.test(r.log()) && r.lastLine(327).go !== true);
+for (let s = 0; s < 2; s++) { r.tick(10000); r.want(327); }
+yes('held for a minute and not taken, it goes to the next in line',
+    /the seat held for profile 326 went unused for 60s/.test(r.log()) && r.lastLine(327).go === true);
 yes('somebody whose seat is held is told again when they ask', (function () {
   const n = r.linesTo(327).length; r.want(327); return r.linesTo(327).length === n + 1 && r.lastLine(327).go === true;
 })());
@@ -363,11 +368,17 @@ yes('a number that is not a whole number is no number', rig({ thornswoodMostOnli
 })();
 yes('the page asks the front for a seat instead of going straight to the client',
     /if \(!cleared\) \{ tell\('want ' \+ picked\); return; \}/.test(page));
-yes('the page shows "You are 3rd in line" from the server place',
-    /'You are ' \+ ordinal\(Number\(what\.place\)\) \+ ' in line'/.test(page) &&
+yes('the page shows "You are 3rd of 7 in line" from the server place and count',
+    /'You are ' \+ ordinal\(Number\(what\.place\)\) \+ ' of ' \+ of \+ ' in line'/.test(page) &&
+    /var of = Math\.max\(Number\(what\.of\) \|\| 0, Number\(what\.place\)\);/.test(page) &&
     /return n \+ \(t === 1 \? 'st' : t === 2 \? 'nd' : t === 3 \? 'rd' : 'th'\);/.test(page));
-yes('the page goes by itself when the server says it is their turn',
-    /if \(msg\.go\) \{ tell\('line: our turn'\); go\(\); return; \}/.test(page) && /go: go,\s*line: lineSays/.test(page));
+yes('on their turn the page shows Join now with the seconds the server holds the seat',
+    /if \(msg\.go\) \{ if \(!turnUntil\) tell\('line: our turn'\); turn\(msg\.secs\); return; \}/.test(page) &&
+    /<button class="btn2 turn" type="button">Join now<\/button>/.test(page) && /go: go,\s*line: lineSays/.test(page));
+yes('pressing Join now joins; the turn passing puts them back to waiting',
+    /tell\('line: joined on our turn'\);\s*go\(\);/.test(page) && /elPlace\.textContent = 'Your turn passed';/.test(page));
+yes('the waiting words say there is nothing to do until their turn',
+    /You do not need to do anything while you wait/.test(page));
 yes('the page keeps its beat while it waits, so the front does not reload it',
     /if \(acked \|\| root\.className === 'gone'\) \{ clearInterval\(beat\); return; \}/.test(page));
 yes('the front answers select:want by asking online.json, and waits in line only when it says full',

@@ -28133,7 +28133,7 @@ log('gamemode loaded:',
   var STAFF_WAIT_MS = 60000;   // a staff role arriving over the number: this long to show a join pass
   var KICK_AFTER_MS = 10000;   // after the line, so it is on screen first
   var LINE_GRACE_MS = 45000;   // not heard from at the menu this long: the place in line goes
-  var GRANT_MS = 120000;       // a seat held for the one whose turn it is, this long to arrive
+  var GRANT_MS = 60000;        // a seat held for the one whose turn it is, this long to arrive (Patrick, 29 Sep: a minute)
   var SAY_AGAIN_MS = 10000;    // a place is said again this often even when it has not moved
   var LINE_EVERY_MS = 10000;   // how often the menu says it is still waiting (the front's side)
 
@@ -28265,7 +28265,7 @@ log('gamemode loaded:',
       if (staff) { heldStaff++; }
       out.granted.push(pid);
       how.log('[thornswood] seats: a seat is held for profile ' + pid + ', ' + why);
-      how.line(pid, { go: true });
+      how.line(pid, { go: true, secs: Math.round(GRANT_MS / 1000) });
     }
 
     // A staff role with a pass skips the line into a staff seat.
@@ -28351,7 +28351,10 @@ log('gamemode loaded:',
     pid = Number(pid) || 0;
     if (!pid) { return 'nobody'; }
     if (state.seated[pid]) { return 'in the world'; }
-    if (state.held[pid]) { how.line(pid, { go: true }); return 'held'; }
+    if (state.held[pid]) {
+      how.line(pid, { go: true, secs: Math.max(0, Math.ceil((GRANT_MS - (now - state.held[pid].at)) / 1000)) });
+      return 'held';
+    }
     var at = lineIndex(pid);
     if (at >= 0) { state.line[at].seen = now; return 'waiting'; }
     var hasOne = false;
