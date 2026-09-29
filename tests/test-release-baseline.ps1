@@ -310,7 +310,8 @@ try {
     Write-Host ''; Write-Host 'the real Publish-Update.ps1'
     $fake = Join-Path $T 'repo'
     foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
-                   'scripts\release\Feed-Store.ps1', 'scripts\release\Release-Baseline.ps1',
+                   'scripts\release\Feed-Store.ps1', 'scripts\release\Release-Baseline.ps1', 'scripts\release\Source-Notice.ps1',
+                   'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
                    'scripts\release\Where.ps1', 'records\client-build.json') {
         $to = Join-Path $fake $f
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
