@@ -531,6 +531,21 @@ try {
     $code = Run $ps51 $svc (@('-From', $unpacked) + $roots)
     Yes "a second run keeps the data folder it replaced (exit $code)" ($code -eq 0 -and @(Get-ChildItem -LiteralPath $nSite -Directory -Filter 'data-before-restore-*').Count -eq 1)
 
+    # Two restores inside one second (#1107). What an earlier run kept under
+    # this second's name is not in the way: stand-ins for it are put there for
+    # the next minute, and the run keeps its own copies beside them as -2.
+    $at = Get-Date
+    foreach ($s in 0..60) {
+        $st = $at.AddSeconds($s).ToString('yyyyMMdd-HHmmss')
+        Put (Join-Path $nSite ('config.json-before-restore-' + $st)) '{"kept":"earlier"}'
+        [void](New-Item -ItemType Directory -Force -Path (Join-Path $nSite ('data-before-restore-' + $st)))
+    }
+    $code = Run $ps51 $svc (@('-From', $unpacked) + $roots)
+    Yes "a run in the same second as the last keeps its copies beside that one's, not over or inside them (exit $code)" (
+        $code -eq 0 -and @(Get-ChildItem -LiteralPath $nSite -File -Filter 'config.json-before-restore-*-2').Count -eq 1 -and
+        @(Get-ChildItem -LiteralPath $nSite -Directory -Filter 'data-before-restore-*-2').Count -eq 1 -and
+        @(Get-ChildItem -LiteralPath $nSite -Directory -Filter 'data-before-restore-*' | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'data') }).Count -eq 0)
+
     $thin = Join-Path $work 'thin'
     Copy-Item -LiteralPath $unpacked -Destination $thin -Recurse
     Remove-Item -LiteralPath (Join-Path $thin 'bot\bot.env.json') -Force
