@@ -10,13 +10,13 @@ each half, with the file and line for each step.
 `.gitmodules:11-15` names the fork, `https://github.com/EvilPatrick06/skymp.git`,
 on the branch `thornswood/engine-changes`, at `engine/skymp`. The repository
 pins a commit, not the branch: `git submodule status` prints
-`d00063515242e0ad1a9affb690c83194acf2c937`, the commit `records\client-build.json:6`
-and `records\server-build.json:10` now both name. The binary that server record
-hashes is the build of that commit, `e5d85ed8...`, built 2026-09-27T05:19:54Z
-and recorded after the Deploy-Server that sent it, so the client half and the
-server half are the same source now. `Deploy-Server.ps1` refuses a rebuilt
-`scam_native.node` until `New-ServerBuildRecord.ps1` records it (see
-"Rebuilding the same commit").
+`1ed42585db413ea40e34a0c1927ff3e05a9346d8`, the commit `records\client-build.json:6`
+and `records\server-build.json:10` both name (issue #1200, 29 September). The
+server record hashes the build of that commit, `de3256be...`, so the client
+half and the server half are the same source. `Deploy-Server.ps1` refuses a
+rebuilt `scam_native.node` until `New-ServerBuildRecord.ps1` records it (see
+"Rebuilding the same commit"), and the build check refuses a pull request whose
+pin and two records do not name one commit (see "One engine").
 
 `ignore = dirty` (`.gitmodules:15`) keeps a build inside the fork from showing
 as a change here. A different commit checked out in it still shows, and is
@@ -183,10 +183,11 @@ hashed `ecb029cb...`, not the recorded `de74c582...`. The recorded binary was
 put back from `local\engine-dist-c8832519`, so neither record changed and
 `Deploy-Server.ps1` still takes it (`docs\archive\todo-list-2026-09-25.md:2987`).
 
-Since 27 September both records name `d0006351` and both halves are built from
-it: `records\server-build.json` hashes `e5d85ed8...`, the build of that commit,
-recorded after the Deploy-Server of that morning, and the `c8832519` build above
-is history.
+From 27 September both records named `d0006351`. Then the client record and
+the pin moved on (#1016 to `44366c7e`, #898 to `c63fe637`) and the server record
+did not, so the servers ran the `d0006351` build while every later server fix
+sat in the fork unused (issue #1200). Since 29 September the pin and both
+records name `1ed42585` again, built together; "One engine" below keeps it so.
 
 So the recorded binaries stay unless the engine changed:
 
@@ -198,8 +199,36 @@ So the recorded binaries stay unless the engine changed:
   (Get-FileHash engine\skymp\build\dist\server\scam_native.node -Algorithm SHA256).Hash.ToLower() -eq (Get-Content records\server-build.json -Raw | ConvertFrom-Json).sha256
   ```
   It prints True when the recorded binary is back.
-- When the engine did change: commit and push on `thornswood/engine-changes`
-  in the fork, run `Build-Server.ps1` without `-NoRecord`, build the client
-  and run `New-ClientBuildRecord.ps1`, then commit the new submodule commit
-  and both records in one pull request here. The server then goes up with
-  `Deploy-Server.ps1`, and the client files with the next Ship.
+- When the engine did change: see "One engine" below.
+
+## One engine
+
+Decided by Patrick on 29 September (issue #1200): "we should always be using
+the new one ... What's the point in the changes if we aren't using them." There
+is one engine, the head of `thornswood/engine-changes` in the fork, and the pin
+here, `records\client-build.json` and `records\server-build.json` all name that
+one commit. No change to the engine lives anywhere else: not on a local branch
+of somebody's `engine\skymp`, not as an uncommitted edit, not in a build nobody
+recorded.
+
+A change to the engine goes like this:
+
+1. A branch in the fork, from the head of `thornswood/engine-changes`, in a
+   worktree of the fork, and a pull request in the fork, merged with a merge
+   commit. A merge commit has the same files as the branch it merges, so a
+   build of the branch's last commit is a build of the head.
+2. Build both halves from that commit: `Build-Engine.ps1 -Fork <that worktree>`.
+3. `New-ClientBuildRecord.ps1 -Dist <fork>\build\dist\client -Clone <fork>` and
+   `New-ServerBuildRecord.ps1 -Dist <fork>\build\dist\server -Clone <fork>`.
+4. One pull request here with the new pin (`git -C engine/skymp checkout
+   <commit>`, then `git add engine/skymp`), both records, and the commit named
+   in `THIRD-PARTY.md` and `site\data\site\credits.md`.
+5. After it merges: the server to the dev server with `Publish-Server.ps1
+   -Channel dev`, the client with the next dev Ship.
+
+Two harnesses hold it. `tests\test-one-engine.js`, in the build check on every
+pull request, is red when the pin and the two records do not name one commit,
+or name another branch or fork than `.gitmodules`. `tests\test-engine-at-fork-head.js`,
+in the nightly checks, asks GitHub whether the pin is the head of the branch
+(or the head is only merge commits over it with the same files), and is red
+when a fork change has been merged and not pinned here.

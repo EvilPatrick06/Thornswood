@@ -65,7 +65,8 @@ measured, names a second person.
 - The fork: `C:\Thornswood-Dev\skymp` is on `thornswood/engine-changes`, and
   the local branch and `origin/thornswood/engine-changes` both point at
   c8832519, read off the clone's own refs. That was the commit both build
-  records named that day; both name d0006351 since 27 September, and
+  records named that day; since 29 September (#1200) the pin and both name one
+  commit, held there by the build check (tests\test-one-engine.js), and
   `records\client-build.json` and `records\server-build.json` are where to read
   it. The triage pass the same day found no uncommitted change in
   it. So the source is not on one disk; the configured build and its
