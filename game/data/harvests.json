@@ -3,7 +3,7 @@
   "source": "the FLOR and TREE records of 101 plugins, the 5 masters and what C:\\Thornswood\\Profile\\OwnGame\\plugins.txt enables",
   "language": "english",
   "rankedBy": "the gold value of the produce, the thresholds in RANK_MAX_VALUE at the top of the script",
-  "harvestsAre": "the plants whose produce is an alchemy reagent. A plant whose produce is food is not the gatherer's: food is bit 0x2 of an ALCH record's ENIT flag word, proved in scripts\\dev\\Build-RecipeTable.ps1, and those rows are in crops, game or unranked instead, but for the ones named in FOOD_STAYS_THE_GATHERERS at the top of the script",
+  "harvestsAre": "the plants whose produce is an alchemy reagent. A plant whose produce is food is not the gatherer's: food is bit 0x2 of an ALCH record's ENIT flag word, proved in scripts\\dev\\Build-RecipeTable.ps1, and those rows are in crops, game or unranked instead, but for the ones named in FOOD_STAYS_THE_GATHERERS at the top of the script. A plant named in FARMYARD_BY_EDITOR_ID (the chicken nest) gives a reagent and is still the farmer's, so it is in unranked and not here",
   "cropsRankedBy": "how hard the crop is to grow, named one at a time in CROP_RANK_BY_EDITOR_ID at the top of the script, because the gold value is the gatherer's ladder and ranking a farm by it put every crop at advanced and left a new farmer nothing to sow",
   "rankMaxValue": {
     "novice": 1,
@@ -11,12 +11,11 @@
     "expert": 12,
     "master": 2147483647
   },
-  "count": 106,
+  "count": 105,
   "harvests": {
     "1016a1:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
     "1016a2:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
     "1016a3:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
-    "1062d1:Skyrim.esm": { "produce": "23d77:Skyrim.esm", "name": "Chicken's Egg", "rank": "advanced" },
     "108ee2:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
     "10f37:Dawnguard.esm": { "produce": "b097:Dawnguard.esm", "name": "Gleamblossom", "rank": "advanced" },
     "110c8:HearthFires.esm": { "produce": "59b86:Skyrim.esm", "name": "Nirnroot", "rank": "expert" },
@@ -272,6 +271,14 @@
       "produceName": "Nightshade (3)",
       "produceType": "MISC",
       "why": "its produce is a sack, Nightshade (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "1062d1:Skyrim.esm": {
+      "editorId": "ChickenNest",
+      "name": "Chickens' Nest",
+      "produce": "23d77:Skyrim.esm",
+      "produceName": "Chicken's Egg",
+      "produceType": "INGR",
+      "why": "it is kept in a farmyard rather than found in the wild, so it is the farmer's and not the gatherer's, and it is named in FARMYARD_BY_EDITOR_ID at the top of this script: collectEgg() in game\\gamemode.js answers it with the farm verb, so it is in none of the tables this script writes"
     },
     "110b9:HearthFires.esm": {
       "editorId": "BYOHHouseFloraCarrots01",
@@ -633,22 +640,6 @@
       "definedIn": "Skyrim.esm",
       "formId": "0x1016A3",
       "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "1062d1:Skyrim.esm": {
-      "rank": "advanced",
-      "produce": "23d77:Skyrim.esm",
-      "produceName": "Chicken's Egg",
-      "produceType": "INGR",
-      "produceValue": 2,
-      "produceFrom": "Skyrim.esm",
-      "name": "Chickens' Nest",
-      "editorId": "ChickenNest",
-      "recordType": "FLOR",
-      "plugin": "Skyrim.esm",
-      "definedIn": "Skyrim.esm",
-      "formId": "0x1062D1",
-      "seasons": "0,0,0,0",
       "nameFrom": "string table"
     },
     "108ee2:Skyrim.esm": {

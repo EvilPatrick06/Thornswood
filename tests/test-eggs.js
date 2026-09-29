@@ -2,14 +2,24 @@
 //
 // #628: a chicken nest is the farmer's; a gatherer must not get the egg.
 //
-// ChickenNest stayed in HARVESTS_BY_BASE because Chicken's Egg is an INGR,
-// and the food rule only pulled ALCH food. plantAt refuses the nest; collectEgg
-// answers it for a farmer. Wild bird eggs stay on the gatherer ladder.
+// ChickenNest was a row in HARVESTS_BY_BASE because Chicken's Egg is an INGR,
+// and the food rule only pulls ALCH food, so a gatherer was handed the egg.
+// The fix is at the table: Build-HarvestTable.ps1 names the nest in
+// FARMYARD_BY_EDITOR_ID and leaves it out of every table, collectEgg answers
+// it for a farmer, and Build-RecipeTable.ps1 reads collectEgg so the Cook's
+// recipes say the farmer supplies the egg. Wild bird eggs stay the gatherer's.
 //
-// Read only against game/gamemode.js.
+// Read only, against game/gamemode.js, game/data/harvests.json,
+// game/data/recipes.json and the two build scripts. GM, HARVESTS and RECIPES
+// point it at other copies (the files from before the fix fail it).
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(__dirname, '..', 'game', 'gamemode.js');
+const ROOT = path.join(__dirname, '..');
+const SRC = process.env.GM || path.join(ROOT, 'game', 'gamemode.js');
+const HARVESTS_JSON = process.env.HARVESTS || path.join(ROOT, 'game', 'data', 'harvests.json');
+const RECIPES_JSON = process.env.RECIPES || path.join(ROOT, 'game', 'data', 'recipes.json');
+const HARVEST_PS1 = path.join(ROOT, 'scripts', 'dev', 'Build-HarvestTable.ps1');
+const RECIPE_PS1 = path.join(ROOT, 'scripts', 'dev', 'Build-RecipeTable.ps1');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -79,6 +89,8 @@ function coolBlock() {
 const NEST = '1062d1:Skyrim.esm';
 const EGG = '23d77:Skyrim.esm';
 const FLOWER = '134aa:Skyrim.esm'; // not a nest
+const THRUSH = '23cff:Skyrim.esm'; // a pine thrush nest, wild, the gatherer's
+const WARBLER = '7e8c9:Skyrim.esm'; // a rock warbler nest, wild, the gatherer's
 
 const itemsLine = constLine('ITEMS');
 let ITEMS = {};
@@ -106,8 +118,21 @@ yes('a non-farmer gets a refusal string, not null (FLOR must not fall through)',
     !!parts.collectEgg && /if \(refusal\) return refusal;/.test(parts.collectEgg));
 yes('success toast starts with You take so putBack leaves the nest empty',
     !!parts.collectEgg && /You take 1 Chicken's Egg/.test(parts.collectEgg));
-yes('plantAt refuses a chicken nest',
-    !!parts.plantAt && /isChickenNest\(baseDesc\)\) return null/.test(parts.plantAt));
+// The generated plant table, lifted whole, so plantAt below runs against what
+// the server really carries rather than a stub.
+function harvestsBlock() {
+  const a = src.indexOf('\nvar HARVESTS_BY_BASE = {');
+  const b = src.indexOf('\n};', a);
+  if (a < 0 || b < 0) { return null; }
+  try { return new Function('return ' + src.slice(a + '\nvar HARVESTS_BY_BASE = '.length, b + 2) + ';')(); }
+  catch (e) { return null; }
+}
+const HARVESTS_BY_BASE = harvestsBlock();
+yes('the generated HARVESTS_BY_BASE block lifts', !!HARVESTS_BY_BASE && Object.keys(HARVESTS_BY_BASE).length > 50);
+yes('and carries no chicken nest, so no plant path can hand a gatherer the egg',
+    !!HARVESTS_BY_BASE && !Object.prototype.hasOwnProperty.call(HARVESTS_BY_BASE, NEST));
+yes('plantAt carries no nest special case: the table is the fix, not a guard over it',
+    !!parts.plantAt && !/isChickenNest/.test(parts.plantAt));
 yes('the activate handler calls collectEgg before the plants',
     !!parts.handler && /isChickenNest\(baseDesc\)/.test(parts.handler) &&
     parts.handler.indexOf('collectEgg(') < parts.handler.indexOf('isPlant(baseDesc)'));
@@ -188,7 +213,7 @@ function world(opts) {
         return typeof message === 'string' && /^(You pick |You take )/.test(message);
       },
       never, function () { return null; },
-      { '1062d1:Skyrim.esm': { produce: EGG, name: "Chicken's Egg", rank: 'advanced' } },
+      HARVESTS_BY_BASE || {},
       {},
       never
     ]);
@@ -215,6 +240,10 @@ function world(opts) {
   if (plantAt) {
     yes('plantAt returns null for the chicken nest so harvest never sees it',
         plantAt(NEST) === null);
+    const thrush = plantAt(THRUSH);
+    const warbler = plantAt(WARBLER);
+    yes('wild bird nests are still the gatherer\'s (Pine Thrush Egg, Rock Warbler Egg)',
+        !!thrush && thrush.name === 'Pine Thrush Egg' && !!warbler && warbler.name === 'Rock Warbler Egg');
   }
 
   if (collectEgg) {
@@ -275,20 +304,71 @@ function world(opts) {
   }
 }
 
-// Nest still listed in harvests.json (generated) but plantAt is the live gate
+// The harvest table: the nest is out of the gatherer's table and listed, with
+// the reason, among the rows no table carries.
+function readJson(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '')); } catch (e) { return null; }
+}
 {
-  const hv = path.join(path.dirname(SRC), 'data', 'harvests.json');
-  if (fs.existsSync(hv)) {
-    const h = JSON.parse(fs.readFileSync(hv, 'utf8'));
-    const plants = h.plants || h;
-    // plants map may be under a key; also check generated block presence in src
-    yes('ChickenNest is still in the generated HARVESTS_BY_BASE (pass has not moved it)',
-        /"1062d1:Skyrim.esm"/.test(src) && /Chicken's Egg/.test(src));
-    yes('and plantAt is what keeps the gatherer off it',
-        /isChickenNest\(baseDesc\)\) return null/.test(src));
-  } else {
-    yes('game/data/harvests.json is there', false);
+  const h = readJson(HARVESTS_JSON);
+  yes('game/data/harvests.json reads', !!h && !!h.harvests && !!h.unranked);
+  if (h && h.harvests && h.unranked) {
+    yes('the chicken nest is not in its harvests map', !Object.prototype.hasOwnProperty.call(h.harvests, NEST));
+    yes('nor in crops, fish or game',
+        !Object.prototype.hasOwnProperty.call(h.crops || {}, NEST) &&
+        !Object.prototype.hasOwnProperty.call(h.fish || {}, NEST) &&
+        !Object.prototype.hasOwnProperty.call(h.game || {}, NEST));
+    const u = h.unranked[NEST];
+    yes('it is in unranked as ChickenNest, giving Chicken\'s Egg',
+        !!u && u.editorId === 'ChickenNest' && u.produce === EGG);
+    yes('and says why: FARMYARD_BY_EDITOR_ID and collectEgg',
+        !!u && /FARMYARD_BY_EDITOR_ID/.test(u.why) && /collectEgg/.test(u.why));
+    yes('the count matches the harvests map', h.count === Object.keys(h.harvests).length);
+    yes('the wild bird nests are still in the gatherer\'s map',
+        !!h.harvests[THRUSH] && !!h.harvests[WARBLER]);
+    if (HARVESTS_BY_BASE) {
+      yes('and the gamemode block is the json\'s harvests map, row for row',
+          JSON.stringify(Object.keys(HARVESTS_BY_BASE).sort()) === JSON.stringify(Object.keys(h.harvests).sort()));
+    }
   }
+}
+
+// The two build scripts say so, so the next run of either keeps it.
+{
+  const hs = fs.existsSync(HARVEST_PS1) ? fs.readFileSync(HARVEST_PS1, 'utf8') : '';
+  yes('Build-HarvestTable.ps1 names ChickenNest in FARMYARD_BY_EDITOR_ID',
+      /^\$FARMYARD_BY_EDITOR_ID = @\([^)]*'ChickenNest'[^)]*\)/m.test(hs));
+  yes('and routes that list out before anything is ranked',
+      /if \(\$FARMYARD_BY_EDITOR_ID -contains \[string\]\$p\.Edid\)/.test(hs));
+  const rs = fs.existsSync(RECIPE_PS1) ? fs.readFileSync(RECIPE_PS1, 'utf8') : '';
+  yes('Build-RecipeTable.ps1 reads collectEgg as the farmer\'s',
+      /@\{ Fn = 'collectEgg';\s+Who = 'farmer';/.test(rs));
+}
+
+// The recipe table: every recipe that asks for Chicken's Egg says the farmer
+// supplies it, at novice, and none still says the gatherer.
+{
+  const r = readJson(RECIPES_JSON);
+  let asks = 0, farmer = 0, gatherer = 0, novice = 0;
+  [r && r.recipes, r && r.unowned].forEach(function (rows) {
+    if (!rows || typeof rows !== 'object') { return; }
+    Object.keys(rows).forEach(function (k) {
+      const row = rows[k];
+      if (!row || !Array.isArray(row.inputItems)) { return; }
+      row.inputItems.forEach(function (i) {
+        if (i.item !== EGG) { return; }
+        asks++;
+        if (i.producedBy === 'farmer') { farmer++; }
+        const also = (i.alsoProducedBy || []).map(function (a) { return a && a.who; });
+        if (i.producedBy === 'gatherer' || also.indexOf('gatherer') >= 0) { gatherer++; }
+        if (i.producedAt === 'novice') { novice++; }
+      });
+    });
+  });
+  yes('game/data/recipes.json has recipes that ask for Chicken\'s Egg', asks > 0);
+  yes('every one says the farmer produces it (' + farmer + ' of ' + asks + ')', asks > 0 && farmer === asks);
+  yes('at novice, which is collectEgg with no rank gate (' + novice + ' of ' + asks + ')', asks > 0 && novice === asks);
+  yes('and none says a gatherer does', gatherer === 0);
 }
 
 console.log('');

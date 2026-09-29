@@ -5624,7 +5624,6 @@ var HARVESTS_BY_BASE = {
   "1016a1:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
   "1016a2:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
   "1016a3:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
-  "1062d1:Skyrim.esm": { "produce": "23d77:Skyrim.esm", "name": "Chicken's Egg", "rank": "advanced" },
   "108ee2:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
   "10f37:Dawnguard.esm": { "produce": "b097:Dawnguard.esm", "name": "Gleamblossom", "rank": "advanced" },
   "110c8:HearthFires.esm": { "produce": "59b86:Skyrim.esm", "name": "Nirnroot", "rank": "expert" },
@@ -6080,16 +6079,6 @@ function plantAt(baseDesc) {
     the same reason: the order in onActivate is a thing somebody can change.
   */
   if (isGame(baseDesc)) return null;
-  /*
-    AND A CHICKEN NEST IS THE FARMER'S, NOT THE GATHERER'S (#628).
-
-    Chicken's Egg is an INGR, so the food rule that pulled ALCH food off the
-    plant table left the nest here. A gatherer who presses it still gets the
-    egg today. plantAt refuses it the way it refuses fish and hanging game,
-    and collectEgg() answers the press for a farmer. Wild bird eggs (pine
-    thrush, rock warbler, hawk) and chaurus sacs stay on the gatherer ladder.
-  */
-  if (isChickenNest(baseDesc)) return null;
   if (Object.prototype.hasOwnProperty.call(HARVESTS_BY_BASE, baseDesc)) {
     return HARVESTS_BY_BASE[baseDesc];
   }
@@ -6732,55 +6721,6 @@ function game(actorId, refrId, baseDesc) {
   on the server (and the client's "Sent activation for caster=") can prove the
   activation arrived. If neither line shows, milk needs another way in.
 */
-/*
-  A CHICKEN NEST IS THE FARMER'S (#628).
-
-  Gather can get eggs today because ChickenNest stayed in HARVESTS_BY_BASE:
-  the produce is an INGR, and the food rule only pulled ALCH food. The farmer
-  grows the food the cook needs; a nest in a farmyard is that work, the same
-  way the churn and the living cow are. Wild bird eggs stay on the gatherer.
-
-  Shape is churn's: classGate farm first, HARVEST_COOLDOWN_MS, addItem the
-  egg. Refusal is a string (not null): a FLOR that falls through is handed to
-  the presser by the engine, which is the free egg this exists to stop.
-  Success toast starts with "You take " so putBack leaves the nest empty the
-  way a real plant pick does.
-*/
-const CHICKEN_NESTS = {
-  '1062d1:Skyrim.esm': "Chicken's Egg"  // ChickenNest -> 23d77 Chicken's Egg
-};
-
-/** True when this base is a chicken nest a farmer collects from. */
-function isChickenNest(baseDesc) {
-  return Object.prototype.hasOwnProperty.call(CHICKEN_NESTS, baseDesc);
-}
-
-/**
- * A press on a chicken nest: a farmer gets one Chicken's Egg, everybody else
- * is told whose work it is. Null only for a base that is not a nest.
- */
-function collectEgg(actorId, refrId, baseDesc) {
-  if (!isChickenNest(baseDesc)) return null;
-
-  log('egg: chicken nest press', baseDesc, 'by', actorId);
-
-  const refusal = classGate(actorId, 'farm');
-  if (refusal) return refusal;
-
-  const wait = cooldownLeft(actorId, refrId, HARVEST_COOLDOWN_MS);
-  if (wait > 0) {
-    return 'You have taken from this nest for now. ' + waitWord(wait) + ' to go.';
-  }
-
-  if (!addItem(actorId, ITEMS.chickenEgg, 1)) {
-    return "There is a Chicken's Egg here and nothing in this load order to " +
-           'put in your hands. Say so in the dev channel.';
-  }
-  stampCooldown(actorId, refrId);
-  const rank = creditWork(actorId, 'farm');
-  return "You take 1 Chicken's Egg." + (rank ? ' ' + rank : '');
-}
-
 const CHURNS = { 'bc0:HearthFires.esm': 'Churn' };
 
 /** True when this base is a butter churn. Never a bare lookup, for the reason
@@ -6819,6 +6759,62 @@ function churn(actorId, refrId, baseDesc) {
   stampCooldown(actorId, refrId);
   const rank = creditWork(actorId, 'farm');
   return 'You churn 1 Butter.' + (rank ? ' ' + rank : '');
+}
+
+/*
+  A CHICKEN NEST IS THE FARMER'S (#628).
+
+  "Gather can get eggs": ChickenNest gives Chicken's Egg, an INGR, so the food
+  rule (which reads the ALCH food bit) never took it off the gatherer, and
+  the harvest table ranked it like a flower. A nest is kept in a farmyard,
+  not found in the wild, so it is the farmer's, the same way the churn and
+  the living cow are. Build-HarvestTable.ps1 now names it in
+  FARMYARD_BY_EDITOR_ID and leaves it out of every table, and this answers
+  the press. Wild bird nests (pine thrush, rock warbler, hawk) are found in
+  the wild and stay the gatherer's.
+
+  Shape is churn's: classGate farm first, HARVEST_COOLDOWN_MS, addItem the
+  egg, counted under the farm verb, no rank gate. Build-RecipeTable.ps1 reads
+  ITEMS.chickenEgg out of this body (STATION_VERBS), which is how the Cook's
+  recipes learn the farmer supplies the egg. The refusal is a string, never
+  null: a FLOR that falls through is handed to the presser by the engine,
+  which is the free egg this exists to stop. The success toast starts with
+  "You take " so the put back in onActivate leaves the nest empty the way a
+  real plant pick does.
+*/
+const CHICKEN_NESTS = {
+  '1062d1:Skyrim.esm': "Chicken's Egg"  // ChickenNest -> 23d77 Chicken's Egg
+};
+
+/** True when this base is a chicken nest a farmer collects from. */
+function isChickenNest(baseDesc) {
+  return Object.prototype.hasOwnProperty.call(CHICKEN_NESTS, baseDesc);
+}
+
+/**
+ * A press on a chicken nest: a farmer gets one Chicken's Egg, everybody else
+ * is told whose work it is. Null only for a base that is not a nest.
+ */
+function collectEgg(actorId, refrId, baseDesc) {
+  if (!isChickenNest(baseDesc)) return null;
+
+  log('egg: chicken nest press', baseDesc, 'by', actorId);
+
+  const refusal = classGate(actorId, 'farm');
+  if (refusal) return refusal;
+
+  const wait = cooldownLeft(actorId, refrId, HARVEST_COOLDOWN_MS);
+  if (wait > 0) {
+    return 'You have taken from this nest for now. ' + waitWord(wait) + ' to go.';
+  }
+
+  if (!addItem(actorId, ITEMS.chickenEgg, 1)) {
+    return "There is a Chicken's Egg here and nothing in this load order to " +
+           'put in your hands. Say so in the dev channel.';
+  }
+  stampCooldown(actorId, refrId);
+  const rank = creditWork(actorId, 'farm');
+  return "You take 1 Chicken's Egg." + (rank ? ' ' + rank : '');
 }
 
 /*
@@ -7824,9 +7820,10 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     */
     if (message && message !== ALLOW && !floraHanded(message)) { putBack(casterRefrId, refrId); }
   }
-  // Chicken nests before the plants: still a row in HARVESTS_BY_BASE until
-  // the harvests pass learns INGR food, and plantAt already refuses them.
-  // Farmer food cluster with the churn below (#628).
+  // The chicken nest, which is the farmer's (#628). The harvest table leaves it
+  // out (FARMYARD_BY_EDITOR_ID in Build-HarvestTable.ps1), so it is in no plant
+  // table and the order against the plants does not matter; it sits with the
+  // churn, the other farmyard work.
   else if (isChickenNest(baseDesc)) {
     message = collectEgg(casterRefrId, refrId, baseDesc);
     /*
