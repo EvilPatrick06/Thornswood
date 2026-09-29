@@ -5,8 +5,11 @@ skill and no perk menu opens when you sleep. What replaced it is three choices
 made once, in the game, that decide what you are for. A new character wakes
 in the creation hall, makes a face, and then the panel behind K opens on its
 own: your class, your profession and the half of it you will make your own,
-and the town you wake up in tomorrow. Take them in any order. The third one
-sends you to your inn. The same panel, on K, is where you spend skill points
+and the town you wake up in tomorrow. Only the town has to be chosen before
+you leave the hall, and choosing it sends you to your inn. Your class and your
+profession can wait: leave them for later and pick them in the world, from the
+same panel. What waiting means is further down. The same panel, on K, is where
+you spend skill points
 for the rest of your character's life, and where the recipe book tells you what
 your half can make at the rank you have reached. A new character gets forty gold once, and the clothes they stand in:
 what else you carry, you earn, buy or are given.
@@ -39,10 +42,10 @@ are able to make at all.
 | **Woodworker** | **Charburner**, firewood through to coke, or **Woodwright**, bows, arrows and instruments |
 
 You get the **novice** work of your sister half for nothing. An Edgewright
-knows how to beat out plain iron plate, because anybody who works a forge does.
-What they cannot do is go any further than novice with it, and a real cuirass
-is not novice work. For that you find a Platewright, and that is a conversation
-rather than a menu.
+knows how to beat out a plain iron cuirass, because anybody who works a forge
+does. What they cannot do is go any further than novice with it, and a steel
+cuirass is not novice work. For that you find a Platewright, and that is a
+conversation rather than a menu.
 
 Everything outside your own profession you cannot do at all, unless somebody
 teaches you. There is a way to learn a little of it and it is further down.
@@ -53,6 +56,16 @@ Your half decides what you are able to make, and the server holds you to it.
 Stand at any forge, oven, tanning rack or workbench in Skyrim and what you are
 about to make is either your half's work or it is not. If it is not, it does not
 get made and you keep your materials.
+
+Some of it is nobody's work. Smelting ore into ingots and tanning a hide into
+leather belong to no half, because every trade needs them, and anybody can do
+them.
+
+The hold starts the day you pick a profession. Until then nothing at a bench is
+held against you, and the first thing you make tells you so: you can make
+whatever anybody can, apart from another race's own gear. Picking a profession
+is what gives you a half, a rank to climb in it and work that is yours, and
+from then on the three answers below are the rule.
 
 Three answers, and every one of them names somebody.
 
@@ -159,6 +172,10 @@ do for a living, and a Hunter cannot pull a flower out of the ground. If you
 want leather you know a hunter, and if you do not know one yet, that is the
 game telling you to go and meet people.
 
+Waiting on a class is the other way round from waiting on a profession. Until
+you pick one, none of the five is yours: every seam, carcass, plant, fishing
+spot and crop turns you away and tells you to press K and choose.
+
 ## Roleplay only (not Class or Profession)
 
 Five names from the old flat list of trades are **not** a Class and **not** a
@@ -188,10 +205,11 @@ and one whole profession. In the pack is enough; nothing has to be equipped.
 | **Farmer** | A shovel |
 | **Woodworker** | A woodcutter's axe |
 
-You are handed yours the moment you pick, and if you ever end up with none, the
-seam, the plot or the kiln hands you another rather than leaving you standing
-there with a class you cannot use. It is not often and it is not much, the same
-as the seed.
+You are handed yours the moment you pick. After that it wears with the work: a
+tool has a hundred uses in it, you are told when it is worn thin, and when it
+breaks the next one comes from a smith. With no tool in your pack the seam, the
+plot, the chopping block and the kiln turn you away, and nothing hands you a
+free one.
 
 Any of them counts. The game has two shovels that look and read exactly alike,
 and six things it calls a pickaxe including the Notched Pickaxe and the ancient
@@ -200,9 +218,8 @@ war pick is a weapon and not a mining tool, so that one does not.
 
 **Skyrim has no hoe.** There is no such item in the game, and there is none in
 any of the mods we load on top of it either; every one of them was searched. So
-farming asks for a shovel, which is a real thing lying about on farms and at
-mills all over the province, and a shovel is what we mean whenever this page
-says farming needs a tool.
+farming asks for a shovel, which a smith forges, and a shovel is what we mean
+whenever this page says farming needs a tool.
 
 Nothing else asks for one. Gathering, hunting and fishing need your hands.
 
@@ -296,7 +313,7 @@ long time.
 
 Each rank opens more of what you are able to make, inside your own half of your
 own profession and nowhere else. An Edgewright at Master still cannot make a
-cuirass.
+steel cuirass.
 
 ### What Master actually gets you
 

@@ -103,9 +103,11 @@ A new character arrives in a quiet hall and the race menu opens, and that is
 where you make your face. When you are done, a panel opens on its own for the
 three choices on the [Professions](/classes) page: your class, your
 profession and the half of it you will make your own, and the town you wake
-up in. Take them in any order; the last one sends you to your inn. You arrive
-in the clothes you stand in and nothing else. The same panel is behind **K**
-from then on, for your skill points.
+up in. Only the town has to be chosen before you leave the hall, and choosing
+it sends you to your inn; your class and profession can wait, and are picked
+later in the world from the same panel. You arrive in the clothes you stand in,
+with forty gold. The same panel is behind **K** from then on, for your skill
+points.
 
 There is no address to type and no password to remember.
 
