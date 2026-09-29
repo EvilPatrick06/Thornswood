@@ -53,6 +53,8 @@ const COMMANDS = slice('const WORDS = [', '// ==== end thornswood chat commands 
 const STAFF = slice('// ==== thornswood staff ====', '// ==== end thornswood staff ====');
 yes('the chat command block is in gamemode.js', !!COMMANDS);
 yes('the staff block is in gamemode.js', !!STAFF);
+const PLACE_ACTORS = slice('\nfunction placeActors(', '\n  return { made: made, why: why };\n}');
+yes('and placeActors, which /spawn and /spawnat share', !!PLACE_ACTORS);
 yes('handle() hands staff words to the staff block with isStaff and /give\'s, /spawn\'s and /tp\'s lookups',
     !!COMMANDS && /staffCmd\.command\(cmd, word, parts, profileId, actorId, isStaff,\s*\{ findThing: findThing, findBeast: findBeast,\s*byFormId: byFormId, findPlace: findPlace \}\)/.test(COMMANDS));
 yes('and before the /give, /spawn and /tp branches, so a line aimed at a person reaches it first',
@@ -185,7 +187,9 @@ function load(w) {
       return { actorId: 0, why: hit.length ? 'More than one person here answers to that.' : 'Nobody here by that name.' };
     }
   };
-  vm.runInContext(COMMANDS.split('const WORDS').join('var WORDS').split('const PLAYER_WORDS').join('var PLAYER_WORDS') +
+  // The real placeActors, which /spawn and /spawnat share (#959).
+  vm.runInContext(PLACE_ACTORS + '\n' +
+                  COMMANDS.split('const WORDS').join('var WORDS').split('const PLAYER_WORDS').join('var PLAYER_WORDS') +
                   '\n' + STAFF, box, { filename: 'gamemode.js (commands and staff)' });
   w.box = box;
   w.tick = w.timers.filter(function (t) { return t.ms === 1500; })[0];

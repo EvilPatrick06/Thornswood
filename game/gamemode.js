@@ -1554,6 +1554,51 @@ function addItem(actorId, itemDesc, count) {
   return true;
 }
 
+/*
+  Puts count new actors of the NPC record baseId away units out from where
+  ({ desc, pos, rot }): one straight ahead of the way they face (rot[2], in
+  degrees), several spread round them. Returns { made, why }. Shared by /spawn
+  and the staff block's /spawnat (#959).
+
+  mp.place and not mp.createActor. createActor's first argument is the form
+  id the NEW actor gets, not the record to build it from (PartOne::CreateActor),
+  so it made a bare actor with no base under the troll record's own id, and
+  nothing appeared. mp.place builds an actor from the record, at the middle of
+  Tamriel, and the locationalData set moves it here, the way PlaceAtMe does.
+  Anything that is not an NPC record is refused before it is placed, since a
+  placed object cannot be moved and would stay at the middle of Tamriel.
+*/
+function placeActors(baseId, where, count, away) {
+  let rec = null;
+  try { rec = (mp.lookupEspmRecordById(baseId) || {}).record || null; } catch (e) { rec = null; }
+  if (rec && rec.type && rec.type !== 'NPC_') {
+    return { made: 0, why: 'that record is a ' + rec.type + ', not a creature or a person' };
+  }
+  const facing = Number(where.rot && where.rot[2]) || 0;
+  let made = 0, why = '';
+  for (let s = 0; s < count; s++) {
+    // Skyrim's heading: 0 is north (+y), 90 is east (+x).
+    const ang = (facing / 180) * Math.PI + (s / Math.max(1, count)) * Math.PI * 2;
+    let ref = 0;
+    try {
+      ref = mp.place(baseId);
+      mp.set(ref, 'locationalData', {
+        cellOrWorldDesc: where.desc,
+        pos: [where.pos[0] + Math.sin(ang) * away, where.pos[1] + Math.cos(ang) * away, where.pos[2]],
+        // Turned to face the person who asked for it.
+        rot: [0, 0, (facing + 180) % 360]
+      });
+      made++;
+    } catch (e) {
+      why = String(e && e.message ? e.message : e);
+      // Placed but not moved: it would stand at the middle of Tamriel.
+      if (ref) { try { mp.destroyActor(ref); } catch (e2) { } }
+      break;
+    }
+  }
+  return { made: made, why: why };
+}
+
 function takeItem(actorId, itemDesc, count) {
   const baseId = idOf(itemDesc);
   if (!baseId) return false;
@@ -36498,48 +36543,32 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         return;
       }
 
-      // /spawn. Where they are standing, which is the only place that is
-      // certainly somewhere real.
+      // /spawn. A few steps in front of where they are standing and facing,
+      // which is certainly somewhere real, and spread round them when there
+      // are several, so three cows are three cows. placeActors (#959).
       var baseId = idOf(hit.desc);
       if (!baseId) {
         toProfile(profileId, hit.name + '\'s plugin is not in this load order.');
         return;
       }
-      var at = null, inCell = '';
+      var at = null, inCell = '', facing = null;
       try {
         at = mp.get(actorId, 'pos');
         inCell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+        facing = mp.get(actorId, 'angle');
       } catch (e) { at = null; }
       if (!at || !inCell) {
         toProfile(profileId, 'The server cannot tell where you are standing.');
         return;
       }
-      var cellId = idOf(inCell);
-      if (!cellId) {
-        toProfile(profileId, 'The server cannot place anything in this cell.');
-        return;
-      }
-      var made = 0;
-      for (var s = 0; s < count; s++) {
-        try {
-          // Spread them out a little, so three cows are three cows and not
-          // one cow with a stacking fault.
-          var ang = (s / Math.max(1, count)) * Math.PI * 2;
-          var away = count > 1 ? 120 : 0;
-          mp.createActor(baseId,
-            [at[0] + Math.cos(ang) * away, at[1] + Math.sin(ang) * away, at[2]],
-            0, cellId);
-          made++;
-        } catch (e) {
-          log('/spawn failed on', hit.name + ':', e);
-          break;
-        }
-      }
+      var put = placeActors(baseId, { desc: inCell, pos: at, rot: facing || [0, 0, 0] }, count, 150);
+      var made = put.made;
       if (!made) {
-        toProfile(profileId, 'Nothing was spawned. The server log says why.');
+        log('/spawn failed on', hit.name + ':', put.why);
+        toProfile(profileId, 'Nothing was spawned: ' + (put.why || 'the server would not place it') + '.');
         return;
       }
-      toProfile(profileId, 'Spawned ' + made + ' ' + hit.name + '.');
+      toProfile(profileId, 'Spawned ' + made + ' ' + hit.name + (made < count ? ' of the ' + count + ' asked for: ' + put.why : '') + '.');
       log('command: /spawn', actorId.toString(16), '->', made, hit.name, hit.desc);
       return;
     }
@@ -42208,20 +42237,8 @@ mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
      mp.place(base) and then a locationalData move, because createActor's first
      argument is the id the NEW actor gets, not the record to make it from. */
   function spawnBeside(baseId, where, count) {
-    var made = 0, why = '';
-    for (var s = 0; s < count; s++) {
-      var ang = (s / Math.max(1, count)) * Math.PI * 2;
-      try {
-        var ref = mp.place(baseId);
-        mp.set(ref, 'locationalData', {
-          cellOrWorldDesc: where.desc,
-          pos: [where.pos[0] + Math.cos(ang) * SPAWN_AWAY, where.pos[1] + Math.sin(ang) * SPAWN_AWAY, where.pos[2]],
-          rot: [0, 0, where.rot[2] || 0]
-        });
-        made++;
-      } catch (e) { why = String(e && e.message ? e.message : e); break; }
-    }
-    return { made: made, why: why };
+    // The one placing /spawn uses too, so a fix to it reaches both (#959).
+    return placeActors(baseId, where, count, SPAWN_AWAY);
   }
 
   function doAimed(a, pid, actorId, me, look) {
