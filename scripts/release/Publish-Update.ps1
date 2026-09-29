@@ -1292,8 +1292,10 @@ foreach ($k in @($gone.Keys)) { $now[':gone:' + $k] = [string]$gone[$k] }
 # Creation Kit, a copy of one of the game's programs, the game itself, or a
 # backup. The scan leaves them out through Test-Machine; this stops the release
 # if a later change ever puts one back, before anything is sent to the site.
+# Bethesda's is Test-ShipBethesda, the question Check-Secrets asks, so
+# MarketplaceTextures.bsa is caught here too (#1229).
 $bethesdaInRecord = @(@($now.Keys) | ForEach-Object { if ($_.StartsWith(':gone:')) { $_.Substring(6) } elseif (-not $_.StartsWith(':')) { $_ } } |
-                      Where-Object { $_ -and ((Test-ShipBethesdaTool $_) -or (Test-ShipBackup $_) -or (Test-ShipVanilla $_)) })
+                      Where-Object { $_ -and ((Test-ShipBethesda $_) -or (Test-ShipBackup $_)) })
 if ($bethesdaInRecord.Count) {
     Die ("The record of this release names {0} of Bethesda's files or backups, which Thornswood never hands out: {1}. Nothing was sent." -f
          $bethesdaInRecord.Count, (($bethesdaInRecord | Select-Object -First 5) -join ', '))

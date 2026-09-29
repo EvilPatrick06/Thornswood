@@ -303,8 +303,9 @@ function Test-ShipPath([string]$where, [string]$key, [string]$inner, $source) {
     }
     # Bethesda's game, its Creation Kit or a copy of one of its programs, and
     # backups (#1152): named apart from the machine's own files, because they
-    # are never ours to give.
-    if ((Test-ShipBethesdaTool $rel) -or (Test-ShipVanilla $rel) -or (Test-ShipBethesdaLeftAlone $rel)) { Write-Hit $where $key '0' 'never-ship-bethesda' $false; return }
+    # are never ours to give. The same question the record guard and the
+    # rollback filter ask (Test-ShipBethesda, #1229).
+    if (Test-ShipBethesda $rel) { Write-Hit $where $key '0' 'never-ship-bethesda' $false; return }
     if (Test-ShipBackup $rel) { Write-Hit $where $key '0' 'never-ship-backup' $false; return }
     if (Test-ShipMachine $rel) { Write-Hit $where $key '0' 'never-ship-machine' $false; return }
     if ($rel -like '*.log') { Write-Hit $where $key '0' 'never-ship-log' $false }
