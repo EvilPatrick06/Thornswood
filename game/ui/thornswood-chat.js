@@ -175,6 +175,20 @@
       // Anything that is not chat belongs to whoever else is on this socket.
       if (msg.t !== 'chat') { fanout(msg); return; }
 
+      /*
+        The line at the menu (#481): the game server's word on this person's
+        place, or that it is their turn, as data. Only the service itself
+        sends from 0, and only the gamemode names a line 'Thornswood line',
+        so no person can send one. Handed to the character choice page as
+        { t: 'line', ... } and never drawn in the chat.
+      */
+      if (!Number(msg.from) && !Number(msg.profileId) && msg.name === 'Thornswood line') {
+        var said = null;
+        try { said = JSON.parse(String(msg.text || '')); } catch (e) { said = null; }
+        if (said && typeof said === 'object') { said.t = 'line'; fanout(said); }
+        return;
+      }
+
       // And from here down it is chat, which the line above already settled.
       // There was a second `if (msg.t === 'chat')` wrapped round all of this,
       // which could never be false.

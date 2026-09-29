@@ -153,6 +153,13 @@
     '#ts-select .foot{padding:16px 44px 30px}',
     '#ts-select .status{font-size:15px;color:rgba(228,217,191,.7);min-height:1.5em;margin-bottom:12px;text-align:center}',
     '#ts-select .hint{font-size:13px;color:rgba(228,217,191,.45);margin-top:4px;text-align:center;letter-spacing:.06em}',
+    // The line at the menu while the world is full (#481): the place, big, in
+    // place of the slots, which cannot be played until it is their turn.
+    '#ts-select .line{display:none;text-align:center;padding:34px 44px 10px}',
+    '#ts-select .line .place{font-size:40px;color:#f6e9c8;line-height:1.15}',
+    '#ts-select .line .why{font-size:16px;line-height:1.55;color:rgba(228,217,191,.72);margin:14px auto 0;max-width:680px}',
+    '#ts-select.waiting .line{display:block}',
+    '#ts-select.waiting .list,#ts-select.waiting .hint{display:none}',
     // Well below the hint and centred, so it is nowhere near the characters.
     '#ts-select .quitrow{display:flex;justify-content:center;margin-top:18px}',
     '#ts-select .quit{opacity:.72}',
@@ -249,6 +256,7 @@
       '<div class="head"><div><div class="eyebrow">Thornswood</div><div class="title">Who are you today?</div></div>' +
       '<div class="count"></div></div>' +
       '<div class="list"></div>' +
+      '<div class="line"><div class="place"></div><div class="why"></div></div>' +
       '<div class="foot"><div class="status"></div>' +
       '<div class="hint">Click a character to play. Click an empty slot for a new character. Delete forgets the one that is lit.</div>' +
       /*
@@ -727,13 +735,99 @@
     (SkyrimPlatform loads the page at start and its plugins fifteen seconds
     later), so a pick made in that gap would otherwise be lost. The client
     ignores the repeats once it has one.
+
+    BUT FIRST THE FRONT ASKS WHETHER THERE IS A SEAT (#481). Patrick, 29 Sep:
+    a full world lets people into the menu, where "they sit there until a
+    slot is free and it's their turn to join". So the pick goes to the front
+    as 'select:want <id>' until it answers: go() when a seat is free, and the
+    pick goes to the client as it always did; or line() when the world is
+    full, and this page shows the place in line the game server gives it
+    over the chat's relay, and goes by itself when the server says it is
+    their turn. The order is the server's: nothing here can move a place.
   */
   var acked = false;
   var picked = 0;
+  var cleared = false;   // the front or the server said go: the pick goes to the client
+  var waiting = false;   // waiting in line at the menu
+  var joinWords = '';
   function sendPick() {
     if (!picked || acked) return;
-    try { window.skyrimPlatform.sendMessage('thornswood', 'select', picked); } catch (err) { }
     if (introSay) tell(introSay);
+    if (!cleared) { tell('want ' + picked); return; }
+    try { window.skyrimPlatform.sendMessage('thornswood', 'select', picked); } catch (err) { }
+  }
+
+  /* 1st, 2nd, 3rd, 4th, 11th, 21st. */
+  function ordinal(n) {
+    var h = n % 100;
+    if (h >= 11 && h <= 13) return n + 'th';
+    var t = n % 10;
+    return n + (t === 1 ? 'st' : t === 2 ? 'nd' : t === 3 ? 'rd' : 'th');
+  }
+  var elPlace = root.querySelector('.line .place');
+  var elWhy = root.querySelector('.line .why');
+  var elTitle = root.querySelector('.title');
+  var KEEP_OPEN = 'Keep the game open: you will join by yourself when a seat frees and it is your turn. ' +
+                  'Closing the game gives up your place.';
+  /* What the line says, from the front (finding, launcher) or the server (place, pass). */
+  function lineSays(what) {
+    what = what || {};
+    if (!waiting) {
+      waiting = true;
+      sent = true;
+      root.className = 'waiting';
+      if (elTitle) elTitle.textContent = 'The world is full';
+      elStatus.textContent = '';
+      tell('line shown');
+    }
+    if (Number(what.id) > 0 && !picked) picked = Number(what.id);
+    if (Number(what.place) > 0) {
+      elPlace.textContent = 'You are ' + ordinal(Number(what.place)) + ' in line';
+      elWhy.textContent = (Number(what.of) > 1 ? Number(what.of) + ' people are waiting. ' : '') + KEEP_OPEN;
+    } else if (what.pass) {
+      elPlace.textContent = 'Waiting for your place in line';
+      elWhy.textContent = 'The launcher is still vouching for this character. Keep the launcher and the game open.';
+    } else if (what.phase === 'launcher') {
+      elPlace.textContent = 'Waiting for your place in line';
+      elWhy.textContent = 'Waiting for the launcher to get this character ready. Keep the launcher and the game open.';
+    } else if (!elPlace.textContent) {
+      elPlace.textContent = 'Finding your place in line';
+      elWhy.textContent = KEEP_OPEN;
+    }
+  }
+  /* The server's word, over the relay: a place, or that it is their turn. */
+  function onRelay(msg) {
+    if (!msg || msg.t !== 'line' || !waiting || cleared) return;
+    if (msg.go) { tell('line: our turn'); go(); return; }
+    lineSays(msg);
+  }
+  var hooked = false;
+  setInterval(function () {
+    if (hooked || !waiting) return;
+    if (window.thornswoodNet && window.thornswoodNet.on) {
+      hooked = true;
+      window.thornswoodNet.on(onRelay);
+    }
+  }, 500);
+  /* A seat: the pick goes to the client, and the world loads. */
+  function go() {
+    if (cleared || !picked) return;
+    cleared = true;
+    if (waiting) {
+      waiting = false;
+      root.className = '';
+      if (elTitle) elTitle.textContent = 'Who are you today?';
+      joinWords = 'A seat is free. ' + (joinWords || 'Joining. The world is loading.');
+    }
+    elStatus.textContent = joinWords || 'Joining. The world is loading.';
+    draw();
+    sendPick();
+    // Said again until the front hears it, as play() does; a page the front
+    // reloaded while it waited has no play() running.
+    var again = setInterval(function () {
+      if (acked) { clearInterval(again); return; }
+      sendPick();
+    }, 2000);
   }
   function play() {
     if (sent) return;
@@ -749,12 +843,16 @@
     }
     sent = true;
     picked = e.id;
-    elStatus.textContent = e.c && !e.c.gone ? 'Joining as ' + (e.c.name || 'your character') + '. The world is loading.' : 'Off to the creation hall. The world is loading.';
+    joinWords = e.c && !e.c.gone ? 'Joining as ' + (e.c.name || 'your character') + '. The world is loading.' : 'Off to the creation hall. The world is loading.';
+    elStatus.textContent = 'Checking for a seat.';
     draw();
     sendPick();
     tell('picked');
+    // Until the front answers, and then until the client has the pick. Not
+    // while waiting in line: the front has the pick and the server the turn.
     var again = setInterval(function () {
       if (acked) { clearInterval(again); return; }
+      if (waiting && !cleared) return;
       sendPick();
     }, 2000);
   }
@@ -900,7 +998,9 @@
   // the same ten seconds now, until a character is picked.
   var beats = 0;
   var beat = setInterval(function () {
-    if (sent || root.className === 'gone') { clearInterval(beat); return; }
+    // Until the pick is taken, not until it is made: a person waiting in line
+    // at the menu (#481) sits on this page for as long as the line takes.
+    if (acked || root.className === 'gone') { clearInterval(beat); return; }
     tell('alive ' + seen());
     if (LIST.intro !== false && beats % 5 === 0) {
       try { window.skyrimPlatform.sendMessage('thornswood', 'stay'); } catch (e) { }
@@ -917,7 +1017,10 @@
     // The front, once a second while this page is up: whether the game is the
     // window Windows is sending the keys to. See keysCount above.
     keys: function (on) { keysHere = !!on; keysSaidAt = Date.now(); },
-    close: function () { root.className = 'gone'; }
+    close: function () { root.className = 'gone'; },
+    // The front's answer to 'select:want' (#481): a seat, or wait in line.
+    go: go,
+    line: lineSays
   };
   fit();
   draw();

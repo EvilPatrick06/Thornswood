@@ -2,26 +2,31 @@
 //
 //     node .\tests\test-seats.js
 //
-// At most 25 people in the world at once, with staff roles allowed over it
-// (#481). Patrick, 28 Sep: cap it at 25 for the alpha, raised later.
+// At most 25 people in the world at once, 5 staff seats over it that only the
+// Discord staff roles may take, and a line at the game's menu past that
+// (#481). Patrick, 28 Sep: cap it at 25 for the alpha. 29 Sep: "5 staff seats
+// for now and only allow those seats to be filled by the discord roles, we
+// need a queue system as well that lets them in the main menu if full but
+// they sit there until a slot is free and it's their turn to join", and "I
+// still want it to say N of 25 anyway".
 //
 // THE GAME SERVER. The seats block is lifted out of game\gamemode.js between
 // its markers and run in a vm with a stand-in mp and its own clock, the way
-// test-join-pass-game.js runs the join pass block. Twenty six people join:
-// the first twenty five are seated and the twenty sixth is told a plain line,
-// named in the log as "door: full", and ended. A staff role with a join pass
-// on hand is seated over the number; one with no pass is given a minute to
-// show one and then refused. Nobody already in the world is ever ended by a
-// hot reload.
+// test-join-pass-game.js runs the join pass block. The line: the 26th and
+// 27th wait in order, a seat frees and the first in line is told to come in
+// and is seated, one who goes quiet is dropped after the grace, a staff role
+// skips the line, and nothing a client sends moves it forward. The staff
+// seats: only the Discord staff role (staffRoleProfiles), never the written
+// admin or dev lists, and 5 of them.
 //
-// THE SITE. /api/play/join is lifted out of site\server.js and run with
-// stand-ins, the way test-play-join.js runs it: with the world full it refuses
-// Play for anybody without a staff role, before the game starts, and says the
-// same sentence the game server does.
+// THE MENU. The chat's relay hands the server's line messages to the page and
+// never draws them; the page and the front plugin are checked for the steps
+// that carry the line.
 //
-// THE NUMBER. records\most-online.json is the one place it lives; this checks
-// it says 25, and that the gamemode reads thornswoodMostOnline, the key the
-// deploy scripts write (test-max-online.ps1 runs the scripts themselves).
+// THE SITE. /api/play/join no longer refuses a full world: it lets them in
+// and says there may be a wait. /api/allowed sends the staff role holders.
+// /api/public and the home page say N of 25 with or without a number from the
+// server.
 //
 // Read only. Nothing connects to anything.
 const fs = require('fs');
@@ -29,9 +34,14 @@ const path = require('path');
 const vm = require('vm');
 const CR = String.fromCharCode(13);
 const ROOT = path.join(__dirname, '..');
-const src = fs.readFileSync(path.join(ROOT, 'game', 'gamemode.js'), 'utf8').split(CR).join('');
-const site = fs.readFileSync(path.join(ROOT, 'site', 'server.js'), 'utf8').split(CR).join('');
-const onlineCs = fs.readFileSync(path.join(ROOT, 'launcher', 'app', 'Online.cs'), 'utf8').split(CR).join('');
+function read(p) { return fs.readFileSync(path.join(ROOT, p), 'utf8').split(CR).join(''); }
+const src = read('game/gamemode.js');
+const site = read('site/server.js');
+const home = read('site/public/home.html');
+const chatJs = read('game/ui/thornswood-chat.js');
+const page = read('game/ui/thornswood-select.js');
+const front = read('game/plugins/thornswood-front.js');
+const doorCs = read('launcher/app/Door.cs');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -42,11 +52,14 @@ function done() {
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 }
+const EM = String.fromCharCode(0x2014);
+const FORBIDDEN = new RegExp('pla' + 'yer', 'i');
+function clean(s) { return String(s).indexOf(EM) < 0 && !FORBIDDEN.test(String(s)); }
 
 // ------------------------------------------------------------ the number
 const record = JSON.parse(fs.readFileSync(path.join(ROOT, 'records', 'most-online.json'), 'utf8').replace(/^﻿/, ''));
 yes('records\\most-online.json says 25 people', record.people === 25);
-yes('and keeps some seats over it for staff', Number(record.staffSeats) > 0 && record.people + record.staffSeats <= 1000);
+yes('and 5 staff seats over it (Patrick, 29 Sep)', record.staffSeats === 5);
 
 // ------------------------------------------------------------ the block
 const a = src.indexOf('// ==== thornswood seats ====');
@@ -56,14 +69,30 @@ if (!(a >= 0 && b > a)) done();
 const block = src.slice(a, b);
 yes('the seats block comes after the join pass block, whose passes it reads',
     src.indexOf('// ==== end thornswood join pass ====') >= 0 && src.indexOf('// ==== end thornswood join pass ====') < a);
-yes('the chat commands block hands the seats block its staff check',
-    /g\.__thornswoodIsStaff = isStaff;/.test(src));
-yes('the online count file carries the number as max',
-    /thornswoodMostOnline\) \|\| 0/.test(src) && /restarting: restarting, max: max/.test(src));
+yes('the staff seats ask the Discord staff role (__thornswoodHoldsStaffRole) and nothing else',
+    /__thornswoodHoldsStaffRole/.test(block) &&
+    !/__thornswoodIs(Staff|Dev|Admin)|thornswoodAdmins|thornswoodDevs|isStaff\(|isDev\(|isAdmin\(/.test(
+      block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')));
+yes('the door reads staffRoleProfiles out of allowed.json and hands it on',
+    /doc\.staffRoleProfiles/.test(src) && /\.__thornswoodHoldsStaffRole = function \(profileId\)/.test(src) &&
+    /l\.staffRoleIds\[Number\(profileId\)\]/.test(src));
+yes('the door writes it into allowed.json, and keeps it for a profile Discord could not be asked about',
+    /staffRoleProfiles: Array\.isArray\(doc\.staffRoleProfiles\) \? doc\.staffRoleProfiles : \[\]/.test(src) &&
+    /staffRoleProfiles: merged\(doc\.staffRoleProfiles, had\.staffRoleProfiles\)/.test(src) &&
+    /doc\.staffRoleProfiles = kept\.staffRoleProfiles;/.test(src));
+yes('the seats block no longer borrows the chat commands staff check', !/g\.__thornswoodIsStaff = isStaff;/.test(src));
+yes('the online count file carries max, how many wait, and whether it is full',
+    /thornswoodMostOnline\) \|\| 0/.test(src) &&
+    /restarting: restarting, max: max, line: line, full: full/.test(src));
+yes('dispatch() takes /line and /line leave from the relay, with no character needed',
+    /if \(word === '\/line'\) \{[\s\S]{0,500}seatsApi\.leave\(profileId, seatsApi\.liveHow\(\)\)[\s\S]{0,200}seatsApi\.want\(profileId, Date\.now\(\), seatsApi\.liveHow\(\)\)/.test(src));
+yes('the place goes back to the menu as data under the name the page looks for',
+    /var LINE_NAME = 'Thornswood line';/.test(src) &&
+    /g\.__thornswoodSayLine = function \(profileId, what\) \{\s*post\('\/say', \{ profileId: profileId, name: LINE_NAME, text: JSON\.stringify\(what \|\| \{\}\) \}\);/.test(src));
 
 const ACTOR = 0xff000000;
 function rig(settings, keep) {
-  const r = { told: [], logged: [], kicked: [], timers: [], online: [], staff: {}, now: 1000000 };
+  const r = { told: [], lines: [], logged: [], kicked: [], timers: [], online: [], staff: {}, now: 1000000 };
   const box = keep || {};
   box.console = { log: function () { r.logged.push(Array.prototype.join.call(arguments, ' ')); } };
   box.Date = { now: function () { return r.now; } };
@@ -85,138 +114,276 @@ function rig(settings, keep) {
     kick: function (userId) { r.kicked.push(userId); }
   };
   box.__thornswoodToProfile = function (p, text) { r.told.push({ p: p, text: text }); };
-  box.__thornswoodIsStaff = function (p) { return !!r.staff[p]; };
+  box.__thornswoodSayLine = function (p, what) { r.lines.push({ p: p, what: JSON.parse(JSON.stringify(what)) }); };
+  box.__thornswoodHoldsStaffRole = function (p) { return !!r.staff[p]; };
+  // The written lists, which must NOT open a staff seat: true for everybody.
+  box.__thornswoodIsStaff = function () { return true; };
+  box.__thornswoodIsDev = function () { return true; };
+  box.__thornswoodIsAdmin = function () { return true; };
   if (!box.__thornswoodPassSeen) { box.__thornswoodPassSeen = { passes: {}, online: {}, said: {} }; }
   if (!keep) { vm.createContext(box); }
   vm.runInContext(block, box);
   r.box = box;
+  r.api = function () { return box.__thornswoodSeats; };
   r.tick = function (ms) { r.now += (ms || 2000); r.interval(); };
   r.join = function (pid) { r.online.push({ actorId: ACTOR + pid, profileId: pid }); };
   r.leave = function (pid) { r.online = r.online.filter(function (o) { return o.profileId !== pid; }); };
   r.pass = function (pid) { box.__thornswoodPassSeen.passes[pid] = { at: r.now, x: r.now + 600000, v: '1.1.102', d: '1' + pid }; };
+  r.want = function (pid) { return r.api().want(pid, r.now, r.api().liveHow()); };
+  r.quit = function (pid) { return r.api().leave(pid, r.api().liveHow()); };
   r.runTimers = function () { const t = r.timers; r.timers = []; t.forEach(function (fn) { fn(); }); };
   r.saidTo = function (pid) { return r.told.filter(function (t) { return t.p === pid; }); };
+  r.linesTo = function (pid) { return r.lines.filter(function (t) { return t.p === pid; }).map(function (t) { return t.what; }); };
+  r.lastLine = function (pid) { const l = r.linesTo(pid); return l.length ? l[l.length - 1] : null; };
   r.log = function () { return r.logged.join('\n'); };
+  r.fill = function (from, n) { for (let p = 0; p < n; p++) { r.join(from + p); } r.tick(); };
   return r;
 }
 
-const SEATS = { thornswoodMostOnline: 25, maxPlayers: 35 };
+const SEATS = { thornswoodMostOnline: 25, maxPlayers: 30 };
 let r = rig(SEATS);
-yes('it says at startup how many the world holds', /seats: at most 25 in the world at once/.test(r.log()));
+yes('it says at startup how many the world holds, the staff seats and the line',
+    /seats: at most 25 in the world at once, 5 staff seats over it for the Discord staff roles, and a line at the menu past that/.test(r.log()));
 r.tick();
-const api = r.box.__thornswoodSeats;
-yes('it hands its sweep and sentence to the rest of the file', !!(api && api.sweep && api.sentence));
+const api = r.api();
+yes('it hands its sweep, line and sentence to the rest of the file',
+    !!(api && api.sweep && api.want && api.leave && api.sentence && api.status));
+yes('the staff seats are the engine slots over the number: 30 - 25 = 5',
+    api.staffSeats(SEATS) === 5 && api.staffSeats({ thornswoodMostOnline: 25, maxPlayers: 20 }) === 0 &&
+    api.staffSeats({ maxPlayers: 30 }) === 0);
 const SENTENCE = api.sentence(25);
-yes("the sentence says the world is full and how many it holds ('" + SENTENCE + "')",
-    /full/.test(SENTENCE) && /25 people/.test(SENTENCE) && /Try again/.test(SENTENCE));
-yes('the sentence has no em dash and never the word the house rules forbid',
-    SENTENCE.indexOf(String.fromCharCode(0x2014)) < 0 && !new RegExp('pla' + 'yer', 'i').test(SENTENCE));
+yes("the sentence for somebody who came in past the line says so and says how to wait ('" + SENTENCE + "')",
+    /full/.test(SENTENCE) && /25 people/.test(SENTENCE) && /place in line/.test(SENTENCE));
+yes('the sentence has no em dash and never the word the house rules forbid', clean(SENTENCE));
+yes('the grace for a quiet place in line is short, and longer than the menu asks',
+    api.lineGrace === 45000 && api.lineEvery === 10000 && api.lineGrace > 3 * api.lineEvery);
 
-// ---- twenty six join, one at a time
+// ---- 25 seated, the 26th and 27th wait in order
 for (let p = 1; p <= 25; p++) { r.join(100 + p); r.tick(); }
 yes('the first 25 are all seated, nobody told anything', r.told.length === 0 && r.kicked.length === 0);
+yes('the world now reads full to somebody picking', api.status().full === true && api.status().line === 0);
+yes('the 26th asks from the menu and is put in line', r.want(126) === 'joined' &&
+    /line: profile 126 is waiting at the menu, 1 in line/.test(r.log()));
+r.tick(1000);
+yes('the 27th asks and is put behind', r.want(127) === 'joined');
+r.tick();
+yes('the 26th is told they are 1st in line', JSON.stringify(r.lastLine(126)) === JSON.stringify({ place: 1, of: 2 }));
+yes('the 27th is told they are 2nd', JSON.stringify(r.lastLine(127)) === JSON.stringify({ place: 2, of: 2 }));
+yes('online.json would say 2 waiting, full', api.status().line === 2 && api.status().full === true);
+const before = r.lines.length;
+r.tick();
+yes('a place that has not moved is not said again every sweep', r.lines.length === before);
+r.tick(10000); r.want(126); r.want(127); r.tick();
+yes('it is said again now and then, so a lost message is not a lost place',
+    r.linesTo(126).length >= 2 && r.lastLine(126).place === 1);
+
+// ---- a client cannot jump the line
+yes('asking again does not move anybody', r.want(127) === 'waiting' && r.want(127) === 'waiting');
+r.tick();
+yes('the 27th is still 2nd after asking again and again', r.lastLine(127).place === 2);
+r.want(128); r.tick();
+yes('a later ask goes to the back: 3rd', r.lastLine(128).place === 3);
+r.join(128); r.tick();
+yes('coming into the world past the line is refused with the sentence',
+    r.saidTo(128).length === 1 && r.saidTo(128)[0].text === SENTENCE);
+yes('and the log says door: full with the line', /door: full, refusing profile 128: 25 of 25 already in the world, 3 waiting in line/.test(r.log()));
+r.runTimers();
+yes('and that session is ended', r.kicked.indexOf(128) >= 0);
+r.leave(128); r.quit(128); r.tick();
+
+// ---- a seat frees: the first in line is told to come in and seated
+r.leave(101); r.tick();
+yes('a seat frees and the first in line is told it is their turn', !!r.lastLine(126) && r.lastLine(126).go === true &&
+    /seats: a seat is held for profile 126, first in line/.test(r.log()));
+yes('the next in line moves up to 1st', r.lastLine(127).place === 1);
+r.join(127); r.tick();
+yes('the 2nd in line cannot take the seat held for the 1st', r.saidTo(127).length === 1 &&
+    /door: full, refusing profile 127/.test(r.log()));
+r.runTimers(); r.leave(127);
+r.want(127); r.tick();
 r.join(126); r.tick();
-yes('the 26th is told the sentence', r.saidTo(126).length === 1 && r.saidTo(126)[0].text === SENTENCE);
-yes('and the log names it door: full, with the count',
-    /door: full, refusing profile 126: 25 of 25 already in the world/.test(r.log()));
-yes('the session is not ended in the same breath, so the line lands first', r.kicked.length === 0);
-r.runTimers();
-yes('then the 26th session is ended', r.kicked.length === 1 && r.kicked[0] === 126);
-r.tick();
-yes('and it is told once, not every sweep', r.saidTo(126).length === 1);
-yes('nobody else was touched', r.told.length === 1);
+yes('the 1st in line arrives and takes the seat held for them', r.saidTo(126).length === 0 &&
+    /seats: profile 126 took the seat held for them/.test(r.log()));
+yes('26 has a seat and 25 are in the world again', r.online.length === 25 && r.kicked.indexOf(126) < 0);
+yes('an ask from somebody already in the world does nothing', r.want(126) === 'in the world');
 
-// ---- 26 at once: whoever the engine lists 26th is the one refused
+// ---- a leaver is dropped after the grace
 r = rig(SEATS); r.tick();
-for (let p = 1; p <= 26; p++) { r.join(200 + p); }
-r.tick();
-yes('26 arriving in one sweep: exactly one refused, the 26th',
-    r.told.length === 1 && r.told[0].p === 226);
+r.fill(200, 25);
+r.want(226); r.tick(1000); r.want(227); r.tick(1000); r.want(228); r.tick();
+for (let s = 0; s < 5; s++) { r.tick(10000); r.want(226); r.want(228); }
+yes('somebody not heard from for the grace loses their place, and the log says why',
+    /line: profile 227 lost their place, not heard from at the menu in \d+s/.test(r.log()));
+yes('and whoever was behind them moves up', r.lastLine(228).place === 2);
+yes('a place kept by asking every ten seconds is not dropped', !/profile 226 lost their place/.test(r.log()));
+r.quit(226); r.tick();
+yes('/line leave gives the place up at once', /line: profile 226 left the line/.test(r.log()) && r.lastLine(228).place === 1);
 
-// ---- staff over the number
+// ---- a held seat nobody takes goes to the next
 r = rig(SEATS); r.tick();
-for (let p = 1; p <= 25; p++) { r.join(300 + p); }
-r.tick();
-r.staff[399] = true; r.pass(399);
-r.join(399); r.tick();
-yes('a staff role with a join pass is seated over the number', r.saidTo(399).length === 0 &&
-    /seats: profile 399 holds a staff role, seated over the number \(26 in the world, the number is 25\)/.test(r.log()));
-r.runTimers();
-yes('and stays', r.kicked.indexOf(399) < 0);
-r.join(327); r.tick();
-yes('the next person without a staff role is still refused', r.saidTo(327).length === 1 &&
-    /door: full, refusing profile 327: 26 of 25/.test(r.log()));
-
-// A staff role with no pass yet is given a minute to show one.
-r.staff[398] = true;
-r.join(398); r.tick();
-yes('a staff role with no pass yet is not refused at once', r.saidTo(398).length === 0);
-r.tick(30000);
-r.pass(398); r.tick();
-yes('and is seated once the pass comes in', r.saidTo(398).length === 0 &&
-    /profile 398 holds a staff role, seated over the number/.test(r.log()));
-// One that never shows a pass is refused after the minute.
-r.staff[397] = true;
-r.join(397); r.tick();
-r.tick(api.staffWait + 1000);
-yes('a staff role that never shows a pass is refused after the wait, and the log says why',
-    r.saidTo(397).length === 1 &&
-    /door: full, refusing profile 397: .* \(a staff role, but no join pass was shown\)/.test(r.log()));
-yes('an expired pass does not count', (function () {
-  const q = rig(SEATS); q.tick();
-  for (let p = 1; p <= 25; p++) { q.join(400 + p); }
-  q.tick();
-  q.staff[499] = true;
-  q.box.__thornswoodPassSeen.passes[499] = { at: q.now - 700000, x: q.now - 100000 };
-  q.join(499); q.tick(); q.tick(api.staffWait + 1000);
-  return q.saidTo(499).length === 1;
+r.fill(300, 25);
+r.want(326); r.tick(1000); r.want(327); r.tick();
+r.leave(300); r.tick();
+yes('the seat is held for the first', r.lastLine(326).go === true);
+for (let s = 0; s < 13; s++) { r.tick(10000); r.want(327); }
+yes('held for two minutes and not taken, it goes to the next in line',
+    /the seat held for profile 326 went unused for 120s/.test(r.log()) && r.lastLine(327).go === true);
+yes('somebody whose seat is held is told again when they ask', (function () {
+  const n = r.linesTo(327).length; r.want(327); return r.linesTo(327).length === n + 1 && r.lastLine(327).go === true;
 })());
 
-// ---- a seat frees up
+// ---- staff skip the line, and only the Discord staff role, 5 of them
 r = rig(SEATS); r.tick();
-for (let p = 1; p <= 25; p++) { r.join(500 + p); }
+r.fill(400, 25);
+r.want(426); r.tick(1000); r.want(427); r.tick();
+r.staff[499] = true; r.pass(499);
+r.want(499); r.tick();
+yes('a staff role with a pass skips the line into a staff seat', r.lastLine(499).go === true &&
+    /seats: a seat is held for profile 499, a staff role, ahead of the line/.test(r.log()));
+yes('and nobody in line moves back for it', r.lastLine(426).place === 1 && r.lastLine(427).place === 2);
+r.join(499); r.tick();
+yes('the staff role arrives and is seated', r.saidTo(499).length === 0 && /profile 499 took the seat held/.test(r.log()));
+for (let k = 0; k < 4; k++) { r.staff[480 + k] = true; r.pass(480 + k); r.join(480 + k); }
 r.tick();
-r.join(526); r.tick();
-yes('full: the 26th is refused', r.saidTo(526).length === 1);
-r.leave(526); r.leave(501); r.tick();
-r.join(526); r.tick();
-yes('once somebody leaves, the one refused comes back and is seated', r.saidTo(526).length === 1);
-r.join(527); r.tick();
-yes('and the next after that is refused again', r.saidTo(527).length === 1);
+yes('four more staff roles arriving directly take the other staff seats', r.told.length === 0 &&
+    /profile 483 holds a staff role, seated in a staff seat \(30 in the world, the number is 25\)/.test(r.log()));
+r.staff[485] = true; r.pass(485); r.join(485); r.tick();
+yes('a sixth staff role finds every staff seat taken', r.saidTo(485).length === 1 &&
+    /door: full, refusing profile 485: .* \(a staff role, but every staff seat is taken\)/.test(r.log()));
+r.want(426); r.want(427);
+r.leave(480); r.tick();
+yes('a staff member leaving frees a staff seat, not one of the 25: the line waits', r.lastLine(426).go !== true);
+r.leave(401); r.tick();
+yes('one of the 25 leaving lets the first in line in', r.lastLine(426).go === true);
 
-// ---- a hot reload ends nobody
+// The written admin and dev lists open nothing.
+r = rig(Object.assign({ thornswoodAdmins: [599], thornswoodDevs: [598] }, SEATS)); r.tick();
+r.fill(500, 25);
+r.pass(599); r.pass(598);
+r.want(599); r.tick(1000); r.want(598); r.tick();
+yes('an admin or dev list profile with a pass but no Discord staff role waits in line like anybody',
+    r.lastLine(599).place === 1 && r.lastLine(598).place === 2);
+r.pass(597); r.join(597); r.tick();
+yes('and arriving directly is refused, not seated in a staff seat', r.saidTo(597).length === 1);
+
+// Staff in the world count into the staff seats first.
 r = rig(SEATS); r.tick();
-for (let p = 1; p <= 25; p++) { r.join(600 + p); }
-r.staff[699] = true; r.pass(699); r.join(699);
+for (let k = 0; k < 5; k++) { r.staff[600 + k] = true; }
+r.fill(600, 25);
+r.want(650); r.tick();
+yes('with 5 staff among 25 in the world, 5 of the 25 are still free for anybody',
+    r.lastLine(650).go === true && r.api().status().full === false);
+
+// A staff role still waiting on its pass gets the minute (#937).
+r = rig(SEATS); r.tick();
+r.fill(700, 25);
+r.staff[798] = true; r.join(798); r.tick();
+yes('a staff role arriving with no pass yet is not refused at once', r.saidTo(798).length === 0);
+r.tick(30000); r.pass(798); r.tick();
+yes('and is seated once the pass comes in', r.saidTo(798).length === 0 && /profile 798 holds a staff role, seated in a staff seat/.test(r.log()));
+r.staff[797] = true; r.join(797); r.tick(); r.tick(r.api().staffWait + 1000);
+yes('one that never shows a pass is refused after the wait, and the log says why',
+    r.saidTo(797).length === 1 && /refusing profile 797: .* \(a staff role, but no join pass was shown\)/.test(r.log()));
+
+// With a pass required, nobody waits without one.
+r = rig(Object.assign({ thornswoodRequirePass: true }, SEATS)); r.tick();
+r.fill(800, 25);
+yes('with thornswoodRequirePass on, an ask with no pass is not placed', r.want(826) === 'no pass' &&
+    r.lastLine(826).pass === true && r.api().status().line === 0);
+r.pass(826);
+yes('and with the pass it is', r.want(826) === 'joined');
+
+// ---- the seats as before
+r = rig(SEATS); r.tick();
+for (let p = 1; p <= 26; p++) { r.join(900 + p); }
 r.tick();
-const kept = r.box;
-const r2 = rig(SEATS, kept);
-r2.online = r.online.slice();
+yes('26 arriving in one sweep with nobody waiting: exactly the 26th refused', r.told.length === 1 && r.told[0].p === 926);
+r.leave(926); r.leave(901); r.tick();
+r.join(926); r.tick();
+yes('once somebody leaves and nobody waits, a person coming back straight in is seated', r.saidTo(926).length === 1);
+
+// ---- a hot reload keeps the seats and the line
+r = rig(SEATS); r.tick();
+r.fill(1000, 25);
+r.want(1026); r.tick(1000); r.want(1027); r.tick();
+const r2 = rig(SEATS, r.box);
+r2.online = r.online.slice(); r2.now = r.now;
 r2.tick();
 yes('after a hot reload everybody in the world keeps their seat', r2.told.length === 0);
-r2.join(626); r2.tick();
-yes('and the next arrival is still judged against the number', r2.saidTo(626).length === 1);
+r2.tick(10000); r2.want(1027); r2.want(1026); r2.tick();
+yes('and the line keeps its order', r2.lastLine(1026).place === 1 && r2.lastLine(1027).place === 2);
 
 // ---- already over the number when the server starts judging
 r = rig(SEATS);
-for (let p = 1; p <= 30; p++) { r.join(700 + p); }
+for (let p = 1; p <= 30; p++) { r.join(1100 + p); }
 r.tick();
 yes('30 already in the world when this starts: all keep their seats', r.told.length === 0 &&
     /30 already in the world keep their seats/.test(r.log()));
-r.join(731); r.tick();
-yes('the 31st is refused', r.saidTo(731).length === 1);
 
-// ---- no number, no limit
+// ---- no number, no limit, no line
 r = rig({ maxPlayers: 100 });
 yes('with no thornswoodMostOnline it says nobody is turned away for numbers',
     /no thornswoodMostOnline in server-settings.json, so nobody is turned away for numbers/.test(r.log()));
 r.tick();
-for (let p = 1; p <= 40; p++) { r.join(800 + p); }
+for (let p = 1; p <= 40; p++) { r.join(1200 + p); }
 r.tick();
 yes('and 40 join with nobody refused', r.told.length === 0 && r.kicked.length === 0);
-yes('a number that is not a whole number is no number', rig({ thornswoodMostOnline: '25x' }).box.__thornswoodSeats.cap() === 0 &&
-    rig({ thornswoodMostOnline: 2.5 }).box.__thornswoodSeats.cap() === 0 &&
-    rig({ thornswoodMostOnline: 25 }).box.__thornswoodSeats.cap() === 25);
+r.want(1299); r.tick();
+yes('and an ask from the menu is let straight in', r.lastLine(1299).go === true && r.api().status().full === false);
+yes('a number that is not a whole number is no number', rig({ thornswoodMostOnline: '25x' }).api().cap() === 0 &&
+    rig({ thornswoodMostOnline: 2.5 }).api().cap() === 0 && rig({ thornswoodMostOnline: 25 }).api().cap() === 25);
+
+// ------------------------------------------------------------ the relay, the page, the front
+(function () {
+  const got = [];
+  const drawn = [];
+  let sock = null;
+  const win = {
+    THORNSWOOD: { host: 'h', port: 1, profileId: 5, token: 't' },
+    thornswoodChat: { add: function (parts) { drawn.push(parts); } },
+    skyrimPlatform: { sendMessage: function () { } }
+  };
+  const box = { window: win, console: console, JSON: JSON, Number: Number, String: String, Math: Math, Date: Date,
+                setTimeout: function () { return 0; }, setInterval: function () { return 0; }, clearTimeout: function () { },
+                WebSocket: function () { sock = this; this.readyState = 1; this.send = function () { }; } };
+  vm.createContext(box);
+  vm.runInContext(chatJs, box);
+  win.thornswoodNet.on(function (m) { got.push(m); });
+  sock.onopen();
+  sock.onmessage({ data: JSON.stringify({ t: 'welcome', peer: 3 }) });
+  drawn.length = 0;
+  sock.onmessage({ data: JSON.stringify({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood line', text: '{"place":3,"of":5}' }) });
+  const line = got.filter(function (m) { return m.t === 'line'; });
+  yes('the chat relay hands the server line message to the page as { t: line, place }',
+      line.length === 1 && line[0].place === 3 && line[0].of === 5);
+  yes('and never draws it in the chat', drawn.length === 0);
+  sock.onmessage({ data: JSON.stringify({ t: 'chat', from: 7, profileId: 44, name: 'Thornswood line', text: '{"go":true}' }) });
+  yes('a person naming themselves Thornswood line is ordinary chat, never a turn',
+      got.filter(function (m) { return m.t === 'line'; }).length === 1 && drawn.length === 1);
+})();
+yes('the page asks the front for a seat instead of going straight to the client',
+    /if \(!cleared\) \{ tell\('want ' \+ picked\); return; \}/.test(page));
+yes('the page shows "You are 3rd in line" from the server place',
+    /'You are ' \+ ordinal\(Number\(what\.place\)\) \+ ' in line'/.test(page) &&
+    /return n \+ \(t === 1 \? 'st' : t === 2 \? 'nd' : t === 3 \? 'rd' : 'th'\);/.test(page));
+yes('the page goes by itself when the server says it is their turn',
+    /if \(msg\.go\) \{ tell\('line: our turn'\); go\(\); return; \}/.test(page) && /go: go,\s*line: lineSays/.test(page));
+yes('the page keeps its beat while it waits, so the front does not reload it',
+    /if \(acked \|\| root\.className === 'gone'\) \{ clearInterval\(beat\); return; \}/.test(page));
+yes('the front answers select:want by asking online.json, and waits in line only when it says full',
+    /if \(what\.indexOf\('select:want '\) === 0\)/.test(front) &&
+    /lineClient\(\)\.get\('\/online\.json'|lineHttp\.get\('\/online\.json'/.test(front) &&
+    /if \(o && o\.full === true\) \{ lineStart\(id, o\); return; \}/.test(front));
+yes('the front asks the server the page belongs to: 3000 for main, the port plus one for dev',
+    /p === 7777 \? 3000 : p \+ 1/.test(front));
+yes('the front joins the relay only with this character own voice token',
+    /\(Number\(String\(tok\)\.split\('\.'\)\[1\]\) \|\| 0\) !== lineId/.test(front));
+yes('the front says /line every ten seconds, sends the pass, and tells the client to stay',
+    /const LINE_EVERY_MS = 10000;/.test(front) && /thornswoodNet\.say\("\/line",true\)/.test(front) &&
+    /'\/joinpass ' \+ pass/.test(front) && /sendMessage\("thornswood","stay"\)/.test(front));
+yes('closing the game from the page gives the place up', /log\('menu: closing the game, asked from the character choice page'\);[\s\S]{0,80}try \{ lineLeave\(\); \} catch \(e\) \{ \}/.test(front));
+yes('the words on the page have no em dash and never the forbidden word',
+    clean((page.match(/KEEP_OPEN = [\s\S]*?;\n/) || [''])[0]) && clean((page.match(/function lineSays[\s\S]*?\n  \}\n/) || [''])[0]));
 
 // ------------------------------------------------------------ the site
 function grabFn(name) {
@@ -230,19 +397,49 @@ function grabFn(name) {
   }
   return '';
 }
-const seatsFullSrc = grabFn('seatsFull');
-const worldFullSrc = grabFn('worldFull');
-yes('server.js has seatsFull and worldFull', !!seatsFullSrc && !!worldFullSrc);
-const seatsFull = new Function(seatsFullSrc + '\nreturn seatsFull;')();
-const worldFull = new Function(worldFullSrc + '\nreturn worldFull;')();
+const seatsFull = new Function(grabFn('seatsFull') + '\nreturn seatsFull;')();
+const worldFull = new Function(grabFn('worldFull') + '\nreturn worldFull;')();
+const holdsStaffRole = new Function('cfg', grabFn('holdsStaffRole') + '\nreturn holdsStaffRole;')(
+  { access: { admin: ['Owner', 'Dev'], dev: ['Owner', 'Dev', 'Gamemaster', 'Moderator', 'Loremaster'] } });
 yes('full at 25 of 25', seatsFull({ up: true, online: 25, max: 25 }) === true);
+yes('full when the server says so (a line, or seats held for it)', seatsFull({ up: true, online: 24, max: 25, full: true }) === true);
 yes('not full at 24 of 25', seatsFull({ up: true, online: 24, max: 25 }) === false);
 yes('not full with no number', seatsFull({ up: true, online: 60, max: 0 }) === false);
-yes('not full while the server is down', seatsFull({ up: false, online: 25, max: 25 }) === false);
-yes('the site says the same sentence the game server does', worldFull(25) === SENTENCE);
-yes('the count poll reads max out of online.json', /o\.max > 0\) max = o\.max/.test(site) &&
-    /max: up \? max : 0/.test(site));
-yes('the public status carries max', /status: \{ up: gameStatus\.up, online: gameStatus\.online, max: gameStatus\.max \}/.test(site));
+yes('not full while the server is down', seatsFull({ up: false, online: 25, max: 25, full: true }) === false);
+yes("the site's sentence says there may be a wait at the menu, not no ('" + worldFull(25) + "')",
+    /25 people/.test(worldFull(25)) && /place in line/.test(worldFull(25)) && !/Try again/.test(worldFull(25)) && clean(worldFull(25)));
+yes('a staff role is a staff role: Moderator yes, Owner yes', holdsStaffRole(['Moderator']) && holdsStaffRole(['Owner']));
+yes('a playtester or nothing is not', !holdsStaffRole(['Playtester', 'Content Creator']) && !holdsStaffRole([]) && !holdsStaffRole(null));
+yes('standing() sets staffRole from the roles in both of its paths, the hand written admins path too',
+    (site.match(/out\.staffRole = holdsStaffRole\(out\.roles\);/g) || []).length === 2);
+yes('/api/allowed sends staffRoleProfiles from staffRole, and a ban takes a profile off it',
+    /if \(st\.staffRole\) \{\s*for \(const n of profiles\) if \(!seenStaffRole\.has\(n\)\) \{ seenStaffRole\.add\(n\); out\.staffRoleProfiles\.push\(n\); \}/.test(site) &&
+    /\['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'staffRoleProfiles', 'failedProfiles'\]/.test(site));
+yes('the count poll reads max, line and full out of online.json',
+    /o\.max > 0\) max = o\.max/.test(site) && /o\.line > 0\) line = o\.line/.test(site) && /o\.full === true\) full = true/.test(site));
+yes('/api/public carries max from the server, or else from the record, and the line',
+    /max: gameStatus\.max \|\| mostOnlineFallback\(\),\s*line: gameStatus\.line, full: seatsFull\(gameStatus\)/.test(site));
+
+// The fallback number: records\most-online.json, then the main feed's maxOnline.
+(function () {
+  const tmp = fs.mkdtempSync(path.join(require('os').tmpdir(), 'seats-'));
+  try {
+    const siteDir = path.join(tmp, 'site');
+    fs.mkdirSync(path.join(siteDir, 'feed'), { recursive: true });
+    const make = function () {
+      return new Function('fs', 'path', 'ROOT',
+        'const MOST_ONLINE_RECORD = path.join(ROOT, "..", "records", "most-online.json");\n' +
+        'let mostOnlineSeen = { file: "", mtime: -1, size: -1, v: 0 };\n' +
+        grabFn('mostOnlineFallback') + '\nreturn mostOnlineFallback;')(fs, path, siteDir);
+    };
+    yes('no record and no feed: no number', make()() === 0);
+    fs.writeFileSync(path.join(siteDir, 'feed', 'version.json'), JSON.stringify({ launcherVersion: '1', maxOnline: 25 }));
+    yes('on the VPS (no records folder) it is the feed maxOnline: 25, which is what live serves today', make()() === 25);
+    fs.mkdirSync(path.join(tmp, 'records'));
+    fs.writeFileSync(path.join(tmp, 'records', 'most-online.json'), '﻿' + JSON.stringify({ people: 30, staffSeats: 5 }));
+    yes('run from the repository it is records\\most-online.json itself', make()() === 30);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+})();
 
 const HEAD = "  if (p === '/api/play/join' && req.method === 'POST') {";
 const from = site.indexOf(HEAD);
@@ -251,10 +448,8 @@ let route = (from >= 0 && next > from) ? site.slice(from, next) : '';
 if (route) route = route.slice(0, route.lastIndexOf('/*'));
 yes('the check in route is in server.js where this expects it', !!route);
 if (!route) done();
-const fullAt = route.indexOf('seatsFull(gameStatus)');
-yes('the full check comes after the ban, role and dev checks, and before anything is written',
-    fullAt > route.indexOf("why:'banned'") && fullAt > route.indexOf("why:'role'") &&
-    fullAt > route.indexOf("why:'dev'") && fullAt < route.indexOf('putJson('));
+yes('the route no longer refuses anybody for numbers', route.indexOf("why:'full'") < 0);
+yes('the launcher logs a yes that carries a message', /if \(st\.Message != null && st\.Message\.Length > 0\) log\(st\.Message\);/.test(doorCs));
 
 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
 async function join(standing, status, channel) {
@@ -265,7 +460,7 @@ async function join(standing, status, channel) {
     readTicket: function (s) { return s ? { d: String(s), n: 'name' } : null; },
     standing: async function () {
       return Object.assign({ id: 'D1', name: 'name', inGuild: true, banned: false, play: true,
-                             dev: false, admin: false, roles: ['Playtester'] }, standing || {});
+                             dev: false, admin: false, staffRole: false, roles: ['Playtester'] }, standing || {});
     },
     standCache: new Map(),
     cfg: { discord: { invite: '' }, access: { dev: ['Owner', 'Dev'] } },
@@ -273,7 +468,7 @@ async function join(standing, status, channel) {
     notAcceptedYet: function () { return 'not yet'; },
     accountBanned: function () { return 'banned'; },
     gameStatus: status, seatsFull: seatsFull, worldFull: worldFull,
-    // Past the full check the route links the id; these only have to not throw.
+    mostOnlineFallback: function () { return 25; },
     departed: async function () { return new Set(); },
     jsonFile: function (f, fallback) { return f === 'linked.json' ? {} : fallback; },
     putJson: function () { },
@@ -290,25 +485,52 @@ async function join(standing, status, channel) {
 }
 
 (async function () {
-  const FULL = { up: true, online: 25, max: 25 };
+  const FULL = { up: true, online: 25, max: 25, line: 3, full: true };
   let got = await join({}, FULL);
-  yes('world full: a person with no staff role is refused Play with why full',
-      !!got.obj && got.code === 403 && got.obj.why === 'full');
-  yes('and told the plain sentence, before the game starts', !!got.obj && got.obj.message === SENTENCE);
-  yes('with the count, for the launcher to show', !!got.obj && got.obj.online === 25 && got.obj.max === 25);
-  got = await join({ dev: true }, FULL);
-  yes('a staff role is let through when the world is full', !!got.obj && got.obj.why !== 'full' && !got.threw);
-  got = await join({ admin: true }, FULL);
-  yes('so is an admin', !!got.obj && got.obj.why !== 'full' && !got.threw);
+  yes('world full: a person with no staff role is let in, not refused', !!got.obj && got.code === 200 && got.obj.ok === true);
+  yes('with wait and the sentence saying there may be a wait', !!got.obj && got.obj.wait === true && got.obj.message === worldFull(25));
+  yes('and the count and the line', !!got.obj && got.obj.online === 25 && got.obj.max === 25 && got.obj.line === 3);
+  got = await join({ staffRole: true, dev: true }, FULL);
+  yes('a Discord staff role is not told to wait: a staff seat is theirs', !!got.obj && got.obj.ok === true && got.obj.wait === false && got.obj.message === '');
+  got = await join({ admin: true, dev: true, staffRole: false }, FULL);
+  yes('the hand written admins list is told to wait like anybody (it is not a role)', !!got.obj && got.obj.wait === true);
   got = await join({}, { up: true, online: 24, max: 25 });
-  yes('24 of 25: let through', !!got.obj && got.obj.why !== 'full' && !got.threw);
+  yes('24 of 25: in, no wait', !!got.obj && got.obj.ok === true && got.obj.wait === false);
   got = await join({}, { up: false, online: 0, max: 0 });
-  yes('server down: not refused for numbers', !!got.obj && got.obj.why !== 'full' && !got.threw);
-  got = await join({ dev: true }, FULL, 'dev');
-  yes('the dev build (staff only) is never refused for numbers', !!got.obj && got.obj.why !== 'full' && !got.threw);
+  yes('server down: in, no wait, and the number from the record', !!got.obj && got.obj.ok === true && got.obj.wait === false && got.obj.max === 25);
+  got = await join({ dev: true, staffRole: true }, FULL, 'dev');
+  yes('the dev build (staff only) never waits', !!got.obj && got.obj.ok === true && got.obj.wait === false);
 
-  // ------------------------------------------------------------ the launcher
-  yes('the launcher reads the server\'s own number out of online.json', /"\\"max\\"\\\\s\*:\\\\s\*\(\\\\d\+\)"/.test(onlineCs) &&
-      /got\.Max = most;/.test(onlineCs));
+  // ------------------------------------------------------------ the home page
+  const START = "    var dot = document.getElementById('dot'), t = document.getElementById('livetext');";
+  const END = "        t.textContent = 'Server offline';\n      }\n    }\n";
+  const ha = home.indexOf(START);
+  const hb = ha < 0 ? -1 : home.indexOf(END, ha);
+  const hblock = (ha >= 0 && hb >= 0) ? home.slice(ha, hb + END.length) : null;
+  yes('home.html still has its status line', hblock !== null);
+  if (hblock) {
+    const say = function (status) {
+      const els = {};
+      const node = function () {
+        const n = { children: [], _text: '', hidden: true, className: '' };
+        Object.defineProperty(n, 'textContent', {
+          get: function () { return n._text + n.children.map(function (c) { return c.textContent; }).join(''); },
+          set: function (v) { n._text = String(v); n.children = []; } });
+        n.appendChild = function (c) { n.children.push(c); return c; };
+        return n;
+      };
+      ['dot', 'livetext', 'figOnline', 'figOnlineWrap'].forEach(function (k) { els[k] = node(); });
+      const document = { getElementById: function (id) { return els[id] || null; }, createElement: function () { return node(); } };
+      vm.runInNewContext('(function(d){' + hblock + '})(d);', { document: document, d: { status: status }, String: String, Math: Math });
+      return els;
+    };
+    let e = say({ up: true, online: 3, max: 25 });
+    yes("with a number: '3 of 25 people in the world'", e.livetext.textContent === '3 of 25 people in the world');
+    e = say({ up: true, online: 27, max: 25, line: 2, full: true });
+    yes("staff over the number: never 27 of 25, and it says who waits (got '" + e.livetext.textContent + "')",
+        e.livetext.textContent === 'The world is full, 25 of 25 people are in it, 2 waiting for a seat' &&
+        e.figOnline.textContent === '25 of 25');
+    yes('what the home page says is clean', clean(e.livetext.textContent));
+  }
   done();
 })();
