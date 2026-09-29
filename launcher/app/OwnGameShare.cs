@@ -256,7 +256,7 @@ namespace Thornswood
 
             var archives = new List<string>();
             foreach (KeyValuePair<string, Rec> kv in files)
-                if (kv.Value.Origin != 'V' && IsArchive(kv.Key) && !changed.Contains(kv.Key)) archives.Add(kv.Key);
+                if (kv.Value.Origin == 'O' && IsArchive(kv.Key) && !changed.Contains(kv.Key)) archives.Add(kv.Key);
             archives.Sort(StringComparer.OrdinalIgnoreCase);
 
             int linked = 0, onRecord = 0, looked = 0;
@@ -458,7 +458,7 @@ namespace Thornswood
             var keep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (made)
             {
-                foreach (KeyValuePair<string, Rec> kv in files) if (kv.Value.Origin == 'V') keep.Add(kv.Key);
+                foreach (KeyValuePair<string, Rec> kv in files) if (kv.Value.Origin == 'V' || kv.Value.Origin == 'T') keep.Add(kv.Key);
                 foreach (string rel in Owned(new HashSet<string>(StringComparer.OrdinalIgnoreCase))) keep.Add(rel);
             }
             else keep = DeployedIn(game);

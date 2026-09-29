@@ -455,6 +455,20 @@ Yes '  with the plugin list the release shipped, in Profile\Default' (Plugins-Ma
 Yes '  it writes down which release it is on' ((Synced $fresh) -match ([regex]::Escape([string]$d3.baseline.sha256) + ' ' + $R3))
 Yes '  and every pack on the feed as behind it, so an old feed shape replays nothing' (@(Get-Content (Join-Path $fresh 'Profile\applied.txt')).Count -eq 4)
 Yes '  after which nothing is pending' ((Pending-Of (Parse-Feed)).Count -eq 0)
+# The release's game files, kept for Thornswood's own folder (#1232): the
+# only record of a file the sync found already right.
+$rf = Join-Path $fresh 'Profile\release-files.txt'
+$rfLines = @(); if (Test-Path -LiteralPath $rf) { $rfLines = @([IO.File]::ReadAllLines($rf)) }
+$gameKeys = @($records[$R3].Keys | Where-Object { -not ([string]$_).StartsWith(':') } | ForEach-Object { [string]$_ } | Sort-Object)
+$kept = @(); if ($rfLines.Count -gt 1) { $kept = @($rfLines[1..($rfLines.Count - 1)] | Sort-Object) }
+Yes ("  and keeps the list of the game files that release ships ({0})" -f $kept.Count) (
+    $rfLines.Count -gt 1 -and $rfLines[0] -eq ('release ' + ([string]$d3.baseline.sha256).ToLowerInvariant() + ' ' + $R3) -and (($kept -join '|') -eq ($gameKeys -join '|')))
+# As a launcher from before #1232 left it: on the release, with no list.
+Remove-Item -LiteralPath $rf
+$again = @(Pending-Of (Parse-Feed))
+Yes 'an install synced before the list was kept is offered the same release once more' ($again.Count -eq 1 -and $null -ne $again[0].Record -and $again[0].Record.id -eq $R3)
+[void](Update-New $fresh)
+Yes '  the check downloads nothing, keeps the list, and then nothing is pending' ((Fetched) -eq 0 -and (Test-Path -LiteralPath $rf) -and (Pending-Of (Parse-Feed)).Count -eq 0)
 $noApplied = New-Install 'no-applied' $installerFiles $null
 [void](Update-New $noApplied)
 Yes 'a fresh install with no applied.txt at all reaches the third release too' ((Test-Lands $noApplied $records[$R3]) -and @(Get-Content (Join-Path $noApplied 'Profile\applied.txt')).Count -eq 4)

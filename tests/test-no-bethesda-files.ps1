@@ -413,7 +413,7 @@ if ($compiled) {
 }
 $skipCs = Get-CsMember $og 'static string Skip(string rel)'
 Yes 'OwnGame.Skip leaves them out of the folder' ($skipCs -match 'if \(BethesdaTool\(rel\)\) return "')
-$refresh = Get-CsMember $og 'public static string Refresh(Config cfg, Action<string> say)'
+$refresh = Get-CsMember $og 'static string RefreshNow(Config cfg, Action<string> say)'
 Yes 'Refresh drops them from a folder that has them' ($null -ne $refresh -and $refresh -match 'foreach \(string dest in BethesdaToolsIn\(Folder\)\)\s*\{\s*try \{ if \(File\.Exists\(dest\)\) \{ DropName\(dest\); removed\+\+; \} \}')
 $rulesNum = [regex]::Match($og, '(?m)^\s*const int Rules = (\d+);')
 $rulesDoc = [regex]::Match($og, "(?m)^\s*/// (\d+): Bethesda's Creation Kit")

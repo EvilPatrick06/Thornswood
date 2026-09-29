@@ -370,8 +370,8 @@ Yes 'StartOwnGame closes it as soon as the work is over' ($start -match 'ownGame
 
 $og = Read-Text (Join-Path $AppDir 'OwnGame.cs')
 Yes 'OwnGame: the phase is "Preparing the game folder"' ($og -match 'public const string Phase = "Preparing the game folder";')
-Yes 'OwnGame.Make counts every file it brings over' ((Body $og 'public static string Make(') -match 'PlayProgress\.Files\(Phase, looked\+\+, all\.Count\)')
-Yes 'OwnGame.Refresh counts every file it compares' ((Body $og 'public static string Refresh(') -match 'PlayProgress\.Files\(Phase, looked\+\+, all\.Count\)')
+Yes 'OwnGame.Make counts every file it brings over' ((Body $og 'static string MakeNow(') -match 'PlayProgress\.Files\(Phase, looked\+\+, all\.Count\)')
+Yes 'OwnGame.Refresh counts every file it compares' ((Body $og 'static string RefreshNow(') -match 'PlayProgress\.Files\(Phase, looked\+\+, all\.Count\)')
 
 $ver = Read-Text (Join-Path $AppDir 'Verify.cs')
 Yes 'Verify.Bytes counts the plugins it checks' ((Body $ver 'public static List<Issue> Bytes(') -match 'PlayProgress\.Files\("Checking files", idx \+ 1, mods\.Length\)')

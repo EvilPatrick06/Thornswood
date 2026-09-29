@@ -51,6 +51,12 @@
     5. The wiring: Shell starts the clean up and gates Steam's setting on the
        folder, Updater keeps the list only while the Steam copy is used, and
        nothing in the launcher decides Paths.Game but Paths.Init.
+    6. Issue #1232: in every case the person's own mods in the Steam copy (a
+       plugin, a loose mesh, a script extender plugin) never reach Root\Game,
+       and the record says which kind each file is. A folder made before
+       that, which took them, loses them at its next refresh, and still keeps
+       the installer's files when the clean up has already emptied the
+       installer's list.
 
   HOW. The installer part runs the real Setup-Thornswood.ps1 in Windows
   PowerShell on a pretend Steam copy, with Get-Process answered empty so no
@@ -170,9 +176,11 @@ function New-Steam([string]$dir, [bool]$newer) {
     else { PutBytes (Join-Path $game 'SkyrimSE.exe') 'PIN-EXE' 4096; Put (Join-Path $game 'Data\Skyrim.esm') 'PIN-MASTER' }
     PutBytes (Join-Path $game 'Data\Skyrim - Textures0.bsa') 'PIN-TEX0' 65536
     Put (Join-Path $game 'bink2w64.dll') 'GAME-BINK'
-    # The person's own mods, put in by hand: theirs, whatever Thornswood does.
+    # The person's own mods, put in by hand: theirs, whatever Thornswood does,
+    # and never part of Thornswood's own folder (#1232).
     Put (Join-Path $game 'Data\MyOwn.esp') 'MINE-ESP'
     Put (Join-Path $game 'Data\meshes\mine\sword.nif') 'MINE-NIF'
+    Put (Join-Path $game 'Data\SKSE\Plugins\MyOwnPlugin.dll') 'MINE-SKSE'
     return $game
 }
 
@@ -517,6 +525,20 @@ namespace Thornswood
 
         static string Cleaned { get { return Path.Combine(OwnGame.Dir, "steam-copy-cleaned.txt"); } }
 
+        // The person's own mods in the Steam copy, put there by hand (New-Steam).
+        static readonly string[] Hand = { "Data\\MyOwn.esp", "Data\\meshes\\mine\\sword.nif", "Data\\SKSE\\Plugins\\MyOwnPlugin.dll" };
+        static readonly string[] HandText = { "MINE-ESP", "MINE-NIF", "MINE-SKSE" };
+        static bool NoneIn(string folder, string[] rels)
+        {
+            foreach (string r in rels) if (File.Exists(Path.Combine(folder, r))) { Console.WriteLine("      in " + folder + ": " + r); return false; }
+            return true;
+        }
+        static bool AllIn(string folder, string[] rels)
+        {
+            for (int i = 0; i < rels.Length; i++) if (Text(Path.Combine(folder, rels[i])) != HandText[i]) { Console.WriteLine("      not as the person left it: " + rels[i]); return false; }
+            return true;
+        }
+
         static int Main(string[] args)
         {
             T = args[0];
@@ -593,8 +615,12 @@ namespace Thornswood
                 File.Exists(Path.Combine(own, "Data\\Platform\\Plugins\\skymp5-client-settings.txt")) &&
                 Text(Path.Combine(own, "Data\\Platform\\Plugins\\thornswood-pack1.js")) == "PACK-JS pack1");
             string files = File.ReadAllText(Path.Combine(OwnGame.Dir, "files.txt"));
-            Yes(n + "the record lists them as the folder's own copies", files.IndexOf("C|O|", StringComparison.Ordinal) >= 0 &&
+            Yes(n + "the record lists them as the folder's own copies, and as Thornswood's (T)", files.IndexOf("C|T|", StringComparison.Ordinal) >= 0 &&
+                files.IndexOf("|T|8|", StringComparison.Ordinal) >= 0 &&
                 files.IndexOf("|Data\\Platform\\Plugins\\thornswood-front.js", StringComparison.OrdinalIgnoreCase) >= 0);
+            Yes(n + "and the game's own as Skyrim's (O)", files.IndexOf("C|O|4096|", StringComparison.Ordinal) >= 0);
+            Yes(n + "the person's mods put into the Steam copy by hand stayed out of the folder: their plugin, a loose mesh, a script extender plugin",
+                NoneIn(own, Hand) && AllIn(s.Game, Hand));
 
             Start(s);
             Yes(n + "after the restart it runs from Root\\Game", !Paths.Collection && !Paths.OwnFirst && OwnGame.Active &&
@@ -661,6 +687,7 @@ namespace Thornswood
             Yes(n + "the folder is made from the download and Payload", made != null && Text(Path.Combine(own, "SkyrimSE.exe")) == "PIN-EXE" &&
                 Text(Path.Combine(own, "Data\\Skyrim.esm")) == "PIN-MASTER" && Text(Path.Combine(own, "Data\\Platform\\Plugins\\thornswood-front.js")) == "TS-FRONT");
             Yes(n + "the Steam copy stays on its newer build, untouched", Same(before, Snap(s.Game)) && Text(Path.Combine(s.Game, "SkyrimSE.exe")) == "NEW-EXE");
+            Yes(n + "and the mods put into it by hand stayed out of the folder", NoneIn(own, Hand) && AllIn(s.Game, Hand));
             Yes(n + "the download is cleared and Payload is gone", Downgrade.Downloaded(s.Cfg) == null && !Directory.Exists(s.Payload));
         }
 
@@ -693,6 +720,30 @@ namespace Thornswood
             Start(s);
             Yes(n + "and the launcher runs from it", OwnGame.Active && !Paths.Collection);
             Yes(n + "Steam's Updates setting is left alone from now on", !SteamUpdates.LooksAtStart(!Paths.Collection, Downgrade.Needed(s.Cfg)));
+            Yes(n + "the person's mods in the Steam copy, the ones from before the install and the one put in later, stayed out of the folder",
+                NoneIn(own, Hand) && !File.Exists(Path.Combine(own, "Data\\MyLater.esp")) && AllIn(s.Game, Hand));
+            string rec = File.ReadAllText(Path.Combine(OwnGame.Dir, "files.txt"));
+            Yes(n + "the installer's files and the pack's are on record as Thornswood's (T), taken from the Steam copy by the installer's list",
+                rec.IndexOf("C|T|", StringComparison.Ordinal) >= 0 &&
+                System.Text.RegularExpressions.Regex.IsMatch(rec, @"\|T\|\d+\|\d+\|Data\\Thornswood-Content\.esp") &&
+                System.Text.RegularExpressions.Regex.IsMatch(rec, @"\|T\|\d+\|\d+\|Data\\Platform\\Plugins\\thornswood-pack1\.js"));
+
+            // As a folder made before #1232 has it: everything not Vortex's on
+            // record as O, the hand placed mods in it as links to the Steam
+            // copy's, under rules 12. The one-time clean up of the Steam copy
+            // then runs first and empties the installer's list; the refresh
+            // after it must still know the installer's files for Thornswood's.
+            var legacy = new List<string>();
+            foreach (string line in File.ReadAllLines(Path.Combine(OwnGame.Dir, "files.txt"))) legacy.Add(line.Replace("|T|", "|O|"));
+            foreach (string h in Hand)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(own, h)));
+                CreateHardLink(Path.Combine(own, h), Path.Combine(s.Game, h), IntPtr.Zero);
+                legacy.Add("L|O|9|1|" + h);
+            }
+            File.WriteAllLines(Path.Combine(OwnGame.Dir, "files.txt"), legacy.ToArray());
+            string madeTxt = Path.Combine(OwnGame.Dir, "made.txt");
+            File.WriteAllText(madeTxt, File.ReadAllText(madeTxt).Replace("rules=13", "rules=12"));
 
             // A game started from Steam holds one of the files open.
             string held = Path.Combine(s.Game, "Data\\Platform\\Plugins\\thornswood-front.js");
@@ -746,6 +797,66 @@ namespace Thornswood
                 Text(Path.Combine(own, "Data\\Platform\\Plugins\\thornswood-pack1.js")) == "PACK-JS pack1" &&
                 Text(Path.Combine(own, "Data\\Thornswood-Content.esp")) == "TS-CONTENT");
 
+            // The folder made before #1232 refreshes once, after the clean up
+            // emptied the installer's list.
+            var steamNow = Snap(s.Game);
+            Yes(n + "made before, the folder asks to refresh once", OwnGame.NeedsRefresh(s.Cfg));
+            string refreshed = null;
+            try { refreshed = OwnGame.Refresh(s.Cfg, delegate(string m) { Say(s, m); }); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
+            Yes(n + "made before, the refresh takes the hand placed mods out of Thornswood's folder and says which",
+                refreshed != null && NoneIn(own, Hand) && refreshed.IndexOf("Took 3 files out of Thornswood's folder", StringComparison.Ordinal) >= 0 &&
+                refreshed.IndexOf("Data\\MyOwn.esp", StringComparison.Ordinal) >= 0 && Clean(refreshed));
+            Yes(n + "made before, the Steam copy keeps them, untouched", Same(steamNow, Snap(s.Game)) && AllIn(s.Game, Hand));
+            Yes(n + "made before, the installer's files stay, known from the list the clean up kept, though the installer's own list is gone",
+                !File.Exists(list) && Text(Path.Combine(own, "Data\\Thornswood-Content.esp")) == "TS-CONTENT" &&
+                Text(Path.Combine(own, "Data\\Platform\\Plugins\\thornswood-front.js")) == "TS-FRONT" &&
+                Text(Path.Combine(own, "Data\\textures\\thornswood\\banner.dds")) == "TS-BANNER");
+            Yes(n + "made before, and the pack's, Thornswood.ini and the client settings", Text(Path.Combine(own, "Data\\Platform\\Plugins\\thornswood-pack1.js")) == "PACK-JS pack1" &&
+                File.Exists(Path.Combine(own, "Data\\SKSE\\Plugins\\Thornswood.ini")) && File.Exists(Path.Combine(own, "Data\\Platform\\Plugins\\skymp5-client-settings.txt")));
+            Yes(n + "made before, Skyrim's own and Vortex's stay", Text(Path.Combine(own, "SkyrimSE.exe")) == "PIN-EXE" && Text(Path.Combine(own, "Data\\Skyrim.esm")) == "PIN-MASTER" &&
+                Id(Path.Combine(own, "Data\\TsOne.esp")) == Id(Path.Combine(s.Staging, "ModA\\TsOne.esp")));
+            string relabelled = File.ReadAllText(Path.Combine(OwnGame.Dir, "files.txt"));
+            Yes(n + "made before, the record now says Thornswood's (T) for the installer's files and Skyrim's (O) for the game",
+                System.Text.RegularExpressions.Regex.IsMatch(relabelled, @"\|T\|\d+\|\d+\|Data\\Thornswood-Content\.esp") &&
+                System.Text.RegularExpressions.Regex.IsMatch(relabelled, @"\|O\|4096\|\d+\|SkyrimSE\.exe") && relabelled.IndexOf("MyOwn", StringComparison.Ordinal) < 0);
+            Yes(n + "made before, and it does not ask again", !OwnGame.NeedsRefresh(s.Cfg));
+
+            // The machine that ships: the release's own files came from its
+            // own folder, so the release's file list (Sync.cs) is their only
+            // record. An install a launcher from before #1232 synced has not
+            // kept that list, and nothing is taken out until it has.
+            string shipped = "Data\\meshes\\thornswood\\shipped.nif";
+            Put(Path.Combine(own, shipped), "TS-SHIPPED");
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(own, Hand[0])));
+            CreateHardLink(Path.Combine(own, Hand[0]), Path.Combine(s.Game, Hand[0]), IntPtr.Zero);
+            var again = new List<string>(File.ReadAllLines(Path.Combine(OwnGame.Dir, "files.txt")));
+            again.Add("C|O|10|1|" + shipped);
+            again.Add("L|O|8|1|" + Hand[0]);
+            File.WriteAllLines(Path.Combine(OwnGame.Dir, "files.txt"), again.ToArray());
+            var made12 = new List<string>();
+            foreach (string l in File.ReadAllLines(madeTxt)) if (!l.StartsWith("kinds=")) made12.Add(l.StartsWith("rules=") ? "rules=12" : l);
+            File.WriteAllLines(madeTxt, made12.ToArray());
+            string sha = new string('a', 64);
+            File.WriteAllText(Path.Combine(Paths.ProfileDir, "release.txt"), "synced " + sha + " 20260929-0000\r\n");
+            Yes(n + "synced by an older launcher: the release's file list is not known yet", !Updater.ReleaseFilesKnown());
+            steamNow = Snap(s.Game);
+            string waited = null;
+            try { waited = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
+            Yes(n + "synced by an older launcher: the refresh takes nothing out without the release's list, and says it waits for it",
+                waited != null && File.Exists(Path.Combine(own, Hand[0])) && Text(Path.Combine(own, shipped)) == "TS-SHIPPED" &&
+                waited.IndexOf("checked this install against its release", StringComparison.Ordinal) >= 0 && Clean(waited));
+            Yes(n + "synced by an older launcher: and does not ask again until the list is here", !OwnGame.NeedsRefresh(s.Cfg));
+
+            // The check against the release keeps its list (Sync.cs).
+            File.WriteAllText(Path.Combine(Paths.ProfileDir, "release-files.txt"), "release " + sha + " 20260929-0000\r\n" + shipped + "\r\n");
+            Yes(n + "with the release's list kept, the folder asks to refresh", Updater.ReleaseFilesKnown() && OwnGame.NeedsRefresh(s.Cfg));
+            string sorted = null;
+            try { sorted = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
+            Yes(n + "with the release's list kept, the hand placed mod comes out and the release's own file stays, as Thornswood's (T)",
+                sorted != null && !File.Exists(Path.Combine(own, Hand[0])) && Text(Path.Combine(own, shipped)) == "TS-SHIPPED" &&
+                System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(Path.Combine(OwnGame.Dir, "files.txt")), @"\|T\|10\|1\|Data\\meshes\\thornswood\\shipped\.nif"));
+            Yes(n + "with the release's list kept, the Steam copy was not touched and nothing more is asked", Same(steamNow, Snap(s.Game)) && AllIn(s.Game, Hand) && !OwnGame.NeedsRefresh(s.Cfg));
+
             // Installed again without the tick: the setup moves the folder
             // aside and puts Thornswood's files into the Steam copy with its
             // list. The folder made again has the Steam copy looked at again.
@@ -775,6 +886,13 @@ $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', '/langve
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 $cscArgs += ('/resource:' + (Join-Path $Repo 'launcher\Thornswood.ini') + ',Thornswood.ini')
 $cscArgs += ('/resource:' + $clientRecord + ',client-build.json')
+# The pretend Steam copy's own files, as records\skyrim-files.json lists the
+# real build's (#1232): what OwnGame takes as Skyrim's own.
+$skyrimList = Join-Path $T 'skyrim-files.json'
+$listed = @('SkyrimSE.exe', 'bink2w64.dll', 'Data\Skyrim.esm', 'Data\Skyrim - Textures0.bsa') |
+    ForEach-Object { '    "{0}": {{ "bytes": 1, "sha1": "0", "depot": "1" }}' -f $_.Replace('\', '\\') }
+Put $skyrimList ("{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" + ($listed -join ",`n") + "`n  }`n}`n")
+$cscArgs += ('/resource:' + $skyrimList + ',skyrim-files.json')
 $cscArgs += $cs
 $cscArgs += $driverCs
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -805,6 +923,12 @@ $setters = @(Get-ChildItem (Join-Path $App '*.cs') -File | Where-Object { [IO.Fi
 Yes ('nothing in the launcher sets Paths.Game but Paths.Init (' + ($setters -join ', ') + ')') ($setters.Count -eq 0)
 $paths = [IO.File]::ReadAllText((Join-Path $App 'Paths.cs'))
 Yes 'Paths.Init points Game at Payload when the folder was chosen and not made' ($paths -match 'Game\s+= !Collection \? own : OwnFirst \? Payload : steam;')
+$ownSrc = [IO.File]::ReadAllText((Join-Path $App 'OwnGame.cs'))
+Yes 'a folder is not made while an install an older launcher synced has not kept its release''s file list (#1232)' ($ownSrc -match '(?s)if \(!made\)\s*\{.*?if \(!OursKnown\(\)\)\s*return "Thornswood is checking this install against its release first')
+$syncSrc = [IO.File]::ReadAllText((Join-Path $App 'Sync.cs'))
+Yes 'a sync keeps the release''s file list before it says it is on that release, and an install without the list is checked once more (#1232)' (
+    ($syncSrc -match '(?s)WriteReleaseFiles\(r, listed\);\s*state = ReadSyncState\(\);\s*state\.Synced = r\.sha256;') -and
+    ($syncSrc -match 'if \(\(s\.Synced == r\.sha256 && ReleaseFilesSha\(\) == r\.sha256\) \|\| s\.PacksOnly == r\.sha256\) return null;'))
 $setup = [IO.File]::ReadAllText($SetupScript)
 Yes 'Setup-Thornswood.ps1 writes the installed-into-game list only when the Steam copy is used' ($setup -match 'if \(\$Collection -and -not \$OwnFirst\) \{\s*\$listed')
 

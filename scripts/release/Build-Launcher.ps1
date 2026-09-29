@@ -343,6 +343,17 @@ if (Test-Path -LiteralPath $clientRecord) {
     Die "client-build.json is not at $clientRecord. It is in the repository, so the path is wrong; the launcher could not check or repair the client runtime."
 }
 
+# Every file of the pinned Skyrim build, from the depot manifests the Downgrade
+# asks Steam for (New-SkyrimFilesRecord.ps1, issue #1232). OwnGame reads it to
+# tell Skyrim's own files from mods put into the Steam copy by hand, and makes
+# and refreshes nothing without it.
+$skyrimRecord = Join-Path $Here '..\..\records\skyrim-files.json'
+if (Test-Path -LiteralPath $skyrimRecord) {
+    $cscArgs += "/resource:$((Resolve-Path $skyrimRecord).Path),skyrim-files.json"
+} else {
+    Die "skyrim-files.json is not at $skyrimRecord. It is in the repository, so the path is wrong; the launcher could not tell Skyrim's own files from mods put into the Steam copy by hand."
+}
+
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 foreach ($f in $cs)   { $cscArgs += $f.FullName }
 if ($infoApp) { $cscArgs += $infoApp }
