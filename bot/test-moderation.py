@@ -200,6 +200,21 @@ try:
     note = bot.moderation_text('dev', json.loads(row('note', why='asked twice about the bridge')))
     yes('M10 a note says what it says', 'wrote a note on Bjorn (profile 2002): asked twice' in note)
 
+    # M11: somebody's own /stuck (#414) says the server, the person and the
+    # gamemode's whole sentence, not "Staff on", and pings nobody.
+    stuck = bot.moderation_text('dev', {
+        'did': 'stuck', 'by': 2002, 'byName': 'Bjorn', 'who': 2002, 'whoName': 'Bjorn',
+        'why': 'used /stuck and was sent back a few steps, from 3c:Skyrim.esm (1, 2, 3) to '
+               '3c:Skyrim.esm (400, 2, 3). Character ff000002, Discord 111.'})
+    yes('M11 a /stuck line says the server, the person and where from and to',
+        stuck == '**/stuck on the dev server:** Bjorn (profile 2002) used /stuck and was sent back '
+                 'a few steps, from 3c:Skyrim.esm (1, 2, 3) to 3c:Skyrim.esm (400, 2, 3). '
+                 'Character ff000002, Discord 111.')
+    yes('M11 the gamemode writes it', "did: 'stuck'" in gm and 'stuck' in bot._MOD_DID)
+    pinged = bot.moderation_text('live', {'did': 'stuck', 'by': 5, 'byName': '@everyone',
+                                          'why': 'used /stuck <@&111111111111111111>'})
+    yes('M11 nothing in it pings anybody', '@everyone' not in pinged and '<@&111111111111111111>' not in pinged)
+
     # M9: started with the others, and sent through report_say (mentions off).
     src = inspect.getsource(bot.on_ready)
     yes('M9 on_ready starts it', 'asyncio.create_task(watch_moderation())' in src)
