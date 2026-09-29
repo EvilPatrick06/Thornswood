@@ -1267,6 +1267,9 @@ namespace Thornswood
         /// </summary>
         static void MusicDecide()
         {
+            // While the game runs the browser behind the theme is closed, not
+            // paused (#963). The first call after the game closes makes it again.
+            if (playing) { try { MenuMusic.Close(); } catch (Exception ex) { Swallow.Note("Shell.MusicDecide, close", ex); } return; }
             bool want = cfg != null && cfg.MusicOn && cfg.MusicVolume > 0 && !playing
                 && win != null && win.WindowState != WindowState.Minimized;
             double vol = cfg == null ? 0 : Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
