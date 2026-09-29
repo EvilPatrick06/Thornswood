@@ -270,7 +270,9 @@ namespace Thornswood
         }
 
         static readonly string Tex = "Data\\Skyrim - Textures0.bsa", Mesh = "Data\\Skyrim - Meshes0.bsa";
-        static readonly string Master = "Data\\Skyrim.esm", Source = "Data\\Scripts\\Source\\vanilla.psc";
+        // A loose file of the game's own, as every Steam copy has it. It was a
+        // script source until #1227 kept those out of the folder altogether.
+        static readonly string Master = "Data\\Skyrim.esm", Loose = "Data\\Video\\BGS_Logo.bik";
 
         static Scene NewScene(string name, bool newer)
         {
@@ -331,7 +333,7 @@ namespace Thornswood
                 Archive(Path.Combine(s.Game, Tex), "PIN-TEX0");
                 Archive(Path.Combine(s.Game, Mesh), "PIN-MESH0");
             }
-            Put(Path.Combine(s.Game, Source), "GAME-SOURCE");
+            Put(Path.Combine(s.Game, Loose), "GAME-LOOSE");
             Put(Path.Combine(s.Game, "bink2w64.dll"), "GAME-BINK");
 
             // Vortex: two files in staging, deployed into the Steam copy as hard links.
@@ -415,7 +417,7 @@ namespace Thornswood
             Yes("Make wrote nothing into the Steam copy", Same(before, Snap(s.Game)));
             Yes("the exe is the folder's own copy", Text(Path.Combine(own, "SkyrimSE.exe")) == "PIN-EXE" && Id(Path.Combine(own, "SkyrimSE.exe")) != Id(Path.Combine(s.Game, "SkyrimSE.exe")));
             Yes("a loose game file is the folder's own copy, not a link to the Steam copy's",
-                Text(Path.Combine(own, Source)) == "GAME-SOURCE" && Id(Path.Combine(own, Source)) != Id(Path.Combine(s.Game, Source)));
+                Text(Path.Combine(own, Loose)) == "GAME-LOOSE" && Id(Path.Combine(own, Loose)) != Id(Path.Combine(s.Game, Loose)));
             Yes("Vortex's files are links to Vortex's own copies",
                 Id(Path.Combine(own, "Data\\TsOne.esp")) == Id(Path.Combine(s.Staging, "ModA\\TsOne.esp")));
             Yes("Skyrim's archives are one file with the Steam copy's, so they are on the disk once",
@@ -458,7 +460,7 @@ namespace Thornswood
             Yes("nothing of the newer build or of the person's own mods came in",
                 !File.Exists(Path.Combine(own, "Data\\PersonsOwn.esp")) && !File.Exists(Path.Combine(own, "Data\\NewBuild.bsa")));
             string files = File.ReadAllText(Path.Combine(OwnGame.Dir, "files.txt"));
-            Yes("the game's own files are still on record after the refresh", files.Contains("|O|") && files.Contains("|" + Master) && files.Contains("|" + Source));
+            Yes("the game's own files are still on record after the refresh", files.Contains("|O|") && files.Contains("|" + Master) && files.Contains("|" + Loose));
             Yes("the check before Play still passes", OwnGame.CheckShared(OwnGame.Source(s.Cfg), null) == null);
         }
 

@@ -555,8 +555,11 @@ namespace Thornswood
         ///    Skyrim's archives, which stay shared only while their bytes are
         ///    the ones on record and are shared where they were not (#1217).
         ///    See Refresh and OwnGameShare.cs.
+        /// 12: the Creation Kit's script sources (Data\Source and
+        ///    Data\Scripts\Source) are left out, and taken out of a folder that
+        ///    already has them. See BethesdaTool, issue #1227.
         /// </summary>
-        const int Rules = 11;
+        const int Rules = 12;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -1292,7 +1295,7 @@ namespace Thornswood
             if (CrashesUs(rel)) return "it crashes the quick favourites menu";
             if (Retired(rel)) return "Start On Save is no longer part of Thornswood";
             if (BodyShape(rel)) return "body shape sliders and jiggle are not part of Thornswood";
-            if (BethesdaTool(rel)) return "Bethesda's Creation Kit or a copy of one of the game's programs, not part of Thornswood";
+            if (BethesdaTool(rel)) return "Bethesda's Creation Kit, its script sources or a copy of one of the game's programs, not part of Thornswood";
             return null;
         }
 
@@ -1314,8 +1317,14 @@ namespace Thornswood
         /// hard link removed here leaves the Steam copy's file where it is.
         /// Ship-Rules.ps1 keeps the same files out of every pack, record and
         /// installer (Test-ShipBethesdaTool); change the two together.
+        ///
+        /// Data\Source and Data\Scripts\Source are the Creation Kit's script
+        /// source folders (#1227): it unpacks Data\Scripts.zip into
+        /// Data\Source\Scripts, 14,298 files on the shipping machine, and the
+        /// game only ever reads the compiled scripts in Data\Scripts. Rules 12
+        /// takes them out of a folder that has them.
         /// </remarks>
-        static readonly string[] BethesdaToolDirs = { "Tools", "Papyrus Compiler", "lex", "Data\\DialogueViews" };
+        static readonly string[] BethesdaToolDirs = { "Tools", "Papyrus Compiler", "lex", "Data\\DialogueViews", "Data\\Source", "Data\\Scripts\\Source" };
         static readonly string[] BethesdaToolFiles = {
             "flowchartx64.dll", "flowchartx32.dll", "p4com64.dll",
             "EditorWarnings.txt", "DataFiles.txt", "SkyrimReservedAddOnIndexes.txt",

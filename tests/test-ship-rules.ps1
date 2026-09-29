@@ -332,7 +332,12 @@ $ck = @(
     'Papyrus Compiler\PapyrusCompiler.exe', 'lex\ssceam.tlx',
     'Data\DialogueViews\0001A2A8.xml', 'Data\Scripts.zip',
     'flowchartx64.dll', 'flowchartx32.dll', 'p4com64.dll',
-    'EditorWarnings.txt', 'DataFiles.txt', 'SkyrimReservedAddOnIndexes.txt'
+    'EditorWarnings.txt', 'DataFiles.txt', 'SkyrimReservedAddOnIndexes.txt',
+    # #1227: the Creation Kit's script sources, both folders. The five dev
+    # records the feed lists on 29 September name IED.psc; three main packs of
+    # 15 September carried
+    # SKSE.psc and 61 more.
+    'Data\Source\Scripts\Actor.psc', 'Data\Scripts\Source\IED.psc', 'Data\Scripts\Source\SKSE.psc'
 )
 foreach ($rel in $ck) {
     Yes "$rel is Bethesda's: never shipped, never removed" ((Test-ShipBethesdaTool $rel) -and (Test-ShipMachine $rel) -and -not (Test-ShipRuntime $rel))
@@ -367,7 +372,9 @@ $prev['Data\Platform\Plugins\thornswood-hud.js'] = '10:1'
 # #1152: the last record listed the Creation Kit and the copy of the game.
 $prev['CreationKit.exe'] = '48685408:1'
 $prev['SkyrimSE.exe.bak-1160-for-369'] = '37157144:1'
-$onDisk = @($bsa, 'Data\Platform\Plugins\thornswood-hud.js', 'CreationKit.exe')
+# #1227: and a script source, while the folder holds the Creation Kit's others.
+$prev['Data\Scripts\Source\IED.psc'] = '16174:1'
+$onDisk = @($bsa, 'Data\Platform\Plugins\thornswood-hud.js', 'CreationKit.exe', 'Data\Source\Scripts\Actor.psc')
 $now = @{}
 foreach ($rel in $onDisk) {
     if (Test-Machine $rel) { continue }
@@ -381,6 +388,8 @@ Yes 'and does not list it as removed, so no tester loses it' ($removed -notconta
 Yes 'the lifted diff is live: a mesh that really went is still removed' ($removed -contains 'Data\meshes\gone\old.nif')
 Yes 'the next pack does not carry the Creation Kit, nor list it as removed' (-not $now.ContainsKey('CreationKit.exe') -and $removed -notcontains 'CreationKit.exe')
 Yes 'nor list the copy of SkyrimSE.exe as removed, which could reach a Steam copy' ($removed -notcontains 'SkyrimSE.exe.bak-1160-for-369')
+Yes 'the next pack carries no script source and lists none as removed (#1227)' (
+    -not $now.ContainsKey('Data\Source\Scripts\Actor.psc') -and $changed -notcontains 'Data\Source\Scripts\Actor.psc' -and $removed -notcontains 'Data\Scripts\Source\IED.psc')
 Yes 'and our overlay is neither changed nor removed' (($changed -notcontains 'Data\Platform\Plugins\thornswood-hud.js') -and ($removed -notcontains 'Data\Platform\Plugins\thornswood-hud.js'))
 
 # ---- the installer asks the same question ----------------------------------------

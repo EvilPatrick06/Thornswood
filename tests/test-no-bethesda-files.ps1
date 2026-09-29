@@ -15,6 +15,14 @@
   launcher's own folder took it from there, and a file Vortex did not deploy
   counted as ours.
 
+  The Creation Kit's script sources joined them on 29 September (#1227): the
+  Creation Kit unpacks Data\Scripts.zip into Data\Source\Scripts, 14,298 files
+  on the shipping machine that Thornswood's own folder took as its own.
+  Data\Source and Data\Scripts\Source are the Creation Kit's source folders and
+  never ship, whoever's sources are in them; Thornswood's own Papyrus sources
+  live in the repository (the engine fork) and only their compiled scripts
+  reach a game.
+
   What this holds, each against the real code:
     1. Ship-Rules: every path of that measurement is never shipped and never
        listed as removed; the game's own files too; any backup; the files of
@@ -34,7 +42,7 @@
   Read only apart from its own scratch folder. Never connects to anything.
 #>
 [CmdletBinding()]
-param([string]$Record)
+param([string]$Record, [string]$OwnGameList = 'C:\Thornswood\Profile\OwnGame\files.txt')
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -77,7 +85,13 @@ $bethesda = @(
     'Papyrus Compiler\PapyrusCompiler.exe', 'Papyrus Compiler\ScriptCompile.bat',
     'lex\ssceam.tlx', 'lex\User\userdic.tlx',
     'Data\DialogueViews\0001A2A8.xml', 'Data\Scripts.zip',
-    'SkyrimSE.exe.bak-1160-for-369', 'SkyrimSE.exe.1170', 'SkyrimSELauncher.exe.old', 'skse64_loader.exe.bak'
+    'SkyrimSE.exe.bak-1160-for-369', 'SkyrimSE.exe.1170', 'SkyrimSELauncher.exe.old', 'skse64_loader.exe.bak',
+    # The Creation Kit's script sources (#1227): what it unpacks from
+    # Data\Scripts.zip, the same folder under its older name, and what mods put
+    # beside them. The game reads none of them.
+    'Data\Source\Scripts\Actor.psc', 'Data\Source\Scripts\TESV_Papyrus_Flags.flg',
+    'Data\Source\Scripts\PlayerVampireQuestScript.psc', 'Data\Source\Textures\Telvanni_BodyColor2.tga',
+    'Data\Scripts\Source\Actor.psc', 'Data\Scripts\Source\IED.psc', 'data\source\scripts\game.PSC'
 )
 foreach ($rel in $bethesda) {
     Yes "$rel is Bethesda's" (Test-ShipBethesdaTool $rel)
@@ -109,8 +123,60 @@ foreach ($rel in @('Data\Thornswood-Content.esp', 'Data\Platform\UI\index.html',
                    'Data\Platform\UI\thornswood-bake.js', 'Data\meshes\interface\logo\logo.nif',
                    'Data\textures\interface\objects\Mainmenuwallpaper.dds', 'Data\music\special\mus_maintheme.xwm',
                    'Data\meshes\tools\hammer.nif', 'Data\DialogueViewsExtra\x.xml', 'Data\textures\CreationKitLogo.dds',
-                   'Data\Scripts\bakery.pex', 'Data\SKSE\Plugins\Tools.ini')) {
+                   'Data\Scripts\bakery.pex', 'Data\SKSE\Plugins\Tools.ini',
+                   'Data\Scripts\Source.pex', 'Data\SourceArt\x.dds', 'Data\textures\Source\x.dds', 'Data\meshes\Scripts\Source\x.nif')) {
     Yes "$rel is not taken for Bethesda's or a backup" (-not (Test-ShipBethesdaTool $rel) -and -not (Test-ShipBackup $rel) -and -not (Test-ShipMachine $rel))
+}
+
+# Everything the Creation Kit installs, read on 29 September from the two
+# Steam depots of the Steam copy's Creation Kit (app 1946180, depots 1946182
+# and 1946183, build 24601472): 56 files. Each one is Bethesda's here.
+$ckInstall = @(
+    'CreationKit.exe', 'CreationKit.ini', 'Data\Scripts.zip', 'flowchartx32.dll', 'flowchartx64.dll', 'p4com64.dll',
+    'SkyrimReservedAddOnIndexes.txt',
+    'lex\accent.tlx', 'lex\ssceam.tlx', 'lex\ssceam2.clx', 'lex\sscebr.tlx', 'lex\sscebr2.clx', 'lex\ssceca.tlx',
+    'lex\ssceca2.clx', 'lex\tech.tlx', 'lex\User\correct.tlx', 'lex\User\userdic.tlx',
+    'Papyrus Compiler\antlr.runtime.dll', 'Papyrus Compiler\Antlr3.Runtime.dll', 'Papyrus Compiler\Antlr3.Utility.dll',
+    'Papyrus Compiler\PapyrusAssembler.exe', 'Papyrus Compiler\PapyrusCompiler.exe', 'Papyrus Compiler\PCompiler.dll',
+    'Papyrus Compiler\ScriptCompile.bat', 'Papyrus Compiler\StringTemplate.dll',
+    'Tools\Archive\Archive.exe', 'Tools\ArtTools\Blender\bgs_skyrim_tools.zip', 'Tools\ArtTools\Blender\io_scene_bsfbx_skyrim.zip',
+    'Tools\AssetWatcher\AssetWatcher.exe', 'Tools\AssetWatcher\platforms\qminimal.dll', 'Tools\AssetWatcher\platforms\qoffscreen.dll',
+    'Tools\AssetWatcher\platforms\qwindows.dll', 'Tools\AssetWatcher\Plugins\Skyrim\BSFBXDLL.dll',
+    'Tools\AssetWatcher\Plugins\Skyrim\Meshes_Settings.json', 'Tools\AssetWatcher\Qt5Core.dll', 'Tools\AssetWatcher\Qt5Gui.dll',
+    'Tools\AssetWatcher\Qt5Network.dll', 'Tools\AssetWatcher\Qt5Svg.dll', 'Tools\AssetWatcher\Qt5Widgets.dll',
+    'Tools\AssetWatcher\SettingsGeneration.py', 'Tools\AssetWatcher\styles\Default.css',
+    'Tools\AssetWatcher\styles\qwindowsvistastyle.dll', 'Tools\Audio\xwmaencode.exe', 'Tools\Elric\xg.dll',
+    'Tools\Elric\xtexconv.exe', 'Tools\Exporting Blender Art Assets for Skyrim.pdf',
+    'Tools\HavokBehaviorPostProcess\HavokBehaviorPostProcess.exe', 'Tools\HavokBehaviorPostProcess\readme.txt',
+    'Tools\HavokBehaviorPostProcess\UpgradeHavokBehavior.bat', 'Tools\LipGen\LipFuzer\LIPFuzer.exe',
+    'Tools\LipGen\LipFuzer\LIPFuzer.txt', 'Tools\LipGen\LipGenerator\FonixData.cdf', 'Tools\LipGen\LipGenerator\LipGenerator.exe',
+    'Tools\redist\dxwebsetup.exe', 'Tools\redist\VC_redist.x64.exe', 'Tools\RoboVoicer.exe'
+)
+Yes ('the Creation Kit install list has all {0} of its files' -f $ckInstall.Count) ($ckInstall.Count -eq 56)
+$ckMissed = @($ckInstall | Where-Object { -not ((Test-ShipBethesdaTool $_) -and (Test-ShipMachine $_)) })
+Yes 'every file the Creation Kit installs is Bethesda''s and never shipped or removed' ($ckMissed.Count -eq 0)
+foreach ($m in $ckMissed) { Write-Host "      not caught: $m" }
+
+# Thornswood's own Papyrus sources are never in a game folder, so nothing of
+# ours is under the two source folders: what the repository hands a game
+# (game\) carries no .psc. Ours are the engine fork's and stay in engine\skymp.
+$gameSrc = Join-Path $Repo 'game'
+$ownPsc = @(Get-ChildItem -LiteralPath $gameSrc -Recurse -File -Filter '*.psc' -ErrorAction SilentlyContinue)
+Yes 'the repository''s game folder carries no Papyrus source of ours' ($ownPsc.Count -eq 0)
+
+# The folder the shipping machine's launcher made, where it is here: every
+# script source it holds is caught, and nothing else of Data\Scripts is.
+if ($OwnGameList -and (Test-Path -LiteralPath $OwnGameList)) {
+    $rels = @(Get-Content -LiteralPath $OwnGameList | ForEach-Object { $p = $_.Split('|'); if ($p.Count -ge 5) { $p[4] } })
+    $src = @($rels | Where-Object { $_ -like 'Data\Source\*' -or $_ -like 'Data\Scripts\Source\*' })
+    Write-Host ("      the folder's list: {0:n0} files, {1:n0} of them script sources" -f $rels.Count, $src.Count)
+    if ($src.Count) {
+        Yes ('every one of its {0:n0} script sources is caught' -f $src.Count) (@($src | Where-Object { -not (Test-ShipBethesdaTool $_) }).Count -eq 0)
+    } else { Skip 'this folder''s list has no script sources left to measure' }
+    $pex = @($rels | Where-Object { $_ -like 'Data\Scripts\*.pex' -and $_ -notlike 'Data\Scripts\Source\*' })
+    Yes ('and none of its {0} compiled scripts is' -f $pex.Count) (@($pex | Where-Object { Test-ShipBethesdaTool $_ }).Count -eq 0)
+} else {
+    Skip "no list of Thornswood's own folder at $OwnGameList to measure against"
 }
 
 # ---- 2. the measured record ---------------------------------------------------
@@ -127,6 +193,13 @@ if (Test-Path -LiteralPath $Record) {
         Yes ('every one of those {0:n0} is caught' -f $ck.Count) ($caught.Count -eq $ck.Count)
         foreach ($m in @($ck | Where-Object { -not (Test-ShipMachine $_) } | Select-Object -First 5)) { Write-Host "      not caught: $m" }
     } else { Skip 'this record has no Creation Kit files left to measure' }
+    # The five dev records the feed lists on 29 September name Data\Scripts\Source\IED.psc,
+    # and the file went up to the site loose (#1227).
+    $srcKeys = @($map.PSObject.Properties.Name | ForEach-Object { if ($_.StartsWith(':gone:')) { $_.Substring(6) } elseif (-not $_.StartsWith(':')) { $_ } } |
+                 Where-Object { $_ -like 'Data\Source\*' -or $_ -like 'Data\Scripts\Source\*' })
+    if ($srcKeys.Count) {
+        Yes ('all {0} script sources it names are caught' -f $srcKeys.Count) (@($srcKeys | Where-Object { -not (Test-ShipMachine $_) }).Count -eq 0)
+    } else { Skip 'this record names no script sources to measure' }
     $platform = @($keys | Where-Object { $_ -like 'Data\Platform\*' })
     Yes ('and none of its {0} Data\Platform files is' -f $platform.Count) (@($platform | Where-Object { (Test-ShipBethesdaTool $_) -or (Test-ShipBackup $_) }).Count -eq 0)
 } else {
@@ -163,6 +236,15 @@ try {
     Yes '  and its dialogue views and tools' ($r.Out.Contains('game/Data/DialogueViews/0001A2A8.xml:0  never-ship-bethesda') -and $r.Out.Contains('game/Tools/RoboVoicer.exe:0  never-ship-bethesda'))
     Yes '  and the game itself' ($r.Out.Contains('game/SkyrimSE.exe:0  never-ship-bethesda'))
     Yes '  and a backup' ($r.Out.Contains('SkyrimPlatform.ini.bak:0  never-ship-backup'))
+
+    # The three main packs of 15 September carried 62 of these under
+    # Data\Scripts\Source (#1227).
+    $src = Join-Path $tmp 'pack-sources.zip'
+    New-Zip $src @('game/Data/Source/Scripts/Actor.psc', 'game/Data/Scripts/Source/SKSE.psc', 'game/Data/Platform/Plugins/thornswood-front.js')
+    $r = Invoke-Secrets @('-Zip', $src)
+    Yes 'a pack carrying the Creation Kit''s script sources fails' ($r.Code -eq 1)
+    Yes '  naming both source folders by rule' ($r.Out.Contains('game/Data/Source/Scripts/Actor.psc:0  never-ship-bethesda') -and $r.Out.Contains('game/Data/Scripts/Source/SKSE.psc:0  never-ship-bethesda'))
+    Yes '  and not the plugin of ours beside them' (-not $r.Out.Contains('thornswood-front.js:0'))
 
     $good = Join-Path $tmp 'pack-good.zip'
     New-Zip $good @('game/Data/Platform/Plugins/thornswood-front.js', 'game/Data/meshes/interface/logo/logo.nif')
@@ -206,7 +288,8 @@ if ($guard) {
     }
     $clean = @{ 'Data\Platform\UI\index.html' = '1:aa'; ':gone:Data\Interface\map.swf' = 'always'; ':order:plugins' = 'x' }
     Yes '  a record of ours alone goes through' ((Invoke-Guard $clean) -eq '')
-    foreach ($k in @('CreationKit.exe', 'SkyrimSE.exe.bak-1160-for-369', 'Data\DialogueViews\1.xml', 'SkyrimSE.exe', 'VERSION.bak', ':gone:Tools\RoboVoicer.exe')) {
+    foreach ($k in @('CreationKit.exe', 'SkyrimSE.exe.bak-1160-for-369', 'Data\DialogueViews\1.xml', 'SkyrimSE.exe', 'VERSION.bak', ':gone:Tools\RoboVoicer.exe',
+                     'Data\Source\Scripts\Actor.psc', 'Data\Scripts\Source\IED.psc', ':gone:Data\Scripts\Source\SKSE.psc')) {
         $m = @{} + $clean; $m[$k] = '1:bb'
         $why = Invoke-Guard $m
         Yes "  a record naming $k stops the release" ($why -like 'STOP*Bethesda*')
@@ -220,12 +303,15 @@ if ($filter) {
     Yes '  and runs before the new record is worked out' ($roll.IndexOf('# ==== thornswood no bethesda in a rollback ====') -lt $roll.IndexOf('$newMap = @{}'))
     function Say($m, $c) { }
     $curMap = @{ 'Data\Platform\UI\index.html' = '1:aa'; 'CreationKit.exe' = '2:bb'; ':gone:lex\ssceam.tlx' = 'removed'; ':profile:plugins.txt' = 'x' }
-    $tgtMap = @{ 'Data\Platform\UI\index.html' = '1:cc'; 'SkyrimSE.exe.bak-1160-for-369' = '3:dd'; 'Data\DialogueViews\1.xml' = '4:ee' }
+    $curMap[':gone:Data\Source\Scripts\Game.psc'] = 'removed'
+    $tgtMap = @{ 'Data\Platform\UI\index.html' = '1:cc'; 'SkyrimSE.exe.bak-1160-for-369' = '3:dd'; 'Data\DialogueViews\1.xml' = '4:ee';
+                 'Data\Scripts\Source\IED.psc' = '5:ff'; 'Data\Scripts\IED.pex' = '6:aa' }
     Invoke-Expression $filter
     Yes '  going back to an old record hands none of them out' (-not $tgtMap.ContainsKey('SkyrimSE.exe.bak-1160-for-369') -and -not $tgtMap.ContainsKey('Data\DialogueViews\1.xml'))
-    Yes '  and going forward lists none of them as gone' (-not $curMap.ContainsKey('CreationKit.exe') -and -not $curMap.ContainsKey(':gone:lex\ssceam.tlx'))
-    Yes '  while the files of ours and the plugin list stay' ($curMap.ContainsKey('Data\Platform\UI\index.html') -and $tgtMap.ContainsKey('Data\Platform\UI\index.html') -and $curMap.ContainsKey(':profile:plugins.txt'))
-    Yes ('  and it says how many it left out ({0})' -f $notOurs) ($notOurs -eq 4)
+    Yes '  nor a script source a record of 29 September names' (-not $tgtMap.ContainsKey('Data\Scripts\Source\IED.psc'))
+    Yes '  and going forward lists none of them as gone' (-not $curMap.ContainsKey('CreationKit.exe') -and -not $curMap.ContainsKey(':gone:lex\ssceam.tlx') -and -not $curMap.ContainsKey(':gone:Data\Source\Scripts\Game.psc'))
+    Yes '  while the files of ours and the plugin list stay' ($curMap.ContainsKey('Data\Platform\UI\index.html') -and $tgtMap.ContainsKey('Data\Platform\UI\index.html') -and $curMap.ContainsKey(':profile:plugins.txt') -and $tgtMap.ContainsKey('Data\Scripts\IED.pex'))
+    Yes ('  and it says how many it left out ({0})' -f $notOurs) ($notOurs -eq 6)
 }
 
 # ---- 5. the launcher --------------------------------------------------------
@@ -278,7 +364,8 @@ if ($compiled) {
     $T = [type]($ns + '.OwnGame')
     $twins = @($bethesda) + @('SkyrimSE.exe', 'SkyrimSELauncher.exe', 'skse64_loader.exe',
         'Data\Thornswood-Content.esp', 'Data\Platform\UI\index.html', 'Data\meshes\tools\hammer.nif',
-        'Data\DialogueViewsExtra\x.xml', 'Data\textures\CreationKitLogo.dds', 'Data\SKSE\Plugins\Tools.ini')
+        'Data\DialogueViewsExtra\x.xml', 'Data\textures\CreationKitLogo.dds', 'Data\SKSE\Plugins\Tools.ini',
+        'Data\Scripts\Source.pex', 'Data\SourceArt\x.dds', 'Data\textures\Source\x.dds', 'Data\meshes\Scripts\Source\x.nif', 'Data\Scripts\IED.pex') + @($ckInstall)
     $apart = @($twins | Where-Object { [bool]$T::BethesdaTool($_) -ne [bool](Test-ShipBethesdaTool $_) })
     Yes ('OwnGame.BethesdaTool and Test-ShipBethesdaTool agree on all {0} paths' -f $twins.Count) ($apart.Count -eq 0)
     foreach ($a in $apart) { Write-Host "      they disagree on $a" }
@@ -286,8 +373,10 @@ if ($compiled) {
     $game = Join-Path ([IO.Path]::GetTempPath()) ('ts-nobethesda-game-' + $PID)
     try {
         $plant = @('CreationKit.exe', 'SkyrimSE.exe.bak-1160-for-369', 'p4com64.dll', 'Tools\Archive\Archive.exe',
-                   'Papyrus Compiler\PapyrusCompiler.exe', 'lex\User\correct.tlx', 'Data\DialogueViews\0001.xml', 'Data\Scripts.zip')
-        $ours = @('SkyrimSE.exe', 'Data\Thornswood-Content.esp', 'Data\Platform\UI\index.html', 'Data\meshes\tools\hammer.nif')
+                   'Papyrus Compiler\PapyrusCompiler.exe', 'lex\User\correct.tlx', 'Data\DialogueViews\0001.xml', 'Data\Scripts.zip',
+                   'Data\Source\Scripts\Actor.psc', 'Data\Source\Scripts\TESV_Papyrus_Flags.flg', 'Data\Scripts\Source\SKSE.psc')
+        $ours = @('SkyrimSE.exe', 'Data\Thornswood-Content.esp', 'Data\Platform\UI\index.html', 'Data\meshes\tools\hammer.nif',
+                  'Data\Scripts\IED.pex', 'Data\Scripts\Source.pex')
         foreach ($p in $plant + $ours) {
             $f = Join-Path $game $p
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $f) | Out-Null
@@ -309,5 +398,9 @@ $rulesNum = [regex]::Match($og, '(?m)^\s*const int Rules = (\d+);')
 $rulesDoc = [regex]::Match($og, "(?m)^\s*/// (\d+): Bethesda's Creation Kit")
 Yes 'Rules moved for it, so every folder already made refreshes once and drops them' (
     $rulesNum.Success -and $rulesDoc.Success -and [int]$rulesNum.Groups[1].Value -ge [int]$rulesDoc.Groups[1].Value)
+$rulesSrc = [regex]::Match($og, "(?m)^\s*/// (\d+): the Creation Kit's script sources")
+Yes 'and moved again for the script sources (#1227), past the Creation Kit''s number' (
+    $rulesNum.Success -and $rulesSrc.Success -and $rulesDoc.Success -and
+    [int]$rulesNum.Groups[1].Value -ge [int]$rulesSrc.Groups[1].Value -and [int]$rulesSrc.Groups[1].Value -gt [int]$rulesDoc.Groups[1].Value)
 
 Done
