@@ -5,11 +5,11 @@
   people with a way to get about.
 
   This deliberately uses the dull kind of carriage. Touring Carriages gives
-  you a real animated ride, and under Skyrim Together that is the worst
+  you a real animated ride, and in multiplayer that is the worst
   possible shape: it parents you to a moving furniture actor that the mod
   does not sync, so everyone else watches you stand still or slide, and its
   own author warns that saves made during a ride will not reload. CFTO fades
-  instead. One position change, which is exactly what Skyrim Together already
+  instead. One position change, which is exactly what multiplayer already
   handles for ordinary fast travel.
 
       .\scripts\mods\Add-CartTravel.ps1

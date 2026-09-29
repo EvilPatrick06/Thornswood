@@ -48,14 +48,10 @@ $ShipRuntimeDirs = @(
     '_to_delete\',
     # RaceMenu writes a face export here when somebody saves one in game.
     'Data\SKSE\Plugins\CharGen\Exported\',
-    # Data\SkyrimTogetherReborn\ WAS HERE, cache and logs, until 23
-    # September. It is another server's folder and it belongs in
-    # Test-ShipOtherServer below, by prefix, which is where it is now.
-    # The difference is not cosmetic: a runtime path has its files listed
-    # as removed and swept off every install that has them, and this is
-    # somebody else's install being swept. Two named subfolders were
-    # listed and the rest of the folder was in no list at all, so a pack
-    # could carry the parts that were not named.
+    # Another server's folder must never be listed here: a runtime path has
+    # its files listed as removed and swept off every install that has them,
+    # which is somebody else's install being swept. Those go in
+    # Test-ShipOtherServer below.
     '.sentry-native\'
 )
 
@@ -281,15 +277,6 @@ function Test-ShipOtherServer([string]$rel) {
     # kept it out of the installer all along; nothing kept it out of a pack.
     if ($rel -match '^Data\\NirnLabUIPlatform($|\\)') { return $true }
     if ((Split-Path $rel -Leaf) -ieq 'NirnLabUIPlugin.dll') { return $true }
-    # Skyrim Together Reborn's whole folder, wherever it came from. Its
-    # cache and its logs used to be in the runtime list above, which meant
-    # a release listed them as removed and every launcher took them off
-    # somebody's other install. Nothing here supports another server any
-    # more, so the rule is the one this list exists for: never shipped,
-    # never removed. Anchored and with a boundary, so a sibling folder
-    # whose name merely starts the same way is not matched.
-    # OwnGame.Foreign carries the same rule; change the two together.
-    if ($rel -match '^Data\\SkyrimTogetherReborn($|\\)') { return $true }
     # Other launchers' parking folders inside our own game folder, Djinn, 25
     # September. Keizaal's launcher moves the Creation Club archives it turns
     # off into Data\_disabledByKzl and keeps its own backup and plugin list

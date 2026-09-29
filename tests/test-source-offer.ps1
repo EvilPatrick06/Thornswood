@@ -10,7 +10,7 @@
   and AGPL version 3, each in its own LICENSE file. Nothing Thornswood put in
   front of a stranger said where the source was: credits.md named SkyMP with
   no licence and no link, and on 24 September the installer's READ ME
-  FIRST.txt was still the Skyrim Together one, left in the setup program's
+  FIRST.txt was still the old multiplayer mod's one, left in the setup program's
   scratch folder. The entry's closing condition: a stranger can reach,
   "from the download page and from inside the installed folder", a page
   naming skymp5-client, skyrim-platform and skymp5-server with their licences

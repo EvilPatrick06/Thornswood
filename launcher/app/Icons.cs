@@ -13,8 +13,8 @@ namespace Thornswood
     ///
     /// Windows draws a shortcut's icon once and then remembers the picture
     /// against the place it came from. Every build used to point the shortcut
-    /// at "SkyrimTogether.exe,0", so that address never changed and neither did
-    /// the remembered picture. New artwork could sit inside the exe for a week
+    /// at the launcher exe's own first icon, so that address never changed and
+    /// neither did the remembered picture. New artwork could sit inside the exe for a week
     /// while the desktop went on showing the old one, and a reboot does not
     /// clear it, which is what makes people think the update did not arrive.
     ///
@@ -28,7 +28,7 @@ namespace Thornswood
     ///
     /// The name under the icon and the label that appears when you hover come
     /// from the shortcut file rather than from the program, so this fixes
-    /// those too. A shortcut still called "Skyrim Together" goes on saying so
+    /// those too. A shortcut still carrying an old name goes on saying so
     /// forever otherwise, and the pinned taskbar copy is its own file in its
     /// own folder that no build script was ever looking at.
     /// </summary>
@@ -49,11 +49,9 @@ namespace Thornswood
         static extern void SHChangeNotify(int eventId, uint flags, string item1, string item2);
 
         /// <summary>
-        /// The running launcher, wherever it is and whatever it is called. It
-        /// was SkyrimTogether.exe and is Thornswood.exe now, and installs made
-        /// before the rename keep the old name because the launcher replaces
-        /// itself in place when it updates. Asking the assembly means the
-        /// shortcut points at the one that is actually there.
+        /// The running launcher, wherever it is and whatever it is called.
+        /// Asking the assembly means the shortcut points at the one that is
+        /// actually there.
         /// </summary>
         static string LauncherExe
         {
@@ -65,12 +63,7 @@ namespace Thornswood
                     if (!string.IsNullOrEmpty(me) && File.Exists(me)) return me;
                 }
                 catch (Exception ex) { Swallow.Note("Icons.LauncherExe", ex); }
-                foreach (string n in new[] { "Thornswood.exe", "SkyrimTogether.exe" })
-                {
-                    string p = Path.Combine(Paths.LauncherDir, n);
-                    if (File.Exists(p)) return p;
-                }
-                return Path.Combine(Paths.LauncherDir, "Thornswood.exe");
+                return Path.Combine(Paths.LauncherDir, SelfSwap.NewName);
             }
         }
 
@@ -288,8 +281,8 @@ namespace Thornswood
                             // The update that renames an install from the
                             // old name deletes the old exe, so a shortcut
                             // still aimed at it in this launcher's folder is
-                            // ours and is pointed at this one. Issue #497,
-                            // release 1 of 2: goes with SelfSwap.OldName.
+                            // ours and is pointed at this one. Issue #497:
+                            // the update path, kept with SelfSwap.OldName.
                             bool repointed = false;
                             if (SelfSwap.AimsAtOld(target, exe))
                             {
@@ -302,7 +295,7 @@ namespace Thornswood
                             if (!string.Equals(Full(target), Full(exe),
                                                StringComparison.OrdinalIgnoreCase)) continue;
 
-                            // Wrong file name, which is where "Skyrim Together"
+                            // Wrong file name, which is where an old name
                             // survives: the label under a shortcut and the one
                             // that appears on hover are the file name, not
                             // anything inside the program.

@@ -99,12 +99,12 @@ const page = all();
 
 // ------------------------------------------------ what the entry says went
 /*
-  The entry's own check is Select-String for 'Skyrim Together|192.135.119.166|
-  password you entered'. The rest are what the page still said on 24 September
+  The entry's own check is Select-String for the old multiplayer mod's name,
+  192.135.119.166 and 'password you entered'. The rest are what the page still said on 24 September
   once it was read against the code, each with the reason it is wrong.
 */
 const DEAD = [
-  [/Skyrim Together|\bTogether\b/, 'the old engine by name'],
+  [/Skyrim\s*Together|\bTogether\b/, 'the old engine by name'],
   [/192\.135\.119\.166|25565/, 'the old engine\'s address and port'],
   [/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/, 'any server address at all: it arrives with the update'],
   [/password you entered/i, 'a password error this client cannot raise'],

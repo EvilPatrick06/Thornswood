@@ -3,12 +3,11 @@
 
   Measures. Deletes nothing, moves nothing, renames nothing.
 
-  Three questions, in order of how much disk they are worth:
+  Two questions, in order of how much disk they are worth:
 
     1. How big is each folder, so the 13 GB ones can be told from the 13 MB
        ones before anybody starts deciding.
-    2. What is left over from Skyrim Together, which this build replaced.
-    3. What is a backup, a temp file or a previous copy of something.
+    2. What is a backup, a temp file or a previous copy of something.
 
   The full answer goes to a file, because a recursive listing of a 22 GB game
   build is not something anybody wants scrolling past. The console gets the
@@ -38,7 +37,6 @@ function MB($b) { '{0,8:n1} MB' -f ($b / 1MB) }
 # measured and named, never to be touched: it is where the vanilla files come
 # from and the installer fingerprints three of them.
 $roots = @(
-    @{ Path = 'C:\SkyrimTogether';                                                   Note = 'the old Skyrim Together build' }
     @{ Path = 'C:\Thornswood';                                                       Note = 'the live build' }
     @{ Path = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Engine);                                             Note = 'the SkyMP source and build tree' }
     @{ Path = 'C:\SkyrimRP';                                                         Note = 'older attempt?' }
@@ -50,9 +48,6 @@ $roots = @(
     @{ Path = (Join-Path $env:LOCALAPPDATA 'Temp\Skyrim Platform');                   Note = 'CEF caches and logs' }
     @{ Path = 'C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition'; Note = 'vanilla Steam copy. DO NOT TOUCH' }
 )
-
-# Anything whose name says Skyrim Together, or the projects it was built on.
-$togetherRx = '(?i)(skyrimtogether|skyrim[_ -]together|tiltedonline|tiltedphoques|\bSTServer\b)'
 
 # Backups, previous copies and scratch. Deliberately narrow: a pattern that
 # matches too much turns an audit into a list nobody reads.
@@ -116,38 +111,6 @@ foreach ($t in ($totals | Sort-Object Bytes -Descending)) {
     }
 }
 
-# ------------------------------------------------------- skyrim together ---
-Head 'Skyrim Together leftovers'
-File ''
-File 'SKYRIM TOGETHER LEFTOVERS'
-File ('-' * 70)
-
-$togetherHits = @()
-foreach ($t in $totals) {
-    # A whole root that IS a Together install is reported as one thing rather
-    # than as ten thousand things.
-    if ($t.Path -match $togetherRx) {
-        $togetherHits += [pscustomobject]@{ Path = $t.Path; Bytes = $t.Bytes; Whole = $true }
-        continue
-    }
-    foreach ($f in $t.Files) {
-        if ($f.FullName -match $togetherRx) {
-            $togetherHits += [pscustomobject]@{ Path = $f.FullName; Bytes = $f.Length; Whole = $false }
-        }
-    }
-}
-$tBytes = ($togetherHits | Measure-Object -Property Bytes -Sum).Sum
-if (-not $tBytes) { $tBytes = 0 }
-Out2 ("  {0} in {1:n0} place(s)" -f (GB $tBytes), $togetherHits.Count)
-foreach ($h in ($togetherHits | Sort-Object Bytes -Descending)) {
-    $tag = if ($h.Whole) { '  <- the whole folder' } else { '' }
-    File ("    {0}   {1}{2}" -f (MB $h.Bytes), $h.Path, $tag)
-}
-foreach ($h in ($togetherHits | Sort-Object Bytes -Descending | Select-Object -First 12)) {
-    $tag = if ($h.Whole) { '  <- the whole folder' } else { '' }
-    Say ("    {0}   {1}{2}" -f (MB $h.Bytes), $h.Path, $tag) 'DarkGray'
-}
-
 # --------------------------------------------------- backups and scratch ---
 Head ("Backups, previous copies and scratch, over {0} MB" -f $MinMB)
 File ''
@@ -156,7 +119,6 @@ File ('-' * 70)
 
 $cruft = @()
 foreach ($t in $totals) {
-    if ($t.Path -match $togetherRx) { continue }   # already counted whole
     foreach ($f in $t.Files) {
         if ($f.Name -match $cruftRx -or $f.FullName -match $cruftDirRx) {
             $cruft += [pscustomobject]@{ Path = $f.FullName; Bytes = $f.Length }

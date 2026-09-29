@@ -35,7 +35,7 @@ param(
     nobody has.
 
     Found 23 September, and it is the same shape as the eleven scripts that
-    were still reading C:\SkyrimTogether: a default that points at a machine
+    were still reading the old build folder: a default that points at a machine
     nobody has any more, waiting for the one day somebody needs it.
   #>
   [string]$OutDir = (& (Join-Path $PSScriptRoot 'Where.ps1') Package),

@@ -7,15 +7,15 @@
 // character after themselves, and to save before connecting." The first-run
 // card on the Play page said "Create a character and name it after yourself"
 // and "Save once before connecting. Joining from an unsaved game drops you back
-// to the menu." Both were Skyrim Together's advice, carried over. The name is
+// to the menu." Both were the old multiplayer mod's advice, carried over. The name is
 // what everybody sees above your head, so somebody who followed the card walked
 // into Whiterun under their own name. And there is no saving here: the site's
 // help page says "No saving. The server holds your character. Quitting is
 // safe."
 //
 // The same name advice was in the Help page's first Joining item, two pages
-// away, and its third item still explained saving by what Skyrim Together
-// used to refuse. Fixing the card alone would have left the launcher telling
+// away, and its third item still explained saving by what the old
+// multiplayer mod used to refuse. Fixing the card alone would have left the launcher telling
 // two different stories, so this reads both files and checks they agree.
 //
 // Read only.
@@ -109,8 +109,8 @@ yes('any Joining item about saving says there is no saving, as the site does',
     saving.every(function (j) { return /no saving/i.test(j.title + ' ' + j.body); }));
 yes('any Joining item about saving says the server holds the character',
     saving.every(function (j) { return /server holds your character/i.test(j.body); }));
-yes('no Joining item is explained by Skyrim Together',
-    joining.every(function (j) { return !/Skyrim Together|\bTogether\b/.test(j.title + ' ' + j.body); }));
+yes('no Joining item is explained by the old multiplayer mod',
+    joining.every(function (j) { return !/Skyrim\s*Together|\bTogether\b/.test(j.title + ' ' + j.body); }));
 yes('no Joining item calls saving worth doing',
     joining.every(function (j) { return !/saving is still worth/i.test(j.body); }));
 

@@ -187,12 +187,7 @@ if (-not (Test-Path $headerVideo)) { Die "launcher-header.mp4 is not at $headerV
 Say "  $($cs.Count) source files" 'Green'
 
 $null = New-Item -ItemType Directory -Force -Path $outDir
-# Thornswood.exe since the move off Skyrim Together. An install made before the
-# rename still has the old name, because the launcher replaces itself in place
-# when it updates rather than being reinstalled, so the old one is cleared out
-# here to stop two launchers sitting in the same folder.
 $exe = Join-Path $outDir 'Thornswood.exe'
-$oldExe = Join-Path $outDir 'SkyrimTogether.exe'
 
 # Nothing is closed here any more; Install-Launcher.ps1 does that, after a
 # build that worked. So a launcher still running from this folder holds its own
@@ -349,14 +344,6 @@ if (Test-Path -LiteralPath $pdb) {
     Say ("  Thornswood.pdb  {0:n0} KB (kept beside the exe; packs and the installer leave it out)" -f ((Get-Item $pdb).Length / 1KB)) 'DarkGray'
 } else {
     Say '  Thornswood.pdb did not appear beside the exe' 'Yellow'
-}
-if (Test-Path -LiteralPath $oldExe) {
-    try {
-        Remove-Item -LiteralPath $oldExe -Force
-        Say '  removed the old SkyrimTogether.exe' 'DarkGray'
-    } catch {
-        Say '  could not remove the old SkyrimTogether.exe, it is probably still running' 'Yellow'
-    }
 }
 
 # ------------------------------------------------------------ setup stub

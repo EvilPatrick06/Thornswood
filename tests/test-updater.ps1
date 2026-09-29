@@ -237,7 +237,7 @@ function Run {
 
     # ---- no GitHub fallback (#907) --------------------------------------------
     #
-    # RepoCandidates tried both sides of the skyrim-together rename on the
+    # RepoCandidates tried both sides of the repository rename on the
     # GitHub Contents API fallback. The fallback went with Thornswood-Releases,
     # so the site feed is the only place updates are read from: a config with a
     # repository and no feed url has no update source at all.

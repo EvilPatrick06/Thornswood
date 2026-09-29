@@ -1,7 +1,7 @@
 <#
   Start-Thornswood.ps1
 
-  Launches the game the way the launcher's Play() does, without Skyrim Together.
+  Launches the game the way the launcher's Play() does, without the launcher.
 
   Skyrim always reads its settings, plugin list and saves from two fixed folders
   under the Windows user profile. It has no concept of a per-build profile. The

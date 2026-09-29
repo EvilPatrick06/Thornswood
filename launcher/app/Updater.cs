@@ -646,7 +646,7 @@ namespace Thornswood
                 throw new Exception("That update arrived without a checksum, so it has not been downloaded. This is a publishing mistake, not something wrong with your install.");
 
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
-            string tmp = Path.Combine(Path.GetTempPath(), "st-" + Guid.NewGuid().ToString("N") + ".bin");
+            string tmp = Path.Combine(Path.GetTempPath(), "thornswood-" + Guid.NewGuid().ToString("N") + ".bin");
             using (var wc = Client(cfg, true, url)) wc.DownloadFile(url, tmp);
 
             string got = Sha256(tmp);
@@ -1161,15 +1161,15 @@ namespace Thornswood
             // minutes now, watching the new launcher start, and with one fixed
             // name the dev build updating in that time would write over a
             // script cmd is still reading.
-            string bat = Path.Combine(Path.GetTempPath(), "st-update-" + me + ".cmd");
+            string bat = Path.Combine(Path.GetTempPath(), "thornswood-update-" + me + ".cmd");
 
             // Waits for this launcher to be gone, keeps it as Thornswood.exe.old,
             // puts the new one in, and puts the old one back if the new one
             // does not start. SelfSwap.cs has the script and the failures each
             // line of it is there for. An install still running under the
             // launcher's name from before the rename gets the new one as
-            // Thornswood.exe beside it and loses the old name (issue #497,
-            // release 1 of 2; SelfSwap.OldName says when that comes out).
+            // Thornswood.exe beside it and loses the old name (issue #497;
+            // SelfSwap.OldName says why that stays).
             if (!String.Equals(SelfSwap.Target(exe), exe, StringComparison.OrdinalIgnoreCase))
                 log("This launcher still has its old name; the update puts it in as " + SelfSwap.NewName + ".");
             File.WriteAllText(bat, SelfSwap.Script(exe, neu, me));

@@ -19,12 +19,9 @@
 function Get-LauncherProcesses {
     param([Parameter(Mandatory)][string]$Root)
 
-    # Both names: Thornswood.exe now, SkyrimTogether.exe on any install made
-    # before the rename, since the launcher updates itself in place.
     $exe = Join-Path $Root 'Launcher\Thornswood.exe'
-    if (-not (Test-Path -LiteralPath $exe)) { $exe = Join-Path $Root 'Launcher\SkyrimTogether.exe' }
     $mine = @(); $unknown = 0
-    foreach ($p in @(Get-Process -Name 'Thornswood', 'SkyrimTogether' -ErrorAction SilentlyContinue)) {
+    foreach ($p in @(Get-Process -Name 'Thornswood' -ErrorAction SilentlyContinue)) {
         $path = $null
         try { $path = $p.MainModule.FileName } catch { }
         if ($path -and ($path -eq $exe)) { $mine += $p }
@@ -39,17 +36,16 @@ function Get-GameProcesses {
     $launcher = ''
     if ($Root) {
         $launcher = Join-Path $Root 'Launcher\Thornswood.exe'
-        if (-not (Test-Path -LiteralPath $launcher)) { $launcher = Join-Path $Root 'Launcher\SkyrimTogether.exe' }
     }
     $out = @()
-    foreach ($n in 'SkyrimSE', 'skse64_loader', 'Thornswood', 'SkyrimTogether') {
+    foreach ($n in 'SkyrimSE', 'skse64_loader', 'Thornswood') {
         foreach ($p in @(Get-Process -Name $n -ErrorAction SilentlyContinue)) {
             $path = $null
             try { $path = $p.MainModule.FileName } catch { }
             # The launcher shares its name with the multiplayer client. Only the
             # full path tells them apart, so a path we cannot read is left alone
             # rather than guessed at.
-            if ($n -eq 'Thornswood' -or $n -eq 'SkyrimTogether') {
+            if ($n -eq 'Thornswood') {
                 if (-not $path) { continue }
                 if ($launcher -and ($path -eq $launcher)) { continue }
                 if ($path -like '*\Launcher\Thornswood.exe') { continue }

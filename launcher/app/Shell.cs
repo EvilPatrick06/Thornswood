@@ -4001,7 +4001,7 @@ namespace Thornswood
             quickKeys.Children.Clear();
 
             // Read out of the real files rather than typed here. A hardcoded
-            // list went stale the moment the build moved off Skyrim Together:
+            // list went stale the moment the build moved to SkyMP:
             // it was still offering an F2 party menu that no longer exists and
             // a trade key belonging to a mod that had been removed. A row now
             // appears only if its binding is really there, and it shows the key
@@ -5333,8 +5333,8 @@ namespace Thornswood
                 // appropriate address library" when it is wrong, even though
                 // the file is sitting right there.
                 //
-                // No --exePath any more. That existed because Skyrim Together's
-                // own client looked Skyrim up through Steam's registry key and
+                // No --exePath any more. That existed because the old
+                // multiplayer mod's own client looked Skyrim up through Steam's registry key and
                 // would start the wrong copy. skse64_loader starts the exe
                 // beside it, so the build it is sitting in is the one that runs.
                 var psi = new ProcessStartInfo(Paths.Loader);
