@@ -501,6 +501,44 @@ namespace Thornswood
             return st;
         }
 
+        /// <summary>
+        /// A join pass for one character, or "" with why saying why not (#937).
+        ///
+        /// The game server ends a session that has not shown it one, so this
+        /// is what lets a character into the world at all. The site signs it
+        /// only for this ticket's own character, and only when this launcher's
+        /// version is one the channel's feed still lets in: from its
+        /// minLauncher up to the launcher it published. why is the site's own
+        /// sentence when it said no, which is written for the person.
+        /// </summary>
+        public static string Pass(int profileId, out string why)
+        {
+            why = "";
+            if (!Linked)
+            {
+                why = "This copy is not linked to a Discord account yet.";
+                return "";
+            }
+            string body = "{\"ticket\":\"" + Escape(Ticket) + "\"" +
+                          ",\"profileId\":" + profileId.ToString(CultureInfo.InvariantCulture) +
+                          ",\"channel\":\"" + Escape(string.IsNullOrEmpty(Channel) ? "main" : Channel) + "\"" +
+                          ",\"version\":\"" + Escape(Updater.Version) + "\"}";
+            string reply;
+            int code = PostJson(Site + "/api/play/pass", body, out reply);
+            if (code == 0)
+            {
+                why = "Could not reach thornswood.net for a join pass.";
+                return "";
+            }
+            string pass = Field(reply, "pass");
+            if (code == 200 && Field(reply, "ok") == "true" &&
+                Regex.IsMatch(pass, "^jp1\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"))
+                return pass;
+            why = Field(reply, "message");
+            if (why.Length == 0) why = "thornswood.net answered " + code + " and gave no join pass.";
+            return "";
+        }
+
         // -------------------------------------------------------- sessions --
         //
         // Both ends of a play session, so there is a record of who tested what
@@ -909,6 +947,8 @@ namespace Thornswood
             if (string.IsNullOrEmpty(text)) return "";
             string s = Regex.Replace(text, @"\bv1\.[0-9]+\.[0-9]+\.[A-Za-z0-9_-]{16,}", "v1.[join token removed]");
             s = Regex.Replace(s, @"\btk1\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}", "tk1.[ticket removed]");
+            // The join pass (#937), "jp1.body.signature" from the site's makePass.
+            s = Regex.Replace(s, @"\bjp1\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}", "jp1.[join pass removed]");
             return s;
         }
 

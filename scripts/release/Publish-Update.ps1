@@ -1276,6 +1276,22 @@ if ($Launcher -and (Test-Path $exePath)) {
     }
 }
 
+# ==== thornswood min launcher ====
+# The launcher this feed offers is the oldest one allowed into the game (#937;
+# Patrick, 28 Sep: no older launcher is kept working in game). The site refuses
+# a join pass below minLauncher, so the game server ends that session, and the
+# launcher holds Play below it (FeedNotice.cs). Written on every publish from
+# the feed's own launcherVersion, so a Ship that keeps the launcher it had
+# (#921) keeps the minimum where it was. Updating needs no pass, so every
+# launcher still out there can read this feed and update itself.
+$minWas = Val $doc 'minLauncher'
+$minNow = Val $doc 'launcherVersion'
+if ($minNow) {
+    Set-Prop $doc 'minLauncher' $minNow
+    if ($minWas -ne $minNow) { Say "  minLauncher $minNow, so an older launcher updates before it can play" 'Green' }
+}
+# ==== end thornswood min launcher ====
+
 # Whatever this machine's launcher is pointed at becomes what everyone else is
 # pointed at. It is how the password reaches four other people without anyone
 # being told what it is, and how a server move fixes itself.
