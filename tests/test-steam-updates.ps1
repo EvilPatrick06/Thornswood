@@ -510,8 +510,12 @@ try {
     Yes 'the remembered No is a config setting that starts off false' ($cfgSrc -match '\[DataMember\] public bool SteamUpdatesDeclined = false;')
 
     $down = Body $shell 'static void RunDowngrade()'
-    Yes 'the question also comes after a downgrade that worked, whatever was said before' (($down -match 'if \(ok\) AskToHoldSteamUpdates\(\);') -and ($ask -notmatch 'SteamUpdatesDeclined\)'))
-    Yes 'the start calls it once no downgrade is needed' ($shell -match 'if \(!Downgrade\.Needed\(cfg\) && !Downgrade\.SourceNeeded\(cfg\)\) HoldSteamUpdatesOnStart\(\);')
+    # Since #1218 the downgrade never writes the Steam copy, so there is nothing
+    # there for the setting to hold afterwards, and the question does not
+    # follow it (test-own-folder-alone.ps1).
+    Yes 'the question does not follow a downgrade, which no longer writes the Steam copy' (($down.Length -gt 0) -and ($down -notmatch 'AskToHoldSteamUpdates') -and ($ask -notmatch 'SteamUpdatesDeclined\)'))
+    Yes 'the start calls it once no downgrade is needed' ($shell -match 'if \(!Downgrade\.Needed\(cfg\)\) HoldSteamUpdatesOnStart\(\);')
+    Yes 'and reads Steam''s file for the Steam copy, never Thornswood''s folder' (($start -match 'string target = OwnGame\.Source\(cfg\);') -and ($ask -match 'SteamUpdates\.ManifestFor\(OwnGame\.Source\(cfg\)\)'))
     Yes 'the start line is read only there' ((([regex]::Matches($shell + $askSrc, 'SteamUpdates\.Report\(')).Count -eq 1) -and ($start -match 'SteamUpdates\.Report\('))
     $draw = Body $shell 'static bool DrawStatus()'
     Yes 'the Play button does not look at it' (($draw.Length -gt 0) -and ($draw -notmatch 'SteamUpdates'))
@@ -527,7 +531,10 @@ try {
     Yes 'every file in the game''s root is copied into Thornswood''s folder, never linked' ($own -match "if \(rel\.IndexOf\('\\\\'\) < 0\) return true;")
     $chk = Get-Content -LiteralPath $checks -Raw
     Yes 'the Game build check reads the exe Thornswood runs (Paths.Exe)' (($chk -match 'new FileInfo\(Paths\.Exe\)\.Length') -and ($chk -match 'new Check\("Game build", bytes == cfg\.ExpectedExeBytes'))
-    Yes 'and a Steam copy on another build stops the folder following it, with Downgrade as the way out' ($own -match 'most likely because Steam updated it\. Press Downgrade')
+    # Since #1218 a Steam copy on another build no longer stops a made folder
+    # following Vortex; only a first build asks for the Downgrade, and that
+    # leaves the Steam copy on its build (test-own-folder-alone.ps1).
+    Yes 'and a Steam copy on another build no longer stops a made folder following Vortex' (($own -notmatch 'most likely because Steam updated it') -and ($own -match 'if \(!made\)'))
 
     # ---- this machine's own manifest, read only ------------------------------------
     $libs = New-Object System.Collections.Generic.List[string]
