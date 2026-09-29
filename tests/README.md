@@ -6,7 +6,8 @@ Every `test-*.js` and `test-*.ps1` here checks one thing the scripts, the
 launcher, the plugins, the gamemode or the site promise, by reading the files
 or by running a piece of them against a scratch copy. None of them talks to
 the VPS or to GitHub unless it says so at the top (`test-branch-rules.js
---live` is the one that does). The nightly checks (`.github/workflows/nightly.yml`) run every one of them
+--live` is one that does; `test-collection-revision-2.ps1` reads both
+servers' manifests over plain HTTP unless given `-Offline`). The nightly checks (`.github/workflows/nightly.yml`) run every one of them
 on the VPS each night and open an issue when one fails; on a pull request,
 run the ones your change touches yourself.
 
