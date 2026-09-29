@@ -307,6 +307,18 @@ function usedTogether(a, b) {
   a = a.toLowerCase(); b = (b || '').toLowerCase();
   return corpus.some(function (t) { return t.indexOf(a) >= 0 && t.indexOf(b) >= 0; });
 }
+// Or a script that builds the file name from a parameter: the folder, then a
+// PowerShell variable and the extension, in the same script as the name
+// itself in quotes, the way scripts\ops\Discord-Hook.ps1 builds
+// C:\Thornswood-Bot\webhooks\$Name.txt with ValidateSet('dev', 'news').
+function builtFrom(dir, leaf) {
+  const dot = leaf.lastIndexOf('.');
+  if (dot <= 0) return false;
+  const stem = leaf.slice(0, dot).toLowerCase(), ext = leaf.slice(dot).toLowerCase();
+  const esc = function (s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
+  const re = new RegExp(esc(dir.toLowerCase() + BS) + '\\$\\w+' + esc(ext));
+  return corpus.some(function (t) { return re.test(t) && t.indexOf("'" + stem + "'") >= 0; });
+}
 const unknown = [];
 let placed = 0;
 rows.forEach(function (r) {
@@ -317,7 +329,7 @@ rows.forEach(function (r) {
     if (/^[A-Za-z]:$/.test(parts[0])) {
       const top = parts.slice(0, 2).join(BS);
       const leaf = parts.length > 2 ? parts[parts.length - 1] : '';
-      if (!usedTogether(top, leaf)) unknown.push(t);
+      if (!usedTogether(top, leaf) && !(leaf && builtFrom(parts.slice(0, -1).join(BS), leaf))) unknown.push(t);
     } else if (!usedTogether(parts[parts.length - 1], '')) {
       unknown.push(t);
     }
