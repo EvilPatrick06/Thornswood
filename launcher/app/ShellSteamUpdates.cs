@@ -29,8 +29,20 @@ namespace Thornswood
                 "Skyrim is on 1.6.1170 now, but Steam can still update it by itself, and the next update Steam takes puts it back on the newer build.\n\n" +
                 "Yes changes Steam's Updates setting for Skyrim to \"" + SteamUpdates.OnLaunchWords + "\", the same as picking it under Automatic Updates on Steam's own Properties, Updates page. " +
                 "It changes that one value in Steam's file for Skyrim and nothing else:\n\n    " + manifest + "\n\n" +
+                // Issue #493: a read-only mark on that file makes Steam fail to
+                // save Skyrim's state every few seconds, and Hold takes it off.
+                (SteamUpdates.IsReadOnly(manifest)
+                    ? "That file is marked read only, which stops Steam saving Skyrim's state in it. Yes also takes that mark off; the Updates setting is what keeps Skyrim on 1.6.1170.\n\n"
+                    : "") +
                 "Steam has to be closed first, or it writes the old setting back when it closes. Exit Steam from its own menu (Steam, Exit), then press Yes.\n\n" +
                 "No leaves it as it is.";
+            // Already held and only marked read only: nothing to change but the mark.
+            if (SteamUpdates.Read(manifest) == SteamUpdates.OnLaunchOnly)
+                ask = "Skyrim is on 1.6.1170 now, and Steam's Updates setting for it is already \"" + SteamUpdates.OnLaunchWords + "\".\n\n" +
+                      "But Steam's file for Skyrim is marked read only, which stops Steam saving Skyrim's state in it, so Steam logs a failure every few seconds:\n\n    " + manifest + "\n\n" +
+                      "Yes takes that mark off and changes nothing in the file. The Updates setting is what keeps Skyrim on 1.6.1170.\n\n" +
+                      "Steam has to be closed first. Exit Steam from its own menu (Steam, Exit), then press Yes.\n\n" +
+                      "No leaves it as it is.";
             while (true)
             {
                 MessageBoxResult r = MessageBox.Show(win, ask, "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
