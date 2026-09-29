@@ -416,8 +416,9 @@ What differs, none of it broken:
   neither feed names one (#907).
 - **Both feeds' client runtime is behind the record.** Main and dev both
   name fork commit `a922b480` (read 28 Sep, after the main Ship);
-  `records\client-build.json` is on `267ac311` since #919, which stops the
-  game's browser starting an mDNS responder. The next dev Ship carries it.
+  `records\client-build.json` is on `10841f40` since #1016, which keeps J
+  from the game's journal, on top of `267ac311` (#919, which stops the game's
+  browser starting an mDNS responder). The next dev Ship carries it.
 - **Main has no Skyrim pin fields.** The dev feed's `expectedExeBytes`,
   `newerExeBytes` and `depots` match `records\skyrim-pin.json`; main was last
   published before #874 added them, so main launchers use their compiled
