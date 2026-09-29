@@ -92,7 +92,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` are built from
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `97fbbaf8` (in full, `97fbbaf89698e27f0a75b84971c6be88bac2b2b1`). That
+commit `c197d382` (in full, `c197d382e05f9bd4b37a88d974ea43d8f2420690`). That
 is upstream skyrim-multiplayer/skymp at `f926944b` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -378,7 +378,7 @@ with.
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`. That record names `skymp5-server` in the fork at
   `b6721bb068756a7a998a8b12a26c7489c6f0e525`, an earlier commit on the same branch than the
-  `97fbbaf8` `records\client-build.json` names (what lies between them changes
+  `c197d382` `records\client-build.json` names (what lies between them changes
   the client, the unit tests and one server function, `getNeighborsByPosition`
   in `651537f4`, which the server binary takes at its next build), and it is
   AGPL-3.0. The binary running on
@@ -395,7 +395,7 @@ For the six client files and for the game server module running on the VPS, the
 Corresponding Source is the fork at the commit each record names. The six
 client files:
 
-https://github.com/EvilPatrick06/skymp/tree/97fbbaf89698e27f0a75b84971c6be88bac2b2b1
+https://github.com/EvilPatrick06/skymp/tree/c197d382e05f9bd4b37a88d974ea43d8f2420690
 
 The game server module:
 
