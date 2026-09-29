@@ -367,9 +367,10 @@ else:
     try:
         botroot = os.path.join(box, 'bot')
         out = os.path.join(box, 'out')
-        os.makedirs(botroot)
+        # In the bot's data folder, where the bot keeps it since #1104.
+        os.makedirs(os.path.join(botroot, 'data'))
         record = json.dumps(RECORD).encode('utf-8')
-        with open(os.path.join(botroot, 'joins.json'), 'wb') as f:
+        with open(os.path.join(botroot, 'data', 'joins.json'), 'wb') as f:
             f.write(record)
         with open(os.path.join(botroot, 'bot.env.json'), 'w',
                   encoding='utf-8') as f:

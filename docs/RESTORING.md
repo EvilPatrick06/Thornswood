@@ -145,7 +145,7 @@ rehearsal, or a real move, that loses it is acceptable. In short:
      `feed-dev`, file by file, beside the downloads already there
    - `bot\bot.env.json` -> `C:\Thornswood-Bot`, readable by SYSTEM and
      Administrators only
-   - `bot\joins.json` -> `C:\Thornswood-Bot\joins.json`, before the bot
+   - `bot\joins.json` -> `C:\Thornswood-Bot\data\joins.json`, before the bot
      starts, or the join cards start counting again
    - `web\Caddyfile` -> `C:\Thornswood-Caddy\Caddyfile`
 4. **The rest comes from the repository and Patrick's machine, not from the

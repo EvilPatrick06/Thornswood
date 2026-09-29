@@ -425,6 +425,80 @@ if (-not (Test-Path -LiteralPath $privDir)) {
     Say '  /tp will refuse everybody until door.json is put there.' 'Yellow'
 }
 
+<#
+  WHO MAY READ THE SERVER'S FOLDERS, issue #1105.
+
+  A folder made under C:\ inherits Windows' rule that BUILTIN\Users may read
+  it and make files in it, and every service account on the box is in Users:
+  the bot's NT SERVICE\ThornswoodBot, the site's LOCAL SERVICE, the build
+  runner's. So every one of them could read private\door.json, the key the
+  site trusts, and the rest of this folder. The stage this install swapped in
+  was made under C:\ like any other, so it is locked here, every install:
+
+    the root and everything under it takes nothing from C:\. SYSTEM, which
+      the server's task runs as, and Administrators have Full Control. The
+      rules put on the folder it replaced by name are carried across: the
+      site's read on the files directly in the root and in data
+      (Deploy-Docs.ps1 -RunAs), and anything else set on purpose. Users,
+      Everyone, Authenticated Users and CREATOR OWNER never are.
+    private\ takes nothing from the root either: SYSTEM and Administrators
+      only. The bot's read on private\moderation.log is a rule on that file
+      and moves with it (Install-Bot.ps1).
+    what it replaced, <root>.prev-<stamp> or .undone-<stamp>, is locked the
+      same way, since it holds the old settings and data.
+
+  tests\test-server-acl.ps1 runs this on scratch folders and reads it back.
+#>
+function Lock-ServerDir([string]$dir, [string]$from) {
+    $broad = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-3-0')
+    $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+    $carried = @()
+    if ($from -and (Test-Path -LiteralPath $from)) {
+        $carried = @((Get-Acl -LiteralPath $from).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) |
+                     Where-Object { $broad -notcontains $_.IdentityReference.Value })
+    }
+    $acl = Get-Acl -LiteralPath $dir
+    $acl.SetAccessRuleProtection($true, $false)
+    foreach ($r in @($acl.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]))) {
+        if ($broad -contains $r.IdentityReference.Value) { [void]$acl.RemoveAccessRuleSpecific($r) }
+    }
+    foreach ($r in $carried) { $acl.AddAccessRule($r) }
+    foreach ($s in 'S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value) {
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+            (New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', $tree, 'None', 'Allow')))
+    }
+    # Writes back only the access rules. Set-Acl can also try to write the audit
+    # part, which needs a privilege the build runner's account does not have
+    # (issue #1120, Set-ThornswoodAclAccess in Bot-Service.ps1).
+    $item = Get-Item -LiteralPath $dir -Force
+    if ($PSVersionTable.PSEdition -eq 'Core') {
+        if ($item -is [IO.DirectoryInfo]) { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$acl) }
+        else { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, [Security.AccessControl.FileSecurity]$acl) }
+    } else { $item.SetAccessControl($acl) }
+}
+function Lock-ServerRoot([string]$dir, [string]$from) {
+    try {
+        Lock-ServerDir $dir $from
+        $d = Join-Path $dir 'data'
+        if (Test-Path -LiteralPath $d) { Lock-ServerDir $d $(if ($from) { Join-Path $from 'data' } else { '' }) }
+        $p = Join-Path $dir 'private'
+        if (Test-Path -LiteralPath $p) { Lock-ServerDir $p '' }
+        Say "locked $dir to SYSTEM and Administrators, with the rules it had by name; private is theirs alone" 'Cyan'
+    } catch { Say "COULD NOT LOCK ${dir}: $($_.Exception.Message)" 'Red' }
+}
+Lock-ServerRoot $Root $(if ($hadRoot) { $aside } else { '' })
+if ($hadRoot -and (Test-Path -LiteralPath $aside)) { Lock-ServerRoot $aside '' }
+# The site reads server.log and data here (Deploy-Docs.ps1). Once the Users
+# rule is gone it reads them only through its own rule, which a box whose
+# site deploy came before this folder existed does not have yet.
+$siteTask = Get-ScheduledTask -TaskName 'Thornswood Docs' -ErrorAction SilentlyContinue
+if ($siteTask -and $siteTask.Principal.UserId -and $siteTask.Principal.UserId -notmatch '(?i)^(NT AUTHORITY\\)?SYSTEM$') {
+    $siteSid = ''
+    try { $siteSid = (New-Object Security.Principal.NTAccount([string]$siteTask.Principal.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+    $has = @((Get-Acl -LiteralPath $Root).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq $siteSid })
+    if (-not $has.Count) { Say "the site's account has no rule on $Root yet, so it cannot read server.log: run .\scripts\deploy\Deploy-Docs.ps1 once" 'Yellow' }
+}
+
 # The roller the task runs in front of the server, from beside this script:
 # Publish-Server sends the two together, and run by hand from tools they are
 # already side by side. Without it the server still starts, the log just is

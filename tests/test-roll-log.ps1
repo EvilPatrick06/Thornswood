@@ -288,8 +288,10 @@ try {
         Yes 'the dev voice run file rolls voice.log before node' ((Size ($dlog + '.1')) -eq (4MB + 3))
         Yes 'and dev voice writes to a fresh one' ((Count (Get $dlog) 'stand-in dev voice up on 7989') -eq 1)
     }
+    # Every copy, the server's and voice's (program and page since #1083).
+    $copies = ([regex]::Matches($dtext, '& robocopy [^\r\n]*')).Count
     Yes 'the dev copies leave the rolled logs of live behind' (
-        ([regex]::Matches($dtext, '& robocopy [^\r\n]*/XF [^\r\n]*\*\.log\.\*')).Count -eq 2)
+        $copies -ge 2 -and ([regex]::Matches($dtext, '& robocopy [^\r\n]*/XF [^\r\n]*\*\.log\.\*')).Count -eq $copies)
 
     # ================================================================== the bot
     $btext = Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\deploy\Install-Bot.ps1') -Raw

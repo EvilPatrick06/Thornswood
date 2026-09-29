@@ -126,23 +126,70 @@ function Remove-ThornswoodBotLoop([string]$Root, [string]$Task) {
   }
 }
 
+# The bot's log, where the running service writes it: data\bot.log once the
+# install has moved the records (issue #1104), bot.log beside the code on a
+# box whose service program is from before. Install-Bot, Show-BotLog,
+# Get-Logs and Write-BotToken all read it by this rule.
+function Get-ThornswoodBotLog([string]$Root) {
+  $new = Join-Path (Join-Path $Root 'data') 'bot.log'
+  $old = Join-Path $Root 'bot.log'
+  if (-not (Test-Path -LiteralPath $new) -and (Test-Path -LiteralPath $old)) { return $old }
+  return $new
+}
+
+# The bot's records and logs, moved out of its code folder into data (issue
+# #1104), only ever with the service stopped. One already in data is newer,
+# because bot.py writes there once the folder exists, so the copy beside the
+# code is then only removed; a log is never removed, it is left and said.
+# __pycache__ goes: the service's account wrote it and owns it, and Python
+# would load a planted file from it ahead of the source. With the code read
+# only to the account, Python does not make it again.
+function Move-ThornswoodBotRecords([string]$Root) {
+  $data = Join-Path $Root 'data'
+  if (-not (Test-Path -LiteralPath $data)) { $null = New-Item -ItemType Directory -Force -Path $data; 'made ' + $data }
+  $names = @('heartbeat.json', 'joins.json', 'open-tickets.json', 'commands-synced.json', 'heartbeat.json.tmp', 'joins.json.tmp')
+  $logs = @(Get-ChildItem -LiteralPath $Root -File -Force -EA SilentlyContinue | Where-Object { $_.Name -match '^bot\.log(\.\d+)?$' } | ForEach-Object { $_.Name })
+  foreach ($n in @($names + $logs)) {
+    $from = Join-Path $Root $n
+    if (-not (Test-Path -LiteralPath $from)) { continue }
+    $to = Join-Path $data $n
+    try {
+      if (-not (Test-Path -LiteralPath $to)) { Move-Item -LiteralPath $from -Destination $to -Force -ErrorAction Stop; 'moved ' + $n + ' into ' + $data }
+      elseif ($n -notmatch '^bot\.log') { Remove-Item -LiteralPath $from -Force -ErrorAction Stop; 'removed the old ' + $n + ' beside the code; data holds the newer one' }
+      else { 'left ' + $from + ': data already has its own ' + $n }
+    } catch { 'COULD NOT MOVE ' + $from + ': ' + $_.Exception.Message }
+  }
+  $cache = Join-Path $Root '__pycache__'
+  if (Test-Path -LiteralPath $cache) {
+    try { Remove-Item -LiteralPath $cache -Recurse -Force -ErrorAction Stop; 'removed ' + $cache + ', which the bot''s account had written' }
+    catch { 'COULD NOT REMOVE ' + $cache + ': ' + $_.Exception.Message }
+  }
+}
+
 # What the service's account may touch, and nothing else of Thornswood's:
-#   the bot's folder, Modify: bot.log and its rolls, heartbeat.json,
-#     and the few records bot.py keeps beside itself. The same shape as
-#     the site's account on its own folder.
+#   the bot's folder, read and run only (issue #1104): the code, the card
+#     art, the channel ids. It inherits nothing from C:\, so no BUILTIN\Users
+#     rule reaches it (every service account is in Users), and OWNER RIGHTS
+#     is held to read and run, so a file the account made before this and
+#     still owns cannot have its rules changed by it.
+#   data\ under it, Modify: bot.log and its rolls, heartbeat.json,
+#     joins.json, open-tickets.json and commands-synced.json. The one place
+#     the account writes.
 #   service\ under it, read only and not inherited from the folder, so the
 #     account cannot change the program or host.json that start it.
+#   webhooks\ under it, nothing: SYSTEM and Administrators only. The news
+#     and dev webhooks are read over ssh by the machines that ship, never by
+#     the bot.
 #   bot.env.json, read. It is protected (Install-Bot), so this is the one
 #     rule on it besides SYSTEM and Administrators.
 #   the watchdog's folder, read on the files in it (alerts.jsonl, what the
 #     webhook already posted), and Modify on alerts-sent-bot.txt, the one file
 #     there the bot writes. The webhook's own file is protected and stays out
 #     of reach.
-#   the site's data folder, read on the files directly in it: trouble.json,
-#     inbox.json and moderation.log are what the bot reads, and the site
-#     writes each through a new file, so a grant on the file itself would go
-#     with the next write. That folder also holds the site's other records,
-#     sessions.json among them; see the issue filed for it.
+#   the site's data\for-bot, read (issue #1102): trouble.json, inbox.json and
+#     moderation.log, which the site writes there for the bot and nothing
+#     else. The rule the bot had on the site's whole data folder before, where
+#     sessions.json and the other records are, is taken off.
 #   each game server's private\moderation.log, read, on that file only,
 #     because private\ also holds door.json and its key.
 # Writes back only the access rules of an ACL from Get-Acl. Set-Acl can also
@@ -164,23 +211,74 @@ function Set-ThornswoodAclAccess([string]$Path, $Acl) {
 # on a machine that has no such service.
 function Grant-ThornswoodBotAccess {
   param([string]$Sid, [string]$Root, [string]$WatchRoot, [string]$DocsData, [string[]]$ModLogs = @())
+  $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+  $none = [Security.AccessControl.PropagationFlags]::None
+  $bot = New-Object Security.Principal.SecurityIdentifier($Sid)
+  # SYSTEM, Administrators, and whoever runs this, which is Administrator
+  # over ssh, the same three bot.env.json keeps.
+  $admins = @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
+  # Everyone, Authenticated Users, Users, CREATOR OWNER: never on a folder of
+  # the bot's.
+  $broad = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-3-0')
+  function Rule([string]$s, $rights, $inherit) {
+    return New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($s)), $rights, $inherit, $none, 'Allow')
+  }
   # $how: 'tree' is this folder and everything under it, 'files' the files
   # directly in this folder, '' the one file.
   function Give([string]$path, [string]$rights, [string]$how, [string]$what) {
     if (-not (Test-Path -LiteralPath $path)) { return ('not there yet, nothing granted: ' + $path) }
     $inherit = [Security.AccessControl.InheritanceFlags]::None
     $prop = [Security.AccessControl.PropagationFlags]::None
-    if ($how -eq 'tree') { $inherit = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit' }
+    if ($how -eq 'tree') { $inherit = $tree }
     if ($how -eq 'files') { $inherit = [Security.AccessControl.InheritanceFlags]::ObjectInherit; $prop = [Security.AccessControl.PropagationFlags]::NoPropagateInherit }
     try {
       $acl = Get-Acl -LiteralPath $path
-      $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
-        (New-Object Security.Principal.SecurityIdentifier($Sid)), $rights, $inherit, $prop, 'Allow')))
+      $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($bot, $rights, $inherit, $prop, 'Allow')))
       Set-ThornswoodAclAccess $path $acl
       return ('granted ' + $what + ' on ' + $path)
     } catch { return ('COULD NOT GRANT ' + $what + ' on ' + $path + ': ' + $_.Exception.Message) }
   }
-  Give $Root 'Modify' 'tree' 'the bot''s account Modify'
+  # Protected, SYSTEM and Administrators Full Control, the broad groups and
+  # every allow rule of the bot's own taken off; any other rule set on the
+  # folder by hand or by another script (a deny for the build runner) stays.
+  function Lock([string]$path, [string]$what) {
+    try {
+      $acl = Get-Acl -LiteralPath $path
+      $acl.SetAccessRuleProtection($true, $false)
+      foreach ($r in @($acl.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]))) {
+        if ($r.AccessControlType -ne 'Allow') { continue }
+        if ($broad -contains $r.IdentityReference.Value -or $r.IdentityReference.Value -eq $Sid) { [void]$acl.RemoveAccessRuleSpecific($r) }
+      }
+      foreach ($s in $admins) { $acl.AddAccessRule((Rule $s 'FullControl' $tree)) }
+      Set-ThornswoodAclAccess $path $acl
+      return ($what + ': ' + $path)
+    } catch { return ('COULD NOT LOCK ' + $path + ': ' + $_.Exception.Message) }
+  }
+  $locked = Lock $Root 'the bot''s folder takes nothing from C:\ and no Users rule reaches it'
+  $locked
+  if ($locked -notmatch '^COULD NOT') {
+    try {
+      $acl = Get-Acl -LiteralPath $Root
+      $acl.AddAccessRule((Rule $Sid 'ReadAndExecute' $tree))
+      $acl.AddAccessRule((Rule 'S-1-3-4' 'ReadAndExecute' $tree))
+      Set-ThornswoodAclAccess $Root $acl
+      'the bot''s code is read only to the bot''s account, and to whoever owns a file in it: ' + $Root
+    } catch { 'COULD NOT GRANT the bot''s account read on ' + $Root + ': ' + $_.Exception.Message }
+  }
+  $data = Join-Path $Root 'data'
+  if (-not (Test-Path -LiteralPath $data)) { $null = New-Item -ItemType Directory -Force -Path $data }
+  Give $data 'Modify' 'tree' 'the bot''s account Modify, the one folder it writes,'
+  $hooks = Join-Path $Root 'webhooks'
+  if (Test-Path -LiteralPath $hooks) {
+    try {
+      $acl = Get-Acl -LiteralPath $hooks
+      $acl.SetAccessRuleProtection($true, $false)
+      foreach ($r in @($acl.Access)) { [void]$acl.RemoveAccessRule($r) }
+      foreach ($s in $admins) { $acl.AddAccessRule((Rule $s 'FullControl' $tree)) }
+      Set-ThornswoodAclAccess $hooks $acl
+      'the webhooks are SYSTEM''s and Administrators'' only: ' + $hooks
+    } catch { 'COULD NOT LOCK ' + $hooks + ': ' + $_.Exception.Message }
+  }
   $svc = Join-Path $Root 'service'
   if (Test-Path -LiteralPath $svc) {
     try {
@@ -210,7 +308,20 @@ function Grant-ThornswoodBotAccess {
       Give $sent 'Modify' '' 'the bot''s account Modify'
     } else { 'not there yet, nothing granted: ' + $WatchRoot + '. Run Install-Bot.ps1 again after Watch-Services.ps1 -Install' }
   }
-  if ($DocsData) { Give $DocsData 'Read' 'files' 'the bot''s account read on the files' }
+  if ($DocsData -and (Test-Path -LiteralPath $DocsData)) {
+    # The rule from before #1102, read on every file in the site's data.
+    try {
+      $acl = Get-Acl -LiteralPath $DocsData
+      if (@($acl.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq $Sid }).Count) {
+        $acl.PurgeAccessRules($bot)
+        Set-ThornswoodAclAccess $DocsData $acl
+        'took the bot''s account off the site''s data folder, where the site''s own records are: ' + $DocsData
+      }
+    } catch { 'COULD NOT TAKE the bot''s account off ' + $DocsData + ': ' + $_.Exception.Message }
+    $forBot = Join-Path $DocsData 'for-bot'
+    if (Test-Path -LiteralPath $forBot) { Give $forBot 'Read' 'tree' 'the bot''s account read' }
+    else { 'not there yet, nothing granted: ' + $forBot + '. Run Deploy-Docs.ps1, whose site makes it, then Install-Bot.ps1 again' }
+  }
   foreach ($m in $ModLogs) { Give $m 'Read' '' 'the bot''s account read' }
 }
 
@@ -220,10 +331,11 @@ function Test-ThornswoodEventSource([string]$Name) {
   return [Diagnostics.EventLog]::SourceExists($Name)
 }
 
-# host.json beside the service program: the bot's folder and the python the
-# service runs. Written as UTF-8 with no mark.
+# host.json beside the service program: the bot's folder, the data folder it
+# writes (issue #1104) and the python the service runs. Written as UTF-8 with
+# no mark.
 function Write-ThornswoodBotHostJson([string]$Path, [string]$Root, [string]$Python) {
-  $o = [ordered]@{ root = $Root; python = $Python; script = 'bot.py' }
+  $o = [ordered]@{ root = $Root; data = (Join-Path $Root 'data'); python = $Python; script = 'bot.py' }
   [IO.File]::WriteAllText($Path, ($o | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
 }
 
@@ -292,7 +404,7 @@ function Install-ThornswoodBotService {
   if (-not $svc) {
     try {
       New-Service -Name $Name -BinaryPathName $exe -DisplayName 'Thornswood Bot' -StartupType Automatic `
-        -Description 'The Thornswood Discord bot. Installed by Install-Bot.ps1; bot.log is in its folder.' -ErrorAction Stop | Out-Null
+        -Description 'The Thornswood Discord bot. Installed by Install-Bot.ps1; bot.log is in the data folder under its folder.' -ErrorAction Stop | Out-Null
       $out += 'made the service ' + $Name
     } catch { return @{ Ok = $false; Lines = $out + @('COULD NOT MAKE the service ' + $Name + ': ' + $_.Exception.Message) } }
   }
@@ -315,6 +427,7 @@ function Install-ThornswoodBotService {
     $out += 'the bot''s exits go to the Application event log as ' + $Name
   } catch { $out += 'no event log source, so exits are in bot.log only: ' + $_.Exception.Message }
 
+  $out += @(Move-ThornswoodBotRecords $Root)
   $out += @(Grant-ThornswoodBotAccess -Sid $sid -Root $Root -WatchRoot $WatchRoot -DocsData $DocsData -ModLogs $ModLogs)
 
   try { Start-Service -Name $Name -ErrorAction Stop; $out += 'started the service ' + $Name }

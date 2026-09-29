@@ -300,7 +300,7 @@ function finish() {
                            xff ? { 'X-Forwarded-For': xff } : {}),
     body: JSON.stringify(obj)
   });
-  const INBOX = path.join(dir, 'data', 'inbox.json');
+  const INBOX = path.join(dir, 'data', 'for-bot', 'inbox.json');
   const inbox = () => JSON.parse(fs.readFileSync(INBOX, 'utf8'));
 
   // Three tickets, the way the bot sends them.

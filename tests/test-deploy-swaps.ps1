@@ -708,8 +708,19 @@ try {
     # The service ThornswoodTestBot, standing in for ThornswoodBot (#465).
     Task 'ThornswoodTestBot' 'powershell.exe' ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $botRoot + '\run.ps1"') $botRoot
     function BotSays([string]$v) { return ((Get (Join-Path $botRoot 'bot.log')) -match [regex]::Escape($v + ' watching')) }
-    $bot = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $botRoot; Service = 'ThornswoodTestBot'; CodeOnly = $true; NoPause = $true; Wait = 20 }
+    # The site's data\for-bot, which Install-Bot waits for before it sends the
+    # bot (#1102): a site that has not made it yet is refused below.
+    $siteForBot = Join-Path $box 'Thornswood-Docs'
+    $null = [IO.Directory]::CreateDirectory((Join-Path $siteForBot 'data\for-bot'))
+    $bot = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $botRoot; DocsRoot = $siteForBot; Service = 'ThornswoodTestBot'; CodeOnly = $true; NoPause = $true; Wait = 20 }
     Yes 'Install-Bot: the stand-in bot is up' (WaitFor { BotSays 'bot v1' })
+
+    Bot 'bot v2'
+    $live = Live $botRoot
+    $a = $bot.Clone(); $a['DocsRoot'] = (Join-Path $box 'No-Site-Yet')
+    $r = Deploy 'Install-Bot.ps1' $a
+    Yes 'Install-Bot: a site with no data\for-bot yet stops it, naming Deploy-Docs, with the bot untouched' (
+        (-not $r.Ok) -and $r.Said -match 'Run \.\\scripts\\deploy\\Deploy-Docs\.ps1 first' -and ((Live $botRoot) -eq $live))
 
     Bot 'bot v2'
     $r = Deploy 'Install-Bot.ps1' $bot.Clone()
