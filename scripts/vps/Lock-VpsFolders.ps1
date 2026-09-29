@@ -2,8 +2,9 @@
   Lock-VpsFolders.ps1
 
   Takes the rule that lets every account on the box read them off the game
-  servers' and the voice services' folders, now rather than at each one's next
-  install (issue #1105). Runs ON the VPS, as Administrator, through Remote.ps1.
+  servers', the voice services' and the backups' folders, now rather than at
+  each one's next install (issues #1105 and #1173). Runs ON the VPS, as
+  Administrator, through Remote.ps1.
 
       .\scripts\vps\Remote.ps1 -File .\scripts\vps\Lock-VpsFolders.ps1 -Arguments '-WhatIf'
       .\scripts\vps\Remote.ps1 -File .\scripts\vps\Lock-VpsFolders.ps1
@@ -19,8 +20,11 @@
   Nothing needs the Users rule.
 
   WHAT IT DOES, for C:\Thornswood-Server, C:\Thornswood-Server-Dev,
-  C:\Thornswood-Voice, C:\Thornswood-Voice-Dev and the .prev, .undone and
-  .failed folders the installers keep beside the servers:
+  C:\Thornswood-Voice, C:\Thornswood-Voice-Dev, the .prev, .undone and
+  .failed folders the installers keep beside the servers, and
+  C:\Thornswood-Backup (issue #1173), which holds the backup passphrase and
+  every backup, and so every secret on the box: that one is SYSTEM's and
+  Administrators' only, like private, and nothing else reads it.
     the folder takes nothing from C:\ any more; SYSTEM, Administrators and the
       account running this have Full Control; every rule set on it by name
       stays (the site's, a deny for the build runner); Users, Everyone,
@@ -68,7 +72,7 @@ if (-not $AllowGamingPc) {
 $broad = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-3-0')
 $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
 $keepers = @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
-$nameRule = '^Thornswood-(Server|Server-Dev|Voice|Voice-Dev)(\.(prev|undone|failed)-\d{8}-\d{6})?$'
+$nameRule = '^(Thornswood-(Server|Server-Dev|Voice|Voice-Dev)(\.(prev|undone|failed)-\d{8}-\d{6})?|Thornswood-Backup)$'
 
 # The site's account, from its task, when it is one of its own.
 if (-not $SiteSid) {
@@ -120,16 +124,17 @@ foreach ($f in $folders) {
     if ($f.Attributes -band [IO.FileAttributes]::ReparsePoint) { Say ('REFUSED ' + $path + ': it is a link, left as it is'); $refused++; continue }
     # What the site reads here, and so must reach by its own rule.
     $isVoice = $f.Name -match '^Thornswood-Voice'
+    $isBackup = $f.Name -eq 'Thornswood-Backup'
     $siteNeeds = if ($isVoice) { Join-Path $path 'chat' } else { $path }
-    if ($SiteSid -ne 'none' -and $f.Name -notmatch '\.(prev|undone|failed)-' -and (Test-Path -LiteralPath $siteNeeds)) {
+    if ($SiteSid -ne 'none' -and -not $isBackup -and $f.Name -notmatch '\.(prev|undone|failed)-' -and (Test-Path -LiteralPath $siteNeeds)) {
         $has = @(Explicit $siteNeeds | Where-Object { $_.IdentityReference.Value -eq $SiteSid -and $_.AccessControlType -eq 'Allow' })
         if (-not $has.Count) {
             Say ('REFUSED ' + $path + ': the site''s account has no rule on ' + $siteNeeds + ' by name, so taking Users off would stop the site reading it. Run .\scripts\deploy\Deploy-Docs.ps1 first, then this again. Left as it is.')
             $refused++; continue
         }
     }
-    $parts = @(@{ P = $path; Only = $false })
-    if (-not $isVoice) {
+    $parts = @(@{ P = $path; Only = $isBackup })
+    if (-not $isVoice -and -not $isBackup) {
         foreach ($sub in 'data', 'private') {
             $p = Join-Path $path $sub
             if (Test-Path -LiteralPath $p) { $parts += @{ P = $p; Only = ($sub -eq 'private') } }
@@ -146,7 +151,7 @@ foreach ($f in $folders) {
         try { Lock $x.P $x.Only; Say ('locked ' + $x.P) }
         catch { Say ('COULD NOT LOCK ' + $x.P + ': ' + $_.Exception.Message); $refused++ }
     }
-    if (-not $isVoice) {
+    if (-not $isVoice -and -not $isBackup) {
         $mod = Join-Path $path 'private\moderation.log'
         if ((Test-Path -LiteralPath $mod) -and (Get-Service -Name 'ThornswoodBot' -ErrorAction SilentlyContinue)) {
             $botSid = ''

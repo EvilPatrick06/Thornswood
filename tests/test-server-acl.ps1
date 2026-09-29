@@ -151,6 +151,11 @@ try {
     Put (Join-Path $c 'Thornswood-Server-Dev\private\door.json') 'key'
     Put (Join-Path $c 'Thornswood-Voice\chat\1.jsonl') 'said'
     Put (Join-Path $c 'Thornswood-Voice\token-key.txt') 'key'
+    # The backups and their passphrase (#1173), with a rule somebody gave the
+    # site on it by name, which must go too: nothing but SYSTEM reads it.
+    Put (Join-Path $c 'Thornswood-Backup\key.txt') 'passphrase'
+    Put (Join-Path $c 'Thornswood-Backup\thornswood-20260929-031500.zip') 'every secret'
+    Grant (Join-Path $c 'Thornswood-Backup') $site 'Read' 'ContainerInherit, ObjectInherit' 'None'
     Grant (Join-Path $c 'Thornswood-Server') $site 'Read' 'ObjectInherit' 'NoPropagateInherit'
     Grant (Join-Path $c 'Thornswood-Server\data') $site 'Read' 'ObjectInherit' 'NoPropagateInherit'
     Grant (Join-Path $c 'Thornswood-Voice\chat') $site 'Read' 'ObjectInherit' 'NoPropagateInherit'
@@ -184,6 +189,18 @@ try {
     Yes 'private is SYSTEM''s and Administrators'' alone' ((Get-Acl -LiteralPath (Join-Path $c 'Thornswood-Server\private')).AreAccessRulesProtected -and
         @((Get-Acl -LiteralPath (Join-Path $c 'Thornswood-Server\private')).Access | Where-Object { @('S-1-5-18', 'S-1-5-32-544', $me) -notcontains (Sid $_) }).Count -eq 0)
     Yes 'each one is read back, one line a rule' ($o -match 'no Users rule' -and $o -match 'Allow ')
+    $bk = Join-Path $c 'Thornswood-Backup'
+    Yes 'the backups'' folder is locked, needing no rule for the site' ($o -match ('locked ' + [regex]::Escape($bk)) -and $o -notmatch ('REFUSED ' + [regex]::Escape($bk)))
+    foreach ($p in 'key.txt', 'thornswood-20260929-031500.zip') {
+        $x = @((Get-Acl -LiteralPath (Join-Path $bk $p)).Access | ForEach-Object { Sid $_ } | Sort-Object -Unique)
+        Yes ("$p in it is SYSTEM's and Administrators' alone, the site's rule gone too (" + ($x -join ', ') + ')') (
+            @($x | Where-Object { @('S-1-5-18', 'S-1-5-32-544', $me) -notcontains $_ }).Count -eq 0)
+    }
+    # Install-Backup.ps1 locks it before anything is sent into it.
+    $ib = Get-Content -LiteralPath (Join-Path $repo 'scripts\deploy\Install-Backup.ps1') -Raw
+    $lk = $ib.IndexOf('SetAccessRuleProtection(`$true, `$false)')
+    Yes 'Install-Backup.ps1 locks the backups'' folder, and before the script or the passphrase go up' (
+        $lk -gt 0 -and $lk -lt $ib.IndexOf('& scp @ssh $script') -and $lk -lt $ib.IndexOf('& scp @ssh $KeyOut') -and $ib -match "'S-1-5-32-545'" -and $ib -match 'Die \("could not lock')
     Yes 'a folder that is not a server''s or voice''s is never touched' ((Broad (Join-Path $c 'Thornswood-Docs\x.txt')) -gt 0 -and (Broad (Join-Path $c 'Something-Else\x.txt')) -gt 0)
     # The gaming PC, if this is one: refused without -AllowGamingPc.
     if (Test-Path 'C:\Thornswood\Game\SkyrimSE.exe') {
