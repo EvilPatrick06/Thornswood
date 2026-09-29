@@ -78,6 +78,19 @@ again. When it says the build is not the recorded one and you did not change
 the engine, the fork is not at the pinned commit; when you did, run
 `New-ClientBuildRecord.ps1` and put the record in your pull request.
 
+A fork in a folder whose path has an `&` in it (every worktree under
+`C:\ThornswoodTemps&Worktrees`, for one) builds too (issue #1025). vcpkg sets
+itself up through `bootstrap-vcpkg.bat`, and cmd.exe cuts a path at a bare
+`&`, so `Build-Engine.ps1 -Fork <that fork>` gives the fork's parent folder a
+free drive letter for the run (`subst`), configures and builds through it,
+and removes the letter when it ends, however it ends. It is the parent and not
+the fork itself because the fork's `CMakeLists.txt` compares the build folder
+with `<fork>/build`, and a drive root gives `J://build`. A build configured
+that way is built through the same letter next time; when that letter has
+become another drive, it stops and says to free it or delete the build
+folder. By hand, the same thing is `subst J: "C:\ThornswoodTemps&Worktrees\worktrees"`,
+then `-Fork J:\<name>`, then `subst J: /d`.
+
 ## Configuring
 
 `Build-Engine.ps1` runs this line. `Build-Server.ps1` never configures and

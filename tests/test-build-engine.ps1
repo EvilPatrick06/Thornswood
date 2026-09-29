@@ -90,6 +90,78 @@ try {
 }
 finally { Remove-Item -LiteralPath $fake -Recurse -Force -ErrorAction SilentlyContinue }
 
+# A fork under a path with an & in it (#1025): vcpkg bootstraps through a
+# .bat, and cmd.exe cuts the path at the &. Build-Engine reaches the fork's
+# parent through a drive letter of its own for the run and removes it after.
+# The real functions, lifted by the parser, on a scratch fork whose .bat
+# stands in for vcpkg's bootstrap.
+$ast = [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$null, [ref]$null)
+$lift = @()
+foreach ($fn in 'Test-CmdSplitsPath', 'Get-SubstMap', 'Mount-EngineFork', 'Dismount-EngineFork') {
+    $d = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $fn }, $true)
+    Yes "it has $fn" ($null -ne $d)
+    if ($d) { $lift += $d.Extent.Text }
+}
+Yes 'configure and build run inside a try whose finally removes the letter' ($text -match '(?s)\$mount = Mount-EngineFork \$Fork.*\} finally \{ Dismount-EngineFork \$mount \}\s*$')
+if ($lift.Count -eq 4) {
+    . ([scriptblock]::Create($lift -join "`n"))
+    $amp = Join-Path ([IO.Path]::GetTempPath()) ('ts-engine-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '\wt&x')
+    $forkA = Join-Path $amp 'fork'
+    $mounts = @()
+    try {
+        New-Item -ItemType Directory -Force -Path $forkA | Out-Null
+        [IO.File]::WriteAllText((Join-Path $forkA 'CMakeLists.txt'), '# stand-in')
+        [IO.File]::WriteAllText((Join-Path $forkA 'bootstrap.bat'), "@echo off`r`necho bootstrapped from %~dp0`r`n")
+        $plain = Mount-EngineFork 'C:\plain\fork'
+        Yes 'a fork with no & in its path is built where it is' ($plain.Fork -eq 'C:\plain\fork' -and -not $plain.Drive -and -not $plain.Why)
+
+        $cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe'
+        $bare = & $cmdExe /d /c ((Join-Path $forkA 'bootstrap.bat') + ' 2>&1') 2>&1 | Out-String
+        Yes 'the stand-in bootstrap, given the path with the & bare, is cut at the & (as vcpkg''s was)' ($bare -notmatch 'bootstrapped from')
+
+        $m = Mount-EngineFork $forkA
+        $mounts += $m
+        Yes ('a fork under a path with an & is reached through a drive letter of its own (' + $m.Drive + ' ' + $m.Why + ')') (
+            $m.Drive -match '^[A-Z]:$' -and $m.Made -and $m.Fork -eq ($m.Drive + '\fork') -and (Test-Path -LiteralPath (Join-Path $m.Fork 'CMakeLists.txt')))
+        Yes '  standing for the fork''s parent, not the fork, so its build folder is not J://build' ((Get-SubstMap)[$m.Drive.Substring(0, 1)] -eq $amp)
+        $through = & $cmdExe /d /c ((Join-Path $m.Fork 'bootstrap.bat') + ' 2>&1') 2>&1 | Out-String
+        Yes '  and the same bootstrap, given that path, runs' ($through -match ('bootstrapped from ' + [regex]::Escape($m.Fork + '\')))
+        $again = Mount-EngineFork $forkA
+        Yes '  a second run while it stands reuses it and leaves it for the first to remove' ($again.Drive -eq $m.Drive -and -not $again.Made)
+        Dismount-EngineFork $again
+        Yes '  which does not remove it' (Test-Path -LiteralPath ($m.Drive + '\'))
+        Dismount-EngineFork $m
+        Yes '  and the run that made it removes it at the end' (-not (Get-SubstMap).ContainsKey($m.Drive.Substring(0, 1)) -and -not (Test-Path -LiteralPath ($m.Drive + '\')))
+
+        # A build configured through a letter is built through the same one.
+        $cacheDir = Join-Path $forkA 'build'
+        New-Item -ItemType Directory -Force -Path $cacheDir | Out-Null
+        $cacheFile = Join-Path $cacheDir 'CMakeCache.txt'
+        $taken = @([IO.DriveInfo]::GetDrives() | ForEach-Object { $_.Name.Substring(0, 1).ToUpper() })
+        $pick = @('Y', 'X', 'W', 'V', 'U', 'T', 'S', 'R') | Where-Object { $taken -notcontains $_ -and -not (Get-SubstMap).ContainsKey($_) } | Select-Object -First 1
+        if ($pick) {
+            [IO.File]::WriteAllText($cacheFile, "CMAKE_CACHEFILE_DIR:INTERNAL=${pick}:/fork/build`r`n")
+            $c = Mount-EngineFork $forkA
+            $mounts += $c
+            Yes ('a fork configured through ' + $pick + ': is built through ' + $pick + ': again (' + $c.Drive + ')') ($c.Drive -eq ($pick + ':') -and $c.Made -and (Test-Path -LiteralPath (Join-Path $c.Fork 'CMakeLists.txt')))
+            Dismount-EngineFork $c
+        } else { Write-Host 'SKIP  no drive letter free for the configured-through-a-letter case' }
+        [IO.File]::WriteAllText($cacheFile, ('CMAKE_CACHEFILE_DIR:INTERNAL=' + $cacheDir.Replace('\', '/') + "`r`n"))
+        $d = Mount-EngineFork $forkA
+        $mounts += $d
+        Yes 'a fork configured on its own path is built there, with no letter' ($d.Fork -eq $forkA -and -not $d.Drive -and -not $d.Why)
+        [IO.File]::WriteAllText($cacheFile, "CMAKE_CACHEFILE_DIR:INTERNAL=C:/somewhere/fork/build`r`n")
+        $e = Mount-EngineFork $forkA
+        $mounts += $e
+        Yes 'a fork configured through a letter that is now a real drive is refused, saying what to do' ($e.Why -match 'configured through C:, which is now another drive' -and -not $e.Made)
+    }
+    finally {
+        foreach ($x in $mounts) { Dismount-EngineFork $x }
+        Remove-Item -LiteralPath (Split-Path -Parent $amp) -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+Yes 'engine\README.md says a fork under a path with an & builds, and how' ($readme -match 'subst' -and $readme -match '#1025')
+
 # The audit's two leftovers.
 $pu = Get-Content -LiteralPath (Join-Path $root 'scripts\release\Publish-Update.ps1') -Raw
 Yes 'Publish-Update hashes the launcher source from launcher\' ($pu -match "\`$srcDir = Join-Path \`$RepoDir 'launcher'")

@@ -379,8 +379,17 @@ SIX.forEach(function (d) {
 
   const iv = read('scripts/deploy/Install-Voice.ps1') || '';
   const sent = (/foreach \(\$f in ('[^)]*')\)/.exec(iv) || [])[1];
-  yes('Install-Voice.ps1 sends named files, with no wildcard (' + sent + ')',
-      !!sent && sent.indexOf('*') < 0 && !/README/i.test(sent) && !/Get-ChildItem/.test(iv));
+  // What goes up is the $send table since #1093 (staged, checked, swapped).
+  // The one Get-ChildItem it has lists the old .stage-* folders on the box to
+  // clear them, with -Directory; any listing of files would be a wildcard
+  // send, so only folder listings are let through.
+  const sendKeys = [];
+  iv.replace(/\$send\['([^']+)'\]\s*=/g, function (m, k) { sendKeys.push(k); return m; });
+  const fileLists = iv.split('\n').filter(function (l) { return /Get-ChildItem/.test(l) && !/-Directory\b/.test(l); });
+  yes('Install-Voice.ps1 sends named files, with no wildcard (' + sent + '; sends ' + sendKeys.join(', ') + ')',
+      !!sent && sent.indexOf('*') < 0 && !/README/i.test(sent) &&
+      sendKeys.length > 0 && sendKeys.every(function (k) { return k.indexOf('*') < 0 && !/README/i.test(k); }) &&
+      fileLists.length === 0);
 
   const bl = read('scripts/release/Build-Launcher.ps1') || '';
   yes('Build-Launcher.ps1 never lists launcher or installer' + BS + 'setup, so only the named file goes in',

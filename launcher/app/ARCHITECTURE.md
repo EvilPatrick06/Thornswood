@@ -68,11 +68,11 @@ handlers. So:
   helper `F<T>` just above it) and keeps it in a static field.
 - `Shell.cs:1021 Wire()` attaches every handler in code.
 - `Shell` is therefore a static class, not a `Window` subclass, and it is
-  split across seven files: Shell.cs, Pages.cs (the read-only pages),
+  split across eight files: Shell.cs, Pages.cs (the read-only pages),
   ShellOwnGame.cs (the game folder card and offer), ShellSteamUpdates.cs (the
   question about Steam's Updates setting after a downgrade), ShellUninstall.cs
-  (the launcher as Windows' Uninstall button opens it), Waiting.cs and
-  Stall.cs.
+  (the launcher as Windows' Uninstall button opens it), ShellProgress.cs (the
+  Play button as a progress bar), Waiting.cs and Stall.cs.
 
 A control renamed in ui.xaml is not a compile error. `F<T>` returns null and
 the first unguarded use of it throws, which at startup lands in Main's catch
@@ -141,7 +141,7 @@ One paragraph per class, naming the files it writes. Profile is
 `<Root>\Profile`; Game is `<Root>\Game`.
 
 **Shell** (Shell.cs, Pages.cs, ShellOwnGame.cs, ShellSteamUpdates.cs,
-ShellUninstall.cs, Waiting.cs, Stall.cs). The window and every flag that
+ShellUninstall.cs, ShellProgress.cs, Waiting.cs, Stall.cs). The window and every flag that
 decides the Play button: `playing`, `updatePending`, `updateAnswered`, `checkFailed`,
 `collectionBarUp`, `ownGameBusy`, `doorCheckOut`, `feedNotice` (the last
 answer FeedNotice gave), and `chosenId`, the character picked at the game's
@@ -190,6 +190,18 @@ version, moved by `scripts\release\Bump-Version.ps1` before a Ship. In the launc
 Play shut and asks again every thirty seconds when the source does not answer.
 Every document that was read also goes to `ShellUpdate.cs:91 ShowNotice()`, which
 asks FeedNotice what the bar above Play says and whether Play is held.
+
+**PlayProgress and PlayBar** (Progress.cs, painted by ShellProgress.cs).
+The Play button as a progress bar (#1145). RunUpdate, the client repair and
+StartOwnGame open it with `PlayProgress.Begin` and close it with `End`; in
+between, `Updater.Download` reports the bytes of each download, Sync the files
+it checks and the bytes it fetches, OwnGame.Make and Refresh the files they
+bring over, and Verify.Bytes the plugins it checks. A report with nothing open
+is dropped, so the same code run by Fix or a Scan leaves the button alone.
+`PlayBar` turns the reports into the words and the fill, never backwards
+within a phase, and a band that slides while the total is unknown;
+ShellProgress.cs redraws it at most every `PlayBar.DrawEveryMs`. It writes
+nothing. `tests\test-play-progress.ps1` compiles Progress.cs and drives it.
 
 **SelfSwap** (SelfSwap.cs). The launcher's own replacement, and the way back
 when the new one will not start. `SelfSwap.cs:67 Script()` is the cmd script
@@ -423,9 +435,11 @@ torn down and rebuilt, so an unchanged pass does not flash or re-say itself.
 it. Then it sets
 `Shell.cs:1885 btnPlay.IsEnabled`, which turns the button on only when no row
 counts against Play, none of
-`playing`, `updatePending`, `collectionBarUp` or `ownGameBusy` is set, and the
+`playing`, `updatePending`, `collectionBarUp` or `ownGameBusy` is set, no work
+is showing on the button (`playBar.Active`, see PlayProgress in section 2), and the
 feed does not hold Play (`feedNotice.Hold`, see FeedNotice in section 2). The
-button's words say which one is holding it: PREPARING THE GAME FOLDER,
+button's words say which one is holding it: while work shows, what it is doing
+and how far it has got (UPDATING 41%, 310 OF 740 MB), otherwise PREPARING THE GAME FOLDER,
 INSTALL THE MODS FIRST, CHECKING..., UPDATE FIRST, NO ANSWER FROM THE UPDATE
 SOURCE, CLOSED FOR MAINTENANCE or UPDATE THE LAUNCHER (the feed's hold, with
 the bar above Play saying why), DOWNGRADE FIRST, or in the shared shape MAKE
@@ -448,7 +462,7 @@ configured at all, which is a developer's own build and never a tester's.
 | 9 | `ShellChars.cs:122 Play` | Into `Shell.cs:3870 Play()`. Its first four lines check `updatePending`, `collectionBarUp`, `ownGameBusy` and the feed's hold again, because the button is not the only way in. | |
 | 10 | `Shell.cs:3887 Paths.Loader` | `Game\skse64_loader.exe` has to exist, and `Shell.cs:3888 Paths.MpClient` (`Game\Data\SKSE\Plugins\MpClientPlugin.dll`). | |
 | 11 | `Shell.cs:3893 ClearStuckGame` | A Skyrim with no window is closed; one on screen is asked about. | |
-| 12 | `Shell.cs:3899 Verify.Run` | Under Waiting. Reads the plugin list, the server's manifest and the plugins' bytes. Any problem that would get the person refused: the Mods page opens with a message saying what to do, and Play stops. | nothing |
+| 12 | `Shell.cs:3899 Verify.Run` | Under Waiting. Reads the plugin list, the server's manifest and the plugins' bytes. Any problem that would get the person refused: the Diagnostics page (Scan and Fix) opens with a message saying what to do, and Play stops. | nothing |
 | 13 | `Shell.cs:3943 Verify.DeployPersonal` | `<Root>\Your Mods` copied into `Game\Data`, never a plugin. | those files in `Game\Data` |
 | 14 | `Shell.cs:3957 Display.MatchScreen` | Skipped when Lock resolution is ticked. The game's window size and Display Tweaks' resolution follow the screen, then `Shell.cs:3959 Display.ScaleMenus`. | `Game\Data\SKSE\Plugins\SSEDisplayTweaks.ini`, `Profile\MyGames\SkyrimPrefs.ini`, `Game\Data\Interface\skyui\config.txt` and `config.shipped.txt`, each only when it changes |
 | 15 | `Shell.cs:3962 Enforce.Apply` | Settings two mods rewrite on the way out, put back; SkyrimPlatform at its normal log level with no text window; one actor draw distance for everybody (#963). | `Game\Data\SKSE\Plugins\SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`, `SkyrimPlatform.ini`, `Profile\MyGames\SkyrimPrefs.ini` |

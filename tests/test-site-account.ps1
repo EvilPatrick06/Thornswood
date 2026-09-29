@@ -504,6 +504,8 @@ try {
         (Modifies (RulesFor $docs $meSid)) -or (Modifies (RulesFor $docs 'S-1-5-32-544')))
     Yes 'and the site account keeps Modify on its folder' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
     Yes 'it says Users was taken off' ($said -match 'BUILTIN\\Users no longer reaches')
+    # What it said instead, so a red on the build runner shows why in the log.
+    foreach ($l in @(($said -split "`n") | Where-Object { $_ -match 'COULD NOT' })) { Write-Host ('      ' + $l) }
 
     # The grants are given again at every deploy while the site is not SYSTEM,
     # so a second run has to leave the same rules, not a second copy of each.
@@ -685,7 +687,12 @@ try {
     if (-not $elevated) {
         Write-Host 'SKIP  not elevated, so the account changes were not applied to a real task'
     } else {
-        $scratchTask = 'Thornswood test-site-account ' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
+        # Not 'Thornswood test...': test-deploy-swaps and test-install-server
+        # clear away every task named 'Thornswood Test*', and task names match
+        # without case, so one of them running beside this deleted its task
+        # half way and the update said "The system cannot find the file
+        # specified" (issue #1135).
+        $scratchTask = 'Thornswood site-account harness ' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
         # From the settings set to the read-back of the account, and not the
         # Start-ScheduledTask after it. The account does not change this part
         # of the script, only the task name does.
@@ -756,6 +763,9 @@ try {
                 $r = OnTask 'LOCAL SERVICE' 2
                 Yes 'real task: -RunAs LOCAL SERVICE updates it without an error' (
                     $r.said -match 'scheduled task updated' -and $r.said -notmatch 'COULD NOT UPDATE')
+                if ($r.said -notmatch 'scheduled task updated' -or $r.said -match 'COULD NOT UPDATE') {
+                    foreach ($l in @($r.said -split "`n" | Select-Object -Last 15)) { Write-Host ('      said: ' + $l) }
+                }
                 Yes 'real task: it is now LOCAL SERVICE at Limited, SeChangeNotifyPrivilege only, token SID type Unrestricted' (IsCut $r.p)
                 Yes 'real task: the trigger and settings kept, and this deploy''s action on it' (
                     (Kept $r.task) -and (ArgsOf $r.task) -eq '/c exit 2')

@@ -202,12 +202,17 @@ if (Test-Path -LiteralPath $srcPriv) {
 $srcData = Join-Path $src 'data'
 if (Test-Path -LiteralPath $srcData) {
   $kept = 0
-  $full = (Resolve-Path -LiteralPath $srcData).Path
-  foreach ($f in @(Get-ChildItem -LiteralPath $srcData -Recurse -File -Force)) {
-    $to = Join-Path (Join-Path $Root 'data') $f.FullName.Substring($full.Length).TrimStart('\')
+  # Each file's path under data, cut off the very string it was listed from.
+  # This used to cut Get-ChildItem's FullName by the length of Resolve-Path's
+  # answer, and the two disagree when TEMP is a short 8.3 path (C:\Users\
+  # ADMINI~1\...), which it is for Administrator on the box: Resolve-Path
+  # kept the short form, FullName gave the long one, and data\keep.txt came
+  # back as data\game\data\keep.txt. Seen on the build runner, issue #1120.
+  foreach ($path in @([IO.Directory]::EnumerateFiles($srcData, '*', [IO.SearchOption]::AllDirectories))) {
+    $to = Join-Path (Join-Path $Root 'data') $path.Substring($srcData.Length).TrimStart('\')
     if (Test-Path -LiteralPath $to) { continue }
     [void](New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force)
-    Copy-Item -LiteralPath $f.FullName -Destination $to
+    Copy-Item -LiteralPath $path -Destination $to
     $kept++
   }
   Say "  data       $kept file(s) the folder did not already have"

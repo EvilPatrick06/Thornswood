@@ -189,9 +189,18 @@ jobs:
           # Issue #454 added the seventh: the new-box runbook read against the
           # scripts it names, about twenty seconds, so a renamed script or
           # parameter fails here rather than on the day the box is gone.
+          # Issue #1088 added three more, which ran only in the nightly, so a
+          # pull request that wrote the VPS address into a script again or
+          # broke a deploy artifact was green here and merged before anything
+          # said so: the VPS address and ssh user kept in scripts/vps/vps.json
+          # alone, a deploy artifact the same bytes for the same commit with
+          # its record matching, and the site and voice handing those records
+          # back. Each reads only the checkout and a temp folder, a few
+          # seconds to half a minute.
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
-                 'test-new-box-runbook.ps1'
+                 'test-new-box-runbook.ps1',
+                 'test-vps-defaults.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n

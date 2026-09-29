@@ -188,10 +188,13 @@ function fakeRequire(name) {
   }
   return require(name);
 }
+// The gamemode wraps the feed's timer in guard() (a throw is logged and the
+// timer lives on); here guard hands the function straight back, so a throw
+// fails this harness instead of being swallowed.
 new Function('globalThis', 'mp', 'require', 'setInterval', 'clearInterval', 'console',
-             'voicePort', 'Buffer', feed)(
+             'voicePort', 'Buffer', 'guard', feed)(
   g, mp, fakeRequire, (fn, ms) => { timers.push({ fn: fn, ms: ms }); return timers.length; },
-  () => { }, { log: () => { } }, () => PORT, Buffer);
+  () => { }, { log: () => { } }, () => PORT, Buffer, (n, f) => f);
 const tick = timers.filter(t => t.ms === 200)[0];
 yes('the feed runs five times a second', !!tick);
 if (tick) { tick.fn(); }

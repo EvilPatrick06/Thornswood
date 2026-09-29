@@ -4,7 +4,8 @@
   Everything the client needs, in one run, in the order it has to happen in.
 
   This replaces the sequence you have been typing by hand: the content plugin,
-  the SkyMP client, the creation menus, the body fix, the
+  the SkyMP client (the recorded build only, through Sync-Client.ps1), the
+  creation menus, the body fix, the
   load order alignment, the gamemode, the preflight check and the launcher
   build. Each step names the files it must leave behind, and a step that exits
   cleanly without leaving them is treated as a failure, because those are the
@@ -97,9 +98,16 @@ $steps = @(
         Wants = @('Thornswood-Content.esp')
         Why = 'the books, the writs and the creation menus'
     },
+    # Sync-Client.ps1, the one way the client goes into the game folder: the
+    # six files records\client-build.json names, each checked by sha256, and
+    # a build that is not the recorded one stops the run with nothing copied.
+    # Until #1001 this step ran a script that copied the whole client build
+    # over Data with no look at the record, so this run could
+    # put in a client Ship then refused. The server address it also wrote is
+    # the launcher's to write, on every Play.
     @{
         Key = 'client'; Name = 'SkyMP client'
-        Script = '..\release\Install-SkyMPClient.ps1'
+        Script = '..\release\Sync-Client.ps1'
         Args = @{ Dist = $Client }
         Wants = @('SKSE\Plugins\MpClientPlugin.dll', 'Platform\Plugins\skymp5-client.js')
         Why = 'the multiplayer layer itself'
@@ -205,9 +213,8 @@ foreach ($s in $steps) {
     if ($help.Parameters.ContainsKey('Root'))    { $splat['Root'] = $Root }
     if ($help.Parameters.ContainsKey('NoShip'))  { $splat['NoShip'] = $true }
 
-    # Install-SkyMPClient writes the address into the client settings itself.
-    # The launcher rewrites it on every Play anyway, but there is no reason to
-    # leave 127.0.0.1 sitting in the file in the meantime.
+    # Any step that writes the server address is handed the one this run is
+    # for. The launcher rewrites it on every Play anyway.
     if ($help.Parameters.ContainsKey('ServerIp'))   { $splat['ServerIp'] = $ServerIp }
     if ($help.Parameters.ContainsKey('ServerPort')) { $splat['ServerPort'] = $ServerPort }
 

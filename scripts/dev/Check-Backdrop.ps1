@@ -2,8 +2,9 @@
   Check-Backdrop.ps1
 
   Read only. Says what the main menu backdrop is in a game folder: the two
-  logo meshes (their hashes and how many shapes each carries, which decides
-  whether a second plate draws) and the wallpaper texture (size, mip levels,
+  logo meshes (their hashes, how many shapes each carries, and whether
+  logo01ae.nif's one shape is hidden, which decides whether a second plate
+  draws and whether the game crashes at the main menu) and the wallpaper texture (size, mip levels,
   format), against what the repo carries in game\menu. Nothing is changed.
 
     .\scripts\dev\Check-Backdrop.ps1                          C:\Thornswood\Game
@@ -24,14 +25,19 @@ $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoMenu = Join-Path $Here '..\..\game\menu'
 
 function Md5([string]$p) { (Get-FileHash -LiteralPath $p -Algorithm MD5).Hash.Substring(0, 8).ToLowerInvariant() }
-# How many blocks in a Skyrim SE nif are shapes (anything the engine draws:
-# BSTriShape, NiTriShape, NiTriStrips and their kin). -1 when it is not a nif
-# this can read. Issue #425: logo01ae.nif is an empty node, 0 shapes.
-function Shapes([string]$p) {
+# A Skyrim SE nif's shapes (anything the engine draws: BSTriShape,
+# NiTriShape, NiTriStrips and their kin) and its root: how many children the
+# root has, the root's scale, and the type and hidden flag (APP_CULLED, bit 0)
+# of its first child. Shapes is -1 when it is not a nif this can read.
+# Issue #1158: the Anniversary menu reads logo01ae.nif's first child, so an
+# empty root crashes the game at the main menu. The plate stays in it,
+# hidden and at scale 0.
+function Mesh([string]$p) {
+    $r = @{ Shapes = -1; Kids = -1; Scale = [single]1; Child = ''; Hidden = $false }
     $b = [IO.File]::ReadAllBytes($p)
     $o = [Array]::IndexOf($b, [byte]10) + 1
-    if ($o -le 0 -or $b.Length -lt $o + 21) { return -1 }
-    if ([BitConverter]::ToUInt32($b, $o) -ne 0x14020007) { return -1 }
+    if ($o -le 0 -or $b.Length -lt $o + 21) { return $r }
+    if ([BitConverter]::ToUInt32($b, $o) -ne 0x14020007) { return $r }
     $blocks = [BitConverter]::ToUInt32($b, $o + 9)
     $o += 17
     for ($i = 0; $i -lt 3; $i++) { $o += 1 + $b[$o] }
@@ -41,11 +47,34 @@ function Shapes([string]$p) {
         $n = [BitConverter]::ToUInt32($b, $o); $o += 4
         $types += [Text.Encoding]::ASCII.GetString($b, $o, $n); $o += $n
     }
-    $count = 0
-    for ($i = 0; $i -lt $blocks; $i++) {
-        if ($types[[BitConverter]::ToUInt16($b, $o + 2 * $i)] -match 'TriShape|TriStrips') { $count++ }
+    $kinds = @(); $at = @()
+    for ($i = 0; $i -lt $blocks; $i++) { $kinds += $types[[BitConverter]::ToUInt16($b, $o + 2 * $i)] }
+    $sizes = $o + 2 * $blocks; $o = $sizes + 4 * $blocks
+    $nstr = [BitConverter]::ToUInt32($b, $o); $o += 8
+    for ($i = 0; $i -lt $nstr; $i++) { $o += 4 + [BitConverter]::ToUInt32($b, $o) }
+    $o += 4 + 4 * [BitConverter]::ToUInt32($b, $o)
+    for ($i = 0; $i -lt $blocks; $i++) { $at += $o; $o += [BitConverter]::ToUInt32($b, $sizes + 4 * $i) }
+    $r.Shapes = @($kinds | Where-Object { $_ -match 'TriShape|TriStrips' }).Count
+    # NiObjectNET + NiAVObject, stream 100: name, extra data, controller,
+    # flags, translation, rotation, scale, collision; then a node's children.
+    $av = {
+        param($x)
+        $x += 4; $x += 4 + 4 * [BitConverter]::ToUInt32($b, $x); $x += 4
+        @{ Flags = [BitConverter]::ToUInt32($b, $x); Scale = [BitConverter]::ToSingle($b, $x + 52); End = $x + 60 }
     }
-    return $count
+    if ($blocks -gt 0 -and $kinds[0] -match 'Node$') {
+        $root = & $av $at[0]
+        $r.Scale = $root.Scale
+        $r.Kids = [BitConverter]::ToUInt32($b, $root.End)
+        if ($r.Kids -gt 0) {
+            $c = [BitConverter]::ToInt32($b, $root.End + 4)
+            if ($c -ge 0 -and $c -lt $blocks) {
+                $r.Child = $kinds[$c]
+                $r.Hidden = ((& $av $at[$c]).Flags -band 1) -eq 1
+            }
+        }
+    }
+    return $r
 }
 # The texture's header, and what is wrong with it. Issue #994: the backdrop is
 # BC7_UNORM (DXGI 98, behind a DX10 header), 4096 x 4096 with all 13 levels,
@@ -98,11 +127,14 @@ foreach ($f in $files) {
     if (-not (Test-Path -LiteralPath $p)) { Write-Host "  $($f.Rel): MISSING" -ForegroundColor Red; $bad++; continue }
     $line = '  ' + $f.Rel + ': md5 ' + (Md5 $p)
     if ($f.Kind -eq 'mesh') {
-        $s = Shapes $p
+        $m = Mesh $p
+        $s = $m.Shapes
         $line += (', {0} shape(s)' -f $s)
         if ($leaf -ieq 'logo01ae.nif') {
-            if ($s -eq 0) { $line += ' (empty node, draws nothing: right)' }
-            else { $line += ' (A SECOND PLATE: the double, or the old copy collapsed to scale 0)'; $bad++ }
+            if ($m.Kids -eq 0) { $line += ' (AN EMPTY ROOT: the Anniversary menu reads its first child and the game crashes at the main menu, #1158)'; $bad++ }
+            elseif ($m.Kids -ne 1 -or $m.Child -ne 'BSTriShape') { $line += (' (THE ROOT SHOULD HOLD ONE BSTriShape, it holds {0}, first {1})' -f $m.Kids, $m.Child); $bad++ }
+            elseif (-not $m.Hidden -or $m.Scale -ne 0) { $line += ' (A SECOND PLATE: the shape should be hidden and the root at scale 0)'; $bad++ }
+            else { $line += ', hidden, root at scale 0 (the menu finds its shape and draws nothing: right)' }
         } elseif ($s -ne 1) { $line += ' (the backdrop plate should be one shape)'; $bad++ }
     } else {
         $d = Dds $p

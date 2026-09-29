@@ -127,6 +127,12 @@ function New-Decider([string]$toolsDir, [string]$which) {
     [void]$sb.AppendLine('. ' + (Quote $rules))
     if ($which -eq 'pack') {
         $file = 'Publish-Update.ps1'
+        # Publish-Update's scan records each file by its bytes since #441,
+        # with Get-BaselineEntry from Release-Baseline.ps1. The paths here are
+        # made up and never on disk, and this asks only which of them ship,
+        # so the lifted loop gets a stand-in that records a path without
+        # opening it.
+        [void]$sb.AppendLine('function Get-BaselineEntry([string]$path) { return ''0:fake'' }')
         $ast = Read-Script (Find-In $toolsDir $file)
         $own = Get-OwnLists $ast
         foreach ($a in $own) { [void]$sb.AppendLine($a.Extent.Text) }
@@ -147,6 +153,7 @@ function Get-Shipped($files, $collection, $prefix, $optional) {
     $GameDir = $prefix.TrimEnd('\')
     $Dev = $false
     $now = @{}
+    $nowFile = @{}
     foreach ($f in $files)
 '@ + $body + @'
 

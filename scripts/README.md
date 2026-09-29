@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 154 of them, by area: `release` builds and
+Every `.ps1` under this folder, 153 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -52,7 +52,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Build-OreTable.ps1](dev/Build-OreTable.ps1) | Builds game\data\ores.json: the table the server needs to answer an ore vein. |
 | [dev/Build-RecipeTable.ps1](dev/Build-RecipeTable.ps1) | Builds game\data\recipes.json: the table the server needs to answer "may this person make this". |
 | [dev/Build-SpellTable.ps1](dev/Build-SpellTable.ps1) | Builds game\data\spells.json: the table the server needs to hand somebody a spell. |
-| [dev/Check-Backdrop.ps1](dev/Check-Backdrop.ps1) | Read only. Says what the main menu backdrop is in a game folder: the two logo meshes (their hashes and how many shapes each carries, which decides whether a second plate draws) and the wallpaper texture (size, mip levels, format), against what the repo carries in game\menu. |
+| [dev/Check-Backdrop.ps1](dev/Check-Backdrop.ps1) | Read only. Says what the main menu backdrop is in a game folder: the two logo meshes (their hashes, how many shapes each carries, and whether logo01ae.nif's one shape is hidden, which decides whether a second plate draws and whether the game crashes at the main menu) and the wallpaper texture (size, mip levels, format), against what the repo carries in game\menu. |
 | [dev/Check-Balance.ps1](dev/Check-Balance.ps1) | Reads the five generated tables and says whether the ladders line up. |
 | [dev/Check-Controls.ps1](dev/Check-Controls.ps1) | Every control in the launcher is found at runtime by name. |
 | [dev/Check-Outside.ps1](dev/Check-Outside.ps1) | Walks the path a first install takes through the things this project does not run itself, and says which of them is broken or has moved. |
@@ -122,7 +122,6 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Feed-Store.ps1](release/Feed-Store.ps1) | Where each channel's feed, its release baseline and their history are kept, and the only code that reads or writes them there (#907). |
 | [release/Go.ps1](release/Go.ps1) | Installs the front, the overlays and the plugins, then reports what the server is doing. |
 | [release/Install-Launcher.ps1](release/Install-Launcher.ps1) | Puts a launcher that Build-Launcher.ps1 has already built into an install, and does the things around it that only an install should do. |
-| [release/Install-SkyMPClient.ps1](release/Install-SkyMPClient.ps1) | Lays the SkyMP client from the client build into the game folder and points it at the server. |
 | [release/New-ClientBuildRecord.ps1](release/New-ClientBuildRecord.ps1) | Records what the client runtime is and which fork commit it was built from, into records\client-build.json. |
 | [release/New-ServerBuildRecord.ps1](release/New-ServerBuildRecord.ps1) | Records what the server binary is and which commit it was built from, into records\server-build.json. |
 | [release/Note-Rules.ps1](release/Note-Rules.ps1) | What release notes may say. Ship.ps1 dot-sources this and refuses notes that break it, before anything is built. tests\test-note-rules.ps1 drives the same function, so the rule and its test cannot disagree. |

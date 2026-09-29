@@ -265,6 +265,15 @@
           <ControlTemplate TargetType="Button">
             <Grid>
               <Border x:Name="b" Background="{DynamicResource Accent}" CornerRadius="2"/>
+              <!-- The Play button as a progress bar (#1145): how far an update,
+                   the game folder or a file check has got, left to right, the
+                   accent faded with a solid accent line along the bottom.
+                   Hidden unless ShellProgress.cs shows it; it sets the width,
+                   and slides a quarter width band while the total is unknown. -->
+              <Grid x:Name="fill" HorizontalAlignment="Left" Width="0" Visibility="Collapsed" IsHitTestVisible="False">
+                <Border Background="{DynamicResource Accent}" Opacity="0.4" CornerRadius="2"/>
+                <Border Height="3" VerticalAlignment="Bottom" Background="{DynamicResource Accent}" CornerRadius="0,0,2,2"/>
+              </Grid>
               <Rectangle Height="1" VerticalAlignment="Top" Margin="1,1,1,0" Fill="#33FFFFFF"/>
               <!-- The focus ring sits on top of the accent fill, drawn in the
                    ink that reads on it, and shows only when the button is

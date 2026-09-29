@@ -10,9 +10,12 @@
 //   1. logo.nif is one plate: a single shape under its root, textured with
 //      MAINMENUWALLPAPER.dds.
 //   2. logo01ae.nif is there (deleting it brings the vanilla Anniversary plate
-//      back) and is an empty node: no shape anywhere in it. So the menu has
-//      exactly one shape to draw, not two. Until #425 it was a copy of the
-//      plate with its root scale set to 0, still a shape in the scene.
+//      back), and its root has the one shape child the Anniversary menu
+//      reads, as the vanilla file does (a BSFadeNode over one BSTriShape).
+//      Issue #1158: #425 made it an empty node, and the game crashed at the
+//      main menu reading a first child that was not there. The shape is
+//      flagged hidden and the root is at scale 0, so it draws nothing and the
+//      menu has exactly one plate to draw, not two.
 //   3. The plate as drawn has the shape Build-Backdrop.py builds for: the
 //      mesh's width over height, after its own rotation and scale, equals
 //      ASPECT; its V reaches texel row 3004, so ROWS is 3005; its UVs are a
@@ -67,7 +70,7 @@ function done() {
 // is located from the header's size table, so a block this does not parse is
 // still counted and skipped correctly.
 function readNif(file) {
-  const b = fs.readFileSync(file);
+  const b = Buffer.isBuffer(file) ? file : fs.readFileSync(file);
   let o = b.indexOf(10) + 1;
   const nif = { bytes: b, version: b.readUInt32LE(o), user: b.readUInt32LE(o + 5),
     bsver: b.readUInt32LE(o + 13), types: [], blocks: [], strings: [] };
@@ -82,6 +85,7 @@ function readNif(file) {
   const kinds = [];
   for (let i = 0; i < count; i++) { kinds.push(nif.types[b.readUInt16LE(o)]); o += 2; }
   const sizes = [];
+  nif.sizesAt = o;
   for (let i = 0; i < count; i++) { sizes.push(b.readUInt32LE(o)); o += 4; }
   const nstr = b.readUInt32LE(o); o += 8;
   for (let i = 0; i < nstr; i++) {
@@ -126,14 +130,17 @@ function children(nif, block) {
 const isShape = t => /TriShape|TriStrips/.test(t);
 const isNode = t => /Node$/.test(t);
 
-// Shapes reachable from the root, each with its scale along the way.
+// Shapes the renderer draws: reachable from the root, not under an object
+// flagged hidden (APP_CULLED, flag bit 0), at a scale above zero.
+const HIDDEN = 1;
 function drawn(nif) {
   const out = [];
   (function walk(i, scale) {
     if (i < 0 || i >= nif.blocks.length) { return; }
     const blk = nif.blocks[i];
     const av = avObject(nif.bytes, blk.at);
-    if (isShape(blk.type)) { out.push({ block: blk, scale: scale * av.scale }); return; }
+    if (av.flags & HIDDEN) { return; }
+    if (isShape(blk.type)) { if (scale * av.scale > 0) { out.push({ block: blk, scale: scale * av.scale }); } return; }
     if (isNode(blk.type)) { for (const c of children(nif, blk)) { walk(c, scale * av.scale); } }
   })(nif.root, 1);
   return out;
@@ -322,8 +329,40 @@ const aeShapes = ae.blocks.filter(x => isShape(x.type)).length;
 console.log('      shapes drawn: logo.nif ' + logoDrawn.length + ', logo01ae.nif ' + aeDrawn.length +
   ' (blocks: ' + logo.blocks.length + ' and ' + ae.blocks.length + ')');
 yes('logo.nif draws one shape, at a scale above zero', logoDrawn.length === 1 && logoDrawn[0].scale > 0);
-yes('logo01ae.nif holds no shape at all, so it draws nothing', aeShapes === 0 && aeDrawn.length === 0);
-yes("logo01ae.nif's root has no children", children(ae, ae.blocks[0]).length === 0);
+// Issue #1158. The Anniversary menu reads the first child of logo01ae.nif's
+// root as the logo's shape (vanilla: BSFadeNode 'Logo' over one BSTriShape,
+// 'actualLogoMirrorLow'). With no child the game crashed at the main menu:
+// MistMenu, "mov rbx, [rax]" with rax 0, on the root named CivilWarMap01.
+// The root's only child when it is a BSTriShape, with its shader block.
+function menuShape(nif) {
+  const kids = children(nif, nif.blocks[0]);
+  const child = kids.length === 1 ? nif.blocks[kids[0]] : null;
+  if (!child || child.type !== 'BSTriShape') { return null; }
+  return { child, shader: nif.blocks[nif.bytes.readInt32LE(avObject(nif.bytes, child.at).end + 16 + 4)] };
+}
+// The file #425 shipped: the same root with its children cut away.
+function emptyRoot(nif) {
+  const b = nif.bytes;
+  const av = avObject(b, nif.blocks[0].at);
+  const kids = b.readUInt32LE(av.end);
+  const cut = Buffer.concat([b.subarray(0, av.end), Buffer.alloc(4), b.subarray(av.end + 4 + 4 * kids)]);
+  cut.writeUInt32LE(nif.blocks[0].size - 4 * kids, nif.sizesAt);
+  return cut;
+}
+const aeShape = menuShape(ae);
+const aeChild = aeShape && aeShape.child;
+yes("logo01ae.nif's root has exactly one child, a BSTriShape, the shape the Anniversary menu reads " +
+  '(an empty root crashed the game at the main menu, #1158)', !!aeShape);
+yes('that shape has a BSLightingShaderProperty, as the vanilla logo01ae.nif shape does',
+  !!aeShape && !!aeShape.shader && aeShape.shader.type === 'BSLightingShaderProperty');
+const empty = readNif(emptyRoot(ae));
+yes('this check catches the empty root #425 shipped (it reads to its end and has no shape child)',
+  empty.endsWhereItShould && children(empty, empty.blocks[0]).length === 0 && menuShape(empty) === null);
+yes('that shape is flagged hidden (APP_CULLED), so the renderer skips it',
+  !!aeChild && (avObject(ae.bytes, aeChild.at).flags & HIDDEN) === HIDDEN);
+yes("and logo01ae.nif's root is at scale 0, so it is a point even if the flag is cleared",
+  avObject(ae.bytes, ae.blocks[0].at).scale === 0);
+yes('logo01ae.nif draws nothing', aeShapes === 1 && aeDrawn.length === 0);
 yes('the menu has one plate to draw, not two', logoDrawn.length + aeDrawn.length === 1);
 
 // ------------------------------------------------------------- the plate --
@@ -541,6 +580,15 @@ if (process.platform !== 'win32') {
   let r = run();
   yes('Check-Backdrop.ps1 passes a game folder holding the repo\'s three files (exit ' + r.status + ')',
     r.status === 0 && /BC7_UNORM, mipmap flag set/.test(r.stdout));
+  place('Data\\meshes\\interface\\logo\\logo01ae.nif', emptyRoot(ae));
+  r = run();
+  yes('it names an empty logo01ae.nif root as the main menu crash (#1158)',
+    r.status === 1 && /AN EMPTY ROOT: the Anniversary menu reads its first child/.test(r.stdout));
+  place('Data\\meshes\\interface\\logo\\logo01ae.nif', logo.bytes);
+  r = run();
+  yes('it names a logo01ae.nif that draws the plate as a second plate',
+    r.status === 1 && /A SECOND PLATE/.test(r.stdout));
+  place('Data\\meshes\\interface\\logo\\logo01ae.nif', ae.bytes);
   const srgb = Buffer.from(d); srgb.writeUInt32LE(99, 128);
   place(TEXREL, srgb);
   r = run();

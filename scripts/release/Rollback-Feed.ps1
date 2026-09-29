@@ -97,6 +97,7 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Wr
 . (Join-Path $Here 'Feed-Rules.ps1')
 . (Join-Path $Here 'Note-Rules.ps1')
 . (Join-Path $Here 'Source-Notice.ps1')
+. (Join-Path $Here 'Ship-Rules.ps1')
 Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
 Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
 
@@ -206,6 +207,25 @@ foreach ($pair in @(@('now', $curMap), @($tgtId, $tgtMap))) {
         }
     }
 }
+
+# ==== thornswood no bethesda in a rollback ====
+# tests\test-no-bethesda-files.ps1 runs this block on its own.
+#
+# Records from before issue #1152 name Bethesda's Creation Kit, a copy of
+# SkyrimSE.exe and backups as files of ours. Going back to one must not hand
+# them out again, and going forward from one must not list them as gone, since
+# the pack's delete list reaches a Steam copy where they are the person's own.
+# So both records are read without them; the launcher takes them out of its own
+# game folder itself (OwnGame.BethesdaTool).
+$notOurs = 0
+foreach ($m in @($curMap, $tgtMap)) {
+    foreach ($k in @($m.Keys)) {
+        $p = $(if ($k.StartsWith(':gone:')) { $k.Substring(6) } elseif ($k.StartsWith(':')) { '' } else { $k })
+        if ($p -and ((Test-ShipBethesdaTool $p) -or (Test-ShipBackup $p) -or (Test-ShipVanilla $p))) { $m.Remove($k); $notOurs++ }
+    }
+}
+if ($notOurs) { Say ("  left out {0} record entries naming Bethesda's files or backups; they are never ours to send" -f $notOurs) 'DarkGray' }
+# ==== end thornswood no bethesda in a rollback ====
 
 # The six client runtime files stay with the launcher, and so does its source
 # record (:src:), because the launcher is not rolled back.
