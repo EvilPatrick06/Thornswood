@@ -34,6 +34,18 @@
        back, the new folder is renamed <root>.failed-<stamp>, the previous one
        comes back as the root and is started again: INSTALL ROLLED BACK, exit 1.
 
+  THE SETTINGS THE SERVER RUNS ARE ITS OWN, issue #1222. The payload's
+  server-settings.json is the build's, not the server's: on 29 September a
+  dev publish came up with thornswoodServer, thornswoodLoadOrderRefuse and
+  thornswoodRequirePass empty and an npcSettings "default" key that refused
+  every NPC. So in step 1 the stage's settings are made from the running
+  server's own, with only the keys a release is meant to change taken from
+  the payload (ServerSettings.ps1, beside this script, says which and why).
+  After the swap in step 2 the new root's settings are read back against the
+  file the old server had, and any other key that differs puts the previous
+  folder back before anything is started: INSTALL ROLLED BACK. A put-back
+  carries the running settings into the folder it brings back the same way.
+
   The newest two .prev folders are kept, and the last .failed one to read.
   -PutBack puts the newest .prev folder back the same way, keeping what it
   took out as <root>.undone-<stamp>. The renames keep every path the task and
@@ -94,6 +106,18 @@ $stageDir = "$Root.stage-$stamp"
 
 function Say([string]$m, [string]$c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Finish([string]$marker, [int]$code) { Write-Host ''; Write-Host $marker; exit $code }
+
+# Which settings come from the payload and which stay the server's: beside
+# this script, where Publish-Server sends it and where the repository keeps it.
+$here = $PSScriptRoot
+if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$settingsLib = Join-Path $here 'ServerSettings.ps1'
+if (-not (Test-Path -LiteralPath $settingsLib)) {
+    Say "ServerSettings.ps1 is not beside this installer, so the running server's settings could not be carried across. Nothing was changed." 'Red'
+    Finish 'INSTALL REFUSED' 1
+}
+. $settingsLib
+$script:running = $null
 
 # The game port a root's settings name, and the resources port that follows
 # from it: skymp5-server/ts/ui.ts gives 3000 for 7777 and the game port plus
@@ -316,6 +340,25 @@ if (-not $PutBack) {
     }
     try { $s = [IO.File]::ReadAllText($settingsPath) | ConvertFrom-Json } catch { Refuse @("server-settings.json does not parse: $($_.Exception.Message)") }
 
+    # The running server's own settings, with only the release's keys taken
+    # from the payload (#1222, see the header). Written into the stage, so
+    # every check below is of the file that will run. A root with no settings
+    # has no server to keep them from, and takes the payload's whole, so those
+    # are held to what no server should start with.
+    $runPath = Join-Path $Root 'server-settings.json'
+    if (Test-Path -LiteralPath $runPath) {
+        try { $script:running = [IO.File]::ReadAllText($runPath) | ConvertFrom-Json }
+        catch { Refuse @("the settings $Root runs on do not parse ($($_.Exception.Message)), so they cannot be carried across") }
+        $m = Join-ThornswoodServerSettings $script:running $s $ThornswoodInstallKeys
+        foreach ($l in $m.Said) { Say $l 'Cyan' }
+        $s = $m.Settings
+        [IO.File]::WriteAllText($settingsPath, (ConvertTo-Json -InputObject $s -Depth 30), (New-Object Text.UTF8Encoding($false)))
+    } else {
+        $first = @(Get-ThornswoodServerSettingsProblems $s)
+        if ($first.Count) { Refuse @($first | ForEach-Object { "the payload's settings have $_, and there is no server here whose own settings would be kept instead" }) }
+        Say "there are no settings in $Root yet, so the payload's are its first" 'DarkGray'
+    }
+
     # The load order resolves, against the stage. The paths in it are written
     # out in full under the root (Export-ServerPayload writes them for the root
     # it is told), so the root's prefix is read as the stage's: the files are
@@ -349,13 +392,20 @@ if (-not $PutBack) {
         try { $said = @(& $node.Source --check $gm 2>&1) } finally { $ErrorActionPreference = $eap }
         if ($LASTEXITCODE -ne 0) { $bad += ('gamemode.js does not parse: ' + ((@($said | ForEach-Object { "$_".Trim() } | Where-Object { $_ }) | Select-Object -First 6) -join ' | ')) }
     }
-    # The binary is the build the payload's own record names.
+    # The binary is the build the payload's own record names. A payload with
+    # no record, or a record naming no build, is a binary nobody recorded
+    # (#1214): Export-ServerPayload puts records\server-build.json in every one.
     $bin = Join-Path $stageDir 'scam_native.node'
     $rec = Join-Path $stageDir 'server-build.json'
-    if ((Test-Path -LiteralPath $bin) -and (Test-Path -LiteralPath $rec)) {
+    if (-not (Test-Path -LiteralPath $rec)) {
+        $bad += 'the payload carries no server-build.json, so nothing says its scam_native.node is a recorded build'
+    } elseif (-not (Test-Path -LiteralPath $bin)) {
+        $bad += 'the payload has no scam_native.node'
+    } else {
         try {
             $want = ([string]([IO.File]::ReadAllText($rec) | ConvertFrom-Json).sha256).ToLowerInvariant()
-            if ($want -and $want -ne (Get-FileHash -LiteralPath $bin -Algorithm SHA256).Hash.ToLowerInvariant()) {
+            if (-not $want) { $bad += 'server-build.json names no sha256 for scam_native.node' }
+            elseif ($want -ne (Get-FileHash -LiteralPath $bin -Algorithm SHA256).Hash.ToLowerInvariant()) {
                 $bad += 'scam_native.node is not the build server-build.json records'
             }
         } catch { $bad += "server-build.json does not parse: $($_.Exception.Message)" }
@@ -378,6 +428,24 @@ if (-not $PutBack) {
     # A put-back that does not answer goes back to being the .prev it was.
     $failedAs  = $candidate
     Say "putting back $candidate" 'Cyan'
+    # What it brings back is the older release, not the older settings: the
+    # running server's go into it, with only the release's keys kept (#1222).
+    # A running file that cannot be read does not stop a put-back, which is
+    # the way out of a bad install; the folder then goes back as it was.
+    $runPath = Join-Path $Root 'server-settings.json'
+    $backPath = Join-Path $candidate 'server-settings.json'
+    if ((Test-Path -LiteralPath $runPath) -and (Test-Path -LiteralPath $backPath)) {
+        try {
+            $run = [IO.File]::ReadAllText($runPath) | ConvertFrom-Json
+            $back = [IO.File]::ReadAllText($backPath) | ConvertFrom-Json
+            $m = Join-ThornswoodServerSettings $run $back $ThornswoodInstallKeys
+            foreach ($l in $m.Said) { Say $l 'Cyan' }
+            [IO.File]::WriteAllText($backPath, (ConvertTo-Json -InputObject $m.Settings -Depth 30), (New-Object Text.UTF8Encoding($false)))
+            $script:running = $run
+        } catch {
+            Say "the settings could not be read ($($_.Exception.Message)), so $candidate goes back with its own" 'Yellow'
+        }
+    }
 }
 
 # ---- the swap ------------------------------------------------------------------
@@ -412,6 +480,58 @@ if (-not (MoveDir $candidate $Root)) {
 }
 Say "swapped in; what it replaced is $aside" 'Cyan'
 if ($hadRoot) { Carry $aside $Root ([bool]$FreshWorld) }
+
+# The way back: what was carried goes back, the new folder is kept as
+# $failedAs to read, the previous one is the root again and, when this run
+# starts servers, is started and asked whether it answers.
+function GoBack([string]$keptAs) {
+    Say 'putting the previous server back' 'Yellow'
+    StopServer $Root
+    Carry $Root $aside ([bool]$FreshWorld)
+    if (-not (MoveDir $Root $failedAs)) {
+        Say "COULD NOT MOVE $Root ASIDE, so the previous server is still in $aside. Look at the box." 'Red'
+        Finish 'INSTALL FAILED' 1
+    }
+    if (-not (MoveDir $aside $Root)) {
+        Say "COULD NOT MOVE $aside BACK TO $Root. The new one is in $failedAs. Look at the box." 'Red'
+        Finish 'INSTALL FAILED' 1
+    }
+    if ($StartNow -and -not $NoTask) {
+        Start-ScheduledTask -TaskName $TaskName
+        $gp = GamePortOf $Root
+        $rp = if ($gp -eq 7777) { 3000 } else { $gp + 1 }
+        if (Answers $Root) { Say ("the previous server is back and answering on {0}" -f $rp) 'Yellow' }
+        else { Say "THE PREVIOUS SERVER IS BACK AND IT STILL IS NOT ANSWERING on $rp" 'Red'; TailLog $Root }
+    } else {
+        Say 'the previous server is back in place, not started, as this run starts nothing' 'Yellow'
+    }
+    if (-not $PutBack) { Say "$keptAs is kept as $failedAs to read" 'DarkGray' }
+    if ($script:carryFailed) { Finish 'INSTALL FAILED' 1 }
+    Finish 'INSTALL ROLLED BACK' 1
+}
+
+<#
+  READ BACK, BEFORE ANYTHING STARTS (#1222). The settings now in the root
+  against the file the old server had when it was stopped: every key outside
+  the release's own must be the same. The stage was made from the running
+  file, so a difference means it moved after that (a deploy that ran in
+  between, say), or that the carry did not hold, and either way the new
+  folder would start with settings nobody chose. The previous folder goes
+  back instead, with what it had.
+#>
+if ($hadRoot -and $null -ne $script:running) {
+    $was = $null
+    $now = $null
+    try { $was = [IO.File]::ReadAllText((Join-Path $aside 'server-settings.json')) | ConvertFrom-Json } catch { }
+    try { $now = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
+    $moved = @('server-settings.json, which cannot be read')
+    if ($null -ne $was -and $null -ne $now) { $moved = @(Compare-ThornswoodCarried $was $now $ThornswoodInstallKeys) }
+    if ($moved.Count) {
+        Say ('read back: ' + ($moved -join ', ') + ' would not be what the server had, so nothing is started and the previous folder goes back') 'Red'
+        GoBack 'the folder whose settings did not read back'
+    }
+    Say 'read back: every setting outside this release is the one the server had' 'Green'
+}
 
 # See Carry. A root that has never had a private folder gets an empty one:
 # the door writes allowed.json itself once it has fetched, and the register
@@ -609,20 +729,4 @@ if (-not $hadRoot) {
 }
 
 # ---- the way back ----------------------------------------------------------------
-Say 'putting the previous server back' 'Yellow'
-StopServer $Root
-Carry $Root $aside ([bool]$FreshWorld)
-if (-not (MoveDir $Root $failedAs)) {
-    Say "COULD NOT MOVE $Root ASIDE, so the previous server is still in $aside. Look at the box." 'Red'
-    Finish 'INSTALL FAILED' 1
-}
-if (-not (MoveDir $aside $Root)) {
-    Say "COULD NOT MOVE $aside BACK TO $Root. The new one is in $failedAs. Look at the box." 'Red'
-    Finish 'INSTALL FAILED' 1
-}
-Start-ScheduledTask -TaskName $TaskName
-if (Answers $Root) { Say ("the previous server is back and answering on {0}" -f $resPort) 'Yellow' }
-else { Say "THE PREVIOUS SERVER IS BACK AND IT STILL IS NOT ANSWERING on $resPort" 'Red'; TailLog $Root }
-if (-not $PutBack) { Say "what did not start is kept as $failedAs to read" 'DarkGray' }
-if ($script:carryFailed) { Finish 'INSTALL FAILED' 1 }
-Finish 'INSTALL ROLLED BACK' 1
+GoBack 'what did not start'

@@ -77,6 +77,17 @@ if ($c -ge 0 -and $d -gt $c) { Invoke-Expression $lib.Substring($c, $d - $c) }
 Yes 'the stage check, the swap, the put-back pick and SwapVars are all there' (
     [bool]$checkBlock -and [bool]$swapBlock -and [bool]$putBackPick -and [bool](Get-Command SwapVars -EA SilentlyContinue))
 Yes 'Deploy-Server.ps1 loads Swap.ps1' ($src -match "\. \(Join-Path \`$Here 'Swap\.ps1'\)")
+# Which settings Deploy-Server takes from the build and which stay the live
+# server's (#1222), and the carry it runs on the box: ServerSettings.ps1.
+$settingsLibPath = Join-Path $Here 'scripts\deploy\ServerSettings.ps1'
+$settingsLibText = [IO.File]::ReadAllText($settingsLibPath)
+$settingsCarryBlock = $null
+. $settingsLibPath
+Yes 'ServerSettings.ps1 has the carry block and the live keys, in plain ASCII' (
+    [bool]$settingsCarryBlock -and @($ThornswoodGamemodeKeys).Count -gt 4 -and $settingsLibText -notmatch '[^\x00-\x7F]')
+Yes 'Deploy-Server.ps1 loads it, sends it with the carry, and checks and swaps with the live keys' (
+    $src -match "\. \(Join-Path \`$Here 'ServerSettings\.ps1'\)" -and $src.Contains('$settingsCarryBlock') -and
+    ([regex]::Matches($src, '\$hashes \$ThornswoodGamemodeKeys\) \+ \$(checkBlock|swapBlock)')).Count -eq 2)
 
 # ---- read, not run ----------------------------------------------------------
 Yes 'the blocks are plain ASCII, which the far end reads right with or without a byte order mark' (
@@ -150,10 +161,11 @@ function Sha([string]$text) {
     try { return (($h.ComputeHash($utf8.GetBytes($text)) | ForEach-Object { $_.ToString('x2') }) -join '') }
     finally { $h.Dispose() }
 }
-function SettingsJson([string]$forRoot, [int]$port, [string[]]$names) {
+function SettingsJson([string]$forRoot, [int]$port, [string[]]$names, [hashtable]$extra = @{}) {
     $far = ($forRoot -replace '\\', '/') + '/plugins/'
-    return ([ordered]@{ port = $port; name = 'Thornswood Test'; loadOrder = @($names | ForEach-Object { $far + $_ }) } |
-            ConvertTo-Json -Depth 5)
+    $s = [ordered]@{ port = $port; name = 'Thornswood Test'; loadOrder = @($names | ForEach-Object { $far + $_ }) }
+    foreach ($k in $extra.Keys) { $s[$k] = $extra[$k] }
+    return ($s | ConvertTo-Json -Depth 8)
 }
 function Tree([string]$dir) {
     $rows = @()
@@ -196,14 +208,14 @@ function StartStub([string]$dir) {
 function MakeStage {
     param([string]$Name, [string]$Gamemode = '// new gamemode', [int]$Port = $P,
           [string[]]$Order = @('Skyrim.esm', $bob, 'New Plugin.esp'),
-          [switch]$Bom, [string]$RecordFor = 'new binary', [string]$SentGamemode = '')
+          [switch]$Bom, [string]$RecordFor = 'new binary', [string]$SentGamemode = '', [hashtable]$Settings = @{})
     $dir = Join-Path $root $Name
     $files = [ordered]@{}
     $files['plugins/' + $bob]        = 'bob v2'
     $files['plugins/New Plugin.esp'] = 'brand new'
     $files['scam_native.node']       = 'new binary'
     $files['gamemode.js']            = $Gamemode
-    $files['server-settings.json']   = SettingsJson $root $Port $Order
+    $files['server-settings.json']   = SettingsJson $root $Port $Order $Settings
     $files['server-build.json']      = '{ "sha256": "' + (Sha $RecordFor) + '" }'
     # The build stamp Deploy-Gamemode leaves beside gamemode.js goes up in the
     # stage with it, so a rollback cannot leave a new stamp describing the old
@@ -221,7 +233,7 @@ function MakeStage {
 
 # The far side, as Deploy-Server sends it: SwapVars, then the block. The two
 # task cmdlets are replaced in between, and nothing else is.
-function RunFar([string]$block, [string]$stageName, [string]$prevName, [int]$wait, $want) {
+function RunFar([string]$block, [string]$stageName, [string]$prevName, [int]$wait, $want, [string[]]$keys = $null) {
     $mock = @"
 function Stop-ScheduledTask { [CmdletBinding()] param([string]`$TaskName) }
 function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
@@ -229,7 +241,7 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
 }
 
 "@
-    $body = (SwapVars $root 'Thornswood Test Swap' $stageName $prevName $wait $want) + $mock + $block
+    $body = (SwapVars $root 'Thornswood Test Swap' $stageName $prevName $wait $want $keys) + $mock + $block
     $f = Join-Path $work ('far-' + [Guid]::NewGuid().ToString('N') + '.ps1')
     [IO.File]::WriteAllText($f, $body, (New-Object Text.UTF8Encoding($true)))
     $eap = $ErrorActionPreference
@@ -438,6 +450,103 @@ try {
     Yes '  and the server is answering again' ((WaitUp $P) -and ((Owner $P) -ne $running))
     Yes '  and the other server was never touched' ((Owner $Q) -eq $otherPid)
     if ($script:fail -gt $failed) { Show }
+
+    # ---- the live server keeps its own settings (#1221, #1222) ----------------
+    # Deploy-Server's carry, run on the box against the stage: the build's
+    # server-settings.json has none of the live server's switches and other
+    # values for some of the keys Deploy-Gamemode writes. What goes live is
+    # the server's own file with only those keys from the build.
+    $far = ($root -replace '\\', '/') + '/plugins/'
+    $own = [ordered]@{ port = $P; name = 'Thornswood'; dataDir = 'data'; loadOrder = @(($far + 'Skyrim.esm'), ($far + $bob))
+                       thornswoodServer = 'main'; thornswoodLoadOrderRefuse = $true; thornswoodRequirePass = $true; thornswoodVoicePort = 7778
+                       npcSettings = [ordered]@{}; npcEnabled = $true; thornswoodSomethingNew = 'the server''s own' }
+    Put (Join-Path $root 'server-settings.json') ($own | ConvertTo-Json -Depth 8)
+    $own = [IO.File]::ReadAllText((Join-Path $root 'server-settings.json')) | ConvertFrom-Json
+    $running = Owner $P
+    $w = MakeStage -Name '.stage-20260929-000601' -Settings @{ name = 'Thornswood'; npcEnabled = $false; thornswoodVoicePort = 7778; npcSettings = @{} }
+    $failed = $script:fail
+    $out = RunFar ($settingsLibText + "`r`n" + $settingsCarryBlock) '.stage-20260929-000601' '.prev-20260929-000601' 30 $w $ThornswoodGamemodeKeys
+    $said = $out -join "`n"
+    $c = @($out | Where-Object { $_ -match '^CARRIED [0-9a-f]{64}$' })
+    Yes 'the carry runs on the box, says what it kept, and hashes what it wrote' (
+        $c.Count -eq 1 -and $said -match 'the settings this release changes: .*npcEnabled' -and $said -match 'loadOrder')
+    if ($c.Count) { $w['server-settings.json'] = $c[0].Substring(8) }
+    $out = RunFar $checkBlock '.stage-20260929-000601' '.prev-20260929-000601' 30 $w $ThornswoodGamemodeKeys
+    Yes '  and the stage it carried into checks out' ($out -contains 'STAGE OK')
+    $out = RunFar $swapBlock '.stage-20260929-000601' '.prev-20260929-000601' 30 $w $ThornswoodGamemodeKeys
+    $said = $out -join "`n"
+    $after = [IO.File]::ReadAllText((Join-Path $root 'server-settings.json')) | ConvertFrom-Json
+    Yes '  and the swap reads it back before the start and is SWAP OK' (
+        ($out -contains 'SWAP OK') -and $said -match 'read back: every setting outside this release is the one the server had' -and
+        $said.IndexOf('read back') -lt $said.IndexOf('started, giving it'))
+    Yes '  and the live server keeps its switches, its name and what the build does not name' (
+        $after.thornswoodLoadOrderRefuse -eq $true -and $after.thornswoodRequirePass -eq $true -and $after.thornswoodServer -eq 'main' -and
+        $after.name -eq 'Thornswood' -and $after.dataDir -eq 'data' -and $after.thornswoodSomethingNew -eq 'the server''s own')
+    Yes '  while what Deploy-Gamemode writes for live comes from the build' ($after.npcEnabled -eq $false -and @($after.loadOrder).Count -eq 3)
+    Yes '  and the server answering is the new one, the other untouched' ((WaitUp $P) -and ((Owner $P) -ne $running) -and ((Owner $Q) -eq $otherPid))
+    if ($script:fail -gt $failed) { Show }
+
+    # Settings that moved between the carry and the swap: the staged file has
+    # the load order refusal off and the running server has it on. The swap
+    # reads that back before it starts anything and puts the old files back.
+    $before = Tree $root
+    $running = Owner $P
+    $moved = @{ name = 'Thornswood'; dataDir = 'data'; thornswoodServer = 'main'; thornswoodLoadOrderRefuse = $false; thornswoodRequirePass = $true
+                thornswoodVoicePort = 7778; npcSettings = @{}; npcEnabled = $false; thornswoodSomethingNew = 'the server''s own' }
+    $w = MakeStage -Name '.stage-20260929-000701' -Settings $moved
+    $out = RunFar $checkBlock '.stage-20260929-000701' '.prev-20260929-000701' 30 $w $ThornswoodGamemodeKeys
+    $failed = $script:fail
+    $out = RunFar $swapBlock '.stage-20260929-000701' '.prev-20260929-000701' 30 $w $ThornswoodGamemodeKeys
+    $said = $out -join "`n"
+    Yes 'a staged settings file that moves a switch the server has is SWAP ROLLED BACK' ($out -contains 'SWAP ROLLED BACK')
+    Yes '  and it names the switch, and nothing new was started' (
+        $said -match 'read back: thornswoodLoadOrderRefuse would not be what the server had' -and $said -notmatch 'started, giving it')
+    Yes '  and every live file is back as it was' ((Tree $root) -eq $before)
+    Yes '  and the old server is answering again' ((WaitUp $P) -and ((Owner $P) -ne $running))
+    if ($script:fail -gt $failed) { Show }
+
+    # ---- Deploy-Server.ps1, whole: a build that is not live's goes nowhere (#1221)
+    # The shared clone's build held the dev server's settings on 29 Sep. Run
+    # with ssh and scp stand-ins that write down any call, and none may come.
+    $shell = (Get-Process -Id $PID).Path
+    $dsBin = Join-Path $work 'ds-bin'
+    $dsCalls = Join-Path $work 'ds-calls.log'
+    foreach ($n in 'ssh', 'scp') {
+        Put (Join-Path $dsBin ($n + '.ps1')) ("[IO.File]::AppendAllText(`$env:TS_DS_CALLS, ('$n ' + (`$args -join ' ') + [Environment]::NewLine))`r`nexit 1`r`n")
+    }
+    $dsDist = Join-Path $work 'ds-dist'
+    Put (Join-Path $dsDist 'scam_native.node') 'a binary'
+    Put (Join-Path $dsDist 'gamemode.js') '// the build copy'
+    $oldPath = $env:PATH
+    $env:PATH = $dsBin + ';' + $oldPath
+    $env:TS_DS_CALLS = $dsCalls
+    try {
+        foreach ($case in @(
+            @{ Label = 'the dev server''s settings'; Settings = [ordered]@{ port = 7787; name = 'Thornswood Dev'; thornswoodVoicePort = 7789; thornswoodServer = 'dev'; loadOrder = @('c:/x/Skyrim.esm') }
+               Why = @('port 7787, not 7777', 'the dev voice port 7789', 'the name Thornswood Dev', 'thornswoodServer dev') },
+            @{ Label = 'an npcSettings default key'; Settings = [ordered]@{ port = 7777; name = 'Thornswood'; thornswoodVoicePort = 7778; loadOrder = @('c:/x/Skyrim.esm')
+                                                                        npcSettings = @{ default = @{ spawnInInterior = $true } } }
+               Why = @('refuses every NPC') }
+        )) {
+            Put (Join-Path $dsDist 'server-settings.json') ($case.Settings | ConvertTo-Json -Depth 6)
+            if (Test-Path -LiteralPath $dsCalls) { Remove-Item -LiteralPath $dsCalls -Force }
+            $eap = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            try {
+                $o = (& $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $Here 'scripts\deploy\Deploy-Server.ps1') `
+                        -Dist $dsDist -Vps 127.0.0.1 -User test -Root 'C:/Thornswood-Server' -Now 2>&1 | Out-String)
+                $code = $LASTEXITCODE
+            } finally { $ErrorActionPreference = $eap }
+            $failed = $script:fail
+            Yes ("Deploy-Server with a build holding $($case.Label) is refused (exit $code)") ($code -ne 0 -and $o -match "is not the live server's")
+            Yes ('  naming ' + ($case.Why -join ', ')) (@($case.Why | Where-Object { -not $o.Contains($_) }).Count -eq 0)
+            Yes '  before anything went to the box: no ssh, no scp' (-not (Test-Path -LiteralPath $dsCalls))
+            if ($script:fail -gt $failed) { Write-Host (($o -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 12) -join "`n") }
+        }
+    } finally {
+        $env:PATH = $oldPath
+        Remove-Item Env:\TS_DS_CALLS -ErrorAction SilentlyContinue
+    }
 
     # ---- nothing to put back --------------------------------------------------
     $empty = Join-Path $work 'no-prev-root'
