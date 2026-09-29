@@ -27276,6 +27276,9 @@ log('gamemode loaded:',
               // file rather than Discord, so they are fresh even when the
               // lists above were kept. The staff block ends a banned session.
               bans: Array.isArray(doc.bans) ? doc.bans : [],
+              // Characters staff have killed for good (#1010). The staff
+              // block ends one quietly if it is in the world.
+              pk: Array.isArray(doc.pk) ? doc.pk : [],
               at: new Date().toISOString(),
               note: 'Written by the gamemode from the site. Set enforce true to turn the door on.'
             }, null, 2));
@@ -35082,6 +35085,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // PLAYER_WORDS for the same reason. See the staff block.
                '/kick', '/freeze', '/unfreeze', '/bring', '/silence',
                '/unsilence', '/warn', '/spawnat', '/ban', '/unban', '/note',
+               // One character or the whole account, and a character killed
+               // for good (#1010).
+               '/banaccount', '/unbanaccount', '/pk',
                /*
                  NOT A COMMAND ANYBODY TYPES. The client reports each fall of
                  the axe with it, because the server sees a press and Skyrim's
@@ -42703,9 +42709,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   /give, /spawn and /tp that name no person are left to those branches, which
   is how a playtester's /give iron ore still works.
 
-    /ban <person> <how long> <why>        30m, 2h, 3d, 1w, or forever
-    /unban <person>
+    /ban <person> <how long> <why>        this one character: 30m, 2h, 3d, 1w, or forever
+    /unban <person>                       lifts the ban on this character
+    /banaccount <person> <how long> <why> the whole Discord account: every character
+                                          on it, and any new one
+    /unbanaccount <person>                lifts the ban on the account
+    /pk <person> <why>                    the character dies for good (#1010)
     /note <person> <text>                 kept against them, for staff to read
+
+  One character or the whole account, and PK, are Patrick's of 28 September
+  (#1010). A PK is not a ban: the character can never be played or picked
+  again, it is kept rather than deleted so staff can use it in events, the
+  account can make a new character, and it is quiet: only the staff member
+  and the person whose character it was are told, nobody else.
 
   Bans and notes are kept on the site (Patrick, 28 September: "put the bans
   and notes on the site"), through its keyed /api/staff/game routes with the
@@ -42748,7 +42764,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   var WORDS_STAFF = ['/kick', '/freeze', '/unfreeze', '/bring', '/goto',
                      '/silence', '/unsilence', '/warn', '/spawnat',
-                     '/ban', '/unban', '/note'];
+                     '/ban', '/unban', '/note', '/banaccount', '/unbanaccount', '/pk'];
   var BAN_SWEEP_MS = 10000;         // how often online people are checked against bans
   var SITE_WAIT_MS = 8000;
   // Everybody's (or a playtester's) words that staff can also aim at a person.
@@ -42775,6 +42791,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   // already on their way out, so the sweep tells them once.
   if (!state.banned) { state.banned = {}; }
   if (!state.ending) { state.ending = {}; }
+  // Characters killed for good here (#1010), until the door's list carries them.
+  if (!state.pk) { state.pk = {}; }
+  // Bans lifted here, so the door's list, which can carry a lifted ban for up
+  // to its five minute refresh, does not end their session again meanwhile.
+  if (!state.lifted) { state.lifted = {}; }
 
   function settings() {
     try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
@@ -43131,26 +43152,55 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /* Every active ban the door's last list carried, and the ones made here since. */
-  var bansRead = { at: 0, list: [] };
-  function bansNow(now) {
-    if (now - bansRead.at >= BAN_SWEEP_MS) {
-      bansRead.at = now;
-      var list = [];
-      try {
-        var doc = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'allowed.json'), 'utf8')
-                               .replace(/^﻿/, ''));
-        if (doc && Array.isArray(doc.bans)) { list = doc.bans; }
-      } catch (e) { list = []; }
-      bansRead.list = list;
+  var bansRead = { at: 0, list: [], pk: [] };
+  function readDoor(now) {
+    if (now - bansRead.at < BAN_SWEEP_MS) { return; }
+    bansRead.at = now;
+    var list = [], pk = [], written = 0;
+    try {
+      var doc = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'allowed.json'), 'utf8')
+                             .replace(/^﻿/, ''));
+      if (doc && Array.isArray(doc.bans)) { list = doc.bans; }
+      if (doc && Array.isArray(doc.pk)) { pk = doc.pk; }
+      written = Date.parse(String((doc && doc.at) || '')) || 0;
+    } catch (e) { list = []; pk = []; }
+    bansRead.list = list;
+    bansRead.pk = pk;
+    bansRead.written = written;
+    // A lift the door's list has caught up with needs remembering no longer.
+    for (var k in state.lifted) {
+      if (Object.prototype.hasOwnProperty.call(state.lifted, k) && written > state.lifted[k].at) { delete state.lifted[k]; }
     }
+  }
+  /* Every character killed for good (#1010): the door's list and this server's own. */
+  function pkNow(now) {
+    readDoor(now);
+    var out = {};
+    for (var i = 0; i < bansRead.pk.length; i++) {
+      if (Number(bansRead.pk[i]) > 0) { out[Number(bansRead.pk[i])] = true; }
+    }
+    for (var k in state.pk) {
+      if (Object.prototype.hasOwnProperty.call(state.pk, k)) { out[Number(k)] = true; }
+    }
+    return out;
+  }
+  function bansNow(now) {
+    readDoor(now);
     var out = {};
     for (var i = 0; i < bansRead.list.length; i++) {
       var b = bansRead.list[i] || {};
       var until = Number(b.until) || 0;
       if (until && until <= now) { continue; }
       var ps = Array.isArray(b.profiles) ? b.profiles : [];
+      var scope = String(b.scope || 'account');
       for (var j = 0; j < ps.length; j++) {
-        if (Number(ps[j]) > 0) { out[Number(ps[j])] = { why: String(b.why || ''), until: until }; }
+        var p = Number(ps[j]);
+        if (!(p > 0)) { continue; }
+        var lift = state.lifted[p];
+        if (lift && lift.scope === scope && lift.at >= (bansRead.written || 0)) { continue; }
+        // A ban on the whole account says more than one on the character.
+        if (out[p] && out[p].scope === 'account') { continue; }
+        out[p] = { why: String(b.why || ''), until: until, scope: scope };
       }
     }
     for (var k in state.banned) {
@@ -43166,9 +43216,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function endBanned(pid, actorId, ban, now) {
     if (state.ending[pid] && now - state.ending[pid] < 60000) { return; }
     state.ending[pid] = now;
-    tell(pid, 'You are banned from Thornswood ' + untilText(ban.until) +
-              (ban.why ? ': ' + ban.why : '') + '. Your session is being ended.');
-    log('staff: ending the session of profile ' + pid + ', banned ' + untilText(ban.until));
+    if (ban.scope === 'character') {
+      tell(pid, 'Staff have banned this character ' + untilText(ban.until) +
+                (ban.why ? ': ' + ban.why : '') + '. Your session is being ended. ' +
+                'You can still play your other characters.');
+    } else {
+      tell(pid, 'You are banned from Thornswood ' + untilText(ban.until) +
+                (ban.why ? ': ' + ban.why : '') + '. Your session is being ended.');
+    }
+    log('staff: ending the session of profile ' + pid + ', ' +
+        (ban.scope === 'character' ? 'character ' : '') + 'banned ' + untilText(ban.until));
+    endLater(pid, actorId);
+  }
+  function endLater(pid, actorId) {
     setTimeout(function () {
       var userId = -1;
       try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
@@ -43177,49 +43237,112 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }, KICK_AFTER_MS);
   }
 
-  /* Anybody banned who is online, whoever banned them and wherever. */
+  /* A character killed for good (#1010): only the one playing it is told,
+     and the session ends. Nothing is said to anybody else. */
+  function endPk(pid, actorId, now) {
+    if (state.ending[pid] && now - state.ending[pid] < 60000) { return; }
+    state.ending[pid] = now;
+    tell(pid, 'This character has died for good and cannot be played again. Your session is ' +
+              'being ended. Press Play in the launcher to pick another character or make a new one.');
+    log('staff: ending the session of profile ' + pid + ', whose character is dead for good');
+    endLater(pid, actorId);
+  }
+
+  /* Anybody banned or dead for good who is online, whoever did it and wherever. */
   function banSweep() {
     var now = Date.now();
     var bans = bansNow(now);
+    var dead = pkNow(now);
     var all = online();
     for (var i = 0; i < all.length; i++) {
       var pid = profileOf(all[i]);
-      if (pid && bans[pid]) { endBanned(pid, all[i], bans[pid], now); }
+      if (pid && dead[pid]) { endPk(pid, all[i], now); }
+      else if (pid && bans[pid]) { endBanned(pid, all[i], bans[pid], now); }
     }
   }
 
   function banOrNote(word, words, pid, me, them) {
     if (!them.pid) { tell(pid, them.why); return true; }
     var rest = them.rest || [];
-    if (word === '/ban') {
+    if (word === '/ban' || word === '/banaccount') {
+      var whole = word === '/banaccount';
       if (them.pid === pid) { tell(pid, 'That is you.'); return true; }
       var minutes = banLength(rest[0]);
       var why = rest.slice(1).join(' ').trim();
       if (minutes < 0 || !why) {
-        tell(pid, 'Say how long and why: /ban ' + them.name + ' 3d spamming the market. ' +
-                  'How long is 30m, 2h, 3d, 1w or forever.');
+        tell(pid, 'Say how long and why: ' + word + ' ' + them.name + ' 3d spamming the market. ' +
+                  'How long is 30m, 2h, 3d, 1w or forever. ' +
+                  (whole ? '/banaccount bans every character on their account; /ban bans only this one.'
+                         : '/ban bans only this character; /banaccount bans every character on their account.'));
         return true;
       }
-      siteCall('ban', { profileId: them.pid, name: them.name, byProfileId: pid, byName: me,
-                        why: why, minutes: minutes }, function (ok, v) {
+      siteCall(whole ? 'banaccount' : 'ban', { profileId: them.pid, name: them.name, byProfileId: pid, byName: me,
+                                              why: why, minutes: minutes }, function (ok, v) {
         if (!ok) { tell(pid, 'The site did not take the ban, so nothing changed: ' + v + '.'); return; }
         var until = Number(v.until) || 0;
-        state.banned[them.pid] = { why: why, until: until };
-        tell(pid, 'Banned ' + them.name + ' ' + untilText(until) + '.');
-        record('ban', pid, me, them.pid, them.name, untilText(until) + ': ' + why, 0);
-        var a = them.actorId || actorFor(them.pid);
-        if (a) { endBanned(them.pid, a, { why: why, until: until }, Date.now()); }
+        var covers = whole && Array.isArray(v.profiles) && v.profiles.length ? v.profiles : [them.pid];
+        var ban = { why: why, until: until, scope: whole ? 'account' : 'character' };
+        var now = Date.now();
+        for (var i = 0; i < covers.length; i++) {
+          var p = Number(covers[i]);
+          if (!(p > 0)) { continue; }
+          state.banned[p] = ban;
+          delete state.lifted[p];
+          var a = (p === them.pid && them.actorId) || actorFor(p);
+          if (a) { endBanned(p, a, ban, now); }
+        }
+        tell(pid, whole
+          ? ('Banned ' + them.name + '\'s whole account, every character on it and any new one, ' + untilText(until) + '.')
+          : ('Banned the character ' + them.name + ' ' + untilText(until) + '. Their other characters can still play.'));
+        if (whole) { record('banaccount', pid, me, them.pid, them.name, untilText(until) + ': ' + why, 0); }
+        else { record('ban', pid, me, them.pid, them.name, untilText(until) + ': ' + why, 0); }
       });
       return true;
     }
-    if (word === '/unban') {
-      siteCall('unban', { profileId: them.pid, name: them.name, byProfileId: pid, byName: me }, function (ok, v) {
-        if (!ok) { tell(pid, 'The site did not take that, so nothing changed: ' + v + '.'); return; }
-        delete state.banned[them.pid];
-        delete state.ending[them.pid];
-        tell(pid, v.was ? (them.name + ' is not banned any more.') : (them.name + ' was not banned.'));
-        if (v.was) { record('unban', pid, me, them.pid, them.name, '', 0); }
-      });
+    if (word === '/unban' || word === '/unbanaccount') {
+      var wholeU = word === '/unbanaccount';
+      siteCall(wholeU ? 'unbanaccount' : 'unban', { profileId: them.pid, name: them.name, byProfileId: pid, byName: me },
+        function (ok, v) {
+          if (!ok) { tell(pid, 'The site did not take that, so nothing changed: ' + v + '.'); return; }
+          var now = Date.now();
+          var covers = wholeU && Array.isArray(v.profiles) && v.profiles.length ? v.profiles : [them.pid];
+          for (var i = 0; i < covers.length; i++) {
+            var p = Number(covers[i]);
+            var had = state.banned[p];
+            if (had && (had.scope || 'account') === (wholeU ? 'account' : 'character')) { delete state.banned[p]; }
+            delete state.ending[p];
+            // The door's list can still carry it for a few minutes.
+            if (v.was) { state.lifted[p] = { at: now, scope: wholeU ? 'account' : 'character' }; }
+          }
+          if (wholeU) {
+            tell(pid, v.was ? ('The ban on ' + them.name + '\'s account is lifted.') : (them.name + '\'s account was not banned.'));
+          } else {
+            tell(pid, v.was ? ('The ban on the character ' + them.name + ' is lifted.') : ('The character ' + them.name + ' was not banned.'));
+          }
+          if (v.was && wholeU) { record('unbanaccount', pid, me, them.pid, them.name, '', 0); }
+          else if (v.was) { record('unban', pid, me, them.pid, them.name, '', 0); }
+        });
+      return true;
+    }
+    if (word === '/pk') {
+      if (them.pid === pid) { tell(pid, 'That is you.'); return true; }
+      var whyPk = rest.join(' ').trim();
+      if (!whyPk) {
+        tell(pid, 'Say why: /pk ' + them.name + ' died in the siege of Whiterun. The character dies for good ' +
+                  'and can never be played again; it is kept for staff, and nobody else is told.');
+        return true;
+      }
+      siteCall('pk', { profileId: them.pid, name: them.name, byProfileId: pid, byName: me, why: whyPk },
+        function (ok, v) {
+          if (!ok) { tell(pid, 'The site did not take the PK, so nothing changed: ' + v + '.'); return; }
+          state.pk[them.pid] = { at: Number(v.at) || Date.now() };
+          if (v.was) { tell(pid, them.name + ' was already dead for good.'); return; }
+          tell(pid, them.name + ' is dead for good. The character is kept for staff and can never be played ' +
+                    'again; their account can make a new one. Nobody else was told.');
+          record('pk', pid, me, them.pid, them.name, whyPk, 0);
+          var a = them.actorId || actorFor(them.pid);
+          if (a) { endPk(them.pid, a, Date.now()); }
+        });
       return true;
     }
     var text = rest.join(' ').trim();
@@ -43299,7 +43422,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       if (!look) { tell(pid, 'The server has no creature list to spawn from right now.'); return true; }
       return doAimed(aimed(word, words), pid, actorId, me, look);
     }
-    if (word === '/ban' || word === '/unban' || word === '/note') {
+    if (word === '/ban' || word === '/unban' || word === '/note' ||
+        word === '/banaccount' || word === '/unbanaccount' || word === '/pk') {
       return banOrNote(word, words, pid, me, takePerson(words));
     }
     var them = takePerson(words);
@@ -43423,7 +43547,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   g.__thornswoodStaff = {
     command: command, find: find, takePerson: takePerson, unproven: unproven,
     freezeTick: freezeTick, pushSilenced: pushSilenced, silencedFor: silencedFor,
-    banSweep: banSweep, banLength: banLength, bansNow: bansNow,
+    banSweep: banSweep, banLength: banLength, bansNow: bansNow, pkNow: pkNow,
     state: state, REFUSED: REFUSED, WORDS: WORDS_STAFF
   };
   log('staff commands ready: ' + WORDS_STAFF.join(', ') + ', and ' + AIMED.join(', ') +

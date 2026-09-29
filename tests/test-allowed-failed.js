@@ -91,7 +91,7 @@ async function ask(linked, standings, devDoor) {
   // it in the address; test-site-auth.js checks that side.
   const run = new Function(
     'route', 'devDoor', 'req', 'res', 'cfg', 'url', 'sameSecret', 'sendJson',
-    'jsonFile', 'LINKED', 'standingCached', 'keyInAddress', 'standingsForDoor', 'activeBans',
+    'jsonFile', 'LINKED', 'standingCached', 'keyInAddress', 'standingsForDoor', 'activeBans', 'pkProfiles',
     'return (async function () {\n' + route + '\n})();');
   await run(
     devDoor ? '/dev/api/allowed' : '/api/allowed', !!devDoor,
@@ -101,7 +101,9 @@ async function ask(linked, standings, devDoor) {
     function (res, code, body) { sent = { code: code, body: JSON.parse(JSON.stringify(body)) }; },
     function () { return linked; }, 'linked.json',
     // No staff bans here (#412); test-staff-bans.js runs them.
-    standingCached, new Set(), standingsForDoor, function () { return []; });
+    standingCached, new Set(), standingsForDoor, function () { return []; },
+    // Nobody killed for good here (#1010); test-bans-pk.js runs that.
+    function () { return []; });
   return sent;
 }
 

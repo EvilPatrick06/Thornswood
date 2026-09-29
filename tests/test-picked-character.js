@@ -314,6 +314,8 @@ if (PUSH && ASK && FRESH) {
     'function sameSecret(a, b) { return a === b; }\n' +
     'function jsonFile(f, d) { if (f === "linked") return LINKED; return store.file ? JSON.parse(JSON.stringify(store.file)) : d; }\n' +
     'function putJson(f, v) { store.file = JSON.parse(JSON.stringify(v)); return true; }\n' +
+    // Nobody killed for good or banned by character here (#1010); test-bans-pk.js runs those.
+    'function characterBar() { return null; }\n' +
     'function sendJson(res, code, obj) { res.code = code; res.obj = obj; return res; }\n' +
     'function readTicket(t) { return t === "good" ? { d: "615236910243119104" } : null; }\n' +
     'const LINKED_ = "linked";\n' +

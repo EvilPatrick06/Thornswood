@@ -63,8 +63,10 @@ function yes(what, cond) {
 }
 
 // ---- what the files say ----------------------------------------------------
-yes('the hub Gallery page is a staff page and the other three stay admin',
-    /uploads: 'staff', linked: 'admin', sessions: 'admin', inbox: 'admin'/.test(SERVER));
+// Linked accounts became a staff page with #1010: every staff role bans and
+// PKs there. Sessions and the inbox stay admin.
+yes('the hub Gallery and Linked accounts pages are staff pages and the other two stay admin',
+    /uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin'/.test(SERVER));
 yes('the page gate reads admin as the admin pair and staff as w.dev',
     /LEVEL\[key\] === 'admin' \? !!w\.admin/.test(SERVER) &&
     /LEVEL\[key\] === 'staff' \? !!w\.dev/.test(SERVER));
@@ -288,8 +290,8 @@ const asJson = { 'content-type': 'application/json' };
     yes('a Loremaster opens the hub api (' + r.status + ')', r.status === 200);
     yes('and is told the Gallery page is a staff page',
         lore.level && lore.level.uploads === 'staff');
-    yes('and that the other three hub pages are admin',
-        lore.level && lore.level.linked === 'admin' && lore.level.sessions === 'admin' &&
+    yes('and that Linked accounts is a staff page too (#1010), and the other two are admin',
+        lore.level && lore.level.linked === 'staff' && lore.level.sessions === 'admin' &&
         lore.level.inbox === 'admin');
     yes('and is handed who the server says they are, staff and not admin',
         lore.me && lore.me.dev === true && lore.me.admin === false);
@@ -298,9 +300,15 @@ const asJson = { 'content-type': 'application/json' };
         Array.isArray(lore.files) && lore.files.length === 0 &&
         Array.isArray(lore.uploads) && lore.uploads.length === 0);
     yes('and none of the admin material either',
-        Array.isArray(lore.linked) && lore.linked.length === 0 &&
         Array.isArray(lore.sessions) && lore.sessions.length === 0 &&
         Array.isArray(lore.inbox) && lore.inbox.length === 0);
+    yes('but the linked accounts and the staff records, bans, PKs and notes, do come to a Loremaster (#1010)',
+        Array.isArray(lore.linked) && lore.records && typeof lore.records.bans === 'object' &&
+        typeof lore.records.pk === 'object' && typeof lore.records.notes === 'object');
+    r = await ask('GET', '/api/staff/records', { cookie: cookieFor(LORE_ID, 'Lore') });
+    yes('and a Loremaster reads the records directly (' + r.status + ')', r.status === 200 && r.json && !!r.json.notes);
+    r = await ask('GET', '/api/staff/records', { cookie: cookieFor(TESTER_ID, 'Tester') });
+    yes('a Playtester cannot read the records, notes included (' + r.status + ')', r.status === 401 || r.status === 403);
     yes('and no document or board is sent to them',
         JSON.stringify(lore.docs) === '{}' && JSON.stringify(lore.boards) === '{}');
 
