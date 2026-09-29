@@ -227,7 +227,7 @@ function MakeStage {
     # Every server file the fork builds goes up together, held to the record
     # sent with them (#1214, ServerBuild.ps1).
     $server = [ordered]@{ 'scam_native.node' = 'new binary'; 'dist_back/skymp5-server.js' = 'new server js'; 'dist_back/skymp5-server.js.map' = 'new map'
-                          'package.json' = 'new package'; 'yarn.lock' = 'new lock'; 'launch_server.bat' = 'new bat'; 'data/scripts/ActiveMagicEffect.pex' = 'new pex' }
+                          'package.json' = '{ "name": "skymp5-server" }'; 'yarn.lock' = 'new lock'; 'launch_server.bat' = 'new bat'; 'data/scripts/ActiveMagicEffect.pex' = 'new pex' }
     $c = 'abcdef0123456789abcdef0123456789abcdef01'
     $recFiles = [ordered]@{}
     foreach ($k in $server.Keys) {
@@ -310,6 +310,11 @@ setTimeout(function () { process.exit(0); }, 600000);
 try {
     Put $stub $stubJs
     Put (Join-Path $root 'scam_native.node') 'old binary'
+    # The rest of the server files a running root has had since its install.
+    foreach ($rel in 'dist_back\skymp5-server.js', 'dist_back\skymp5-server.js.map', 'package.json', 'yarn.lock', 'launch_server.bat', 'data\scripts\ActiveMagicEffect.pex') {
+        Put (Join-Path $root $rel) ('old ' + $rel)
+    }
+    Put (Join-Path $root 'package.json') '{ "name": "skymp5-server", "old": true }'
     Put (Join-Path $root 'gamemode.js') '// old gamemode'
     Put (Join-Path $root 'server-build.json') ('{ "sha256": "' + (Sha 'old binary') + '" }')
     Put (Join-Path $root 'thornswood-build.json') ('{ "gamemode": "' + (Sha '// old gamemode') + '" }')
@@ -373,6 +378,7 @@ try {
     $w = MakeStage -Name '.stage-20260924-000201' -Gamemode '// new gamemode, udp-only'
     $out = RunFar $checkBlock '.stage-20260924-000201' '.prev-20260924-000201' 4 $w
     Yes 'a good stage checks out' ($out -contains 'STAGE OK')
+    if ($out -notcontains 'STAGE OK') { Show }
     Yes '  and checking it stopped nothing' (((Owner $P) -eq $oldPid) -and (Answers $P))
     $failed = $script:fail
     $out = RunFar $swapBlock '.stage-20260924-000201' '.prev-20260924-000201' 4 $w

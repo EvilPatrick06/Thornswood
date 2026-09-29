@@ -49,7 +49,9 @@ Yes '  and stops when node is missing, rather than skipping' (($g -join "`n") -m
 # ---- Deploy-Server.ps1 --------------------------------------------------------
 $s = @(Get-Content -LiteralPath (Join-Path $Repo 'scripts\deploy\Deploy-Server.ps1'))
 $check = LineOf $s '^\s*& node --check \$built'
-$list = LineOf $s "^\`$files = 'scam_native.node'"
+# Every server file the record lists goes, since #1214, so the list is built
+# from the record rather than written out.
+$list = LineOf $s "^\`$files = "
 # The first line that runs a call to the VPS: Remote, scp or ssh, or one of
 # the functions that ask the live server who is on it. Read off the syntax
 # tree, and only outside a function body, because a body runs where it is
