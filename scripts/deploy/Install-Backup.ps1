@@ -135,7 +135,8 @@ try {
   foreach (`$s in @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)) {
     `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier(`$s)), 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
   }
-  Set-Acl -LiteralPath '$Root' -AclObject `$acl -ErrorAction Stop
+  # Only the access rules are written back (issue #1120).
+  (Get-Item -LiteralPath '$Root' -Force).SetAccessControl(`$acl)
   'LOCKED'
 } catch { 'COULD NOT LOCK: ' + `$_.Exception.Message }
 "@

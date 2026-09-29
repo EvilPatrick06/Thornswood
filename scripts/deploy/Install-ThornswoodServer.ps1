@@ -467,7 +467,14 @@ function Lock-ServerDir([string]$dir, [string]$from) {
         $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
             (New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', $tree, 'None', 'Allow')))
     }
-    Set-Acl -LiteralPath $dir -AclObject $acl -ErrorAction Stop
+    # Writes back only the access rules. Set-Acl can also try to write the audit
+    # part, which needs a privilege the build runner's account does not have
+    # (issue #1120, Set-ThornswoodAclAccess in Bot-Service.ps1).
+    $item = Get-Item -LiteralPath $dir -Force
+    if ($PSVersionTable.PSEdition -eq 'Core') {
+        if ($item -is [IO.DirectoryInfo]) { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$acl) }
+        else { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, [Security.AccessControl.FileSecurity]$acl) }
+    } else { $item.SetAccessControl($acl) }
 }
 function Lock-ServerRoot([string]$dir, [string]$from) {
     try {
