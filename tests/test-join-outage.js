@@ -90,6 +90,8 @@ const slotsFor = () => 2;
 eval(grab('guildMembers') + '\n' + grab('memberOf') + '\n' + grab('roleNames') + '\n' + grab('standing') +
      '\n' + grab('standingCached') + '\n' + grab('hasLeft') + '\n' + grab('departed') +
      '\n' + route('function notAcceptedYet(') +
+     // What a banned account is told at Play (#1010).
+     '\n' + route('function banUntilText(') + '\n' + route('function accountBanned(') +
      '\nasync function join(p, req, res) {\n' + JOIN + '\n}');
 
 function reset() {

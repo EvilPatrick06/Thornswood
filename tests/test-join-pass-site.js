@@ -56,7 +56,10 @@ const HELPERS = [
   grab('function feedLaunchers('),
   grab('async function hasLeft('), grab('async function departed('),
   // What a refusal for want of a role says, alpha or open (#428).
-  grab('function notAcceptedYet(')
+  grab('function notAcceptedYet('),
+  // One character banned by itself, or killed for good by staff (#1010).
+  grab('function banActive('), grab('function characterBar('), grab('function banUntilText('),
+  grab('function accountBanned(')
 ];
 yes('the pass helpers are in server.js where this expects them', HELPERS.every(function (h) { return h.length > 10; }));
 const ROUTE = grab("  if (p === '/api/play/pass' && req.method === 'POST') {");
@@ -117,8 +120,13 @@ async function ask(o) {
     cfg: { passKey: o.key === undefined ? KEY : o.key, access: { dev: ['Owner', 'Dev'] },
            discord: { botToken: 'x', guildId: 'g' } },
     andList: function (a) { return (a || []).join(' and '); },
-    jsonFile: function (f, fallback) { return f === 'linked.json' ? clone(o.linked || {}) : fallback; },
-    LINKED: 'linked.json',
+    jsonFile: function (f, fallback) {
+      if (f === 'linked.json') return clone(o.linked || {});
+      if (f === 'bans.json') return clone(o.bans || {});
+      if (f === 'pk.json') return clone(o.pk || {});
+      return fallback;
+    },
+    LINKED: 'linked.json', BANS: 'bans.json', PK: 'pk.json',
     crypto: crypto, fs: fs, path: path, ROOT: FEEDROOT,
     console: { log: function () { }, error: function () { } },
     sendJson: null
@@ -236,6 +244,31 @@ async function main() {
   r = await ask({ body: { ticket: '333', profileId: 900, version: '1.1.102' }, linked: MINE,
                   standing: { '222': { inGuild: false, play: false } } });
   yes('a character held only by an account that has left the Discord is the caller\'s', r.code === 200);
+
+  // One character, not the account (#1010).
+  const P = { body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE };
+  r = await ask(Object.assign({}, P, { pk: { 700: { at: 1, by: 'Aela', why: 'died in the siege' } } }));
+  yes('a character staff killed for good is refused with why pk, and no pass', r.code === 403 && r.obj.why === 'pk' && !r.obj.pass);
+  yes('and told it cannot be played again and to pick or make another, without staff\'s reason',
+      /died for good and cannot be played again/.test(r.obj.message) && /make a new one/.test(r.obj.message) &&
+      r.obj.message.indexOf('siege') < 0);
+  r = await ask(Object.assign({}, P, { body: { ticket: '111', profileId: 701, version: '1.1.102' },
+                                       pk: { 700: { at: 1 } } }));
+  yes('the same account\'s other character still gets a pass', r.code === 200 && readPass(r.obj.pass).p === 701);
+  r = await ask(Object.assign({}, P, { body: { ticket: '111', profileId: 556, version: '1.1.102' },
+                                       pk: { 700: { at: 1 } } }));
+  yes('and so does a new character on that account', r.code === 200 && readPass(r.obj.pass).p === 556);
+  r = await ask(Object.assign({}, P, { bans: { 'p:700': { until: Date.now() + 3600000, why: 'griefing' } } }));
+  yes('a character banned by itself is refused with why banned character, until and why',
+      r.code === 403 && r.obj.why === 'banned character' && !r.obj.pass &&
+      /banned that character until .* UTC: griefing/.test(r.obj.message));
+  r = await ask(Object.assign({}, P, { body: { ticket: '111', profileId: 701, version: '1.1.102' },
+                                       bans: { 'p:700': { until: 0, why: 'x' } } }));
+  yes('a character ban leaves the account\'s other characters alone', r.code === 200);
+  r = await ask(Object.assign({}, P, { bans: { 'p:700': { until: Date.now() - 1000, why: 'over' } } }));
+  yes('a character ban that has run out lets it back at once', r.code === 200);
+  r = await ask(Object.assign({}, P, { bans: { 'p:700': { until: 0, why: 'for good' } } }));
+  yes('a character ban for good holds', r.code === 403 && /for good/.test(r.obj.message));
 
   try { fs.rmSync(FEEDROOT, { recursive: true, force: true }); } catch (e) { }
   console.log('');
