@@ -53,8 +53,10 @@ $og = [IO.File]::ReadAllText($ogPath)
 
 $rulesNum = [regex]::Match($og, '(?m)^\s*const int Rules = (\d+);')
 $rulesDoc = [regex]::Match($og, '(?m)^\s*/// (\d+): Vortex''s Data\\Platform\\Distribution redistributables')
-Yes 'OwnGame.Rules is 6 for the Distribution hard-link change' (
-    $rulesNum.Success -and [int]$rulesNum.Groups[1].Value -eq 6)
+# At least 6, not equal to it: rules 7 (Start On Save left out, #394) moved it
+# on past this change on purpose.
+Yes 'OwnGame.Rules is at least 6 for the Distribution hard-link change' (
+    $rulesNum.Success -and [int]$rulesNum.Groups[1].Value -ge 6)
 Yes 'and the history comment names Distribution redistributables under that number' (
     $rulesDoc.Success -and $rulesDoc.Groups[1].Value -eq '6')
 
