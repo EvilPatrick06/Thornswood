@@ -194,8 +194,10 @@ if (`$off) {
   'ping address written to ' + `$f + ' and read back'
 }
 `$u = `$null; `$h = `$null; `$back = `$null
-# The service hands bot.env.json to python only when it starts it.
-`$log = '$rootWin\bot.log'
+# The service hands bot.env.json to python only when it starts it. Its log is
+# in data since #1104, beside the code on a box whose full install is older.
+`$log = '$rootWin\data\bot.log'
+if (-not (Test-Path -LiteralPath `$log) -and (Test-Path -LiteralPath '$rootWin\bot.log')) { `$log = '$rootWin\bot.log' }
 `$before = Get-ThornswoodLogLength `$log
 `$r = @(Restart-ThornswoodBot -Root '$rootWin' -Service '$Service')
 `$r
@@ -334,6 +336,16 @@ $art = Join-Path $Repo 'bot\assets\join-card.png'
 if (Test-Path $art) { $send['assets/join-card.png'] = $art }
 else { Say '  no join-card.png, cards will fall back to a plain background' 'Yellow' }
 
+# The bot reads what the site writes for it from the site's data\for-bot
+# (issue #1102), which the site's own code makes and moves those files into.
+# A bot sent before the site has done that would find nothing there, and once
+# the site moved them it would read every row as new and say each one in the
+# staff channel. So the site goes first.
+$forBot = @(Remote "if (Test-Path -LiteralPath '$docsWin\data\for-bot') { 'FOR-BOT THERE' } else { 'NO FOR-BOT' }" | ForEach-Object { "$_".Trim() })
+if ($forBot -notcontains 'FOR-BOT THERE') {
+  Die "the site has not made $docsWin\data\for-bot yet, where the bot now reads what the site writes for it. Run .\scripts\deploy\Deploy-Docs.ps1 first, then this again. Nothing on the box was changed."
+}
+
 # A stage a run that died part way left behind was never swapped in.
 $made = @(Remote @"
 New-Item -ItemType Directory -Force -Path '$rootWin','$rootWin\assets' | Out-Null
@@ -365,7 +377,7 @@ if ($checkOut -notcontains 'STAGE OK') { Die 'the stage did not check out, so th
 # on import is running for a second at a time. A box with no service yet, on a
 # full run that is about to install it, has nothing to start or check here.
 $botHooks = @"
-`$log = '$rootWin\bot.log'
+`$log = Get-ThornswoodBotLog '$rootWin'
 `$before = 0
 `$hasService = [bool](Get-Service -Name '$Service' -EA SilentlyContinue)
 if (-not `$hasService -and -not `$NoServiceOk) {
@@ -685,9 +697,14 @@ $running = @(Remote ((Get-Content -LiteralPath $svcLib -Raw) + "`n" + @"
 # begun. Writing a marker line instead did not work either, because the bot
 # holds bot.log open the whole time it runs and Add-Content is refused. A byte
 # count needs nothing but a look at the file.
-`$log = '$rootWin\bot.log'
+#
+# Measured on the log the running service writes, which the install moves
+# into data if it is still beside the code (issue #1104), and read afterwards
+# from data, where the new program writes it.
+`$log = Get-ThornswoodBotLog '$rootWin'
 `$before = 0
 if (Test-Path `$log) { `$before = (Get-Item `$log).Length }
+`$log = '$rootWin\data\bot.log'
 
 `$r = Install-ThornswoodBotService -Name '$Service' -Root '$rootWin' -Source '$rootWin\service\BotService.cs' -Task '$Task'
 `$r.Lines

@@ -164,7 +164,7 @@ function post(where, body, opts) {
     r.end(data);
   });
 }
-const inbox = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'data', 'inbox.json'), 'utf8')); } catch (e) { return []; } };
+const inbox = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'data', 'for-bot', 'inbox.json'), 'utf8')); } catch (e) { return []; } };
 const kept = (title) => inbox().filter((r) => r.title === title);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

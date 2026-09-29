@@ -127,7 +127,7 @@ if (`$t) { 'state ' + `$t.State } else { 'NO SUCH TASK: $($it.Task)' }
 # ------------------------------------------------------------- did it come back
 Head 'What it said on the way up'
 Remote @"
-foreach (`$n in 'server.log', 'voice.log', 'docs.log', 'bot.log') {
+foreach (`$n in 'server.log', 'voice.log', 'docs.log', 'data\bot.log') {
   `$p = Join-Path '$($it.Root)' `$n
   if (Test-Path `$p) { Get-Content `$p -Tail 8 -EA SilentlyContinue }
 }

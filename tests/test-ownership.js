@@ -129,7 +129,8 @@ const NOT_SECRET = {
   'check-secrets.allow.txt': 'the secret scan\'s list of known non-secrets, paths and rule names only',
   'discord-webhook.txt': 'a made-up file test-check-secrets.ps1 writes in its own temp folder to prove the scan catches a webhook',
   'github-token.txt': 'the same, for a GitHub token',
-  'test-turn-key.js': 'the voice service\'s harness for the relay key, named by test-voice-turn-url.ps1; it holds no key'
+  'test-turn-key.js': 'the voice service\'s harness for the relay key, named by test-voice-turn-url.ps1; it holds no key',
+  'open-tickets.json': 'the bot\'s record of which thread is each person\'s open ticket, named by Bot-Service.ps1 when it moves the bot\'s records into data; no key in it'
 };
 
 const sources = [];

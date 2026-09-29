@@ -118,7 +118,8 @@ $logs = @(
     @{ Name = 'site.log';   Path = (Join-Path $docsRoot 'site.log');     What = 'the website and the Discord door' }
     # The bot has written this all along and nothing ever fetched it, which
     # is why the site watcher's startup line had to be read over ssh by hand.
-    @{ Name = 'bot.log';    Path = (Join-Path $botRoot 'bot.log');       What = 'the Discord bot, the panel and the site watcher' }
+    # In the bot's data folder since #1104, the one folder its account writes.
+    @{ Name = 'bot.log';    Path = (Join-Path $botRoot 'data\bot.log');  What = 'the Discord bot, the panel and the site watcher' }
 )
 
 Head 'Pulling'

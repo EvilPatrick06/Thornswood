@@ -198,17 +198,34 @@ def _staff_channel_id():
 # staff-general up by name, which is what was wanted.
 TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id())
 
+# The bot's own records, joins.json, open-tickets.json, heartbeat.json and
+# commands-synced.json, go in a folder of their own, data beside bot.py, and
+# so does bot.log, which the service writes (issue #1104). The service's
+# account may write there and nowhere else in the bot's folder: the code is
+# read only to it, so nothing that gets into the bot can rewrite bot.py or put
+# a module beside it for the next start to import. The service names the
+# folder in THORNSWOOD_BOT_DATA (BotService.cs). With no data folder yet, a
+# box whose full install has not run since, the records stay beside bot.py
+# where they were, so a code only deploy never starts the join numbers again;
+# the full install moves them across while the bot is stopped (Bot-Service.ps1).
+HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get('THORNSWOOD_BOT_DATA') or (
+    os.path.join(HERE, 'data') if os.path.isdir(os.path.join(HERE, 'data')) else HERE)
+
 # Where the site writes the sessions that went wrong. The bot and the site run
 # on the same box, so this is a file rather than a request: no ticket, no port
-# and nothing to keep in step.
+# and nothing to keep in step. In for-bot, a folder of the site's data that
+# holds only what the site writes for the bot, so the bot's account is granted
+# read on that and never on the site's own records, sessions.json among them
+# (issue #1102).
 TROUBLE_FILE = os.environ.get(
-    'TROUBLE_FILE', r'C:\Thornswood-Docs\data\trouble.json')
+    'TROUBLE_FILE', r'C:\Thornswood-Docs\data\for-bot\trouble.json')
 TROUBLE_EVERY = _int_env('TROUBLE_EVERY', 120)
 
 # Where the site writes what people send in on its public report page, read
 # the same way as trouble.json and said in the same staff channel.
 REPORTS_FILE = os.environ.get(
-    'REPORTS_FILE', r'C:\Thornswood-Docs\data\inbox.json')
+    'REPORTS_FILE', r'C:\Thornswood-Docs\data\for-bot\inbox.json')
 REPORTS_EVERY = _int_env('REPORTS_EVERY', 120)
 # More than this many in one look is a script, not five people, because the
 # site takes five an hour from any one place. Then one line says how many.
@@ -506,7 +523,7 @@ def thread_block(guild, ch):
 # Install-Bot.ps1 sends a fixed list of files and deletes nothing in this
 # folder, so neither the full run nor -CodeOnly can overwrite or remove it,
 # and .gitignore keeps it out of the repo, like open-tickets.json.
-JOINS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'joins.json')
+JOINS = os.path.join(DATA_DIR, 'joins.json')
 JOIN_FLOOR = _int_env('JOIN_NUMBER_FLOOR', 28)
 
 
@@ -1131,8 +1148,7 @@ _last_ticket = {}
 # that forgets on every restart is not a rule. The thread name cannot carry it,
 # because the name is the label and a display name, and a display name is
 # neither unique nor fixed.
-OPEN_TICKETS = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            'open-tickets.json')
+OPEN_TICKETS = os.path.join(DATA_DIR, 'open-tickets.json')
 
 
 def _now():
@@ -2435,7 +2451,7 @@ async def watch_moderation():
 # the watchdog never reads half of one.
 HEARTBEAT_FILE = os.environ.get(
     'HEARTBEAT_FILE',
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'heartbeat.json'))
+    os.path.join(DATA_DIR, 'heartbeat.json'))
 HEARTBEAT_EVERY = _int_env('HEARTBEAT_EVERY', 60)
 
 # The fields the watchdog reads. test-heartbeat.py checks the two agree.
@@ -2637,8 +2653,7 @@ _watching = False
 # What was last registered with Discord, so a restart does not do it all
 # again. Next to the code, because that folder is the bot's own and a deploy
 # that replaces it is a deploy that may have changed the commands anyway.
-STAMP = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                     'commands-synced.json')
+STAMP = os.path.join(DATA_DIR, 'commands-synced.json')
 
 # Set FORCE_COMMAND_SYNC=1 in bot.env.json to make the next start register them
 # whatever the stamp says. For the case where Discord has them and this file

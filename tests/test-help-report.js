@@ -185,7 +185,7 @@ function waitUp(port) {
     })();
   });
 }
-const inbox = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'data', 'inbox.json'), 'utf8')); } catch (e) { return []; } };
+const inbox = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'data', 'for-bot', 'inbox.json'), 'utf8')); } catch (e) { return []; } };
 
 (async function main() {
   const port = await freePort();
@@ -386,7 +386,7 @@ const inbox = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'da
         'print(json.dumps(out))'
       ].join('\n'));
       const said = spawnSync('python', [probe], { encoding: 'utf8',
-        env: Object.assign({}, process.env, { BOT_DIR: BOT, INBOX: path.join(dir, 'data', 'inbox.json'),
+        env: Object.assign({}, process.env, { BOT_DIR: BOT, INBOX: path.join(dir, 'data', 'for-bot', 'inbox.json'),
                                               PYTHONDONTWRITEBYTECODE: '1' }) });
       let lines = [];
       try { lines = JSON.parse(String(said.stdout).trim().split('\n').pop()); } catch (e) { lines = []; }

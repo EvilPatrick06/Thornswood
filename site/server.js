@@ -41,6 +41,11 @@ const DATA   = path.join(ROOT, 'data');
 const PUBLIC = path.join(ROOT, 'public');
 const FILES  = path.join(ROOT, 'files');
 const UP     = path.join(ROOT, 'uploads');
+/* What the site writes for the bot and nothing else: trouble.json, inbox.json
+   and moderation.log (issue #1102). The bot runs as its own account, which is
+   granted read on this folder only (scripts\vps\Bot-Service.ps1), so it never
+   reaches the site's own records beside it, sessions.json among them. */
+const FOR_BOT = path.join(DATA, 'for-bot');
 
 // ==== thornswood site log ====
 //
@@ -276,8 +281,26 @@ if (cfgBroken) {
   }
 }
 
-for (const dir of [DATA, PUBLIC, FILES, UP]) {
+for (const dir of [DATA, FOR_BOT, PUBLIC, FILES, UP]) {
   try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { }
+}
+/* A site from before #1102 kept those three directly in data. Each is moved
+   into for-bot once: copied, so the copy takes that folder's rules rather
+   than keeping the old file's, then removed. One already in for-bot is never
+   written over, and the old one is then left where it is and said. */
+for (const n of ['trouble.json', 'inbox.json', 'moderation.log']) {
+  const from = path.join(DATA, n);
+  const to = path.join(FOR_BOT, n);
+  try {
+    if (!fs.existsSync(from)) continue;
+    if (fs.existsSync(to)) {
+      console.log('[thornswood-docs] ' + n + ' is in data and in data\\for-bot; the one in for-bot is used, the other is left for a look');
+      continue;
+    }
+    fs.copyFileSync(from, to);
+    fs.unlinkSync(from);
+    console.log('[thornswood-docs] moved ' + n + ' into data\\for-bot, where the bot reads it');
+  } catch (e) { console.log('[thornswood-docs] could not move ' + n + ' into data\\for-bot: ' + e.message); }
 }
 
 // --------------------------------------------------------------- content --
@@ -705,7 +728,7 @@ function writeBoardOne(name, value) {
 }
 
 const RESULTS = path.join(DATA, 'results.json');
-const INBOX   = path.join(DATA, 'inbox.json');
+const INBOX   = path.join(FOR_BOT, 'inbox.json');
 
 // ==== thornswood rules accepted ====
 /* Who accepted the rules, by Discord id (#428). Before this nobody ever did:
@@ -1683,7 +1706,7 @@ const PK = path.join(DATA, 'pk.json');
 const NOTES = path.join(DATA, 'notes.json');
 // What staff did on the hub, one JSON line each, for the bot's staff channel.
 // The game servers write their own (private\moderation.log).
-const MODLOG = path.join(DATA, 'moderation.log');
+const MODLOG = path.join(FOR_BOT, 'moderation.log');
 const NOTES_KEEP = 200;
 const BAN_MOST_MIN = 10 * 365 * 24 * 60;
 
@@ -2437,7 +2460,7 @@ function rereadTrouble() {
   file needs no ticket, no port and nothing to keep in step. Newest last, the
   last 200, so it cannot grow without bound.
 */
-const TROUBLE_FILE = path.join(DATA, 'trouble.json');
+const TROUBLE_FILE = path.join(FOR_BOT, 'trouble.json');
 const TROUBLE_KEEP = 200;
 
 function noteTrouble(row, found) {
