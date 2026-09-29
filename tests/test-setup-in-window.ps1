@@ -195,7 +195,13 @@ exit 7
     # ---- 3. Work: the script, not Setup.bat, and the exit code decides --------
     $work = Get-Method $bs 'static void Work('
     Yes 'Work no longer starts Setup.bat' ($work.Length -gt 0 -and -not $work.Contains('"Setup.bat"'))
-    Yes 'nothing in Bootstrap starts anything through the shell' (-not $bs.Contains('UseShellExecute = true'))
+    # Except the browser on the terms, privacy or rules page (issue #1009),
+    # which is the shell's job; OpenPage takes only the site's own addresses.
+    $shellUse = @([regex]::Matches($bs, 'UseShellExecute = true'))
+    $openPage = Get-Method $bs 'static void OpenPage('
+    Yes 'nothing in Bootstrap starts anything through the shell but the site''s own pages' (
+        $shellUse.Count -eq 1 -and $openPage.Contains('UseShellExecute = true') -and
+        $openPage.Contains('if (!url.StartsWith(Site + "/", StringComparison.OrdinalIgnoreCase)) return;'))
     Yes 'Work runs the payload''s Setup-Thornswood.ps1 through SetupStartInfo' (
         $work.Contains('Path.Combine(temp, "Setup-Thornswood.ps1")') -and
         $work.Contains('RunSetupScript(SetupStartInfo(PowerShellExe(), script, installRoot, makeOwnGame, vortexGame)'))

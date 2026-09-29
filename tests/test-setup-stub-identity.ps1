@@ -93,8 +93,14 @@ $iStart = $bs.IndexOf('p.Start();')
 Yes 'the only program it starts is PowerShell on the payload''s script, not a downloaded exe' (
     $bs.Contains('string script = Path.Combine(temp, "Setup-Thornswood.ps1");') -and
     $bs.Contains('SetupStartInfo(PowerShellExe(), script, installRoot, makeOwnGame, vortexGame)') -and
-    $bs.Contains('var psi = new ProcessStartInfo(ps);') -and $iStart -gt 0 -and
-    @([regex]::Matches($bs, 'Process\.Start\(')).Count -eq 0)
+    $bs.Contains('var psi = new ProcessStartInfo(ps);') -and $iStart -gt 0)
+# The one Process.Start is the browser on the terms, privacy or rules page
+# (issue #1009), and OpenPage refuses any address that is not the site's.
+$openAt = $bs.IndexOf('static void OpenPage(Uri uri)')
+$psAt = @([regex]::Matches($bs, 'Process\.Start\('))
+$guard = if ($openAt -gt 0) { $bs.IndexOf('if (!url.StartsWith(Site + "/", StringComparison.OrdinalIgnoreCase)) return;', $openAt) } else { -1 }
+Yes 'the one Process.Start opens only a page on the site, in the browser' (
+    $psAt.Count -eq 1 -and $openAt -gt 0 -and $guard -gt $openAt -and $psAt[0].Index -gt $guard)
 
 # ---- 4. the #429 age lock, left alone --------------------------------------
 # Install starts disabled and the checkbox is the only thing that enables it,
