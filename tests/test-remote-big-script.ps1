@@ -333,6 +333,18 @@ function Test-Sends([string]$name, [scriptblock]$sendBig, [scriptblock]$sendShor
     if (-not $r.Out.Contains('short and sent inline')) { Show-Why $r }
 }
 
+# ---- Send-Script.ps1, the helper every script sends through (#1070) -----------
+$sendScript = Join-Path $RepoPath 'scripts\vps\Send-Script.ps1'
+Yes 'Send-Script.ps1 is there' (Test-Path -LiteralPath $sendScript)
+if (Test-Path -LiteralPath $sendScript) {
+    . $sendScript
+    Test-Sends 'Send-Script.ps1 Invoke-ThornswoodRemote' {
+        Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $big
+    } {
+        Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $short
+    } $true
+}
+
 # ---- Remote.ps1, which takes any script --------------------------------------
 $remotePs1 = Join-Path $RepoPath 'scripts\vps\Remote.ps1'
 Yes 'Remote.ps1 is there' (Test-Path -LiteralPath $remotePs1)
@@ -375,6 +387,14 @@ $helpers = 0
 foreach ($f in (Get-ChildItem -Path (Join-Path $RepoPath 'scripts') -Filter *.ps1 -File -Recurse | Where-Object { $_.Name -notlike 'test-*' -and $_.FullName -notmatch '[\\/]oneoff[\\/]' } | Sort-Object Name)) {
     $fn = Get-FunctionText $f.FullName 'Remote'
     if (-not $fn) { continue }
+    # Since #1070 the copies call Send-Script.ps1, loaded above, which keeps
+    # the far side's exit code, so theirs is held to that as well.
+    if ($fn -match 'Invoke-ThornswoodRemote') {
+        $helpers++
+        try { Invoke-Expression $fn } catch { Yes ("the Remote in {0} can be lifted" -f $f.Name) $false; continue }
+        Test-Sends $f.Name { Remote $big } { Remote $short } $true
+        continue
+    }
     if ($fn -notmatch '\$cmd\.Length -(le|gt) \d+') {
         Write-Host ("SKIP  {0}: its Remote has no guard; it sends only its own blocks, which test-remote-length.ps1 measures" -f $f.Name)
         continue

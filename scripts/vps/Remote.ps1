@@ -63,9 +63,10 @@ param(
     # A value the script needs and nobody may see: a webhook, a password. It
     # goes on ssh's standard input, never on a command line, and the script
     # finds it in $ThornswoodSecret (Send-Secret.ps1, issue #451). Only from
-    # another script (& Remote.ps1 ... -Secret $v), never typed: a value typed
-    # after -Secret is in this shell's history.
-    [string]$Secret
+    # another script that already asked for it, as a SecureString, which
+    # nobody can type on a command line (issue #1069): a value typed there
+    # would be in this shell's history.
+    [System.Security.SecureString]$Secret
 )
 
 
@@ -107,63 +108,24 @@ if ($Show) {
     Write-Host ''
 }
 
+# The sending is Send-Script.ps1's (issue #1070), the one helper every script
+# here uses: the command line when the script fits, otherwise a file of its
+# own name in C:/Windows/Temp, run, removed whether it worked or not, and the
+# far side's exit code handed back rather than the tidy up's. Why a long
+# script goes as a file, and why the path goes bare, is in its header;
+# tests\test-remote-big-script.ps1 sends a 10 KB script through it.
+#
 # With a secret, Send-Secret.ps1 sends it: the value on standard input, the
-# script on the command line or, when long, by file, the same as below.
+# script the same way as without one.
+. (Join-Path $Here 'Send-Secret.ps1')
+$sshArgs = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 if ($PSBoundParameters.ContainsKey('Secret')) {
-    . (Join-Path $Here 'Send-Secret.ps1')
-    $sshArgs = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
-    Invoke-ThornswoodSecretRemote -Target "$VpsUser@$VpsHost" -SshArgs $sshArgs -Script $full -Secret $Secret
+    $value = ConvertFrom-ThornswoodSecureString $Secret
     $Secret = $null
+    Invoke-ThornswoodSecretRemote -Target "$VpsUser@$VpsHost" -SshArgs $sshArgs -Script $full -Secret $value
+    $value = $null
     exit $LASTEXITCODE
 }
 
-$encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($full))
-
-# A LONG SCRIPT GOES AS A FILE, because a command line cannot hold it and
-# nothing says so. On the VPS a long command line arrives cut short, and the
-# far end complains about a brace in a script nobody can see: Deploy-Docs.ps1
-# hit it on 17 September and Deploy-DevGamemode.ps1 on 20 September, and
-# sixteen scripts were given this guard that night. This one was not, and it
-# is the one that takes any script at all. Base64 of UTF-16 is about 2.7 times
-# the script, so the 6,000 character gate the sixteen use is a script of about
-# 2 KB. Measured 24 September: a 10,266 character script made a 27,526
-# character command line. Where exactly the VPS cuts a line has not been
-# measured. Entry 197 on the To Do List asked for "the remote helper survives
-# a 10 KB script"; tests\test-remote-big-script.ps1 is that.
-#
-# Under the limit nothing changes. Over it, the script is copied up and run
-# from there. A name of its own, so two of these at once cannot run each
-# other's script. Written with a byte order mark so Windows PowerShell on the
-# box reads it as UTF-8 whichever PowerShell sent it. The exit code is the
-# far end's, kept across the tidy up: the script's own number when cmd.exe
-# hands the line on, and 1 for any failure when Windows PowerShell does,
-# because that is what powershell -Command returns for a program that failed.
-# Both measured on this machine, 24 September.
-#
-# The path goes bare, with no quotes round it; it is ours and has no spaces.
-# Measured on this machine on 24 September, not on the VPS: bare runs whether
-# cmd.exe or Windows PowerShell hands the line on, and the form the sixteen
-# used, the path in single quotes, fails under cmd.exe. That form did run on
-# the VPS on 20 and 21 September, so which shell sshd uses there is not known,
-# and bare is the form that works under either. Bare also reaches ssh the same
-# from Windows PowerShell and from pwsh, which quote an embedded double quote
-# differently.
-$cmd = "powershell -NoProfile -EncodedCommand $encoded"
-if ($cmd.Length -gt 6000) {
-    $far = 'C:/Windows/Temp/thornswood-remote-' + [Guid]::NewGuid().ToString('N') + '.ps1'
-    $tmp = [IO.Path]::GetTempFileName()
-    $rc = 1
-    try {
-        [IO.File]::WriteAllText($tmp, $full, (New-Object Text.UTF8Encoding($true)))
-        & scp -o BatchMode=yes -o StrictHostKeyChecking=yes $tmp "${VpsUser}@${VpsHost}:$far" 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Could not copy the script to $VpsHost. Nothing was run." }
-        & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$VpsUser@$VpsHost" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
-        $rc = $LASTEXITCODE
-        & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$VpsUser@$VpsHost" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-    }
-    finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
-    exit $rc
-}
-
-& ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$VpsUser@$VpsHost" "powershell -NoProfile -EncodedCommand $encoded" 2>&1
+Invoke-ThornswoodRemote -Target "$VpsUser@$VpsHost" -SshArgs $sshArgs -Script $full
 exit $LASTEXITCODE

@@ -71,6 +71,7 @@ $off = @()
 $bare = @()
 $calls = 0
 $secretCalls = 0
+$helperCalls = 0
 foreach ($f in $files) {
     $tokens = $null; $errors = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors)
@@ -109,10 +110,11 @@ foreach ($f in $files) {
                 -not $first.Splatted -and $toolVars.ContainsKey($first.VariablePath.UserPath.ToLowerInvariant())) { $name = 'ssh' }
             else { continue }
         }
-        if ($name -eq 'Invoke-ThornswoodSecretRemote') {
-            # Send-Secret.ps1 adds the option itself and refuses a weaker one,
-            # but a caller still hands it the script's strict array.
-            $secretCalls++
+        if ($name -eq 'Invoke-ThornswoodSecretRemote' -or $name -eq 'Invoke-ThornswoodRemote') {
+            # Send-Secret.ps1 and Send-Script.ps1 (#1070) add the option
+            # themselves and refuse a weaker one, but a caller still hands them
+            # the script's strict array.
+            if ($name -eq 'Invoke-ThornswoodSecretRemote') { $secretCalls++ } else { $helperCalls++ }
             $okS = $false
             for ($i = 0; $i -lt $c.CommandElements.Count - 1; $i++) {
                 $e = $c.CommandElements[$i]
@@ -122,7 +124,7 @@ foreach ($f in $files) {
                         ($v -is [System.Management.Automation.Language.VariableExpressionAst] -and $strictVars.ContainsKey($v.VariablePath.UserPath.ToLowerInvariant()))) { $okS = $true }
                 }
             }
-            if (-not $okS) { $bare += ('{0}:{1} (Invoke-ThornswoodSecretRemote)' -f (Rel $f.FullName), $c.Extent.StartLineNumber) }
+            if (-not $okS -and $f.Name -notin @('Send-Script.ps1', 'Send-Secret.ps1', 'Artifact.ps1')) { $bare += ('{0}:{1} ({2})' -f (Rel $f.FullName), $c.Extent.StartLineNumber, $name) }
             continue
         }
         if (@('ssh', 'scp', 'sftp', 'ssh.exe', 'scp.exe', 'sftp.exe') -notcontains $name.ToLowerInvariant()) { continue }
@@ -139,7 +141,10 @@ foreach ($f in $files) {
 
 Yes ('no script turns host key checking down' + $(if ($off.Count) { ': ' + ($off -join ', ') } else { '' })) ($off.Count -eq 0)
 Yes ('every ssh, scp and sftp call carries StrictHostKeyChecking=yes' + $(if ($bare.Count) { ': ' + ($bare -join ', ') } else { '' })) ($bare.Count -eq 0)
-Yes ("  and there are real calls to check ($calls found)") ($calls -ge 100)
+# Since #1070 twenty scripts send through Send-Script.ps1 instead of four ssh
+# and scp calls each, so the raw calls are fewer and the helper calls count.
+Yes ("  and there are real calls to check ($calls found)") ($calls -ge 60)
+Yes ("  every Invoke-ThornswoodRemote caller hands it a strict array ($helperCalls found)") ($helperCalls -ge 20)
 Yes ("  every Invoke-ThornswoodSecretRemote caller hands it a strict array ($secretCalls found)") ($secretCalls -ge 8)
 
 # ---- 2b: Send-Secret.ps1 keeps its own guard ----------------------------------------

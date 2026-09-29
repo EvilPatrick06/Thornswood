@@ -53,6 +53,8 @@
   machine that can reach the box can do it.
 #>
 
+. (Join-Path $PSScriptRoot '..\vps\Send-Script.ps1')
+
 $script:ThornswoodDeployStore = 'C:/Thornswood-Deploys'
 
 function Initialize-ThornswoodArtifactType {
@@ -365,28 +367,14 @@ function Get-ThornswoodArtifactPart([string]$Root) {
 function Invoke-ThornswoodArtifactRemote([string]$Target, [string[]]$SshArgs, [string]$Script) {
   # Host key checking on whatever the caller passed (#450): only the box whose
   # key known_hosts holds, checked against vps.json, is ever talked to.
-  $strict = @('-o', 'StrictHostKeyChecking=yes') + @($SshArgs | Where-Object { $_ })
-  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($Script))
-  $cmd = "powershell -NoProfile -EncodedCommand $e"
+  # Send-Script.ps1 adds it and refuses a weaker one.
   $eap = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   try {
     # cmd.exe on the box stops at 8,191 characters (tests\test-remote-length.ps1).
-    # These scripts are short; one that is not goes up as a file and is run
-    # from there, the way Deploy-Docs.ps1 does it.
-    if ($cmd.Length -le 6000) {
-      $out = @(& ssh @strict $Target $cmd 2>&1 | Where-Object { $_ -is [string] } | ForEach-Object { $_.Trim() })
-    } else {
-      $far = 'C:/Windows/Temp/thornswood-artifact.ps1'
-      $tmp = [IO.Path]::GetTempFileName()
-      try {
-        [IO.File]::WriteAllText($tmp, $Script, (New-Object Text.UTF8Encoding($true)))
-        & scp @strict $tmp ($Target + ':' + $far) 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw ('could not send a script to ' + $Target) }
-        $out = @(& ssh @strict $Target "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1 | Where-Object { $_ -is [string] } | ForEach-Object { $_.Trim() })
-        & ssh @strict $Target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-      } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
-    }
+    # These scripts are short; one that is not goes up as a file of its own
+    # name and is run from there (Send-Script.ps1, issue #1070).
+    $out = @(Invoke-ThornswoodRemote -Target $Target -SshArgs @($SshArgs | Where-Object { $_ }) -Script $Script | Where-Object { $_ -is [string] } | ForEach-Object { $_.Trim() })
   } finally { $ErrorActionPreference = $eap }
   return $out
 }

@@ -80,6 +80,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Script.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
@@ -209,27 +210,9 @@ foreach ($f in 'voice-server.js', 'public\index.html', 'public\voice.js') {
   the newest .prev folder back and leaves the task as it is.
 #>
 function Remote($script) {
-    $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-    $cmd = "powershell -NoProfile -EncodedCommand $e"
-    # Under the limit it goes on the command line, one round trip. Over it,
-    # the script goes as a file and is run from there: sshd on Windows hands
-    # the command to cmd.exe, which stops at 8,191 characters, and the install
-    # below has never fitted (measured 23 September, 24,350 on the wire). The
-    # path goes across bare, the form that runs under cmd.exe and Windows
-    # PowerShell alike, measured on 24 September.
-    if ($cmd.Length -le 6000) {
-        return & ssh @ssh $target $cmd 2>&1
-    }
-    $far = 'C:/Windows/Temp/thornswood-install-voice.ps1'
-    $tmp = [IO.Path]::GetTempFileName()
-    try {
-        Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
-        & scp @ssh $tmp "${target}:$far" 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "could not send a script to $VpsHost" }
-        & ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
-        & ssh @ssh $target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-    }
-    finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
+    # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
+    # name, removed after, and the far side's exit code comes back.
+    return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script
 }
 
 $rootFar   = $Root -replace '\\', '/'
