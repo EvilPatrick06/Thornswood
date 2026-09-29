@@ -222,37 +222,20 @@ if ((Test-Path -LiteralPath $gmSrc) -and (Test-Path -LiteralPath $Dist)) {
 $settingsPath = Join-Path $Dist 'server-settings.json'
 
 <#
-  A DEV PUBLISH REWRITES THE PORTS BEFORE ANYTHING IS PACKED.
+  A DEV PUBLISH PACKS THE DEV PORTS, AND ONLY INTO THE PAYLOAD.
 
   The build's server-settings.json is the LIVE one: port 7777, name
   Thornswood. Unpacked into the dev root unchanged it brings the dev server up
   on the live port, which is what happened the first time this channel was
-  run. vps-dev-instance.ps1 is where these two numbers come from, and they are
-  the same ones Deploy-DevGamemode.ps1 checks for.
+  run. So Export-ServerPayload.ps1 -Channel dev writes port 7787, voice 7789
+  and the name Thornswood Dev into its staged copy, and the zip carries them.
 
-  Written into the DIST copy rather than on the box, so what is packed is what
-  runs, and a publish that fails half way has not left a live port in a dev
-  folder.
+  It used to write them here, into the build's own file, and never put them
+  back (#1114): the next live publish packed them and live came up on 7787
+  under the dev name. The build is not written for a channel any more, a live
+  export refuses settings that are not the live server's, and the zip is read
+  back below before it is sent.
 #>
-if ($IsDev -and (Test-Path -LiteralPath $settingsPath)) {
-    try {
-        $devJson = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
-        $devJson.port = 7787
-        if ($devJson.PSObject.Properties.Name -contains 'name') {
-            $devJson.name = 'Thornswood Dev'
-        }
-        if ($devJson.PSObject.Properties.Name -contains 'thornswoodVoicePort') {
-            $devJson.thornswoodVoicePort = 7789
-        } else {
-            $devJson | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue 7789
-        }
-        $devJson | ConvertTo-Json -Depth 20 |
-            Set-Content -LiteralPath $settingsPath -Encoding UTF8
-        Say '  dev channel: port 7787, voice 7789, name Thornswood Dev' 'Green'
-    } catch {
-        throw "Could not set the dev ports in $settingsPath : $_"
-    }
-}
 <#
   AND HOW MANY IT HOLDS AT ONCE, #481, whichever channel it goes to:
   thornswoodMostOnline for the gamemode and maxPlayers, with the staff seats
@@ -332,11 +315,36 @@ if (-not $SkipBuild) {
     # order mark that only ever showed up as a parse error on the VPS.
     $ps = (Get-Process -Id $PID).Path
     if (-not $ps) { $ps = 'powershell' }
-    & $ps -NoProfile -ExecutionPolicy Bypass -File $export -Dist $Dist -Zip $Zip -VpsRoot $VpsRoot
-    if ($LASTEXITCODE -ne 0) { Die "Export-ServerPayload.ps1 exited with $LASTEXITCODE" }
+    # The staging folder beside the zip (out\_payload beside
+    # out\thornswood-server.zip, the same as its default).
+    & $ps -NoProfile -ExecutionPolicy Bypass -File $export -Dist $Dist -Zip $Zip -VpsRoot $VpsRoot `
+        -OutDir (Join-Path (Split-Path -Parent $Zip) '_payload') -Channel $Channel
+    if ($LASTEXITCODE -ne 0) { Die "Export-ServerPayload.ps1 exited with $LASTEXITCODE. The lines above say why." }
 }
 if (-not (Test-Path -LiteralPath $Zip)) { Die "not found: $Zip. Run without -SkipBuild." }
 Say ("payload {0:N1} MB" -f ((Get-Item -LiteralPath $Zip).Length / 1MB)) 'Green'
+
+# The port the zip will really start on, read out of the zip (#1114), so a
+# -SkipBuild zip packed for the other channel cannot go to this one either.
+$wantPort = if ($IsDev) { 7787 } else { 7777 }
+$zipPort = ''
+try {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $za = [IO.Compression.ZipFile]::OpenRead($Zip)
+    try {
+        $ze = $za.GetEntry('server-settings.json')
+        if ($ze) {
+            $zr = New-Object IO.StreamReader($ze.Open())
+            try { $zj = $zr.ReadToEnd() | ConvertFrom-Json } finally { $zr.Dispose() }
+            if ($zj.PSObject.Properties['port']) { $zipPort = [string]$zj.port }
+        }
+    } finally { $za.Dispose() }
+} catch { $zipPort = '' }
+if ($zipPort -ne [string]$wantPort) {
+    Die ("the payload's server-settings.json starts the server on port " + $(if ($zipPort) { $zipPort } else { 'nothing it says' }) +
+         ", and the $Channel server is $wantPort. Nothing was sent. Run it again without -SkipBuild.")
+}
+Say ("payload starts the $Channel server on port $wantPort") 'Green'
 
 # ------------------------------------------------------------ no stop here ---
 # This used to stop the server here, before anything was copied, so a copy

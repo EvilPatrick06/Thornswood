@@ -58,6 +58,18 @@ function Get-ExpectedSignerFragment {
     return $m.Groups[1].Value.Trim()
 }
 
+# One key of signing.json, or $null when it is not there. Every key is read
+# this way rather than as $cfg.enabled: Ship runs under Set-StrictMode -Version
+# Latest, which its children inherit, and under that a key left out of the file
+# throws "The property 'enabled' cannot be found" instead of the gate's own
+# sentence (#1072). "enabled" is optional: a file without it is on.
+function Get-SigningConfigValue($Config, [string]$Key) {
+    if ($null -eq $Config -or $null -eq $Config.PSObject) { return $null }
+    $p = $Config.PSObject.Properties[$Key]
+    if ($null -eq $p) { return $null }
+    return $p.Value
+}
+
 function Get-SigningConfigRefusal {
     param(
         [Parameter(Mandatory = $true)][string]$ConfigPath,
@@ -77,19 +89,20 @@ function Get-SigningConfigRefusal {
                 ' Nothing was published.')
     }
 
-    if ($null -ne $cfg.enabled -and -not $cfg.enabled) {
+    $on = Get-SigningConfigValue $cfg 'enabled'
+    if ($null -ne $on -and -not $on) {
         return ('records\signing\signing.json has "enabled": false. Only a signing machine may Ship, ' +
                 'dev included (CONTRIBUTING). Nothing was published.')
     }
 
-    $m = if ($cfg.metadata) { [string]$cfg.metadata } else { '' }
+    $m = [string](Get-SigningConfigValue $cfg 'metadata')
     if ($m -and $RepoRoot -and -not [IO.Path]::IsPathRooted($m)) {
         $m = Join-Path $RepoRoot $m
     }
     if ($m -and (Test-Path -LiteralPath $m)) {
         $meta = $null
         try { $meta = Get-Content -LiteralPath $m -Raw | ConvertFrom-Json } catch { $meta = $null }
-        $profName = if ($meta -and $meta.CertificateProfileName) { [string]$meta.CertificateProfileName } else { '' }
+        $profName = [string](Get-SigningConfigValue $meta 'CertificateProfileName')
         if (-not $profName -or $profName -match 'FILL THIS IN|YOUR_|<|\s') {
             return ('the certificate profile in ' + $m + ' is not filled in yet. ' +
                     'Only a signing machine may Ship. Nothing was published.')

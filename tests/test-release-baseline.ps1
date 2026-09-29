@@ -349,12 +349,11 @@ try {
     function YesR([string]$what, [bool]$cond, $r) { Yes $what $cond; Said $r $cond }
     # Nothing of ours changed. Every release also deletes the paths
     # Ship-Rules deletes from every install by rule, so the run is stopped at
-    # the removals gate (-MaxRemovals 0) and nothing else may be removed.
+    # the removals gate (-MaxRemovals 0) and nothing else may be removed. The
+    # removed count is what this build removed, the rule paths apart (#1012).
     function Nothing($r) {
-        $rule = [regex]::Match($r.Out, '(\d+) path\(s\) are deleted from every install by rule')
         $gone = [regex]::Match($r.Out, '(?m)^\s*(\d+) removed')
-        $ruleN = if ($rule.Success) { [int]$rule.Groups[1].Value } else { 0 }
-        return ($r.Out -match '(?m)^\s*0 added or changed' -and $gone.Success -and [int]$gone.Groups[1].Value -eq $ruleN)
+        return ($r.Out -match '(?m)^\s*0 added or changed' -and $gone.Success -and [int]$gone.Groups[1].Value -eq 0)
     }
     function Feed6([string]$json) { Put (Join-Path $site6 'feed\version.json') $json; Put (Join-Path $rel6 'version.json') $json }
 
