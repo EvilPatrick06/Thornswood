@@ -335,7 +335,10 @@ function connect() {
     // a fresh token; see the note over RETRY_FIRST.
     if (m.t === 'denied') { deniedWhy = String(m.why || 'it did not say why'); host('denied', deniedWhy); return; }
     if (m.t === 'peers') { onPeers(m.peers || []); return; }
+    // The whole view on the first tick after a join, then only what moved
+    // and who left it (issue #482; the note over the tick in voice-server.js).
     if (m.t === 'pos') { places = m.who || {}; place(); return; }
+    if (m.t === 'moved') { applyMoved(places, m); place(); return; }
     if (m.t === 'sdp') { onSdp(m); return; }
     if (m.t === 'ice') { onIce(m); return; }
     if (m.t === 'vmode') {
@@ -480,6 +483,17 @@ function drop(id) {
 }
 
 // ------------------------------------------------------------- positions --
+/* A 'moved' tick on top of the table the last 'pos' gave: the rows that
+   changed replace theirs, and the ids in gone are nobody this person can
+   hear any more. */
+function applyMoved(table, m) {
+  var who = m.who || {};
+  for (var k in who) {
+    if (Object.prototype.hasOwnProperty.call(who, k)) { table[k] = who[k]; }
+  }
+  (m.gone || []).forEach(function (id) { delete table[id]; });
+}
+
 function place() {
   var me = places[myProfile];
   if (!me || !me.pos) {

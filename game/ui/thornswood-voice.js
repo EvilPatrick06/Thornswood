@@ -746,7 +746,11 @@
       */
       if (inRelay() && (m.t === 'sdp' || m.t === 'ice' || m.t === 'peers')) { return; }
       if (m.t === 'peers') { reconcile(m.peers); return; }
+      // The whole view on the first tick after a join, then only what moved
+      // and who left it (issue #482; the note over the tick in
+      // voice/voice-server.js). The party strip reads the same table.
       if (m.t === 'pos') { lastWho = m.who || {}; place(); return; }
+      if (m.t === 'moved') { applyMoved(lastWho, m); place(); return; }
       if (m.t === 'vmode') {
         var rec = conns.get(Number(m.from));
         if (rec) {
@@ -980,6 +984,18 @@
   // the front's widget, and it handles /roll. Nothing about chat is left here.
 
   // ---------------------------------------------------------- placement -----
+  /* A 'moved' tick on top of the table the last 'pos' gave: the rows that
+     changed replace theirs, and the ids in gone are nobody this person can
+     hear any more. */
+  function applyMoved(table, m) {
+    var who = m.who || {};
+    for (var k in who) {
+      if (Object.prototype.hasOwnProperty.call(who, k)) { table[k] = who[k]; }
+    }
+    var gone = m.gone || [];
+    for (var i = 0; i < gone.length; i++) { delete table[gone[i]]; }
+  }
+
   function place() {
     var me = lastWho[cfg.profileId];
     if (!me || !ctx) { draw(); return; }

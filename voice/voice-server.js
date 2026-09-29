@@ -58,7 +58,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1';
 
 // How long a position snapshot stays believable. The gamemode pushes about
 // five a second; if they stop, everybody is stale and goes quiet rather than
@@ -576,6 +576,8 @@ class Sock {
     this.backed = false;
     // The newest roster not yet written, while backed. See sendLatest.
     this.latest = null;
+    // When the log last said this one is behind. See sendLossy.
+    this.saidBehind = 0;
     // When anything last arrived from the other end: a pong, a message, a
     // ping of its own. See SILENT_AFTER.
     this.heard = Date.now();
@@ -628,10 +630,27 @@ class Sock {
     try { this.write(frame(JSON.stringify(obj))); } catch (e) { this.close(); }
   }
 
-  /* For the position tick only: skipped while backed, and counted. */
+  /* For the position tick only: skipped while backed, and counted. Says
+     whether it went, because the tick sends only what changed and has to
+     start again from the whole view after one that did not. */
   sendLossy(obj) {
-    if (this.backed) { droppedPositions++; return; }
+    if (this.backed) {
+      droppedPositions++;
+      /*
+        Said in the log, once a minute at most per connection, so a person
+        whose voice goes stale can be matched to a line here (issue #483).
+        The ceiling says it again if it closes one.
+      */
+      const now = Date.now();
+      if (now - this.saidBehind > 60000) {
+        this.saidBehind = now;
+        console.log('[voice] a connection is behind (' + this.socket.writableLength +
+                    ' bytes waiting), so its position updates are skipped until it catches up');
+      }
+      return false;
+    }
     this.send(obj);
+    return true;
   }
 
   /*
@@ -833,12 +852,22 @@ function onJoin(ws, msg) {
 }
 
 // ------------------------------------------------------------- positions ---
+/*
+  Whole units and whole degrees. A unit is a seventieth of a metre and a
+  degree is finer than any ear can place a voice, and the game's own floats
+  carry a dozen digits each: rounded, a row is about a third shorter, and a
+  person standing still sends the same row every tick, which is what lets the
+  tick below leave them out (issue #482).
+*/
+function whole(n) { return Math.round(Number(n) || 0); }
+
 function snapshot() {
   const now = Date.now();
   const out = {};
   for (const [pid, v] of positions) {
     if (now - v.at > STALE_MS) continue;
-    out[pid] = { pos: v.pos, angleZ: v.angleZ, cell: v.cell, name: v.name };
+    const pos = Array.isArray(v.pos) ? [whole(v.pos[0]), whole(v.pos[1]), whole(v.pos[2])] : v.pos;
+    out[pid] = { pos: pos, angleZ: whole(v.angleZ), cell: v.cell, name: v.name };
   }
   return out;
 }
@@ -938,10 +967,58 @@ function viewsOf(snap) {
   };
 }
 
+/*
+  AND ONLY WHAT CHANGED. Issue #482.
+
+  After the cull each person was still sent their whole view five times a
+  second, whether anybody in it had moved or not: a room of twenty standing
+  round a fire was twenty rows to each of them, every 200 ms, all evening.
+  Most of an evening is people standing, so most of that said nothing new.
+
+  So each peer keeps what it was last sent, row by row, as the text of the
+  row. The first tick after a join is the whole view, { t: 'pos' }, which is
+  what every tick used to be. After that a tick sends { t: 'moved' }, with
+  only the rows that differ from what that peer holds and the ids that have
+  left its view in gone (out of range, another cell, gone stale, logged
+  off), and nothing at all when neither. Every client applies moved on top of
+  the table the last pos gave it: launcher/voice-host.html,
+  game/ui/thornswood-voice.js and voice/public/voice.js.
+
+  A tick skipped for a backed socket (sendLossy) leaves that peer holding
+  something older than this side thinks, so its record is dropped and the
+  next tick it is sent is the whole view again. voice/test-moved.js measures
+  the bill before and after on the wire.
+
+  A quiet socket is no longer sent something five times a second, which is
+  why the pages keep their own ping (SILENT_AFTER, above).
+*/
 setInterval(() => {
   if (peers.size === 0) return;
-  const viewOf = viewsOf(snapshot());
-  for (const [, p] of peers) p.ws.sendLossy({ t: 'pos', at: Date.now(), who: viewOf(p.profileId) });
+  const snap = snapshot();
+  const viewOf = viewsOf(snap);
+  const text = {};
+  const rowText = (pid) => text[pid] || (text[pid] = JSON.stringify(snap[pid]));
+  const at = Date.now();
+  for (const [, p] of peers) {
+    const view = viewOf(p.profileId);
+    const now = new Map();
+    for (const pid of Object.keys(view)) now.set(pid, rowText(pid));
+    let msg;
+    if (!p.sent) {
+      msg = { t: 'pos', at: at, who: view };
+    } else {
+      const moved = {};
+      let any = false;
+      for (const [pid, t] of now) {
+        if (p.sent.get(pid) !== t) { moved[pid] = view[pid]; any = true; }
+      }
+      const gone = [];
+      for (const pid of p.sent.keys()) if (!now.has(pid)) gone.push(Number(pid));
+      if (!any && gone.length === 0) continue;
+      msg = { t: 'moved', at: at, who: moved, gone: gone };
+    }
+    p.sent = p.ws.sendLossy(msg) ? now : null;
+  }
 }, 200);
 
 function isLoopback(req) {
