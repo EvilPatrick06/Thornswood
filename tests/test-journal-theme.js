@@ -125,7 +125,10 @@ const doc = {
 };
 const win = {
   skyrimPlatform: { sendMessage(to, what) { told.push(to + ' ' + what); } },
-  thornswoodNet: { say(line) { sent.push(line); return true; } }
+  thornswoodNet: { say(line) { sent.push(line); return true; } },
+  // The panel is scaled to the screen (test-journal-scale.js holds that).
+  innerWidth: 1920, innerHeight: 1080,
+  addEventListener() { }
 };
 new Function('window', 'document', journalSrc)(win, doc);
 const J = win.thornswoodJournal;
