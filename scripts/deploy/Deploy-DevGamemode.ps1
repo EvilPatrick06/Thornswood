@@ -22,6 +22,10 @@
                                    load order and plugins up to what the built
                                    server has
 
+    .\Deploy-DevGamemode.ps1 -LoadOrderRefuse on
+                                   the same, and end a session whose plugins
+                                   are not the server's (#402); off only warns
+
     .\Deploy-DevGamemode.ps1 -Minutes 3
                                    a longer warning for the people on it
     .\Deploy-DevGamemode.ps1 -Mode restart
@@ -122,6 +126,11 @@ param(
   # has. Off by default: a code-only gamemode change does not need it, and the
   # plugin sizes are one extra call to the box.
   [switch]$LoadOrder,
+  # thornswoodLoadOrderRefuse in the dev settings (#402): on ends a session
+  # whose plugins are not the server's, or that never reports them; off only
+  # tells the person and logs WOULD REFUSE. Left off, the box keeps what it has.
+  [ValidateSet('', 'on', 'off')]
+  [string]$LoadOrderRefuse = '',
   # Where Deploy-Gamemode.ps1 leaves the built server. Its server-settings.json
   # is the one authority on what the load order is and in what order.
   [string]$Dist = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
@@ -612,6 +621,11 @@ Write-Host 'Pointing the dev server at the dev voice service...'
 # dev box kept the old one. The key is dropped here and the rest of npcSettings
 # is left as it is.
 #
+# AND WHETHER A WRONG LOAD ORDER ENDS THE SESSION, added 28 September for
+# #402. -LoadOrderRefuse on sets thornswoodLoadOrderRefuse true, off sets it
+# false, and leaving the switch off keeps whatever the box has. This is the
+# only place the dev settings are edited, so the switch lives here.
+#
 # This comment is HERE and not inside the here-string below on purpose. Anything
 # in that string is base64 encoded and sent as an ssh command line, where it
 # counts double and the far end truncates at about 8191 characters. Ten lines of
@@ -678,6 +692,12 @@ if ($maxOnline -gt 0 -and [int]`$s.maxPlayers -ne $maxOnline) {
   `$wantMax = `$true
   'the most online moves from ' + `$s.maxPlayers + ' to $maxOnline'
 }
+`$wantRefuse = `$false
+`$refuse = ('$LoadOrderRefuse' -eq 'on')
+if ('$LoadOrderRefuse' -and `$s.thornswoodLoadOrderRefuse -ne `$refuse) {
+  `$wantRefuse = `$true
+  'thornswoodLoadOrderRefuse moves from ' + `$s.thornswoodLoadOrderRefuse + ' to ' + `$refuse
+}
 
 # A byte order mark counts as needing a rewrite even when the number is
 # already right. The run on 18 September set the value AND wrote a mark, so
@@ -686,7 +706,7 @@ if ($maxOnline -gt 0 -and [int]`$s.maxPlayers -ne $maxOnline) {
 `$bom = `$false
 try { `$bom = ([IO.File]::ReadAllBytes(`$p)[0] -eq 0xEF) } catch { }
 if (`$bom) { 'the settings file starts with a byte order mark, rewriting it without one' }
-if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax -and -not `$wantNpc) {
+if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax -and -not `$wantNpc -and -not `$wantRefuse) {
   'thornswoodVoicePort is already $VoicePort, both equipment checks are already off, and the load order is already right'
 } else {
   Copy-Item `$p (`$p + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
@@ -698,6 +718,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
   }
   if (`$wantMax) { `$s | Add-Member -NotePropertyName maxPlayers -NotePropertyValue $maxOnline -Force }
   if (`$wantNpc) { `$s.npcSettings.PSObject.Properties.Remove('default') }
+  if (`$wantRefuse) { `$s | Add-Member -NotePropertyName thornswoodLoadOrderRefuse -NotePropertyValue `$refuse -Force }
   `$s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoicePort -Force
   `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
@@ -735,6 +756,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
             ', load order ' + @(`$back.loadOrder).Count + ' plugins' +
             ', most online ' + `$back.maxPlayers +
             ', npcSettings keys ' + @(`$back.npcSettings.PSObject.Properties).Count +
+            ', load order refusal ' + `$back.thornswoodLoadOrderRefuse +
             ', start point ' + @(`$back.startPoints)[0].worldOrCell }
   } catch {
     'THE FILE NO LONGER PARSES: ' + `$_.Exception.Message + '. Put the .before- copy back.'
