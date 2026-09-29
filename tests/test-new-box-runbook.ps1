@@ -292,6 +292,7 @@ $steps = @(
     @{ Say = 'the watchdog installed';                               Leaf = 'Watch-Services.ps1'; Also = { param($r) Has $r 'Install' } },
     @{ Say = 'Install-Backup';                                       Leaf = 'Install-Backup.ps1' },
     @{ Say = 'Install-Runner';                                       Leaf = 'Install-Runner.ps1' },
+    @{ Say = 'Harden-VPS, once key login works (issue #450)';        Leaf = 'Harden-VPS.ps1' },
     @{ Say = 'Set-Server moves everybody';                           Leaf = 'Set-Server.ps1' },
     @{ Say = 'the main Ship';                                        Leaf = 'Ship.ps1' },
     @{ Say = 'the outside watch installed';                          Leaf = 'Watch-Outside.ps1'; Also = { param($r) Has $r 'Install' } }
@@ -306,6 +307,10 @@ foreach ($s in $steps) {
 Yes ("the new machine steps run in the order the scripts need ({0} steps)" -f $steps.Count) $inOrder
 $lastPs1 = $moving[$moving.Count - 1]
 Yes ("and end with the watchers (the last is {0})" -f $lastPs1.Leaf) (@('Watch-Outside.ps1', 'Fetch-Backups.ps1') -contains $lastPs1.Leaf -and ((Has $lastPs1 'Install') -or (Has $lastPs1 'Schedule')))
+$mt = $pages['MOVING-THE-SERVER.md, new machine']
+$pinAt = $mt.IndexOf('hostKeys')
+Yes 'the new box''s host key is pinned in vps.json before Setup-SshKey reaches for it (issue #450)' (
+    $pinAt -ge 0 -and $pinAt -lt $mt.IndexOf('.\scripts\vps\Setup-SshKey.ps1') -and $mt -match 'ssh-keygen -lf')
 $watchAt = First $moving 'Watch-Services.ps1' { param($r) Has $r 'Install' }
 $startAt = @(for ($i = 0; $i -lt $moving.Count; $i++) { if ($moving[$i].Text -match 'Start-ScheduledTask') { $i } })
 Yes 'the watchdog, which starts whatever is down, goes in after every service is started' ($startAt.Count -and $watchAt -gt ($startAt | Measure-Object -Maximum).Maximum)

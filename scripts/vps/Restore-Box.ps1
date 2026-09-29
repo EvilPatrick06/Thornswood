@@ -69,7 +69,7 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
 $target = "$VpsUser@$VpsHost"
-$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 foreach ($t in 'ssh', 'scp') {
   if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
     Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client."
