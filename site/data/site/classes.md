@@ -61,11 +61,11 @@ Some of it is nobody's work. Smelting ore into ingots and tanning a hide into
 leather belong to no half, because every trade needs them, and anybody can do
 them.
 
-The hold starts the day you pick a profession. Until then nothing at a bench is
-held against you, and the first thing you make tells you so: you can make
-whatever anybody can, apart from another race's own gear. Picking a profession
-is what gives you a half, a rank to climb in it and work that is yours, and
-from then on the three answers below are the rule.
+Until you pick a profession, you cannot make anything that is somebody's work.
+Every bench tells you so and to press K and choose one; only the smelting and
+tanning above stay open to you. Picking a profession is what gives you a half,
+a rank to climb in it and work that is yours, and from then on the three
+answers below are the rule.
 
 Three answers, and every one of them names somebody.
 
@@ -112,8 +112,8 @@ to hold you to. The bench is held instead.
 An **alchemy lab** works for an Alchemist, either a **Blightbrewer** or a
 **Physicker**. An **arcane enchanter** works for an Enchanter, either a
 **Bladebinder** or a **Wardweaver**. Anybody else is turned away at the bench.
-Somebody who has not chosen a profession yet can use both, so nobody is shut
-out on their first evening.
+Somebody who has not chosen a profession yet can use neither, and is told to
+press K and choose one.
 
 Tempering is the other gap worth knowing about. Improving a weapon or a piece of
 armour at a grindstone or an armour table never reaches the server at all, so
@@ -152,6 +152,22 @@ on how many spells anyone can learn that way, so it stays a thing you know
 rather than turning into a mage with extra steps.
 
 That is a scene between two people, and the master gets to say no.
+
+### Spell tomes
+
+A spell tome teaches its spell only to somebody who could have picked that
+spell anyway, mage or not, Enchanter or not. Reading one asks three things:
+
+- **A spell point** to spend. A mage earns them by rank; anybody else has only
+  the places a Master mage's teaching gave them.
+- **The rank** the spell asks for in its school. Apprentice and Adept spells
+  are Advanced here, Expert spells Expert, Master spells Master.
+- **A spell from the rank below**, of the same school, already known. A
+  Novice spell needs none.
+
+If any of the three is missing, nothing is learned, you keep the tome, and the
+line in chat says which ones. An Enchanter learns the spell a staff binds the
+same way, and only then can make that staff.
 
 ## Classes
 
