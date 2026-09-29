@@ -448,8 +448,10 @@ namespace Thornswood
         ///    .dll/.exe. A folder that still holds its own copy of each gets
         ///    the link instead, giving the disk the second copy back. See
         ///    MustCopy.
+        /// 7: Start On Save is left out, and taken out of a folder that
+        ///    already has it, its settings file included. See Retired.
         /// </summary>
-        const int Rules = 6;
+        const int Rules = 7;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -692,6 +694,18 @@ namespace Thornswood
                     if (File.Exists(dest)) { DropName(dest); removed++; }
                 }
                 catch (Exception ex) { Swallow.Note("OwnGame.Refresh, drop removed", ex); }
+            }
+
+            // A retired mod goes whether the record lists it or not: the
+            // launcher wrote one of its files itself and never recorded it.
+            foreach (string r in RetiredFiles)
+            {
+                try
+                {
+                    string dest = Path.Combine(Folder, r);
+                    if (File.Exists(dest)) { DropName(dest); removed++; }
+                }
+                catch (Exception ex) { Swallow.Note("OwnGame.Refresh, drop retired", ex); }
             }
 
             File.WriteAllLines(FilesList, lines.ToArray());
@@ -1083,7 +1097,42 @@ namespace Thornswood
             if (Foreign(rel)) return "not one of ours";
             if (UnwantedCreation(rel)) return "a Creation Club plugin the server does not load";
             if (CrashesUs(rel)) return "it crashes the quick favourites menu";
+            if (Retired(rel)) return "Start On Save is no longer part of Thornswood";
             return null;
+        }
+
+        /// <summary>
+        /// A mod Thornswood has taken out, kept out of this folder even while
+        /// the collection still deploys it into the Steam copy.
+        /// </summary>
+        /// <remarks>
+        /// Start On Save (po3, Nexus 50054), issue #394. It loads the newest
+        /// save at the main menu, or presses New Game when there is none, and
+        /// under SkyMP either one is a second load on top of the one the server
+        /// starts: the crashes of 12 and 13 Sep, about thirty seconds in, with
+        /// its DLL on the stack. The launcher used to hold it still by
+        /// rewriting its settings file on every Play. It does not any more, so
+        /// the mod must not be in the folder at all: an untouched copy of its
+        /// settings file would start those crashes again.
+        ///
+        /// Refresh also deletes both files from a folder that has them, whether
+        /// the folder's record lists them or not, because the settings file
+        /// was written by the launcher and never recorded. Rules 7 makes every
+        /// folder refresh once to do it.
+        ///
+        /// Ship-Rules.ps1 keeps the same two files out of every pack and the
+        /// installer ($ShipRetiredFiles); change the two together.
+        /// </remarks>
+        static readonly string[] RetiredFiles = {
+            "Data\\SKSE\\Plugins\\po3_StartOnSave.dll",
+            "Data\\SKSE\\Plugins\\po3_StartOnSave.ini",
+        };
+
+        static bool Retired(string rel)
+        {
+            foreach (string r in RetiredFiles)
+                if (rel.Equals(r, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
         }
 
         /// <summary>

@@ -140,9 +140,6 @@ they are usually the difference between a fix and a guess.
   still forget themselves every session, because there is no save to write
   them to.
 - No levelling, no fast travel, and the difficulty is fixed at Expert.
-- Start On Save is in the mod list but never loads a save. The launcher points
-  it at a character that does not exist, on purpose: an ordinary Skyrim save
-  cannot be loaded under Thornswood.
 - The creation hall is a bare room. Your face is made there, and everything
   else is chosen on the panel that opens by itself once it is done.
 

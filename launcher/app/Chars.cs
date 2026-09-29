@@ -40,7 +40,8 @@ namespace Thornswood
 
         // One saves folder for the whole install, where a folder per slot was
         // until 20 September. Nothing on this disk decides who the character
-        // is (see WriteStartIni), so there is nothing to keep apart.
+        // is (SkyMP loads the character the server holds), so there is
+        // nothing to keep apart.
         static string SavesDir { get { return Path.Combine(Home, "saves"); } }
 
         // One line per character, and one for the spare:
@@ -70,10 +71,6 @@ namespace Thornswood
         // reads the first six fields and writes the seventh back as nothing,
         // which this one takes as not known and mints a fresh spare for.
         static string ProfileFile { get { return Path.Combine(Home, "profiles.txt"); } }
-        static string StartIni
-        {
-            get { return Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\po3_StartOnSave.ini"); }
-        }
 
         // The two files the plugin and the launcher pass between them at the
         // main menu. Both in Data\Platform, the one folder each end finds
@@ -743,7 +740,7 @@ namespace Thornswood
         /// The save folder half used to throw too, and Play stopped, with one
         /// line in the log and no reason (a tester on 1.1.36: "Could not point
         /// the save folder at character 1."). Under SkyMP nothing on this disk
-        /// decides who the character is (see WriteStartIni), so a save folder
+        /// decides who the character is (the server does), so a save folder
         /// that cannot be redirected is not a reason to keep anybody out.
         /// </summary>
         public static string Prepare(Config cfg)
@@ -840,7 +837,6 @@ namespace Thornswood
             int point = last > 0 ? last : spare;
             AutoJoin.SetChooseAtMenu(point);
 
-            WriteStartIni();
             BrowserBackend = WriteBrowserBackend();
             KeepPlatformLogReadable();
 
@@ -900,7 +896,7 @@ namespace Thornswood
         /// save: it is a shell with no world behind it. Loading one gets you a
         /// black screen if you are lucky and a null pointer thirty seconds into
         /// startup if you are not, which is the crash sitting in
-        /// crash-2026-09-13-17-45-02.log with po3_StartOnSave's hook on the
+        /// crash-2026-09-13-17-45-02.log with an auto load mod's hook on the
         /// stack and rcx at zero.
         ///
         /// This machine's save folder had nothing else left in it. Two
@@ -927,90 +923,6 @@ namespace Thornswood
                 }
             }
             catch (Exception ex) { Swallow.Note("Chars.Scrub, delete", ex); }
-        }
-
-        // Written fresh every launch, and what it writes is "do nothing".
-        //
-        // Start On Save used to be how the launcher reached past the main menu:
-        // point the save folder at one character, set bStartNewGame, and let it
-        // load the newest save or start a new game when there was none.
-        //
-        // Under SkyMP that job is already taken. When the server sends
-        // CreateActor for your own character the client calls
-        //
-        //     loadGameService.loadGame(pos, rot, worldOrCell, appearance, loadOrder)
-        //
-        // which walks you from the main menu to wherever the server says you
-        // are, with the body and the face the server holds. Nothing here has to
-        // press anything, and a character that lives on the server has nothing
-        // on this disk worth loading anyway.
-        //
-        // Leaving bStartNewGame true meant Start On Save pressed New Game at the
-        // main menu, Skyrim Unbound's alternate start began, and SkyMP's own
-        // load landed on top of a game that was still loading. Two loads through
-        // one BGSSaveLoadManager, about thirty seconds in, every single launch:
-        //
-        //   crash-2026-09-13-01-20-50   uptime 33s   po3_StartOnSave.dll frame 4
-        //   crash-2026-09-13-01-14-07   uptime 30s   po3_StartOnSave.dll frame 11
-        //   crash-2026-09-12-18-53-41   uptime 42s   inside the allocator's free
-        //
-        // It is also why creation flashed up for a moment and then teleported
-        // somebody who had not finished making a face: Unbound's start was being
-        // interrupted part way through.
-        //
-        // The mod stays installed, because the build ships it and Verify checks
-        // the file list. It is simply told to stand still.
-        //
-        // Standing still takes more than bStartNewGame false. Read from the
-        // mod's own source (powerof3/Start-On-Save, Hooks.cpp): when the load
-        // spinner first opens it builds the save list, and if that list is
-        // not empty and sSaveFile names nothing, it loads the newest save in
-        // it, full stop. bStartNewGame only decides what happens when the
-        // list is EMPTY. The list is empty on a machine whose slot folder
-        // holds nothing, which is most of them. It is not empty on a fresh
-        // install where Skyrim had been played before: Adopt moves that
-        // person's own saves into character one, the junction points Saves
-        // at that folder, and the newest of those saves was loaded at the
-        // main menu while SkyMP was loading its own. That is the install on
-        // 17 Sep whose slot showed a level 21 from single player and whose
-        // game closed after 0 minutes, and it is the thirty second crashes
-        // above with a different lever.
-        //
-        // The one filter the mod applies before loading is sCharacterName:
-        // the save's character has to carry that exact name. No save does
-        // carry the one below, so nothing qualifies and nothing is loaded,
-        // whatever is in the folder.
-        //
-        // The bool it took until 20 September said whether the slot was fresh
-        // and had not been read since the day this stopped starting new games.
-        static void WriteStartIni()
-        {
-            try
-            {
-                string dir = Path.GetDirectoryName(StartIni);
-                Directory.CreateDirectory(dir);
-                var sb = new StringBuilder();
-                sb.AppendLine("; Written by the Thornswood launcher every time you press Play.");
-                sb.AppendLine("; Editing it by hand will not stick.");
-                sb.AppendLine(";");
-                sb.AppendLine("; This file tells Start On Save to load nothing. SkyMP loads you into");
-                sb.AppendLine("; the world itself once the server has made your character, and a second");
-                sb.AppendLine("; load running at the same time crashes the game about thirty seconds in.");
-                sb.AppendLine(";");
-                sb.AppendLine("; bStartNewGame false is not enough for that: with sSaveFile blank the mod");
-                sb.AppendLine("; loads the newest save in the Saves folder whenever there is one. The");
-                sb.AppendLine("; character name below is the one filter it applies first. No save");
-                sb.AppendLine("; carries that name, so nothing qualifies.");
-                sb.AppendLine("[Settings]");
-                sb.AppendLine("sSaveFile =");
-                sb.AppendLine("sCharacterName = Thornswood-Nobody");
-                sb.AppendLine("iSaveType = 0");
-                sb.AppendLine("bStartNewGame = false");
-                sb.AppendLine("iSkipAutoLoadHotkey = 16");
-                sb.AppendLine("bDisableMissingContentWarning = true");
-                File.WriteAllText(StartIni, sb.ToString());
-            }
-            catch (Exception ex) { Swallow.Note("Chars.WriteStartIni, write", ex); }
         }
 
         static string PlatformIni

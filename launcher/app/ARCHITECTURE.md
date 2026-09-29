@@ -468,7 +468,6 @@ box.
 | `Chars.cs:694 Prepare()` | The saves folder Skyrim will see, `Profile\MyGames\Saves`, becomes a junction to `Profile\Characters\saves`. A real folder there with files in it is moved aside whole, never deleted. SkyrimPlatform's scaffolding saves are deleted. | `Profile\Characters\saves`, the junction, maybe `Saves-before-Thornswood-<time>` |
 | `Chars.cs:766 EnsureSpare` | Mints the spare id for New character when there is none. | `Profile\Characters\profiles.txt` |
 | `Chars.cs:769 AutoJoin.SetChooseAtMenu` | `AutoJoin.cs:295 SetChooseAtMenu()`: the id played last and `chooseAtMenu` inside `gameData`, read back, and a throw if the file does not say what was written. | `skymp5-client-settings.txt` |
-| `Chars.cs:771 WriteStartIni` | Start On Save told to load nothing. | `Game\Data\SKSE\Plugins\po3_StartOnSave.ini` |
 | `Chars.cs:772 WriteBrowserBackend` | Which in-game browser SkyrimPlatform uses, then `Chars.cs:773 KeepPlatformLogReadable` stops its log being switched off. Edited, never rewritten, and only when a value changes. | `Game\Data\SKSE\Plugins\SkyrimPlatform.ini` |
 | `Chars.cs:778 Voice.Reconfigure` | Voice fetches a token for that id, when the voice address is https. | `voice-token.txt` in `Game\Data\Platform` and Profile |
 | `Chars.cs:800 TidySlots` | Only on the site's own answer about how many slots this account has. | `profiles.txt` when a slot moves |
@@ -487,7 +486,7 @@ Written or rewritten, when anything needed changing:
 - `Game\Data\Platform`: `Plugins\skymp5-client-settings.txt`, any kept file
   put back, `thornswood-session.txt`, `thornswood-characters.json`,
   `UI\thornswood-characters.js`, `voice-token.txt`.
-- `Game\Data\SKSE\Plugins`: `po3_StartOnSave.ini`, `SkyrimPlatform.ini`,
+- `Game\Data\SKSE\Plugins`: `SkyrimPlatform.ini`,
   `SSEDisplayTweaks.ini`, `SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`,
   `Thornswood.ini`.
 - `Game\Data\Interface\skyui\config.txt` and `config.shipped.txt`, and
