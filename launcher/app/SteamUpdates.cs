@@ -99,7 +99,8 @@ namespace Thornswood
     ///
     /// SO THE LAUNCHER WRITES THE SETTING ITSELF (Patrick on #493, 29 Sep:
     /// "Our Repo should write this so it doesn't auto update the game and
-    /// people have to re do the downgrade again"). At every start, while the
+    /// people have to re do the downgrade again"). At every start until
+    /// Thornswood's own folder is made (LooksAtStart, #1226), while the
     /// Steam copy is on the build the server runs and the file is not on 1 or
     /// carries the mark (OnStart): with Steam closed it is written there and
     /// then, with nothing to ask; with Steam open, a question whose Yes closes
@@ -293,6 +294,26 @@ namespace Thornswood
 
         /// <summary>What the launcher does on the way in, from OnStart.</summary>
         public const string Nothing = "nothing", Write = "write", Ask = "ask";
+
+        /// <summary>
+        /// Whether the launcher looks at Steam's Updates setting for Skyrim at
+        /// all on the way in: only while the install has no folder of its own
+        /// and no downgrade is needed first.
+        ///
+        /// Patrick, 29 Sep (#1226): the launcher sets "Wait until I launch the
+        /// game" only before the own folder is made; after that "people's
+        /// Steam copy is theirs to update however they like". Before the folder
+        /// exists it is made from the Steam copy's game, so a Steam update then
+        /// costs a whole Downgrade; once it exists the folder holds the game
+        /// itself (#1218) and an update to the Steam copy costs Thornswood
+        /// nothing, so neither the setting nor a line about it is Thornswood's
+        /// business any more. <paramref name="ownFolder"/> is true once the game
+        /// runs from a folder of its own (Paths.Collection false).
+        /// </summary>
+        public static bool LooksAtStart(bool ownFolder, bool downgradeNeeded)
+        {
+            return !ownFolder && !downgradeNeeded;
+        }
 
         /// <summary>
         /// What the launcher does with the file on the way in. Nothing when it

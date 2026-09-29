@@ -887,11 +887,15 @@ namespace Thornswood
         /// knows nothing about what arrived afterwards. Paths in it are
         /// relative to the game folder, one per line, which is what the
         /// uninstaller reads. Nothing is done on an install that has a game
-        /// folder of its own, because that whole folder goes at uninstall.
+        /// folder of its own, because that whole folder goes at uninstall, nor
+        /// on one whose own folder was chosen and is not made yet, whose game
+        /// files are in Profile\Payload and never in the Steam copy (#1226).
+        /// The list is also what OwnGame.CleanSteamCopy takes out of the Steam
+        /// copy once the folder is made.
         /// </summary>
         static void NoteInstalledIntoGame(List<string> rels)
         {
-            if (!Paths.Collection || rels == null || rels.Count == 0) return;
+            if (!Paths.Collection || Paths.OwnFirst || rels == null || rels.Count == 0) return;
             try
             {
                 string list = Path.Combine(Paths.ProfileDir, "installed-into-game.txt");

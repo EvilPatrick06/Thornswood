@@ -548,7 +548,8 @@ namespace Thornswood
             string steam = SteamCopy(s, s.Steam, "STEAM");
             Staging(s);
             string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow.AddMinutes(-5));
-            Paths.Game = steam;
+            // SteamCopy is what Paths.Init sets beside Game under the collection (#1226).
+            Paths.Game = Paths.SteamCopy = steam;
 
             Yes("Steam.SkyrimPath still answers the Steam copy", string.Equals(Steam.SkyrimPath(), steam, StringComparison.OrdinalIgnoreCase));
             Yes("the folder Vortex deploys into is found without being told: Keizaal Online", string.Equals(DeploysInto(s.Cfg), k, StringComparison.OrdinalIgnoreCase));
@@ -661,7 +662,7 @@ namespace Thornswood
             Put(Path.Combine(second, "Mods\\left-by-someone.txt"), "LIB2-OWN");
             Record(Path.Combine(second, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(second, "Data"),
                    new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" } }, DateTime.UtcNow);
-            Paths.Game = first;
+            Paths.Game = Paths.SteamCopy = first;
             Yes("two Steam copies: SkyrimPath still answers the first", string.Equals(Steam.SkyrimPath(), first, StringComparison.OrdinalIgnoreCase));
             Yes("the one with Vortex's record is chosen", string.Equals(DeploysInto(s.Cfg), second, StringComparison.OrdinalIgnoreCase));
             Yes("and, being a Steam copy, the game comes from it too", string.Equals(OwnGame.Source(s.Cfg), second, StringComparison.OrdinalIgnoreCase));
@@ -690,7 +691,7 @@ namespace Thornswood
             Staging(s);
             string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow);
             s.Cfg.VortexGame = k;
-            Paths.Game = steam;
+            Paths.Game = Paths.SteamCopy = steam;
             string made = null;
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             string game = OwnGame.Folder;
@@ -755,7 +756,7 @@ namespace Thornswood
             Put(Path.Combine(k, "ModA\\TsTwo.esm"), "KEIZAAL-MODA-TWO");
             Record(Path.Combine(k, "Data\\vortex.deployment.json"), k, Path.Combine(k, "Data"),
                    new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" }, new string[] { "x.txt", "Mods" } }, DateTime.UtcNow);
-            Paths.Game = steam;
+            Paths.Game = Paths.SteamCopy = steam;
             string made = null;
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             string game = OwnGame.Folder;
@@ -780,7 +781,7 @@ namespace Thornswood
             Put(Path.Combine(steam, "Data\\Loose.esp"), "STEAM-LOOSE");
             Record(Path.Combine(steam, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(steam, "Data"),
                    new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" } }, DateTime.UtcNow);
-            Paths.Game = steam;
+            Paths.Game = Paths.SteamCopy = steam;
             Yes("Vortex deploying into the Steam copy: it is the answer, as it always was", string.Equals(DeploysInto(s.Cfg), steam, StringComparison.Ordinal));
             Yes("Scan says nothing about another folder", DeploysElsewhere(s.Cfg) == "" && (Verify.Run(s.Cfg).Count == 0 || VortexFolderOf(Verify.Run(s.Cfg)[0]) == null));
             string made = null;
@@ -794,7 +795,7 @@ namespace Thornswood
             Yes("taken from the Steam copy itself, not from staging",
                 Text(Path.Combine(game, "Data\\TsOne.esp")) == "DEPLOYED-TSONE" && Id(Path.Combine(game, "Data\\TsOne.esp")) == Id(Path.Combine(steam, "Data\\TsOne.esp")));
             Paths.Collection = false;
-            Paths.Game = game;
+            Paths.Game = Paths.SteamCopy = game;
             string again = null;
             try { again = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
             Yes("and a refresh with nothing new changes nothing", again != null && again.IndexOf("already matches", StringComparison.Ordinal) >= 0);
@@ -831,7 +832,7 @@ namespace Thornswood
             Record(Path.Combine(steam, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(steam, "Data"),
                    new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" },
                                     new string[] { "Meshes\\actors\\character\\animations\\walk.hkx", "ModA" } }, DateTime.UtcNow);
-            Paths.Game = steam;
+            Paths.Game = Paths.SteamCopy = steam;
             string made = null;
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             string game = OwnGame.Folder;
@@ -869,7 +870,7 @@ namespace Thornswood
             foreach (string l in File.ReadAllLines(madeFile)) made4.Add(l.StartsWith("rules=") ? "rules=4" : l);
             File.WriteAllLines(madeFile, made4.ToArray());
             Paths.Collection = false;
-            Paths.Game = game;
+            Paths.Game = Paths.SteamCopy = game;
             Yes("a folder made under the old rules asks to refresh", OwnGame.NeedsRefresh(s.Cfg));
             string again = null;
             try { again = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
@@ -916,7 +917,7 @@ namespace Thornswood
             // Vortex's record lists a Thornswood plugin whose copy in Vortex's
             // mods folder is gone: the Thornswood profile is deployed, the
             // deployment is out of date. It must not say another profile.
-            Paths.Game = s.Common(s.Steam, "Skyrim Special Edition");
+            Paths.Game = Paths.SteamCopy = s.Common(s.Steam, "Skyrim Special Edition");
             File.Delete(Path.Combine(s.Staging, "ModA\\TsOne.esp"));
             string why = OwnGame.WhyNot(s.Cfg, k);
             Yes("a staged copy gone missing is called an out of date deployment, not another profile",
@@ -928,7 +929,7 @@ namespace Thornswood
         {
             Scene s = NewScene("nothing", true);
             string steam = SteamCopy(s, s.Steam, "STEAM");
-            Paths.Game = steam;
+            Paths.Game = Paths.SteamCopy = steam;
             string why = OwnGame.WhyNot(s.Cfg, DeploysInto(s.Cfg));
             Yes("with nothing deployed anywhere it still names the Steam copy", why != null && why.IndexOf("nothing deployed in " + steam, StringComparison.Ordinal) >= 0);
             Yes("and says how to find the folder Vortex deploys into", why != null && why.IndexOf("Open Game Folder", StringComparison.Ordinal) >= 0);
@@ -944,7 +945,7 @@ namespace Thornswood
             Scene s = NewScene("nosteam", true);
             Staging(s);
             string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow);
-            Paths.Game = k;
+            Paths.Game = Paths.SteamCopy = k;
             Yes("with no Steam copy, Vortex's folder is still found", string.Equals(DeploysInto(s.Cfg), k, StringComparison.OrdinalIgnoreCase));
             Yes("but the game is never taken from it", OwnGame.Source(s.Cfg) == "");
             string why = OwnGame.WhyNot(s.Cfg, k);

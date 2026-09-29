@@ -36,6 +36,38 @@ namespace Thornswood
         /// </summary>
         public static bool Collection;
 
+        /// <summary>
+        /// The Steam copy of Skyrim Special Edition, or "" when Steam lists none.
+        /// Read for the game's build and what Vortex deployed there; the
+        /// launcher writes into it only when it is also Game.
+        /// </summary>
+        public static string SteamCopy;
+
+        /// <summary>
+        /// Profile\Payload: Thornswood's own game files while its own folder is
+        /// chosen and not made yet (#1226). The installer lays its payload here
+        /// instead of into the Steam copy when the own folder is ticked, and
+        /// OwnGame.Make takes it into Root\Game and removes it.
+        /// </summary>
+        public static string Payload;
+
+        /// <summary>
+        /// The own folder was chosen at install and is not made yet (#1226).
+        /// Then Game is Payload rather than the Steam copy, so nothing the
+        /// launcher writes before the folder exists (the client settings,
+        /// Thornswood.ini, packs, Keep, the client runtime) reaches the Steam
+        /// copy, by where Game points and not by each writer remembering to
+        /// look. Collection stays true: there is no folder to play from yet.
+        ///
+        /// Patrick, 29 Sep: "it should only do that if you choose own folder
+        /// during install; otherwise it still uses Steam's copy until you
+        /// turn own game folder on later". So without Payload an install with
+        /// no folder of its own is what it always was: Game is the Steam copy,
+        /// and turning the folder on later takes Thornswood's files back out
+        /// of it once the folder is made (OwnGame.CleanSteamCopy).
+        /// </summary>
+        public static bool OwnFirst;
+
         public static void Init(string rootOverride)
         {
             string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
@@ -44,12 +76,17 @@ namespace Thornswood
             string own = Path.Combine(Root, "Game");
             string steam = "";
             try { steam = Steam.SkyrimPath(); } catch (Exception ex) { Swallow.Note("Paths.Init, Steam.SkyrimPath", ex); }
+            SteamCopy = steam ?? "";
 
             // The launcher's own copy wins whenever it is there, so an upgrade
             // never moves somebody's game out from under them mid-session.
-            // Only an install that has no copy of its own goes to Steam.
-            Collection = !Directory.Exists(own) && !string.IsNullOrEmpty(steam);
-            Game        = Collection ? steam : own;
+            // Only an install that has no copy of its own goes to Steam, and
+            // not even that one when its own folder was chosen at install: its
+            // files wait in Payload until the folder is made.
+            Payload     = Path.Combine(Root, "Profile\\Payload");
+            Collection  = !Directory.Exists(own) && !string.IsNullOrEmpty(steam);
+            OwnFirst    = Collection && Directory.Exists(Payload);
+            Game        = !Collection ? own : OwnFirst ? Payload : steam;
             LauncherDir = Path.Combine(Root, "Launcher");
             ProfileDir  = Path.Combine(Root, "Profile");
             MyGames     = Path.Combine(ProfileDir, "MyGames");
