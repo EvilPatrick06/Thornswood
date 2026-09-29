@@ -159,7 +159,8 @@ function world(opts) {
   const names = ['classGate', 'addItem', 'creditWork', 'putBack', 'Date', 'benchGate',
     'notify', 'say', 'globalThis', 'mp', 'kindIsContainer', 'STATIONS', 'mineSalt',
     'burnCharcoal', 'isChoppingBlock', 'chopWood', 'SHRINES', 'bless', 'isCrop',
-    'farmActivate', 'isFish', 'fish', 'isGame', 'game', 'isPlant', 'harvest', 'ALLOW',
+    'farmActivate', 'isFish', 'fish', 'isGame', 'game', 'isChickenNest', 'collectEgg',
+    'isPlant', 'harvest', 'ALLOW',
     'isVein', 'mineOre', 'loot', 'log', 'ITEMS', 'floraHanded', 'isChurn', 'churn'];
   const body = "'use strict';\n" +
     [parts.coolBlock, parts.waitLine, parts.cowsLine,
@@ -180,6 +181,7 @@ function world(opts) {
       tag('mineSalt'), tag('burnCharcoal'), never, tag('chopWood'), {}, tag('bless'),
       never, tag('farmActivate'),
       never, tag('fish'), never, tag('game'),
+      never, function () { return null; },
       never, tag('harvest'),
       { thornswoodAllow: true }, never, tag('mineOre'), loot,
       function () { rec.logs.push(Array.prototype.slice.call(arguments).join(' ')); },
