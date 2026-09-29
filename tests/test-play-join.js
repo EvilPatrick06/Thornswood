@@ -276,6 +276,10 @@ async function checkIn(table, discordId, profileId, standingOver, world) {
     putJson: function (f, obj) { state.writes++; state.table = clone(obj); },
     sendJson: function (r, code, obj) { state.sent = { code: code, obj: obj }; return state.sent; },
     slotsFor: function () { return 2; },
+    // The world is never full here (#481); test-seats.js runs that refusal.
+    gameStatus: { up: false, online: 0, max: 0 },
+    seatsFull: function () { return false; },
+    worldFull: function () { return ''; },
     console: {
       log: function (s) { state.logged.push(String(s)); },
       error: function (s) { state.logged.push(String(s)); }
