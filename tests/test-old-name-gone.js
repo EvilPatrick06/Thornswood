@@ -12,12 +12,12 @@
 // fallbacks for installs and folders that stopped existing weeks earlier, and
 // each clean up found more because nothing failed when one came back.
 //
-// The one place it may stay is the update path. A launcher installed before
-// the rename still runs under the old exe file name, and an update is what
-// renames it to Thornswood.exe and repoints its shortcuts
-// (launcher\app\SelfSwap.cs, driven by tests\test-self-update.ps1). So in
-// those two files, and only there, the old exe file name itself (the name
-// followed by ".exe") is allowed. Nothing else is, in them or anywhere.
+// There is no exception. Until 29 Sep the update path kept the old exe file
+// name, so that an install still running under it was renamed by its next
+// update and its shortcuts repointed (launcher\app\SelfSwap.cs and Icons.cs,
+// driven by tests\test-self-update.ps1). Patrick, 29 Sep: "We can actually do
+// that now nobody has those old files anymore." So that went too, and the
+// name may appear nowhere at all, the update path and this harness included.
 //
 // Not the old mod: "tilted" is SkyrimPlatform's own browser backend, a value
 // SkyrimPlatform.ini takes, and TiltedUI, TiltedCore, TiltedHooks and
@@ -29,12 +29,12 @@
 // next) is caught too.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const ROOT = path.join(TOOLS_DIR, '..');
+// The tests are in tests\, the repository is one folder up.
+const ROOT = path.join(__dirname, '..');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -72,14 +72,6 @@ const NAMES = [
   /"s(?:t)-"/g,
 ];
 
-// The update path, and nothing else. Only the exe file name is allowed there.
-const UPDATE_PATH = ['launcher/app/SelfSwap.cs', 'tests/test-self-update.ps1'];
-function allowed(rel, text, at, hit) {
-  if (UPDATE_PATH.indexOf(rel) < 0) return false;
-  if (!/^skyrim(?:together)$/i.test(hit)) return false;
-  return text.substr(at + hit.length, 4).toLowerCase() === '.exe';
-}
-
 let tracked = [];
 try {
   tracked = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
@@ -96,8 +88,7 @@ function lineOf(text, at) {
 }
 
 const hits = [];
-let read = 0, allowedCount = 0;
-const allowedIn = {};
+let read = 0;
 tracked.forEach(function (rel) {
   NAMES.forEach(function (rx) {
     rx.lastIndex = 0;
@@ -120,7 +111,6 @@ tracked.forEach(function (rel) {
     rx.lastIndex = 0;
     let m;
     while ((m = rx.exec(text)) !== null) {
-      if (allowed(rel, text, m.index, m[0])) { allowedCount++; allowedIn[rel] = true; continue; }
       hits.push(rel + ':' + lineOf(text, m.index) + '  ' + JSON.stringify(m[0]));
     }
   });
@@ -133,13 +123,6 @@ hits.slice(0, show).forEach(function (h) { console.log('      ' + h); });
 if (hits.length > show) console.log('      ... and ' + (hits.length - show) + ' more (--all lists them)');
 yes('no tracked file names the old multiplayer mod or its add-ons (' + hits.length + ' found)', hits.length === 0);
 
-// The exception stays honest: it is the update path, so the file that renames
-// an old install has to be there and has to be where the old exe name lives.
-const swap = (function () { try { return fs.readFileSync(path.join(ROOT, 'launcher/app/SelfSwap.cs'), 'utf8'); } catch (e) { return ''; } })();
-yes('SelfSwap.cs still renames an install that runs under the old exe name, which is why it is allowed there',
-    /public const string OldName = "[A-Za-z]+\.exe";/.test(swap) && /public static string Target\(string exe\)/.test(swap));
-yes('the old exe name is allowed in ' + Object.keys(allowedIn).length + ' file(s), both on the update path (' + allowedCount + ' uses)',
-    Object.keys(allowedIn).every(function (r) { return UPDATE_PATH.indexOf(r) >= 0; }));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

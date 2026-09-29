@@ -15,21 +15,22 @@
   pack without its overlays, and nobody would notice until a tester did. This
   turns that into a failed check before anything is built.
 
-  HOW. Every tools\*.ps1 is read as text for Join-Path $Here, $PSScriptRoot,
-  $Tools, $RepoDir or $Repo with a single quoted path, which is how every
-  script here names its neighbours. A path with a variable or a wildcard in it
-  is not followed. Read only.
+  HOW. Every script under scripts\ and every harness in tests\ is read as
+  text for Join-Path $Here, $PSScriptRoot, $RepoDir or $Repo with a single
+  quoted path, which is how every script here names its neighbours. A path
+  with a variable or a wildcard in it is not followed. tools\ went on
+  29 September (issue #440, phase 10), so nothing is read from there. Read
+  only.
 #>
 [CmdletBinding()]
-param([string]$Tools)
+param([string]$Repo)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $Tools) { $Tools = $Here }
-$repo = Split-Path -Parent $Tools
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $Repo) { $Repo = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -43,14 +44,13 @@ $notInGit = @{
     '.claude/settings.json'         = 'written by Allow-Claude.ps1 on the machine it runs on'
     '.git'                          = 'the repository itself'
     'version.json'                  = 'the releases clone''s feed; the scripts that name it are pointed at that clone'
-    'tools/mod-audit.json'          = 'what Audit-Mods.ps1 writes, ignored by git'
-    'tools/setup-stub.exe'          = 'built by Build-Launcher.ps1, ignored with every exe'
-    'tools/setup-stub.pdb'          = 'built beside setup-stub.exe by Build-Launcher.ps1, ignored with every pdb'
+    'local'                         = 'what one machine keeps and git ignores; Audit-Mods.ps1 writes mod-audit.json there'
+    'out'                           = 'the build output, which git ignores; Build-Launcher leaves the setup stub there'
     'out/dist'                      = 'the release output, under out, which git ignores (CONTRIBUTING, the fork and its build)'
-    'tools/signing.json'            = 'a machine''s signing settings, ignored by git'
+    'records/signing/signing.json'  = 'a machine''s signing settings, ignored by git'
     'records/signing/client'        = 'Microsoft''s signing client, fetched from NuGet by Setup-ShipMachine.ps1 and ignored by git (#458)'
-    'tools/backup-key.txt'          = 'the backup passphrase, a secret kept out of git'
-    'tools/thornswood-front.zip'    = 'the front build, made outside the repository and dropped beside Go.ps1'
+    'local/backup-key.txt'          = 'the backup passphrase, a secret kept out of git'
+    'local/thornswood-front.zip'    = 'the front build, made outside the repository and kept in local'
     'bot/announced.json'  = 'what Publish-Discord.ps1 has posted, written on the machine that ships'
     'bot/dev-webhook.txt' = 'a webhook, a secret kept out of git'
     'bot/news-webhook.txt'= 'a webhook, a secret kept out of git'
@@ -58,7 +58,7 @@ $notInGit = @{
     'launcher/app/app.ico'             = 'the second place the icon lookups try; the icon is launcher/app.ico'
 }
 # Setup-Thornswood.ps1 runs inside an unpacked installer, where its own folder
-# is the installer's, not tools, so its paths are the installer's layout.
+# is the installer's, so its paths are the installer's layout.
 $skipScripts = @('Setup-Thornswood.ps1')
 
 $tracked = @{}
@@ -69,19 +69,19 @@ foreach ($t in (& git -C $repo ls-files)) {
 }
 Yes ('git lists the tracked files ({0})' -f $tracked.Count) ($tracked.Count -gt 100)
 
-$rx = [regex]"Join-Path\s+\`$(Here|PSScriptRoot|Tools|RepoDir|Repo)\s+'([^'`$``*]+)'"
+$rx = [regex]"Join-Path\s+\`$(Here|PSScriptRoot|RepoDir|Repo)\s+'([^'`$``*]+)'"
 $found = 0
 $missing = @()
 $allowedSeen = @{}
 # The harnesses too, since they moved to tests\ (issue #440, phase 5). In a
-# harness $Here and $Tools are pointed at tools\ at its top, so they resolve
-# as they do in a script; $PSScriptRoot there only ever appears inside the
+# harness $Here is pointed at the repository folder at its top, so a path on
+# it is from the root; $PSScriptRoot there only ever appears inside the
 # stub scripts a harness writes to a scratch folder, so it is not a path in
 # this repository and is passed over.
 $testsDir = Join-Path $repo 'tests'
 # And the scripts themselves, in scripts\<area> since phase 8: each one's
 # paths resolve from its own folder.
-$scan = @(Get-ChildItem -LiteralPath $Tools -Filter *.ps1 -File)
+$scan = @()
 $scriptsDir = Join-Path $repo 'scripts'
 # scripts\oneoff is parked history: its scripts name the layout they ran in.
 if (Test-Path -LiteralPath $scriptsDir) { $scan += @(Get-ChildItem -LiteralPath $scriptsDir -Filter *.ps1 -File -Recurse | Where-Object { $_.FullName -notmatch '[\\/]oneoff[\\/]' }) }
@@ -106,14 +106,11 @@ foreach ($f in $scan) {
     $text = $sb.ToString()
     foreach ($m in $rx.Matches($text)) {
         if ($inTests -and $m.Groups[1].Value -eq 'PSScriptRoot') { continue }
-        # In a script $Tools is a folder it was given (New-ScriptIndex's -Tools is
-        # scripts\), not the one it sits in, so it cannot be resolved from here.
-        if (-not $inTests -and $m.Groups[1].Value -eq 'Tools') { continue }
         $rel = $m.Groups[2].Value.Replace('\', '/').Trim('/')
-        $baseRel = if ($inTests) { 'tools' } else { [IO.Path]::GetRelativePath($repo, (Split-Path -Parent $f.FullName)).Replace('\', '/') }
+        $baseRel = if ($inTests) { '' } else { [IO.Path]::GetRelativePath($repo, (Split-Path -Parent $f.FullName)).Replace('\', '/') }
         $full = if ($m.Groups[1].Value -in 'RepoDir', 'Repo') { $rel } else { $baseRel + '/' + $rel }
-        # tools/../bot/x is bot/x: a script beside tools reaches the rest of the
-        # repository that way since the folders began to move.
+        # scripts/release/../../bot/x is bot/x: a script reaches the rest of
+        # the repository that way from its own folder.
         $parts = New-Object System.Collections.Generic.List[string]
         foreach ($seg in $full.Split('/')) {
             if ($seg -eq '..') { if ($parts.Count) { $parts.RemoveAt($parts.Count - 1) } }

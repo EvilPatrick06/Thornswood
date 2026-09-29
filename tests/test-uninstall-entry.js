@@ -45,11 +45,11 @@
 
       node tests/test-uninstall-entry.js <folder>
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const APP = process.argv[2] ? path.resolve(process.argv[2]) : path.join(TOOLS_DIR, '..', 'launcher', 'app');
+const APP = process.argv[2] ? path.resolve(process.argv[2]) : path.join(REPO_DIR, 'launcher', 'app');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

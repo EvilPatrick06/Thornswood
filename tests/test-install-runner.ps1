@@ -17,15 +17,14 @@
   HOW. Reads both files as text, and parses the script.
 #>
 [CmdletBinding()]
-param([string]$Tools)
+param([string]$Repo)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $Tools) { $Tools = $Here }
-$repo = Split-Path -Parent $Tools
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $Repo) { $Repo = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -34,7 +33,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$path = Join-Path $Tools '..\scripts\deploy\Install-Runner.ps1'
+$path = Join-Path $Repo 'scripts\deploy\Install-Runner.ps1'
 $text = [IO.File]::ReadAllText($path)
 $yml = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))
 # The bot harnesses run in the nightly checks since 25 September.

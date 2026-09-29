@@ -54,9 +54,9 @@ param([string]$ScriptPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-$RepoRoot = Split-Path -Parent $Here
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+$RepoRoot = $Here
 if (-not $ScriptPath) { $ScriptPath = Join-Path $RepoRoot 'scripts\release\Publish-VirusTotal.ps1' }
 $Installer = Join-Path $RepoRoot 'scripts\release\Publish-Installer.ps1'
 $Readme = Join-Path $RepoRoot 'installer\setup\README.md'

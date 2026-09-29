@@ -16,10 +16,10 @@ machine had.
   `bin\x64` in the package; One has it at
   `client\client\Microsoft.ArtifactSigning.Client\bin\x64`, where nuget.exe
   put it.
-- `signing.template.json`: the `tools\signing.json` a new machine starts from,
+- `signing.template.json`: the `records\signing\signing.json` a new machine starts from,
   paths and "enabled": true, no key or password (issue #458).
 
-`tools\signing.json` says whether a machine signs, and with what. It stays out
+`records\signing\signing.json` says whether a machine signs, and with what. It stays out
 of git because it is one machine's setup. Its `dlib` and `metadata` can name
 these files relative to the repository folder, which is what the template
 does:
@@ -35,25 +35,25 @@ does:
 ```
 
 On a new machine `.\scripts\release\Setup-ShipMachine.ps1` fetches the client
-at the pinned version (refusing any other bytes), writes `tools\signing.json`
+at the pinned version (refusing any other bytes), writes `records\signing\signing.json`
 from the template when there is none, and asks the signing service whether
 this machine's `az login` can sign with the profile. The sign in is the
 credential, and only Patrick's Azure account has signing access (the
 Certificate Profile Signer role on the ThornswoodSigning account), so a second
 machine signs only while `az` on it is signed in as Patrick (Patrick,
 29 Sep). Never copy another machine's
-`tools\signing.json`: One's names `C:\tools\metadata.json`, which no other
+`records\signing\signing.json`: One's names `C:\tools\metadata.json`, which no other
 machine has.
 
 SIGNING IS ON since 27 September (issue #390, closed). It was switched off on
 purpose until then (Patrick, 22 September: "the code signing stuff isnt
 finnished thats why its switched off"). The launcher and the setup program are
-signed on every Ship from a machine whose `tools\signing.json` is enabled.
+signed on every Ship from a machine whose `records\signing\signing.json` is enabled.
 
 EVERY RELEASE HAS TO BE SIGNED NOW. `ExpectedSigner` in
 `launcher\app\Updater.cs` is set, so a launcher from dev 1.1.101.17 on
 refuses an update that is not signed by this certificate. A machine with no
-`tools\signing.json`, or one that is disabled, still builds and only prints
+`records\signing\signing.json`, or one that is disabled, still builds and only prints
 "not signing", but Ship and Publish-Installer refuse to publish from it
 (`scripts\release\Assert-PublishSigned.ps1`). So only a machine that signs
 Ships, dev included.

@@ -27,13 +27,13 @@
 // into this harness, so a table that changes under the page fails here.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const CR = String.fromCharCode(13);
 function read(rel) {
-  return fs.readFileSync(path.join(TOOLS_DIR, '..', rel), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join(REPO_DIR, rel), 'utf8').split(CR).join('');
 }
 
 let pass = 0, fail = 0;

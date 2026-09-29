@@ -33,7 +33,7 @@
   Nothing leaves this machine and nothing touches the repository's data
   folder. Scratch files go under THORNSWOOD_TEMP when it is set.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const { spawn, spawnSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -42,9 +42,9 @@ const net = require('net');
 const os = require('os');
 const path = require('path');
 
-const GM = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
-const SITE = path.join(TOOLS_DIR, '..', 'site', 'server.js');
-const BOT = path.join(TOOLS_DIR, '..', 'bot');
+const GM = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
+const SITE = path.join(REPO_DIR, 'site', 'server.js');
+const BOT = path.join(REPO_DIR, 'bot');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(GM, 'utf8').split(CR).join('');
 

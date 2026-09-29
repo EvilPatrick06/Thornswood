@@ -37,7 +37,7 @@
 // changes a race.
 //
 // Read only. It opens the plugins of the build, writes game\data\races.json, and
-// replaces one generated line in tools\gamemode.js.
+// replaces one generated line in game\gamemode.js.
 //
 // Usage:
 //   node scripts\dev\Build-RaceTable.js

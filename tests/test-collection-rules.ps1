@@ -32,9 +32,9 @@ param([string]$CheckPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $CheckPath) { $CheckPath = Join-Path $Here '..\scripts\mods\Check-CollectionRules.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $CheckPath) { $CheckPath = Join-Path $Here 'scripts\mods\Check-CollectionRules.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -60,7 +60,7 @@ $shell = (Get-Process -Id $PID).Path
 # a machine with 7-Zip proves the .7z shape and one without says it skipped
 # rather than failing. Nothing else is taken from here: the script under test
 # still runs as a child process.
-. (Join-Path $Here '..\scripts\mods\LoadOrder.ps1')
+. (Join-Path $Here 'scripts\mods\LoadOrder.ps1')
 $sevenZip = Get-SevenZipPath
 
 # Where the check unpacks an export archive to. Taken before anything runs so

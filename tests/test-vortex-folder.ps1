@@ -56,9 +56,9 @@ param([string]$AppPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppPath) { $AppPath = Join-Path $Here '..\launcher\app' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $AppPath) { $AppPath = Join-Path $Here 'launcher\app' }
 
 $script:pass = 0
 $script:fail = 0

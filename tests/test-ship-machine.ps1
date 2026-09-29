@@ -7,7 +7,7 @@
   anything copied from One, and without weakening signing. Issue #458.
 
   WHY THIS EXISTS. Measured on One on 29 September: the signing setup there
-  (tools\signing.json naming C:\tools\metadata.json and a client folder only
+  (records\signing\signing.json naming C:\tools\metadata.json and a client folder only
   One has, and the az sign in behind it) and the client runtime the record
   names (held only in One's dev game folder) were the two things a Ship needs
   that no other machine could get. scripts\release\Setup-ShipMachine.ps1
@@ -116,17 +116,17 @@ try {
     Yes '1. it has the Artifact Signing timestamp, without which a signature dies with its 3 day certificate' ($t.timestampUrl -eq 'http://timestamp.acs.microsoft.com')
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     & git -C $Repo check-ignore -q 'records/signing/signing.template.json' 2>$null; $ign = ($LASTEXITCODE -eq 0)
-    & git -C $Repo check-ignore -q 'tools/signing.json' 2>$null; $cfgIgn = ($LASTEXITCODE -eq 0)
-    & git -C $Repo check-ignore -q 'tools/signing.json.old' 2>$null; $oldIgn = ($LASTEXITCODE -eq 0)
+    & git -C $Repo check-ignore -q 'records/signing/signing.json' 2>$null; $cfgIgn = ($LASTEXITCODE -eq 0)
+    & git -C $Repo check-ignore -q 'records/signing/signing.json.old' 2>$null; $oldIgn = ($LASTEXITCODE -eq 0)
     $ErrorActionPreference = $old
     Yes '1. git tracks the template' (-not $ign)
-    Yes '1. and ignores tools\signing.json and the .old a person moves aside' ($cfgIgn -and $oldIgn)
+    Yes '1. and ignores records\signing\signing.json and the .old a person moves aside' ($cfgIgn -and $oldIgn)
 
     # ------------------------------------------------ 2. writing signing.json --
     $fake = Join-Path $tmp 'repo'
     Fresh $fake
     $null = Put $fake 'records\signing\metadata.json' (Get-Content -LiteralPath (Join-Path $Repo 'records\signing\metadata.json') -Raw)
-    $cfg = Join-Path $fake 'tools\signing.json'
+    $cfg = Join-Path $fake 'records\signing\signing.json'
     $r = New-SigningConfig $template $cfg ''
     Yes '2. with none there, it is written' ($r.Wrote -and (Test-Path -LiteralPath $cfg))
     $w = Get-Content -LiteralPath $cfg -Raw | ConvertFrom-Json
@@ -157,7 +157,7 @@ try {
     $r = New-SigningConfig $bad $cfg ''
     Yes '2. and one without "enabled", which strict mode would throw on in Ship' (-not $r.Wrote -and -not (Test-Path -LiteralPath $cfg))
 
-    $null = Put $fake 'tools\signing.json' '{"method":"artifactsigning","dlib":"C:\\tools\\nowhere\\Azure.CodeSigning.Dlib.dll","metadata":"C:\\tools\\nowhere\\metadata.json"}'
+    $null = Put $fake 'records\signing\signing.json' '{"method":"artifactsigning","dlib":"C:\\tools\\nowhere\\Azure.CodeSigning.Dlib.dll","metadata":"C:\\tools\\nowhere\\metadata.json"}'
     $miss = @(Get-SigningPathsMissing $cfg $fake)
     Yes '2. a copy from One naming One''s paths says both are missing' ($miss.Count -eq 2)
 
@@ -277,12 +277,12 @@ try {
     # ---------------------------------------------- 5. Check-ShipReady rows --
     $sr = Join-Path $tmp 'sr'
     Fresh $sr
-    $srCfg = Join-Path $sr 'tools\signing.json'
+    $srCfg = Join-Path $sr 'records\signing\signing.json'
     $rows = @(Get-SigningRows $srCfg $sr '' 'C:\signtool.exe')
     Yes '5. no signing.json: one row, NOT READY, pointing at Setup-ShipMachine' ($rows.Count -eq 1 -and -not $rows[0].Ok -and $rows[0].Level -eq 'need' -and $rows[0].Fix -match 'Setup-ShipMachine\.ps1')
-    $null = Put $sr 'tools\signing.json' '{"method":"artifactsigning","dlib":"records\\signing\\client\\X\\bin\\x64\\Azure.CodeSigning.Dlib.dll","metadata":"records\\signing\\metadata.json"}'
+    $null = Put $sr 'records\signing\signing.json' '{"method":"artifactsigning","dlib":"records\\signing\\client\\X\\bin\\x64\\Azure.CodeSigning.Dlib.dll","metadata":"records\\signing\\metadata.json"}'
     $null = Put $sr 'records\signing\metadata.json' '{}'
-    $rows = @(Get-SigningRows $srCfg $sr 'tools\signing.json has "enabled": false.' 'C:\signtool.exe')
+    $rows = @(Get-SigningRows $srCfg $sr 'records\signing\signing.json has "enabled": false.' 'C:\signtool.exe')
     Yes '5. a signing.json Ship refuses is a need that fails, saying why' (-not $rows[0].Ok -and $rows[0].Level -eq 'need' -and $rows[0].Detail -match 'enabled')
     $rows = @(Get-SigningRows $srCfg $sr '' 'C:\signtool.exe')
     Yes '5. one Ship accepts, naming a dlib that is not here, fails on the dlib' ($rows[0].Ok -and -not $rows[1].Ok -and $rows[1].Detail -match 'dlib' -and $rows[1].Detail -notmatch 'metadata')
@@ -312,7 +312,7 @@ try {
     $m = [regex]::Match($dev, '(?ms)^## Shipping from another machine\s*$(.*?)(?=^## )')
     Yes '6. DEVELOPING.md has the section "Shipping from another machine"' ($m.Success)
     $sec = $m.Groups[1].Value
-    foreach ($item in @('tools\signing.json', 'signing client', 'az login', 'Certificate Profile Signer', 'client runtime', 'game folder',
+    foreach ($item in @('records\signing\signing.json', 'signing client', 'az login', 'Certificate Profile Signer', 'client runtime', 'game folder',
                         'Vortex', 'feed', 'webhooks', 'VPS access', 'Backups', 'records\signing\signing.template.json')) {
         Yes ("6. it covers " + $item) ($sec.IndexOf($item, [StringComparison]::OrdinalIgnoreCase) -ge 0)
     }

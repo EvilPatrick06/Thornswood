@@ -35,14 +35,14 @@
 //
 // Read only.
 'use strict';
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 
-const ROOT = path.join(TOOLS_DIR, '..');
-const TOOLS = TOOLS_DIR;
+const ROOT = REPO_DIR;
+const REPO = REPO_DIR;
 const CR = String.fromCharCode(13);
 
 let pass = 0, fail = 0;
@@ -59,7 +59,7 @@ function flat(s) { return String(s).replace(/\s+/g, ' ').trim(); }
 const noticesRaw = read(path.join(ROOT, 'THIRD-PARTY.md'));
 yes('THIRD-PARTY.md exists at the repo root', noticesRaw !== null);
 const N = noticesRaw || '';
-const creditsRaw = read(path.join(TOOLS, '..', 'site', 'data', 'site', 'credits.md'));
+const creditsRaw = read(path.join(REPO, 'site', 'data', 'site', 'credits.md'));
 yes('the public credits page is there to read', creditsRaw !== null);
 const C = creditsRaw || '';
 
@@ -80,7 +80,7 @@ const OURS = {
   'client-build.json': 'the record of the client runtime'
 };
 
-const build = read(path.join(TOOLS, '..', 'scripts', 'release', 'Build-Launcher.ps1')) || '';
+const build = read(path.join(REPO, 'scripts', 'release', 'Build-Launcher.ps1')) || '';
 yes('Build-Launcher.ps1 is there to read', build.length > 0);
 
 // The WebView2 names come out of two arrays and go in through a loop as $n,
@@ -132,7 +132,7 @@ function walk(dir, out) {
   });
   return out;
 }
-const libFiles = walk(path.join(TOOLS, '..', 'launcher', 'lib'), []);
+const libFiles = walk(path.join(REPO, 'launcher', 'lib'), []);
 yes('launcher\\lib has files to check (' + libFiles.length + ')', libFiles.length > 0);
 
 // The file version out of a Windows version resource: the UTF-16 key
@@ -169,7 +169,7 @@ libFiles.forEach(function (p) {
 });
 wv2.forEach(function (n) {
   yes(n + ', which the launcher embeds, is in launcher\\lib\\webview2',
-      fs.existsSync(path.join(TOOLS, '..', 'launcher', 'lib', 'webview2', n)));
+      fs.existsSync(path.join(REPO, 'launcher', 'lib', 'webview2', n)));
 });
 const vList = Object.keys(versions);
 yes('the WebView2 files all carry one file version (' + vList.join(', ') + ')', vList.length === 1);
@@ -220,7 +220,7 @@ yes('the credits page carries the WebView2 licence word for word', flat(C).index
 // so a newer marked or another font dropped in without a word fails here.
 // Text is hashed with its CRs taken out: git stores it with LF, a Windows
 // checkout adds them, and the hash in the notices is of what git stores.
-const PUB = path.join(TOOLS, '..', 'site', 'public');
+const PUB = path.join(REPO, 'site', 'public');
 function vendoredKind(n) { return /\.(woff2?|ttf|otf)$/i.test(n) || /\.min\.js$/i.test(n); }
 let pubNames = [];
 try { pubNames = fs.readdirSync(PUB); } catch (e) { pubNames = []; }
@@ -283,7 +283,7 @@ function namesLicence(text, want) {
 }
 
 let cb = null;
-try { cb = JSON.parse(read(path.join(TOOLS, '..', 'records', 'client-build.json'))); } catch (e) { cb = null; }
+try { cb = JSON.parse(read(path.join(REPO, 'records', 'client-build.json'))); } catch (e) { cb = null; }
 yes('records\\client-build.json reads', !!(cb && cb.files && cb.forkCommit));
 const cbFiles = cb && cb.files ? Object.keys(cb.files) : [];
 const commit = cb ? String(cb.forkCommit || '') : '';
@@ -344,7 +344,7 @@ Object.keys(LICENCE_OF).forEach(function (sub) {
 // checked on its own line so the next one says what it is rather than only that
 // the file did not read. The writer uses UTF8Encoding($false) now, the same as
 // New-ClientBuildRecord.ps1.
-const sbText = read(path.join(TOOLS, '..', 'records', 'server-build.json'));
+const sbText = read(path.join(REPO, 'records', 'server-build.json'));
 yes('records\\server-build.json has no byte order mark in front of it', !!sbText && sbText.charCodeAt(0) !== 0xFEFF);
 let sb = null;
 try { sb = JSON.parse(sbText); } catch (e) { sb = null; }
@@ -364,7 +364,7 @@ if (sb && sb.source) {
 // what makes the licence column a measurement rather than a memory.
 // The engine/skymp submodule once it has files in it, and the old clone until
 // then: the same rule as scripts\release\Where.ps1.
-const REPO_FORK = path.join(TOOLS_DIR, '..', 'engine', 'skymp');
+const REPO_FORK = path.join(REPO_DIR, 'engine', 'skymp');
 const FORK = process.env.THORNSWOOD_SKYMP ||
   (fs.existsSync(path.join(REPO_FORK, 'CMakeLists.txt')) ? REPO_FORK : 'C:\\Thornswood-Dev\\skymp');
 function git(args) {

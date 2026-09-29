@@ -37,11 +37,10 @@ param([string]$ToolsPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-# The scripts are in scripts\<area> since phase 8 of issue #440; tools\ holds
-# only forwarding copies.
-if (-not $ToolsPath) { $ToolsPath = Join-Path (Split-Path -Parent $Here) 'scripts' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+# The scripts are in scripts\<area> since phase 8 of issue #440.
+if (-not $ToolsPath) { $ToolsPath = Join-Path $Here 'scripts' }
 
 $script:pass = 0
 $script:fail = 0

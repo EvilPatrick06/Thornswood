@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           $bad = 0
-          Get-ChildItem -Path scripts, tools, tests -Filter *.ps1 -Recurse -File | ForEach-Object {
+          Get-ChildItem -Path scripts, tests, installer -Filter *.ps1 -Recurse -File | ForEach-Object {
             $tokens = $null; $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
             foreach ($e in $errors) {
@@ -286,7 +286,7 @@ jobs:
           # so what this build made is read too, byte by byte: the launcher with
           # everything Build-Launcher embeds in it, and the setup stub.
           $built = @(Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe')
-          if (Test-Path tools\setup-stub.exe) { $built += (Resolve-Path tools\setup-stub.exe).Path }
+          if (Test-Path out\setup-stub.exe) { $built += (Resolve-Path out\setup-stub.exe).Path }
           .\scripts\dev\Check-Secrets.ps1 -Binary $built
           exit $LASTEXITCODE
 

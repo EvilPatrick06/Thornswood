@@ -32,14 +32,14 @@
   Nothing here reaches the VPS. Read only apart from its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$ToolsDir)
+param([string]$RepoDir)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsDir) { $ToolsDir = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoDir) { $RepoDir = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -60,13 +60,13 @@ function Done {
     exit 0
 }
 
-$helper = Join-Path $ToolsDir '..\scripts\deploy\MaxOnline.ps1'
+$helper = Join-Path $RepoDir 'scripts\deploy\MaxOnline.ps1'
 Yes 'MaxOnline.ps1 is there for the settings section' (Test-Path -LiteralPath $helper)
 if (-not (Test-Path -LiteralPath $helper)) { Done }
 . $helper
 
 # ---- 1 to 3. Deploy-Gamemode.ps1's settings section --------------------------
-$dg = Get-Content -LiteralPath (Join-Path $ToolsDir '..\scripts\deploy\Deploy-Gamemode.ps1') -Raw
+$dg = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\deploy\Deploy-Gamemode.ps1') -Raw
 $from = $dg.IndexOf('# ---- rewrite server-settings.json')
 $to = -1
 if ($from -ge 0) { $to = $dg.IndexOf('[IO.File]::WriteAllText($settingsPath', $from) }
@@ -140,7 +140,7 @@ foreach ($npcs in 'all', 'interior') {
 # the one on the box, so its settings block is lifted and run in Windows
 # PowerShell (what sshd runs there) against a box that has neither key, which
 # is what the dev box had on 28 September.
-$devScript = Join-Path $ToolsDir '..\scripts\deploy\Deploy-DevGamemode.ps1'
+$devScript = Join-Path $RepoDir 'scripts\deploy\Deploy-DevGamemode.ps1'
 $devText = [IO.File]::ReadAllText($devScript)
 $dStart = $devText.IndexOf("Write-Host 'Pointing the dev server at the dev voice service...'")
 $dOpen = $devText.IndexOf('Remote @"', $dStart)
@@ -186,7 +186,7 @@ if ($dStart -ge 0 -and $dOpen -gt $dStart -and $dClose -gt $dOpen) {
 # ---- 4. the engine itself, where this machine has it --------------------------
 $serverDist = $env:THORNSWOOD_SERVER_DIST
 if (-not $serverDist) {
-    try { $serverDist = [string](& (Join-Path $ToolsDir '..\scripts\release\Where.ps1') ServerDist 6>$null) } catch { $serverDist = '' }
+    try { $serverDist = [string](& (Join-Path $RepoDir 'scripts\release\Where.ps1') ServerDist 6>$null) } catch { $serverDist = '' }
 }
 $gameData = $env:THORNSWOOD_GAME_DATA
 if (-not $gameData) { $gameData = 'C:\Thornswood\Game\Data' }

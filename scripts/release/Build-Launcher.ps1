@@ -373,11 +373,15 @@ Head 'Setup stub'
 # The scratch name is the name it ships under, Thornswood-Setup.exe, not a
 # setup-stub name, because csc writes the exe's OriginalFilename and
 # InternalName version fields from the /out leaf. Package-Thornswood.ps1
-# copies tools\setup-stub.exe to Thornswood-Setup.exe without recompiling,
+# copies out\setup-stub.exe to Thornswood-Setup.exe without recompiling,
 # so if it were built as setup-stub.exe those two fields would read a name
 # nobody ever downloads. Built under the shipped name in %TEMP% and then
-# moved onto tools\setup-stub.exe, which is what packaging copies from.
-$stub = Join-Path $Here '..\..\tools\setup-stub.exe'
+# moved onto out\setup-stub.exe, which is what packaging copies from. out\ is
+# the build output, the folder Where.ps1 calls Out, ignored by git; until
+# 29 September the stub sat in tools\ (issue #440, phase 10).
+$stubDir = Join-Path $Here '..\..\out'
+New-Item -ItemType Directory -Force -Path $stubDir | Out-Null
+$stub = Join-Path $stubDir 'setup-stub.exe'
 $stubNew = Join-Path $env:TEMP 'Thornswood-Setup.exe'
 if (Test-Path $stubNew) { Remove-Item $stubNew -Force }
 $stubArgs = @('/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+', '/debug:pdbonly',
@@ -445,9 +449,9 @@ else {
 # 0x800700C1). Measured 27 September on Main Package. The stub stays unsigned
 # on disk; Package signs the final Setup after attach, and the two-file path
 # signs the copied Setup the same way. A stranger still gets a signed installer
-# from the site; this machine's tools\setup-stub.exe is only a build input.
+# from the site; this machine's out\setup-stub.exe is only a build input.
 #
-# This does nothing at all unless tools\signing.json exists, so Djinn's machine
+# This does nothing at all unless records\signing\signing.json exists, so Djinn's machine
 # and the pull request build carry on exactly as before. See the header of
 # Sign-Artifact.ps1 for what that file holds, and Bootstrap.cs:112-121 for why
 # any of this matters.

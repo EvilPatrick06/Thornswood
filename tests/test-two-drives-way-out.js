@@ -33,7 +33,7 @@
 //      letters and the two ways out are what the person reads.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
@@ -43,7 +43,7 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const appDir = path.join(TOOLS_DIR, '..', 'launcher', 'app');
+const appDir = path.join(REPO_DIR, 'launcher', 'app');
 const own = fs.readFileSync(path.join(appDir, 'OwnGame.cs'), 'utf8');
 const shell = fs.readFileSync(path.join(appDir, 'ShellOwnGame.cs'), 'utf8');
 

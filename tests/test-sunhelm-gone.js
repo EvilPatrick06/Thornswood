@@ -34,7 +34,7 @@
 // those say SKIP.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
@@ -48,7 +48,7 @@ function yes(what, cond) {
 function skip(what) { console.log('SKIP  ' + what); }
 
 function read(parts) {
-  return fs.readFileSync(path.join.apply(path, [TOOLS_DIR].concat(parts)), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join.apply(path, [REPO_DIR].concat(parts)), 'utf8').split(CR).join('');
 }
 
 // The mods that left. Matched loosely, because people write them with and
@@ -107,7 +107,7 @@ function csStrings(src) {
 }
 
 // ---------------------------------------------------------- the gamemode
-const GM = read(['..', 'game', 'gamemode.js']);
+const GM = read(['game', 'gamemode.js']);
 const nA = GM.indexOf('// ==== thornswood needs');
 const nB = GM.indexOf('// ==== end thornswood needs ====');
 const needs = (nA >= 0 && nB > nA) ? GM.slice(nA, nB) : '';
@@ -123,7 +123,7 @@ const playerWords = (pA >= 0 && pB > pA) ? GM.slice(pA, pB) : '';
 yes('PLAYER_WORDS is in the gamemode', playerWords.length > 0);
 
 // ---------------------------------------------------------- the Help page
-const helpStrings = csStrings(read(['..', 'launcher', 'app', 'Help.cs']));
+const helpStrings = csStrings(read(['launcher', 'app', 'Help.cs']));
 yes('the Help page has text to read, ' + helpStrings.length + ' strings', helpStrings.length > 50);
 const helpGone = [];
 helpStrings.forEach(function (s) {
@@ -226,7 +226,7 @@ if (/metal the worst|metal is the worst/i.test(body)) {
 }
 
 // ------------------------------------------------------ the Controls page
-const pagesStrings = csStrings(read(['..', 'launcher', 'app', 'Pages.cs']));
+const pagesStrings = csStrings(read(['launcher', 'app', 'Pages.cs']));
 yes('the Controls page has text to read, ' + pagesStrings.length + ' strings', pagesStrings.length > 20);
 const pagesGone = [];
 pagesStrings.forEach(function (s) {
@@ -244,7 +244,7 @@ const MCM_PAGES = { 'QuickLoot': 'QuickLootIEMCM.pex', 'Skyrim Unbound': 'Skyrim
 const named = Object.keys(MCM_PAGES).filter(function (k) { return mcmRow.indexOf(k) >= 0; });
 yes('the row gives an example of a mod whose page is there', named.length > 0);
 
-const KNOWN = read(['..', 'site', 'data', 'known.md']);
+const KNOWN = read(['site', 'data', 'known.md']);
 yes('the row does not say the choices are kept in your save, when known.md says menus reset',
     !(/reset every session/i.test(KNOWN) && /kept in your save/i.test(mcmRow)));
 
@@ -273,7 +273,7 @@ if (shCount) {
 }
 
 // ------------------------------------------------------- Add-CartTravel.ps1
-const CART = read(['..', 'scripts', 'mods', 'Add-CartTravel.ps1']);
+const CART = read(['scripts', 'mods', 'Add-CartTravel.ps1']);
 const says = [];
 CART.split('\n').forEach(function (line) {
   const m = /^\s*Say\s+'((?:[^']|'')*)'/.exec(line) || /^\s*Say\s+"([^"]*)"/.exec(line);
@@ -305,7 +305,7 @@ yes('and the fast travel line says the SkyMP client turns it off',
   Add-TempleRespawn.ps1 is checked to refuse before it reaches any of the
   install.
 */
-const QUICKLOOT = read(['..', 'scripts', 'mods', 'Fix-QuickLoot.ps1']);
+const QUICKLOOT = read(['scripts', 'mods', 'Fix-QuickLoot.ps1']);
 const anchor = /\[string\]\s*\$After\s*=\s*'([^']+)'/.exec(QUICKLOOT);
 yes('Fix-QuickLoot.ps1 has a default plugin to insert behind', anchor !== null);
 const anchorName = anchor ? anchor[1] : '';
@@ -313,7 +313,7 @@ yes('and it is not a mod that has left, it is ' + anchorName, goneIn(anchorName)
 
 // The chain at the top of Enable-MCM.ps1 is where the masters are written
 // down: "MCMHelper.esp   NOT light, masters SkyUI_SE.esp".
-const ENABLE_MCM = read(['..', 'scripts', 'mods', 'Enable-MCM.ps1']);
+const ENABLE_MCM = read(['scripts', 'mods', 'Enable-MCM.ps1']);
 const master = /MCMHelper\.esp\b[^\n]*masters\s+(\S+\.es[pml])/i.exec(ENABLE_MCM);
 yes('Enable-MCM.ps1 says what MCMHelper.esp masters', master !== null);
 yes('and the anchor is that master, so the entry lands where the server can read it',
@@ -321,7 +321,7 @@ yes('and the anchor is that master, so the entry lands where the server can read
 yes('a missing anchor stops the script rather than guessing a place',
     /throw \("?\$After is not in the server load order/.test(QUICKLOOT));
 
-const TEMPLE = read(['..', 'scripts', 'oneoff', 'Add-TempleRespawn.ps1']);
+const TEMPLE = read(['scripts', 'oneoff', 'Add-TempleRespawn.ps1']);
 const stopAt = TEMPLE.indexOf('throw (\'STOP.');
 const installAt = TEMPLE.indexOf('Head \'Making room\'');
 yes('Add-TempleRespawn.ps1 throws a STOP', stopAt >= 0);
@@ -334,9 +334,9 @@ yes('and it says why, which is the mod it installed leaving the collection',
 // from #781 until #394 took the mod out for good; now it is deleted, so no
 // run can put the mod back into a build (tests\test-start-on-save-gone.js).
 yes('Add-Characters.ps1 is gone from scripts\\mods',
-    !fs.existsSync(path.join(TOOLS_DIR, '..', 'scripts', 'mods', 'Add-Characters.ps1')));
+    !fs.existsSync(path.join(REPO_DIR, 'scripts', 'mods', 'Add-Characters.ps1')));
 
-const RUN_EVERYTHING = read(['..', 'scripts', 'oneoff', 'Run-Everything.ps1']);
+const RUN_EVERYTHING = read(['scripts', 'oneoff', 'Run-Everything.ps1']);
 yes('Run-Everything.ps1 no longer runs Add-Characters as a step',
     !/Script\s*=\s*'Add-Characters\.ps1'/.test(RUN_EVERYTHING));
 yes('and it no longer wants po3_StartOnSave.dll',

@@ -175,7 +175,7 @@ if ($PutBack) {
 }
 
 # ------------------------------------------------------------- gamemode ------
-# The gamemode is edited in tools\ and packaged from dist\server. Those are two
+# The gamemode is edited in game\ and packaged from dist\server. Those are two
 # different files, and for a whole evening every change went into the first one
 # while every publish shipped the second: the race menu fix, the launcher
 # choices, the removal of the books, none of it ever reached the server, and

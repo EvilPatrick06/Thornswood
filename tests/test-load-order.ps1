@@ -48,10 +48,10 @@ param([string]$LoadOrderPath, [string]$LauncherPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $LoadOrderPath) { $LoadOrderPath = Join-Path $Here '..\scripts\mods\LoadOrder.ps1' }
-if (-not $LauncherPath) { $LauncherPath = Join-Path $Here '..\launcher\app\LoadOrder.cs' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $LoadOrderPath) { $LoadOrderPath = Join-Path $Here 'scripts\mods\LoadOrder.ps1' }
+if (-not $LauncherPath) { $LauncherPath = Join-Path $Here 'launcher\app\LoadOrder.cs' }
 . $LoadOrderPath
 
 $script:pass = 0

@@ -26,11 +26,11 @@
 
   Read only. It reads source files and nothing else.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const APP = path.join(TOOLS_DIR, '..', 'launcher', 'app');
+const APP = path.join(REPO_DIR, 'launcher', 'app');
 const CHECKS = fs.readFileSync(path.join(APP, 'Checks.cs'), 'utf8');
 const SHELL = fs.readFileSync(path.join(APP, 'Shell.cs'), 'utf8');
 

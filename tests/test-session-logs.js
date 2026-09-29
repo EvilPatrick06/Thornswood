@@ -29,13 +29,13 @@
   This lifts the real functions out of server.js by text, so a rename fails
   loudly rather than testing a copy. Read only apart from its own temp folder.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 
-const SRC = path.join(TOOLS_DIR, '..', 'site', 'server.js');
+const SRC = path.join(REPO_DIR, 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8');
 
 function grab(name) {
@@ -175,7 +175,7 @@ yes('a server log that is not on this box says so rather than throwing',
   real Roll-Log.ps1 the way the task line runs it, and asks again.
 */
 const { spawnSync } = require('child_process');
-const ROLLER = path.join(TOOLS_DIR, '..', 'scripts', 'vps', 'Roll-Log.ps1');
+const ROLLER = path.join(REPO_DIR, 'scripts', 'vps', 'Roll-Log.ps1');
 const WINPS = path.join(process.env.SystemRoot || 'C:\\Windows',
                         'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
 let rolledBy = 'Roll-Log.ps1';
@@ -403,17 +403,17 @@ yes('the server outranks the launcher\'s own Scan lines',
     readTrouble({ 'launcher.log': LATER + DJINN }, SRV, 42).file === 'server');
 
 /* The words these read are other files' words. If one moves, this says so. */
-const GM = fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'gamemode.js'), 'utf8');
+const GM = fs.readFileSync(path.join(REPO_DIR, 'game', 'gamemode.js'), 'utf8');
 yes('gamemode.js still logs a refusal as "refusing profile N: load order differs"',
     GM.indexOf("'[thornswood] refusing profile ' + profileId + ': load order differs at '") >= 0);
 yes('and one for no report as "refusing profile N: no load order report"',
     GM.indexOf("'[thornswood] refusing profile ' + pid + ': no load order report in '") >= 0);
 yes('and watching only as "WOULD REFUSE profile N:"',
     GM.indexOf("'[thornswood] WOULD REFUSE profile ' + profileId + ': load order differs at '") >= 0);
-const SHELL = fs.readFileSync(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Shell.cs'), 'utf8');
+const SHELL = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'app', 'Shell.cs'), 'utf8');
 yes('Shell.cs still starts a session in launcher.log with the line this cuts at',
     SHELL.indexOf('Log("' + eval(grabLine('SESSION_START_MARK').replace(/^const SESSION_START_MARK = /, '')) + '" + Updater.Version') >= 0);
-const CLIENT = path.join(TOOLS_DIR, '..', 'engine', 'skymp', 'skymp5-client', 'src', 'services', 'services', 'loadOrderVerificationService.ts');
+const CLIENT = path.join(REPO_DIR, 'engine', 'skymp', 'skymp5-client', 'src', 'services', 'services', 'loadOrderVerificationService.ts');
 if (fs.existsSync(CLIENT)) {
   const LOV = fs.readFileSync(CLIENT, 'utf8');
   yes('the client still logs "Load order check failed" and "Missing some server mods"',
@@ -465,7 +465,7 @@ yes('the word error on its own does not colour a session',
   reading the launcher's list out of Discord.cs rather than keeping a copy of
   it here. The launcher's own half is test-log-upload.ps1.
 */
-const CS = fs.readFileSync(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Discord.cs'), 'utf8');
+const CS = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'app', 'Discord.cs'), 'utf8');
 const sends = (function () {
   const at = CS.indexOf('public static void SessionLogs()');
   const end = at < 0 ? -1 : CS.indexOf('};', at);

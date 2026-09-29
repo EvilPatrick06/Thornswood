@@ -2,7 +2,7 @@
   test-app-manifest.ps1
 
   Issue #463. Both exes a stranger runs, the launcher (Thornswood.exe) and the
-  setup program (Thornswood-Setup.exe, built as tools\setup-stub.exe), carry
+  setup program (Thornswood-Setup.exe, built as out\setup-stub.exe), carry
   an application manifest of our own:
     - dpiAwareness PerMonitorV2, and the legacy dpiAware "true" (system aware,
       never the per-monitor legacy form, which older Framework WPF sizes wrong);
@@ -37,7 +37,7 @@
     pwsh -File tests\test-app-manifest.ps1 -Root <scratch folder>    builds there first
   With neither, on the build runner it reads the exe the build step made
   ($env:RUNNER_TEMP\Thornswood\Launcher\Thornswood.exe). -Stub defaults to
-  tools\setup-stub.exe, which Build-Launcher.ps1 writes.
+  out\setup-stub.exe, which Build-Launcher.ps1 writes.
   Read only, apart from -Root's build and a scratch folder for step 3.
 #>
 [CmdletBinding()]
@@ -147,7 +147,7 @@ if (-not $Exe -and $Root) {
     $Exe = Join-Path $Root 'Launcher\Thornswood.exe'
 }
 if (-not $Exe -and $env:RUNNER_TEMP) { $Exe = Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe' }
-if (-not $Stub) { $Stub = Join-Path $repo 'tools\setup-stub.exe' }
+if (-not $Stub) { $Stub = Join-Path $repo 'out\setup-stub.exe' }
 
 Add-Type -TypeDefinition @'
 using System;

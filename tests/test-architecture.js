@@ -38,13 +38,13 @@
 // against the code on every run.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const ROOT = path.join(TOOLS_DIR, '..');
-const APP = path.join(TOOLS_DIR, '..', 'launcher', 'app');
+const ROOT = REPO_DIR;
+const APP = path.join(REPO_DIR, 'launcher', 'app');
 const PAGE = path.join(APP, 'ARCHITECTURE.md');
 
 let pass = 0, fail = 0;
