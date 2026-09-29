@@ -31484,14 +31484,23 @@ log('gamemode loaded:',
       '        var r = sp.ObjectReference.from(sp.Game.getFormEx(v.shut[i]));',
       // A door in a cell nobody has loaded does not resolve, and there is
       // nothing to lock until it does. The tick below comes back to it.
-      '        if (r) { r.lock(true, false); }',
+      // ONLY A DOOR IN THE WRONG STATE IS TOUCHED (#963). lock() fires the
+      // game's lockChanged event even when nothing changes, and the front
+      // plugin answers every one with a log line and a blockActivation: the
+      // dev log of 28 September has the same open door "opened" twice every
+      // four seconds, 16 events costing 408 ms in 30 s, worst 229 ms, which
+      // is a stutter on each heartbeat. If isLocked cannot be read the door
+      // is locked anyway, so this fails shut.
+      '        if (r) { var was = null; try { was = r.isLocked(); } catch (e2) { }',
+      '          if (was !== true) { r.lock(true, false); } }',
       '        shutMap[v.shut[i]] = true;',
       '      } catch (e) { }',
       '    }',
       '    for (var j = 0; j < (v.open || []).length; j++) {',
       '      try {',
       '        var o = sp.ObjectReference.from(sp.Game.getFormEx(v.open[j]));',
-      '        if (o) { o.lock(false, false); }',
+      '        if (o) { var shut = true; try { shut = o.isLocked(); } catch (e2) { }',
+      '          if (shut !== false) { o.lock(false, false); } }',
       '        delete shutMap[v.open[j]];',
       '      } catch (e) { }',
       '    }',
