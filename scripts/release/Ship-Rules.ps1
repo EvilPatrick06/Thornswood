@@ -24,6 +24,8 @@
                                    somebody else's framework or modding tool under Data; never shipped, never removed
       Test-ShipBethesdaLeftAlone   Bethesda's, and a pack once carried it; never shipped, never removed
       Test-ShipRetired $rel        a mod Thornswood took out; never shipped, never removed (the launcher drops it)
+      Test-ShipBethesdaTool $rel   the Creation Kit, or a copy of one of the game's programs; never shipped, never recorded, never removed (the launcher drops it)
+      Test-ShipBackup $rel         any *.bak; never shipped, never removed
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
       Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
@@ -48,6 +50,9 @@ $ShipRuntimeDirs = @(
     '_to_delete\',
     # RaceMenu writes a face export here when somebody saves one in game.
     'Data\SKSE\Plugins\CharGen\Exported\',
+    # And its face tint beside it. The dev record of 29 September carried one
+    # person's, Data\textures\CharGen\Exported\Adventurer3424.dds (#1152).
+    'Data\textures\CharGen\Exported\',
     # Another server's folder must never be listed here: a runtime path has
     # its files listed as removed and swept off every install that has them,
     # which is somebody else's install being swept. Those go in
@@ -551,6 +556,69 @@ function Test-ShipBodyShape([string]$rel) {
     return $false
 }
 
+# BETHESDA'S CREATION KIT, AND COPIES OF THE GAME'S OWN PROGRAMS. Issue #1152.
+#
+# Never shipped, never in a release record, and never listed as removed.
+# Thornswood never hands out Bethesda's files: the installer fingerprints the
+# game (vanilla.json) and never carries it.
+#
+# MEASURED 29 September on the dev record the feed named that day
+# (20260929-0259-dev): of its 2,515 files of ours, about 180 MB were Bethesda's.
+# CreationKit.exe (46.4 MB) with CreationKit.ini and CreationKitPrefs.ini; the
+# Tools folder (86.8 MB: AssetWatcher, the Havok, lip sync and audio tools,
+# Microsoft's redistributables); Papyrus Compiler; lex; flowchartx64.dll,
+# flowchartx32.dll and p4com64.dll; EditorWarnings.txt, DataFiles.txt and
+# SkyrimReservedAddOnIndexes.txt; Data\Scripts.zip, the game's script sources
+# (13.6 MB); 1,785 files under Data\DialogueViews (55.4 MB); and
+# SkyrimSE.exe.bak-1160-for-369 (35.4 MB), a copy of Skyrim itself. Main pack
+# 20260926-1603 carried the Creation Kit and the copy of the game, and the dev
+# packs 20260927-0059 and 0250 the rest.
+#
+# How they got in: Steam installs the Creation Kit into the Steam copy, the
+# launcher's own folder takes what the Steam copy has, and a file Vortex did
+# not deploy counted as ours. The vanilla lists above name SkyrimSE.exe, not a
+# copy of it under another name.
+#
+# NOT LISTED AS REMOVED, ON PURPOSE. A pack's delete.txt reaches every
+# launcher, old ones too, and an install with no game folder of its own
+# applies it to the Steam copy, where a Creation Kit is the person's own. So
+# the launcher takes these out of its own game folder itself
+# (OwnGame.BethesdaTool, rules 10) and nothing touches a Steam copy. Change the
+# two together.
+$ShipBethesdaToolRootDirs  = @('Tools', 'Papyrus Compiler', 'lex')
+$ShipBethesdaToolRootFiles = @(
+    'flowchartx64.dll', 'flowchartx32.dll', 'p4com64.dll',
+    'EditorWarnings.txt', 'DataFiles.txt', 'SkyrimReservedAddOnIndexes.txt'
+)
+
+function Test-ShipBethesdaTool([string]$rel) {
+    $parts = $rel -split '\\'
+    if ($parts.Count -gt 1 -and ($ShipBethesdaToolRootDirs -contains $parts[0])) { return $true }
+    if ($parts.Count -eq 1) {
+        $leaf = $parts[0]
+        # CreationKit.exe, its settings files and anything else it names so.
+        if ($leaf -like 'CreationKit*') { return $true }
+        if ($ShipBethesdaToolRootFiles -contains $leaf) { return $true }
+        # A copy of one of the game's programs under another name, such as
+        # SkyrimSE.exe.bak-1160-for-369. The programs themselves are vanilla.
+        if ($leaf -match '^(SkyrimSE|SkyrimSELauncher|skse64_loader)\.exe.') { return $true }
+        return $false
+    }
+    if ($rel -ieq 'Data\Scripts.zip') { return $true }
+    if ($rel.StartsWith('Data\DialogueViews\', 'OrdinalIgnoreCase')) { return $true }
+    return $false
+}
+
+# A BACKUP IS NEVER A FILE OF THE BUILD, wherever it is. The rule in
+# Test-ShipOtherServer only looked in Data\Platform, so the same dev record
+# carried Data\SKSE\Plugins\SkyrimPlatform.ini.bak and
+# SkyrimPlatform.ini.2026-09-19T20-17-00-253Z.bak (one machine's settings, see
+# $ShipMachineFiles) and VERSION.bak beside the game (#1152). A name with .bak
+# at its end, or followed by a dash or a dot. Never shipped, never removed.
+function Test-ShipBackup([string]$rel) {
+    return ((Split-Path $rel -Leaf) -match '\.bak($|[-.])')
+}
+
 # One machine's own, never shipped and never listed as removed. Other servers'
 # files count as the machine's here, so a release never strips another
 # server's install off a tester.
@@ -558,6 +626,8 @@ function Test-ShipMachine([string]$rel) {
     if (Test-ShipOtherServer $rel) { return $true }
     if (Test-ShipRetired $rel) { return $true }
     if (Test-ShipBodyShape $rel) { return $true }
+    if (Test-ShipBethesdaTool $rel) { return $true }
+    if (Test-ShipBackup $rel) { return $true }
     # So do Bethesda's files and other people's frameworks and tools, for the
     # same reason. See the note over $ShipVanillaDataFiles for the 90 files
     # that needed it on 24 September, and the one over $ShipBethesdaLeftAlone
