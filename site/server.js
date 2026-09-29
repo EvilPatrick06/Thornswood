@@ -985,15 +985,31 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
   while (fs.existsSync(path.join(UP, name))) { name = stamp + '-' + n + '-' + safe; n++; }
   const dest = path.join(UP, name);
 
-  let got = 0, over = false;
+  /* Over the cap or cut off partway, the half file goes (#1095). Over the cap
+     it destroyed the request, so the 413 went to a socket already closed, and
+     a sender that dropped partway never ended the pipe, so the half file sat
+     open on disk and the route never answered. Now too big is answered 413
+     and the rest read and thrown away, and a connection that went is closed
+     with nothing left to say. */
+  let got = 0, over = false, cut = false, broke = false;
   const out = fs.createWriteStream(dest);
-  req.on('data', (c) => { got += c.length; if (got > cap) { over = true; req.destroy(); out.destroy(); } });
-  req.on('error', () => { over = true; });
+  out.on('error', () => { broke = true; });
+  req.on('data', (c) => {
+    got += c.length;
+    if (got > cap && !over) { over = true; req.unpipe(out); out.destroy(); }
+  });
+  const drop = () => { if (!req.complete && !over && !cut) { cut = true; req.unpipe(out); out.destroy(); } };
+  req.on('error', drop);
+  req.on('aborted', drop);
+  req.on('close', drop);
   req.pipe(out);
   out.on('close', () => {
-    if (over) {
+    if (over || cut || broke) {
       try { fs.unlinkSync(dest); } catch (e) { }
-      return sendJson(res, 413, { error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' });
+      if (over) return send(res, 413, JSON.stringify({ error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' }),
+                            null, { Connection: 'close' });
+      if (cut) { try { res.destroy(); } catch (e) { } return; }
+      return sendJson(res, 500, { error: 'the site could not save that file. Try again in a minute.' });
     }
     saved(name);
   });
@@ -1070,8 +1086,15 @@ async function standingCached(id) {
   if (hit && !stale && Date.now() - hit.at < 60000) return hit.v;
   const v = await standing(id);
   standCache.set(id, { at: Date.now(), v });
+  if (!v.lookupFailed) standGood.set(id, { at: Date.now(), v });
   return v;
 }
+/* The last answer Discord actually gave for each account, kept past the
+   minute above for STAND_STALE_MS so a page load can use it while Discord is
+   slow (#1096). Only page loads read it (who() with staleOk); a failed lookup
+   never lands here. */
+const standGood = new Map();
+const STAND_STALE_MS = 10 * 60000;
 
 /* Every linked account's standing, for /api/allowed, inside the door's time.
 
@@ -1134,13 +1157,36 @@ async function standingsForDoor(ids) {
   and the hand written admin list need no Discord, so they still count.
 */
 const SUBMIT_WAIT_MS = 700;
+/* Play's two doors, /api/play/join and /api/play/pass, answer inside
+   PLAY_ANSWER_MS of the question, well inside the launcher's fifteen seconds
+   (Discord.cs PostJson), with 503 "could not ask Discord" when Discord has
+   not answered by then, which the launcher treats as a site that could not
+   vouch (#1094). What the launcher sends is small and sent at once, so it
+   gets PLAY_BODY_MS of that. */
+const PLAY_ANSWER_MS = 10000;
+const PLAY_BODY_MS = 5000;
 const SUBMIT_DOORS = new Set(['/api/report', '/api/gallery/submit', '/api/gallery/report']);
 // Shared for at most STAND_ASKING_MS: three questions of ten seconds is the
 // longest a lookup should take, and one that never settles must not hold
 // every later request for that account behind it.
 const STAND_ASKING_MS = 35000;
 const standAsking = new Map();
-function standingSoon(id, waitMs) {
+/* What an account counts as when Discord has not answered in time: the hand
+   written admin list, which needs no Discord, and otherwise signed in with
+   no roles and the lookup failed, which each door turns into words. */
+function standingLate(id) {
+  const listed = cfg.admins.indexOf(String(id)) >= 0;
+  return { id: String(id), inGuild: listed, banned: false, admin: listed, play: listed, dev: listed,
+           roles: [], name: '', lookupFailed: 'Discord did not answer in time' };
+}
+// p's answer, or late()'s once ms has passed without one.
+function within(p, ms, late) {
+  let timer = null;
+  const LATE = {};
+  const t = new Promise((r) => { timer = setTimeout(() => r(LATE), Math.max(0, ms)); });
+  return Promise.race([p, t]).then((v) => { clearTimeout(timer); return v === LATE ? late() : v; });
+}
+function standingSoon(id, waitMs, staleOk) {
   let ask = standAsking.get(id);
   if (!ask || Date.now() - ask.at > STAND_ASKING_MS) {
     const mine = { p: standingCached(id), at: Date.now() };
@@ -1150,21 +1196,29 @@ function standingSoon(id, waitMs) {
     ask = mine;
   }
   if (!(waitMs > 0)) return ask.p;
-  let timer = null;
-  const late = new Promise((r) => { timer = setTimeout(() => r(null), waitMs); });
-  return Promise.race([ask.p, late]).then((st) => {
-    clearTimeout(timer);
-    if (st) return st;
-    const listed = cfg.admins.indexOf(String(id)) >= 0;
-    return { id: String(id), inGuild: listed, banned: false, admin: listed, play: listed, dev: listed,
-             roles: [], name: '', lookupFailed: 'Discord did not answer in time' };
+  // A page load uses the last answer Discord gave when this one is late or
+  // failed, while the question above carries on and lands in the cache for
+  // the next one (#1096).
+  return within(ask.p, waitMs, () => standingLate(id)).then((st) => {
+    const good = staleOk && st.lookupFailed && standGood.get(id);
+    if (good && Date.now() - good.at < STAND_STALE_MS) return Object.assign({}, good.v, { stale: true });
+    return st;
   });
 }
 
-async function who(req, waitMs) {
+/*
+  PAGE LOADS WAIT NO LONGER THAN A SUBMIT (#1096). A GET or HEAD from a
+  signed in visitor asked Discord in full before anything was sent back, so
+  with Discord slow the gallery, the report page's sign in check and the hub
+  took ten to twenty seconds to show. They get SUBMIT_WAIT_MS too, and then
+  the last answer Discord gave for that account (up to STAND_STALE_MS old)
+  or, with none, signed in with the lookup failed. Anything else that is not
+  a Submit door still waits for Discord, inside DISCORD_ASK_MS a question.
+*/
+async function who(req, waitMs, staleOk) {
   const me = identity(req);
   if (!me) return { member: isMember(req), admin: false, dev: false, name: '', id: '', play: false };
-  const st = await standingSoon(me.id, waitMs);
+  const st = await standingSoon(me.id, waitMs, staleOk);
   return {
     // "member" is now "may use the hub", and only staff may. Being allowed
     // into the GAME is st.play, and that is asked separately by the launcher.
@@ -1181,6 +1235,25 @@ async function who(req, waitMs) {
     id: me.id,
     name: st.name || me.name
   };
+}
+
+/*
+  Why this visitor cannot report a person from the report page, or null when
+  they can. /api/report answers with it, and /api/gallery/who hands it to the
+  page, so the page says the same words before Send it as the site would
+  after (#1097). Signed in already is never told to sign in (#467), and
+  Discord not answering in time is said as that.
+*/
+function personReportRefusal(w) {
+  if (!w.id) return { code: 401, why: 'sign in', error: 'Sign in with Discord to report somebody, ' +
+    'so staff can come back to you about it.' };
+  if (w.banned) return { code: 403, why: 'banned', error: 'That Discord account is banned from Thornswood.' };
+  if (!w.play && w.lookupFailed) return { code: 503, why: 'could not ask Discord', error:
+    'Thornswood could not ask Discord who you are just now, so a report about a person cannot go yet. ' +
+    'Try again in a minute. A problem or an idea goes without it.' };
+  if (!w.play) return { code: 403, why: 'role', error: 'Your Discord account is not let into Thornswood ' +
+    'yet, so it cannot report somebody from here. Ask staff in the Discord instead.' };
+  return null;
 }
 
 /* 'staff' is w.dev, which already folds admin in, so widening access.dev
@@ -1298,11 +1371,55 @@ function rangeReply(req, res, file, size, headers, head) {
   return true;
 }
 
-function body(req, cap) {
-  return new Promise((resolve) => {
-    let out = '';
-    req.on('data', (d) => { out += d; if (out.length > (cap || 4000000)) req.destroy(); });
-    req.on('end', () => resolve(out));
+/*
+  What was sent with a request, settled on every path (#1095).
+
+  It resolved on 'end' and nothing else. Over the cap it destroyed the
+  request, after which 'end' never came, and a connection that dropped or a
+  sender that stopped halfway left it waiting too, so the route never went
+  on and the visitor got a dropped connection instead of words.
+
+  Now it rejects with a BodyFailed, which failed() below turns into an
+  answer: 413 with the most the route takes when it is too big, 408 when it
+  took longer than waitMs to arrive (by default ten seconds, plus a second
+  for every 64 KB the route allows), and nothing when the connection has
+  already gone, because nobody is left to read it. Over the cap the rest is
+  read and thrown away rather than the socket cut, so the answer can reach
+  the sender. The routes pass a BodyFailed on (passBodyFailure) rather than
+  reading it as a body that was not JSON.
+*/
+class BodyFailed extends Error {
+  constructor(status, why, words) { super(why); this.status = status; this.why = why; this.words = words; }
+}
+function passBodyFailure(e) { if (e instanceof BodyFailed) throw e; }
+function body(req, cap, waitMs) {
+  const max = cap || 4000000;
+  const wait = waitMs > 0 ? waitMs : 10000 + Math.ceil(max / 65536) * 1000;
+  return new Promise((resolve, reject) => {
+    const parts = [];
+    let size = 0, settled = false;
+    const settle = (e, v) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (e) reject(e); else resolve(v);
+    };
+    const timer = setTimeout(() => settle(new BodyFailed(408, 'slow',
+      'That took too long to arrive, so it was not read. Try again.')), wait);
+    const gone = () => settle(new BodyFailed(0, 'closed', ''));
+    req.on('data', (d) => {
+      if (settled) return;
+      size += d.length;
+      if (size > max) {
+        return settle(new BodyFailed(413, 'too big', 'That was too big to send here: the most this takes is ' +
+          (max >= 1048576 ? Math.round(max / 1048576) + ' MB' : Math.max(1, Math.round(max / 1024)) + ' KB') + '.'));
+      }
+      parts.push(Buffer.isBuffer(d) ? d : Buffer.from(String(d)));
+    });
+    req.on('end', () => settle(null, Buffer.concat(parts).toString('utf8')));
+    req.on('error', gone);
+    req.on('aborted', gone);
+    req.on('close', () => { if (!req.complete) gone(); });
   });
 }
 
@@ -1426,6 +1543,14 @@ function discordWaitMs(headers, text) {
   if (!(s >= 0)) return -1;
   return Math.min(60000, Math.ceil(s * 1000));
 }
+/* TEN SECONDS FOR THE WHOLE ANSWER (#1094). The limit was req.setTimeout,
+   which only watches for a quiet socket and then destroys the request. When
+   Discord sent its headers and stalled, the response never ended, nothing
+   listened for it failing, and the promise never settled, so the visitor or
+   launcher waiting on it never heard back. Now one timer runs from the
+   question to the last byte, and a response that fails, is cut off or closes
+   before its end settles the question too, once. */
+const DISCORD_ASK_MS = 10000;
 function discordGet(path) {
   return new Promise((resolve) => {
     if (!cfg.discord.botToken) {
@@ -1434,12 +1559,25 @@ function discordGet(path) {
     if (discordQuietMs() > 0) {
       return resolve({ ok: false, status: 429, body: null, why: 'rate limited by Discord' });
     }
+    let settled = false;
+    let timer = null;
+    const settle = (v) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (!v.ok && v.status === 0 && v.why) console.error('[thornswood] discord ' + path + ': ' + v.why);
+      resolve(v);
+    };
     const req = https.get({
       hostname: 'discord.com', path: '/api/v10' + path,
       headers: { Authorization: 'Bot ' + cfg.discord.botToken }
     }, (res) => {
       let out = '';
+      const cut = () => settle({ ok: false, status: 0, body: null, why: 'Discord stopped partway through its answer' });
       res.on('data', (d) => out += d);
+      res.on('error', cut);
+      res.on('aborted', cut);
+      res.on('close', () => { if (!res.complete) cut(); });
       res.on('end', () => {
         const hdr = res.headers || {};
         if (res.statusCode === 429 || String(hdr['x-ratelimit-remaining']) === '0') {
@@ -1449,22 +1587,25 @@ function discordGet(path) {
           discordQuietUntil = Math.max(discordQuietUntil, Date.now() + ms);
         }
         if (res.statusCode === 200) {
-          try { return resolve({ ok: true, status: 200, body: JSON.parse(out) }); }
-          catch (e) { return resolve({ ok: false, status: 200, body: null, why: 'unreadable answer' }); }
+          try { return settle({ ok: true, status: 200, body: JSON.parse(out) }); }
+          catch (e) { return settle({ ok: false, status: 200, body: null, why: 'unreadable answer' }); }
         }
         if (res.statusCode === 404) {
-          return resolve({ ok: false, status: 404, body: null, why: 'not found' });
+          return settle({ ok: false, status: 404, body: null, why: 'not found' });
         }
         let msg = 'Discord answered ' + res.statusCode;
         if (res.statusCode === 401) msg = 'the bot token is wrong or has been reset';
         else if (res.statusCode === 403) msg = 'the bot is in the server but not allowed to read members';
         else if (res.statusCode === 429) msg = 'rate limited by Discord';
         console.error('[thornswood] discord ' + path + ': ' + msg);
-        resolve({ ok: false, status: res.statusCode, body: null, why: msg });
+        settle({ ok: false, status: res.statusCode, body: null, why: msg });
       });
     });
-    req.setTimeout(10000, () => { try { req.destroy(); } catch (e) { } });
-    req.on('error', (e) => resolve({ ok: false, status: 0, body: null, why: 'could not reach Discord: ' + e.message }));
+    timer = setTimeout(() => {
+      settle({ ok: false, status: 0, body: null, why: 'Discord did not answer inside ten seconds' });
+      try { req.destroy(); } catch (e) { }
+    }, DISCORD_ASK_MS);
+    req.on('error', (e) => settle({ ok: false, status: 0, body: null, why: 'could not reach Discord: ' + e.message }));
   });
 }
 
@@ -2767,7 +2908,7 @@ async function hasLeft(discordId) {
   and a wait between reading linked.json and writing it would write over
   whatever another launcher checked in meanwhile.
 */
-async function departed(linked, pid, caller) {
+async function departed(linked, pid, caller, by) {
   const out = new Set();
   const table = linked || {};
   const n = Number(pid) || 0;
@@ -2780,7 +2921,10 @@ async function departed(linked, pid, caller) {
     const theirs = (table[d] && Array.isArray(table[d].profiles))
       ? table[d].profiles.map(Number) : [];
     if (theirs.indexOf(n) < 0) continue;
-    if (await hasLeft(d)) out.add(String(d));
+    // Past the deadline (by, when the door has one) an account counts as
+    // still holding, the safe side (#1094).
+    const left = by ? await within(hasLeft(d), by - Date.now(), () => false) : await hasLeft(d);
+    if (left) out.add(String(d));
   }
   return out;
 }
@@ -2993,6 +3137,19 @@ function notAllowedPage(me, st) {
   500, logged with a stack so it can be fixed rather than quietly swallowed.
 */
 function failed(req, res, e) {
+  // What was sent could not be read (body() above, #1095): too big or too
+  // slow is answered in words, and a connection already gone gets nothing.
+  // Closed after, so the rest of a body too big is not read for nothing.
+  if (e instanceof BodyFailed) {
+    console.error('[thornswood-docs] body ' + e.why + ' on ' +
+                  JSON.stringify(String(req.url || '').split('?')[0].slice(0, 200)));
+    try {
+      if (!e.status || res.headersSent || res.destroyed) { if (!res.writableEnded) res.destroy(); return; }
+      send(res, e.status, JSON.stringify({ ok: false, why: e.why, error: e.words, message: e.words }),
+           null, { Connection: 'close' });
+    } catch (e2) { }
+    return;
+  }
   const bad = e instanceof URIError;
   // The path and never the query. A caller that puts a key or a ticket in the
   // address would have it copied into site.log, which Get-Logs brings down
@@ -3088,7 +3245,10 @@ async function handle(req, res) {
     return send(res, 301, '', 'text/plain', { Location: url.pathname.replace(/\/{2,}/g, '/') + url.search });
   }
 
-  const w = await who(req, req.method === 'POST' && SUBMIT_DOORS.has(route) ? SUBMIT_WAIT_MS : 0);
+  // A page load (GET, HEAD was made GET above) waits as long as a Submit and
+  // may use the last answer Discord gave (#1096).
+  const pageLoad = req.method === 'GET';
+  const w = await who(req, pageLoad || (req.method === 'POST' && SUBMIT_DOORS.has(route)) ? SUBMIT_WAIT_MS : 0, pageLoad);
 
   // ---------------------------------------------------------- member login
   if (p === '/api/login' && req.method === 'POST') {
@@ -3097,7 +3257,7 @@ async function handle(req, res) {
     }
     let given = '';
     try { given = (JSON.parse(await body(req, 4096)) || {}).password || ''; }
-    catch (e) { }
+    catch (e) { passBodyFailure(e); }
     if (!sameSecret(given, String(cfg.password || ''))) {
       return sendJson(res, 401, { error: 'wrong password' });
     }
@@ -3426,7 +3586,7 @@ async function handle(req, res) {
     if (early) return refuse(early);
     let o;
     try { o = JSON.parse(await body(req, 20000)); }
-    catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+    catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
     // The form's hidden field. A person never sees it, so anything in it was
     // put there by a script filling in every box it found. Answered as if it
     // worked, so the script has nothing to learn from, and nothing is kept.
@@ -3449,24 +3609,8 @@ async function handle(req, res) {
        counted per account as well as per connection. */
     let person = null;
     if (o.kind === 'report') {
-      if (!w.id) {
-        return sendJson(res, 401, { error: 'Sign in with Discord to report somebody, ' +
-          'so staff can come back to you about it.' });
-      }
-      // Signed in already, so "sign in" is the wrong thing to tell them
-      // (#467). Discord not answering in time is said as that.
-      if (w.banned) {
-        return sendJson(res, 403, { error: 'That Discord account is banned from Thornswood.' });
-      }
-      if (!w.play && w.lookupFailed) {
-        return sendJson(res, 503, { error: 'Thornswood could not ask Discord who you are just ' +
-          'now, so a report about a person cannot go yet. Try again in a minute. A problem or ' +
-          'an idea goes without it.' });
-      }
-      if (!w.play) {
-        return sendJson(res, 403, { error: 'Your Discord account is not let into Thornswood ' +
-          'yet, so it cannot report somebody from here. Ask staff in the Discord instead.' });
-      }
+      const no = personReportRefusal(w);
+      if (no) return sendJson(res, no.code, { error: no.error });
       const about = String(o.about || '').trim().slice(0, 60);
       if (!about) return sendJson(res, 400, { error: 'say who it is about in the Who box' });
       const acct = 'acct:' + w.id;
@@ -3512,7 +3656,7 @@ async function handle(req, res) {
     }
     let o;
     try { o = JSON.parse(await body(req, 8000)) || {}; }
-    catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+    catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
     const dev = route.indexOf('/dev/') === 0;
     const kind = o.kind === 'report' ? 'report' : (o.kind === 'help' ? 'help' : '');
     const pid = Number(o.profileId) || 0;
@@ -3582,7 +3726,7 @@ async function handle(req, res) {
     }
     let o;
     try { o = JSON.parse(await body(req, 8000)) || {}; }
-    catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+    catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
     const from = staffGame[1] ? 'the dev server' : 'the live server';
     const byPid = Number(o.byProfileId) || 0;
     if (staffGame[2] === 'unpk' && byPid > 0) {
@@ -3675,7 +3819,7 @@ async function handle(req, res) {
     if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
     let o;
     try { o = JSON.parse(await body(req, 40000)); }
-    catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+    catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
     if (!sameSecret(String(o.key || ''), String(cfg.botKey))) {
       return sendJson(res, 401, { error: 'no' });
     }
@@ -4109,7 +4253,7 @@ async function handle(req, res) {
     const gs = await galleryStaff(url, w);
     if (!gs.ok) return sendJson(res, gs.code, gs.body);
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const name = String(o.name || '');
     if (!name) return sendJson(res, 400, { error: 'no name' });
 
@@ -4140,13 +4284,22 @@ async function handle(req, res) {
   // page needs to know whether to show Sign in, Submit, or the staff tools
   // without treating a play-capable signed-in person as signed out the way
   // /api/hello does for the hub.
+  /* Answered inside SUBMIT_WAIT_MS with Discord slow or silent (#1096), like
+     any page load. asked is false when Discord could not be asked and there
+     was no earlier answer to use, so a page says that rather than offering a
+     sign in to somebody who is signed in. personWhy is what the report page
+     shows under "about a person": /api/report's own words (#1097). */
   if (p === '/api/gallery/who' && req.method === 'GET') {
+    const no = personReportRefusal(w);
     return sendJson(res, 200, {
       signed: !!(w.id || w.member),
       canSubmit: !!(w.play || w.member),
       staff: !!w.dev,
       admin: !!w.admin,
-      name: w.name || ''
+      name: w.name || '',
+      asked: !(w.id && w.lookupFailed),
+      personWhy: no ? no.why : '',
+      personSays: no ? no.error : ''
     });
   }
 
@@ -4157,7 +4310,7 @@ async function handle(req, res) {
     const gs = await galleryStaff(url, w);
     if (!gs.ok) return sendJson(res, gs.code, gs.body);
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const name = String(o.name || '');
     if (!name) return sendJson(res, 400, { error: 'no name' });
 
@@ -4225,7 +4378,7 @@ async function handle(req, res) {
     }
 
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const name = String(o.name || '');
     if (!name) return sendJson(res, 400, { error: 'no name' });
     const why = String(o.why || '').slice(0, 500);
@@ -4255,7 +4408,7 @@ async function handle(req, res) {
     const gs = await galleryStaff(url, w);
     if (!gs.ok) return sendJson(res, gs.code, gs.body);
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const id = String(o.id || '');
     if (!id) return sendJson(res, 400, { error: 'no id' });
     const reports = jsonFile(GREPORTS, []);
@@ -4280,13 +4433,14 @@ async function handle(req, res) {
     role, stops the next launch working, with nothing to remember to do.
   */
   if (p === '/api/play/join' && req.method === 'POST') {
+    const by = Date.now() + PLAY_ANSWER_MS;
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192, PLAY_BODY_MS)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 401, { ok:false, why:'link', message:
       'This copy is not linked to a Discord account yet.' });
 
-    const st = await standing(t.d);
+    const st = await within(standing(t.d), by - Date.now(), () => standingLate(t.d));
     standCache.delete(String(t.d));
     /*
       Could not ask Discord is not the same answer as not in the Discord.
@@ -4344,7 +4498,7 @@ async function handle(req, res) {
     // Which accounts holding this id have left the Discord, asked off a copy
     // of the file before the one written back is read. Nothing may wait
     // between that read and putJson below; departed() says why.
-    const left = await departed(jsonFile(LINKED, {}), pid, t.d);
+    const left = await departed(jsonFile(LINKED, {}), pid, t.d, by);
     const linked = jsonFile(LINKED, {});
     const was = linked[t.d] || {};
     const profiles = Array.isArray(was.profiles) ? was.profiles.slice() : [];
@@ -4505,7 +4659,7 @@ async function handle(req, res) {
   if ((p === '/api/play/start' || p === '/api/play/end') && req.method === 'POST') {
     const ending = (p === '/api/play/end');
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 401, { ok: false, why: 'link' });
     const key = sessionKey(o.session);
@@ -4598,7 +4752,7 @@ async function handle(req, res) {
   */
   if (p === '/api/play/logs' && req.method === 'POST') {
     let o = {};
-    try { o = JSON.parse(await body(req, SLOG_ALL + 64 * 1024)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, SLOG_ALL + 64 * 1024)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 401, { ok: false, why: 'link' });
     const key = sessionKey(o.session);
@@ -4684,7 +4838,7 @@ async function handle(req, res) {
   if ((route === '/api/roster' || route === '/dev/api/roster') && req.method === 'POST') {
     if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
     let o = {};
-    try { o = JSON.parse(await body(req, 4 * 1024 * 1024)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 4 * 1024 * 1024)) || {}; } catch (e) { passBodyFailure(e); }
     if (!sameSecret(String(o.key || ''), String(cfg.botKey))) return sendJson(res, 401, { error: 'no' });
     const who = (o.who && typeof o.who === 'object') ? o.who : {};
     const store = jsonFile(ROSTER, { who: {} });
@@ -4717,7 +4871,7 @@ async function handle(req, res) {
 
   if (p === '/api/play/roster' && req.method === 'POST') {
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 401, { ok: false, why: 'link' });
     const linked = jsonFile(LINKED, {});
@@ -4908,7 +5062,7 @@ async function handle(req, res) {
   */
   if (p === '/api/play/owns' && req.method === 'POST') {
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 200, { ok: false, why: 'ticket' });
     const pid = Number(o.profileId) || 0;
@@ -4983,8 +5137,9 @@ async function handle(req, res) {
     by an account that has left the Discord. Somebody else's is refused.
   */
   if (p === '/api/play/pass' && req.method === 'POST') {
+    const by = Date.now() + PLAY_ANSWER_MS;
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192, PLAY_BODY_MS)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 401, { ok: false, why: 'link', message:
       'This copy is not linked to a Discord account yet.' });
@@ -5011,7 +5166,7 @@ async function handle(req, res) {
         'Install the launcher from thornswood.net, then press Play again.' });
     }
 
-    const st = await standingCached(t.d);
+    const st = await within(standingCached(t.d), by - Date.now(), () => standingLate(t.d));
     if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', message:
       'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
     // Banned before the guild, as at /api/play/join (#1010).
@@ -5027,7 +5182,7 @@ async function handle(req, res) {
     const mine = (linked[t.d] && Array.isArray(linked[t.d].profiles))
       ? linked[t.d].profiles.map(Number) : [];
     if (mine.indexOf(pid) < 0) {
-      const left = await departed(linked, pid, t.d);
+      const left = await departed(linked, pid, t.d, by);
       for (const d of Object.keys(linked)) {
         if (String(d) === String(t.d)) continue;
         const theirs = (linked[d] && Array.isArray(linked[d].profiles))
@@ -5058,7 +5213,7 @@ async function handle(req, res) {
   // show who it is linked as without pretending it is about to connect.
   if (p === '/api/play/who' && req.method === 'POST') {
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 401, { ok:false, why:'link' });
     const st = await standingCached(t.d);
@@ -5111,7 +5266,7 @@ async function handle(req, res) {
       if (!w.member) return sendJson(res, 403, { error: 'hub members only' });
       let obj;
       try { obj = JSON.parse(await body(req)); }
-      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
       if (!putJson(RESULTS, obj)) return sendJson(res, 500, { error: 'could not save' });
       return sendJson(res, 200, { ok: true });
     }
@@ -5144,7 +5299,7 @@ async function handle(req, res) {
       }
       let o;
       try { o = JSON.parse(await body(req, 8000)) || {}; }
-      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
       const id = String(o.id || '').trim();
       const linked = jsonFile(LINKED, {});
       if (!/^\d{5,25}$/.test(id) || !linked[id]) return sendJson(res, 404, { error: 'nobody linked with that id' });
@@ -5225,7 +5380,7 @@ async function handle(req, res) {
     if (mb && req.method === 'PUT') {
       let obj;
       try { obj = JSON.parse(await body(req)); }
-      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
       if (!writeBoardOne(mb[1], obj)) return sendJson(res, 400, { error: 'no such board' });
       return sendJson(res, 200, { ok: true });
     }
@@ -5313,7 +5468,7 @@ async function handle(req, res) {
     if (p === '/api/session-keep' && req.method === 'PUT') {
       let obj;
       try { obj = JSON.parse(await body(req)); }
-      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
       const key = sessionKey(obj && obj.session);
       const rows = sessionRows();
       const at = key ? findSession(rows, key, obj.who) : -1;
@@ -5335,7 +5490,7 @@ async function handle(req, res) {
     if (p === '/api/session-note' && req.method === 'PUT') {
       let obj;
       try { obj = JSON.parse(await body(req)); }
-      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
       const key = sessionKey(obj && obj.session);
       const rows = sessionRows();
       const at = key ? findSession(rows, key, obj.who) : -1;
@@ -5350,7 +5505,7 @@ async function handle(req, res) {
     if (p === '/api/inbox' && req.method === 'PUT') {
       let obj;
       try { obj = JSON.parse(await body(req)); }
-      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
       if (!putJson(INBOX, obj)) return sendJson(res, 500, { error: 'could not save' });
       return sendJson(res, 200, { ok: true });
     }
