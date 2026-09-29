@@ -32,10 +32,18 @@
 
   WHAT THIS HOLDS THE LAUNCHER TO. A broken manifest is worse than an unwanted
   update, so only the value's bytes may change, anything not shaped the way
-  Steam writes it is left alone, a read-only file stays read-only, nothing is
-  written while Steam runs, and nothing is written at all unless a person
-  pressed Yes on a question that says what Yes does. Reading it to warn is
-  fine; Play is never held on it.
+  Steam writes it is left alone, nothing is written while Steam runs, and
+  nothing is written at all unless a person pressed Yes on a question that
+  says what Yes does. Reading it to warn is fine; Play is never held on it.
+
+  A READ-ONLY FILE IS LEFT WRITABLE (issue #493). The read-only mark is how
+  some guides hold the version, and it makes Steam fail to save the game's
+  state in the file every six seconds (11,568 "Failed to write app state
+  file" lines in Patrick's content_log.txt on 29 September). The setting is
+  what holds the version, so Hold takes the mark off, a file already on 1
+  that is only read only gets the mark taken off with its bytes untouched,
+  the start line says when a file has the mark and how to take it off by
+  hand, and nothing in the launcher puts it back.
 
   It compiles the shipped launcher\app\SteamUpdates.cs with the same .NET
   Framework csc that Build-Launcher.ps1 uses, which is C# 5, and drives the
@@ -317,13 +325,41 @@ try {
     Yes 'already 1: the file is not touched' ([IO.File]::GetLastWriteTimeUtc($m) -eq [DateTime]::new(2026, 1, 1, 0, 0, 0, [DateTimeKind]::Utc))
     Yes 'and it says so' ($r -like '*already*')
 
-    # Read-only, as it is on Patrick's machine.
+    # Read-only, as it is on Patrick's machine. Issue #493: the mark makes
+    # Steam fail to save the game's state every six seconds, and the setting,
+    # not the mark, is what holds the version, so the mark comes off.
+    function IsRO([string]$p) { return (([IO.File]::GetAttributes($p) -band [IO.FileAttributes]::ReadOnly) -ne 0) }
+    $mRO = Method 'IsReadOnly' @([string])
+    function ReadOnlyByClass([string]$s) { return [bool]$mRO.Invoke($null, [object[]]@($s)) }
     Put (Acf '0')
     [IO.File]::SetAttributes($m, [IO.FileAttributes]::ReadOnly -bor [IO.FileAttributes]::Archive)
+    Yes 'IsReadOnly sees the mark' (ReadOnlyByClass $m)
+    Yes 'the start line on a read-only file says so, and how to take the mark off by hand' (((Report $game) -like '*marked read only*') -and ((Report $game) -like '*clear Read-only*') -and ((Report $game) -like ('*' + $m + '*')))
     $r = Hold $m $false
     Yes 'a read-only file is changed' ((ReadValue $m) -ceq '1')
-    Yes 'and is read-only again afterwards' (([IO.File]::GetAttributes($m) -band [IO.FileAttributes]::ReadOnly) -ne 0)
-    Yes 'and the log line says so' ($r -like '*read-only again*')
+    Yes 'and is left writable, so Steam can save its state in it (#493)' (-not (IsRO $m))
+    Yes 'and the log line says so' ($r -like '*no longer marked read only*')
+    Yes 'and the start line no longer mentions a mark' ((Report $game) -notlike '*read only*')
+
+    # Already on 1 and read only, as Patrick's is since 25 September: only the
+    # mark comes off, and not a byte of the file changes.
+    Put (Acf '1')
+    [IO.File]::SetAttributes($m, [IO.FileAttributes]::ReadOnly -bor [IO.FileAttributes]::Archive)
+    $was = [IO.File]::ReadAllBytes($m)
+    Yes 'on 1 but read only: the question is still asked' (Needs $m)
+    Yes 'and the start line says it is held and marked read only' (((Report $game) -like '*"Wait until I launch the game"*') -and ((Report $game) -like '*marked read only*'))
+    $r = Hold $m $true
+    Yes 'Steam running: the mark stays and nothing is written' ((IsRO $m) -and (Same $was ([IO.File]::ReadAllBytes($m))))
+    $r = Hold $m $false
+    Yes 'Steam closed: the mark comes off' (-not (IsRO $m))
+    Yes '  and the bytes are exactly as they were' (Same $was ([IO.File]::ReadAllBytes($m)))
+    Yes '  and no temporary file is left' (-not (Test-Path -LiteralPath $tmp))
+    Yes '  and the log line says what changed' (($r -like '*already*') -and ($r -like '*no longer marked read only*'))
+    Yes '  and the question is not asked again' (-not (Needs $m))
+
+    # No launcher code puts the mark back on.
+    $marks = @(Get-ChildItem -LiteralPath $AppPath -Filter *.cs -File | Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match '\|\s*FileAttributes\.ReadOnly' })
+    Yes ('no launcher file sets the read-only mark on anything' + $(if ($marks.Count) { ': ' + (($marks | ForEach-Object { $_.Name }) -join ', ') } else { '' })) ($marks.Count -eq 0)
 
     # Bytes that are not ASCII, a byte order mark, and CRLF, all kept.
     $name = 'C:\\Users\\Zo' + [char]0x00EB + '\\Steam\\steam.exe'
