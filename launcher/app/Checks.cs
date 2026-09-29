@@ -106,10 +106,10 @@ namespace Thornswood
         ///
         /// This replaces asking whether one named file exists, which is what
         /// decided "your collection is behind" until 22 September. That test
-        /// was wrong in both directions. It named po3_StartOnSave.dll, which
-        /// Add-Characters.ps1 puts into a build BY HAND and which the
-        /// collection has never carried, so anybody who installed the
-        /// collection correctly and never ran that script read as behind, and
+        /// was wrong in both directions. It named one mod's file, which a
+        /// script put into a build BY HAND and which the collection did not
+        /// carry then, so anybody who installed the collection correctly and
+        /// never ran that script read as behind, and
         /// anybody genuinely two revisions behind read as fine as long as the
         /// file was there.
         ///

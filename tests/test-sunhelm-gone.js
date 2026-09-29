@@ -330,14 +330,11 @@ yes('and it throws before it looks for an archive or writes anything',
 yes('and it says why, which is the mod it installed leaving the collection',
     stopAt >= 0 && goneIn(TEMPLE.slice(stopAt, stopAt + 600)).length > 0);
 
-const CHARS = read(['..', 'scripts', 'mods', 'Add-Characters.ps1']);
-const charsStopAt = CHARS.indexOf('throw (\'STOP.');
-const charsInstallAt = CHARS.indexOf('Head \'Making room\'');
-yes('Add-Characters.ps1 throws a STOP', charsStopAt >= 0);
-yes('and it throws before it looks for an archive or writes anything',
-    charsStopAt >= 0 && charsInstallAt > charsStopAt);
-yes('and it says why, which is Start On Save after the launcher #394 / #490 strip',
-    charsStopAt >= 0 && /Start On Save|#394|#490/i.test(CHARS.slice(charsStopAt, charsStopAt + 700)));
+// Add-Characters.ps1 installed Start On Save by hand. It was a STOP guard
+// from #781 until #394 took the mod out for good; now it is deleted, so no
+// run can put the mod back into a build (tests\test-start-on-save-gone.js).
+yes('Add-Characters.ps1 is gone from scripts\\mods',
+    !fs.existsSync(path.join(TOOLS_DIR, '..', 'scripts', 'mods', 'Add-Characters.ps1')));
 
 const RUN_EVERYTHING = read(['..', 'scripts', 'oneoff', 'Run-Everything.ps1']);
 yes('Run-Everything.ps1 no longer runs Add-Characters as a step',

@@ -684,10 +684,11 @@
         provable from the server log and this one. That decision was not,
         because nothing wrote either flag down.
 
-        uncaused is the count of game loads SkyrimPlatform did not ask for,
-        and po3_StartOnSave makes one on every launch that has a save to
-        load. If it reads above zero here, at a main menu, that guard is why
-        the world never came.
+        uncaused is the count of game loads SkyrimPlatform did not ask for.
+        Start On Save made one on every launch that had a save to load, until
+        it left the build (issue #394). If it reads above zero here, at a main
+        menu, something else loaded a save, and that guard is why the world
+        never came.
       */
       let inWorld = '?', uncaused = '?';
       try { inWorld = String(!!globalThis.__thornswoodInWorld); } catch (e) { }
@@ -1667,9 +1668,10 @@
    * them.
    *
    * It fired on every launch, because Skyrim has no command line for loading a
-   * save and this build uses po3_StartOnSave to walk into the right character.
-   * That load is real and SkyMP did not cause it, so the guard was right about
-   * the facts and wrong about what they meant.
+   * save and this build used Start On Save to walk into the right character,
+   * until it left the build (issue #394). That load was real and SkyMP did not
+   * cause it, so the guard was right about the facts and wrong about what they
+   * meant.
    *
    * The disconnect is patched out in skymp5-client.js and the count is kept
    * here instead, because how often this happens is worth knowing even now
@@ -1692,8 +1694,8 @@
    *
    * skymp5-client has two and they race on one flag. One moves the character
    * with moveRefrToPosition. The other writes a save on the spot and loads it,
-   * which on this build means reverting the save po3_StartOnSave just finished
-   * loading and never coming back out of it. That is the infinite loading
+   * which when Start On Save was in the build meant reverting the save it had
+   * just finished loading and never coming back out of it. That is the infinite loading
    * screen, and the second path is now told to stand down whenever there is
    * already a game to be in.
    *

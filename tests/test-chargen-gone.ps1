@@ -265,7 +265,9 @@ $ck = [IO.File]::ReadAllText((Join-Path $Here '..\launcher\app\Checks.cs'))
 $lifted = [ordered]@{
     'OwnGame.Skip'             = Get-CsMember $og 'static string Skip(string rel)'
     'OwnGame.CrashesUs'        = Get-CsMember $og 'static bool CrashesUs(string rel)'
-    'OwnGame.Parked'           = Get-CsMember $og 'static bool Parked(string rel)'
+    'OwnGame.RetiredFiles'     = (Get-CsMember $og 'static readonly string[] RetiredFiles =') + ';'
+    'OwnGame.Retired'          = Get-CsMember $og 'static bool Retired(string rel)'
+    'OwnGame.Parked'          = Get-CsMember $og 'static bool Parked(string rel)'
     'OwnGame.wantedPlugins'    = Get-CsLine $og '(?m)^\s*static HashSet<string> wantedPlugins = [^\r\n]*;'
     'OwnGame.UnwantedCreation' = Get-CsMember $og 'static bool UnwantedCreation(string rel)'
     'OwnGame.ClientFiles'      = (Get-CsMember $og 'public static readonly string[] ClientFiles =') + ';'
@@ -305,6 +307,8 @@ namespace $ns
     {
         $($lifted['OwnGame.Skip'])
         $($lifted['OwnGame.CrashesUs'])
+        $($lifted['OwnGame.RetiredFiles'])
+        $($lifted['OwnGame.Retired'])
         $($lifted['OwnGame.Parked'])
         $($lifted['OwnGame.wantedPlugins'])
         $($lifted['OwnGame.UnwantedCreation'])
