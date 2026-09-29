@@ -225,7 +225,7 @@ namespace Thornswood
         /// and the file itself, when they are missing. Returns true only when
         /// something actually changed.
         /// </summary>
-        static bool SetOrAdd(string file, string section, string key, string value, string sep)
+        internal static bool SetOrAdd(string file, string section, string key, string value, string sep)
         {
             try
             {
@@ -275,7 +275,7 @@ namespace Thornswood
         /// rule owns the first of them. Commented out lines are not live.
         /// Returns true only when something actually changed.
         /// </summary>
-        static bool Set(string file, string key, string value, string sep)
+        internal static bool Set(string file, string key, string value, string sep)
         {
             try
             {

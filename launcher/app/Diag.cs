@@ -93,9 +93,11 @@ namespace Thornswood
             else
             {
                 string who = CrashCulprit();
+                string dmp = CrashDump.Beside(crash.FullPath);
                 l.Add(new Reading(1, "Newest crash: " + crash.Name,
                     (who.Length > 0 ? "The log points at " + who + ". " : "") +
-                    "Send the report below rather than reading it yourself."));
+                    "Send the report below rather than reading it yourself." +
+                    (dmp != null ? " Its full crash snapshot is " + dmp + ". The report leaves it out: it holds what was in the game's memory, so it stays on this PC." : "")));
             }
 
             // ---- server
