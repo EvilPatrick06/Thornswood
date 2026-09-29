@@ -202,6 +202,11 @@ typed on a command line or written on this page.
    The last one prints `load order: all <n> plugins present` and registers the
    `Thornswood Server` task, which starts at boot; without `-StartNow` it does
    not start now. If the box restarts before step 13, stop that task first.
+   The installer unpacks beside `C:\Thornswood-Server` and checks the payload
+   there before it touches anything (issue #446); on a box that already has a
+   server it keeps the one it replaces as `C:\Thornswood-Server.prev-<stamp>`,
+   and `.\scriptselease\Publish-Server.ps1 -PutBack` puts that back. On a
+   new box there is nothing to keep.
    The gamemode that goes up is this branch's, which is main's; if main holds
    gamemode changes that have not been tried on dev, tell Patrick before
    step 16. Restore-Box says so too (step 13).

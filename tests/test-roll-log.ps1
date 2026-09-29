@@ -256,7 +256,7 @@ try {
             Yes 'the command line still names the log, which is how the installer finds its own process' ($line -like ('*' + $vlog + '*'))
         }
     }
-    Yes 'Install-Voice sends the roller up beside the service' ($vtext -match 'Join-Path \$Here ''\.\.\\vps\\Roll-Log\.ps1''' -and $vtext -match '/roll-log\.ps1"')
+    Yes 'Install-Voice sends the roller up beside the service' ($vtext -match 'Join-Path \$Here ''\.\.\\vps\\Roll-Log\.ps1''' -and $vtext.Contains("`$send['roll-log.ps1']"))
     Yes 'Install-Voice rolls voice.log at install rather than deleting it' (
         $vtext -notmatch 'Remove-Item -LiteralPath `\$log\b' -and $vtext -match '& `\$roll -Path `\$log -Force')
 
@@ -329,7 +329,7 @@ try {
 
     # Run the installer's own copy lines against both layouts and against neither.
     $copyFrom = $inst.IndexOf('$rollSrc = $null')
-    $copyTo = $inst.IndexOf('# ---- check the load order')
+    $copyTo = $inst.IndexOf('# ---- end of the roller copy')
     Yes 'the installer''s Roll-Log copy block is intact' ($copyFrom -ge 0 -and $copyTo -gt $copyFrom)
     if ($copyFrom -ge 0 -and $copyTo -gt $copyFrom) {
         $copyBody = $inst.Substring($copyFrom, $copyTo - $copyFrom)
@@ -367,44 +367,35 @@ try {
             $inst -match 'Write-Host "Roll-Log\.ps1 is not beside this installer, so server\.log will not be rolled at start\." -ForegroundColor Yellow')
     }
 
-    # The folder it deletes on every publish held both logs. Run the real
-    # set-aside and the real restore against a temp root.
-    $aside = Get-BlockText $inst 'if (Test-Path -LiteralPath $Root) {'
-    $back  = Get-BlockText $inst 'if ($logBak -and (Test-Path -LiteralPath $logBak)) {'
-    Yes 'the installer sets the logs aside and puts them back' ($null -ne $aside -and $null -ne $back -and $aside -match 'logBak')
-    if ($aside -and $back -and $aside -match 'logBak') {
+    # The folder every publish deleted held both logs. Since issue #446 the
+    # old folder is not deleted: it is renamed aside and Carry moves the logs
+    # into the new one. Run the real Carry against two temp roots.
+    $carry = Get-BlockText $inst 'function Carry('
+    $move  = Get-BlockText $inst 'function MoveDir('
+    $say   = Get-BlockText $inst 'function Say('
+    Yes 'the installer carries the logs from the old folder to the new one' (
+        $null -ne $carry -and $null -ne $move -and $null -ne $say -and $carry.Contains('.log(') -and $carry.Contains('Move-Item'))
+    if ($carry -and $move -and $say) {
+        $old = Join-Path $tmp 'srvroot.prev-test'
         $Root = Join-Path $tmp 'srvroot'
-        New-Item -ItemType Directory -Force -Path (Join-Path $Root 'dist_back') | Out-Null
-        Put (Join-Path $Root 'server.log') 'LIVE LOG'
-        Put (Join-Path $Root 'server.log.1') 'OLDER LOG'
-        Put (Join-Path $Root 'thornswood.log') 'OURS'
-        Put (Join-Path $Root 'thornswood.log.3') 'OURS OLDER'
-        Put (Join-Path $Root 'dist_back\skymp5-server.js') 'program'
-        $stamp = 'test'
-        $logBak = $null
-        $wasTemp = $env:TEMP
-        $env:TEMP = $tmp
-        try {
-            . ([scriptblock]::Create($aside)) 6>$null
-        } finally { $env:TEMP = $wasTemp }
-        Yes 'the old folder is gone' (-not (Test-Path -LiteralPath $Root))
-        Yes 'and every log went aside first' (
-            (Get (Join-Path $logBak 'server.log')) -eq 'LIVE LOG' -and
-            (Get (Join-Path $logBak 'server.log.1')) -eq 'OLDER LOG' -and
-            (Get (Join-Path $logBak 'thornswood.log')) -eq 'OURS' -and
-            (Get (Join-Path $logBak 'thornswood.log.3')) -eq 'OURS OLDER')
-        Yes 'and no program file with them' (-not (Test-Path -LiteralPath (Join-Path $logBak 'skymp5-server.js')))
-
-        # The unpack, then the restore.
-        New-Item -ItemType Directory -Force -Path $Root | Out-Null
+        New-Item -ItemType Directory -Force -Path (Join-Path $old 'dist_back'), $Root | Out-Null
+        Put (Join-Path $old 'server.log') 'LIVE LOG'
+        Put (Join-Path $old 'server.log.1') 'OLDER LOG'
+        Put (Join-Path $old 'thornswood.log') 'OURS'
+        Put (Join-Path $old 'thornswood.log.3') 'OURS OLDER'
+        Put (Join-Path $old 'dist_back\skymp5-server.js') 'program'
         Put (Join-Path $Root 'server-settings.json') '{}'
-        . ([scriptblock]::Create($back)) 6>$null
-        Yes 'the logs are back beside the new server' (
+        . ([scriptblock]::Create($say + "`n" + $move + "`n" + $carry))
+        Carry $old $Root $false 6>$null
+        Yes 'the logs are beside the new server' (
             (Get (Join-Path $Root 'server.log')) -eq 'LIVE LOG' -and
             (Get (Join-Path $Root 'server.log.1')) -eq 'OLDER LOG' -and
             (Get (Join-Path $Root 'thornswood.log')) -eq 'OURS' -and
             (Get (Join-Path $Root 'thornswood.log.3')) -eq 'OURS OLDER')
-        Yes 'and the empty set-aside is tidied away' (-not (Test-Path -LiteralPath $logBak))
+        Yes 'and no program file went with them' (-not (Test-Path -LiteralPath (Join-Path $Root 'dist_back')))
+        Yes 'and the old folder is kept, its program still in it, not deleted' (
+            (Get (Join-Path $old 'dist_back\skymp5-server.js')) -eq 'program' -and
+            -not (Test-Path -LiteralPath (Join-Path $old 'server.log')))
     }
 }
 catch {

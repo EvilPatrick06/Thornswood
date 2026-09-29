@@ -249,6 +249,14 @@ live server's plugins, because the payload's settings name
 `C:/Thornswood-Server`; Restore-Server points them at the test folder first,
 so its check is the one that means something.
 
+Since issue #446 the installer unpacks into `C:\Thornswood-RestoreTest\server.stage-<stamp>`
+beside the root and renames it in, and a second run keeps the first as
+`server.prev-<stamp>`, all inside `C:\Thornswood-RestoreTest`, so the
+`Remove-Item` above still takes everything. What it stops before a second
+run is only what runs from that folder: the payload's settings name the live
+server's port, and the process on that port is the live server, which is left
+alone (`tests	est-install-server.ps1` holds it to that).
+
 ### What it showed
 
 - Live: 11 characters (18 slot files, 7 of them deleted characters), all 48

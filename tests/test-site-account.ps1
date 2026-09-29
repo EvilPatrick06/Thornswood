@@ -194,9 +194,11 @@ foreach ($account in @('', 'SYSTEM', 'LOCAL SERVICE')) {
 
     $block = BlockOf $text
     Yes "$label`: it carries the account block between its markers" ($null -ne $block)
+    # Since issue #446 this block stops nothing: it ends with SETUP DONE, and
+    # only then does Deploy-Docs send the swap that stops the old site.
     $firstStop = $text.IndexOf('Stop-Process')
-    Yes "$label`: the account is worked out before anything is stopped" (
-        $null -ne $block -and $firstStop -gt 0 -and $text.IndexOf($open) -lt $firstStop)
+    Yes "$label`: the account is worked out, and the block stops nothing" (
+        $null -ne $block -and $firstStop -lt 0 -and $text.IndexOf($open) -lt $text.IndexOf("'SETUP DONE'"))
 
     $reg = @(CallsOf $sent 'Register-ScheduledTask')
     $upd = @(CallsOf $sent 'Set-ScheduledTask')
@@ -539,9 +541,12 @@ try {
     Yes 'an account that does not resolve is said' (($r.said -join "`n") -match 'NO SUCH ACCOUNT HERE: NOBODY AT ALL')
     Yes 'and nothing is granted and no principal is made' ($script:icaclsCalls -eq 0 -and $null -eq $r.principal)
     $whole = Build 'NOBODY AT ALL' 'C:\Thornswood-Docs'
-    Yes 'and it returns from the block before the old site is stopped' (
+    $deployText = Get-Content -LiteralPath $deploy -Raw
+    $gate = $deployText.IndexOf("if (`$setup -notcontains 'SETUP DONE')")
+    Yes 'and it returns from the block before SETUP DONE, and Deploy-Docs swaps nothing without it' (
         $whole.IndexOf('Nothing was stopped or changed.''; return') -gt 0 -and
-        $whole.IndexOf('Nothing was stopped or changed.''; return') -lt $whole.IndexOf('Stop-Process'))
+        $whole.IndexOf('Nothing was stopped or changed.''; return') -lt $whole.IndexOf("'SETUP DONE'") -and
+        $gate -gt 0 -and $gate -lt $deployText.IndexOf('$serviceSwapBlock)'))
 
     # -- no -RunAs keeps the account the task already has -----------------------
     #
