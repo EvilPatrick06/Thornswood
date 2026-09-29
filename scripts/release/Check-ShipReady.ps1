@@ -425,7 +425,7 @@ if ($NoVps) {
 } else {
   $sshOk = $false
   try {
-    $out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 "$(Get-ThornswoodVpsUser)@$($script:VpsAddress)" 'echo THORNSWOOD_OK' 2>&1 | Out-String
+    $out = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 "$(Get-ThornswoodVpsUser)@$($script:VpsAddress)" 'echo THORNSWOOD_OK' } 2>&1 | Out-String
     $sshOk = ($out -match 'THORNSWOOD_OK')
   } catch { $sshOk = $false }
   Ready 'ssh to the VPS works without a password' $sshOk $script:VpsAddress `

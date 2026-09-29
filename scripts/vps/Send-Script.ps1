@@ -42,7 +42,14 @@
 
   A secret never goes through here as part of the script: Send-Secret.ps1
   puts it on standard input, and uses this for the rest.
+
+  A warning ssh prints on stderr is not a failure (issue #941): ssh and scp
+  run inside Invoke-ThornswoodNative (Vps.ps1), so the OpenSSH post-quantum
+  warning does not stop a Windows PowerShell 5.1 caller, and whether the far
+  side ran is ssh's exit code, the same under PowerShell 7.
 #>
+
+. (Join-Path $PSScriptRoot 'Vps.ps1')
 
 # Runs $Script on the VPS and hands back what the far side printed (2>&1, the
 # same as every Remote here).
@@ -76,8 +83,8 @@ function Invoke-ThornswoodRemote {
     $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($Script))
     $cmd = 'powershell -NoProfile' + $policy + ' -EncodedCommand ' + $e
     if ($cmd.Length -le $Limit) {
-        if ($piped) { return ($Stdin | & ssh @ssh $Target $cmd 2>&1) }
-        return (& ssh @ssh $Target $cmd 2>&1)
+        if ($piped) { return ($Stdin | Invoke-ThornswoodNative { $input | & ssh @ssh $Target $cmd } 2>&1) }
+        return (Invoke-ThornswoodNative { & ssh @ssh $Target $cmd } 2>&1)
     }
 
     $far = 'C:/Windows/Temp/thornswood-remote-' + [Guid]::NewGuid().ToString('N') + '.ps1'
@@ -86,18 +93,18 @@ function Invoke-ThornswoodRemote {
     $rc = 1
     try {
         [IO.File]::WriteAllText($tmp, $Script, (New-Object Text.UTF8Encoding($true)))
-        & scp @ssh $tmp "${Target}:$far" 2>&1 | Out-Null
+        Invoke-ThornswoodNative { & scp @ssh $tmp "${Target}:$far" } 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "could not send a script to $Target. Nothing was run." }
         $sent = $true
         $run = "powershell -NoProfile -ExecutionPolicy Bypass -File $far"
-        if ($piped) { $Stdin | & ssh @ssh $Target $run 2>&1 }
-        else { & ssh @ssh $Target $run 2>&1 }
+        if ($piped) { $Stdin | Invoke-ThornswoodNative { $input | & ssh @ssh $Target $run } 2>&1 }
+        else { Invoke-ThornswoodNative { & ssh @ssh $Target $run } 2>&1 }
         $rc = $LASTEXITCODE
     }
     finally {
         # Removed whether the run worked or not, and before anything else can
         # stop this: a script left there is one the next run could trip on.
-        if ($sent) { & ssh @ssh $Target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null }
+        if ($sent) { Invoke-ThornswoodNative { & ssh @ssh $Target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" } 2>&1 | Out-Null }
         Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
         # The far side's exit code, not the tidy up's.
         $global:LASTEXITCODE = $rc

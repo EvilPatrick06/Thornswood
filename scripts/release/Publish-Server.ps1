@@ -147,7 +147,7 @@ if (-not (Test-Path -LiteralPath $rollLog)) { Die "not found: $rollLog" }
 # What the installer said, printed as it comes, and its last line read: it
 # ends with INSTALL OK, INSTALL REFUSED, INSTALL ROLLED BACK or INSTALL FAILED.
 function Invoke-Installer([string]$instArgs) {
-    $lines = @(& ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 $instArgs" |
+    $lines = @(Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 $instArgs" } |
                ForEach-Object { Say "  $_"; "$_".Trim() })
     $code = $LASTEXITCODE
     if ($lines -contains 'INSTALL OK' -and $code -eq 0) { return }
@@ -163,9 +163,9 @@ function Invoke-Installer([string]$instArgs) {
 # ------------------------------------------------------------- -PutBack -----
 if ($PutBack) {
     Head 'Putting the previous server back'
-    & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1"
+    Invoke-ThornswoodNative { & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
-    & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1"
+    Invoke-ThornswoodNative { & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Invoke-Installer "-Root '$VpsRoot' -TaskName '$TaskName' -StartNow -PutBack -Wait $Wait"
     Say 'the previous server is back and answering up there' 'Green'
@@ -354,11 +354,11 @@ Say ("payload starts the $Channel server on port $wantPort") 'Green'
 
 Head 'Copying'
 Say 'this is the slow part, a few minutes on a first run; the server keeps running' 'DarkGray'
-& scp @ssh $Zip "${target}:C:/thornswood-server.zip"
+Invoke-ThornswoodNative { & scp @ssh $Zip "${target}:C:/thornswood-server.zip" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
-& scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1"
+Invoke-ThornswoodNative { & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
-& scp @ssh $rollLog "${target}:C:/Roll-Log.ps1"
+Invoke-ThornswoodNative { & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Say 'copied' 'Green'
 
@@ -455,7 +455,7 @@ if (-not (Test-Path -LiteralPath $live)) {
 '@
     $seed = $seed.Replace('@@DEVROOT@@', $VpsRoot.TrimEnd('\'))
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($seed))
-    $out = & ssh @ssh $target "powershell -NoProfile -EncodedCommand $enc"
+    $out = Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $enc" }
     foreach ($line in @($out)) { Say "  $line" 'Green' }
 }
 
@@ -503,7 +503,7 @@ if ($up) {
     # Rather than list what it might be, fetch what it actually said. The task
     # redirects everything the server prints into this file for exactly this.
     Head 'What the server printed up there'
-    & ssh @ssh $target "powershell -NoProfile -Command `"if (Test-Path '$VpsRoot\server.log') { Get-Content '$VpsRoot\server.log' -Tail 40 } else { 'server.log is not there, so node never started. Check that node is on the machine PATH up there.' }`""
+    Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -Command `"if (Test-Path '$VpsRoot\server.log') { Get-Content '$VpsRoot\server.log' -Tail 40 } else { 'server.log is not there, so node never started. Check that node is on the machine PATH up there.' }`"" }
 
     Write-Host ''
     Say 'If that log is empty or says nothing useful, the other candidate is the' 'Yellow'

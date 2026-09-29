@@ -96,7 +96,7 @@ function Remote($script) {
   # is what an execution policy looks at.
   $cmd = "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $e"
   if ($cmd.Length -gt 8000) { throw 'the remote script is too long for one command line' }
-  return & ssh @ssh "$User@$Vps" $cmd 2>&1
+  return Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" $cmd } 2>&1
 }
 
 function Show($lines) {
@@ -110,7 +110,7 @@ function Show($lines) {
 }
 
 function SendWriter {
-  & scp @ssh $writer "${User}@${Vps}:$far" 2>&1 | Out-Null
+  Invoke-ThornswoodNative { & scp @ssh $writer "${User}@${Vps}:$far" } 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) { Die "could not send Write-BotToken.ps1 to $Vps. Is the VPS key set up? .\scripts\vps\Setup-SshKey.ps1 -Test" }
 }
 

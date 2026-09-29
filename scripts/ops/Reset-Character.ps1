@@ -95,7 +95,7 @@ else {
     $tmp = Join-Path $env:TEMP 'thornswood-reset.ps1'
     Set-Content -LiteralPath $tmp -Value $body -Encoding UTF8
 
-    & scp @ssh $tmp "${target}:C:/thornswood-reset.ps1"
+    Invoke-ThornswoodNative { & scp @ssh $tmp "${target}:C:/thornswood-reset.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
     Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
 
@@ -108,7 +108,7 @@ else {
               "Start-ScheduledTask -TaskName '$TaskName'; " +
               "Start-Sleep -Seconds 3; " +
               "'server restarted'`""
-    & ssh @ssh $target $remote
+    Invoke-ThornswoodNative { & ssh @ssh $target $remote }
     if ($LASTEXITCODE -ne 0) { Die "the reset on the VPS exited with $LASTEXITCODE" }
 
     Head 'Checking it came back'

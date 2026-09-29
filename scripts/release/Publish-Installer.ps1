@@ -135,7 +135,7 @@ Write-Host ''
 $send = @(, @($exeItem.FullName, $exeOut))
 if (-not $single) { $send += , @($zipItem.FullName, $zipOut) }
 foreach ($pair in $send) {
-  & scp @ssh $pair[0] "$User@${Vps}:$Root/files/$($pair[1])"
+  Invoke-ThornswoodNative { & scp @ssh $pair[0] "$User@${Vps}:$Root/files/$($pair[1])" }
   if ($LASTEXITCODE -ne 0) { throw "scp failed: $($pair[1])" }
   Write-Host "  $($pair[1])"
 }

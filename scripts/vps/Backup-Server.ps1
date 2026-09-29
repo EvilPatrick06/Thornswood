@@ -277,7 +277,7 @@ if (-not ($lines | Where-Object { "$_" -match '^zip' })) {
 
 # ------------------------------------------------------------ bring it down ---
 Head 'Bringing it down'
-& scp @ssh "${User}@${Vps}:$remoteZip" "$localZip" 2>&1 | Out-Host
+Invoke-ThornswoodNative { & scp @ssh "${User}@${Vps}:$remoteZip" "$localZip" } 2>&1 | Out-Host
 if (-not (Test-Path -LiteralPath $localZip)) { Die "scp did not leave a file at $localZip. The zip is still on the server at $remoteZip." }
 
 $mb = [math]::Round((Get-Item -LiteralPath $localZip).Length / 1MB, 1)
