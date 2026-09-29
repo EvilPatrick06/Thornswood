@@ -24,6 +24,14 @@
 //     fields, the same values, name and party included, and a new name is
 //     picked up within a second.
 //
+// Issue #963 (NPCs stay on, less lag): the stand-in also holds NPCS actors
+// (6,000 unless told otherwise, the count on each server since #879). Every
+// timer is run with them and without them and must make the same engine reads,
+// the whole set must stay under 3% of one core, and an NPC's death or a press
+// on one is timed per call. PEOPLE=5, 20 and 50 are the sizes the issue asks
+// about; the table prints sets a second beside reads, since a set on a visible
+// property is a message to somebody's game.
+//
 // Read only. Nothing leaves the machine: http is a fake that records bodies.
 // Files the gamemode writes (online.json and the like) land in a scratch
 // folder, TICK_TMP or the system temp folder.
@@ -88,6 +96,24 @@ for (let i = 0; i < PEOPLE; i++) {
   });
 }
 
+// THE NPCS, issue #963. About 6,000 actors are on each server since #879, and
+// Patrick wants them on. They are in the store the way the engine holds them:
+// a position, a cell and a base, never online. hideNpcs takes them out again,
+// so every timer can be run twice and its engine reads compared: a timer whose
+// reads move with the number of NPCs is a cost that grows with the world.
+const NPCS = Math.max(0, Number(process.env.NPCS === undefined ? 6000 : process.env.NPCS));
+const npcIds = [];
+for (let i = 0; i < NPCS; i++) {
+  const id = 0x00100000 + i;
+  npcIds.push(id);
+  store.set(id, {
+    pos: [(i % 80) * 512, Math.floor(i / 80) * 512, 0], angle: [0, 0, 0],
+    worldOrCellDesc: '3c:Skyrim.esm', baseDesc: (0x13bbf + (i % 40)).toString(16) + ':Skyrim.esm',
+    isDead: false, inventory: { entries: [] }
+  });
+}
+let hideNpcs = false;
+
 const reads = {};           // property -> count
 let counting = false;
 function count(k) { if (counting) { reads[k] = (reads[k] || 0) + 1; } }
@@ -96,6 +122,7 @@ const mpBase = {
   get: function (id, k) {
     count(k);
     if (id === 0 && k === 'onlinePlayers') { return ids.slice(); }
+    if (hideNpcs && id >= 0x00100000 && id < 0x00100000 + NPCS) { return undefined; }
     const row = store.get(id);
     if (!row) { return undefined; }
     // The engine hands an appearance back parsed, a fresh object each time.
@@ -111,7 +138,9 @@ const mpBase = {
   },
   makeProperty: function () { },
   makeEventSource: function () { },
-  getNeighborsByPosition: function () { return ids.slice(); },
+  // The engine answers with everything in the grid squares around a position,
+  // NPCs included; a town square holds a few hundred. The first 300 stand in.
+  getNeighborsByPosition: function () { return hideNpcs ? ids.slice() : ids.concat(npcIds.slice(0, 300)); },
   callPapyrusFunction: function () { return undefined; },
   getDescFromId: function (id) { return (id >>> 0).toString(16) + ':Skyrim.esm'; },
   getIdFromDesc: function () { return 0; },
@@ -237,28 +266,31 @@ live.forEach(function (row) {
   counting = true;
   const ms = time(row.fn, runs);
   counting = false;
-  let got = 0;
-  for (const k in reads) { got += reads[k]; }
+  let got = 0, wrote = 0;
+  for (const k in reads) { if (/^set:/.test(k)) { wrote += reads[k]; } else { got += reads[k]; } }
   const perSec = 1000 / row.ms;
   table.push({ name: nameOf(row), line: row.line, every: row.ms, msRun: ms / runs,
                coreShare: (ms / runs) * perSec / 10, readsSec: got / runs * perSec,
-               reads: Object.assign({}, reads), runs: runs });
+               setsSec: wrote / runs * perSec,
+               reads: Object.assign({}, reads), runs: runs, row: row });
 });
 table.sort(function (a, b) { return b.coreShare - a.coreShare; });
 
 console.log('');
-console.log('The gamemode\'s timers with ' + PEOPLE + ' people on, costliest first:');
+console.log('The gamemode\'s timers with ' + PEOPLE + ' people on and ' + NPCS + ' NPCs, costliest first:');
 console.log('  ' + 'timer'.padEnd(26) + 'every'.padStart(8) + 'ms/run'.padStart(9) +
-            '% core'.padStart(8) + 'reads/s'.padStart(9) + '   line');
+            '% core'.padStart(8) + 'reads/s'.padStart(9) + 'sets/s'.padStart(8) + '   line');
 table.forEach(function (t) {
   console.log('  ' + t.name.slice(0, 25).padEnd(26) + (t.every + 'ms').padStart(8) +
               t.msRun.toFixed(3).padStart(9) + t.coreShare.toFixed(2).padStart(8) +
-              Math.round(t.readsSec).toString().padStart(9) + '   ' + t.line);
+              Math.round(t.readsSec).toString().padStart(9) +
+              (Math.round(t.setsSec * 10) / 10).toString().padStart(8) + '   ' + t.line);
 });
 const total = table.reduce(function (s, t) { return s + t.coreShare; }, 0);
 const totalReads = table.reduce(function (s, t) { return s + t.readsSec; }, 0);
+const totalSets = table.reduce(function (s, t) { return s + t.setsSec; }, 0);
 console.log('  ' + 'all of them'.padEnd(26) + ''.padStart(17) + total.toFixed(2).padStart(8) +
-            Math.round(totalReads).toString().padStart(9));
+            Math.round(totalReads).toString().padStart(9) + (Math.round(totalSets * 10) / 10).toString().padStart(8));
 const heaviest = table.slice().sort(function (a, b) { return b.readsSec - a.readsSec; })[0];
 console.log('  most engine reads: ' + heaviest.name + ', ' + Math.round(heaviest.readsSec) +
             ' a second: ' + Object.keys(heaviest.reads).sort(function (a, b) {
@@ -268,6 +300,50 @@ console.log('  most engine reads: ' + heaviest.name + ', ' + Math.round(heaviest
             }).join(', '));
 if (Object.keys(unknown).length) { console.log('  (stand-in answered nothing for: ' + Object.keys(unknown).join(', ') + ')'); }
 console.log('');
+
+// --------------------------------------------------------------- the NPCs
+// Issue #963. The timers only ever walk the people online, so the NPCs cost
+// the gamemode nothing a tick: every timer makes the same engine reads with
+// the 6,000 in the world as with none. A timer that starts walking the world
+// fails here, by name.
+yes('the whole of the gamemode\'s timers stay under 3% of one core with ' + PEOPLE + ' people and ' +
+    NPCS + ' NPCs (' + total.toFixed(2) + '%)', total < 3);
+if (NPCS) {
+  const moved = [];
+  table.forEach(function (t) {
+    function one() {
+      for (const k in reads) { delete reads[k]; }
+      counting = true; try { t.row.fn(); } catch (e) { } counting = false;
+      let n = 0; for (const k in reads) { n += reads[k]; }
+      return n;
+    }
+    one();                                  // settle anything a first pass does once
+    const withNpcs = one();
+    hideNpcs = true;
+    const without = one();
+    hideNpcs = false;
+    if (withNpcs !== without) { moved.push(t.name + ' ' + without + ' -> ' + withNpcs); }
+  });
+  yes('no timer reads more of the engine because the NPCs are on' + (moved.length ? ' (' + moved.join(', ') + ')' : ''),
+      moved.length === 0);
+
+  // The handlers the NPCs can set off by themselves: a death (an NPC killed in
+  // a fight nobody started), and a press on one. Timed per call.
+  function perCall(name, fn, n) {
+    const f = sandbox.mp[name];
+    if (typeof f !== 'function') { return -1; }
+    const t0 = process.hrtime.bigint();
+    for (let i = 0; i < n; i++) { try { fn(f, i); } catch (e) { } }
+    return Number(process.hrtime.bigint() - t0) / 1e6 / n;
+  }
+  const deathMs = perCall('onDeath', function (f, i) { f(npcIds[i % npcIds.length], 0); }, 2000);
+  const pressMs = perCall('onActivate', function (f, i) { f(npcIds[i % npcIds.length], ids[i % ids.length]); }, 2000);
+  console.log('  an NPC dying costs ' + deathMs.toFixed(3) + ' ms, a press on one ' + pressMs.toFixed(3) + ' ms');
+  yes('an NPC\'s death costs the gamemode under half a millisecond (' + deathMs.toFixed(3) + ')',
+      deathMs >= 0 && deathMs < 0.5);
+  yes('a press on an NPC costs under half a millisecond (' + pressMs.toFixed(3) + ')',
+      pressMs >= 0 && pressMs < 0.5);
+}
 
 // ------------------------------------------------------------ one timer's pass
 function passOf(row) {
