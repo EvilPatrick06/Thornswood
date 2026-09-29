@@ -14,6 +14,7 @@
 # runs on the VPS beside the live server.
 #
 # Any failure opens an issue on the board, or adds to the one already open,
+# and the first night everything passes closes it (Nightly-Issue.ps1),
 # with a link to the run; the last lines of the harness step name every
 # harness that failed and the ten slowest. Runs at 03:00 Mountain (09:00
 # UTC), when nobody is playing, and by hand from the Actions tab.
@@ -339,25 +340,20 @@ jobs:
           REPO: ${{ github.repository }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'thornswood-nightly'; Accept = 'application/vnd.github+json' }
-          $api = "https://api.github.com/repos/$env:REPO"
-          $title = 'Nightly checks failed'
-          $line = "The nightly checks failed on $((Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')): $env:RUN. The failed step says which check; the harness step's last lines name every harness that failed."
-          # In brackets for the reason in the step above: without them $_ is
-          # the whole list, and the test matched on any one issue in it.
-          # Every page, oldest first. One page of the newest hundred missed #905
-          # once more than a hundred issues were open, and 29 September's run
-          # opened #1120 beside it; the oldest open one is the one to add to.
-          $mine = @()
-          for ($pg = 1; $pg -le 20; $pg++) {
-            $page = @((Invoke-RestMethod -Headers $h -Uri "$api/issues?state=open&sort=created&direction=asc&per_page=100&page=$pg"))
-            $mine += @($page | Where-Object { $_.title -eq $title -and -not $_.pull_request })
-            if ($mine.Count -or $page.Count -lt 100) { break }
-          }
-          if ($mine.Count) {
-            Invoke-RestMethod -Method Post -Headers $h -Uri "$api/issues/$($mine[0].number)/comments" -Body (@{ body = $line } | ConvertTo-Json) -ContentType 'application/json' | Out-Null
-            Write-Host "added to #$($mine[0].number)"
-          } else {
-            $i = Invoke-RestMethod -Method Post -Headers $h -Uri "$api/issues" -Body (@{ title = $title; body = $line + "`n`nClose this once the nightly run is green again." } | ConvertTo-Json) -ContentType 'application/json'
-            Write-Host "opened #$($i.number)"
-          }
+          # One "Nightly checks failed" issue, never two: added to when one is
+          # open (every page read, the oldest kept, any duplicate closed
+          # pointing to it), opened when none is. Issues #905 and #1120.
+          .\scripts\dev\Nightly-Issue.ps1 -Result failure
+
+      - name: Close the failure when every check passed
+        if: success()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # The first night everything above passes, the open "Nightly checks
+          # failed" issue is closed with a line naming this run, so a fixed
+          # nightly does not stay on the board as a failure.
+          .\scripts\dev\Nightly-Issue.ps1 -Result success
