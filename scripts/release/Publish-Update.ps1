@@ -136,6 +136,8 @@ if ($Dev -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
 # What a release is diffed against: file contents, and the feed's own record
 # of what its last release left installed (#441). Release-Baseline.ps1 says why.
 . (Join-Path $Here 'Release-Baseline.ps1')
+# The one name a release goes by, and what else it is known by (#444).
+. (Join-Path $Here 'Release-Name.ps1')
 if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir $Channel }
 if (-not (Test-Path -LiteralPath $ReleaseDir)) { New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null }
 $haveLocal = (Test-Path -LiteralPath (Join-Path $ReleaseDir 'version.json')) -and (Test-Path -LiteralPath (Join-Path $ReleaseDir 'published.json'))
@@ -1797,6 +1799,22 @@ if ($Dev) {
     Set-Prop $doc 'mainVersion' ''
 }
 
+# ==== thornswood release record ====
+# tests\test-release-name.ps1 runs the real publisher and reads this back.
+#
+# ONE NAME FOR THIS RELEASE (#444): its id, which its packs and its baseline
+# record are already named by. Written with everything else it is known by:
+# the launcher the feed offers with it (unchanged by a Ship that keeps its
+# launcher, #921), its packs, its baseline, and the commit it was built from,
+# which Ship tags as release/<channel>/<id> once the feed is out.
+$relSource = Get-ReleaseSource $RepoDir
+$relBaseline = if ($releaseBaseline) { [string]$releaseBaseline.id } else { '' }
+$relRecord = New-ReleaseRecord $Id $Channel (Val $doc 'launcherVersion') @($chunks | ForEach-Object { [string]$_.Id }) `
+    $relBaseline $relSource.Commit $relSource.Branch $relSource.Uncommitted
+Set-Prop $doc 'release' $relRecord
+Say ("  release {0}{1}" -f $Id, $(if ($relRecord.commit) { ', built from ' + $relRecord.commit.Substring(0, 12) } else { ', not from a git checkout' })) 'Green'
+# ==== end thornswood release record ====
+
 # Set-Content -Encoding UTF8 writes a byte order mark on Windows PowerShell,
 # and a BOM is not JSON. The launcher's reader stops on it and reports an
 # unexpected character, which takes out the update check for everyone at once,
@@ -1976,6 +1994,10 @@ if ($pushFailed) {
     Save-State
     Clear-Pending $StateFile
     Send-Baseline $Id
+    # What Ship tags, and only once the feed is on the VPS (#444). Global, the
+    # way Publish-Discord hands back its result, because Ship runs this script
+    # in its own scope.
+    if (-not $NoPush) { $global:ThornswoodPublishedRelease = $Id }
 }
 # ==== end thornswood feed send ====
 

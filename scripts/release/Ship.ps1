@@ -57,6 +57,13 @@
   The feed is mirrored before the news steps tell people to update, because
   they send everybody to fetch a release the feed has to be serving.
 
+  LAST, THE TAG (#444). A release goes by one name, the id its packs carry
+  (20260928-1630, or 20260928-2324-dev on dev), and the feed records its
+  launcher, packs, baseline and commit against it (Release-Name.ps1). Once the
+  publisher has sent the feed, Ship tags that commit release/main/<id> or
+  release/dev/<id> and pushes the tag. Never on a dry run, and a tag that did
+  not go on is a line at the end, not a failed release.
+
   NO SWITCH TURNS THE REMIRROR OFF, asked for by the website and launcher
   lanes on 27 September: the block runs on every release, dev and main, so the
   dev channel exercises it several times a week. A dry run runs none of it,
@@ -527,6 +534,8 @@ $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 # receives them into and sends them back from (Feed-Store.ps1, #907). Until
 # then they were clones of Thornswood-Releases beside this repository.
 . (Join-Path $Here 'Feed-Store.ps1')
+# The release's one name and its tag (#444).
+. (Join-Path $Here 'Release-Name.ps1')
 $Dev = ($Channel -eq 'dev')
 $ReleaseDir = Get-FeedStoreDir $Channel
 $MainReleaseDir = Get-FeedStoreDir 'main'
@@ -1387,6 +1396,10 @@ if ($DryRun) {
 
 # global: for the reason at the client patch step.
 $global:LASTEXITCODE = 0
+# The id the publisher sets once the feed is on the VPS, and nothing before
+# that; the release tag below goes on only then (#444). Cleared first, so a
+# run earlier in this same window can never be tagged by this one.
+$global:ThornswoodPublishedRelease = ''
 & (Join-Path $Here 'Publish-Update.ps1') @pubArgs
 $published = $LASTEXITCODE
 
@@ -1810,6 +1823,27 @@ if (-not $DryRun -and -not $Dev -and (Test-Path (Join-Path $RepoDir '.git'))) {
     Say "  already on GitHub. The gate above refused anything uncommitted or unpushed," 'DarkGray'
     Say "  so what shipped and what is written down are the same thing." 'DarkGray'
 }
+
+# ==== thornswood release tag ====
+# THE COMMIT THIS RELEASE WAS BUILT FROM GETS A TAG (#444): release/main/<id>
+# or release/dev/<id>, the id the feed names the release by (Release-Name.ps1),
+# annotated with its launcher, packs and baseline, and pushed. Only after the
+# publisher has said it sent the feed, never on a dry run, and last, so a slow
+# or refused push never holds up the news or the countdown. A tag that did not
+# go on is a line in Done with the command that finishes it, like the other
+# follow-ons: the release is out either way.
+if (-not $DryRun -and $global:ThornswoodPublishedRelease) {
+    Head 'The tag'
+    $tagged = Add-ReleaseTag $RepoDir (Join-Path $ReleaseDir 'version.json') ([string]$global:ThornswoodPublishedRelease) 'origin' `
+        ('https://thornswood.net/' + $(if ($Dev) { 'feed-dev' } else { 'feed' }) + '/version.json')
+    if (-not $tagged.Why) {
+        Say "  $($tagged.Tag) marks $($tagged.Commit.Substring(0, 12)), and it is on GitHub" 'Green'
+    } else {
+        Say "  $($tagged.Why)" $(if ($tagged.PutRight) { 'Red' } else { 'Yellow' })
+        if ($tagged.PutRight) { $script:PostShipFailed += [pscustomobject]@{ What = 'the release tag'; PutRight = $tagged.PutRight } }
+    }
+}
+# ==== end thornswood release tag ====
 
 Head 'Done'
 # Repeated here on purpose. A red line in the middle of a release log is a line
