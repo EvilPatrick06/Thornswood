@@ -49,6 +49,39 @@ sentences, no filler, no placeholders. Secrets (server passwords, site keys,
 Discord tokens, the news webhook, anything out of a config.json or .env on the
 VPS) are named by location only; never printed, pasted, committed or logged.
 
+What checks these, since 29 Sep (issue #460). Every pull request's build
+(`Launcher builds`, step "Check the writing rules") runs
+`scripts\dev\Check-Words.ps1` over every Markdown file outside `lore\` and
+`docs\archive\`, the launcher's help and window, the bot's channel posts,
+the public pages of the site and the voice service, and the installer's read
+me. Each hit names the file, the line and the rule, and turns the build red:
+
+| Rule | What it refuses |
+| --- | --- |
+| `em-dash` | an em dash, typed or as an HTML entity |
+| `banned-word` | the word this section bans, any case; multiplayer and playtest pass |
+| `old-owner` | the old owner name |
+| `open-alpha` | calling the alpha a playtest that is closed; it is open by application |
+| `placeholder` | a marker left for later, in capitals (to do, to be decided, fix me), or filler Latin |
+| `names-person` | a person's name in README.md or the six component READMEs (launcher, site, voice, game\plugins, game\ui, installer\setup) |
+
+A line that has to say it anyway (this section naming the word it bans, a
+document quoting a note as it went out) goes in
+`scripts\dev\Check-Words.allow.txt` with its reason; an allowance that no
+longer matches anything is itself a hit. Release notes are not files, so
+`scripts\release\Note-Rules.ps1` checks them when Ship or Rollback-Feed runs,
+before anything is built. The same build step runs `tests\test-check-words.ps1`
+and `tests\test-note-rules.ps1`, which plant a break of every rule and fail
+if either check lets one through. Secrets are checked by
+`scripts\dev\Check-Secrets.ps1` in the same build.
+
+No machine checks these, so the person writing keeps them: plain, direct
+sentences with no filler; the text inside code (the launcher's messages, the
+game's chat lines, the bot's replies), because a word check there cannot
+tell a message from a name in the code or one of Skyrim's own record names;
+and names in the other documents, which record who decided something and
+who holds what on purpose.
+
 ## Everything we need to do goes on the board
 
 The one record of outstanding work is the Thornswood To Do board:
@@ -235,7 +268,7 @@ the team before code; nobody settles it alone, and a Claude never does.
   it does and what to do if anything. Ship refuses a title under three words
   or notes with no "- " line. Since 27 Sep it also refuses notes that say
   what only we would understand (scripts\release\Note-Rules.ps1): the word
-  player, an em dash, an issue or pull request number, "PR", a code file or
+  the Words section bans, an em dash, an issue or pull request number, "PR", a code file or
   a setting name (WEBVIEW2_LIKE_THIS), a name out of the code (PutInServerOrder,
   camelCase), our own words for how we work (demoting, worktree, squash, CI),
   and the same line twice. On 26 and 27 Sep all of those went out to the
@@ -284,7 +317,7 @@ the team before code; nobody settles it alone, and a Claude never does.
   1.1.101, predates signing; the next main Ship is the first signed one.
 - Every pull request gets the build check (.github/workflows/build.yml, about
   two minutes: the secret scan, every script and file parses, the writing
-  rules, the ownership page (`tests\test-ownership.js`, added by issue #752),
+  rules and the two harnesses that prove the writing checks (see Words), the ownership page (`tests\test-ownership.js`, added by issue #752),
   six more harnesses that are just as quick (the script index, the script
   paths, the architecture page and three launcher harnesses, issue #875),
   the launcher window, the count of

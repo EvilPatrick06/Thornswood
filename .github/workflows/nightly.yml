@@ -68,7 +68,7 @@ jobs:
         if: ${{ !cancelled() }}
         shell: pwsh
         run: |
-          # The Words section of CLAUDE.md, over the files people read: no em
+          # The Words section of CONTRIBUTING.md, over the files people read: no em
           # dashes, never the word player, and the owner is Patrick. Written
           # down since the start and never checked, and on 24 September eleven
           # hits had gone out in those files. Each hit is marked on its line.
