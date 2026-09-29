@@ -150,7 +150,15 @@ function connect() {
     if (m.t === 'denied') { deniedWhy = String(m.why || 'it did not say why'); return; }
     if (m.t === 'welcome') { myPeer = m.peer; deniedWhy = ''; return; }
     if (m.t === 'peers') { reconcile(m.peers); return; }
+    // The whole view first, then only what moved and who left it (issue
+    // #482; the note over the tick in voice-server.js).
     if (m.t === 'pos') { lastWho = m.who || {}; place(); return; }
+    if (m.t === 'moved') {
+      for (const k of Object.keys(m.who || {})) lastWho[k] = m.who[k];
+      for (const id of (m.gone || [])) delete lastWho[id];
+      place();
+      return;
+    }
     if (m.t === 'sdp') { onSdp(m); return; }
     if (m.t === 'ice') { onIce(m); return; }
   };
