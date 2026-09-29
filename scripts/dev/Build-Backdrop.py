@@ -46,10 +46,15 @@ The second plate. Skyrim's Anniversary Edition menu draws logo01ae.nif as
 well as logo.nif, and both used to be the same plate, so the backdrop was
 drawn twice. Deleting logo01ae.nif is no cure: the game then draws the
 vanilla plate from Skyrim - Meshes1.bsa, a Bethesda logo over the backdrop.
-So game\\menu\\logo01ae.nif is an empty node (issue #425): the same header
-as logo.nif, one BSFadeNode with no children, and nothing to draw. It used
-to be a copy of the plate with its root scale set to 0, which hid the plate
-but left the shape in the scene for the engine to walk every frame.
+And it cannot be an empty node either: the menu reads the first child of
+logo01ae.nif's root as the logo's shape (the vanilla file is a BSFadeNode
+over one BSTriShape), so a root with no children crashes the game at the
+main menu (issue #1158: MistMenu, "mov rbx, [rax]" with rax 0, on the root
+named CivilWarMap01). So game\\menu\\logo01ae.nif is logo.nif with the plate
+hidden twice over: the shape carries the hidden flag (APP_CULLED), so the
+renderer skips it without walking it, and the root's scale is 0, so it is a
+point even if something clears that flag. The menu finds the shape it reads,
+and there is one plate to draw.
 
 Usage:
   python Build-Backdrop.py [<picture.png>] [<out.dds>]
@@ -89,48 +94,65 @@ TEXCONV_SHA256 = "dcfdec10244e02cf5037fba089c55fb7e1326b1c8181742d77d15fa5cb5eef
 TEXCONV = REPO / "local" / "texconv" / "may2026" / "texconv.exe"
 
 
-def blank_logo(plate):
-    """An empty copy of the menu plate: logo.nif's header, one BSFadeNode
-    with the same name and no children, root scale 0. Nothing to draw, and
-    the file still stops the game falling back to the vanilla plate."""
-    b = plate
+def nif_blocks(b):
+    """(type, offset, size) of every block of a Skyrim SE nif."""
     o = b.index(b"\n") + 1
     version, endian, user, blocks, bsver = struct.unpack_from("<IBIII", b, o)
     if version != 0x14020007 or user != 12 or bsver != 100:
-        raise SystemExit("logo.nif is not a Skyrim SE nif (20.2.0.7, 12, 100)")
-    head_start = o
+        raise SystemExit("not a Skyrim SE nif (20.2.0.7, 12, 100)")
     o += 17
     for _ in range(3):                                  # author, process, export
         o += 1 + b[o]
-    export_info = b[head_start + 17:o]
     ntypes = struct.unpack_from("<H", b, o)[0]; o += 2
     types = []
     for _ in range(ntypes):
         n = struct.unpack_from("<I", b, o)[0]; o += 4
         types.append(b[o:o + n].decode("latin-1")); o += n
-    first = struct.unpack_from("<H", b, o)[0]
-    o += 2 * blocks + 4 * blocks
+    kinds = struct.unpack_from("<%dH" % blocks, b, o); o += 2 * blocks
+    sizes = struct.unpack_from("<%dI" % blocks, b, o); o += 4 * blocks
     nstr = struct.unpack_from("<I", b, o)[0]; o += 8
-    n = struct.unpack_from("<I", b, o)[0]
-    name = b[o + 4:o + 4 + n] if nstr else b""
-    if types[first] != "BSFadeNode":
-        raise SystemExit("logo.nif's root is %s, not BSFadeNode" % types[first])
+    for _ in range(nstr):
+        o += 4 + struct.unpack_from("<I", b, o)[0]
+    o += 4 + 4 * struct.unpack_from("<I", b, o)[0]    # groups
+    out = []
+    for i in range(blocks):
+        out.append((types[kinds[i]], o, sizes[i]))
+        o += sizes[i]
+    return out
 
-    out = bytearray(b[:head_start])
-    out += struct.pack("<IBIII", version, endian, user, 1, bsver) + export_info
-    out += struct.pack("<HI", 1, 10) + b"BSFadeNode"
-    node = struct.pack("<iIiI3f9ffiII",
-                       0, 0, -1, 0x8000E,                # name, extra data, controller, flags
-                       0.0, 0.0, 0.0,                    # translation
-                       1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-                       0.0,                              # scale
-                       -1, 0, 0)                         # collision, children, effects
-    out += struct.pack("<HI", 0, len(node))
-    out += struct.pack("<III", 1, len(name), len(name)) + name
-    out += struct.pack("<I", 0)                         # groups
-    out += node
-    out += struct.pack("<Ii", 1, 0)                     # one root, block 0
-    return bytes(out)
+
+def av_fields(b, at):
+    """Offsets of the flags and the scale of a NiAVObject block, and where
+    the NiAVObject part ends (stream 100)."""
+    o = at + 4                                          # name
+    o += 4 + 4 * struct.unpack_from("<I", b, o)[0]      # extra data
+    o += 4                                              # controller
+    flags_at = o; o += 4
+    o += 12 + 36                                        # translation, rotation
+    scale_at = o; o += 4
+    o += 4                                              # collision
+    return flags_at, scale_at, o
+
+
+def blank_logo(plate):
+    """logo.nif with the plate hidden: the same blocks, so the Anniversary
+    menu still finds the root's one shape child it reads (issue #1158), but
+    the shape is flagged hidden (APP_CULLED, flag bit 0) and the root's scale
+    is 0. Nothing is drawn, and the file still stops the game falling back to
+    the vanilla plate."""
+    b = bytearray(plate)
+    blocks = nif_blocks(b)
+    if blocks[0][0] != "BSFadeNode":
+        raise SystemExit("logo.nif's root is %s, not BSFadeNode" % blocks[0][0])
+    _, root_scale, root_end = av_fields(b, blocks[0][1])
+    kids = struct.unpack_from("<I", b, root_end)[0]
+    child = struct.unpack_from("<i", b, root_end + 4)[0] if kids else -1
+    if kids != 1 or not (0 <= child < len(blocks)) or blocks[child][0] != "BSTriShape":
+        raise SystemExit("logo.nif's root should have one BSTriShape child, the plate")
+    struct.pack_into("<f", b, root_scale, 0.0)
+    shape_flags, _, _ = av_fields(b, blocks[child][1])
+    struct.pack_into("<I", b, shape_flags, struct.unpack_from("<I", b, shape_flags)[0] | 1)
+    return bytes(b)
 
 
 def fill(src, aspect):
@@ -193,7 +215,7 @@ def main(argv):
         data = blank_logo((MENU / "logo.nif").read_bytes())
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(data)
-        print("wrote %s: one empty BSFadeNode, no shape, %d bytes" % (out, len(data)))
+        print("wrote %s: the plate, hidden and at scale 0, %d bytes" % (out, len(data)))
         return 0
 
     from PIL import Image
