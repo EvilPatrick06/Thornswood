@@ -64,6 +64,7 @@ function Run-Block([string]$value, $settings) {
     $remotePlugins = 'C:/nowhere'
     $VoicePort = 7789
     $maxOnline = 0
+    $seats = 0
     $LoadOrderRefuse = ''
     $RequirePass = $value
     $Npcs = ''

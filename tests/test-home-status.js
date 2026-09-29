@@ -82,6 +82,19 @@ yes('three on: unchanged, with the tile', e.livetext.textContent === '3 people i
 e = run({ up: false });
 yes('down: unchanged', e.livetext.textContent === 'Server offline' && e.dot.className === 'dot');
 
+// Out of the server's own number when it says one (#481).
+e = run({ up: true, online: 3, max: 25 });
+yes("three of 25: '3 of 25 people in the world' (got '" + e.livetext.textContent + "')",
+    e.livetext.textContent === '3 of 25 people in the world');
+yes('three of 25: the tile says 3 of 25', e.figOnline.textContent === '3 of 25' && e.figOnlineWrap.hidden === false);
+e = run({ up: true, online: 1, max: 25 });
+yes('one of 25: 1 of 25 people in the world', e.livetext.textContent === '1 of 25 people in the world');
+e = run({ up: true, online: 25, max: 25 });
+yes("full: 'The world is full, 25 of 25 people are in it' (got '" + e.livetext.textContent + "')",
+    e.livetext.textContent === 'The world is full, 25 of 25 people are in it');
+e = run({ up: true, online: 0, max: 25 });
+yes("nobody on with a number: still Patrick's line", /^The world is open, /.test(e.livetext.textContent));
+
 const said = e.livetext.textContent + run({ up: true, online: 0 }).livetext.textContent;
 yes('no em dash in what it says', said.indexOf(String.fromCharCode(0x2014)) < 0);
 yes('never the word the house rules forbid', !new RegExp('pla' + 'yer', 'i').test(said));

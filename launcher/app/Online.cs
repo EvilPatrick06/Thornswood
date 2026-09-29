@@ -82,6 +82,11 @@ namespace Thornswood
                                 got.Known = true;
                                 got.Now = int.Parse(m.Groups[1].Value);
                             }
+                            // The most the server holds at once, in its own
+                            // words (#481), over the feed's copy of it.
+                            var mx = System.Text.RegularExpressions.Regex.Match(text, "\"max\"\\s*:\\s*(\\d+)");
+                            int most;
+                            if (mx.Success && int.TryParse(mx.Groups[1].Value, out most) && most > 0) got.Max = most;
                         }
                     }
                 }

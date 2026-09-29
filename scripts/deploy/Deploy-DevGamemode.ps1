@@ -126,10 +126,6 @@ param(
   # voice service on 7778, pushes its positions over the live ones and
   # drains the live command and choice queues.
   [int]$VoicePort = 7789,
-  # The launcher whose config.json holds MaxOnline for the dev server: the
-  # dev launcher, whose file the dev feed is published from. Empty means the
-  # one Publish-Update.ps1 -Channel dev would find. See MaxOnline.ps1.
-  [string]$LauncherRoot = '',
   [string]$Gamemode,
   # Bring the dev server's load order and plugins up to what the built server
   # has. Off by default: a code-only gamemode change does not need it, and the
@@ -257,14 +253,14 @@ $stampFile = Join-Path $env:TEMP 'thornswood-dev-build.json'
 $buildStamp = Save-ThornswoodBuildStamp -Gamemode $Gamemode -Channel dev -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) -Path $stampFile -Artifact $artifact
 Write-Host ('  build stamp: ' + (Format-ThornswoodBuildStamp $buildStamp))
 
-# How many the dev server seats, read here so a number the engine would refuse
-# stops this while the dev server is still up. MaxOnline.ps1 says where it
-# lives and why there.
+# How many the dev server holds at once, read here so a number the engine
+# would refuse stops this while the dev server is still up. MaxOnline.ps1 says
+# where it lives (records\most-online.json) and why.
 . (Join-Path $Here 'MaxOnline.ps1')
-if (-not $LauncherRoot) { $LauncherRoot = (Find-LauncherRoot) + '-DevBuild' }
-$got = Get-MaxOnline $LauncherRoot
+$got = Get-MostOnline
 $maxOnline = $got.Value
-if ($maxOnline -gt 0) { Write-Host ('  most online: {0}, from MaxOnline in {1}' -f $maxOnline, $got.From) }
+$seats = $got.Seats
+if ($maxOnline -gt 0) { Write-Host ('  most online: {0}, engine seats {1} ({2} over it for staff roles), from {3}' -f $maxOnline, $seats, $got.Staff, $got.From) }
 else { Write-Host ('  most online: {0} gave no number ({1}), so the dev server keeps the one it has' -f $got.From, $got.Why) -ForegroundColor Yellow }
 
 # --------------------------------------------------------- the load order ---
@@ -645,10 +641,11 @@ Write-Host 'Pointing the dev server at the dev voice service...'
 # Deploy-Gamemode.ps1 computes the same thing the same way for the live
 # server, which is why live was right and dev was not.
 #
-# AND HOW MANY IT SEATS, added 24 September for entry 281. maxPlayers is the
-# engine's own slot count, and it is set to the dev launcher's MaxOnline, read
-# above, so the dev feed and the dev server say one number. With no number it
-# is left as the box has it and does not count as a reason to rewrite.
+# AND HOW MANY IT HOLDS AT ONCE, #481. thornswoodMostOnline is the number the
+# gamemode turns people away past, and maxPlayers, the engine's own slot
+# count, is set that plus the staff seats, both from records\most-online.json
+# read above. With no number both are left as the box has them and that does
+# not count as a reason to rewrite.
 #
 # AND NO "default" KEY IN npcSettings, added 28 September for issue #879. The
 # engine reads every key of npcSettings as a plugin name and refuses every NPC
@@ -749,9 +746,9 @@ if (`$wantNpc) { 'npcSettings has a default key, which refuses every NPC. Droppi
 `$wantPeople = (`$s.npcAllowCrimeFaction -ne `$true -or `$s.npcAllowEssential -ne `$true)
 if (`$wantPeople) { 'guards, shopkeepers and named people were refused (npcAllowCrimeFaction ' + `$s.npcAllowCrimeFaction + ', npcAllowEssential ' + `$s.npcAllowEssential + '). Letting them in.' }
 `$wantMax = `$false
-if ($maxOnline -gt 0 -and [int]`$s.maxPlayers -ne $maxOnline) {
+if ($maxOnline -gt 0 -and ([int]`$s.thornswoodMostOnline -ne $maxOnline -or [int]`$s.maxPlayers -ne [int]'$seats')) {
   `$wantMax = `$true
-  'the most online moves from ' + `$s.maxPlayers + ' to $maxOnline'
+  'the most online moves from ' + `$s.thornswoodMostOnline + ' to $maxOnline, engine seats from ' + `$s.maxPlayers + ' to $seats'
 }
 `$wantRefuse = `$false
 `$refuse = ('$LoadOrderRefuse' -eq 'on')
@@ -791,7 +788,10 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
     `$s | Add-Member -NotePropertyName startPoints -NotePropertyValue @(`$pt) -Force
     'start point moved to 0x{0:X8}, index {1}' -f `$startWant, `$unb
   }
-  if (`$wantMax) { `$s | Add-Member -NotePropertyName maxPlayers -NotePropertyValue $maxOnline -Force }
+  if (`$wantMax) {
+    `$s | Add-Member -NotePropertyName thornswoodMostOnline -NotePropertyValue $maxOnline -Force
+    `$s | Add-Member -NotePropertyName maxPlayers -NotePropertyValue $seats -Force
+  }
   if (`$wantNpc) { `$s.npcSettings.PSObject.Properties.Remove('default') }
   `$s | Add-Member -NotePropertyName npcAllowCrimeFaction -NotePropertyValue `$true -Force
   `$s | Add-Member -NotePropertyName npcAllowEssential -NotePropertyValue `$true -Force
@@ -834,7 +834,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
             ', spell strip ' + `$back.equipmentSpellCheckEnabled +
             ', unknown item vetoes ' + `$back.equipmentInventoryCheckEnabled +
             ', load order ' + @(`$back.loadOrder).Count + ' plugins' +
-            ', most online ' + `$back.maxPlayers +
+            ', most online ' + `$back.thornswoodMostOnline + ', engine seats ' + `$back.maxPlayers +
             ', npcSettings keys ' + @(`$back.npcSettings.PSObject.Properties).Count +
             ', guards and townsfolk ' + `$back.npcAllowCrimeFaction + ', named people ' + `$back.npcAllowEssential +
             ', load order refusal ' + `$back.thornswoodLoadOrderRefuse +
