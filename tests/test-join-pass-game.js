@@ -270,7 +270,7 @@ door(null);
 {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   yes('dispatch() hands /joinpass to the block before anything else, with the relay\'s profile',
-      /var word = parts\[0\]\.toLowerCase\(\);\s*if \(word === '\/joinpass'\) \{[\s\S]{0,200}jp\.take\(profileId, parts\[1\], Date\.now\(\)\)[\s\S]{0,120}return;\s*\}\s*if \(!profileId \|\| runsNow\(word, parts\)\)/.test(code));
+      /var word = parts\[0\]\.toLowerCase\(\);\s*if \(word === '\/joinpass'\) \{[\s\S]{0,200}jp\.take\(profileId, parts\[1\], Date\.now\(\)\)[\s\S]{0,120}return;\s*\}\s*(if \(word === '\/line'\) \{[\s\S]{0,700}?return;\s*\}\s*)?if \(!profileId \|\| runsNow\(word, parts\)\)/.test(code));
 }
 
 // ------------------------------------------------------------ the voice log

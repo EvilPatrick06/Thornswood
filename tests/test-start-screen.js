@@ -158,8 +158,10 @@ yes('the front hears Continue and remembers it for its own repeats',
 
 yes('with the scroll on the page tells the client to wait',
     /if \(LIST\.intro !== false && beats % 5 === 0\) \{\s*try \{ window\.skyrimPlatform\.sendMessage\('thornswood', 'stay'\); \}/.test(page));
-yes('every ten seconds, on a two second beat, until a character is picked',
-    /\}, 2000\);/.test(page) && /if \(sent \|\| root\.className === 'gone'\) \{ clearInterval\(beat\); return; \}/.test(page));
+// Until the pick is taken rather than made (#481): somebody waiting in line
+// at the menu sits on the page, and its beat is what keeps it from reloading.
+yes('every ten seconds, on a two second beat, until the pick is taken',
+    /\}, 2000\);/.test(page) && /if \(acked \|\| root\.className === 'gone'\) \{ clearInterval\(beat\); return; \}/.test(page));
 yes('with the scroll off it says nothing, so the three minutes work as before',
     page.indexOf('LIST.intro !== false && beats % 5 === 0') >= 0);
 yes('the front says the same two words from its own tick, so the wait outlives the page',

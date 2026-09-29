@@ -87,11 +87,13 @@ const slotsFor = () => 2;
 const gameStatus = { up: false, online: 0, max: 0 };
 const seatsFull = () => false;
 const worldFull = () => '';
+const mostOnlineFallback = () => 0;
 
 // standingCached, hasLeft and departed because the join route asks whether an
 // account holding the id has left the Discord before it reads the file it
 // writes back (entry 142).
 eval(grab('guildMembers') + '\n' + grab('memberOf') + '\n' + grab('roleNames') + '\n' + grab('standing') +
+     '\n' + route('function holdsStaffRole(') +
      '\n' + grab('standingCached') + '\n' + grab('hasLeft') + '\n' + grab('departed') +
      '\n' + route('function notAcceptedYet(') +
      // What a banned account is told at Play (#1010).

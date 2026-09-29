@@ -138,6 +138,10 @@ namespace Thornswood
                             Last = st;
                             if (st.Name != null && st.Name.Length > 0) log("Discord says yes. " + st.Name + ".");
                             else log("Discord says yes.");
+                            // A yes can still say something: that the world is
+                            // full and there will be a wait in line at the
+                            // game's menu (#481).
+                            if (st.Message != null && st.Message.Length > 0) log(st.Message);
                             if (onAllowed != null) onAllowed();
                             return;
                         }
