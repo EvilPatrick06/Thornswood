@@ -24,6 +24,10 @@
        written npcSettings is handed to the engine itself: under all the
        Whiterun cow (outdoors) loads, under interior it does not and an
        indoor actor does. That part says SKIP where either is missing.
+    5. The people (#956): both deploy scripts set npcAllowCrimeFaction and
+       npcAllowEssential true, the dev settings block puts them on a box that
+       lacks them and leaves a box that has them alone, and the engine then
+       loads Belethor, Hulda and Nazeem, which it refuses with both off.
 
   Nothing here reaches the VPS. Read only apart from its own temp folder.
 #>
@@ -126,6 +130,59 @@ Yes '-Npcs interior: every entry is inside only' (
 
 Yes '-Npcs off: npcEnabled is off' ($written['off'].npcEnabled -eq $false)
 
+# ---- 5. the people, #956: the two gates that refuse guards and named people ----
+foreach ($npcs in 'all', 'interior') {
+    Yes ("-Npcs {0}: npcAllowCrimeFaction is true, so guards and townsfolk load" -f $npcs) ($written[$npcs].npcAllowCrimeFaction -eq $true)
+    Yes ("-Npcs {0}: npcAllowEssential is true, so named shopkeepers and residents load" -f $npcs) ($written[$npcs].npcAllowEssential -eq $true)
+}
+
+# The dev box: Deploy-DevGamemode.ps1 never sends the settings file, it edits
+# the one on the box, so its settings block is lifted and run in Windows
+# PowerShell (what sshd runs there) against a box that has neither key, which
+# is what the dev box had on 28 September.
+$devScript = Join-Path $ToolsDir '..\scripts\deploy\Deploy-DevGamemode.ps1'
+$devText = [IO.File]::ReadAllText($devScript)
+$dStart = $devText.IndexOf("Write-Host 'Pointing the dev server at the dev voice service...'")
+$dOpen = $devText.IndexOf('Remote @"', $dStart)
+$dClose = $devText.IndexOf('"@ | ForEach-Object', $dOpen)
+Yes 'the dev settings block is in Deploy-DevGamemode.ps1' ($dStart -ge 0 -and $dOpen -gt $dStart -and $dClose -gt $dOpen)
+if ($dStart -ge 0 -and $dOpen -gt $dStart -and $dClose -gt $dOpen) {
+    $devBody = $devText.Substring($dOpen + 'Remote @"'.Length, $dClose - $dOpen - 'Remote @"'.Length).Trim("`r", "`n")
+    $box = Join-Path $tmp 'dev-box'
+    New-Item -ItemType Directory -Force -Path $box | Out-Null
+    function Run-DevBlock {
+        $rootWin = $box; $farOrder = ''; $remotePlugins = 'C:/nowhere'; $VoicePort = 7789
+        $maxOnline = 0; $LoadOrderRefuse = ''; $RequirePass = ''; $Npcs = ''
+        $file = Join-Path $tmp 'dev-block.ps1'
+        [IO.File]::WriteAllText($file, $ExecutionContext.InvokeCommand.ExpandString($devBody), (New-Object Text.UTF8Encoding $true))
+        $ErrorActionPreference = 'Continue'
+        $said = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $file 2>&1 | ForEach-Object { "$_" }
+        return ($said -join "`n")
+    }
+    function Dev-Backups { return @(Get-ChildItem -LiteralPath $box -Filter 'server-settings.json.before-*').Count }
+    [IO.File]::WriteAllText((Join-Path $box 'server-settings.json'),
+        ('{"port":7787,"thornswoodVoicePort":7789,"thornswoodServer":"dev","maxPlayers":10,' +
+         '"equipmentSlotCheckEnabled":false,"equipmentSpellCheckEnabled":false,"equipmentInventoryCheckEnabled":false,' +
+         '"loadOrder":["C:/p/Skyrim.esm"],"npcEnabled":true,"npcSettings":{}}'), $utf8)
+    $said = Run-DevBlock
+    $after = Get-Content -LiteralPath (Join-Path $box 'server-settings.json') -Raw | ConvertFrom-Json
+    Yes 'dev box with neither key: says the people were refused and lets them in' ($said -match 'guards, shopkeepers and named people were refused')
+    Yes 'dev box: npcAllowCrimeFaction is true after the run' ($after.npcAllowCrimeFaction -eq $true)
+    Yes 'dev box: npcAllowEssential is true after the run' ($after.npcAllowEssential -eq $true)
+    Yes 'dev box: the read back names both' ($said -match 'guards and townsfolk True, named people True')
+    Yes 'dev box: the rest is kept (npcEnabled, npcSettings, port)' ($after.npcEnabled -eq $true -and $after.port -eq 7787 -and (Keys $after.npcSettings).Count -eq 0)
+    Yes 'dev box: the old file is kept' ((Dev-Backups) -eq 1)
+    $said = Run-DevBlock
+    Yes 'dev box: a second run finds nothing to do and writes nothing' ((Dev-Backups) -eq 1 -and $said -notmatch 'were refused')
+    # A box someone set false by hand is put back too.
+    $o = Get-Content -LiteralPath (Join-Path $box 'server-settings.json') -Raw | ConvertFrom-Json
+    $o.npcAllowEssential = $false
+    [IO.File]::WriteAllText((Join-Path $box 'server-settings.json'), ($o | ConvertTo-Json -Depth 10), $utf8)
+    $null = Run-DevBlock
+    $after = Get-Content -LiteralPath (Join-Path $box 'server-settings.json') -Raw | ConvertFrom-Json
+    Yes 'dev box: npcAllowEssential false is put back to true' ($after.npcAllowEssential -eq $true)
+}
+
 # ---- 4. the engine itself, where this machine has it --------------------------
 $serverDist = $env:THORNSWOOD_SERVER_DIST
 if (-not $serverDist) {
@@ -147,7 +204,7 @@ const addon = require(process.argv[2]);
 const s = JSON.parse(require('fs').readFileSync(process.argv[3], 'utf8'));
 const srv = new addon.ScampServer(JSON.stringify(s));
 const out = {};
-for (const [k, id] of [['cow', 0x10ebaf], ['indoors', 0xea7]]) {
+for (const [k, id] of [['cow', 0x10ebaf], ['indoors', 0xea7], ['belethor', 0x1a672], ['hulda', 0x1a66e], ['nazeem', 0x1a6a4]]) {
   try { srv.get(id, 'pos'); out[k] = true; } catch (e) { out[k] = false; }
 }
 console.log('PROBE ' + JSON.stringify(out));
@@ -157,7 +214,7 @@ $probeFile = Join-Path $tmp 'probe.js'
 [IO.File]::WriteAllText($probeFile, $probe, $utf8)
 $masters = @('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm')
 
-function Invoke-Engine($npcSettings, [bool]$enabled, [switch]$AsGiven) {
+function Invoke-Engine($npcSettings, [bool]$enabled, [switch]$AsGiven, [bool]$people = $true) {
     # The written npcSettings with the entries for the two plugins not loaded
     # here taken out, because the engine needs every key to be a plugin it
     # actually loaded. Any other key goes over as written, so a default key
@@ -169,7 +226,7 @@ function Invoke-Engine($npcSettings, [bool]$enabled, [switch]$AsGiven) {
     $s = [ordered]@{
         port = 7991; maxPlayers = 2; offlineMode = $true; name = 'npc-settings-test'
         dataDir = $gameData; loadOrder = @($masters | ForEach-Object { Join-Path $gameData $_ })
-        npcEnabled = $enabled; npcAllowEssential = $false; npcAllowCrimeFaction = $false
+        npcEnabled = $enabled; npcAllowEssential = $people; npcAllowCrimeFaction = $people
         npcSettings = [pscustomobject]$ns; logLevel = 'error'
     }
     $f = Join-Path $tmp ('engine-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.json')
@@ -180,9 +237,19 @@ function Invoke-Engine($npcSettings, [bool]$enabled, [switch]$AsGiven) {
     return ($line[-1].Substring(6) | ConvertFrom-Json)
 }
 
-$r = Invoke-Engine $written['all'].npcSettings $true
+$allPeople = ($written['all'].npcAllowCrimeFaction -eq $true -and $written['all'].npcAllowEssential -eq $true)
+$r = Invoke-Engine $written['all'].npcSettings $true -people $allPeople
 Yes 'engine, -Npcs all: the Whiterun cow is in the world' ($null -ne $r -and $r.cow -eq $true)
 Yes 'engine, -Npcs all: so is the indoor actor' ($null -ne $r -and $r.indoors -eq $true)
+# #956: Whiterun's trader, innkeeper and Nazeem, each unique and in the
+# Whiterun crime faction, under the gates Deploy-Gamemode writes.
+Yes 'engine, -Npcs all: Belethor is in the world' ($null -ne $r -and $r.belethor -eq $true)
+Yes 'engine, -Npcs all: Hulda is in the world' ($null -ne $r -and $r.hulda -eq $true)
+Yes 'engine, -Npcs all: Nazeem is in the world' ($null -ne $r -and $r.nazeem -eq $true)
+# And the shape the dev box had, both gates off: the cow loads, the people do not.
+$r = Invoke-Engine $written['all'].npcSettings $true -people $false
+Yes 'engine, both gates off (the dev box before #956): the cow loads' ($null -ne $r -and $r.cow -eq $true)
+Yes 'engine, both gates off: Belethor, Hulda and Nazeem do not' ($null -ne $r -and -not $r.belethor -and -not $r.hulda -and -not $r.nazeem)
 $r = Invoke-Engine $written['interior'].npcSettings $true
 Yes 'engine, -Npcs interior: the cow outdoors is not' ($null -ne $r -and $r.cow -eq $false)
 Yes 'engine, -Npcs interior: the indoor actor is' ($null -ne $r -and $r.indoors -eq $true)

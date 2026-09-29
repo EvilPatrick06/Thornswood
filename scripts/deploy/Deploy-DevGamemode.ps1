@@ -641,6 +641,18 @@ Write-Host 'Pointing the dev server at the dev voice service...'
 # dev box kept the old one. The key is dropped here and the rest of npcSettings
 # is left as it is.
 #
+# AND THE PEOPLE COME BACK, added 28 September for issue #956. Two more gates
+# in the engine refuse an NPC, both off unless a setting says otherwise, and no
+# script here ever said so: npcAllowCrimeFaction (anyone in a hold's crime
+# faction, which is every guard and nearly every townsperson) and
+# npcAllowEssential (essential, protected and unique actors, which is every
+# named shopkeeper and resident). Animals are in neither, which is why they
+# came back with #879 and the people did not. Measured with the server binary
+# over the dev load order: 1406 of 4942 people in Skyrim.esm load with both
+# off, 3274 with both on; across the other plugins 275 of 1445 against 1243.
+# Belethor, Hulda and Nazeem are refused on both counts. Both are set true
+# here on every run.
+#
 # AND WHETHER A WRONG LOAD ORDER ENDS THE SESSION, added 28 September for
 # #402. -LoadOrderRefuse on sets thornswoodLoadOrderRefuse true, off sets it
 # false, and leaving the switch off keeps whatever the box has. This is the
@@ -717,6 +729,8 @@ if (`$pt -and `$unb -ge 0) {
 elseif (`$unb -lt 0) { 'Skyrim Unbound.esp is not in this load order, leaving the start point alone' }
 `$wantNpc = (`$s.npcSettings -and (`$s.npcSettings.PSObject.Properties.Name -contains 'default'))
 if (`$wantNpc) { 'npcSettings has a default key, which refuses every NPC. Dropping it.' }
+`$wantPeople = (`$s.npcAllowCrimeFaction -ne `$true -or `$s.npcAllowEssential -ne `$true)
+if (`$wantPeople) { 'guards, shopkeepers and named people were refused (npcAllowCrimeFaction ' + `$s.npcAllowCrimeFaction + ', npcAllowEssential ' + `$s.npcAllowEssential + '). Letting them in.' }
 `$wantMax = `$false
 if ($maxOnline -gt 0 -and [int]`$s.maxPlayers -ne $maxOnline) {
   `$wantMax = `$true
@@ -750,7 +764,7 @@ if ('$Npcs' -and `$s.npcEnabled -ne `$npcOn) {
 `$bom = `$false
 try { `$bom = ([IO.File]::ReadAllBytes(`$p)[0] -eq 0xEF) } catch { }
 if (`$bom) { 'the settings file starts with a byte order mark, rewriting it without one' }
-if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax -and -not `$wantNpc -and -not `$wantRefuse -and -not `$wantPass -and -not `$wantServer -and -not `$wantNpcs) {
+if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax -and -not `$wantNpc -and -not `$wantPeople -and -not `$wantRefuse -and -not `$wantPass -and -not `$wantServer -and -not `$wantNpcs) {
   'thornswoodVoicePort is already $VoicePort, both equipment checks are already off, and the load order is already right'
 } else {
   Copy-Item `$p (`$p + '.before-' + (Get-Date -Format 'yyyyMMdd-HHmmss')) -Force
@@ -762,6 +776,8 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
   }
   if (`$wantMax) { `$s | Add-Member -NotePropertyName maxPlayers -NotePropertyValue $maxOnline -Force }
   if (`$wantNpc) { `$s.npcSettings.PSObject.Properties.Remove('default') }
+  `$s | Add-Member -NotePropertyName npcAllowCrimeFaction -NotePropertyValue `$true -Force
+  `$s | Add-Member -NotePropertyName npcAllowEssential -NotePropertyValue `$true -Force
   if (`$wantRefuse) { `$s | Add-Member -NotePropertyName thornswoodLoadOrderRefuse -NotePropertyValue `$refuse -Force }
   if (`$wantPass) { `$s | Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue `$needPass -Force }
   `$s | Add-Member -NotePropertyName thornswoodServer -NotePropertyValue 'dev' -Force
@@ -803,6 +819,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
             ', load order ' + @(`$back.loadOrder).Count + ' plugins' +
             ', most online ' + `$back.maxPlayers +
             ', npcSettings keys ' + @(`$back.npcSettings.PSObject.Properties).Count +
+            ', guards and townsfolk ' + `$back.npcAllowCrimeFaction + ', named people ' + `$back.npcAllowEssential +
             ', load order refusal ' + `$back.thornswoodLoadOrderRefuse +
             ', join pass required ' + `$back.thornswoodRequirePass + ' on ' + `$back.thornswoodServer +
             ', NPCs ' + `$back.npcEnabled +
