@@ -54,7 +54,11 @@ param(
     # home folder, so only one machine could build an installer that knew its
     # own packs.
     # Last in the list so no existing positional argument moves.
-    [string]$ReleaseDir = ''
+    [string]$ReleaseDir = '',
+    # The setup program to build the installer around, instead of the one
+    # the last Build-Launcher left in out\. A main Ship passes the one CI
+    # built for the tag it ships (issue #932); nothing else needs it.
+    [string]$Stub = ''
 )
 
 
@@ -177,8 +181,16 @@ function Get-StubRefusal([string]$stub, [string]$src) {
             'with is left alone. From PowerShell 7 in the repo folder, the way Ship runs it: ' +
             '.\scripts\release\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause and then run this again.')
 }
-$stubNow = @((Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
-           Where-Object { Test-Path $_ } | Select-Object -First 1
+# Given one (-Stub, a main Ship's from CI, issue #932), that one and no other:
+# a file that is not there stops the build here rather than packing a
+# different stub found in out\.
+if ($Stub) {
+    if (-not (Test-Path -LiteralPath $Stub)) { Die ('The setup program given with -Stub is not there: ' + $Stub + '. Nothing was built.') }
+    $stubNow = (Resolve-Path -LiteralPath $Stub).Path
+} else {
+    $stubNow = @((Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
+               Where-Object { Test-Path $_ } | Select-Object -First 1
+}
 $stubWhy = Get-StubRefusal $stubNow (Join-Path $Here '..\..\installer\setup\Bootstrap.cs')
 if ($stubWhy) { Die $stubWhy }
 # ==== end thornswood setup stub ====
@@ -1001,8 +1013,8 @@ $zip = Join-Path $OutDir 'Thornswood-Setup.zip'
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Move-Item $blob $zip
 
-$stub = @((Join-Path (& (Join-Path $here 'Where.ps1') Out) 'setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
-        Where-Object { Test-Path $_ } | Select-Object -First 1
+# The one checked above, before anything was staged.
+$stub = $stubNow
 if (-not $stub) {
     Head 'Done, but incomplete'
     Say '  setup-stub.exe is missing, so THIS PACKAGE HAS NO INSTALLER.' 'Red'

@@ -15,6 +15,13 @@
 # the shipped exe, and SHA256SUMS is what proves the download is that exe and
 # nothing else.
 #
+# THE SETUP PROGRAM TOO, issue #932. The same build compiles setup-stub.exe,
+# the program the installer is built around, into out\ of the checkout. It is
+# attached beside the launcher and listed in the same SHA256SUMS, and a main
+# Ship with -Package downloads and checks it the same way. Until then a main
+# Ship, which never runs Build-Launcher, had no stub to package, and the one
+# in a shared clone's out\ was whatever the last local build had left there.
+#
 # WHY IT IS PINNED. runs-on names the dedicated self-hosted runner by its exact
 # labels, including thornswood-vps, so another runner cannot pick up a release
 # build accidentally. Every action is pinned to a full-length commit SHA for the
@@ -73,22 +80,28 @@ jobs:
           .\scripts\release\Build-Launcher.ps1 -Root $root -NoPause
           $exe = Join-Path $root 'Launcher\Thornswood.exe'
           if (-not (Test-Path $exe)) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
+          # The setup program the same build compiled (issue #932).
+          if (-not (Test-Path 'out\setup-stub.exe')) { Write-Host '::error::no setup-stub.exe came out of the build'; exit 1 }
 
-      - name: Collect the exe and write SHA256SUMS
+      - name: Collect the exe and the setup program, and write SHA256SUMS
         shell: pwsh
         run: |
           $root = Join-Path $env:RUNNER_TEMP 'Thornswood'
-          $exe = Join-Path $root 'Launcher\Thornswood.exe'
           $out = Join-Path $env:RUNNER_TEMP 'release'
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          Copy-Item -LiteralPath $exe -Destination (Join-Path $out 'Thornswood.exe') -Force
-          $hash = (Get-FileHash -LiteralPath (Join-Path $out 'Thornswood.exe') -Algorithm SHA256).Hash.ToLower()
-          # The sha256sum shape, "<hash>  <name>" with two spaces, so both
-          # `sha256sum -c` and Ship read the same file.
-          Set-Content -LiteralPath (Join-Path $out 'SHA256SUMS') -Value ("$hash  Thornswood.exe") -Encoding ascii
-          Write-Host ("SHA256  {0}  Thornswood.exe" -f $hash)
+          Copy-Item -LiteralPath (Join-Path $root 'Launcher\Thornswood.exe') -Destination (Join-Path $out 'Thornswood.exe') -Force
+          Copy-Item -LiteralPath 'out\setup-stub.exe' -Destination (Join-Path $out 'setup-stub.exe') -Force
+          # The sha256sum shape, "<hash>  <name>" with two spaces, one line
+          # each, so both `sha256sum -c` and Ship read the same file.
+          $lines = @()
+          foreach ($n in 'Thornswood.exe', 'setup-stub.exe') {
+            $hash = (Get-FileHash -LiteralPath (Join-Path $out $n) -Algorithm SHA256).Hash.ToLower()
+            $lines += ("$hash  $n")
+            Write-Host ("SHA256  {0}  {1}" -f $hash, $n)
+          }
+          Set-Content -LiteralPath (Join-Path $out 'SHA256SUMS') -Value $lines -Encoding ascii
 
-      - name: Draft a release with the exe and its checksum
+      - name: Draft a release with the exe, the setup program and their checksums
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -97,8 +110,9 @@ jobs:
           $tag = if ($env:INPUT_TAG) { $env:INPUT_TAG } else { $env:GITHUB_REF_NAME }
           $out = Join-Path $env:RUNNER_TEMP 'release'
           $exe = Join-Path $out 'Thornswood.exe'
+          $stub = Join-Path $out 'setup-stub.exe'
           $sums = Join-Path $out 'SHA256SUMS'
-          $notes = "Launcher exe for $tag, built on a clean runner and verified by SHA256SUMS. Ship downloads this and checks the checksum instead of compiling the shipped binary (issue #457).`n`nSource for the SkyMP files Thornswood ships: https://thornswood.net/credits#source"
+          $notes = "Launcher exe and setup program for $tag, built on a clean runner and verified by SHA256SUMS. Ship downloads these and checks the checksums instead of compiling the shipped binaries (issues #457 and #932).`n`nSource for the SkyMP files Thornswood ships: https://thornswood.net/credits#source"
           # A draft: a person promotes it, and Ship reads a draft's assets. If a
           # run for this tag already made the release, upload into it instead,
           # the same fallback Publish-Update.ps1 uses.
@@ -128,7 +142,7 @@ jobs:
             } | ConvertTo-Json
             $release = Invoke-RestMethod -Method Post -Uri "$api/releases" -Headers $headers -ContentType 'application/json' -Body $payload
           }
-          foreach ($asset in @($exe, $sums)) {
+          foreach ($asset in @($exe, $stub, $sums)) {
             $assetName = [IO.Path]::GetFileName($asset)
             $existing = @($release.assets | Where-Object { $_.name -eq $assetName })
             foreach ($item in $existing) {

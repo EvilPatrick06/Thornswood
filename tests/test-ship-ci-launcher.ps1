@@ -11,6 +11,14 @@
   Byte-identical local and runner builds are impossible with the Framework 4
   csc, so the checksum file is the whole of the verification.
 
+  The setup program the installer is built around comes the same way since
+  issue #932: release.yml attaches setup-stub.exe beside the launcher and
+  lists it in the same SHA256SUMS, a main Ship with -Package downloads and
+  checks it with Get-ReleaseStub before anything is published, and hands it
+  to Package-Thornswood.ps1 -Stub. On 28 September a main Ship -Package
+  stopped on "setup-stub.exe is missing" after the release was out, because
+  a main Ship never runs Build-Launcher, which is what compiles the stub.
+
   This lifts the two functions that do it, Get-SourceRepo and
   Get-ReleaseLauncher, out of the shipped Ship.ps1 by the parser, the way the
   other ship tests lift their blocks, and drives them with a fake gh on PATH so
@@ -53,9 +61,11 @@ $fns = @{}
 foreach ($f in $ast.FindAll({ param($n) $n -is $FnAst }, $true)) { $fns[$f.Name] = $f.Extent.Text }
 Yes 'Ship.ps1 has Get-SourceRepo' ($fns.ContainsKey('Get-SourceRepo'))
 Yes 'Ship.ps1 has Get-ReleaseLauncher' ($fns.ContainsKey('Get-ReleaseLauncher'))
-if (-not ($fns.ContainsKey('Get-SourceRepo') -and $fns.ContainsKey('Get-ReleaseLauncher'))) { Done }
+Yes 'Ship.ps1 has Get-ReleaseStub' ($fns.ContainsKey('Get-ReleaseStub'))
+if (-not ($fns.ContainsKey('Get-SourceRepo') -and $fns.ContainsKey('Get-ReleaseLauncher') -and $fns.ContainsKey('Get-ReleaseStub'))) { Done }
 Invoke-Expression $fns['Get-SourceRepo']
 Invoke-Expression $fns['Get-ReleaseLauncher']
+Invoke-Expression $fns['Get-ReleaseStub']
 
 $onWindows = ($PSVersionTable.PSVersion.Major -lt 6) -or $IsWindows
 
@@ -96,24 +106,37 @@ try {
     }
 
     # ---- a fake gh on PATH -------------------------------------------------------
-    # On "release download" it writes Thornswood.exe and a SHA256SUMS into --dir,
-    # the way the real gh would from the release CI drafted. TS_FAKE_GH_MODE bends
-    # it: good (default), mismatch (wrong hash), noline (no Thornswood.exe line),
-    # fail (exits non-zero and writes nothing, as a missing release does).
+    # On "release download" it writes each asset its --pattern names into --dir,
+    # with a SHA256SUMS listing Thornswood.exe and setup-stub.exe, the way the
+    # real gh would from the release CI drafted. TS_FAKE_GH_MODE bends it: good
+    # (default), mismatch (wrong hashes), noline (no line for either), fail
+    # (exits non-zero and writes nothing, as a missing release does), nostub (a
+    # release drafted before #932: the launcher and its line, no setup program).
     $helper = Join-Path $bin 'fake-gh.ps1'
     [IO.File]::WriteAllText($helper, @'
 $mode = $env:TS_FAKE_GH_MODE; if (-not $mode) { $mode = 'good' }
 if ($mode -eq 'fail') { exit 3 }
 $dir = ''
-for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--dir') { $dir = $args[$i + 1] } }
+$want = @()
+for ($i = 0; $i -lt $args.Count; $i++) {
+    if ($args[$i] -eq '--dir') { $dir = $args[$i + 1] }
+    if ($args[$i] -eq '--pattern') { $want += [string]$args[$i + 1] }
+}
 if (-not $dir) { exit 0 }
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
-$exe = Join-Path $dir 'Thornswood.exe'
-[IO.File]::WriteAllText($exe, 'the launcher CI built for this tag')
-$h = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLower()
-if ($mode -eq 'mismatch') { $h = ('0' * 64) }
-$name = if ($mode -eq 'noline') { 'something-else.exe' } else { 'Thornswood.exe' }
-Set-Content -LiteralPath (Join-Path $dir 'SHA256SUMS') -Value ("$h  $name") -Encoding ascii
+$assets = [ordered]@{ 'Thornswood.exe' = 'the launcher CI built for this tag'; 'setup-stub.exe' = 'the setup program CI built for this tag' }
+if ($mode -eq 'nostub') { $assets.Remove('setup-stub.exe') }
+$lines = @()
+foreach ($n in $assets.Keys) {
+    $tmp = [IO.Path]::GetTempFileName()
+    [IO.File]::WriteAllText($tmp, $assets[$n])
+    $h = (Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLower()
+    if ($want -contains $n) { Move-Item -LiteralPath $tmp -Destination (Join-Path $dir $n) -Force } else { Remove-Item -LiteralPath $tmp -Force }
+    if ($mode -eq 'mismatch') { $h = ('0' * 64) }
+    $name = if ($mode -eq 'noline') { 'something-else.exe' } else { $n }
+    $lines += ("$h  $name")
+}
+if ($want -contains 'SHA256SUMS') { Set-Content -LiteralPath (Join-Path $dir 'SHA256SUMS') -Value $lines -Encoding ascii }
 exit 0
 '@)
     if ($onWindows) {
@@ -157,11 +180,53 @@ exit 0
     Yes "  and says this machine does not compile it: '$why'" ($why -match 'this machine does not compile it')
     Yes '  and hands over the exact tag commands' ($why -match 'git tag v1\.2\.3' -and $why -match 'git push origin v1\.2\.3')
     Yes '  in the house words' ($why -notmatch 'player' -and $why.IndexOf([char]0x2014) -lt 0)
+
+    # ---- Get-ReleaseStub (issue #932) ---------------------------------------------
+    $stubInto = Join-Path $work 'stub'
+
+    # 5. The setup program CI built verifies and lands in the folder.
+    $env:TS_FAKE_GH_MODE = 'good'
+    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    Yes "the setup program CI built verifies and returns nothing: '$why'" ($why -eq '')
+    Yes '  and setup-stub.exe is sitting in the folder' (Test-Path -LiteralPath (Join-Path $stubInto 'setup-stub.exe'))
+    Yes '  and it is the one CI built, not a local one' ([IO.File]::ReadAllText((Join-Path $stubInto 'setup-stub.exe')) -eq 'the setup program CI built for this tag')
+
+    # 6. A checksum that does not match is refused.
+    $env:TS_FAKE_GH_MODE = 'mismatch'
+    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    Yes "a setup program whose checksum does not match is refused: '$why'" ($why -match 'does not match its SHA256SUMS' -and $why -match 'Do not ship it')
+
+    # 7. No line for it cannot be verified, and says how to get one.
+    $env:TS_FAKE_GH_MODE = 'noline'
+    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    Yes 'a SHA256SUMS with no setup-stub.exe line is refused' ($why -match 'no line for setup-stub\.exe')
+
+    # 8. A release drafted before #932 has no setup program: build the tag again.
+    $env:TS_FAKE_GH_MODE = 'nostub'
+    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    Yes "a release with no setup program stops the ship before anything is published: '$why'" ($why -match 'no setup program' -and $why -match 'Nothing was published')
+    Yes '  and hands over the exact command that builds the tag again' ($why -match [regex]::Escape('gh workflow run release.yml --repo EvilPatrick06/Thornswood -f tag=v1.2.3'))
+    Yes '  in the house words' ($why -notmatch 'player' -and $why.IndexOf([char]0x2014) -lt 0)
+
+    $env:TS_FAKE_GH_MODE = 'fail'
+    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    Yes 'no release at all stops it too' ($why -match 'no setup program')
 }
 finally {
     $env:PATH = $oldPath
     $env:TS_FAKE_GH_MODE = $oldMode
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 }
+
+# ---- the pieces are joined up -----------------------------------------------------
+$repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $ShipPath))
+$rel = [IO.File]::ReadAllText((Join-Path $repoRoot '.github/workflows/release.yml'))
+Yes 'release.yml stops when the build made no setup-stub.exe' ($rel -match [regex]::Escape("if (-not (Test-Path 'out\setup-stub.exe'))"))
+Yes '  lists it in SHA256SUMS beside the launcher' ($rel -match [regex]::Escape("foreach (`$n in 'Thornswood.exe', 'setup-stub.exe')"))
+Yes '  and attaches it to the draft' ($rel -match [regex]::Escape('foreach ($asset in @($exe, $stub, $sums))'))
+Yes 'Ship fetches it for a main -Package, before the build and the publish' ($src -match '(?s)if \(\$Package -and -not \$Dev -and -not \$DryRun\) \{.*?Get-ReleaseStub.*?# -+ build')
+Yes '  and hands it to Package-Thornswood as -Stub' ($src -match [regex]::Escape("if (`$ciStub) { `$pkgArgs['Stub'] = `$ciStub }") -and $src -match [regex]::Escape("& (Join-Path `$Here 'Package-Thornswood.ps1') @pkgArgs"))
+$pkg = [IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/release/Package-Thornswood.ps1'))
+Yes 'Package-Thornswood takes -Stub and packs that one, refusing one that is not there' ($pkg -match '\[string\]\$Stub = ' -and $pkg -match '(?s)if \(\$Stub\) \{\s*if \(-not \(Test-Path -LiteralPath \$Stub\)\) \{ Die' -and $pkg -match '\$stub = \$stubNow')
 
 Done

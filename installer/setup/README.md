@@ -38,7 +38,12 @@ install that way. `tests\test-installer-own-payload.ps1` holds it to that.
 
 `scripts\release\Build-Launcher.ps1` compiles it after the launcher, into
 `out\setup-stub.exe`, which git ignores like every other `.exe`. A failed
-compile keeps the last working stub and says so. Build into a scratch root, as
+compile keeps the last working stub and says so. That copy is what a dev Ship
+and a hand-run `Package-Thornswood.ps1` build around. A main Ship with
+`-Package` does not use it: `.github\workflows\release.yml` builds the stub
+beside the launcher from the tagged commit and lists both in `SHA256SUMS`,
+and Ship downloads it, checks it, and passes it as
+`Package-Thornswood.ps1 -Stub` (issue #932). Build into a scratch root, as
 for the launcher:
 
 ```
