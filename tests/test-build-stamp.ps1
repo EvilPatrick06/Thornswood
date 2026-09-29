@@ -120,12 +120,14 @@ if ($saves.Count -eq 1) {
     Yes 'Deploy-DevGamemode.ps1 stamps the gamemode it sends' ((Arg $s 'Gamemode') -eq '$Gamemode')
     Yes 'Deploy-DevGamemode.ps1 makes the stamp before the dev server is stopped' (
         $s.Extent.StartOffset -lt (At $dd "Write-Host 'Stopping the dev server...'"))
-    $scps = @(Commands $dd 'scp')
-    $gm = @($scps | Where-Object { $_.Extent.Text -match '\$Root/gamemode\.js' })
-    $st = @($scps | Where-Object { $_.Extent.Text -match '\$stampFile' -and $_.Extent.Text -match '\$Root/thornswood-build\.json' })
-    Yes 'Deploy-DevGamemode.ps1 sends the stamp beside gamemode.js on the dev server' ($st.Count -eq 1)
-    Yes 'Deploy-DevGamemode.ps1 sends it after gamemode.js' (
-        $gm.Count -eq 1 -and $st.Count -eq 1 -and $st[0].Extent.StartOffset -gt $gm[0].Extent.StartOffset)
+    # Since issue #446 both go into the stage in one list, and the stage is
+    # swapped in whole, so the stamp and the gamemode it names go live, and
+    # come back out on a rollback, together.
+    $gm = $dd.Extent.Text.IndexOf("`$send['gamemode.js'] = `$Gamemode")
+    $st = $dd.Extent.Text.IndexOf("`$send['thornswood-build.json'] = `$stampFile")
+    $scps = @(Commands $dd 'scp' | Where-Object { $_.Extent.Text -match '\$send\[\$rel\]' -and $_.Extent.Text -match '\$stageFar/\$rel' })
+    Yes 'Deploy-DevGamemode.ps1 sends the stamp beside gamemode.js on the dev server, into the stage' ($st -gt 0 -and $scps.Count -eq 1)
+    Yes 'Deploy-DevGamemode.ps1 sends it after gamemode.js' ($gm -gt 0 -and $st -gt $gm)
     Yes 'Deploy-DevGamemode.ps1 writes the stamp to the file it sends' ((Arg $s 'Path') -eq '$stampFile')
 }
 

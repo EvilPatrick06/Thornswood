@@ -7,11 +7,14 @@
       .\Install-Bot.ps1               all of it, asks for the token
       .\Install-Bot.ps1 -CodeOnly    just the code, then restart
       .\Install-Bot.ps1 -NoToken     everything except asking for it
+      .\Install-Bot.ps1 -PutBack     the code the last run replaced goes back
+                                     in, checked the same way
 
   What it does:
 
     1. Checks Python is on the VPS, and says how to get it if not.
-    2. Copies bot.py, card.py and the card artwork up.
+    2. Stages bot.py, card.py and the card artwork beside the running bot and
+       checks them there, before anything is stopped (issue #446, FILES below).
     3. Installs discord.py and Pillow there.
     4. Asks for the bot token at a prompt, never on a command line, and puts
        it in the bot's bot.env.json and the site's config.json together
@@ -26,8 +29,9 @@
        rolls bot.log by size while it runs. The first full run takes the old
        scheduled task and its run.ps1 loop off the box.
 
-  Run it again any time to push a change. It stops the old one first, by the
-  service's name.
+  Run it again any time to push a change. It stops the old one by the
+  service's name only once the new code has checked out, and puts the old
+  code back if the new one does not come up.
 #>
 [CmdletBinding()]
 param(
@@ -69,7 +73,12 @@ param(
   # so it runs unattended.
   [switch]$CodeOnly,
   [switch]$NoToken,
-  [switch]$NoPause
+  [switch]$NoPause,
+  # How long the new bot has to say it is watching its server before the old
+  # code goes back. Connecting to Discord and reading the roles takes a while.
+  [int]$Wait = 90,
+  # Put the code the last run replaced back in, and send nothing.
+  [switch]$PutBack
 )
 
 $ErrorActionPreference = 'Stop'
@@ -80,6 +89,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
+. (Join-Path $Here 'Swap.ps1')
 # The bot sources live at the repo root, in bot\. This script sits two levels
 # down, in scripts\deploy, since #440 sorted the scripts into scripts\<area> on
 # 25 September, so the repo root is two up from here. The copy loop below kept
@@ -95,11 +105,15 @@ $docsWin = $DocsRoot.Replace('/','\')
 # as the commit holds them, in one zip named by commit and hash, sent to the
 # box's store first. From here $Repo is the artifact's folder, which is laid
 # out like the repository, so every copy below sends exactly what the zip holds.
+# -PutBack builds and sends nothing.
 . (Join-Path $Here 'Artifact.ps1')
+$artifact = $null
+if (-not $PutBack) {
 $artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
 Write-Host ('artifact ' + (Format-ThornswoodArtifact $artifact)) -ForegroundColor DarkGray
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 $Repo = $artifact.Folder
+}
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -204,8 +218,27 @@ if (`$p) { 'FOUND ' + (& `$p.Source --version 2>&1) } else { 'MISSING' }
 }
 
 # --------------------------------------------------------------- files ---
-Head 'Copying it up'
-$null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin','$rootWin\assets' | Out-Null; 'ready'"
+<#
+  STAGED, CHECKED, THEN SWAPPED, issue #446.
+
+  This used to copy every file straight over the running bot, without looking
+  at a single scp exit code, and then restart it, so a copy that failed half
+  way was loaded half new at the next start. Now the files go into
+  $Root\.stage-<stamp> while the bot runs, every copy is checked, and the box
+  checks the stage (each file by its hash, bot.py and card.py through Python's
+  own parser). Nothing is stopped if that fails. The swap then stops the
+  service by name, renames the files in (what they replace goes to
+  $Root\.prev-<stamp>, the newest three kept), starts it by name, and waits
+  for this start to say it is watching its server. If it does not, the old
+  files go back and the service is started again on them. -PutBack puts the
+  newest .prev folder back the same way.
+#>
+$stamp     = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stageName = '.stage-' + $stamp
+$prevName  = '.prev-' + $stamp
+$hashes    = [ordered]@{}
+if (-not $PutBack) {
+Head 'Staging it'
 # dev-channel.txt goes up with the code, and it is not an afterthought.
 #
 # The site watcher reads the staff channel's id out of it, beside bot.py. It
@@ -216,11 +249,11 @@ $null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin','$rootWin\a
 # be added here.
 #
 # requirements.txt too, because the full run installs the libraries from it.
+$send = [ordered]@{}
 foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') {
   $src = Join-Path $Repo "bot\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
-  & scp @ssh $src "${User}@${Vps}:$Root/$f" | Out-Null
-  Say "  $f" 'Green'
+  $send[$f] = $src
 }
 # No roll-log.ps1 any more: the service rolls bot.log itself, by size, while
 # the bot runs (BotService.cs).
@@ -232,24 +265,130 @@ foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') {
 # working bot rather than a silent one. Put an id in it the moment two
 # channels ever share that name, which has already happened here with news.
 $staff = Join-Path $Repo 'bot\staff-channel.txt'
-if (Test-Path $staff) {
-  & scp @ssh $staff "${User}@${Vps}:$Root/staff-channel.txt" | Out-Null
-  Say '  staff-channel.txt' 'Green'
-} else {
-  Say '  no staff-channel.txt, so the bot resolves staff-general by name' 'DarkGray'
-}
+if (Test-Path $staff) { $send['staff-channel.txt'] = $staff }
+else { Say '  no staff-channel.txt, so the bot resolves staff-general by name' 'DarkGray' }
 $art = Join-Path $Repo 'bot\assets\join-card.png'
-if (Test-Path $art) {
-  & scp @ssh $art "${User}@${Vps}:$Root/assets/join-card.png" | Out-Null
-  Say '  assets\join-card.png' 'Green'
-} else {
-  Say '  no join-card.png, cards will fall back to a plain background' 'Yellow'
+if (Test-Path $art) { $send['assets/join-card.png'] = $art }
+else { Say '  no join-card.png, cards will fall back to a plain background' 'Yellow' }
+
+# A stage a run that died part way left behind was never swapped in.
+$made = @(Remote @"
+New-Item -ItemType Directory -Force -Path '$rootWin','$rootWin\assets' | Out-Null
+Get-ChildItem -LiteralPath '$rootWin' -Directory -Force -EA SilentlyContinue |
+  Where-Object { `$_.Name -like '.stage-*' } |
+  ForEach-Object { Remove-Item -LiteralPath `$_.FullName -Recurse -Force -EA SilentlyContinue }
+New-Item -ItemType Directory -Force -Path '$rootWin\$stageName\assets' | Out-Null
+'ready'
+"@ | ForEach-Object { "$_".Trim() })
+if ($made -notcontains 'ready') { Die "could not make $rootWin\$stageName on the VPS. The bot was not touched." }
+foreach ($rel in $send.Keys) {
+  & scp @ssh $send[$rel] "${User}@${Vps}:$Root/$stageName/$rel" | Out-Null
+  if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE for $rel. The bot was not touched." }
+  Say "  $rel" 'Green'
 }
+$hashes = Get-SwapHashes $send
+$checkOut = @(Remote ((ServiceSwapVars $Root $stageName $prevName $Wait $hashes @('bot.py', 'card.py')) + $serviceCheckBlock) |
+              ForEach-Object { Say "  $_"; "$_".Trim() })
+if ($checkOut -notcontains 'STAGE OK') { Die 'the stage did not check out, so the bot was not stopped or changed. The lines above say why.' }
+}
+
+# ==== thornswood bot hooks ====
+# What is particular to the bot, for Swap.ps1's service swap, in front of
+# which Bot-Service.ps1 goes: stopped by the service's name, with one sweep
+# for a copy somebody started by hand, which is still a bot holding the token
+# (issue #465); started by name. Healthy when this start has written 'watching
+# N server' to bot.log, which bot.py says once it is connected and has read
+# the roles, and not merely when the service says Running: a bot.py that fails
+# on import is running for a second at a time. A box with no service yet, on a
+# full run that is about to install it, has nothing to start or check here.
+$botHooks = @"
+`$log = '$rootWin\bot.log'
+`$before = 0
+`$hasService = [bool](Get-Service -Name '$Service' -EA SilentlyContinue)
+if (-not `$hasService -and -not `$NoServiceOk) {
+  'THE BOT SERVICE IS NOT INSTALLED HERE. Run Install-Bot.ps1 once without -CodeOnly: it puts the service in place of the old loop.'
+  'SWAP REFUSED'
+  exit 1
+}
+function StopIt {
+  if (`$hasService) {
+    try { Stop-Service -Name '$Service' -Force -ErrorAction Stop; 'stopped the service $Service' }
+    catch { 'COULD NOT STOP the service $Service' + ': ' + `$_.Exception.Message }
+  }
+  Stop-ThornswoodBotStrays '$rootWin'
+}
+function StartIt {
+  `$script:before = 0
+  if (Test-Path -LiteralPath `$log) { `$script:before = (Get-Item -LiteralPath `$log).Length }
+  if (`$hasService) { Restart-ThornswoodBotService -Name '$Service' -Root '$rootWin' }
+}
+# Only what this start wrote. The file is held open by the service, so it is
+# read with FileShare ReadWrite or not at all. Shorter than before means it
+# rolled, so all of it is this start.
+function Fresh {
+  `$out = @()
+  `$fs = `$null
+  try {
+    `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
+    `$from = `$before
+    if (`$fs.Length -lt `$from) { `$from = 0 }
+    if (`$fs.Length -gt `$from) {
+      [void]`$fs.Seek(`$from, 'Begin')
+      `$sr = New-Object IO.StreamReader(`$fs, [Text.Encoding]::UTF8)
+      `$out = @((`$sr.ReadToEnd()) -split "\r?\n")
+      `$sr.Close()
+    }
+  } catch { }
+  if (`$fs) { `$fs.Dispose() }
+  return `$out
+}
+function Healthy {
+  if (-not `$hasService) { return `$true }
+  `$until = (Get-Date).AddSeconds(`$Wait)
+  while (`$true) {
+    `$said = @(Fresh)
+    if (@(`$said -match 'watching \d+ server').Count -and (Get-Service -Name '$Service').Status -eq 'Running') { return `$true }
+    if (@(`$said -match 'stopped within').Count) { return `$false }
+    if ((Get-Date) -gt `$until) { return `$false }
+    Start-Sleep -Seconds 2
+  }
+}
+function Answer {
+  if (-not `$hasService) { return 'the files are in; the service is installed below' }
+  'service $Service is ' + (Get-Service -Name '$Service').Status + ', and the bot says it is watching its server'
+}
+function Why {
+  '--- what the bot said this time ---'
+  `$said = @(Fresh | Where-Object { `$_ -match '^\s*\[(thornswood-bot|run|service)\]' -or `$_ -match 'Error|Traceback' })
+  if (`$said.Count) { `$said | Select-Object -Last 25 } else { 'nothing yet' }
+}
+
+"@
+# ==== end thornswood bot hooks ====
+
+# The swap itself, for -CodeOnly, -PutBack and a full run. Hands back what the
+# box said. A full run may meet a box with no service yet, which the service
+# install below then puts in.
+function Invoke-BotSwap([bool]$noServiceOk) {
+  $pick = ''
+  if ($PutBack) { $pick = $putBackPick }
+  $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
+  if (-not (Test-Path -LiteralPath $svcLib)) { Die "missing: $svcLib" }
+  $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + ('$NoServiceOk = $' + $noServiceOk + "`r`n")
+  $out = @(Remote ($vars + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $botHooks + $pick + $serviceSwapBlock) |
+           ForEach-Object { Say "  $_"; "$_".Trim() })
+  if (-not (Show-SwapResult $out "$rootWin\.prev-<stamp>")) { Die 'the bot was not swapped in. The lines above say what is running.' }
+  return $out
+}
+
 # The box records that the bot runs this artifact (Artifact.ps1), and only
-# once the service is running on it (issue #465): -CodeOnly after the restart
-# by name, a full run after the service install. A run that ends with the bot
-# stopped records nothing, so the record never names code that is not up.
+# once the service is running on it (issue #465) and the swap has answered
+# (issue #446): -CodeOnly after the swap, a full run after the service
+# install. The record it had goes into .prev with the files it describes, so
+# -PutBack brings it back (Swap.ps1). A run that ends with the bot stopped
+# records nothing, so the record never names code that is not up.
 function Save-BotRecord {
+  Save-SwapPreviousRecord "$User@$Vps" $ssh $Root $prevName
   $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root
 }
 
@@ -257,47 +396,19 @@ function Save-BotRecord {
 # A change to bot.py and nothing else, which is most of them.
 #
 # The full run checks Python, reinstalls three libraries over the network,
-# rewrites bot.env.json and re-registers the scheduled task, and none of that
-# has anything to do with the code having changed. This sends the files and
-# restarts, which is the whole job, and it never asks for the token, so it
-# runs unattended.
-if ($CodeOnly) {
-    Head 'Restarting it'
-    $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
-    if (-not (Test-Path -LiteralPath $svcLib)) { Die "missing: $svcLib" }
-    $restart = @(Remote ((Get-Content -LiteralPath $svcLib -Raw) + "`n" + @"
-`$ErrorActionPreference = 'Continue'
-`$log = '$rootWin\bot.log'
-`$before = 0
-if (Test-Path `$log) { `$before = (Get-Item `$log).Length }
-
-# By the service's name (issue #465), with one sweep in between for a copy
-# somebody started by hand, which is still a bot holding the token.
-`$did = Restart-ThornswoodBotService -Name '$Service' -Root '$rootWin'
-if (`$null -eq `$did) { 'THE BOT SERVICE IS NOT INSTALLED HERE. Run Install-Bot.ps1 once without -CodeOnly: it puts the service in place of the old loop.'; return }
-`$did
-Start-Sleep -Seconds 12
-'service ' + '$Service' + ' is ' + (Get-Service -Name '$Service').Status
-
-# Only what this start wrote. The file is held open by the service, so it is
-# read with FileShare ReadWrite or not at all. Shorter than before means it
-# rolled, so all of it is this start.
-`$fs = `$null
-try {
-  `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
-  `$from = `$before
-  if (`$fs.Length -lt `$from) { `$from = 0 }
-  if (`$fs.Length -gt `$from) {
-    [void]`$fs.Seek(`$from, 'Begin')
-    `$sr = New-Object IO.StreamReader(`$fs, [Text.Encoding]::UTF8)
-    (`$sr.ReadToEnd()) -split "\r?\n" | Where-Object { `$_ } | Select-Object -Last 12
-    `$sr.Close()
-  } else { 'nothing new in the log yet' }
-} catch { 'could not read the log: ' + `$_.Exception.Message } finally { if (`$fs) { `$fs.Dispose() } }
-"@))
-    $restart | ForEach-Object { Say "  $_" }
-    if ("$restart" -match ('service ' + $Service + ' is Running')) { Save-BotRecord }
-    else { Say '  The service is not running, so the box does not record this code as the bot''s.' 'Yellow' }
+# rewrites bot.env.json and re-installs the service, and none of that has
+# anything to do with the code having changed. This swaps the staged files in
+# and restarts the service by name, which is the whole job, and it never asks
+# for the token, so it runs unattended. -PutBack is the same swap with the
+# newest .prev folder in place of the stage.
+if ($CodeOnly -or $PutBack) {
+    if ($PutBack) { Head 'Putting the last files back' } else { Head 'Swapping it in' }
+    $restart = Invoke-BotSwap $false
+    if ($PutBack) { Restore-SwapRecord "$User@$Vps" $ssh $Root $restart '' 'bot' }
+    elseif ($restart -contains 'SWAP OK') {
+        if ("$restart" -match ('service ' + $Service + ' is Running')) { Save-BotRecord }
+        else { Say '  The service is not running, so the box does not record this code as the bot''s.' 'Yellow' }
+    }
 
     Write-Host ''
     Say '  Code only. Python, the libraries, the token and the service were left alone.' 'DarkGray'
@@ -323,7 +434,7 @@ Set-Location '$rootWin'
 # box would have taken the next major of any of the three, untried. The
 # build check installs the same file before it runs the bot harnesses, so the
 # versions tested are the versions run. Bump them there, on purpose.
-& python -m pip install --quiet --disable-pip-version-check -r '$rootWin\requirements.txt' 2>&1 | Out-Null
+& python -m pip install --quiet --disable-pip-version-check -r '$rootWin\$stageName\requirements.txt' 2>&1 | Out-Null
 if (`$LASTEXITCODE -eq 0) { 'discord.py, pillow and certifi ready, at the versions in requirements.txt' } else { 'PIP FAILED with ' + `$LASTEXITCODE }
 `$ca = (& python -c "import certifi; print(certifi.where())" 2>&1 | Select-Object -Last 1)
 if (`$ca -and (Test-Path `$ca)) { 'root certificates at ' + `$ca } else { 'COULD NOT FIND certifi, TLS will fail' }
@@ -473,6 +584,13 @@ if (`$changed -or `$tokenChanged) {
 "@)
 $payload = $null; $botKey = $null
 $settings | ForEach-Object { Say "  $_" }
+
+# ---------------------------------------------------------------- swap ---
+# The staged code in, with the old service stopped and started again by name,
+# and the old code back if it does not come up (issue #446). A box with no
+# service yet gets the files, and the install below starts them.
+Head 'Swapping it in'
+$null = Invoke-BotSwap $true
 
 # -------------------------------------------------------------- runner ---
 # The bot as the Windows service ThornswoodBot, under its own account (issue

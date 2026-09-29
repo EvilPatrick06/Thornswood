@@ -49,6 +49,11 @@ try {
     $App = Join-Path $scratch 'repo'
     $rootWin = Join-Path $scratch 'vps'
     $Root = $rootWin
+    # Since issue #446 what differs goes into the stage and is listed in $send
+    # for the box to hash. The stage here is the scratch folder itself, so the
+    # files still land where this reads them back.
+    $stageFar = $rootWin
+    $send = [ordered]@{}
     New-Item -ItemType Directory -Force -Path (Join-Path $App 'public'), (Join-Path $rootWin 'public') | Out-Null
     function put([string]$p, [string]$s) { [IO.File]::WriteAllText($p, $s) }
     # The same in both places, as banner.mp4 was.

@@ -190,6 +190,32 @@ a server folder, `Restore-Box.ps1` puts all of it onto a new box, and
 `tests\test-backup-restore.ps1` and `tests\test-new-box-runbook.ps1` prove the
 round trip.
 
+How a deploy replaces what runs (issue #446): nothing is written over a
+running service any more. The new files go into `<folder>\.stage-<stamp>`
+while the old one runs, the box checks them there (each file by its hash, the
+program parsing, the load order resolving), and a refusal stops nothing. Only
+then is it stopped, the files renamed in, started and asked whether it
+answers; if it does not, the old files go back and it is started again, and
+the run says `SWAP ROLLED BACK` and fails. What a deploy replaced stays in
+`<folder>\.prev-<stamp>`, the newest three, and `-PutBack` puts the newest
+back the same way, keeping what it took out in `.undone-<stamp>`:
+`Deploy-Server.ps1`, `Deploy-DevGamemode.ps1`, `Deploy-Docs.ps1`,
+`Install-Voice.ps1` and `Install-Bot.ps1` all take it, and the blocks that do
+it on the box are `scripts\deploy\Swap.ps1`. The record of what a part runs (issue #459,
+`C:\Thornswood-Deploys`) is written only once the swap has answered; the one
+it had goes into `.prev` with the files it describes, and `-PutBack` brings it
+back and tells the store. A whole server install through
+`Publish-Server.ps1` does the same one level up: the payload is unpacked to
+`C:\Thornswood-Server.stage-<stamp>` beside the root, the old root becomes
+`C:\Thornswood-Server.prev-<stamp>` (the newest three kept, each a whole
+server folder, so they cost disk), the world, the roster, the runtime data and
+the logs are carried across, and a server that does not answer is swapped
+back and kept as `.failed-<stamp>` to read. `Publish-Server.ps1 -PutBack`
+puts the newest `.prev` back. The documents and public pages the site serves
+from `data` are content, not the app, and still go up in place with a `.bak`.
+The harnesses are `tests\test-deploy-swaps.ps1`,
+`tests\test-install-server.ps1` and `tests\test-deploy-server-swap.ps1`.
+
 ## How the pieces talk
 
 - **Launcher to game server:** the SkyMP client connects to `serverAddress` and

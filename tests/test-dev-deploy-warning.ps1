@@ -117,8 +117,9 @@ for ($i = 0; $i -lt $top.Count; $i++) {
         $s.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst] -and
         $s.PipelineElements[0].GetCommandName() -eq 'Warn-DevRoom') { $iWarn = $i }
     if ($iStop -lt 0 -and $text -match "^Write-Host 'Stopping the dev server\.\.\.'") { $iStop = $i }
+    # The stop is Swap.ps1's swap block since issue #446, sent as $swapBlock.
     if ($iFirstStopTask -lt 0 -and $s -isnot [System.Management.Automation.Language.FunctionDefinitionAst] -and
-        $text -match 'Stop-ScheduledTask') { $iFirstStopTask = $i }
+        $text -match 'Stop-ScheduledTask|\$swapBlock') { $iFirstStopTask = $i }
 }
 Yes 'the deploy calls the warning' ($iWarn -ge 0)
 Yes 'after the load order is worked out, so a missing plugin still stops it before anybody is told' (
@@ -337,21 +338,29 @@ try {
     # And the stop, run here. The things that would stop a task or a process
     # are functions in front of the cmdlets, which PowerShell prefers, so
     # nothing on this machine is touched whatever is on that port.
-    $stopAst = @($ast.EndBlock.Statements | Where-Object {
-        $_ -is [System.Management.Automation.Language.PipelineAst] -and
-        $_.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst] -and
-        $_.PipelineElements[0].GetCommandName() -eq 'Remote' -and
-        $_.Extent.Text -match 'Stop-ScheduledTask' })
-    Yes 'the deploy has one stop block to run' ($stopAst.Count -eq 1)
-    if ($stopAst.Count -eq 1) {
-        $Task = 'thornswood-test-no-such-task'
-        $stopText = Invoke-Expression $stopAst[0].PipelineElements[0].CommandElements[1].Extent.Text
+    #
+    # Since issue #446 the stop is StopOurs in Swap.ps1's swap block, the one
+    # Deploy-Server sends to live, and the deploy sends that block rather than
+    # a stop of its own. So the stop run here is that one, against the dev box.
+    $lib = Get-Content -LiteralPath (Join-Path (Split-Path -Parent $deployPath) 'Swap.ps1') -Raw
+    $la = $lib.IndexOf('# ==== deploy-server remote blocks ====')
+    $lb = $lib.IndexOf('# ==== end deploy-server remote blocks ====')
+    $swapBlock = ''
+    if ($la -ge 0 -and $lb -gt $la) { $checkBlock = $null; Invoke-Expression $lib.Substring($la, $lb - $la) }
+    $stopMatch = [regex]::Match($swapBlock, '(?ms)^function StopOurs \{.*?^\}\r?$')
+    Yes 'the deploy sends Swap.ps1''s swap block, which carries the stop' (
+        $src -match '\. \(Join-Path \$Here ''Swap\.ps1''\)' -and $src -match '\+ \$swapBlock\)')
+    Yes 'the deploy has one stop block to run' ($stopMatch.Success)
+    if ($stopMatch.Success) {
+        $stopText = "`$Task = 'thornswood-test-no-such-task'`r`n`$Root = '" + $box.Replace("'", "''") + "'`r`n`$port = " + $upPort + "`r`n" +
+                    $stopMatch.Value + "`r`nStopOurs`r`n'stopped'`r`n"
         $standIns = @'
 function Stop-ScheduledTask { }
 function Stop-Process { 'stand-in asked to stop ' + ($args -join ' ') }
 function Get-NetUDPEndpoint { }
 function Get-NetTCPConnection { }
 function Start-Sleep { }
+function Held { $false }
 
 '@
         $request = Join-Path $boxData 'restart.json'

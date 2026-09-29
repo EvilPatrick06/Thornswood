@@ -7,14 +7,22 @@
 
   What it does, in order:
     1. builds the payload zip from your local dist\server
-    2. stops the scheduled task on the VPS so files are not in use
-    3. copies the zip across
-    4. unpacks it there, checks every plugin in the load order is on disk,
-       registers the boot task and starts it
+    2. copies the zip across, with the server still running
+    3. the installer unpacks it BESIDE the running server, checks it there
+       (the zip's hash, every plugin in the load order, gamemode.js parsing,
+       the binary against its record) and stops nothing if any of it fails
+    4. only then stops the server, swaps the new folder in, registers the
+       boot task and starts it; if it does not answer on its ports, the
+       previous folder goes back and is started again (issue #446)
     5. waits for the resources port to answer, from here
 
-  The world folder on the VPS is preserved across reinstalls by the installer,
-  so characters made on the server survive an update. -FreshWorld throws it away.
+  The world folder on the VPS is carried across reinstalls by the installer,
+  so characters made on the server survive an update. -FreshWorld starts the
+  server with none, and leaves the old one in the previous folder.
+
+  The previous folder is kept beside the root, the newest three, and
+      .\scripts\release\Publish-Server.ps1 -PutBack
+  puts the newest back the same checked way (-Channel dev for the dev server).
 
   It also writes a line into the launcher's News page and pushes it.
 
@@ -62,7 +70,13 @@ param(
     [string]$TaskName,
     [switch]$FreshWorld,
     [switch]$SkipBuild,
-    [switch]$NoPause
+    [switch]$NoPause,
+    # Put the previous server folder back instead of publishing. Builds and
+    # sends nothing but the installer, and writes no news.
+    [switch]$PutBack,
+    # How long the new server has to answer on the box before the previous one
+    # goes back.
+    [int]$Wait = 60
 )
 
 # The two that the channel decides, unless they were given outright. An
@@ -102,6 +116,47 @@ foreach ($t in 'ssh', 'scp') {
     if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
         Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client."
     }
+}
+
+# ------------------------------------------------------------- installer ----
+# Sent every time rather than trusting whatever copy is up there, so the VPS
+# never runs a version of the installer older than the payload it is unpacking.
+$installer = Join-Path $Here '..\deploy\Install-ThornswoodServer.ps1'
+if (-not (Test-Path -LiteralPath $installer)) { Die "not found: $installer" }
+# Beside the installer, which puts it in the server's folder for the task to
+# run in front of the server. See Roll-Log.ps1 for why a log can only be
+# rolled at start.
+$rollLog = Join-Path $Here '..\vps\Roll-Log.ps1'
+if (-not (Test-Path -LiteralPath $rollLog)) { Die "not found: $rollLog" }
+
+# What the installer said, printed as it comes, and its last line read: it
+# ends with INSTALL OK, INSTALL REFUSED, INSTALL ROLLED BACK or INSTALL FAILED.
+function Invoke-Installer([string]$instArgs) {
+    $lines = @(& ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 $instArgs" |
+               ForEach-Object { Say "  $_"; "$_".Trim() })
+    $code = $LASTEXITCODE
+    if ($lines -contains 'INSTALL OK' -and $code -eq 0) { return }
+    if ($lines -contains 'INSTALL REFUSED') {
+        Die "the installer refused, so the server up there was not stopped or changed. The lines above say why."
+    }
+    if ($lines -contains 'INSTALL ROLLED BACK') {
+        Die "the new server did not answer, so the installer put the previous one back and started it again. The lines above say whether it answers, and why the new one did not."
+    }
+    Die "the installer on the VPS exited with $code and did not say it finished. THE SERVER MAY BE DOWN: look at $VpsRoot and the folders beside it before anything else."
+}
+
+# ------------------------------------------------------------- -PutBack -----
+if ($PutBack) {
+    Head 'Putting the previous server back'
+    & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1"
+    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
+    & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1"
+    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
+    Invoke-Installer "-Root '$VpsRoot' -TaskName '$TaskName' -StartNow -PutBack -Wait $Wait"
+    Say 'the previous server is back and answering up there' 'Green'
+    Write-Host ''
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
 }
 
 # ------------------------------------------------------------- gamemode ------
@@ -268,73 +323,33 @@ if (-not $SkipBuild) {
 if (-not (Test-Path -LiteralPath $Zip)) { Die "not found: $Zip. Run without -SkipBuild." }
 Say ("payload {0:N1} MB" -f ((Get-Item -LiteralPath $Zip).Length / 1MB)) 'Green'
 
-# ---------------------------------------------------------------- installer --
-# Sent every time rather than trusting whatever copy is up there, so the VPS
-# never runs a version of the installer older than the payload it is unpacking.
-$installer = Join-Path $Here '..\deploy\Install-ThornswoodServer.ps1'
-if (-not (Test-Path -LiteralPath $installer)) { Die "not found: $installer" }
-# Beside the installer, which puts it in the server's folder for the task to
-# run in front of the server. See Roll-Log.ps1 for why a log can only be
-# rolled at start.
-$rollLog = Join-Path $Here '..\vps\Roll-Log.ps1'
-if (-not (Test-Path -LiteralPath $rollLog)) { Die "not found: $rollLog" }
-
-Head 'Stopping the server up there'
-# Not fatal: on a first install there is no task to stop.
-#
-# Sent base64 encoded rather than as a quoted string. The previous version wrote
-# \$_.Name, escaping with a backslash, which PowerShell does not use: the escape
-# character is a backtick. So the backslash stayed literal, $_ expanded to
-# nothing outside a pipeline, and the remote shell was asked to run a command
-# called \.Name, once per process on the box. A hundred red errors every publish,
-# none of them real, and real ones buried in the middle of them.
-#
-# EncodedCommand takes the script as one blob and nothing has to survive two
-# layers of quoting.
-$stopRemote = @'
-$ProgressPreference = 'SilentlyContinue'
-Stop-ScheduledTask -TaskName '@@TASK@@' -ErrorAction SilentlyContinue
-<#
-  BY THE FOLDER, NOT BY THE WORD skymp5-server.
-
-  This used to match every node process carrying 'skymp5-server' on its
-  command line. On the live server that is the live server and nothing else,
-  so it was right for years. The moment this script gained a dev channel it
-  was the thing that took the LIVE server down while publishing to dev, on
-  21 September, exactly as Deploy-DevGamemode.ps1's header warns it would.
-
-  The trailing backslash is the whole of the fix and it is not decoration:
-  'C:\Thornswood-Server' is a prefix of 'C:\Thornswood-Server-Dev', so
-  matching without it means a live publish also kills the dev server, and the
-  bug simply changes direction.
-#>
-Get-CimInstance Win32_Process -EA SilentlyContinue |
-  Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*@@ROOT@@\*' } |
-  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }
-'stopped'
-'@ -replace '@@TASK@@', $TaskName -replace '@@ROOT@@', $VpsRoot.TrimEnd('\')
-
-$stopEnc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($stopRemote))
-& ssh @ssh $target "powershell -NoProfile -EncodedCommand $stopEnc"
+# ------------------------------------------------------------ no stop here ---
+# This used to stop the server here, before anything was copied, so a copy
+# that failed or a payload the installer refused left it down. Issue #446.
+# The installer stops it now, by its own folder and port, and only once the
+# new folder has checked out beside the old one.
 
 Head 'Copying'
-Say 'this is the slow part, a few minutes on a first run' 'DarkGray'
+Say 'this is the slow part, a few minutes on a first run; the server keeps running' 'DarkGray'
 & scp @ssh $Zip "${target}:C:/thornswood-server.zip"
-if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1"
-if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1"
-if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Say 'copied' 'Green'
 
 Head 'Installing'
-$instArgs = "-Zip C:\thornswood-server.zip -Root '$VpsRoot' -TaskName '$TaskName' -StartNow"
+# The zip's hash as it left here, for the installer to hold the copy up there to.
+$zipSum = (Get-FileHash -LiteralPath $Zip -Algorithm SHA256).Hash
+$instArgs = "-Zip C:\thornswood-server.zip -Root '$VpsRoot' -TaskName '$TaskName' -StartNow -ZipSha256 $zipSum -Wait $Wait"
 if ($FreshWorld) {
-    Say 'throwing away the world on the VPS as asked' 'Yellow'
-    & ssh @ssh $target "powershell -NoProfile -Command `"Remove-Item -LiteralPath '$VpsRoot\world' -Recurse -Force -ErrorAction SilentlyContinue; 'world cleared'`""
+    # Not deleted any more: the installer starts the new server with no world
+    # and leaves the old one in the previous folder beside the root.
+    Say 'starting with no world, as asked; the old one stays in the previous folder' 'Yellow'
+    $instArgs += ' -FreshWorld'
 }
-& ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 $instArgs"
-if ($LASTEXITCODE -ne 0) { Die "the installer on the VPS exited with $LASTEXITCODE. Nothing local was changed." }
+Invoke-Installer $instArgs
 
 <#
   DEV CARRIES MAIN'S ROSTER.
@@ -471,6 +486,11 @@ if ($up) {
     Say 'If that log is empty or says nothing useful, the other candidate is the' 'Yellow'
     Say 'firewall. The server can be up and still unreachable from here:' 'Yellow'
     Say "    ssh $target `"powershell -NoProfile -Command Get-NetFirewallRule -DisplayName '*Thornswood*' ^| Format-Table DisplayName,Enabled,Direction`"" 'DarkGray'
+    # The box said it answers on its own ports, so the new server stays: this
+    # is the network or the firewall, and the previous folder would not change it.
+    Write-Host ''
+    if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
+    exit 1
 }
 
 # ------------------------------------------------------------------ news ----
