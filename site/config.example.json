@@ -47,5 +47,6 @@
   },
   "botKey": "",
   "admins": [],
-  "secret": ""
+  "secret": "",
+  "passKey": ""
 }
