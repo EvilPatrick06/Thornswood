@@ -866,7 +866,7 @@ var BLURB = {
   '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
   '/roadmap': ['Roadmap', 'What is being worked on and roughly in what order.'],
   '/news':    ['Every release', 'What changed, newest first. The same list the launcher shows.'],
-  '/report':  ['Report a problem', 'Something broken, or an idea. No account needed.'],
+  '/report':  ['Report a problem', 'Something broken, or an idea, with no account needed. Or somebody behaving badly, signed in.'],
   '/gallery': ['From the world', 'Pictures taken by people playing.'],
   '/privacy': ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no analytics.'],
   '/terms':   ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.'],
@@ -1489,6 +1489,8 @@ if (AGE_PATHS[here] && !ageOk()) {
   show('<h1>Report a problem</h1>' +
     '<p>Something broken, or an idea. Either one lands in front of whoever is ' +
     'fixing things. You do not need an account and nothing here is public.</p>' +
+    '<p>Somebody behaving badly goes here too: tick the box about a person. ' +
+    'That one needs you signed in with Discord, and only staff read it.</p>' +
     '<form id="rep" class="form">' +
     '<div><label for="rTitle">What happened</label>' +
       '<span class="hint">One line. The rest goes below.</span>' +
@@ -1508,23 +1510,52 @@ if (AGE_PATHS[here] && !ageOk()) {
       'autocomplete="off"></div>' +
     '<label class="check"><input type="checkbox" id="rIdea"> ' +
       'This is an idea, not a fault</label>' +
+    /* Reporting a person (#414). Never anonymous: the site keeps it against
+       the Discord account that sent it, so this half asks for a sign in and
+       the server refuses it without one. */
+    '<label class="check"><input type="checkbox" id="rPerson"> ' +
+      'This is about a person, not the game</label>' +
+    '<div id="rWhoBox" hidden><label for="rWho">Who</label>' +
+      '<span class="hint">Their character name, or their Discord name. It goes to ' +
+      'staff and nobody else, and staff see that it came from you.</span>' +
+      '<input id="rWho" type="text" maxlength="60">' +
+      '<p id="rSign" class="hint" hidden>Reporting somebody needs you signed in, so staff ' +
+      'can come back to you about it. <a href="/auth/discord?back=/report">Sign in with ' +
+      'Discord</a>. In the game, /report does the same.</p></div>' +
     '<div><button class="btn first" type="submit">Send it</button></div>' +
     '<p id="rSaid" class="said" hidden></p>' +
     '</form>');
   var form = document.getElementById('rep');
+  var signedIn = false;
+  fetch('/api/gallery/who', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { signedIn = !!(d && d.canSubmit); personBox(); })
+    .catch(function () { });
+  function personBox() {
+    var on = document.getElementById('rPerson').checked;
+    document.getElementById('rWhoBox').hidden = !on;
+    document.getElementById('rSign').hidden = !on || signedIn;
+    document.getElementById('rIdea').disabled = on;
+    form.querySelector('button').disabled = on && !signedIn;
+  }
+  document.getElementById('rPerson').addEventListener('change', personBox);
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var said = document.getElementById('rSaid');
     var btn = form.querySelector('button');
     btn.disabled = true;
+    var aboutPerson = document.getElementById('rPerson').checked;
     fetch('/api/report', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({
         title:  document.getElementById('rTitle').value,
         detail: document.getElementById('rDetail').value,
         by:     document.getElementById('rBy').value,
         homepage: document.getElementById('rHome').value,
-        kind:   document.getElementById('rIdea').checked ? 'idea' : 'bug'
+        about:  aboutPerson ? document.getElementById('rWho').value : '',
+        kind:   aboutPerson ? 'report'
+              : (document.getElementById('rIdea').checked ? 'idea' : 'bug')
       })
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
@@ -1533,7 +1564,10 @@ if (AGE_PATHS[here] && !ageOk()) {
           form.querySelectorAll('input, textarea').forEach(function (i) {
             if (i.type === 'checkbox') { i.checked = false; } else { i.value = ''; }
           });
-          said.textContent = 'Sent. Somebody will read it.';
+          said.textContent = aboutPerson
+            ? 'Sent to staff, and to nobody else. Somebody will read it.'
+            : 'Sent. Somebody will read it.';
+          personBox();
         } else {
           said.textContent = res.j.error || 'That did not send. Try again in a minute.';
         }

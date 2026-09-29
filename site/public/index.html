@@ -596,7 +596,7 @@ var isBoard = function (k) { return BOARDKEYS.indexOf(k) >= 0; };
 
 var ABOUT = {
   uploads:     'Staff Accept waiting shots and Delete pending or live ones. Send and browse pictures on /gallery.',
-  inbox:       'Bugs and ideas sent in from the public report page.',
+  inbox:       'Bugs and ideas from the public report page, reports about people, and calls for help from the game.',
   linked:      'Everybody who has linked a Discord account to a copy of the game.',
   sessions:    'One card a person, newest first by when they last played. ' +
                'Open one for every session they have had, with its logs and ' +
@@ -2320,11 +2320,15 @@ function drawInbox() {
     out += '<div class="empty">Nothing sent in yet.</div>';
   }
   S.inbox.forEach(function (n) {
+    // A report about a person and a call for help from the game (#414) say
+    // what they are, rather than reading as a bug.
+    var label = (n.kind === 'idea' || n.kind === 'report' || n.kind === 'help' ||
+                 n.kind === 'ticket') ? n.kind : 'bug';
     out += '<div class="note' + (n.state !== 'new' ? ' done' : '') + '" data-i="' + n.id + '">' +
       '<span class="kind ' + (n.kind === 'idea' ? 'idea' : 'bug') + '">' +
-        (n.kind === 'idea' ? 'idea' : 'bug') + '</span>' +
+        label + '</span>' +
       '<div class="mid">' +
-        '<div class="t">' + esc(n.title) + '</div>' +
+        '<div class="t">' + (n.about ? 'About ' + esc(n.about) + ': ' : '') + esc(n.title) + '</div>' +
         (n.detail ? '<div class="d">' + esc(n.detail) + '</div>' : '') +
         '<div class="m">' + (n.by ? esc(n.by) + '  &middot;  ' : '') +
           new Date(n.at).toLocaleString() +
