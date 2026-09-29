@@ -6,9 +6,9 @@ or a test. They were parked here on 25 September from `tools\` (and one from
 the repository root), after the audit of that day found nothing still using
 them.
 
-They were written to sit in `tools\` and some of them reach the scripts beside
-them from there, so a script moved back to run again goes back into `tools\`
-first. Most of them were written for the old layout (the old build folder, the
+They were written to sit in `tools\`, which is gone since 29 September, and
+some of them reach the scripts beside them from there, so a script taken out to
+run again needs its paths pointed at `scripts\<area>` first. Most of them were written for the old layout (the old build folder, the
 build before the own game folder) and would do the wrong thing on a machine
 set up today. Read the header before running anything.
 

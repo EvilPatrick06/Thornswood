@@ -32,14 +32,14 @@
   from files under its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$ToolsDir)
+param([string]$RepoDir)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsDir) { $ToolsDir = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoDir) { $RepoDir = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -85,7 +85,7 @@ function New-Record([string]$name, $json, [bool]$bom) {
 }
 
 # ---- 1. the helper ----------------------------------------------------------
-$helper = Join-Path $ToolsDir '..\scripts\deploy\MaxOnline.ps1'
+$helper = Join-Path $RepoDir 'scripts\deploy\MaxOnline.ps1'
 Yes 'MaxOnline.ps1 is in scripts\deploy' (Test-Path -LiteralPath $helper)
 if (-not (Test-Path -LiteralPath $helper)) { Done }
 . $helper
@@ -133,7 +133,7 @@ Yes 'the refusal names the engine ceiling' ($null -ne $threw -and $threw.Contain
 # The real record, found the way every caller finds it: no path given.
 $real = Get-MostOnline
 Yes ("with no path it reads records\most-online.json (got {0})" -f $real.From) (
-    [IO.Path]::GetFullPath($real.From) -eq [IO.Path]::GetFullPath((Join-Path $ToolsDir '..\records\most-online.json')))
+    [IO.Path]::GetFullPath($real.From) -eq [IO.Path]::GetFullPath((Join-Path $RepoDir 'records\most-online.json')))
 Yes ("the record says 25 people at once (got {0})" -f $real.Value) ($real.Value -eq 25)
 Yes ("and seats staff over it: engine seats {0}" -f $real.Seats) ($real.Seats -gt 25 -and $real.Seats -le 1000)
 
@@ -154,14 +154,14 @@ Set-MaxPlayers $s $g35 6>$null
 Yes 'it adds both keys when the file had neither' ($s.maxPlayers -eq 35 -and $s.thornswoodMostOnline -eq 25)
 
 # ---- 3. the feed reads the same record --------------------------------------
-$pu = Get-Content -LiteralPath (Join-Path $ToolsDir '..\scripts\release\Publish-Update.ps1') -Raw
+$pu = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\release\Publish-Update.ps1') -Raw
 Yes 'Publish-Update.ps1 dot-sources MaxOnline.ps1 for the feed''s number' ($pu.Contains(". (Join-Path `$PSScriptRoot '..\deploy\MaxOnline.ps1')"))
 Yes 'and announces Get-MostOnline''s number as maxOnline' ($pu.Contains('$mo = (Get-MostOnline).Value') -and
     $pu.Contains("if (`$mo -gt 0) { Set-Prop `$doc 'maxOnline' `$mo }"))
 Yes 'and no longer reads MaxOnline out of the launcher''s config.json' (-not $pu.Contains('$cfg.MaxOnline'))
 
 # ---- 4. Deploy-Gamemode.ps1 --------------------------------------------------
-$dg = Get-Content -LiteralPath (Join-Path $ToolsDir '..\scripts\deploy\Deploy-Gamemode.ps1') -Raw
+$dg = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\deploy\Deploy-Gamemode.ps1') -Raw
 $read = $dg.IndexOf('Get-MostOnline')
 $copy = $dg.IndexOf('Copy-Item -LiteralPath $Gamemode')
 Yes 'Deploy-Gamemode.ps1 dot-sources MaxOnline.ps1' ($dg.Contains("Join-Path `$Here 'MaxOnline.ps1'"))
@@ -208,7 +208,7 @@ if ($from -ge 0 -and $to -gt $from) {
 }
 
 # ---- 5. Deploy-DevGamemode.ps1 ----------------------------------------------
-$dd = Get-Content -LiteralPath (Join-Path $ToolsDir '..\scripts\deploy\Deploy-DevGamemode.ps1') -Raw
+$dd = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\deploy\Deploy-DevGamemode.ps1') -Raw
 $read = $dd.IndexOf('Get-MostOnline')
 $stop = $dd.IndexOf("Write-Host 'Stopping the dev server...'")
 Yes 'Deploy-DevGamemode.ps1 dot-sources MaxOnline.ps1' ($dd.Contains("Join-Path `$Here 'MaxOnline.ps1'"))
@@ -296,7 +296,7 @@ if ($open -ge 0 -and $close -gt $marker) {
 }
 
 # ---- 6. Publish-Server.ps1 ----------------------------------------------------
-$pubs = Get-Content -LiteralPath (Join-Path $ToolsDir '..\scripts\release\Publish-Server.ps1') -Raw
+$pubs = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\release\Publish-Server.ps1') -Raw
 $capAt = $pubs.IndexOf('$mostOnline = Get-MostOnline')
 $ifAt = -1
 if ($capAt -ge 0) { $ifAt = $pubs.LastIndexOf('if (Test-Path -LiteralPath $settingsPath) {', $capAt) }

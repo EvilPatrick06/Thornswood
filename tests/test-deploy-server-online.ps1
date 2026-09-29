@@ -23,8 +23,8 @@ $ErrorActionPreference = 'Stop'
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-$tools = Join-Path (Split-Path -Parent $Here) 'tools'
-$deployPath = Join-Path $tools '..\scripts\deploy\Deploy-Server.ps1'
+$tools = Split-Path -Parent $Here
+$deployPath = Join-Path $tools 'scripts\deploy\Deploy-Server.ps1'
 
 $script:pass = 0
 $script:fail = 0

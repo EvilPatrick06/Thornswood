@@ -33,11 +33,11 @@
 
   Read only. It reads launcher\app\Downgrade.cs and installer\Setup-Thornswood.ps1.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.join(TOOLS_DIR, '..');
+const ROOT = REPO_DIR;
 const APP = path.join(ROOT, 'launcher', 'app');
 const DOWN = fs.readFileSync(path.join(APP, 'Downgrade.cs'), 'utf8');
 const SETUP = fs.readFileSync(path.join(ROOT, 'installer', 'Setup-Thornswood.ps1'), 'utf8');

@@ -22,12 +22,12 @@
 // hurt most on.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const HERE = TOOLS_DIR;
-const ROOT = path.join(HERE, '..');
+const REPO = REPO_DIR;
+const ROOT = REPO;
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -39,7 +39,7 @@ function read(p) {
   try { return fs.readFileSync(p, 'utf8'); } catch (e) { return ''; }
 }
 
-const page = read(path.join(HERE, '..', 'docs', 'OWNERSHIP.md'));
+const page = read(path.join(REPO, 'docs', 'OWNERSHIP.md'));
 yes('docs/OWNERSHIP.md exists', page.length > 0);
 
 // ------------------------------------------------------------ the table --
@@ -141,8 +141,8 @@ function addDir(dir, ext) {
   });
 }
 // The scripts are in scripts\<area> since phase 8 of issue #440.
-['release', 'deploy', 'vps', 'ops', 'mods', 'dev'].forEach(function (a) { addDir(path.join(HERE, '..', 'scripts', a), '.ps1'); });
-addDir(path.join(HERE, '..', 'launcher', 'app'), '.cs');
+['release', 'deploy', 'vps', 'ops', 'mods', 'dev'].forEach(function (a) { addDir(path.join(REPO, 'scripts', a), '.ps1'); });
+addDir(path.join(REPO, 'launcher', 'app'), '.cs');
 yes('there are scripts and launcher sources to read, ' + sources.length + ' of them', sources.length > 50);
 
 const found = {};
@@ -165,7 +165,7 @@ missing.forEach(function (k) { console.log('      not in the table: ' + found[k]
 yes('every credential file the scripts and the launcher name is in the table', missing.length === 0);
 
 // The launcher's own config: any field whose name says it is a secret.
-const configCs = read(path.join(HERE, '..', 'launcher', 'app', 'Config.cs'));
+const configCs = read(path.join(REPO, 'launcher', 'app', 'Config.cs'));
 const FIELD = /\[DataMember[^\]]*\]\s*public\s+[\w?<>]+\s+(\w*(?:token|password|secret|key)\w*)\b/gi;
 const fields = [];
 let fm;

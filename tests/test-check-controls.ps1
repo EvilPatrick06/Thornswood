@@ -29,11 +29,11 @@ param([string]$CheckPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $CheckPath) { $CheckPath = Join-Path $Here '..\scripts\dev\Check-Controls.ps1' }
-$RealXaml = Join-Path $Here '..\launcher\ui.xaml'
-$RealApp  = Join-Path $Here '..\launcher\app'
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $CheckPath) { $CheckPath = Join-Path $Here 'scripts\dev\Check-Controls.ps1' }
+$RealXaml = Join-Path $Here 'launcher\ui.xaml'
+$RealApp  = Join-Path $Here 'launcher\app'
 
 $script:pass = 0
 $script:fail = 0
@@ -129,7 +129,7 @@ try {
     Yes ("in one session, a failing run then a clean one read 1 then 0 (read {0} then {1})" -f $first, $second) ($first -eq 1 -and $second -eq 0)
 
     # ---- the build check runs it ----------------------------------------------
-    $yml = Join-Path (Split-Path -Parent $Here) '.github\workflows\build.yml'
+    $yml = Join-Path $Here '.github\workflows\build.yml'
     if (Test-Path -LiteralPath $yml) {
         $y = [System.IO.File]::ReadAllText($yml)
         Yes 'build.yml runs Check-Controls.ps1 with -NoPause' ($y -match 'Check-Controls\.ps1[^\r\n]*-NoPause')

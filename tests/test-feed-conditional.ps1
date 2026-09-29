@@ -46,9 +46,9 @@ param([string]$Src)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $Src) { $Src = Join-Path $Here '..\launcher\app' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $Src) { $Src = Join-Path $Here 'launcher\app' }
 
 if ($PSVersionTable.PSEdition -eq 'Core') {
     $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -102,7 +102,7 @@ function Find-Ref([string]$name) {
     $null
 }
 
-$builder = Join-Path $Here '..\scripts\release\Build-Launcher.ps1'
+$builder = Join-Path $Here 'scripts\release\Build-Launcher.ps1'
 $tokens = $null; $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($builder, [ref]$tokens, [ref]$errors)
 $assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
@@ -290,7 +290,7 @@ function Run {
         if ($p) { $refs += $p } else { $missing += $n }
     }
     foreach ($n in $wv2) {
-        $p = Join-Path $Here ('..\launcher\lib\webview2\' + $n)
+        $p = Join-Path $Here ('launcher\lib\webview2\' + $n)
         if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n }
     }
     Yes ('every reference is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0)

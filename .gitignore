@@ -13,11 +13,6 @@ published.json
 logs/
 *.log
 
-# Scratch that has been committed by accident before.
-tools/thornswood-probe.js
-# What Audit-Mods.ps1 writes. A report of one machine at one moment, not source.
-tools/mod-audit.json
-
 # The Discord webhook is a credential: anyone holding the URL can post as the
 # bot. Publish-Discord reads it from here on the machine that ships.
 bot/news-webhook.txt
@@ -62,10 +57,11 @@ bot/dev-webhook.txt
 # Where a certificate lives and how to drive it. Never a password or a key,
 # but it names a machine's own signing setup and only that machine needs it.
 # scripts\release\Sign-Artifact.ps1 does nothing when this is absent, which is how a
-# machine without a certificate still builds.
-tools/signing.json
+# machine without a certificate still builds. Written from
+# records\signing\signing.template.json beside it; in tools\ until 29 Sep.
+records/signing/signing.json
 # and any copy of it kept beside it while the setup is being changed.
-tools/signing.json.*
+records/signing/signing.json.*
 
 # Microsoft's signing client, Azure.CodeSigning.Dlib.dll and what comes with
 # it, fetched from NuGet. records\signing\metadata.json beside it is tracked on
@@ -73,11 +69,11 @@ tools/signing.json.*
 records/signing/client/
 
 # The passphrase the nightly backups are encrypted with. Restore-Backup.ps1
-# looks for it beside itself, so the name has to be unable to land in here.
-# Where it really lives is Documents on Patrick's machine and
-# C:\Thornswood-Backup on the VPS, and it must be in both.
-tools/backup-key.txt
+# also looks for it in local\ (ignored below), so the name has to be unable
+# to land in here anywhere else. Where it really lives is Documents on
+# Patrick's machine and C:\Thornswood-Backup on the VPS, and it must be in both.
 thornswood-backup-key.txt
+backup-key.txt
 
 # What the voice service makes beside itself the first time it runs. On the VPS
 # it lives in its own folder, so these only appear here when somebody runs it
@@ -104,4 +100,7 @@ voice/chat/
 # Things kept beside the repository that never go to GitHub: other servers'
 # launcher scripts, a copy of the VPS server settings, backups of old files.
 # Everything C:\Thornswood-Dev held that was not the fork or build output.
+# Since 29 September also what tools\ held for one machine (issue #440,
+# phase 10): the front build thornswood-front.zip, Audit-Mods' mod-audit.json
+# and a copy of the backup passphrase. The setup stub is build output, in out\.
 /local/

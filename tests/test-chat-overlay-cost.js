@@ -44,7 +44,7 @@
 //     nothing and reads none of the launcher's files.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -57,7 +57,7 @@ function yes(what, cond) {
 
 const CR = String.fromCharCode(13);
 function read(rel) {
-  return fs.readFileSync(path.join(TOOLS_DIR, rel), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join(REPO_DIR, rel), 'utf8').split(CR).join('');
 }
 function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 
@@ -410,7 +410,7 @@ function page() {
   // widget list later, because it is deferred and this file is not.
   win.skyrimPlatform = { sendMessage: function () { told.push([].slice.call(arguments)); } };
   vm.createContext(win);
-  vm.runInContext(read('../game/ui/thornswood-bridge.js'), win, { filename: 'thornswood-bridge.js' });
+  vm.runInContext(read('game/ui/thornswood-bridge.js'), win, { filename: 'thornswood-bridge.js' });
 
   const front = makeFront(dom, win);
   win.skyrimPlatform.widgets = front.widgets;
@@ -430,7 +430,7 @@ function page() {
   }
   function loadChat(cfg) {
     win.THORNSWOOD = cfg;
-    vm.runInContext(read('../game/ui/thornswood-chat.js'), win, { filename: 'thornswood-chat.js' });
+    vm.runInContext(read('game/ui/thornswood-chat.js'), win, { filename: 'thornswood-chat.js' });
     settle();
   }
   return {
@@ -590,7 +590,7 @@ const PORT_PROFILE = '../Profile/voice-port.txt';
 const PTT = 'Data/Platform/voice-ptt.txt';
 const PTT_PROFILE = '../Profile/voice-ptt.txt';
 
-const PLUGIN = read('../game/plugins/thornswood-voice.js');
+const PLUGIN = read('game/plugins/thornswood-voice.js');
 const oursMatch = /const ours = \['([^']+)'\];/.exec(PLUGIN);
 const OURS = oursMatch ? oursMatch[1] : '';
 yes('the plugin names the address it calls ours', !!OURS);

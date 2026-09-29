@@ -17,14 +17,14 @@
   broken file, to show the check this relies on really fails.
 #>
 [CmdletBinding()]
-param([string]$Tools)
+param([string]$Repo)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $Tools) { $Tools = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $Repo) { $Repo = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -38,7 +38,7 @@ function LineOf([string[]]$lines, [string]$pattern) {
 }
 
 # ---- Deploy-Gamemode.ps1 ------------------------------------------------------
-$g = @(Get-Content -LiteralPath (Join-Path $Tools '..\scripts\deploy\Deploy-Gamemode.ps1'))
+$g = @(Get-Content -LiteralPath (Join-Path $Repo 'scripts\deploy\Deploy-Gamemode.ps1'))
 $check = LineOf $g '^\s*& node --check \$Gamemode'
 $copy = LineOf $g "^Copy-Item -LiteralPath \`$Gamemode -Destination \(Join-Path \`$Dist 'gamemode.js'\)"
 Yes 'Deploy-Gamemode runs node --check on gamemode.js' ($check -gt 0)
@@ -47,7 +47,7 @@ Yes '  and stops when it fails' (($g -join "`n") -match "LASTEXITCODE -ne 0\) \{
 Yes '  and stops when node is missing, rather than skipping' (($g -join "`n") -match "Get-Command node[^\n]*\) \{ throw")
 
 # ---- Deploy-Server.ps1 --------------------------------------------------------
-$s = @(Get-Content -LiteralPath (Join-Path $Tools '..\scripts\deploy\Deploy-Server.ps1'))
+$s = @(Get-Content -LiteralPath (Join-Path $Repo 'scripts\deploy\Deploy-Server.ps1'))
 $check = LineOf $s '^\s*& node --check \$built'
 $list = LineOf $s "^\`$files = 'scam_native.node'"
 # The first line that runs a call to the VPS: Remote, scp or ssh, or one of
@@ -57,7 +57,7 @@ $list = LineOf $s "^\`$files = 'scam_native.node'"
 # Remote lines near the top of the file and is called after the check.
 $vpsCalls = @('Remote', 'scp', 'ssh', 'OnlineNow', 'Get-LiveOnline', 'Warn-LiveRoom')
 $tk = $null; $pe = $null
-$sAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $Tools '..\scripts\deploy\Deploy-Server.ps1'), [ref]$tk, [ref]$pe)
+$sAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $Repo 'scripts\deploy\Deploy-Server.ps1'), [ref]$tk, [ref]$pe)
 $first = 0
 foreach ($c in $sAst.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
     if ($vpsCalls -notcontains $c.GetCommandName()) { continue }
@@ -73,7 +73,7 @@ Yes '  and before anything talks to the VPS' ($check -gt 0 -and ($first -eq 0 -o
 Yes '  and stops when it fails' (($s -join "`n") -match "LASTEXITCODE -ne 0\) \{ throw 'gamemode.js does not parse")
 
 # ---- Deploy-DevGamemode.ps1 still has its own ---------------------------------
-$d = @(Get-Content -LiteralPath (Join-Path $Tools '..\scripts\deploy\Deploy-DevGamemode.ps1'))
+$d = @(Get-Content -LiteralPath (Join-Path $Repo 'scripts\deploy\Deploy-DevGamemode.ps1'))
 Yes 'Deploy-DevGamemode still runs node --check' ((LineOf $d '& node --check \$Gamemode') -gt 0)
 
 # ---- node --check really fails on a broken file -------------------------------

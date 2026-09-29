@@ -8,7 +8,7 @@
   WHY. Since 27 September launchers from ExpectedSigner on refuse an update
   that is not signed by that certificate (CONTRIBUTING, issue #390). Build and
   Package may still leave a local binary unsigned: Sign-Artifact.ps1 prints
-  "not signing" and exits 0 when tools\signing.json is missing or disabled.
+  "not signing" and exits 0 when records\signing\signing.json is missing or disabled.
   That soft skip must not reach the site or the feed. Ship and Publish-
   Installer refuse instead.
 
@@ -65,7 +65,7 @@ function Get-SigningConfigRefusal {
     )
 
     if (-not (Test-Path -LiteralPath $ConfigPath)) {
-        return ('There is no tools\signing.json on this machine. Only a signing machine may Ship, ' +
+        return ('There is no records\signing\signing.json on this machine. Only a signing machine may Ship, ' +
                 'dev included (CONTRIBUTING). Nothing was published.')
     }
 
@@ -73,12 +73,12 @@ function Get-SigningConfigRefusal {
     try {
         $cfg = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
     } catch {
-        return ('tools\signing.json is not valid JSON: ' + $_.Exception.Message +
+        return ('records\signing\signing.json is not valid JSON: ' + $_.Exception.Message +
                 ' Nothing was published.')
     }
 
     if ($null -ne $cfg.enabled -and -not $cfg.enabled) {
-        return ('tools\signing.json has "enabled": false. Only a signing machine may Ship, ' +
+        return ('records\signing\signing.json has "enabled": false. Only a signing machine may Ship, ' +
                 'dev included (CONTRIBUTING). Nothing was published.')
     }
 
@@ -121,7 +121,7 @@ function Get-PublishSignRefusal {
         $st = if ($sig) { [string]$sig.Status } else { 'unknown' }
         return ((Split-Path -Leaf $Path) + ' is not Authenticode Valid (status ' + $st + '). ' +
                 'Ship and site publish refuse an unsigned tip. Sign it on a machine with ' +
-                'tools\signing.json, then publish again. Nothing was published.')
+                'records\signing\signing.json, then publish again. Nothing was published.')
     }
 
     $who = ''

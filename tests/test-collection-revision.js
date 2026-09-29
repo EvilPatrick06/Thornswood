@@ -29,7 +29,7 @@
 
   Read only. It builds strings in memory and reads the two source files.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -40,8 +40,8 @@ const os = require('os');
   they cannot share code across C#, PowerShell and this, so this is the one
   that fails loudly when they drift: it reads the C# and asserts the shape.
 */
-const CS = fs.readFileSync(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Checks.cs'), 'utf8');
-const PS = fs.readFileSync(path.join(TOOLS_DIR, '..', 'scripts', 'mods', 'LoadOrder.ps1'), 'utf8');
+const CS = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'app', 'Checks.cs'), 'utf8');
+const PS = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'mods', 'LoadOrder.ps1'), 'utf8');
 
 let pass = 0, fail = 0;
 const yes = (w, c) => {
@@ -286,7 +286,7 @@ yes('the publisher refuses a bad slug', /\^\[A-Za-z0-9\]\+\$/.test(PS));
 
 /* The thing this replaced must not creep back as the test. */
 yes('nothing decides staleness from po3_StartOnSave any more',
-    fs.readFileSync(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Shell.cs'), 'utf8')
+    fs.readFileSync(path.join(REPO_DIR, 'launcher', 'app', 'Shell.cs'), 'utf8')
       .indexOf('if (!Checks.StartOnSaveInstalled()) return "stale"') < 0);
 
 console.log('');

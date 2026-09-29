@@ -35,13 +35,13 @@
 // read, and a call whose name cannot be read fails.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 // The fork is the engine/skymp submodule (scripts/release/Where.ps1 has the
 // same rule; the old folder outside the repository went on 28 September).
-const FORK = process.env.SKYMP || path.join(TOOLS_DIR, '..', 'engine', 'skymp');
+const FORK = process.env.SKYMP || path.join(REPO_DIR, 'engine', 'skymp');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 

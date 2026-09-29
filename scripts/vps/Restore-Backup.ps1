@@ -49,7 +49,7 @@ if ($src.ToLower().EndsWith('.enc')) {
     # Where Install-Backup.ps1 copies it down to first, then the older places.
     $guesses = @()
     if ($env:USERPROFILE) { $guesses += Join-Path $env:USERPROFILE 'Documents\thornswood-backup-key.txt' }
-    $guesses += (Join-Path $PSScriptRoot '..\..\tools\backup-key.txt'), 'C:\Thornswood-Backup\key.txt'
+    $guesses += (Join-Path $PSScriptRoot '..\..\local\backup-key.txt'), 'C:\Thornswood-Backup\key.txt'
     foreach ($guess in $guesses) {
       if (Test-Path -LiteralPath $guess) { $KeyFile = $guess; break }
     }

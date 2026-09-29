@@ -45,14 +45,13 @@
        Never connects to anything.
 #>
 [CmdletBinding()]
-param([string]$Tools)
+param()
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\ and scripts\.
+# The tests are in tests\, what they test is in scripts\.
 $repo = Split-Path -Parent $Here
-if (-not $Tools) { $Tools = Join-Path $repo 'tools' }
 
 $script:pass = 0
 $script:fail = 0
@@ -63,7 +62,7 @@ function Yes([string]$what, [bool]$cond) {
 function Rel([string]$p) { return $p.Substring($repo.Length + 1) }
 
 $files = @()
-foreach ($d in @($Tools, (Join-Path $repo 'scripts'))) {
+foreach ($d in @((Join-Path $repo 'scripts'))) {
     if (Test-Path -LiteralPath $d) { $files += @(Get-ChildItem -LiteralPath $d -Filter *.ps1 -File -Recurse) }
 }
 
@@ -164,7 +163,7 @@ finally {
 
 # ---- 3: the other languages ----------------------------------------------------------
 $others = @()
-foreach ($d in 'scripts', 'bot', 'voice', 'site', 'tools', '.github', 'launcher') {
+foreach ($d in 'scripts', 'bot', 'voice', 'site', '.github', 'launcher') {
     $p = Join-Path $repo $d
     if (-not (Test-Path -LiteralPath $p)) { continue }
     foreach ($f in (Get-ChildItem -LiteralPath $p -File -Recurse -Include *.py, *.js, *.sh, *.cmd, *.bat, *.yml, *.yaml, *.psm1, *.cs -ErrorAction SilentlyContinue)) {

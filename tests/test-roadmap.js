@@ -25,13 +25,13 @@
 // wheel that grows fails here until the words say so too.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 
 function read(rel) {
-  let t = fs.readFileSync(path.join(TOOLS_DIR, rel), 'utf8').split(CR).join('');
+  let t = fs.readFileSync(path.join(REPO_DIR, rel), 'utf8').split(CR).join('');
   if (t.charCodeAt(0) === 0xFEFF) { t = t.slice(1); }
   return t;
 }
@@ -58,7 +58,7 @@ function says(text, n) {
 
 // ------------------------------------------------------------- the board ----
 let board = null;
-try { board = JSON.parse(read('../site/data/board.json')); }
+try { board = JSON.parse(read('site/data/board.json')); }
 catch (e) { console.log('      board.json: ' + e.message); }
 yes('board.json parses', !!board);
 
@@ -126,7 +126,7 @@ yes('the row keeps done false like every other roadmap row, since Done is the se
     !!w && w.row.done === false);
 
 // -------------------------------------------------------------- the keys ----
-const ini = read('../launcher/Thornswood.ini');
+const ini = read('launcher/Thornswood.ini');
 function iniKey(name) {
   const m = ini.match(new RegExp('^\\s*' + name + '\\s*=\\s*(\\d+)', 'm'));
   return m ? parseInt(m[1], 10) : NaN;
@@ -159,14 +159,14 @@ yes('the row says Tab moves on, as the ini does', /\bTab\b/.test(text));
 yes('the row says ' + stopLetter + ' stops, as the ini does', !!stopLetter && stops(text, stopLetter));
 
 /* "The launcher's Controls page moves any of those keys" is a claim too. */
-const keys = read('../launcher/app/Keys.cs');
+const keys = read('launcher/app/Keys.cs');
 yes('the launcher\'s Controls page does list WheelKey, PageKey and StopKey, as the row says',
     ['WheelKey', 'PageKey', 'StopKey'].every(function (k) {
       return keys.indexOf('ThornIni, "' + k + '"') !== -1;
     }));
 
 // ------------------------------------------------------------ the emotes ----
-const plugin = read('../game/plugins/thornswood-emotes.js');
+const plugin = read('game/plugins/thornswood-emotes.js');
 const a = plugin.indexOf('const CATEGORIES = [');
 const b = a < 0 ? -1 : plugin.indexOf('\n];', a);
 let cats = null;
@@ -190,7 +190,7 @@ yes('the row never says player', !/\bplayers?\b/i.test(text));
 
 // -------------------------------------------------- the note in todo.md ----
 /* The note the wrong numbers were copied from, so the next copy is right. */
-const todo = read('../site/data/todo.md');
+const todo = read('site/data/todo.md');
 const t0 = todo.indexOf('- Emote wheel.');
 const t1 = t0 < 0 ? -1 : todo.indexOf('\n- ', t0 + 1);
 const note = t0 < 0 ? '' : todo.slice(t0, t1 < 0 ? todo.length : t1).replace(/\s+/g, ' ');

@@ -27,7 +27,8 @@
   read directly, and each declared parameter must have a .PARAMETER there.
   Three things the help says are also read against the code, because text
   that is merely present can still be wrong: that a main release refuses
-  -Version, that it refuses a file under tools git does not know, and that a
+  -Version, that it refuses a file in a folder a release is built from that
+  git does not know, and that a
   dry run closes a running game.
 
   The index half runs New-ScriptIndex.ps1 -Check against this folder, which
@@ -42,10 +43,10 @@ param([string]$ToolsPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
 # The scripts, in scripts\<area> since phase 8 of issue #440.
-if (-not $ToolsPath) { $ToolsPath = Join-Path (Split-Path -Parent $Here) 'scripts' }
+if (-not $ToolsPath) { $ToolsPath = Join-Path $Here 'scripts' }
 
 $script:pass = 0
 $script:fail = 0
@@ -137,9 +138,9 @@ $refusesVersion = $shipText -match '-not \$Dev -and \$Version -ne \$current'
 $saysVersion = ($versionHelp -match '(?i)a main release refuses it') -and ($versionHelp -match 'Bump-Version\.ps1 -To')
 Yes ('Get-Help -Parameter Version says a main release refuses it, exactly when the code does' +
      ' (code refuses: ' + $refusesVersion + ', help says: ' + $saysVersion + ')') ($refusesVersion -eq $saysVersion)
-$refusesLoose = $shipText -match 'ls-files --others --exclude-standard -- tools'
-$saysLoose = $channelFlat -match '(?i)a file under tools git does not know'
-Yes ('Get-Help -Parameter Channel names the refusal of a file under tools git does not know, exactly when the code does' +
+$refusesLoose = $shipText -match 'ls-files --others --exclude-standard -- @moreRoots'
+$saysLoose = $channelFlat -match '(?i)a file in a folder a release is built from that git does not know'
+Yes ('Get-Help -Parameter Channel names the refusal of a file git does not know in a folder a release is built from, exactly when the code does' +
      ' (code refuses: ' + $refusesLoose + ', help says: ' + $saysLoose + ')') ($refusesLoose -eq $saysLoose)
 
 # A dry run must not close a running game and must not prune old packs
@@ -252,7 +253,7 @@ try {
 
     # ================================================== the check goes red
 
-    $t = Join-Path $work 'tools'
+    $t = Join-Path $work 'scripts'
     New-Item -ItemType Directory -Path $t -Force | Out-Null
     foreach ($n in 'release\Ship.ps1', 'release\Go.ps1', 'mods\Check-Plugins.ps1') {
         Copy-Item -LiteralPath (Join-Path $ToolsPath $n) -Destination $t

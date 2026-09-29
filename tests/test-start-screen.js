@@ -32,13 +32,13 @@
 //
 // Read only.
 'use strict';
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 
-const FRONT = process.env.FRONT || path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
-const SELECT = process.env.SELECT || path.join(TOOLS_DIR, '..', 'game', 'ui', 'thornswood-select.js');
+const FRONT = process.env.FRONT || path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js');
+const SELECT = process.env.SELECT || path.join(REPO_DIR, 'game', 'ui', 'thornswood-select.js');
 const front = fs.readFileSync(FRONT, 'utf8').split(CR).join('');
 const page = fs.readFileSync(SELECT, 'utf8').split(CR).join('');
 

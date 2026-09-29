@@ -29,8 +29,8 @@ param()
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
 $inv = [Globalization.CultureInfo]::InvariantCulture
 
 $script:pass = 0
@@ -50,11 +50,11 @@ function Finish {
     exit 0
 }
 
-$collector = Join-Path $Here '..\scripts\vps\vps-load.ps1'
-$reader    = Join-Path $Here '..\scripts\vps\Read-Load.ps1'
-$watcher   = Join-Path $Here '..\scripts\vps\Watch-Load.ps1'
-$checkLoad = Join-Path $Here '..\scripts\vps\Check-Load.ps1'
-$gamemode  = Join-Path $Here '..\game\gamemode.js'
+$collector = Join-Path $Here 'scripts\vps\vps-load.ps1'
+$reader    = Join-Path $Here 'scripts\vps\Read-Load.ps1'
+$watcher   = Join-Path $Here 'scripts\vps\Watch-Load.ps1'
+$checkLoad = Join-Path $Here 'scripts\vps\Check-Load.ps1'
+$gamemode  = Join-Path $Here 'game\gamemode.js'
 
 foreach ($f in @($collector, $reader, $watcher)) {
     Yes ((Split-Path -Leaf $f) + ' is there') (Test-Path -LiteralPath $f)

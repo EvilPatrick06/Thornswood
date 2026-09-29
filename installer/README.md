@@ -15,7 +15,7 @@ paths are the payload's layout and not this repository's.
 ## On your machine
 
 `scripts\release\Build-Launcher.ps1` compiles `setup\Bootstrap.cs` into
-`tools\setup-stub.exe` after the launcher. `scripts\release\Package-Thornswood.ps1`
+`out\setup-stub.exe` after the launcher. `scripts\release\Package-Thornswood.ps1`
 builds the payload: it copies the four files here beside the launcher and the
 game files and stops if any of them is missing. With `-OneFile` it attaches
 the payload to the stub; otherwise the stub downloads it from the site.

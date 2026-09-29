@@ -37,7 +37,7 @@ const crypto = require('crypto');
 
 const PORT = 7921;
 const BASE = 'http://127.0.0.1:' + PORT;
-const TOOLS = path.resolve(__dirname, '..', 'tools');
+const REPO = path.resolve(__dirname, '..');
 
 // What /ice answered, to the byte, before any of this. The STUN server the
 // pages had always had typed into them, and nothing else.
@@ -139,8 +139,8 @@ function leaks(r, key) {
   // Each page starts from its own list and swaps in whatever /ice answers, so
   // an unchanged answer leaves every page exactly where it started.
   const pages = [
-    ['the in-game page', path.join(TOOLS, '..', 'game', 'ui', 'thornswood-voice.js')],
-    ['the launcher overlay', path.join(TOOLS, '..', 'launcher', 'voice-host.html')],
+    ['the in-game page', path.join(REPO, 'game', 'ui', 'thornswood-voice.js')],
+    ['the launcher overlay', path.join(REPO, 'launcher', 'voice-host.html')],
     ['the plain page the service serves', path.join(__dirname, 'public', 'voice.js')]
   ];
   for (const p of pages) {

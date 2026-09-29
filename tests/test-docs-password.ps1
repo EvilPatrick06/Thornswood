@@ -30,9 +30,9 @@ param([string]$DeployPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $DeployPath) { $DeployPath = Join-Path $Here '..\scripts\deploy\Deploy-Docs.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $DeployPath) { $DeployPath = Join-Path $Here 'scripts\deploy\Deploy-Docs.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -82,7 +82,7 @@ if (-not $ps51 -or -not $node) {
 # one that runs that command line in Windows PowerShell 5.1 here, with the
 # same standard input, and keeps every command line it was handed so the
 # password can be looked for in them afterwards.
-. (Join-Path $Here '..\scripts\vps\Send-Secret.ps1')
+. (Join-Path $Here 'scripts\vps\Send-Secret.ps1')
 $script:lines = New-Object System.Collections.ArrayList
 function ssh {
     $a = @($args | ForEach-Object { [string]$_ })

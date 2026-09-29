@@ -32,11 +32,11 @@
 // reads board.json and only checks todo.md's heading, which the entry names.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.join(TOOLS_DIR, '..');
+const ROOT = REPO_DIR;
 const APP = path.join(ROOT, 'site');
 
 let pass = 0, fail = 0;

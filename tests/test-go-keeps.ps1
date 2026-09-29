@@ -21,14 +21,14 @@
   folder. Go.ps1 and Publish-Update.ps1 are read, not run.
 #>
 [CmdletBinding()]
-param([string]$Tools)
+param([string]$Repo)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $Tools) { $Tools = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $Repo) { $Repo = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -43,8 +43,8 @@ function Done {
     exit 0
 }
 
-$go = Join-Path $Tools '..\scripts\release\Go.ps1'
-$pub = Join-Path $Tools '..\scripts\release\Publish-Update.ps1'
+$go = Join-Path $Repo 'scripts\release\Go.ps1'
+$pub = Join-Path $Repo 'scripts\release\Publish-Update.ps1'
 $tokens = $null; $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($go, [ref]$tokens, [ref]$errors)
 Yes 'Go.ps1 parses' ($errors.Count -eq 0)

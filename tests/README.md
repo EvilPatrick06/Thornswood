@@ -22,11 +22,12 @@ The voice service's own harnesses stay beside it in `voice\`, and the bot's in
 
 ## Where they look
 
-They moved here from `tools\` on 25 September (issue #440, phase 5). What they
-test did not move, so each one finds `tools\` from here: a `.js` harness through
-`TOOLS_DIR`, declared at its top as `..\tools`, and a `.ps1` harness through the
-line after its `$Here = $PSScriptRoot` that points `$Here` at `..\tools`. A new
-harness does the same; copying the top of an existing one is the easy way.
+They moved here from `tools\` on 25 September (issue #440, phase 5), and
+`tools\` itself went on 29 September (phase 10). Each one finds the repository
+folder from here, one folder up: a `.js` harness through `REPO_DIR`, declared at
+its top as `path.join(__dirname, '..')`, and a `.ps1` harness through the line
+after its `$Here = $PSScriptRoot` that points `$Here` at the repository folder.
+A new harness does the same; copying the top of an existing one is the easy way.
 
 ## Running them
 

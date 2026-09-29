@@ -17,13 +17,13 @@
 // running it, because that is the half a typo cannot break.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
-const SRC = path.join(TOOLS_DIR, '..', 'site', 'server.js');
+const SRC = path.join(REPO_DIR, 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const builder = fs.readFileSync(path.join(TOOLS_DIR, '..', 'bot', 'Build-Discord.py'), 'utf8')
+const builder = fs.readFileSync(path.join(REPO_DIR, 'bot', 'Build-Discord.py'), 'utf8')
   .split(CR).join('');
 
 let pass = 0, fail = 0;

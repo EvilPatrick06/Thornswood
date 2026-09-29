@@ -39,9 +39,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-$Repo = Split-Path -Parent $Here
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+$Repo = $Here
 if (-not $DocPath) { $DocPath = Join-Path $Repo 'docs\COLLECTION-REVISION-2.md' }
 if (-not $CheckPath) { $CheckPath = Join-Path $Repo 'scripts\mods\Check-CleanInstall.ps1' }
 if (-not $Scratch) { $Scratch = [IO.Path]::GetTempPath() }

@@ -36,11 +36,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $InstallerPath) { $InstallerPath = Join-Path $Here '..\scripts\release\Publish-Installer.ps1' }
-if (-not $ServerPath)    { $ServerPath    = Join-Path $Here '..\site\server.js' }
-if (-not $BootstrapPath) { $BootstrapPath = Join-Path $Here '..\installer\setup\Bootstrap.cs' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $InstallerPath) { $InstallerPath = Join-Path $Here 'scripts\release\Publish-Installer.ps1' }
+if (-not $ServerPath)    { $ServerPath    = Join-Path $Here 'site\server.js' }
+if (-not $BootstrapPath) { $BootstrapPath = Join-Path $Here 'installer\setup\Bootstrap.cs' }
 
 $script:pass = 0
 $script:fail = 0

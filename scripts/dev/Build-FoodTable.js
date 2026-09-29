@@ -48,7 +48,7 @@
 //      the way Build-FireTable.js does it, and the version kept is the last
 //      one in the load order, which is the one the game uses.
 //
-// Read only. It opens the plugins of the build and writes tools\food.json.
+// Read only. It opens the plugins of the build and writes game\data\food.json.
 //
 // Usage:
 //   node scripts\dev\Build-FoodTable.js

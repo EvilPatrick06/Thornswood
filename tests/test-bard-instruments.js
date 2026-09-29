@@ -21,18 +21,18 @@
 //
 // Read only. The plugin half runs only where the game folder is, and says SKIP
 // anywhere else, because the build check on GitHub has no Skyrim.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const CR = String.fromCharCode(13);
 const read = (p) => fs.readFileSync(p, 'utf8').split(CR).join('');
 
-const TESTS = process.env.TESTS_MD || path.join(TOOLS_DIR, '..', 'site', 'data', 'tests.md');
-const KNOWN = path.join(TOOLS_DIR, '..', 'site', 'data', 'known.md');
-const EMOTES = path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-emotes.js');
-const INI = path.join(TOOLS_DIR, '..', 'launcher', 'Thornswood.ini');
-const GM = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const TESTS = process.env.TESTS_MD || path.join(REPO_DIR, 'site', 'data', 'tests.md');
+const KNOWN = path.join(REPO_DIR, 'site', 'data', 'known.md');
+const EMOTES = path.join(REPO_DIR, 'game', 'plugins', 'thornswood-emotes.js');
+const INI = path.join(REPO_DIR, 'launcher', 'Thornswood.ini');
+const GM = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const DATA = process.env.GAME_DATA || 'C:\\Thornswood\\Game\\Data';
 const PLUGIN = 'PlayFluteLuteDrum.esp';
 

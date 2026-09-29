@@ -37,7 +37,7 @@ install that way. `tests\test-installer-own-payload.ps1` holds it to that.
 ## On your machine
 
 `scripts\release\Build-Launcher.ps1` compiles it after the launcher, into
-`tools\setup-stub.exe`, which git ignores like every other `.exe`. A failed
+`out\setup-stub.exe`, which git ignores like every other `.exe`. A failed
 compile keeps the last working stub and says so. Build into a scratch root, as
 for the launcher:
 
@@ -47,7 +47,7 @@ for the launcher:
 
 `scripts\release\Package-Thornswood.ps1` copies the stub to `Thornswood-Setup.exe`
 beside `Thornswood-Setup.zip`, the payload, and `Sign-Artifact.ps1` signs the
-exe when the machine has `tools\signing.json`. Running the stub installs for
+exe when the machine has `records\signing\signing.json`. Running the stub installs for
 real into the folder picked, and asks Skyrim to close first if it is running.
 
 ## Where it runs
@@ -80,7 +80,7 @@ manual script.
 
 ### What Windows shows, for the Downloads page and the FAQ to match
 
-`Thornswood-Setup.exe` is signed when the build machine has `tools\signing.json`
+`Thornswood-Setup.exe` is signed when the build machine has `records\signing\signing.json`
 (#390 done). The UAC publisher line then shows the signed publisher rather than
 `Unknown`. The product NAME strings the prompt and the file's Properties show
 come from a version resource `Bootstrap.cs` carries itself, and those names are
@@ -105,7 +105,7 @@ Build-Launcher version-stamping wiring to what is here.
 
 ### Version resource after signing
 
-`Build-Launcher.ps1` leaves `tools\setup-stub.exe` unsigned. `Package-Thornswood.ps1`
+`Build-Launcher.ps1` leaves `out\setup-stub.exe` unsigned. `Package-Thornswood.ps1`
 copies it to `Thornswood-Setup.exe`, for a one-file build appends the payload and
 a trailer, then signs the final Setup (a pre-signed stub cannot be signed again
 after attach). `Publish-Installer.ps1` only uploads it. Neither rewrites the exe or

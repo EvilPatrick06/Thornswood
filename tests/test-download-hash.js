@@ -17,7 +17,7 @@
 //     branch of the page script is lifted and run with the fetch stubbed.
 //
 // Read only. Writes to a temp folder and nowhere else.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -25,10 +25,10 @@ const crypto = require('crypto');
 const { spawnSync } = require('child_process');
 
 const CR = String.fromCharCode(13);
-const read = (p) => fs.readFileSync(path.join(TOOLS_DIR, p), 'utf8').split(CR).join('');
-const publisher = read('../scripts/release/Publish-Installer.ps1');
-const server = read(path.join('..', 'site', 'server.js'));
-const page = read(path.join('..', 'site', 'public', 'home.html'));
+const read = (p) => fs.readFileSync(path.join(REPO_DIR, p), 'utf8').split(CR).join('');
+const publisher = read('scripts/release/Publish-Installer.ps1');
+const server = read(path.join('site', 'server.js'));
+const page = read(path.join('site', 'public', 'home.html'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {

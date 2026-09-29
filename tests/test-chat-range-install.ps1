@@ -25,10 +25,10 @@ param([string]$InstallPath, [string]$ServerPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $InstallPath) { $InstallPath = Join-Path $Here '..\scripts\deploy\Install-Voice.ps1' }
-if (-not $ServerPath) { $ServerPath = Join-Path $Here '..\voice\voice-server.js' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $InstallPath) { $InstallPath = Join-Path $Here 'scripts\deploy\Install-Voice.ps1' }
+if (-not $ServerPath) { $ServerPath = Join-Path $Here 'voice\voice-server.js' }
 
 $script:pass = 0
 $script:fail = 0

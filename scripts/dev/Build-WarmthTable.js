@@ -33,7 +33,7 @@
 // gamemode.js, and Patrick can move it without rebuilding anything. This file
 // answers "what is it", the gamemode answers "what is that worth".
 //
-// Read only. It opens the plugins of the build and writes tools\warmth.json.
+// Read only. It opens the plugins of the build and writes game\data\warmth.json.
 //
 // Usage:
 //   node scripts\dev\Build-WarmthTable.js
