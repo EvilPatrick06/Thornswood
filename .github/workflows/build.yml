@@ -168,6 +168,26 @@ jobs:
             exit 1
           }
 
+      - name: Check the engine is one commit
+        shell: pwsh
+        run: |
+          # Issue #1200. The commit engine\skymp is pinned to, the commit
+          # records\client-build.json and records\server-build.json say the
+          # two halves were built from must be one fork commit. On 29
+          # September the server record was two days and several fixes behind
+          # the pin and nothing said so, so the servers ran old engine code.
+          # Reads only the checkout (the pin is the gitlink in HEAD's tree),
+          # well under a second. Fail closed, like the steps above.
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=tests/test-one-engine.js::no node on this runner, so the engine commit was not checked'
+            exit 1
+          }
+          node tests\test-one-engine.js
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=records/server-build.json::the engine pin and the client and server build records do not name one fork commit; the lines above say which'
+            exit 1
+          }
+
       - name: Run the harnesses that went red unseen
         shell: pwsh
         run: |

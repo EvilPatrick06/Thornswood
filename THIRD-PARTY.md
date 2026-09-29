@@ -92,7 +92,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` are built from
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `b4543a86` (in full, `b4543a86cd5702090e188edafcc34ba4d351e542`). That
+commit `1a2e5995` (in full, `1a2e5995dc3a50c1f79d830c8b4474624c423a45`). That
 is upstream skyrim-multiplayer/skymp at `f926944b` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -377,15 +377,15 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`. That record names `skymp5-server` in the fork at
-  `5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df`, an earlier commit on the same branch than the
-  `b4543a86` `records\client-build.json` names (what lies between them changes
-  the client, the unit tests and one server function, `getNeighborsByPosition`
-  in `8fa465bc`, which the server binary takes at its next build), and it is
-  AGPL-3.0. The binary running on
-  the VPS is that build: the record hashes it as
-  `e5d85ed8038b5bfc8e896ab6addc757709d5f272765fba7c418374ca2aedd53f`, built
-  2026-09-27T05:19:54Z and recorded after the Deploy-Server that sent it, and
-  `Deploy-Server.ps1` refuses any module whose sha256 the record does not name.
+  `1a2e5995dc3a50c1f79d830c8b4474624c423a45`, the same commit
+  `records\client-build.json` names and the repository pins (issue #1200), and
+  it is AGPL-3.0. The record hashes the build of that commit as
+  `de3256be296688b8726a8f08873ba5eec00606c39290fb2e1e9af6e6e731c453`, built 2026-09-29T19:34:37Z, and `Deploy-Server.ps1` refuses any module
+  whose sha256 the record does not name. It goes to the dev server first. Until
+  a live server release sends it, the live server runs the build of the
+  earlier commit `5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df` on the same branch,
+  sha256 `e5d85ed8038b5bfc8e896ab6addc757709d5f272765fba7c418374ca2aedd53f`,
+  built 2026-09-27T05:19:54Z.
   Section 13 of the AGPL asks that everybody who connects to a modified server
   over a network be offered its source. The next section is that offer.
 
@@ -393,11 +393,11 @@ with.
 
 For the six client files and for the game server module running on the VPS, the
 Corresponding Source is the fork at the commit each record names. The six
-client files:
+client files and the game server module, both built from one commit:
 
-https://github.com/EvilPatrick06/skymp/tree/b4543a86cd5702090e188edafcc34ba4d351e542
+https://github.com/EvilPatrick06/skymp/tree/1a2e5995dc3a50c1f79d830c8b4474624c423a45
 
-The game server module:
+The game server module the live server runs until its next server release:
 
 https://github.com/EvilPatrick06/skymp/tree/5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df
 

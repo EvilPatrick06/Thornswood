@@ -6,7 +6,8 @@ These three files are staged into every installer beside SOURCE CODE.txt
 and removed on uninstall (Uninstall.cs). Issue #421.
 
   GPL-3.0.txt
-    Byte for byte skyrim-platform/LICENSE at fork commit 5c54e8b9
+    Byte for byte skyrim-platform/LICENSE at fork commit 1a2e5995, and at
+    5c54e8b9 before it (the file did not change between them)
     (https://github.com/EvilPatrick06/skymp). Same text as skymp5-client/LICENSE
     at that commit. Covers the GPL client runtime files.
 
