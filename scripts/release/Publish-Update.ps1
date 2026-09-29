@@ -251,6 +251,12 @@ function Get-SkyrimPath {
 # the packs (it did not, and shipped a token file).
 . (Join-Path $Here 'Ship-Rules.ps1')
 
+# Where the source of the SkyMP files is, and the GPL and AGPL texts, go inside
+# every pack that carries one and inside the client runtime zip (#421).
+. (Join-Path $Here 'Source-Notice.ps1')
+$sourceRecord   = Join-Path $Here '..\..\records\client-build.json'
+$sourceLicences = Join-Path $Here '..\..\installer\licences'
+
 # The reference plugin list ships in the server's order, not in whatever order
 # Vortex or LOOT last wrote it. The game compares its load order with the
 # server's manifest position by position, and one name out of place from any
@@ -885,6 +891,8 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
                 $n++
                 if ($n % 500 -eq 0) { Write-Host ("    part $part  {0:n0}/{1:n0}" -f $n, $groups[$g].Count) -ForegroundColor DarkGray }
             }
+            $inPart = @($groups[$g] | Where-Object { Test-Path -LiteralPath (Join-Path $GameDir $_) })
+            Add-SourceNoticeToZip $zip (Get-SourceNoticeEntries $sourceRecord $inPart 'pack' $sourceLicences)
 
             # Removals go in the first part, so nothing is deleted after the
             # files that replace it have already arrived.
@@ -1033,7 +1041,8 @@ try {
         if ($doc.PSObject.Properties['clientRuntime']) { $have = $doc.clientRuntime }
         $already = ($null -ne $have) -and ($have.PSObject.Properties['forkCommit']) -and
                    ([string]$have.forkCommit -eq $cbCommit) -and
-                   ($have.PSObject.Properties['url']) -and ([string]$have.url).Length -gt 0
+                   ($have.PSObject.Properties['url']) -and ([string]$have.url).Length -gt 0 -and
+                   ($have.PSObject.Properties['notice']) -and ([int]$have.notice -ge $SourceNoticeVersion)
         if ($already) {
             Say "  client runtime $cbCommit is already on the feed" 'DarkGray'
         } else {
@@ -1051,6 +1060,9 @@ try {
             if ($missingClient.Count) {
                 foreach ($m in $missingClient) { Say "  client runtime file missing from the build: $m" 'Red' }
                 Die 'The client runtime is incomplete in the game folder, so it was not published. Run scripts\release\Sync-Client.ps1 and ship again.'
+            }
+            foreach ($sn in @(Get-SourceNoticeEntries $cbPath $names 'runtime' $sourceLicences)) {
+                [IO.File]::WriteAllBytes((Join-Path $stage $sn.Name), $sn.Bytes)
             }
             $clientZip = Join-Path $DistDir ("client-runtime-" + $cbCommit + ".zip")
             if (Test-Path -LiteralPath $clientZip) { Remove-Item -LiteralPath $clientZip -Force }
@@ -1246,6 +1258,7 @@ if ($clientRel -and $clientRel.url) {
         sha256     = $clientRel.sha256
         bytes      = $clientRel.bytes
         forkCommit = $clientRel.forkCommit
+        notice     = $SourceNoticeVersion
     })
     Say "  client runtime $($clientRel.forkCommit) recorded" 'Green'
 }
