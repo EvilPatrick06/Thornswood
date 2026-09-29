@@ -23,6 +23,7 @@
       Test-ShipForeignFramework $rel
                                    somebody else's framework or modding tool under Data; never shipped, never removed
       Test-ShipBethesdaLeftAlone   Bethesda's, and a pack once carried it; never shipped, never removed
+      Test-ShipRetired $rel        a mod Thornswood took out; never shipped, never removed (the launcher drops it)
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
       Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
@@ -484,11 +485,34 @@ function Test-ShipBethesdaLeftAlone([string]$rel) {
     return $false
 }
 
+# A mod Thornswood has taken out. Never shipped, and never listed as removed:
+# the launcher takes these out of its own game folder itself (OwnGame.Retired,
+# rules 7), so a pack has nothing to delete and no Vortex file in the Steam
+# copy is touched. Change the two lists together.
+#
+# Start On Save (po3, Nexus 50054), issue #394. Under SkyMP it only ever
+# started a second load on top of the server's, which crashed the game about
+# thirty seconds in, and the launcher held it still by rewriting its settings
+# file on every Play. That rewrite is gone, so neither file may reach a build:
+# the DLL with an untouched settings file is the crash again.
+$ShipRetiredFiles = @(
+    'Data\SKSE\Plugins\po3_StartOnSave.dll',
+    'Data\SKSE\Plugins\po3_StartOnSave.ini'
+)
+
+function Test-ShipRetired([string]$rel) {
+    foreach ($f in $ShipRetiredFiles) {
+        if ($rel -ieq $f) { return $true }
+    }
+    return $false
+}
+
 # One machine's own, never shipped and never listed as removed. Other servers'
 # files count as the machine's here, so a release never strips another
 # server's install off a tester.
 function Test-ShipMachine([string]$rel) {
     if (Test-ShipOtherServer $rel) { return $true }
+    if (Test-ShipRetired $rel) { return $true }
     # So do Bethesda's files and other people's frameworks and tools, for the
     # same reason. See the note over $ShipVanillaDataFiles for the 90 files
     # that needed it on 24 September, and the one over $ShipBethesdaLeftAlone

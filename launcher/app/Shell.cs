@@ -5613,13 +5613,13 @@ namespace Thornswood
 
                 // THE REVISION, NOT A NAMED FILE.
                 //
-                // This used to ask whether po3_StartOnSave.dll was present and
+                // This used to ask whether one mod's file was present and
                 // call the collection stale when it was not. That was wrong in
                 // both directions, and on 22 September it was wrong on
                 // Patrick's own machine in the quietest possible way.
                 //
-                // The file is not in the collection and never has been:
-                // Add-Characters.ps1 puts it into a build by hand. So anybody
+                // The file was not in the collection then: a script put it
+                // into a build by hand. So anybody
                 // who installed the collection correctly and never ran that
                 // script read as behind, and Patrick, who had run it, read as
                 // fine while sitting two revisions behind the collection he
