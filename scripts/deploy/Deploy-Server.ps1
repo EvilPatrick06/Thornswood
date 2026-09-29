@@ -39,6 +39,15 @@
     .\Deploy-Server.ps1 -PutBack         the files the last deploy replaced go
                                          back in, checked the same way
 
+  THE LIVE SERVER KEEPS ITS OWN SETTINGS (#1221, #1222). A build whose
+  server-settings.json is not the live server's (port 7777, not the dev voice
+  port or name, not thornswoodServer dev, no npcSettings "default" key) is
+  refused before anything is sent. The one that goes up is carried on the box
+  into the running server's own, taking from the build only what
+  Deploy-Gamemode.ps1 writes for live on purpose (ServerSettings.ps1 says
+  which and why), and the swap reads it back before the start: any other key
+  that is not what the server had puts the old files back.
+
   The files a deploy replaced stay in $Root\.prev-<stamp>, the newest two.
   -PutBack is the one command that puts the newest back: the same stop, renames,
   start and check, and if the old files do not answer either, what was running
@@ -80,6 +89,7 @@ if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
 . (Join-Path $Here 'Artifact.ps1')
+. (Join-Path $Here 'ServerSettings.ps1')
 
 function Remote($script) {
   # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
@@ -349,6 +359,23 @@ foreach ($f in $files) {
   '{0,-22} {1:N0} bytes' -f $f, (Get-Item $p).Length | Write-Host
 }
 
+# THE BUILD'S SETTINGS ARE THE LIVE SERVER'S, OR NOTHING GOES (#1221). This
+# sends server-settings.json from the build, and on 29 Sep the shared clone's
+# build held the dev server's (port 7787, the name Thornswood Dev), left by an
+# older dev publish. Sent, live would have come up where no launcher looks for
+# it. The same test Export-ServerPayload.ps1 makes for a live payload, and an
+# npcSettings "default" key, which refuses every NPC. Before the stamp is
+# written, the box is asked anything or the artifact is sent.
+$buildSettings = Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw | ConvertFrom-Json
+$notLive = @(Get-ThornswoodServerSettingsProblems $buildSettings 'main')
+if ($notLive.Count) {
+  Write-Host ''
+  Write-Host ("  server-settings.json in $Dist is not the live server's:") -ForegroundColor Red
+  foreach ($w in $notLive) { Write-Host ('    ' + $w) -ForegroundColor Red }
+  Write-Host '  Run .\scripts\deploy\Deploy-Gamemode.ps1, which writes the live ones, then deploy again.' -ForegroundColor Yellow
+  throw "server-settings.json in $Dist is not the live server's. Nothing was sent and the server was not touched."
+}
+
 # The build stamp Deploy-Gamemode.ps1 left beside gamemode.js goes up with it,
 # so the box can say which gamemode it runs. It is made again here when it does
 # not describe the gamemode about to be sent, which is what happens when the
@@ -563,7 +590,25 @@ foreach ($rel in $send.Keys) {
   Write-Host "  $rel"
 }
 
-$checkOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes) + $checkBlock) |
+# The running server's own settings, carried into the staged file on the box,
+# with only the keys Deploy-Gamemode writes for live taken from the build
+# (#1222, ServerSettings.ps1). The file this rewrites is hashed there, so the
+# check below holds the stage to it like every file sent from here.
+Write-Host ''
+Write-Host 'Keeping the live server''s own settings...'
+$carryScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerSettings.ps1')) + "`r`n" +
+               (SwapVars $Root $Task $stageName $prevName $Wait $hashes $ThornswoodGamemodeKeys) + $settingsCarryBlock
+$carryOut = @(Remote $carryScript | ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
+$carried = @($carryOut | Where-Object { $_ -match '^CARRIED [0-9a-f]{64}$' })
+if (-not $carried.Count) {
+  Write-Host ''
+  Write-Host '  THE SETTINGS COULD NOT BE CARRIED ACROSS, so nothing was stopped and nobody was warned.' -ForegroundColor Red
+  Write-Host '  The server is still running exactly as it was. The lines above say why.' -ForegroundColor Red
+  exit 1
+}
+$hashes['server-settings.json'] = $carried[0].Substring(8)
+
+$checkOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $ThornswoodGamemodeKeys) + $checkBlock) |
               ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 if ($checkOut -notcontains 'STAGE OK') {
   Write-Host ''
@@ -584,16 +629,16 @@ Write-Host 'Stopping, swapping in and starting...'
 $eap = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes) + $swapBlock) |
+  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $ThornswoodGamemodeKeys) + $swapBlock) |
                ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 } finally { $ErrorActionPreference = $eap }
 
 if ($swapOut -notcontains 'SWAP OK') {
   Write-Host ''
   if ($swapOut -contains 'SWAP ROLLED BACK') {
-    Write-Host '  FAIL. The new server did not answer, so the old files were put back and it' -ForegroundColor Red
-    Write-Host '  was started again. The lines above say whether it answered, and server.log' -ForegroundColor Red
-    Write-Host '  says why the new one did not come up.' -ForegroundColor Red
+    Write-Host '  FAIL. The new server did not answer, or its settings did not read back as the' -ForegroundColor Red
+    Write-Host '  server''s own, so the old files were put back and it was started again. The' -ForegroundColor Red
+    Write-Host '  lines above say which, and whether it answered.' -ForegroundColor Red
   } elseif ($swapOut -contains 'SWAP REFUSED') {
     Write-Host '  FAIL. Nothing was swapped. The lines above say why.' -ForegroundColor Red
   } else {
