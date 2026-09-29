@@ -330,7 +330,7 @@ if (-not $NoPush) {
 }
 '@
     # The real one's last step, which the static check above holds it to.
-    Stub 'Package-Thornswood' '[string]$Root, [string]$OutDir, [switch]$NoPause, [switch]$NoPublish, [string]$ReleaseDir' @'
+    Stub 'Package-Thornswood' '[string]$Root, [string]$OutDir, [switch]$NoPause, [switch]$NoPublish, [string]$ReleaseDir, [string]$Stub' @'
 if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutDir $OutDir }
 '@
     Stub 'Publish-Installer' '[string]$OutDir, [switch]$OneFile' ''
@@ -361,17 +361,27 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     # writes Thornswood.exe and a SHA256SUMS whose hash is that file's, into the
     # --dir it was given, the way the real gh would. It computes the hash itself,
     # so the download always verifies and the test proves the path runs, not that
-    # a particular byte matches. Every other gh call still only logs.
+    # a particular byte matches. Every other gh call still only logs. It
+    # writes each asset a --pattern names, and the setup program too, since a
+    # main Ship with -Package takes the one CI built (issue #932).
     $ghDl = Join-Path $bin 'gh-download.ps1'
     [IO.File]::WriteAllText($ghDl, @'
 $dir = ''
-for ($i = 0; $i -lt $args.Count; $i++) { if ($args[$i] -eq '--dir') { $dir = $args[$i + 1] } }
+$want = @()
+for ($i = 0; $i -lt $args.Count; $i++) {
+    if ($args[$i] -eq '--dir') { $dir = $args[$i + 1] }
+    if ($args[$i] -eq '--pattern') { $want += [string]$args[$i + 1] }
+}
 if ($dir) {
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    $exe = Join-Path $dir 'Thornswood.exe'
-    [IO.File]::WriteAllText($exe, 'the launcher CI built for this tag')
-    $h = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLower()
-    Set-Content -LiteralPath (Join-Path $dir 'SHA256SUMS') -Value ("$h  Thornswood.exe") -Encoding ascii
+    $lines = @()
+    foreach ($n in 'Thornswood.exe', 'setup-stub.exe') {
+        if ($want -notcontains $n) { continue }
+        $f = Join-Path $dir $n
+        [IO.File]::WriteAllText($f, "the $n CI built for this tag")
+        $lines += ((Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLower() + '  ' + $n)
+    }
+    Set-Content -LiteralPath (Join-Path $dir 'SHA256SUMS') -Value $lines -Encoding ascii
 }
 '@)
     [IO.File]::WriteAllText((Join-Path $bin 'gh.ps1'), $standIn.Replace('NAME', 'gh') + "`r`n" +
@@ -449,6 +459,7 @@ if ($dir) {
     $pk = Called $r 'Package-Thornswood'
     Yes ('R the installer is built, without -NoPublish, into the staging folder' + $(if ($pk.Count) { ' (' + ($pk -join '; ') + ')' } else { '' })) (
         $pk.Count -eq 1 -and $pk[0] -notmatch ' -NoPublish\b' -and $pk[0].Contains(' -OutDir ' + $distDir))
+    Yes '  around the setup program CI built for the tag, not one from out\ (#932)' ($pk.Count -eq 1 -and $pk[0] -match ' -Stub \S*setup-stub\.exe')
     Yes '  and so it goes on the site: Publish-Installer.ps1 is called' ((Called $r 'Publish-Installer').Count -eq 1)
     foreach ($n in 'Publish-News', 'Publish-Discord', 'Request-Restart') {
         Yes "R $n.ps1 is called" ((Called $r $n).Count -eq 1)
@@ -474,8 +485,9 @@ if ($dir) {
         $inst.Count -eq 1 -and $inst[0].Contains(' -Root ' + $root))
     $gone = Away $r
     Yes 'R the shipped launcher is not compiled here: Build-Launcher.ps1 is not called' ((Called $r 'Build-Launcher').Count -eq 0)
-    Yes ('R the launcher CI built is downloaded and verified: gh release download runs once (' + ($gone -join '; ') + ')') (
-        @($gone | Where-Object { $_ -match '^gh release download' }).Count -eq 1)
+    Yes ('R the launcher and the setup program CI built are downloaded and verified: gh release download runs for each (' + ($gone -join '; ') + ')') (
+        @($gone | Where-Object { $_ -match '^gh release download .*--pattern Thornswood\.exe' }).Count -eq 1 -and
+        @($gone | Where-Object { $_ -match '^gh release download .*--pattern setup-stub\.exe' }).Count -eq 1)
     Yes 'R the feed reaches the VPS store: the site serves what the publisher wrote' (
         ([IO.File]::ReadAllText($siteFeed)) -match '20990101-0000')
     # The one thing pushed is the release tag (#444), on the commit the feed
