@@ -44,6 +44,50 @@
   next one. tests\test-release-name.ps1 drives all of it.
 #>
 
+# ==== thornswood release id ====
+# A NEW RELEASE ID, NEVER ONE THE FEED ALREADY USES (#1057). It was the minute,
+# yyyyMMdd-HHmm, so two publishes inside one minute both got the same name: a
+# launcher that took the first wrote that id into applied.txt and skipped the
+# second as already applied, and the store, "releases" and the release tag named
+# two releases the same. Now it is the second, yyyyMMdd-HHmmss (-dev on dev),
+# and if the feed already names that id, or a part of it (<id>-2), it moves on
+# a second at a time to the next free one.
+#
+# Every installed launcher still updates across it: a launcher compares pack
+# ids only for equality (applied.txt) and a release record by its sha256, never
+# by the shape of the id. Everything that reads the time out of an id takes
+# its first 13 characters, yyyyMMdd-HHmm, and both shapes start that way.
+# Publish-Update and Rollback-Feed both mint through this.
+function Get-FeedTakenIds($doc) {
+    $t = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    if ($null -eq $doc) { return ,$t }
+    foreach ($k in 'packs', 'releases', 'release', 'baseline') {
+        $p = $doc.PSObject.Properties[$k]
+        if ($null -eq $p -or $null -eq $p.Value) { continue }
+        foreach ($o in @($p.Value)) {
+            if ($null -eq $o -or $o -is [string]) { continue }
+            $idp = $o.PSObject.Properties['id']
+            if ($null -ne $idp -and [string]$idp.Value) { [void]$t.Add([string]$idp.Value) }
+        }
+    }
+    return ,$t
+}
+
+function New-ReleaseId($doc, [switch]$Dev, [datetime]$Now = (Get-Date)) {
+    $taken = Get-FeedTakenIds $doc
+    $suffix = if ($Dev) { '-dev' } else { '' }
+    $t = $Now
+    for ($i = 0; $i -lt 3600; $i++) {
+        $id = $t.ToString('yyyyMMdd-HHmmss', [Globalization.CultureInfo]::InvariantCulture) + $suffix
+        $clash = $taken.Contains($id)
+        if (-not $clash) { foreach ($x in $taken) { if ($x.StartsWith($id + '-', [StringComparison]::OrdinalIgnoreCase)) { $clash = $true; break } } }
+        if (-not $clash) { return $id }
+        $t = $t.AddSeconds(1)
+    }
+    throw "Every release id for the hour from $($Now.ToString('HH:mm:ss')) is already on the feed, so none was made."
+}
+# ==== end thornswood release id ====
+
 # The tag for a release, by its channel and id. '' when there is no id.
 function Get-ReleaseTagName([string]$Channel, [string]$Id) {
     if (-not $Id) { return '' }

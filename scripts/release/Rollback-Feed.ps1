@@ -98,6 +98,7 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Wr
 . (Join-Path $Here 'Note-Rules.ps1')
 . (Join-Path $Here 'Source-Notice.ps1')
 . (Join-Path $Here 'Ship-Rules.ps1')
+. (Join-Path $Here 'Release-Name.ps1')
 Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
 Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
 
@@ -393,10 +394,11 @@ if ($listMoved -and $profileFound -notcontains 'plugins.txt') {
 
 # ------------------------------------------------------------ the pack
 Head 'Building the pack'
-if (-not $Id) { $Id = (Get-Date -Format 'yyyyMMdd-HHmm') + $(if ($Dev) { '-dev' } else { '' }) }
-if (@($packs | Where-Object { (Get-Prop $_ 'id') -eq $Id }).Count) {
+# Never an id the feed already names, a pack or a release (#1057).
+if (-not $Id) { $Id = New-ReleaseId $doc -Dev:$Dev }
+if ((Get-FeedTakenIds $doc).Contains($Id)) {
     Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
-    Die "The feed already lists a pack $Id. Run it again in a minute."
+    Die "The feed already names a pack or release $Id. Leave -Id out and a free one is made."
 }
 $zipPath = Join-Path $WorkDir ("pack-$Id.zip")
 if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }

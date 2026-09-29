@@ -304,6 +304,8 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
                            '[string]$Channel, [string]$VersionOverride, [switch]$NoUpload, [switch]$NoPush, ' +
                            # A dry run also passes these two since #494: close no game, prune no packs.
                            '[switch]$NoClose, [int]$KeepPacks = 10') @'
+# F: the send of the feed failed, the way the real one ends then (#1055).
+if ($env:TS_PUB_FAIL) { Write-Host 'NOT SHIPPED. the store refused version.json'; exit 1 }
 . (Join-Path $PSScriptRoot 'Feed-Store.ps1')
 if (-not $NoPush) { [void](Receive-FeedStore $(if ($Channel) { $Channel } else { 'main' }) $ReleaseDir) }
 $vf = Join-Path $ReleaseDir 'version.json'
@@ -509,6 +511,22 @@ if ($dir) {
         $pub.Count -eq 1 -and $pub[0] -match ' -VersionOverride 1\.1\.93\.3\b')
     $gone = Away $e
     Yes ('E and asks nothing of git, gh, ssh or scp to get it' + $(if ($gone.Count) { ' (' + ($gone -join '; ') + ')' } else { '' })) ($gone.Count -eq 0)
+
+    # ---- F: a Ship that keeps its launcher, whose feed did not send (#1055) ------------
+    # -ModsOnly publishes no launcher, so there is no version.json naming one to
+    # check and the publisher's exit code is all Ship has. The publisher ends
+    # NOT SHIPPED with exit 1 now; Ship must stop there and tell nobody.
+    $env:TS_PUB_FAIL = '1'
+    try {
+        $f = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-ModsOnly', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
+    } finally { $env:TS_PUB_FAIL = '' }
+    Yes ("F a mods-only Ship whose feed did not send stops, NOTHING was published (exit {0})" -f $f.Code) (
+        $f.Code -eq 1 -and (Called $f 'Publish-Update').Count -eq 1 -and $f.Out -match 'NOTHING was published')
+    foreach ($n in 'Publish-News', 'Publish-Discord', 'Request-Restart', 'Publish-PostShip') {
+        Yes "F $n.ps1 is not called" ((Called $f $n).Count -eq 0)
+    }
+    $pushes = @(Away $f | Where-Object { $_ -match '^git .*\b(push|tag)\b' })
+    Yes ('F and no release tag is made' + $(if ($pushes.Count) { ' (' + ($pushes -join '; ') + ')' } else { '' })) ($pushes.Count -eq 0)
 }
 finally {
     $env:PATH = $oldPath
