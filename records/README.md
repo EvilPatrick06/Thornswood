@@ -7,9 +7,12 @@ read it (issue #440, phase 8):
   hash, and the fork commit they came from. `scripts\release\New-ClientBuildRecord.ps1`
   writes it; Build-Launcher puts it inside the launcher, and Sync-Client and
   Ship refuse a client that is not this build.
-- `server-build.json`: the server binary the same way.
-  `scripts\release\New-ServerBuildRecord.ps1` writes it and Deploy-Server
-  refuses any other binary.
+- `server-build.json`: every server file the fork builds the same way (the
+  binary, the JavaScript half the server runs, its map and the rest
+  `scripts\deploy\ServerBuild.ps1` names), and the one fork commit.
+  `scripts\release\New-ServerBuildRecord.ps1` writes it (Build-Server runs it),
+  and Export-ServerPayload, Publish-Server, Deploy-Server and the installer on
+  the box refuse any server file that is not this build.
 - `steam-build.json`: the public Steam build of Skyrim last looked at and
   accepted. `scripts\dev\Check-Outside.ps1` goes red when Steam moves past it,
   which is the day to try the downgrade on one machine.

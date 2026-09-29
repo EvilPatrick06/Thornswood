@@ -48,6 +48,14 @@
   which and why), and the swap reads it back before the start: any other key
   that is not what the server had puts the old files back.
 
+  EVERY SERVER FILE GOES, AND ONLY THE RECORDED BUILD (#1214). The binary,
+  the JavaScript half the server runs and the rest the fork builds
+  (ServerBuild.ps1) go up together with records\server-build.json, each held
+  to it here and again in the stage on the box. One that is not the recorded
+  build, or a server file the record does not list, stops the deploy before
+  anything is sent. Until then only the binary went, so the box could run a
+  binary of one build beside the JavaScript half of another.
+
   The files a deploy replaced stay in $Root\.prev-<stamp>, the newest two.
   -PutBack is the one command that puts the newest back: the same stop, renames,
   start and check, and if the old files do not answer either, what was running
@@ -90,6 +98,7 @@ if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
 . (Join-Path $Here 'Artifact.ps1')
 . (Join-Path $Here 'ServerSettings.ps1')
+. (Join-Path $Here 'ServerBuild.ps1')
 
 function Remote($script) {
   # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
@@ -352,11 +361,8 @@ if (Test-Path -LiteralPath $built) {
   Write-Host '  gamemode.js parses'
 }
 
-$files = 'scam_native.node', 'gamemode.js', 'server-settings.json'
-foreach ($f in $files) {
-  $p = Join-Path $Dist $f
-  if (-not (Test-Path -LiteralPath $p)) { throw "not built: $p" }
-  '{0,-22} {1:N0} bytes' -f $f, (Get-Item $p).Length | Write-Host
+foreach ($f in 'gamemode.js', 'server-settings.json') {
+  if (-not (Test-Path -LiteralPath (Join-Path $Dist $f))) { throw "not built: $(Join-Path $Dist $f)" }
 }
 
 # THE BUILD'S SETTINGS ARE THE LIVE SERVER'S, OR NOTHING GOES (#1221). This
@@ -400,39 +406,41 @@ if (-not (Test-ThornswoodBuildStamp -Path $stampPath -Gamemode $built)) {
 # date was six minutes later than the last edit to ScampServer.cpp, which is an
 # argument rather than a proof.
 #
-# records\server-build.json is that proof: the hash of the binary a release was
-# tested with, and the commit it came from. Regenerate it with
+# records\server-build.json is that proof: the hash of every server file the
+# fork builds (the binary, the JavaScript half the server runs, and the rest
+# ServerBuild.ps1 names) and the one commit they came from. Regenerate it with
 # scripts\release\New-ServerBuildRecord.ps1 after every rebuild.
 #
-# No record yet means carry on with a warning, so a machine that has not made one
-# can still deploy. A record that disagrees is a stop: it means this binary is not
-# the one the release was built and tested against, and shipping it would put an
-# unknown server in front of everybody.
+# Every one of them goes up together, so the box never runs a binary of one
+# build beside the JavaScript half of another, and any of them that is not the
+# recorded build, or a server file the record does not list, stops the deploy
+# before anything is sent (#1214). Until then only the binary went and only
+# the binary was held, and a build with no record went with a warning.
 $recordPath = Join-Path $Here '..\..\records\server-build.json'
-$binPath = Join-Path $Dist 'scam_native.node'
-if (Test-Path -LiteralPath $recordPath) {
-  $rec = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
-  $have = (Get-FileHash -LiteralPath $binPath -Algorithm SHA256).Hash.ToLowerInvariant()
-  $want = "$($rec.sha256)".ToLowerInvariant()
-  if ($have -ne $want) {
-    Write-Host ''
-    Write-Host '  scam_native.node is not the build this release recorded.' -ForegroundColor Red
-    Write-Host ("    on disk   {0}" -f $have) -ForegroundColor Red
-    Write-Host ("    recorded  {0}" -f $want) -ForegroundColor Red
-    Write-Host ("    recorded build came from commit {0}" -f $rec.source.commit) -ForegroundColor Yellow
-    Write-Host ''
-    Write-Host '  If you rebuilt on purpose, record the new build and deploy again:' -ForegroundColor Yellow
-    Write-Host '    .\scripts\release\New-ServerBuildRecord.ps1' -ForegroundColor Yellow
-    Write-Host '  If you did not, find out what changed before this reaches the VPS.' -ForegroundColor Yellow
-    throw 'server binary does not match records\server-build.json'
-  }
-  Write-Host ('{0,-22} matches the record, commit {1}' -f 'build', $rec.source.commit.Substring(0, 8)) -ForegroundColor DarkGray
+if (-not (Test-Path -LiteralPath $recordPath)) {
+  throw 'there is no records\server-build.json, so nothing says which build these server files are. Nothing was sent and the server was not touched.'
 }
-else {
+$rec = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+$notBuild = @(Get-ThornswoodServerBuildProblems $rec (Get-ThornswoodServerFolderSums $Dist) $Dist 'records\server-build.json')
+if ($notBuild.Count) {
   Write-Host ''
-  Write-Host '  No records\server-build.json, so nothing says which commit this binary is.' -ForegroundColor Yellow
-  Write-Host '  Make one with .\scripts\release\New-ServerBuildRecord.ps1 and commit it.' -ForegroundColor Yellow
+  Write-Host '  The server files are not the build this release recorded:' -ForegroundColor Red
+  foreach ($w in $notBuild) { Write-Host ('    ' + $w) -ForegroundColor Red }
+  Write-Host ("    recorded build came from commit {0}" -f $rec.source.commit) -ForegroundColor Yellow
   Write-Host ''
+  Write-Host '  If you rebuilt on purpose, record the new build and deploy again:' -ForegroundColor Yellow
+  Write-Host '    .\scripts\release\New-ServerBuildRecord.ps1' -ForegroundColor Yellow
+  Write-Host '  If you did not, find out what changed before this reaches the VPS.' -ForegroundColor Yellow
+  throw 'server files do not match records\server-build.json'
+}
+$serverFiles = @((Get-ThornswoodServerRecordFiles $rec).Keys)
+Write-Host ('{0,-22} every server file is the recorded build, commit {1}' -f 'build', $rec.source.commit.Substring(0, 8)) -ForegroundColor DarkGray
+
+$files = @($serverFiles) + @('gamemode.js', 'server-settings.json')
+foreach ($f in $files) {
+  $p = Join-Path $Dist ($f -replace '/', '\')
+  if (-not (Test-Path -LiteralPath $p)) { throw "not built: $p" }
+  '{0,-22} {1:N0} bytes' -f $f, (Get-Item $p).Length | Write-Host
 }
 
 # ------------------------------------------------------------- load order
@@ -547,15 +555,16 @@ $stageFar  = ($Root -replace '\\', '/') + '/' + $stageName
 $send = [ordered]@{}
 foreach ($p in $sendPlugins) { $send['plugins/' + (Split-Path $p -Leaf)] = $p }
 foreach ($f in $files) {
-  $src = Join-Path $Dist $f
+  $src = Join-Path $Dist ($f -replace '/', '\')
   if ($f -eq 'server-settings.json') { $src = $settingsForVps }
   $send[$f] = $src
 }
-# The record goes up with the binary, so the box itself answers what it is
-# running. Hash $Root/scam_native.node against it there and the two halves of
-# the question, what source and what binary, both have an answer on the machine
-# serving people rather than only on a developer's disk.
-if (Test-Path -LiteralPath $recordPath) { $send['server-build.json'] = $recordPath }
+# The record goes up with the server files, so the box itself answers what it
+# is running, and the stage is held to it there before anything stops: every
+# file it lists, by hash (ServerBuild.ps1, part of Swap.ps1's check). The
+# two halves of the question, what source and what files, both have an answer
+# on the machine serving people rather than only on a developer's disk.
+$send['server-build.json'] = $recordPath
 # The build stamp goes up in the stage with the gamemode it describes, so it
 # is hashed and checked with the rest, swapped in beside gamemode.js, and put
 # back with it on a rollback. Sent on its own straight into the live folder,

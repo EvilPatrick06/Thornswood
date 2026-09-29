@@ -344,22 +344,43 @@ setTimeout(function () { process.exit(0); }, 600000);
 '@
 
 $script:zipN = 0
+# The server files the fork builds besides the binary and the JavaScript half
+# (ServerBuild.ps1), as a payload carries them.
+$forkRest = [ordered]@{ 'dist_back/skymp5-server.js.map' = '{ "version": 3 }'; 'package.json' = '{ "name": "skymp5-server" }'; 'yarn.lock' = '# yarn'
+                        'launch_server.bat' = 'node dist_back/skymp5-server.js'; 'data/scripts/ActiveMagicEffect.pex' = 'compiled papyrus' }
+function TextSha([string]$text) {
+    $h = [Security.Cryptography.SHA256]::Create()
+    try { return (($h.ComputeHash($utf8.GetBytes($text)) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $h.Dispose() }
+}
+# The record of a build whose binary says $Binary and whose JavaScript half is
+# $Js, the way New-ServerBuildRecord.ps1 writes one: every file, one commit.
+function RecordText([string]$Binary, [string]$Js = $stubJs) {
+    $c = 'abcdef0123456789abcdef0123456789abcdef01'
+    $files = [ordered]@{}
+    $files['scam_native.node'] = [ordered]@{ sha256 = (TextSha $Binary); bytes = 1; commit = $c }
+    $files['dist_back/skymp5-server.js'] = [ordered]@{ sha256 = (TextSha $Js); bytes = 1; commit = $c }
+    foreach ($k in $forkRest.Keys) { $files[$k] = [ordered]@{ sha256 = (TextSha $forkRest[$k]); bytes = 1; commit = $c } }
+    return ([ordered]@{ binary = 'scam_native.node'; sha256 = (TextSha $Binary); source = [ordered]@{ commit = $c }; files = $files } | ConvertTo-Json -Depth 5)
+}
 # A payload as Export-ServerPayload makes one: the load order written out in
-# full under the root it is for.
+# full under the root it is for, and every server file with its record.
+# -RecordFor and -RecordJs make a record of another binary or JavaScript half.
 function Payload {
     param([string]$Gamemode = '// v2', [string[]]$Order = @('Skyrim.esm', 'A.esp'), [string[]]$Carry = @('Skyrim.esm', 'A.esp'),
-          [string]$Binary = 'binary v2', [string]$RecordFor = '', [string]$Shipped = 'shipped v2', [int]$Port = $P,
-          [string]$ForRoot = $root, [hashtable]$Settings = @{}, [switch]$NoRecord)
+          [string]$Binary = 'binary v2', [string]$RecordFor = '', [string]$RecordJs = '', [string]$Shipped = 'shipped v2', [int]$Port = $P,
+          [string]$ForRoot = $root, [hashtable]$Settings = @{}, [switch]$NoRecord, [string]$Stray = '', [string]$Js = '')
     $script:zipN++
     $dir = Join-Path $work ('payload-' + $script:zipN)
     foreach ($n in $Carry) { Put (Join-Path $dir ('plugins\' + $n)) ('plugin ' + $n) }
     Put (Join-Path $dir 'gamemode.js') $Gamemode
-    Put (Join-Path $dir 'dist_back\skymp5-server.js') $stubJs
+    if (-not $Js) { $Js = $stubJs }
+    Put (Join-Path $dir 'dist_back\skymp5-server.js') $Js
     Put (Join-Path $dir 'scam_native.node') $Binary
+    foreach ($k in $forkRest.Keys) { Put (Join-Path $dir ($k -replace '/', '\')) $forkRest[$k] }
+    if ($Stray) { Put (Join-Path $dir ($Stray -replace '/', '\')) '// from another build' }
     if (-not $RecordFor) { $RecordFor = $Binary }
-    $h = [Security.Cryptography.SHA256]::Create()
-    $sum = (($h.ComputeHash($utf8.GetBytes($RecordFor)) | ForEach-Object { $_.ToString('x2') }) -join '')
-    if (-not $NoRecord) { Put (Join-Path $dir 'server-build.json') ('{ "sha256": "' + $sum + '" }') }
+    if (-not $RecordJs) { $RecordJs = $Js }
+    if (-not $NoRecord) { Put (Join-Path $dir 'server-build.json') (RecordText $RecordFor $RecordJs) }
     Put (Join-Path $dir 'data\shipped.txt') $Shipped
     $far = ($ForRoot -replace '\\', '/') + '/plugins/'
     $st = [ordered]@{ port = $Port; name = 'Thornswood Test'; dataDir = 'data'; loadOrder = @($Order | ForEach-Object { $far + $_ }) }
@@ -432,7 +453,11 @@ try {
         @{ Label = 'a binary that is not its recorded build'; Why = 'not the build server-build\.json records';
            Zip = { Payload -RecordFor 'some other binary' }; More = @() },
         @{ Label = 'a payload that carries no build record (#1214)'; Why = 'carries no server-build\.json';
-           Zip = { Payload -NoRecord }; More = @() }
+           Zip = { Payload -NoRecord }; More = @() },
+        @{ Label = 'a JavaScript half that is not its recorded build (#1214)'; Why = 'dist_back/skymp5-server\.js in the payload is not the build server-build\.json records';
+           Zip = { Payload -RecordJs '// the 24 Sep JavaScript half' }; More = @() },
+        @{ Label = 'a server file its record does not list (#1214)'; Why = 'dist_back/old-bundle\.js in the payload is a server file server-build\.json does not list';
+           Zip = { Payload -Stray 'dist_back/old-bundle.js' }; More = @() }
     )) {
         $zip = & $case.Zip
         $out = Install $zip $case.More
@@ -646,7 +671,7 @@ try {
         # names on C:\ land in the scratch folder, and the live root it reads
         # the roster from is the scratch one, which has none.
         function MapFar([string]$s) {
-            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\Roll-Log.ps1', 'C:\Thornswood-Server\') {
+            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\Roll-Log.ps1', 'C:\Thornswood-Server\') {
                 $to = Join-Path $global:TsBox.Box $p.Substring(3)
                 $s = $s.Replace($p, $to).Replace($p.Replace('\', '/'), $to)
             }
@@ -691,9 +716,7 @@ try {
         # The build record the payloads' binary is held to (#1214): Payload's
         # default binary.
         $recordFile = Join-Path $work 'server-build.json'
-        $hr = [Security.Cryptography.SHA256]::Create()
-        Put $recordFile ('{ "sha256": "' + (($hr.ComputeHash($utf8.GetBytes('binary v2')) | ForEach-Object { $_.ToString('x2') }) -join '') + '" }')
-        $hr.Dispose()
+        Put $recordFile (RecordText 'binary v2')
         function Publish([string]$zip, [string[]]$more, [string]$channel = 'dev', [string]$vpsRoot = $devRoot, [string]$task = 'Thornswood Test Dev') {
             $a = @{ Channel = $channel; VpsRoot = $vpsRoot; TaskName = $task; VpsHost = '127.0.0.1'; VpsUser = 'nobody'
                     Dist = $dist; Zip = $zip; SkipBuild = $true; NoPause = $true; Wait = 8; Record = $recordFile; NoNews = $true; NoPush = $true }
@@ -745,6 +768,16 @@ try {
         $code = Publish (Payload -Port 7787 -ForRoot $devRoot -Binary 'binary v9') @()
         $failed = $script:fail
         Yes 'Publish-Server with a binary the build record does not name exits 1 (#1214)' ($code -ne 0 -and (($script:lastOut) -join "`n") -match 'not the recorded build')
+        Yes '  before anything is sent: the installer never ran, the same process, the root as it was' (
+            @($global:TsSshSeen | Where-Object { $_ -match '-File' }).Count -eq 0 -and ((Owner 7787) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
+        if ($script:fail -gt $failed) { Show }
+
+        # The recorded binary beside a JavaScript half from another build, in a
+        # zip whose own record names it: the shape of 29 September.
+        $code = Publish (Payload -Port 7787 -ForRoot $devRoot -Js '// the 24 Sep JavaScript half') @()
+        $failed = $script:fail
+        Yes 'Publish-Server with a JavaScript half the build record does not name exits 1 (#1214)' (
+            $code -ne 0 -and (($script:lastOut) -join "`n") -match 'dist_back/skymp5-server\.js in the payload is not the build')
         Yes '  before anything is sent: the installer never ran, the same process, the root as it was' (
             @($global:TsSshSeen | Where-Object { $_ -match '-File' }).Count -eq 0 -and ((Owner 7787) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
         if ($script:fail -gt $failed) { Show }

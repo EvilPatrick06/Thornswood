@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-  Records what the server binary is and which commit it was built from, into
-  records\server-build.json.
+  Records every server file the fork builds and the one commit they were built
+  from, into records\server-build.json.
 
 .DESCRIPTION
   The server binaries have always been copied rather than rebuilt, and nothing
@@ -10,9 +10,28 @@
   was six minutes later than the last edit to ScampServer.cpp. A file date is not
   a build record.
 
-  Run this after every rebuild of skymp. Deploy-Server.ps1 reads the result and
-  refuses to ship a binary whose hash is not the recorded one, so a stale or
-  unknown build cannot reach the VPS by accident.
+  Run this after every rebuild of skymp (Build-Server.ps1 runs it). Deploy-Server,
+  Export-ServerPayload, Publish-Server and the installer on the box read the
+  result and refuse any server file whose hash is not the recorded one, so a
+  stale or unknown build cannot reach the VPS by accident.
+
+  EVERY SERVER FILE, NOT ONLY THE BINARY (#1200, #1214). The record lists
+  every file the fork's build puts in the server (scripts\deploy\ServerBuild.ps1
+  names them and says why), each with its hash and the one fork commit. It is
+  written only for files this can tie to that commit:
+    dist_back\skymp5-server.js(.map)  every TypeScript source the source map
+                                      carries is the fork's, word for word, and
+                                      every package it bundled that is on disk
+                                      (server-bundle-sources.js); the fork's
+                                      packages are the ones its yarn.lock names
+                                      (yarn check --integrity); the bundle
+                                      names that map
+    package.json, yarn.lock           the fork's skymp5-server ones, byte for byte
+    data\scripts\*                    the fork's skymp5-scripts\pex, byte for byte,
+                                      every one of them
+    launch_server.bat                 the one the fork's configure wrote
+    scam_native.node                  built from the clone, newer than its sources
+  Anything else stops it and nothing is written.
 
   Read only except for the one file it writes. It never starts anything and never
   talks to the VPS.
@@ -21,7 +40,7 @@
   Where the build puts the server. The same default Deploy-Server.ps1 uses.
 
 .PARAMETER Clone
-  The skymp clone, read for the commit the binary came from.
+  The skymp clone, read for the commit the files came from and held to.
 
 .PARAMETER Out
   The record to write. Committed to this repo, so a reader can answer what the
@@ -41,17 +60,28 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Out) { $Out = Join-Path $Here '..\..\records\server-build.json' }
+. (Join-Path $Here '..\deploy\ServerBuild.ps1')
 
 $bin = Join-Path $Dist 'scam_native.node'
 if (-not (Test-Path -LiteralPath $bin)) { throw "not built: $bin" }
+foreach ($n in $ThornswoodServerForkFiles) {
+  if (-not (Test-Path -LiteralPath (Join-Path $Dist $n))) { throw "not built: $(Join-Path $Dist $n). Build-Server.ps1 builds every server file. Nothing was recorded." }
+}
 
 $item = Get-Item -LiteralPath $bin
 $hash = (Get-FileHash -LiteralPath $bin -Algorithm SHA256).Hash.ToLowerInvariant()
 
 # Named Read-Git, not Git. A function called Git wins name resolution over
 # git.exe, so '& git' inside it called itself until the call stack blew.
+#
+# The exit code decides, not stderr. Under Windows PowerShell 5.1 with Stop, a
+# line git writes to stderr (a clone with no upstream remote says "No such
+# remote") ends the script even through 2>$null, so a fork without that
+# remote could not be recorded from 5.1 at all.
 function Read-Git([string[]]$a) {
-  $o = & git.exe -C $Clone @a 2>$null
+  $eap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try { $o = & git.exe -C $Clone @a 2>$null } finally { $ErrorActionPreference = $eap }
   if ($LASTEXITCODE -ne 0) { return '' }
   return ($o | Out-String).Trim()
 }
@@ -60,10 +90,17 @@ function Read-Git([string[]]$a) {
 # a fresh clone of it has no upstream remote. Both used to leave the record
 # with an empty branch, or "HEAD", and no base (issue #546). These fall back
 # to what the clone itself can say.
+#
+# The fork's branch first, whatever the local one is called: a fork worktree
+# on a local branch of its own (thornswood/1200-craft-resync, 29 Sep) holding
+# a commit that is on thornswood/engine-changes recorded the local name, and
+# tests\test-one-engine.js holds the record to the branch .gitmodules follows.
 function Get-ForkBranch([string]$clone, [string]$now) {
-  if ($now -and $now -ne 'HEAD') { return $now }
+  # Read-Git's reason: git's stderr must not end the script under 5.1.
+  $ErrorActionPreference = 'Continue'
   $remote = @(& git -C $clone branch -r --contains HEAD 2>$null | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch '->' })
   if ($remote -contains 'origin/thornswood/engine-changes') { return 'thornswood/engine-changes' }
+  if ($now -and $now -ne 'HEAD') { return $now }
   if ($remote.Count) { return ($remote[0] -replace '^origin/', '') }
   # A clone fetched with one branch knows no other: the branch the repository
   # follows it on, from .gitmodules, when that is where it lives.
@@ -75,6 +112,7 @@ function Get-ForkBranch([string]$clone, [string]$now) {
   return $now
 }
 function Get-UpstreamBase([string]$clone, [string]$now, [string]$recorded) {
+  $ErrorActionPreference = 'Continue'
   if ($now) { return $now }
   if ($recorded) {
     & git -C $clone merge-base --is-ancestor $recorded HEAD 2>$null | Out-Null
@@ -125,8 +163,77 @@ if ($newest -and $newest.LastWriteTime -gt $item.LastWriteTime) {
   Write-Host ''
 }
 
+# ---- every other server file, tied to the clone (#1200, #1214) ----------------
+# See the header for what each is held to. Every reason is gathered, then all of
+# them are said, so one run shows everything that is wrong.
+$why = @()
+function Test-SameBytes([string]$a, [string]$b) {
+  if (-not (Test-Path -LiteralPath $a) -or -not (Test-Path -LiteralPath $b)) { return $false }
+  return (Get-FileHash -LiteralPath $a -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $b -Algorithm SHA256).Hash
+}
+$srv = Join-Path $Clone 'skymp5-server'
+foreach ($n in 'package.json', 'yarn.lock') {
+  if (-not (Test-SameBytes (Join-Path $Dist $n) (Join-Path $srv $n))) { $why += "$n in the build is not the fork's skymp5-server\$n" }
+}
+$pexDir = Join-Path $Clone 'skymp5-scripts\pex'
+$distPex = Join-Path $Dist 'data\scripts'
+$forkPex = @(if (Test-Path -LiteralPath $pexDir) { Get-ChildItem -LiteralPath $pexDir -File | ForEach-Object { $_.Name } })
+if (-not $forkPex.Count) { $why += "the fork has no compiled Papyrus in $pexDir, so data\scripts cannot be tied to it" }
+foreach ($n in $forkPex) {
+  if (-not (Test-SameBytes (Join-Path $distPex $n) (Join-Path $pexDir $n))) { $why += "data\scripts\$n in the build is not the fork's skymp5-scripts\pex\$n" }
+}
+foreach ($f in @(if (Test-Path -LiteralPath $distPex) { Get-ChildItem -LiteralPath $distPex -Recurse -File })) {
+  if ($forkPex -notcontains $f.Name) { $why += "data\scripts\$($f.Name) in the build is not one the fork compiles" }
+}
+# Written by the fork's configure into the build folder, and copied beside the
+# server after every build of the addon.
+$bat = Join-Path $Clone 'build\skymp5-server\launch_server.bat.tmp'
+if (-not (Test-SameBytes (Join-Path $Dist 'launch_server.bat') $bat)) { $why += "launch_server.bat in the build is not the one the fork's configure wrote ($bat)" }
+# The JavaScript half: the bundle names its map, the map's sources are the
+# fork's, and the fork's packages are its lockfile's.
+$js = Join-Path $Dist 'dist_back\skymp5-server.js'
+$tail = ''
+try {
+  $fs = [IO.File]::OpenRead($js)
+  try {
+    $n = [Math]::Min(200, [int]$fs.Length); [void]$fs.Seek(-$n, 'End'); $buf = New-Object byte[] $n; [void]$fs.Read($buf, 0, $n)
+    $tail = [Text.Encoding]::ASCII.GetString($buf)
+  } finally { $fs.Dispose() }
+} catch { }
+if ($tail -notmatch 'sourceMappingURL=skymp5-server\.js\.map\s*$') { $why += 'dist_back\skymp5-server.js does not name skymp5-server.js.map as its map, so the map says nothing about it' }
+$node = Get-Command node -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $node) { $why += 'node is not on this machine, so the JavaScript half cannot be tied to the fork' }
+else {
+  $said = @(& $node.Source (Join-Path $Here 'server-bundle-sources.js') (Join-Path $Dist 'dist_back\skymp5-server.js.map') $Clone 2>&1 | ForEach-Object { "$_" })
+  if ($LASTEXITCODE -ne 0) { $why += @($said | ForEach-Object { "dist_back\skymp5-server.js: $_" }) }
+  else { Write-Host ('  the JavaScript half was built from the fork''s sources: ' + (($said | Select-Object -Last 1) -replace '^SOURCES OK (\d+) (\d+)$', '$1 sources, $2 of them the server''s own TypeScript')) }
+  $yarn = Get-Command yarn -ErrorAction SilentlyContinue | Select-Object -First 1
+  if (-not $yarn) { $why += 'yarn is not on this machine, so the packages the JavaScript half bundles cannot be held to the fork''s yarn.lock' }
+  else {
+    # Run in the folder rather than given it: yarn is a .cmd, and cmd.exe
+    # splits a path argument at an & (the worktrees folder has one).
+    $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    Push-Location -LiteralPath $srv
+    try { $ys = @(& yarn check --integrity 2>&1 | ForEach-Object { "$_" }); $yc = $LASTEXITCODE } finally { Pop-Location; $ErrorActionPreference = $eap }
+    if ($yc -ne 0) { $why += ("the packages in $srv\node_modules are not the ones its yarn.lock names (yarn check --integrity: " + (($ys | Where-Object { $_ -match 'error' } | Select-Object -First 2) -join ' ') + '). Build-Server.ps1 installs them.') }
+  }
+}
+if ($why.Count) {
+  Write-Host ''
+  Write-Host '  NOT RECORDED. These server files cannot be tied to the clone:' -ForegroundColor Red
+  foreach ($w in $why) { Write-Host ('    ' + $w) -ForegroundColor Red }
+  Write-Host '  .\scripts\release\Build-Server.ps1 builds every one of them from the clone and records them.' -ForegroundColor Yellow
+  throw 'the server build does not match the clone; nothing was recorded'
+}
+
+$files = [ordered]@{}
+$sums = Get-ThornswoodServerFolderSums $Dist
+foreach ($rel in @($sums.Keys | Sort-Object)) {
+  $files[$rel] = [ordered]@{ 'sha256' = $sums[$rel]; 'bytes' = (Get-Item -LiteralPath (Join-Path $Dist ($rel -replace '/', '\'))).Length; 'commit' = $commit }
+}
+
 $rec = [ordered]@{
-  '_note'   = 'What the server binary in this release is, and the source it was built from. Deploy-Server.ps1 refuses to ship a binary whose sha256 is not this one. Regenerate with scripts\release\New-ServerBuildRecord.ps1 after every rebuild.'
+  '_note'   = 'What the server in this release is, and the source it was built from: every file the fork builds into it, by hash, and the one fork commit (scripts\deploy\ServerBuild.ps1 says which files). sha256 is the binary''s. Export-ServerPayload, Publish-Server, Deploy-Server and the installer refuse any server file that is not this. Regenerate with scripts\release\New-ServerBuildRecord.ps1 after every rebuild.'
   'binary'  = 'scam_native.node'
   'sha256'  = $hash
   'bytes'   = $item.Length
@@ -138,6 +245,7 @@ $rec = [ordered]@{
     'upstream'     = $upstream
     'upstreamBase' = $base
   }
+  'files'    = $files
   'recorded' = (Get-Date).ToString('yyyy-MM-dd')
 }
 
@@ -156,6 +264,7 @@ Write-Host ('  bytes   {0:N0}' -f $item.Length)
 Write-Host ('  built   {0}' -f $item.LastWriteTime)
 Write-Host ('  commit  {0}' -f $commit)
 Write-Host ('  branch  {0}' -f $branch)
+foreach ($rel in @($files.Keys)) { Write-Host ('  {0}  {1}' -f $files[$rel].sha256.Substring(0, 12), $rel) }
 Write-Host ('  written {0}' -f $Out)
 Write-Host ''
 Write-Host '  Commit this file with the release it describes.' -ForegroundColor DarkGray
