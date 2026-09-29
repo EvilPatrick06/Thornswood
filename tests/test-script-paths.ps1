@@ -48,6 +48,7 @@ $notInGit = @{
     'tools/setup-stub.pdb'          = 'built beside setup-stub.exe by Build-Launcher.ps1, ignored with every pdb'
     'out/dist'                      = 'the release output, under out, which git ignores (CONTRIBUTING, the fork and its build)'
     'tools/signing.json'            = 'a machine''s signing settings, ignored by git'
+    'records/signing/client'        = 'Microsoft''s signing client, fetched from NuGet by Setup-ShipMachine.ps1 and ignored by git (#458)'
     'tools/backup-key.txt'          = 'the backup passphrase, a secret kept out of git'
     'tools/thornswood-front.zip'    = 'the front build, made outside the repository and dropped beside Go.ps1'
     'bot/announced.json'  = 'what Publish-Discord.ps1 has posted, written on the machine that ships'

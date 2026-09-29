@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "method": "artifactsigning",
+  "dlib": "records\\signing\\client\\Microsoft.ArtifactSigning.Client\\bin\\x64\\Azure.CodeSigning.Dlib.dll",
+  "metadata": "records\\signing\\metadata.json",
+  "timestampUrl": "http://timestamp.acs.microsoft.com"
+}
