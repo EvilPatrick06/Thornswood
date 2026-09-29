@@ -40,7 +40,9 @@
 
   Anything else on this box that needs to tell staff something (the bot's own
   wrapper, issue #449) appends a line of the same shape to alerts.jsonl and
-  this delivers it the same way. tests\test-watch-alerts.ps1 drives the real
+  this delivers it the same way. So does Watch-Outside.ps1 on One, over ssh,
+  for what it sees from outside (issue #448); when the box cannot be reached
+  it posts through its own copy of the same webhook. tests\test-watch-alerts.ps1 drives the real
   code below against fakes: down, back, flapping, the bot down, a webhook
   that fails. bot\test-watch-services.py reads what that harness writes.
 
