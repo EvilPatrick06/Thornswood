@@ -47,6 +47,13 @@ what they wrote and where they were standing, so staff can act on it. Only
 staff read them, the person reported is not told, and nothing else from
 the chat is copied into them.
 
+**Using /stuck.** Each use keeps your character, your profile, your Discord
+account, where you were and where it sent you, and when, so staff can see it
+was used for being stuck. The game server also keeps the last few places each
+character stood, for as long as they are online, so /stuck has somewhere to
+send them back to; that list is gone when they leave or the server restarts.
+Only staff read these.
+
 **The launcher's own log.** Sent to the site when a session ends. It is about
 the game: which mods are installed, what failed to start, which version you
 are on. It is how somebody who cannot play gets helped without a conversation.
