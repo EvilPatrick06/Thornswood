@@ -10,20 +10,38 @@ machine had.
   (it read "FILL THIS IN AFTER THE PROFILE EXISTS" until 27 September, while
   the machine that signs read its own copy at `C:\tools\metadata.json`).
 - `client\`: Microsoft's signing client, `Azure.CodeSigning.Dlib.dll` and what
-  comes with it, from the `Microsoft.Trusted.Signing.Client` package on NuGet.
-  Ignored by git: it is Microsoft's, and it can be fetched again.
+  comes with it, from the `Microsoft.ArtifactSigning.Client` package on NuGet
+  (it was `Microsoft.Trusted.Signing.Client` before the rename). Ignored by
+  git: it is Microsoft's, and it can be fetched again. The dlib is under
+  `bin\x64` in the package; One has it at
+  `client\client\Microsoft.ArtifactSigning.Client\bin\x64`, where nuget.exe
+  put it.
+- `signing.template.json`: the `tools\signing.json` a new machine starts from,
+  paths and "enabled": true, no key or password (issue #458).
 
 `tools\signing.json` says whether a machine signs, and with what. It stays out
 of git because it is one machine's setup. Its `dlib` and `metadata` can name
-these files relative to the repository folder:
+these files relative to the repository folder, which is what the template
+does:
 
 ```json
 {
+  "enabled": true,
   "method": "artifactsigning",
-  "dlib": "records\\signing\\client\\Azure.CodeSigning.Dlib.dll",
-  "metadata": "records\\signing\\metadata.json"
+  "dlib": "records\\signing\\client\\Microsoft.ArtifactSigning.Client\\bin\\x64\\Azure.CodeSigning.Dlib.dll",
+  "metadata": "records\\signing\\metadata.json",
+  "timestampUrl": "http://timestamp.acs.microsoft.com"
 }
 ```
+
+On a new machine `.\scripts\release\Setup-ShipMachine.ps1` fetches the client
+at the pinned version (refusing any other bytes), writes `tools\signing.json`
+from the template when there is none, and asks the signing service whether
+this machine's `az login` can sign with the profile. The sign in is the
+credential: an Azure account Patrick has given the Certificate Profile Signer
+role on the ThornswoodSigning account. Never copy another machine's
+`tools\signing.json`: One's names `C:\tools\metadata.json`, which no other
+machine has.
 
 SIGNING IS ON since 27 September (issue #390, closed). It was switched off on
 purpose until then (Patrick, 22 September: "the code signing stuff isnt
@@ -33,10 +51,10 @@ signed on every Ship from a machine whose `tools\signing.json` is enabled.
 EVERY RELEASE HAS TO BE SIGNED NOW. `ExpectedSigner` in
 `launcher\app\Updater.cs` is set, so a launcher from dev 1.1.101.17 on
 refuses an update that is not signed by this certificate. A machine with no
-`tools\signing.json`, or one that is disabled, still builds and Ships and
-only prints "not signing": its launcher would be refused by everybody on a
-signed one. So only a machine that signs Ships, dev included, until Ship
-itself refuses an unsigned launcher.
+`tools\signing.json`, or one that is disabled, still builds and only prints
+"not signing", but Ship and Publish-Installer refuse to publish from it
+(`scripts\release\Assert-PublishSigned.ps1`). So only a machine that signs
+Ships, dev included.
 
 The certificate is issued to a person, and Windows shows that person's name
 as the verified publisher. The live main launcher, 1.1.101, was built before
