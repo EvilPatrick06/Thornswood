@@ -820,7 +820,7 @@ try {
 }
 "@
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($put))
-  $out = $url | & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" 2>&1
+  $out = $url | Invoke-ThornswoodNative { $input | & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" } 2>&1
   $url = $null
   foreach ($l in $out) {
     $c = 'Gray'

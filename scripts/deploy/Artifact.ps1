@@ -53,6 +53,9 @@
   machine that can reach the box can do it.
 #>
 
+# ssh and scp run through Invoke-ThornswoodNative (issue #941).
+. (Join-Path $PSScriptRoot '..\vps\Vps.ps1')
+
 . (Join-Path $PSScriptRoot '..\vps\Send-Script.ps1')
 
 $script:ThornswoodDeployStore = 'C:/Thornswood-Deploys'
@@ -386,7 +389,7 @@ function Send-ThornswoodArtifactFile([string]$Local, [string]$Target, [string[]]
   $eap = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   try {
-    & scp @strict $Local ($Target + ':' + $Far) 2>&1 | Out-Null
+    Invoke-ThornswoodNative { & scp @strict $Local ($Target + ':' + $Far) } 2>&1 | Out-Null
     $code = $LASTEXITCODE
   } finally { $ErrorActionPreference = $eap }
   if ($code -ne 0) { throw ('scp failed sending ' + (Split-Path -Leaf $Local) + ' to ' + $Far) }

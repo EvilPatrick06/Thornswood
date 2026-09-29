@@ -78,7 +78,7 @@ foreach ($t in 'ssh', 'scp') {
 }
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  return & ssh @ssh $target "powershell -NoProfile -EncodedCommand $e" 2>&1 | ForEach-Object { "$_" }
+  return Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $e" } 2>&1 | ForEach-Object { "$_" }
 }
 # A script on the box, run from its own file, the way Publish-Server.ps1 runs
 # the installer: every argument here is a path under C:\Thornswood-Restore or
@@ -88,7 +88,7 @@ function OnBox([string]$file, [string]$argLine) {
   $eap = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   try {
-    & ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File $far\scripts\vps\$file $argLine" 2>&1 |
+    Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File $far\scripts\vps\$file $argLine" } 2>&1 |
       ForEach-Object { Say ('  ' + $_) }
   } finally { $ErrorActionPreference = $eap }
   return $LASTEXITCODE
@@ -178,14 +178,14 @@ try {
   Head 'Sending it'
   $made = Remote "New-Item -ItemType Directory -Force -Path '$far\scripts\vps', 'C:\Thornswood-Backup' | Out-Null; 'MADE'"
   if (-not ($made -contains 'MADE')) { throw "could not make $far on the box" }
-  & scp @ssh $Backup "${target}:$farFwd/$name"
+  Invoke-ThornswoodNative { & scp @ssh $Backup "${target}:$farFwd/$name" }
   if ($LASTEXITCODE -ne 0) { throw 'scp could not send the backup' }
   Say "  $name" 'Green'
-  & scp @ssh $KeyFile "${target}:$farFwd/key.txt"
+  Invoke-ThornswoodNative { & scp @ssh $KeyFile "${target}:$farFwd/key.txt" }
   if ($LASTEXITCODE -ne 0) { throw 'scp could not send the passphrase file' }
   Say '  the passphrase file (not shown)' 'Green'
   foreach ($s in 'Restore-Backup.ps1', 'Restore-Server.ps1', 'vps-restore-services.ps1') {
-    & scp @ssh (Join-Path $Here $s) "${target}:$farFwd/scripts/vps/$s"
+    Invoke-ThornswoodNative { & scp @ssh (Join-Path $Here $s) "${target}:$farFwd/scripts/vps/$s" }
     if ($LASTEXITCODE -ne 0) { throw "scp could not send $s" }
     Say "  $s" 'Green'
   }

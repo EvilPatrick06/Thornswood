@@ -165,7 +165,7 @@ function Remote($script) {
 }
 
 function Push($local, $remote) {
-  & scp @ssh $local "$User@${Vps}:$remote"
+  Invoke-ThornswoodNative { & scp @ssh $local "$User@${Vps}:$remote" }
   if ($LASTEXITCODE -ne 0) { throw "scp failed: $local" }
 }
 

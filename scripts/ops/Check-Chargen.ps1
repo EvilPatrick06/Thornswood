@@ -63,7 +63,7 @@ if ($From -eq 'build') {
     $settingsPath = "$root\server-settings.json"
     $remote = "`$ProgressPreference='SilentlyContinue'; Get-Content -LiteralPath '$settingsPath' -Raw"
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-    $text = & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" 2>&1
+    $text = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" } 2>&1
     $json = (@($text) -join "`n")
     # The warning ssh prints about key exchange arrives on the same stream as
     # the answer, so the JSON is taken from its first brace rather than from

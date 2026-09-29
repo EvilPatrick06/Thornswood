@@ -294,7 +294,7 @@ try {
   # fail on the first character for reasons nobody enjoys finding out.
   [IO.File]::WriteAllText($tmp, $payload, (New-Object Text.UTF8Encoding $false))
 
-  & scp @ssh $tmp "$User@${Vps}:$Root/data/news.json"
+  Invoke-ThornswoodNative { & scp @ssh $tmp "$User@${Vps}:$Root/data/news.json" }
   if ($LASTEXITCODE -ne 0) { throw 'scp failed' }
 
   if (-not $Quiet) {

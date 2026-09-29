@@ -568,12 +568,12 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
   $send['thornswood-build.json'] = $stampFile
   foreach ($p in $sendPlugins) { $send['plugins/' + (Split-Path $p -Leaf)] = $p }
   foreach ($rel in $send.Keys) {
-    & scp @ssh $send[$rel] "$User@${Vps}:$stageFar/$rel"
+    Invoke-ThornswoodNative { & scp @ssh $send[$rel] "$User@${Vps}:$stageFar/$rel" }
     if ($LASTEXITCODE -ne 0) { throw "scp failed for $rel. The dev server has not been touched." }
     Write-Host "  $rel"
   }
   if ($LoadOrder) {
-    & scp @ssh $orderFile "$User@${Vps}:$farOrder"
+    Invoke-ThornswoodNative { & scp @ssh $orderFile "$User@${Vps}:$farOrder" }
     $sentOrder = $LASTEXITCODE
     Remove-Item -LiteralPath $orderFile -Force -ErrorAction SilentlyContinue
     if ($sentOrder -ne 0) { throw 'scp failed for the load order list. The dev server has not been touched.' }
