@@ -1078,8 +1078,8 @@
             "by": "",
             "cells": {
               "c21n": "**Default channels**",
-              "c22n": "Discord needs 7, and 5 that everybody can post in. These are nine, six writable.",
-              "c23n": "Tick these nine:\n\n`#welcome` `#rules` `#start-here` `#news`\n\n`#general` `#media` `#character-introductions` `#tales` `#rp-appreciation`\n\nThat is nine total and five writable. The first four are read-only."
+              "c22n": "Discord needs 7, and 5 that everybody can post in. These are nine, five writable, which is exactly the minimum.",
+              "c23n": "Tick these nine:\n\n`#welcome` `#rules` `#start-here` `#news`\n\n`#general` `#media` `#character-introductions` `#tales` `#rp-appreciation`\n\nThat is nine total and five writable. The first four are read-only. All nine have to be channels everybody can see, so check first: `.\\scripts\\deploy\\Set-DiscordOnboarding.ps1 -Check` reads the server and says which of these Discord would refuse, and changes nothing."
             }
           },
           {
