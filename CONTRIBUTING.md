@@ -318,8 +318,9 @@ the team before code; nobody settles it alone, and a Claude never does.
 - Every pull request gets the build check (.github/workflows/build.yml, about
   two minutes: the secret scan, every script and file parses, the writing
   rules and the two harnesses that prove the writing checks (see Words), the ownership page (`tests\test-ownership.js`, added by issue #752),
-  six more harnesses that are just as quick (the script index, the script
-  paths, the architecture page and three launcher harnesses, issue #875),
+  seven more harnesses that are just as quick (the script index, the script
+  paths, the architecture page and three launcher harnesses, issue #875, and
+  the new-box runbook read against its scripts, issue #454),
   the launcher window, the count of
   silent catches in the launcher, and the launcher compiles with the .NET
   Framework csc). Red means the branch would stop Ship at the build step;
