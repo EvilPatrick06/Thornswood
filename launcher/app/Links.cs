@@ -123,7 +123,7 @@ namespace Thornswood
             A("AnotherOakwood", 61007);
             A("aaaGraniteHill", 14658);
             A("OarsRest", 41812);
-            A("ElysiumEstateSSE", 4119);
+            A("ElysiumEstate", 4119);
             A("Populated Cities Towns Villages Legendary", 2005);
 
             // ---------------------------------------------------- looks

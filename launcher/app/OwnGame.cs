@@ -603,8 +603,11 @@ namespace Thornswood
         ///    What Make took from the Steam copy that is none of them, mods put
         ///    there by hand, is taken out of the folder and logged, and each file
         ///    is recorded as which kind it is (O, V or T). See OwnGameKinds.cs.
+        /// 14: Elysium Estate's old plugin, ElysiumEstateSSE.esp, is left out,
+        ///    so a refresh cannot copy it back after a pack deletes it. See
+        ///    Foreign, issue #690.
         /// </summary>
-        const int Rules = 13;
+        const int Rules = 14;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -1774,6 +1777,13 @@ namespace Thornswood
             // Ship-Rules.ps1 carries the same rule ($ShipOldSkyUIScripts);
             // change the two together.
             if (Regex.IsMatch(rel, @"^Data\\Scripts\\ski_(activeeffectswidget|configmenu|favoritesmanager|main|playerloadgamealias|qf_configmanagerinstance|questbase|settingsmanager|widgetbase|widgetmanager)\.pex$", I)) return true;
+
+            // Elysium Estate 4.3.5's plugin, issue #690. The servers load the
+            // collection's 5.0.1, ElysiumEstate.esp, since 29 September. The old
+            // name was only ever a hand copy in a Steam copy or a pack's copy,
+            // so packs delete it and this keeps a refresh from bringing it back.
+            // Ship-Rules.ps1 carries the same rule; change the two together.
+            if (rel.Equals("Data\\ElysiumEstateSSE.esp", StringComparison.OrdinalIgnoreCase)) return true;
 
             if (!rel.StartsWith("Data\\Platform\\", StringComparison.OrdinalIgnoreCase)) return false;
             if (leaf.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)) return true;
