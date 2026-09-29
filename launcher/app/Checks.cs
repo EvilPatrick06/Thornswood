@@ -1282,6 +1282,40 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
         }
 
         /// <summary>
+        /// GameRunning for the launcher's two second tick while the game runs.
+        /// Asks the processes the last look found whether they are still up,
+        /// by the handle each already has, and lists the machine's processes
+        /// again only once none of them is (#978). See Watched. Called from
+        /// the window's thread only.
+        /// </summary>
+        public static bool GameStillRunning()
+        {
+            return inPlay.Any();
+        }
+
+        static bool stillAskRefused;
+
+        static readonly Watched<Process> inPlay = new Watched<Process>(
+            GameProcesses,
+            delegate (Process p)
+            {
+                // A process that cannot be asked (access refused) is not
+                // provably up, so the watch looks again, as GameRunning would.
+                // Said once a session: a game run as administrator refuses
+                // every tick, and one line says it as well as a thousand.
+                try { return !p.HasExited; }
+                catch (Exception ex)
+                {
+                    if (!stillAskRefused) { stillAskRefused = true; Swallow.Note("Checks.GameStillRunning, has exited", ex); }
+                    return false;
+                }
+            },
+            delegate (Process p)
+            {
+                try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Checks.GameStillRunning, dispose", ex); }
+            });
+
+        /// <summary>
         /// The in game browser's helpers. Each one is started by Skyrim and
         /// usually dies with it, but after a crash they stay behind with no
         /// window, holding Data\Platform and Data\NirnLabUIPlatform open. Task
@@ -1310,12 +1344,28 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
 
             var names = new List<string> { "SkyrimSE", "skse64_loader" };
             names.AddRange(Helpers);
+
+            // One list of the machine's processes, not one per name. Each
+            // GetProcessesByName lists them all and keeps the matches, so
+            // asking for four names was four lists (#978).
+            Process[] all;
+            try { all = Process.GetProcesses(); }
+            catch (Exception ex) { Swallow.Note("Checks.GameProcesses, list", ex); return l; }
+            var byName = new Dictionary<string, List<Process>>(StringComparer.OrdinalIgnoreCase);
+            foreach (string n in names) byName[n] = new List<Process>();
+            foreach (Process p in all)
+            {
+                string pn = null;
+                try { pn = p.ProcessName; } catch (Exception ex) { Swallow.Note("Checks.GameProcesses, name", ex); }
+                List<Process> into;
+                if (pn != null && byName.TryGetValue(pn, out into)) into.Add(p);
+                else { try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Checks.GameProcesses, dispose other", ex); } }
+            }
+
             foreach (string n in names)
             {
                 bool helper = Array.IndexOf(Helpers, n) >= 0;
-                Process[] found;
-                try { found = Process.GetProcessesByName(n); } catch { continue; }
-                foreach (Process p in found)
+                foreach (Process p in byName[n])
                 {
                     bool skip = p.Id == mine;
                     // A helper only counts when it provably runs from this

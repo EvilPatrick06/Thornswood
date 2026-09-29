@@ -11,7 +11,7 @@
 // between 20:08 and 21:00, and not one "fires: N of ours in this cell" line.
 // #184 moved the fire probe off Game.findClosestReferenceOfType and onto a
 // walk of the cell, and the line fireSpotsHere logs at the end of that walk
-// named `walked`, which is the counter inside refsInCell. Its own is
+// named `walked`, which was the counter inside the walk. Its own is
 // fireWalked. So every cell change threw after the fires had been kept, the
 // place tick died before it composed its line, and the /place report for that
 // tick never reached the server. The tick after it read the kept list and got
@@ -19,7 +19,7 @@
 //
 // test-temp.js reads this code as text, and text that names a variable which
 // does not exist reads exactly as well as text that names one that does. So
-// this RUNS it: the real CELL_TYPES, refsInCell, the fire state, fireIdList,
+// this RUNS it: the real CELL_TYPES, walkCellSlice, the fire state, fireIdList,
 // fireSpotsHere and fireDistance, lifted out of the plugin, over a fake cell
 // and a fake sp. The fire table is a stub of two real Skyrim.esm bases, because
 // the table is data and the walk is what is under test.
@@ -52,7 +52,7 @@ function lift(from, fnName) {
   return b < 0 ? null : src.slice(a, b + END.length);
 }
 
-const walk = lift('  const CELL_TYPES = [', 'refsInCell');
+const walk = lift('  const CELL_TYPES = [', 'walkCellSlice');
 const fires = lift('  let fireBases = 0;', 'fireDistance');
 const reach = /const FIRE_REACH = (\d+);/.exec(src);
 const inside = /const FIRE_INSIDE = (\d+);/.exec(src);

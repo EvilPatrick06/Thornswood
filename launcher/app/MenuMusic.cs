@@ -32,20 +32,69 @@ namespace Thornswood
         static string trackPath;
         static Action<string> log;
 
+        /// <summary>
+        /// Bumped every time the browser is made or closed, so an answer from
+        /// the browser that was closed (its environment arriving late, say)
+        /// finds it is no longer the current one and does nothing.
+        /// </summary>
+        static int generation;
+
+        /// <summary>
+        /// How many times the browser has been made this session, and closed.
+        /// For tests\test-963-perf-settings.ps1 and the log line.
+        /// </summary>
+        public static int Opened, Closed;
+
+        /// <summary>
+        /// Remembers the track and the volume. The browser itself is made the
+        /// first time Decide asks for the music, not here: a launcher that
+        /// starts while the game runs, or with the music off in Settings,
+        /// never makes one at all.
+        /// </summary>
         public static void Start(string file, double volume, Action<string> say)
         {
             log = say;
             trackPath = file;
             wantVol = Clamp(volume);
-            try
-            {
-                Voice.Prepare();
-                Begin();
-            }
+            try { Voice.Prepare(); }
             catch (Exception ex)
             {
                 Stamp("Menu music: WebView2 path did not start (" + ex.Message + ")");
             }
+        }
+
+        static void Open()
+        {
+            try { Begin(); }
+            catch (Exception ex)
+            {
+                Stamp("Menu music: WebView2 path did not start (" + ex.Message + ")");
+            }
+        }
+
+        /// <summary>
+        /// Closes the browser that plays the theme, which ends its own WebView2
+        /// processes (it has a profile folder of its own, MusicBrowser, so none
+        /// of voice's). Called when the game starts. Patrick, 28 September
+        /// (#963): the paused browser stayed alive for the whole session, a
+        /// second Chromium sitting beside the game doing nothing. Decide makes
+        /// a new one when the music is wanted again after the game closes.
+        /// Safe to call any time, as often as wanted.
+        /// </summary>
+        public static void Close()
+        {
+            wantPlay = false;
+            if (view == null && host == null) return;
+            generation++;
+            ready = false;
+            var v = view;
+            var h = host;
+            view = null;
+            host = null;
+            try { if (v != null) v.Dispose(); } catch (Exception ex) { Swallow.Note("MenuMusic.Close, view", ex); }
+            try { if (h != null) h.Close(); } catch (Exception ex) { Swallow.Note("MenuMusic.Close, host", ex); }
+            Closed++;
+            Stamp("Menu music: closed its browser while the game runs");
         }
 
         static double Clamp(double v)
@@ -108,11 +157,17 @@ namespace Thornswood
         static void Begin()
         {
             if (view != null) return;
+            if (string.IsNullOrEmpty(trackPath)) return;
 
             string hostPath = PlaceHost(trackPath);
             if (hostPath == null) return;
 
-            host = new Window
+            // This browser's own handles. Everything below that runs later
+            // (the environment arriving, the page loading) checks it is still
+            // the current one first: Close may have come in between.
+            int gen = ++generation;
+            Opened++;
+            var h = new Window
             {
                 Width = 64,
                 Height = 64,
@@ -122,24 +177,27 @@ namespace Thornswood
                 Visibility = Visibility.Hidden,
                 Title = "Thornswood music"
             };
-            view = new Microsoft.Web.WebView2.Wpf.WebView2();
-            host.Content = view;
-            host.Left = -10000;
-            host.Top = -10000;
+            var v = new Microsoft.Web.WebView2.Wpf.WebView2();
+            host = h;
+            view = v;
+            h.Content = v;
+            h.Left = -10000;
+            h.Top = -10000;
             // Shown offscreen then hidden so the control actually creates its
             // browser (same pattern as Voice).
-            host.Show();
-            host.Hide();
+            h.Show();
+            h.Hide();
 
             string pageUri = new Uri(hostPath).AbsoluteUri;
 
-            view.CoreWebView2InitializationCompleted += delegate (
+            v.CoreWebView2InitializationCompleted += delegate (
                 object s,
                 Microsoft.Web.WebView2.Core.CoreWebView2InitializationCompletedEventArgs e)
             {
                 try
                 {
-                    if (!e.IsSuccess || view.CoreWebView2 == null)
+                    if (gen != generation) return;
+                    if (!e.IsSuccess || v.CoreWebView2 == null)
                     {
                         string detail = e.InitializationException == null
                             ? "no reason given"
@@ -148,7 +206,7 @@ namespace Thornswood
                         return;
                     }
 
-                    var core = view.CoreWebView2;
+                    var core = v.CoreWebView2;
                     core.WebMessageReceived += delegate (
                         object s2,
                         Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs a)
@@ -175,6 +233,7 @@ namespace Thornswood
                     {
                         try
                         {
+                            if (gen != generation) return;
                             if (!nav.IsSuccess)
                             {
                                 Stamp("Menu music: host page did not load");
@@ -240,9 +299,10 @@ namespace Thornswood
                     }
                     catch (Exception ex) { Swallow.Note("MenuMusic.CreateAsyncFault", ex); }
                     Stamp("Menu music: WebView2 environment failed (" + why + "); trying default");
-                    host.Dispatcher.BeginInvoke(new Action(delegate
+                    h.Dispatcher.BeginInvoke(new Action(delegate
                     {
-                        try { view.EnsureCoreWebView2Async(); }
+                        if (gen != generation) return;
+                        try { v.EnsureCoreWebView2Async(); }
                         catch (Exception ex) { Stamp("Menu music: " + ex.Message); }
                     }));
                     return;
@@ -250,25 +310,36 @@ namespace Thornswood
                 if (t.Result == null)
                 {
                     Stamp("Menu music: WebView2 environment was empty; trying default");
-                    host.Dispatcher.BeginInvoke(new Action(delegate
+                    h.Dispatcher.BeginInvoke(new Action(delegate
                     {
-                        try { view.EnsureCoreWebView2Async(); }
+                        if (gen != generation) return;
+                        try { v.EnsureCoreWebView2Async(); }
                         catch (Exception ex) { Stamp("Menu music: " + ex.Message); }
                     }));
                     return;
                 }
-                host.Dispatcher.BeginInvoke(new Action(delegate
+                h.Dispatcher.BeginInvoke(new Action(delegate
                 {
-                    try { view.EnsureCoreWebView2Async(t.Result); }
+                    // Closed before the environment arrived: nothing to put
+                    // it in, and the browser it would start is not wanted.
+                    if (gen != generation) return;
+                    try { v.EnsureCoreWebView2Async(t.Result); }
                     catch (Exception ex) { Stamp("Menu music: " + ex.Message); }
                 }));
             });
         }
 
+        /// <summary>
+        /// Plays or pauses the theme. A pause keeps the browser, so coming
+        /// back from a minimised window is instant; only Close ends it. When
+        /// the music is wanted and there is no browser (the first time, or
+        /// after the game closed), one is made and plays once its page is up.
+        /// </summary>
         public static void Decide(bool play, double volume)
         {
             wantPlay = play;
             wantVol = Clamp(volume);
+            if (play && view == null) { Open(); return; }
             Apply();
         }
 

@@ -304,6 +304,11 @@ namespace Thornswood
             after = SetEveryNumber(after, "profileId", lastProfileId);
             after = EnsureInGameData(after, "chooseAtMenu", "true");
             after = SetEveryBool(after, "chooseAtMenu", true);
+            // SkyMP's skipUpdates draws everybody else's movement at half
+            // rate (worldView.ts skips every other update when it is true).
+            // Patrick, 28 September (#963): it stays off. Absent is off, so
+            // nothing is added; one that says true is put back to false.
+            after = SetEveryBool(after, "skipUpdates", false);
 
             if (!string.Equals(before, after, StringComparison.Ordinal))
             {
