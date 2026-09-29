@@ -289,7 +289,9 @@ if ($guard) {
     $clean = @{ 'Data\Platform\UI\index.html' = '1:aa'; ':gone:Data\Interface\map.swf' = 'always'; ':order:plugins' = 'x' }
     Yes '  a record of ours alone goes through' ((Invoke-Guard $clean) -eq '')
     foreach ($k in @('CreationKit.exe', 'SkyrimSE.exe.bak-1160-for-369', 'Data\DialogueViews\1.xml', 'SkyrimSE.exe', 'VERSION.bak', ':gone:Tools\RoboVoicer.exe',
-                     'Data\Source\Scripts\Actor.psc', 'Data\Scripts\Source\IED.psc', ':gone:Data\Scripts\Source\SKSE.psc')) {
+                     'Data\Source\Scripts\Actor.psc', 'Data\Scripts\Source\IED.psc', ':gone:Data\Scripts\Source\SKSE.psc',
+                     # Bethesda's archive a pack once carried, as a file and as gone (#1229).
+                     'Data\MarketplaceTextures.bsa', ':gone:Data\MarketplaceTextures.bsa')) {
         $m = @{} + $clean; $m[$k] = '1:bb'
         $why = Invoke-Guard $m
         Yes "  a record naming $k stops the release" ($why -like 'STOP*Bethesda*')
@@ -304,15 +306,30 @@ if ($filter) {
     function Say($m, $c) { }
     $curMap = @{ 'Data\Platform\UI\index.html' = '1:aa'; 'CreationKit.exe' = '2:bb'; ':gone:lex\ssceam.tlx' = 'removed'; ':profile:plugins.txt' = 'x' }
     $curMap[':gone:Data\Source\Scripts\Game.psc'] = 'removed'
+    $curMap[':gone:Data\MarketplaceTextures.bsa'] = 'removed'
     $tgtMap = @{ 'Data\Platform\UI\index.html' = '1:cc'; 'SkyrimSE.exe.bak-1160-for-369' = '3:dd'; 'Data\DialogueViews\1.xml' = '4:ee';
-                 'Data\Scripts\Source\IED.psc' = '5:ff'; 'Data\Scripts\IED.pex' = '6:aa' }
+                 'Data\Scripts\Source\IED.psc' = '5:ff'; 'Data\Scripts\IED.pex' = '6:aa'; 'Data\MarketplaceTextures.bsa' = '7:bb' }
     Invoke-Expression $filter
     Yes '  going back to an old record hands none of them out' (-not $tgtMap.ContainsKey('SkyrimSE.exe.bak-1160-for-369') -and -not $tgtMap.ContainsKey('Data\DialogueViews\1.xml'))
     Yes '  nor a script source a record of 29 September names' (-not $tgtMap.ContainsKey('Data\Scripts\Source\IED.psc'))
-    Yes '  and going forward lists none of them as gone' (-not $curMap.ContainsKey('CreationKit.exe') -and -not $curMap.ContainsKey(':gone:lex\ssceam.tlx') -and -not $curMap.ContainsKey(':gone:Data\Source\Scripts\Game.psc'))
+    Yes '  nor MarketplaceTextures.bsa, Bethesda''s archive a pack once carried (#1229)' (-not $tgtMap.ContainsKey('Data\MarketplaceTextures.bsa'))
+    Yes '  and going forward lists none of them as gone' (-not $curMap.ContainsKey('CreationKit.exe') -and -not $curMap.ContainsKey(':gone:lex\ssceam.tlx') -and -not $curMap.ContainsKey(':gone:Data\Source\Scripts\Game.psc') -and -not $curMap.ContainsKey(':gone:Data\MarketplaceTextures.bsa'))
     Yes '  while the files of ours and the plugin list stay' ($curMap.ContainsKey('Data\Platform\UI\index.html') -and $tgtMap.ContainsKey('Data\Platform\UI\index.html') -and $curMap.ContainsKey(':profile:plugins.txt') -and $tgtMap.ContainsKey('Data\Scripts\IED.pex'))
-    Yes ('  and it says how many it left out ({0})' -f $notOurs) ($notOurs -eq 6)
+    Yes ('  and it says how many it left out ({0})' -f $notOurs) ($notOurs -eq 8)
 }
+
+# ---- 4b. one Bethesda question for all three (#1229) --------------------------
+# Check-Secrets, the record guard and the rollback filter all ask
+# Test-ShipBethesda, which is the three rules together, so they cannot drift.
+$one = @('Data\MarketplaceTextures.bsa', 'CreationKit.exe', 'Data\Scripts\Source\IED.psc', 'SkyrimSE.exe', 'Data\Skyrim.esm',
+         'Data\Platform\UI\index.html', 'Data\textures\MarketplaceTextures.bsa', 'VERSION.bak')
+Yes 'Test-ShipBethesda is the vanilla, Creation Kit and left alone rules together, path for path' (
+    @($one | Where-Object { [bool](Test-ShipBethesda $_) -ne [bool]((Test-ShipBethesdaTool $_) -or (Test-ShipVanilla $_) -or (Test-ShipBethesdaLeftAlone $_)) }).Count -eq 0)
+Yes '  and it names MarketplaceTextures.bsa and not a file of ours' ((Test-ShipBethesda 'Data\MarketplaceTextures.bsa') -and -not (Test-ShipBethesda 'Data\Platform\UI\index.html'))
+$sec = Get-Content -LiteralPath $SecretsPath -Raw
+Yes 'Check-Secrets asks it' ($sec -match "if \(Test-ShipBethesda \`$rel\) \{ Write-Hit \`$where \`$key '0' 'never-ship-bethesda'")
+Yes 'the record guard asks it' ($null -ne $guard -and $guard -match 'Test-ShipBethesda \$_\)' -and $guard -notmatch 'Test-ShipBethesdaTool')
+Yes 'the rollback filter asks it' ($null -ne $filter -and $filter -match 'Test-ShipBethesda \$p\)' -and $filter -notmatch 'Test-ShipBethesdaTool')
 
 # ---- 5. the launcher --------------------------------------------------------
 $og = [IO.File]::ReadAllText($OwnGamePath)
@@ -368,6 +385,10 @@ if ($compiled) {
         'Data\Scripts\Source.pex', 'Data\SourceArt\x.dds', 'Data\textures\Source\x.dds', 'Data\meshes\Scripts\Source\x.nif', 'Data\Scripts\IED.pex') + @($ckInstall)
     $apart = @($twins | Where-Object { [bool]$T::BethesdaTool($_) -ne [bool](Test-ShipBethesdaTool $_) })
     Yes ('OwnGame.BethesdaTool and Test-ShipBethesdaTool agree on all {0} paths' -f $twins.Count) ($apart.Count -eq 0)
+    # The game opens MarketplaceTextures.bsa by name, so Thornswood's own folder
+    # keeps it as the game's file while packs and records never carry it (#1229).
+    Yes 'OwnGame keeps MarketplaceTextures.bsa, which the game opens by name, while Ship-Rules never ships it' (
+        -not [bool]$T::BethesdaTool('Data\MarketplaceTextures.bsa') -and (Test-ShipBethesda 'Data\MarketplaceTextures.bsa'))
     foreach ($a in $apart) { Write-Host "      they disagree on $a" }
 
     $game = Join-Path ([IO.Path]::GetTempPath()) ('ts-nobethesda-game-' + $PID)
