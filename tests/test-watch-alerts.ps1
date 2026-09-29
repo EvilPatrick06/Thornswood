@@ -18,15 +18,16 @@
   written out on the VPS as watch.ps1. This lifts it out through the AST and
   runs the real thing, top to bottom, once per five minute step on a fake
   clock, in a scratch folder. Only what touches the world is replaced: the
-  port, site, health, bot, backup, runner and disk probes, schtasks, the
-  sleep, the clock and the webhook post. A fake bot plays the part of
+  port, site, health, bot, backup, runner and disk probes, schtasks,
+  Restart-Service (the bot's service, #465), the sleep, the clock and the
+  webhook post. A fake bot plays the part of
   watch_services in bot.py between runs: it posts whatever is in the outbox
   and not yet posted, and marks it, the way the real one does.
   bot\test-watch-services.py drives the real bot against what this writes
   (-Emit).
 
   Read only apart from files under its own temp folder. Never connects to
-  anything, and never runs schtasks.
+  anything, never runs schtasks and never restarts a service.
 #>
 [CmdletBinding()]
 param(
@@ -117,7 +118,7 @@ New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 # Built, never written whole: this file is scanned for webhook addresses.
 $script:goodHook = 'https://discord.com/api/' + 'webhooks/12345/' + 'harness-not-a-real-token'
 $ports = @{ 3001 = 'website'; 3000 = 'game'; 7778 = 'voice'; 7788 = 'dev game'; 7789 = 'dev voice' }
-$tasks = @{ 'Thornswood Web' = 'caddy'; 'Thornswood Docs' = 'website'; 'Thornswood Server' = 'game'; 'Thornswood Voice' = 'voice'; 'Thornswood Bot' = 'bot'; 'Thornswood Dev Server' = 'dev game'; 'Thornswood Dev Voice' = 'dev voice' }
+$tasks = @{ 'Thornswood Web' = 'caddy'; 'Thornswood Docs' = 'website'; 'Thornswood Server' = 'game'; 'Thornswood Voice' = 'voice'; 'Thornswood Dev Server' = 'dev game'; 'Thornswood Dev Voice' = 'dev voice' }
 
 function Box([string]$name, [switch]$NoHook, [string]$Hook) {
     $script:boxRoot = Join-Path $tmp $name
@@ -150,6 +151,18 @@ function schtasks {
     if ($w.Restart -eq 'up') { $w.Up = $true }
     $global:LASTEXITCODE = 0
     return 'SUCCESS'
+}
+# The bot is a Windows service since #465, restarted by its name. Standing in
+# here matters more than anything else in this file: on the VPS, where the
+# nightly run is, the real Restart-Service would restart the real bot.
+$services = @{ 'ThornswoodBot' = 'bot' }
+function Restart-Service {
+    [CmdletBinding()] param([string]$Name, [switch]$Force)
+    $script:runs += $Name
+    $w = $null
+    if ($services.ContainsKey($Name)) { $w = $script:world[$services[$Name]] }
+    if (-not $w -or $w.Restart -eq 'refuse') { throw ('Cannot find any service with service name ''' + $Name + '''.') }
+    if ($w.Restart -eq 'up') { $w.Up = $true }
 }
 function Answers($port) { return [bool]$script:world[$ports[[int]$port]].Up }
 function SiteAnswers($url) { return [bool]$script:world['caddy'].Up }
@@ -326,6 +339,7 @@ try {
     $b.Up = $false; $b.Restart = 'down'
     Step 1
     Yes 'the bot down is said through the webhook, at once' ((Said 'The Discord bot is down') -eq 1 -and (By 'hook') -eq 1 -and (By 'bot') -eq 0)
+    Yes 'and restarted by its service''s name, never through a task (#465)' (@($script:runs | Where-Object { $_ -eq 'ThornswoodBot' }).Count -eq 1 -and @($script:runs | Where-Object { $_ -eq 'Thornswood Bot' }).Count -eq 0)
     Yes 'and marked as posted' ((SentIn 'alerts-sent-webhook.txt').Count -eq 1)
     Step 5
     Yes 'and not again' ($script:said.Count -eq 1)
@@ -439,6 +453,12 @@ try {
     $script:diskPct = 50
     Step 2
     Yes 'cleared, it is said once to be fine again' ((Said 'Free disk space on the VPS is fine again') -eq 1 -and $script:said.Count -eq 2)
+
+    # -- Windows refusing the bot's service ------------------------------------------
+    Box 'bot-refused'
+    $script:world['bot'].Up = $false; $script:world['bot'].Restart = 'refuse'
+    Step 1
+    Yes 'Windows refusing the bot''s service names the service' ((Said 'Windows would not restart its service, ThornswoodBot, which usually means the service is not installed') -eq 1)
 
     # -- what the messages look like ----------------------------------------------
     Box 'words'

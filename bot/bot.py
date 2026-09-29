@@ -209,7 +209,8 @@ REPORTS_AT_ONCE = 5
 
 
 # The folder the watchdog Watch-Services.ps1 puts on the VPS. The bot runs on
-# the same box as the same SYSTEM account, so it can read it.
+# the same box, as its own service account, which Install-Bot.ps1 grants read
+# on this folder and write on alerts-sent-bot.txt (Bot-Service.ps1).
 WATCH_DIR = os.environ.get('WATCH_DIR', r'C:\Thornswood-Watch')
 # Once a minute. The watchdog itself runs every five and gives this two and a
 # half minutes to post a message before it posts it through its webhook.
