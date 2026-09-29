@@ -688,6 +688,10 @@ namespace Thornswood
             // A share record left by a folder of the same name that is gone
             // speaks for files that are not there any more.
             ForgetShares();
+            // And a note that the Steam copy was cleaned speaks for an install
+            // before this one: a reinstall without the own folder put
+            // Thornswood's files back into the Steam copy (#1226).
+            ForgetCleaned();
             Directory.Move(temp, Folder);
             WriteMade(src, SumCopied(lines));
             SettleSettings(true);

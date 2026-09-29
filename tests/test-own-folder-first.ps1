@@ -745,6 +745,21 @@ namespace Thornswood
                 Text(Path.Combine(own, "Data\\Platform\\Plugins\\thornswood-front.js")) == "TS-FRONT" &&
                 Text(Path.Combine(own, "Data\\Platform\\Plugins\\thornswood-pack1.js")) == "PACK-JS pack1" &&
                 Text(Path.Combine(own, "Data\\Thornswood-Content.esp")) == "TS-CONTENT");
+
+            // Installed again without the tick: the setup moves the folder
+            // aside and puts Thornswood's files into the Steam copy with its
+            // list. The folder made again has the Steam copy looked at again.
+            Directory.Move(own, own + "-old");
+            Put(Path.Combine(s.Game, "Data\\Thornswood-Content.esp"), "TS-CONTENT-2");
+            File.WriteAllText(list, "Data\\Thornswood-Content.esp\r\n");
+            Start(s);
+            Yes(n + "installed again without the tick, the launcher is back on the Steam copy", Paths.Collection && !Paths.OwnFirst);
+            OwnGame.Make(s.Cfg, null);
+            Start(s);
+            string c4 = OwnGame.CleanSteamCopy(s.Cfg);
+            Yes(n + "and once the folder is made again the next start takes them out again",
+                c4 != null && !File.Exists(Path.Combine(s.Game, "Data\\Thornswood-Content.esp")) &&
+                Text(Path.Combine(OwnGame.Folder, "Data\\Thornswood-Content.esp")) == "TS-CONTENT-2" && File.Exists(Cleaned));
         }
     }
 }

@@ -53,6 +53,13 @@ namespace Thornswood
             "Data\\Platform\\UI\\build.js",
         };
 
+        /// <summary>A folder made anew has its Steam copy looked at again (Make).</summary>
+        static void ForgetCleaned()
+        {
+            try { if (File.Exists(CleanedFile)) File.Delete(CleanedFile); }
+            catch (Exception ex) { Swallow.Note("OwnGame.ForgetCleaned", ex); }
+        }
+
         static bool SharedWithOthers(string rel)
         {
             if (ClientFile(rel)) return true;
