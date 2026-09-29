@@ -706,21 +706,61 @@ namespace Thornswood
         /// </remarks>
         static void RenewToken()
         {
-            if (tokenGot == DateTime.MinValue) return;
-            if (tokenProfile <= 0 || tokenHost.Length == 0) return;
-            if ((DateTime.UtcNow - tokenGot).TotalMinutes < 30) return;
+            RenewToken(false);
+        }
 
-            string fresh = FetchToken(tokenHost, tokenPort, tokenProfile, null);
-            if (fresh.Length == 0)
+        /*
+          The token fields are read and written from three threads now: the
+          file channel's tick, the config sent when the page loads, and a
+          refusal passed up by the page. One at a time, and a caller that finds
+          another already fetching goes away rather than queueing a second
+          request behind it.
+        */
+        static readonly object tokenLock = new object();
+        static DateTime forcedAt = DateTime.MinValue;
+
+        /// <summary>
+        /// As above, or at once when the voice service has just refused the
+        /// page's token (force), at most every thirty seconds.
+        /// </summary>
+        /// <remarks>
+        /// Issue #409. On 21 September the machine woke at 20:06 with a token
+        /// from 19:02, an hour old and expired. The tick tried to renew it at
+        /// once, while the Wi-Fi was still coming back, failed, and dated
+        /// itself five minutes on, so for five minutes the page offered the
+        /// dead token every two seconds and was refused 134 times. A refusal
+        /// is now what asks for the new token, and the page waits for it.
+        /// </remarks>
+        static void RenewToken(bool force)
+        {
+            if (!Monitor.TryEnter(tokenLock)) return;
+            try
             {
-                // Try again on the next pass rather than every 100ms.
-                tokenGot = DateTime.UtcNow.AddMinutes(-25);
-                return;
+                if (tokenProfile <= 0 || tokenHost.Length == 0) return;
+                if (force)
+                {
+                    if ((DateTime.UtcNow - forcedAt).TotalSeconds < 30) return;
+                    forcedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    if (tokenGot == DateTime.MinValue) return;
+                    if ((DateTime.UtcNow - tokenGot).TotalMinutes < 30) return;
+                }
+
+                string fresh = FetchToken(tokenHost, tokenPort, tokenProfile, null);
+                if (fresh.Length == 0)
+                {
+                    // Try again on the next pass rather than every 100ms.
+                    tokenGot = DateTime.UtcNow.AddMinutes(-25);
+                    return;
+                }
+                tokenGot = DateTime.UtcNow;
+                try { WriteChannel("voice-token.txt", fresh); } catch (Exception ex) { Swallow.Note("Voice.RenewToken, write channel", ex); }
+                Post("{\"t\":\"token\",\"token\":\"" + JsonEscape(fresh) + "\"}");
+                Say("Voice: join token renewed");
             }
-            tokenGot = DateTime.UtcNow;
-            try { WriteChannel("voice-token.txt", fresh); } catch (Exception ex) { Swallow.Note("Voice.RenewToken, write channel", ex); }
-            Post("{\"t\":\"token\",\"token\":\"" + JsonEscape(fresh) + "\"}");
-            Say("Voice: join token renewed");
+            finally { Monitor.Exit(tokenLock); }
         }
 
         // The last config the page was given, as host, port and profile.
@@ -767,9 +807,32 @@ namespace Thornswood
             }
             lastConfig = want;
 
+            /*
+              The rest waits on a network, so it never runs on the window's
+              thread. The page's NavigationCompleted calls this on that thread,
+              and the token fetch below is a web request with five second
+              timeouts and a name lookup that can take fifteen seconds
+              whatever the timeout says, so a slow network at startup could
+              hold the launcher window that long (issue #409). Numbered, so
+              that when two configs are in flight only the newest reaches the
+              page.
+            */
+            int seq = Interlocked.Increment(ref configSeq);
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try { SendConfig(seq, host, port, profile); }
+                catch (Exception ex) { Swallow.Note("Voice.Configure, send", ex); }
+            });
+        }
+
+        static int configSeq;
+
+        static void SendConfig(int seq, string host, string port, long profile)
+        {
             // Fetched here rather than in the page, because the ticket lives in
             // this process and has no business being handed to a browser.
             string token = FetchToken(host, port, profile, Say);
+            if (seq != Thread.VolatileRead(ref configSeq)) return;
 
             // What the renewal fetches for, whether or not this fetch worked.
             // These used to move only on success, so a config for a new id
@@ -777,10 +840,13 @@ namespace Thornswood
             // previous id, and voice-token.txt with them. A failed fetch is
             // dated so the renewal tries again in five minutes rather than
             // thirty.
-            tokenHost = host;
-            tokenPort = port;
-            tokenProfile = profile;
-            tokenGot = token.Length > 0 ? DateTime.UtcNow : DateTime.UtcNow.AddMinutes(-25);
+            lock (tokenLock)
+            {
+                tokenHost = host;
+                tokenPort = port;
+                tokenProfile = profile;
+                tokenGot = token.Length > 0 ? DateTime.UtcNow : DateTime.UtcNow.AddMinutes(-25);
+            }
 
             // The game's overlay joins the same room on its own socket and holds
             // no ticket, so it reads the token out of the folder the two already
@@ -846,6 +912,19 @@ namespace Thornswood
             if (kind == "talking") { talking = text == "1"; PublishStatus(); return; }
 
             if (kind == "debug") { Quiet("Voice: " + text); return; }
+
+            // The service refused the page's token. A fresh one, now and off
+            // this thread, which the page waits for before trying again. The
+            // page says what happened on the status line; this is the file.
+            if (kind == "denied")
+            {
+                Quiet("Voice: the voice server refused the join token (" + text + "), fetching a fresh one");
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    try { RenewToken(true); } catch (Exception ex) { Swallow.Note("Voice.OnPageMessage, renew", ex); }
+                });
+                return;
+            }
 
             if (kind == "peers")
             {
