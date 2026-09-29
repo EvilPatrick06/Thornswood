@@ -125,31 +125,20 @@ function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [st
   return $rows
 }
 
-# WHAT ONLY A MAIN RELEASE ASKS FOR (issue #932), as warnings: neither stops
-# Ship.ps1 itself.
-#   The setup stub. A main Ship takes the launcher CI built and never runs
-#   Build-Launcher, which is what compiles out\setup-stub.exe. So -Package,
-#   which a main Ship needs whenever the installer is behind, stops on
-#   "setup-stub.exe is missing" after the release is already published.
-#   Package-Thornswood also refuses a stub older than installer\setup\Bootstrap.cs.
+# WHAT ONLY A MAIN RELEASE ASKS FOR (issue #932), as a warning: it does not
+# stop Ship.ps1 itself.
+#   The setup stub is not asked here any more: a main Ship with -Package
+#   takes the one CI built for its tag, verified by SHA256SUMS, and stops
+#   before anything is published when there is none (Get-ReleaseStub in
+#   Ship.ps1). What this machine's out\ holds does not go into a main
+#   installer.
 #   The server binary. Deploy-Gamemode and Deploy-Server follow a main Ship,
 #   and Deploy-Server refuses a scam_native.node that is not the one
 #   records\server-build.json names. They read the fork's build\dist\server
 #   unless given -Dist; out\_payload holds the one the last release sent.
-function Get-MainOnlyRows([string]$Channel, [string[]]$StubPlaces, [string]$Bootstrap, [string]$ServerRecord, [string[]]$ServerDists) {
+function Get-MainOnlyRows([string]$Channel, [string]$ServerRecord, [string[]]$ServerDists) {
   if ($Channel -ne 'main') { return @() }
   $rows = @()
-
-  $stub = @($StubPlaces | Where-Object { $_ -and (Test-Path -LiteralPath $_) }) | Select-Object -First 1
-  $stubOk = $false
-  if (-not $stub) { $stubDetail = 'no setup-stub.exe in ' + ($StubPlaces -join ' or ') }
-  elseif ($Bootstrap -and (Test-Path -LiteralPath $Bootstrap) -and
-          ((Get-Item -LiteralPath $stub).LastWriteTimeUtc -lt (Get-Item -LiteralPath $Bootstrap).LastWriteTimeUtc)) {
-    $stubDetail = $stub + ' is older than installer\setup\Bootstrap.cs'
-  }
-  else { $stubOk = $true; $stubDetail = $stub }
-  $rows += New-Row 'the setup stub is built, which Ship -Package needs' $stubOk $stubDetail `
-    '.\scripts\release\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause     compiles it into out\ and leaves the launcher you play with alone' 'either' 'warn'
 
   if (-not (Test-Path -LiteralPath $ServerRecord)) {
     $rows += New-Row 'the server build record is in the repo' $false 'records\server-build.json' 'git pull brings it' 'either' 'warn'
@@ -410,10 +399,7 @@ if (Test-Path -LiteralPath (Join-Path $fork '.git')) {
 # ------------------------------------------------ what only main asks for --
 if (-not $Dev) {
   Head 'For -Package and the live deploys'
-  $pkgOut = Join-Path (Join-Path (& $where Dist) (Split-Path -Leaf $Root.TrimEnd('\'))) '_dist'
   foreach ($r in @(Get-MainOnlyRows $Channel `
-                     @((Join-Path (& $where Out) 'setup-stub.exe'), (Join-Path $pkgOut 'setup-stub.exe')) `
-                     (Join-Path $RepoDir 'installer\setup\Bootstrap.cs') `
                      (Join-Path $RepoDir 'records\server-build.json') `
                      @((& $where ServerDist), (& $where Payload)))) { Show-Row $r }
 }

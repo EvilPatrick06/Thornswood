@@ -27,8 +27,9 @@
     3. A matching build and a game folder that differs: READY, Ship copies it.
     4. A build that is not the recorded one: READY when the game folder holds
        the recorded client, NOT READY when it does not.
-    5. The main-only rows (the setup stub, the server build, issue #932): none
-       on dev, WARN on main, and never a change to the verdict.
+    5. The main-only row (the server build, issue #932): none on dev, WARN
+       on main, and never a change to the verdict. The setup stub is not a
+       row: a main Ship takes the one CI built (test-ship-ci-launcher.ps1).
     6. The script's own text: no row asks for the fork, stale plugins and
        required-data in the game folder are notes (Ship's Go.ps1 step copies
        them in before it checks), and the main-only rows are asked only when
@@ -169,28 +170,19 @@ try {
     Yes 'no record: the record row fails as a need' ($rows.Count -eq 1 -and -not $rows[0].Ok -and $rows[0].Level -eq 'need')
 
     # -------------------------------------------------- 5. main-only rows --
-    $outDir = Join-Path $tmp 'out'
-    $stub = Join-Path $outDir 'setup-stub.exe'
-    $pkgStub = Join-Path $tmp 'out\dist\Thornswood\_dist\setup-stub.exe'
-    $boot = Join-Path $tmp 'installer\setup\Bootstrap.cs'
-    Put $tmp 'installer\setup\Bootstrap.cs' 'class Bootstrap {}'
-    (Get-Item -LiteralPath $boot).LastWriteTimeUtc = [datetime]::UtcNow.AddHours(-2)
     $srv = Join-Path $tmp 'engine\skymp\build\dist\server'
     $payload = Join-Path $tmp 'out\_payload'
     Put $payload 'scam_native.node' 'the recorded server'
     $srvRecord = Join-Path $tmp 'server-build.json'
     (@{ binary = 'scam_native.node'; sha256 = (Sha (Join-Path $payload 'scam_native.node')) } | ConvertTo-Json) |
         Set-Content -LiteralPath $srvRecord -Encoding UTF8
-    function Main-Rows([string]$chan) { return @(Get-MainOnlyRows $chan @($stub, $pkgStub) $boot $srvRecord @($srv, $payload)) }
+    function Main-Rows([string]$chan) { return @(Get-MainOnlyRows $chan $srvRecord @($srv, $payload)) }
 
     Yes '5. dev asks for none of the main-only rows' (@(Main-Rows 'dev').Count -eq 0)
 
     $m = @(Main-Rows 'main')
-    Yes '5. main asks for the setup stub and the server build' ($m.Count -eq 2)
-    Yes '5. both are warnings' (@($m | Where-Object { $_.Level -ne 'warn' }).Count -eq 0)
-    $s = @($m | Where-Object { $_.What -like '*setup stub*' })[0]
-    Yes '5. no stub: the stub row fails' (-not $s.Ok)
-    Yes '5. and its fix is Build-Launcher into a scratch root' ($s.Fix -match 'Build-Launcher\.ps1 -Root')
+    Yes '5. main asks for the server build only: the setup stub comes from CI (#932)' ($m.Count -eq 1 -and @($m | Where-Object { $_.What -like '*setup stub*' }).Count -eq 0)
+    Yes '5. and it is a warning' (@($m | Where-Object { $_.Level -ne 'warn' }).Count -eq 0)
     $b = @($m | Where-Object { $_.What -like '*server build*' })[0]
     Yes '5. the server row fails when only out\_payload matches' (-not $b.Ok)
     Yes '5. naming the folder that does match' ($b.Detail.Contains($payload + ' does'))
@@ -198,22 +190,12 @@ try {
 
     Set-Game 'recorded'; Set-Dist 'none'
     $v = Get-ShipVerdict (@(Client-Rows) + $m)
-    Yes '5. a fresh worktree on main with both warnings is still READY' ($v.Ready)
-    Yes '5. and lists the two warnings' ($v.Warns.Count -eq 2)
+    Yes '5. a fresh worktree on main with the warning is still READY' ($v.Ready)
+    Yes '5. and lists the one warning' ($v.Warns.Count -eq 1)
 
-    Put $outDir 'setup-stub.exe' 'stub'
     Put $srv 'scam_native.node' 'the recorded server'
     $m = @(Main-Rows 'main')
-    Yes '5. a stub newer than Bootstrap.cs and a matching server build pass' (@($m | Where-Object { -not $_.Ok }).Count -eq 0)
-
-    (Get-Item -LiteralPath $stub).LastWriteTimeUtc = [datetime]::UtcNow.AddHours(-3)
-    $s = @(Main-Rows 'main' | Where-Object { $_.What -like '*setup stub*' })[0]
-    Yes '5. a stub older than Bootstrap.cs fails, saying so' (-not $s.Ok -and $s.Detail -match 'older than')
-
-    Remove-Item -LiteralPath $stub -Force
-    Put (Split-Path -Parent $pkgStub) 'setup-stub.exe' 'stub'
-    $s = @(Main-Rows 'main' | Where-Object { $_.What -like '*setup stub*' })[0]
-    Yes '5. a stub beside the package output counts, as Package-Thornswood takes it from there too' ($s.Ok)
+    Yes '5. a matching server build passes' (@($m | Where-Object { -not $_.Ok }).Count -eq 0)
 
     Put $srv 'scam_native.node' 'an edited server'
     Put $payload 'scam_native.node' 'another edited server'
@@ -227,7 +209,7 @@ try {
     # Ship runs Go.ps1 before it checks either, and Go.ps1 copies both in.
     Yes '6. stale plugins in the game folder are a note, not a gap' ($text -notmatch "Ready\s+'the game folder holds this source")
     Yes '6. stale required-data in the game folder is a note, not a gap' ($text -notmatch "Ready\s+'the game folder holds required-data")
-    Yes '6. the main-only rows are asked only when the channel is not dev' ($text -match '(?s)if \(-not \$Dev\) \{\s*Head [^\n]*\n[^\n]*\n\s*foreach \(\$r in @\(Get-MainOnlyRows')
+    Yes '6. the main-only rows are asked only when the channel is not dev' ($text -match '(?s)if \(-not \$Dev\) \{\s*Head [^\n]*\n\s*foreach \(\$r in @\(Get-MainOnlyRows')
     Yes '6. the verdict is Get-ShipVerdict''s, and exit 1 follows it' ($text -match '\$verdict = Get-ShipVerdict \$script:rows' -and $text -match 'if \(-not \$verdict\.Ready\) \{ exit 1 \}')
 }
 finally {
