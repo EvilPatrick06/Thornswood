@@ -184,6 +184,7 @@ $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Script.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
@@ -213,47 +214,9 @@ $Gamemode = Join-Path $artifact.Folder 'game\gamemode.js'
 }
 
 function Remote($script) {
-  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  $cmd = "powershell -NoProfile -EncodedCommand $e"
-
-  # A long script does not fit on a command line, and nothing says so.
-  #
-  # sshd on Windows hands the command to cmd.exe, which stops at 8,191
-  # characters. Base64 of UTF-16 is about 2.7 times the script, so a block of
-  # any size arrives cut in half and PowerShell then complains about a brace or
-  # a token in a script nobody can see. On 20 Sep the settings block below went
-  # to 10,252 characters and the far end reported "Unexpected token '$?'" and
-  # "Missing closing '}'" about a line fifteen above the one that was actually
-  # cut, which is what makes this so expensive to find. Deploy-Docs.ps1 hit the
-  # same thing on 17 Sep and solved it; this is that fix, and it is now in all
-  # sixteen scripts that talk to the VPS rather than in one.
-  #
-  # Under the limit it goes on the command line as before, because that is one
-  # round trip. Over it, the script is sent as a file and run from there, which
-  # has no length to run into.
-  if ($cmd.Length -le 6000) {
-    return & ssh @ssh "$User@$Vps" $cmd 2>&1
-  }
-
-  $far = 'C:/Windows/Temp/thornswood-remote.ps1'
-  $tmp = [IO.Path]::GetTempFileName()
-  try {
-    Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
-    & scp @ssh $tmp "$User@${Vps}:$far" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "could not send a script to $Vps" }
-    # The path goes across as it is. Windows PowerShell takes forward
-    # slashes, and converting them was how this shipped with the slashes
-    # stripped out of it entirely: C:WindowsTempthornswood-remote.ps1.
-    # And bare, with no quotes round it; the path above is ours and has no
-    # spaces. Measured on this machine on 24 September, not on the VPS: bare
-    # runs whether cmd.exe or Windows PowerShell hands the line on, and the
-    # old form, the path in single quotes, fails under cmd.exe. The old form
-    # did run on the VPS on 20 and 21 September, so which shell sshd uses
-    # there is not known, and bare is the form that works under either.
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-  }
-  finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
+  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
+  # name, removed after, and the far side's exit code comes back.
+  return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
 $rootWin = $Root.Replace('/', '\')
@@ -363,9 +326,12 @@ if ($LoadOrder) {
   # UTF-16 on a command line, which is the length problem Remote() exists to
   # work around; and the dev settings file is edited in place here rather than
   # written from a local build, which is the rule this script is built on.
-  $orderFile = Join-Path $env:TEMP 'thornswood-dev-loadorder.txt'
+  # A name of its own each run, here and on the box, so two deploys at once
+  # cannot read or remove each other's list (#1070).
+  $orderName = 'thornswood-dev-loadorder-' + [Guid]::NewGuid().ToString('N') + '.txt'
+  $orderFile = Join-Path $env:TEMP $orderName
   [IO.File]::WriteAllText($orderFile, (($pluginNames -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
-  $farOrder = 'C:/Windows/Temp/thornswood-dev-loadorder.txt'
+  $farOrder = 'C:/Windows/Temp/' + $orderName
 }
 
 # ------------------------------------------------------------ the warning ---
@@ -608,7 +574,9 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
   }
   if ($LoadOrder) {
     & scp @ssh $orderFile "$User@${Vps}:$farOrder"
-    if ($LASTEXITCODE -ne 0) { throw 'scp failed for the load order list. The dev server has not been touched.' }
+    $sentOrder = $LASTEXITCODE
+    Remove-Item -LiteralPath $orderFile -Force -ErrorAction SilentlyContinue
+    if ($sentOrder -ne 0) { throw 'scp failed for the load order list. The dev server has not been touched.' }
     Write-Host ('  the load order list, {0} plugins' -f $pluginNames.Count)
   }
   $hashes = Get-SwapHashes $send

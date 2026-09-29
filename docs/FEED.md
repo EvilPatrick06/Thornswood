@@ -457,7 +457,8 @@ reader. That is the rest of #1050.
 - **sha256.** Required for packs, the launcher and the client runtime; an empty
   one refuses the download (`Updater.cs:428-451`).
 - **Signature.** A downloaded launcher exe must carry a signer whose Subject
-  contains `ExpectedSigner` (`Gavin Knotts`, `Updater.CheckSigner`), checked
+  contains `ExpectedSigner`, the name on the signing certificate
+  (`Updater.CheckSigner`; the profile is ThornswoodRelease), checked
   before the swap, in every launcher from dev 1.1.101.17 on. Main's live
   1.1.101 predates it and is itself unsigned; dev 1.1.101.34 is signed and
   timestamped. Up to #912 the check read only the embedded certificate's

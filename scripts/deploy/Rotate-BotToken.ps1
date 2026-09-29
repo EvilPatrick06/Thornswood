@@ -76,7 +76,8 @@ $botWin  = $BotRoot.Replace('/','\')
 $docsWin = $DocsRoot.Replace('/','\')
 $envFile = $botWin + '\bot.env.json'
 $cfgFile = $docsWin + '\config.json'
-$far     = 'C:/Windows/Temp/thornswood-write-bottoken.ps1'
+# A name of its own each run, so two at once cannot remove each other's (#1070).
+$far     = 'C:/Windows/Temp/thornswood-write-bottoken-' + [Guid]::NewGuid().ToString('N') + '.ps1'
 $farWin  = $far.Replace('/','\')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }

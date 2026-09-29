@@ -10,7 +10,7 @@
 
   WHY THIS EXISTS. Issue #912. Until then the check read the Subject of the
   embedded certificate (X509Certificate.CreateFromSignedFile) and looked for
-  "Gavin Knotts" in it. That call verifies nothing, so a certificate anybody
+  the signer's name in it. That call verifies nothing, so a certificate anybody
   can make on their own machine with that name passed. This proves the new
   check on each file it has to decide:
 
@@ -18,7 +18,7 @@
               C:\Thornswood-DevBuild\Launcher\Thornswood.exe), and a copy of
               it in another folder.
     refused   an unsigned exe; the same exe signed with a self-made
-              certificate named Gavin Knotts, and with one that also copies
+              certificate named as the signer, and with one that also copies
               every usage Thornswood's real certificate carries; a program
               validly signed by another publisher (csc.exe); a program signed
               through Artifact Signing by another publisher (Git for
@@ -66,6 +66,12 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
 $App = Join-Path $Repo 'launcher\app'
+# The name on the signing certificate, read from the one place it is written,
+# ExpectedSigner in launcher\app\Updater.cs, so no other file carries it (#1052).
+$Signer = ''
+$m = [regex]::Match([IO.File]::ReadAllText((Join-Path $App 'Updater.cs')), 'const string ExpectedSigner = "([^"]+)"')
+if ($m.Success) { $Signer = $m.Groups[1].Value }
+if (-not $Signer) { Write-Host 'FAIL  ExpectedSigner could not be read from launcher\app\Updater.cs'; exit 1 }
 
 $script:pass = 0
 $script:fail = 0
@@ -162,21 +168,21 @@ try {
     # ---- a real signed launcher is accepted --------------------------------
     $haveSigned = $Signed -and (Test-Path -LiteralPath $Signed)
     if ($haveSigned) {
-        $r = Check $Signed 'Gavin Knotts'
+        $r = Check $Signed $Signer
         Yes ('the real signed launcher is accepted: ' + $(if ($r.Why) { $r.Why } else { $r.Said })) ($r.Why -eq '')
         Yes 'the log line says who signed it and that it is timestamped' (
-            $r.Said -match 'Gavin Knotts' -and $r.Said -match 'Artifact Signing' -and $r.Said -match 'timestamped')
+            $r.Said -match [regex]::Escape($Signer) -and $r.Said -match 'Artifact Signing' -and $r.Said -match 'timestamped')
         $copy = Join-Path $tmp 'elsewhere\Thornswood.exe'
         $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $copy)
         Copy-Item -LiteralPath $Signed -Destination $copy
-        $r = Check $copy 'Gavin Knotts'
+        $r = Check $copy $Signer
         Yes 'a copy of it in another folder is accepted' ($r.Why -eq '')
-        $g = Get-PublishSignRefusal -Path $Signed -ExpectedSigner 'Gavin Knotts'
+        $g = Get-PublishSignRefusal -Path $Signed -ExpectedSigner $Signer
         Yes ('the publish gate accepts it too' + $(if ($g) { ': ' + $g } else { '' })) ($g -eq '')
 
         $r = Check $Signed 'Somebody Else'
         Yes ('asked for another name, it is refused: ' + $r.Why) ($r.Why -match 'does not name Somebody Else')
-        $why = CheckAs $Signed 'Gavin Knotts' @('1.3.6.1.4.1.311.97.1.2.3.4')
+        $why = CheckAs $Signed $Signer @('1.3.6.1.4.1.311.97.1.2.3.4')
         Yes ('asked for another identity, it is refused: ' + $why) ($why -match "somebody else's identity")
 
         # One byte in the middle of the file, well before the signature at its end.
@@ -186,10 +192,10 @@ try {
         $at = [int]($bytes.Length / 3)
         $bytes[$at] = $bytes[$at] -bxor 0xFF
         [IO.File]::WriteAllBytes($flip, $bytes)
-        $r = Check $flip 'Gavin Knotts'
+        $r = Check $flip $Signer
         Yes ('the real launcher with one byte changed is refused: ' + $r.Why) ($r.Why -match 'changed since it was signed')
-        Yes 'the old Subject read would have passed the changed file' (OldCheck $flip 'Gavin Knotts')
-        $g = Get-PublishSignRefusal -Path $flip -ExpectedSigner 'Gavin Knotts'
+        Yes 'the old Subject read would have passed the changed file' (OldCheck $flip $Signer)
+        $g = Get-PublishSignRefusal -Path $flip -ExpectedSigner $Signer
         Yes 'the publish gate refuses the changed file' ($g -ne '')
     } else {
         Skip "no signed launcher at $Signed on this machine: accepted, byte changed and another identity not run"
@@ -203,30 +209,30 @@ try {
     $ok = Compile @('/noconfig', '/nologo', '/target:exe', "/out:$stub", $stubCs)
     Yes 'a stand-in exe compiles' $ok
     if ($ok) {
-        $r = Check $stub 'Gavin Knotts'
+        $r = Check $stub $Signer
         Yes ('an unsigned exe is refused: ' + $r.Why) ($r.Why -eq 'is not signed.')
     }
     $junk = Join-Path $tmp 'junk\Thornswood.exe'
     $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $junk)
     [IO.File]::WriteAllBytes($junk, [byte[]](0x4D, 0x5A, 0, 0, 0, 0, 0, 0))
-    $r = Check $junk 'Gavin Knotts'
+    $r = Check $junk $Signer
     Yes ('a file that is not a program is refused: ' + $r.Why) ($r.Why -ne '')
-    $r = Check (Join-Path $tmp 'gone.exe') 'Gavin Knotts'
+    $r = Check (Join-Path $tmp 'gone.exe') $Signer
     Yes ('a missing file is refused: ' + $r.Why) ($r.Why -match 'could not be opened')
 
-    # ---- self-made certificates named Gavin Knotts are refused ---------------
+    # ---- self-made certificates named as the signer are refused ------------
     if ($ok -and (Get-Command New-SelfSignedCertificate -ErrorAction SilentlyContinue)) {
-        $plain = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=Gavin Knotts, O=Gavin Knotts, L=Philippi, S=wv, C=US' `
+        $plain = New-SelfSignedCertificate -Type CodeSigningCert -Subject ('CN=' + $Signer + ', O=' + $Signer + ', C=US') `
                     -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddDays(2)
         $made += $plain.Thumbprint
         # Every usage the real one carries, Thornswood's durable identity included.
         $eku = '2.5.29.37={text}1.3.6.1.5.5.7.3.3,1.3.6.1.4.1.311.97.1.0,' + $ids[0]
-        $forged = New-SelfSignedCertificate -Type Custom -Subject 'CN=Gavin Knotts, O=Gavin Knotts, L=Philippi, S=wv, C=US' `
+        $forged = New-SelfSignedCertificate -Type Custom -Subject ('CN=' + $Signer + ', O=' + $Signer + ', C=US') `
                     -KeyUsage DigitalSignature -TextExtension @($eku) `
                     -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddDays(2)
         $made += $forged.Thumbprint
 
-        foreach ($pair in @(@('self', $plain, 'a self-made certificate named Gavin Knotts'),
+        foreach ($pair in @(@('self', $plain, 'a self-made certificate named as the signer'),
                             @('forged', $forged, "a self-made certificate with Thornswood's name and every usage its real one has"))) {
             $f = Join-Path $tmp ($pair[0] + '\Thornswood.exe')
             $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $f)
@@ -234,10 +240,10 @@ try {
             $null = Set-AuthenticodeSignature -LiteralPath $f -Certificate $pair[1] -HashAlgorithm SHA256
             $on = (Get-AuthenticodeSignature -LiteralPath $f).SignerCertificate
             Yes ('the exe signed with ' + $pair[2] + ' carries that signature') ($null -ne $on -and $on.Thumbprint -eq $pair[1].Thumbprint)
-            Yes ('the old Subject read would have accepted ' + $pair[2] + ' (#912)') (OldCheck $f 'Gavin Knotts')
-            $r = Check $f 'Gavin Knotts'
+            Yes ('the old Subject read would have accepted ' + $pair[2] + ' (#912)') (OldCheck $f $Signer)
+            $r = Check $f $Signer
             Yes ('signed with ' + $pair[2] + ', it is refused: ' + $r.Why) ($r.Why -match 'does not trust')
-            $g = Get-PublishSignRefusal -Path $f -ExpectedSigner 'Gavin Knotts'
+            $g = Get-PublishSignRefusal -Path $f -ExpectedSigner $Signer
             Yes ('the publish gate refuses ' + $pair[2]) ($g -ne '')
         }
     } else {
@@ -261,7 +267,7 @@ try {
         if ($s.Status -eq 'Valid' -and $embedded) { $other = $c; break }
     }
     if ($other) {
-        $r = Check $other 'Gavin Knotts'
+        $r = Check $other $Signer
         Yes ('a program validly signed by Microsoft (' + (Split-Path -Leaf $other) + ') is refused: ' + $r.Why) ($r.Why -ne '')
         $r = Check $other 'Microsoft'
         Yes ('it is refused even when asked for its own name, because it is not Thornswood''s identity: ' + $r.Why) ($r.Why -ne '')
@@ -279,13 +285,13 @@ try {
         if (-not (Test-Path -LiteralPath $c)) { continue }
         try {
             $pc = [Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile($c)
-            if ($pc.Issuer -like 'CN=Microsoft ID Verified CS *' -and $pc.Subject -notlike '*Gavin Knotts*') { $peer = $c; break }
+            if ($pc.Issuer -like 'CN=Microsoft ID Verified CS *' -and $pc.Subject -notlike ('*' + $Signer + '*')) { $peer = $c; break }
         } catch { $peer = $null }
     }
     if ($peer) {
         $pc = [Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile($peer)
         $peerName = ([regex]::Match($pc.Subject, 'CN=([^,]+)')).Groups[1].Value
-        $r = Check $peer 'Gavin Knotts'
+        $r = Check $peer $Signer
         Yes ('another publisher''s Artifact Signing program (' + $peer + ') is refused: ' + $r.Why) (
             $r.Why -match "somebody else's identity")
         $r = Check $peer $peerName

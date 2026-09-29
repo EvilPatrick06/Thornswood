@@ -167,7 +167,7 @@ if ($wantChannel -and $got.channel -ne $wantChannel) {
 
 # On the VPS since 25 September, where every machine that ships reads it
 # (Discord-Hook.ps1), rather than in bot\dev-webhook.txt on this machine only.
-& (Join-Path $Here 'Discord-Hook.ps1') -Name dev -Save $url
+& (Join-Path $Here 'Discord-Hook.ps1') -Name dev -Save -Url $ss
 $saved = $LASTEXITCODE
 $url = $null
 if ($saved -ne 0) { Done; exit 1 }

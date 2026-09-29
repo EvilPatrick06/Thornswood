@@ -87,7 +87,9 @@ and the cookie secret, and is never in the repo. `.\scripts\deploy\Deploy-Docs.p
 sends `server.js` and everything in `public\` and restarts the task, and
 `-Site` also sends the public pages. A plain deploy never overwrites a
 document somebody has typed into on the site; `-Boards`, `-Docs` and
-`-SeedDocs` do, after a `.bak` of each. `-Password` reads the `config.json`
+`-SeedDocs` do, after a `.bak` of each. `-Password` asks for the new member
+password without showing it, never typed on the command line, where the
+shell's history would keep it. `-Password` reads the `config.json`
 on the VPS, changes the member password in it and keeps every other setting.
 A `config.json` there that will not read as JSON, an empty one included, is
 left exactly as it is and the password is not changed.

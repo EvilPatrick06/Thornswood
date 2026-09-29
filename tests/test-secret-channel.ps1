@@ -206,9 +206,10 @@ $p = $ThornswoodSecret | ConvertFrom-Json
     Yes 'json: the far side reads the token out of the payload' ((Said $out 'HASH') -eq (Hash $tok))
     Yes 'json: the token is in nothing handed to ssh' (-not (AllSent).Contains($tok))
 
-    # ---- 6. Remote.ps1 -Secret, the way Discord-Hook.ps1 -Save uses it
+    # ---- 6. Remote.ps1 -Secret, the way Discord-Hook.ps1 -Save uses it: a
+    # SecureString handed over by a script that asked for it (#1069)
     $ScCalls.Clear()
-    $out = @(& $remotePs1 ($probe + "`r`nexit 5") -Secret $secret -VpsHost 'box.invalid' -VpsUser 'tester' 2>&1 | ForEach-Object { "$_" })
+    $out = @(& $remotePs1 ($probe + "`r`nexit 5") -Secret (ConvertTo-SecureString $secret -AsPlainText -Force) -VpsHost 'box.invalid' -VpsUser 'tester' 2>&1 | ForEach-Object { "$_" })
     $rc = $LASTEXITCODE
     Yes 'Remote.ps1 -Secret: one ssh call to the box' (@($ScCalls | Where-Object { $_.Tool -eq 'ssh' }).Count -eq 1 -and $ScCalls[0].Args -contains 'tester@box.invalid')
     Yes 'Remote.ps1 -Secret: the far side got the value whole' ((Said $out 'HASH') -eq (Hash $secret))
@@ -216,6 +217,14 @@ $p = $ThornswoodSecret | ConvertFrom-Json
     Yes 'Remote.ps1 -Secret: the exit code comes back' ($rc -eq 5)
     $all = AllSent
     Yes 'Remote.ps1 -Secret: the value is in nothing handed to ssh' (-not $all.Contains($secret) -and -not $all.Contains($wire))
+
+    # ---- 6b. a value typed after -Secret is refused before anything is sent:
+    # typed, it would be in the shell's history (#1069)
+    $ScCalls.Clear()
+    $typed = $null
+    try { & $remotePs1 "'x'" -Secret 'typed-on-the-command-line' -VpsHost 'box.invalid' -VpsUser 'tester' 2>&1 | Out-Null } catch { $typed = $_ }
+    Yes 'Remote.ps1 -Secret refuses a typed value' ($null -ne $typed)
+    Yes 'Remote.ps1 -Secret: and nothing went to ssh or scp' ($ScCalls.Count -eq 0)
 
     # ---- 7. Remote.ps1 without -Secret is unchanged: the script on the command line
     $ScCalls.Clear()

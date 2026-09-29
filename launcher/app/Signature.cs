@@ -12,7 +12,7 @@ namespace Thornswood
     ///
     /// Until #912 the self update read the Subject of the certificate embedded
     /// in the download (X509Certificate.CreateFromSignedFile) and looked for
-    /// "Gavin Knotts" in it. That call only reads the certificate: it proves
+    /// the signer's name (Updater.ExpectedSigner) in it. That call only reads the certificate: it proves
     /// nothing about who issued it, or that the signature covers the file. A
     /// certificate anybody can make on their own machine with that name
     /// passed, and so did a signed file with its bytes changed afterwards.
@@ -46,7 +46,7 @@ namespace Thornswood
     ///      ExpectedSigner, a fragment, because renewals reorder fields).
     ///
     /// MEASURED 28 SEP on dev 1.1.101.34 (C:\Thornswood-DevBuild\Launcher):
-    /// CN=Gavin Knotts, O=Gavin Knotts, L=Philippi, S=wv, C=US, three days
+    /// CN and O the name on the certificate (Updater.ExpectedSigner), three days
     /// (27 to 30 Sep), issued by Microsoft ID Verified CS AOC CA 04, under
     /// Microsoft ID Verified Code Signing PCA 2021, under Microsoft Identity
     /// Verification Root Certificate Authority 2020 (F40042E2...BFA2, to
