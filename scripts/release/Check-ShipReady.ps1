@@ -44,6 +44,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\deploy\ServerBuild.ps1')
+. (Join-Path $Here '..\mods\Generated.ps1')
 $script:VpsAddress = Get-ThornswoodVpsAddress
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 $Dev = ($Channel -eq 'dev')
@@ -124,6 +125,20 @@ function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [st
          ' or build the fork with .\scripts\release\Build-Engine.ps1'
   $rows += New-Row 'the recorded client is in the game folder, or here to copy in' (($code -eq 0) -or ($code -eq 2)) $detail $fix
   return $rows
+}
+
+# WHETHER THE GENERATED FILES ARE CURRENT (issue #1247). Ship stops, on both
+# channels, when the record scripts\mods\Build-Generated.ps1 writes of the
+# Nemesis and BodySlide files it made in the game folder is missing, or no
+# longer matches the mod list, the files the tools read, records\generated.json
+# or the files themselves (Get-GeneratedState, scripts\mods\Generated.ps1).
+function Get-GeneratedRows([string]$Root, [string]$ListPath, [string]$Channel) {
+  $what = 'Thornswood''s animation and body files are built for this mod list'
+  $fix = '.\scripts\mods\Build-Generated.ps1 -Channel ' + $Channel + '     with the game and the launcher closed; it builds them in Thornswood''s own folder'
+  $st = $null
+  try { $st = Get-GeneratedState $Root $ListPath } catch { return @(New-Row $what $false $_.Exception.Message $fix) }
+  if ($st.Current) { return @(New-Row $what $true ('{0} files, as built' -f $st.Record.Files.Count) $null) }
+  return @(New-Row $what $false ($st.Why -join '; ') $fix)
 }
 
 # WHAT ONLY A MAIN RELEASE ASKS FOR (issue #932), as a warning: it does not
@@ -397,6 +412,14 @@ if (Test-Path -LiteralPath (Join-Path $fork '.git')) {
 } else {
   Say '  note  no clone of the skymp fork here. A Ship does not build the engine, so it is not needed;' 'DarkGray'
   Say '        only rebuilding the client or the server is (.\scripts\release\Build-Engine.ps1).' 'DarkGray'
+}
+
+# ------------------------------------------------ the generated files --
+Head 'The animation and body files'
+if ($hasGame) {
+  foreach ($r in @(Get-GeneratedRows $Root (Join-Path $RepoDir 'records\generated.json') $Channel)) { Show-Row $r }
+} else {
+  Say '  skip  no own game folder, so there are none to check' 'DarkGray'
 }
 
 # ------------------------------------------------ what only main asks for --
