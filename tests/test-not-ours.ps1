@@ -73,10 +73,12 @@ $theirs = @(
     # Other mods' scripts: IED, old MCM Helper, the Unofficial Patch, interior mods.
     'Data\Scripts\IED.pex', 'Data\Scripts\MCM.pex', 'Data\Scripts\MCM_ConfigBase.pex',
     'Data\Scripts\dlc1vcmoondialscript.pex', 'Data\Scripts\wbptlightonscript.pex', 'Data\Scripts\rp_trapcactusscript.pex',
-    # BodySlide builds and leftovers of mods nothing loads.
-    'Data\meshes\armor\travel clothes\robes\robesf_0.nif', 'Data\meshes\armor\bosmerarmormaty743\torsof_0.nif',
+    # A travel clothes file that is byte for byte Common Clothes' own (the
+    # collection installs it), refits nobody traced, and leftovers of mods
+    # nothing loads.
+    'Data\meshes\armor\travel clothes\clothes\3clothesf_0.nif',
     'Data\meshes\armor\dragon priests\krosis\dragonpriestclothingf_krosis_0.nif', 'Data\meshes\MCE\Clothing\F\0MCE_(1f)_Romper.tri',
-    'Data\meshes\MCE\clothes\executioner\f\body_0.nif', 'Data\meshes\0CCE\f\0CCE_Hoodf.tri',
+    'Data\meshes\0CCE\f\0CCE_Hoodf.tri',
     'Data\meshes\surarmorcustommeshes\redf_0.nif', 'Data\meshes\surwhiterunmeshes\outfit_0.nif',
     'Data\meshes\clothes\saviik\banker\bankeroutfitf_0.nif', 'Data\meshes\clothes\sheogorath\sheogorathoutfit.nif',
     'Data\meshes\pulcharmsolis\rhino beetle\armorloinclothm_0.nif', 'Data\meshes\Armor_Replacer\steel\armor1m_0.nif',
@@ -117,6 +119,22 @@ Yes 'our menu backdrop is the three files Go.ps1 writes' (@($ShipOwnArt).Count -
 Yes 'required data is read from game\required-data, README left out' (@($ShipRequiredDataFiles | Where-Object { $_ -like '*README*' }).Count -eq 0)
 Yes 'a behaviour graph outside a behaviors folder is not taken for Nemesis''s' (Test-ShipNotOurs 'Data\meshes\actors\character\animations\mt_idle.hkx')
 Yes 'nor a file named like ours in another folder' (Test-ShipNotOurs 'Data\Interface\old\startmenu.swf')
+
+# Ours for now, until #1259: the outfits built in BodySlide keep shipping until
+# Thornswood builds them itself from the collection's BodySlide projects.
+$builtList = Join-Path $Repo 'scripts\release\built-until-1259.txt'
+Yes 'the BodySlide builds shipped for now are listed beside Ship-Rules' (Test-Path -LiteralPath $builtList)
+$builtText = $(if (Test-Path -LiteralPath $builtList) { Get-Content -LiteralPath $builtList -Raw } else { '' })
+Yes '  and the list says it is for now, until #1259 replaces it' ($builtText -match '#1259' -and $builtText -match 'FOR NOW')
+Yes ('  140 of them, the count measured on 29 September ({0})' -f $ShipBuiltUntil1259.Count) ($ShipBuiltUntil1259.Count -eq 140)
+$builtOut = @($ShipBuiltUntil1259 | Where-Object { -not (Test-ShipOurs $_) -or (Test-ShipNotOurs $_) })
+Yes '  every one ships as ours' ($builtOut.Count -eq 0)
+$builtWhere = @($ShipBuiltUntil1259 | ForEach-Object { ($_ -split '\\')[0..3] -join '\' } | Sort-Object -Unique)
+Yes ('  all in the three folders BodySlide built ({0})' -f ($builtWhere -join ', ')) (
+    @($builtWhere | Where-Object { $_ -notin @('Data\meshes\armor\travel clothes', 'Data\meshes\armor\bosmerarmormaty743', 'Data\meshes\MCE\clothes') }).Count -eq 0)
+Yes '  by exact path: a file beside them that is not listed does not ship' (
+    (Test-ShipNotOurs 'Data\meshes\armor\travel clothes\clothes\3clothesf_0.nif') -and (Test-ShipNotOurs 'Data\meshes\armor\bosmerarmormaty743\new.tri'))
+Yes '  and none is held for the collection, which could not carry built output' (@($ShipBuiltUntil1259 | Where-Object { Test-ShipHeld $_ 1 }).Count -eq 0)
 
 # Held for the collection.
 Yes 'something is held for revision 2' (@($ShipHeldForCollection).Count -gt 0)
@@ -275,7 +293,9 @@ foreach ($s in @($strays | Select-Object -First 10)) { Write-Host "      $($s.Re
 $looseLeft = Get-ShipLooseArt @($shipped | Where-Object { -not (Test-ShipHeld $_.Rel 1) })
 Yes 'the loose art report has nothing left to name but what is held' ($looseLeft.Count -eq 0)
 foreach ($l in $looseLeft) { Write-Host ("      {0} {1} file(s)" -f $l.Folder, $l.Files) }
-Yes 'the other people''s files the 29 September measurement found are left out (at least 300)' ($leftOut -ge 300)
+# 166 on 29 September, once the 140 BodySlide builds kept until #1259 and the
+# 102 held for revision 2 are counted apart.
+Yes ('the other people''s files the 29 September measurement found are left out (at least 160, {0} here)' -f $leftOut) ($leftOut -ge 160)
 
 # The generator's own record of the patches it ran, and whose they are.
 $settings = Join-Path $game 'Data\Nemesis_Engine\cache\mod settings'

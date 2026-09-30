@@ -299,7 +299,10 @@ built on 23 September carries every one of them.
   (Test-ShipNotOurs). The files of four Nexus mods the collection does not have
   yet (male face morphs, fitted hoods and robes, children's clothes, a mesh
   fix) and the message board Thornswood-Content.esp places still ship until
-  collection revision 2 carries them (docs\COLLECTION-REVISION-2.md). Packs
+  collection revision 2 carries them (docs\COLLECTION-REVISION-2.md), and 140
+  outfit meshes built in BodySlide on another machine ship as ours for now,
+  until Thornswood builds them itself from the collection's BodySlide projects
+  (#1259, `scripts\release\built-until-1259.txt`). Packs
   and records already on the site, and the installer there, still carry the
   rest until they are scrubbed.
 - Bethesda's `MarketplaceTextures.bsa` went out in every pack and in the

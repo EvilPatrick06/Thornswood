@@ -158,6 +158,10 @@ Yes 'every held folder or file is named on a Held row of the loose files table' 
     $leaf = ([string]$_.Path).TrimEnd('\') -replace '^Data\\meshes\\', ''
     $leaf = $leaf.Substring($leaf.LastIndexOf('\') + 1)
     -not @($heldRows | Where-Object { $_.Contains($leaf) }).Count }).Count -eq 0)
+$builtRows = 0
+foreach ($r in @($loose | Where-Object { $_ -match '\*\*Ours for now \(#1259\)\*\*' })) { $c = ($r -split '\|')[2].Trim(); if ($c -match '^\d+$') { $builtRows += [int]$c } }
+Yes ('the rows kept as ours until #1259 count the BodySlide builds Ship-Rules lists ({0} and {1})' -f $builtRows, $ShipBuiltUntil1259.Count) (
+    $builtRows -gt 0 -and $builtRows -eq $ShipBuiltUntil1259.Count)
 $counted = 0
 foreach ($r in $loose) { $c = ($r -split '\|')[2].Trim(); if ($c -match '^\d+$') { $counted += [int]$c } }
 Yes ('the loose files table counts the 424 files measured on 29 September ({0})' -f $counted) ($counted -eq 424)

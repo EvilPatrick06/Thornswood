@@ -32,7 +32,7 @@
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
       Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
       Test-ShipNotOurs $rel        another author's loose file (outside Data\Platform, not named ours); never packed, recorded or listed as removed
-      Test-ShipOurs $rel           ours outside Data\Platform: the named files, the client runtime, required data, the menu, Nemesis's output
+      Test-ShipOurs $rel           ours outside Data\Platform: the named files, the client runtime, required data, the menu, Nemesis's output, the BodySlide builds until #1259
       Test-ShipHeld $rel           a loose file that ships until the collection revision that carries its mod
       Get-ShipCollectionRevision   the revision a release is built against, for $ShipCollectionRevision
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
@@ -897,7 +897,8 @@ function Get-ShipLooseArt($files) {
 # dev build's (C:\Thornswood-DevBuild\Game), the dev record 20260929-140118-dev
 # and the last main record (20260928-1630): 424 loose files of other people's
 # mods outside Data\Platform, 124.7 MB (the installer 409 of them, 116.9 MB).
-# 321 (116.3 MB) leave now and 103 (8.4 MB) wait for revision 2 (below). All
+# 181 (75.1 MB) leave now, 103 (8.4 MB) wait for revision 2 and 140 (41.2 MB)
+# BodySlide builds ship as ours for now until #1259 (both below). All
 # were in Profile\OwnGame\files.txt with origin O (taken from the Steam copy,
 # never deployed by Vortex), most put there by the old installer
 # (Profile\installed-into-game.txt), so the old rules called them ours. Each
@@ -918,6 +919,8 @@ function Get-ShipLooseArt($files) {
 #     (Common Clothes and Armors 3BA), More Craftable Equipment's executioner,
 #     Capital Windhelm's and Crossed Daggers' outfits. Generated output is ours
 #     only when we generate it from the collection, as Nemesis's is below.
+#     The first three ship as ours for now, until Thornswood builds them
+#     itself (#1259, $ShipBuiltUntil1259); the refits of the last two leave.
 #   - Files of Nexus mods the collection does not have yet: male face and
 #     beard morphs, fitted vanilla hoods and robes, children's clothes, a mesh
 #     fix. Held below until revision 2 carries them.
@@ -1049,14 +1052,38 @@ function Get-ShipCollectionRevision([string]$Root) {
 }
 
 # Plugins game\required-data puts in Data\ before a scan (Ensure-ShipRequiredData).
-$ShipRequiredDataFiles = @()
-try {
-    $rd = Join-Path $PSScriptRoot '..\..\game\required-data'
-    if (Test-Path -LiteralPath $rd) {
-        $ShipRequiredDataFiles = @(Get-ChildItem -LiteralPath $rd -File | Where-Object { $_.Name -ne 'README.md' } |
-                                   ForEach-Object { 'Data\' + $_.Name })
-    }
-} catch { }
+# Worked out in a child scope: this file is dot-sourced into its callers, and
+# a name set here would overwrite one of theirs.
+$ShipRequiredDataFiles = @(& {
+    try {
+        $dir = Join-Path $PSScriptRoot '..\..\game\required-data'
+        if (Test-Path -LiteralPath $dir) {
+            Get-ChildItem -LiteralPath $dir -File | Where-Object { $_.Name -ne 'README.md' } | ForEach-Object { 'Data\' + $_.Name }
+        }
+    } catch { }
+})
+
+# OURS FOR NOW, UNTIL #1259: 140 outfit meshes built in BodySlide on some other
+# machine (Common Clothes' travel clothes, Immersive Armours' Bosmer armour,
+# More Craftable Equipment's executioner). Patrick, 29 September: Thornswood
+# builds the outfits itself from the collection's BodySlide projects, and until
+# that build replaces these they keep shipping so nothing looks broken. Exact
+# paths, in built-until-1259.txt beside this file; the build that closes #1259
+# names its own output here and deletes that file in the same pull request.
+# Scrub-Feed leaves them on the site, since they are ours while listed.
+# In a child scope, for the reason given over $ShipRequiredDataFiles.
+$ShipBuiltUntil1259 = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+foreach ($ShipBuiltLine in @(& {
+    try {
+        $list = Join-Path $PSScriptRoot 'built-until-1259.txt'
+        if (Test-Path -LiteralPath $list) {
+            foreach ($line in [IO.File]::ReadAllLines($list)) {
+                $one = $line.Trim()
+                if ($one -and -not $one.StartsWith('#')) { $one }
+            }
+        }
+    } catch { }
+})) { [void]$ShipBuiltUntil1259.Add($ShipBuiltLine) }
 
 function Test-ShipGenerated([string]$rel) {
     foreach ($p in $ShipGeneratedPatterns) { if ($rel -like $p) { return $true } }
@@ -1083,6 +1110,7 @@ function Test-ShipOurs([string]$rel) {
     foreach ($o in $ShipOursFiles) { if ($rel -ieq $o) { return $true } }
     foreach ($o in $ShipOwnArt) { if ($rel -ieq $o) { return $true } }
     foreach ($o in $ShipRequiredDataFiles) { if ($rel -ieq $o) { return $true } }
+    if ($ShipBuiltUntil1259.Contains($rel)) { return $true }
     return (Test-ShipGenerated $rel)
 }
 

@@ -235,8 +235,12 @@ the installer.
 Since #1178 `scripts\release\Ship-Rules.ps1` names what is Thornswood's
 outside `Data\Platform` and nothing else ships (`Test-ShipNotOurs`). The rows
 marked **Held** still ship until a release is built against revision 2 of the
-collection, then leave by themselves. Nothing here is deleted from anybody's
-game.
+collection, then leave by themselves. The rows marked **Ours for now (#1259)**
+are the 140 outfit meshes built in BodySlide on some other machine: Patrick,
+29 September, Thornswood builds the outfits itself from the collection's
+BodySlide projects (#1259), and until that build replaces them they keep
+shipping so nothing looks broken (`scripts\release\built-until-1259.txt`
+lists them). Nothing here is deleted from anybody's game.
 
 <!-- loose:start -->
 | Files | Count | Where they come from | What happens |
@@ -249,9 +253,9 @@ game.
 | Children's clothes (`clothes\childrenclothes\`, `_byoh\clothes\childrenclothesvariants\`) | 10 | Styles of Skyrim Mashups - Children Clothes Variations and Mesh Fixes (154063), Vanilla Mesh Fixes Standalone | **Held**: revision 2 adds the mod |
 | A noble end table (`furniture\noble\nobleendtable04.nif`) | 1 | Assorted Mesh Fixes (32117) | **Held**: revision 2 adds the mod |
 | The message board Thornswood-Content.esp places (`olivar-messageboard\missiveboardcotnd.nif`, dev packs only) | 1 | No mod at this path; kept from the other server's kzolivar records | **Held**: the rebuilt Thornswood Content (step 3) must point its board at a mesh the collection installs first |
-| Travel clothes built in BodySlide | 120 | Built on some other machine from Common Clothes and Armors 3BA BodySlide (83980), for a body and preset nothing records | Out now. Built output is not a mod file, so the collection cannot carry it |
-| Bosmer armour built in BodySlide (`armor\bosmerarmormaty743\`) | 18 | Built from Immersive Armours SSE CBBE 3BA BodySlide (22382, in the collection) | Out now, as above |
-| More Craftable Equipment's executioner built in BodySlide (`MCE\clothes\executioner\f\`) | 2 | Built from its CBBE BodySlide file (44666) | Out now, as above |
+| Travel clothes built in BodySlide | 120 | Built on some other machine from Common Clothes and Armors 3BA BodySlide (83980), for a body and preset nothing records | **Ours for now (#1259)**: still ships until Thornswood builds the outfits itself from the collection's BodySlide projects |
+| Bosmer armour built in BodySlide (`armor\bosmerarmormaty743\`) | 18 | Built from Immersive Armours SSE CBBE 3BA BodySlide (22382, in the collection) | **Ours for now (#1259)**, as above |
+| More Craftable Equipment's executioner built in BodySlide (`MCE\clothes\executioner\f\`) | 2 | Built from its CBBE BodySlide file (44666) | **Ours for now (#1259)**, as above |
 | Capital Windhelm's and Crossed Daggers' outfits, refitted (`surarmorcustommeshes\`, `clothes\saviik\`) | 15 | A refit of Capital Windhelm Expansion (42990) and The City of Crossed Daggers (168629) outfits that is not on Nexus | Out now; their own meshes, from the collection, show instead |
 | Vanilla outfits refitted by nobody traced (`clothes\farmclothes03\`, `monk\`, `sheogorath\`, `dlc02\clothes\`), women's tails | 12 | Not found on Nexus | Out now |
 | Leftovers nothing loads: `MCE\Clothing\`, `0CCE\`, `armor\dragon priests\`, `pulcharmsolis\`, `Armor_Replacer\` (3 files), `surwhiterunmeshes\` | 59 | Mage Clothing Expansion (128173), Common Clothing Expansion (134088), Armory of the Dragon Cult (94244), Armors of the Velothi (62752), NordwarUA's compilation (61423), Capital Whiterun Expansion (37982): none of their plugins is on the server, so nothing uses these | Out now. Adding any of them would add a plugin and move the load order |
@@ -295,12 +299,12 @@ plugin moves the load order.
 3. Check in game, before the upload, that the faces, hoods, robes and
    children's clothes look as they do today.
 
-Patrick decides, and it is not part of this revision: whether the armour and
-clothes built in BodySlide should be built again here, from the collection's
-own BodySlide projects with a recorded body and preset, and shipped as ours
-the way Nemesis's output is. Without that, women's travel clothes, Bosmer
-armour, the executioner's robes and the Windhelm and Riften townsfolk outfits
-show their mods' own meshes.
+Not part of this revision: Thornswood building the outfits itself from the
+collection's own BodySlide projects, with a recorded body and preset, and
+shipping the output as ours the way Nemesis's is (#1259, Patrick's choice of
+29 September). Until then the 140 built meshes above keep shipping. The
+Windhelm and Riften townsfolk refits are not among them and show their mods'
+own meshes.
 
 ## Keeping this page true
 
