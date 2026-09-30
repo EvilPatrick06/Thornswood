@@ -328,9 +328,9 @@ try {
     $site6 = Join-Path $T 'site6'
     foreach ($d in 'Game\Data', 'Profile\OwnGame', 'rel', 'dist', 'appdata') { New-Item -ItemType Directory -Force -Path (Join-Path $inst $d) | Out-Null }
     [IO.File]::WriteAllLines((Join-Path $inst 'Profile\OwnGame\files.txt'), @('F|V|1024|638000000000000000|Data\collection.esp'))
-    $ours = Join-Path $inst 'Game\Data\ours.bsa'
+    $ours = Join-Path $inst 'Game\Data\Platform\UI\ours.bsa'
     Put $ours ('x' * 4096)
-    Put (Join-Path $inst 'Game\Data\ours.esp') 'plugin'
+    Put (Join-Path $inst 'Game\Data\Platform\UI\ours.esp') 'plugin'
     $rel6 = Join-Path $inst 'rel'
     function Publish([string[]]$extra) {
         $oldA = $env:LOCALAPPDATA; $oldE = $ErrorActionPreference
@@ -365,7 +365,7 @@ try {
     $base6 = Join-Path $rel6 'published.json'
     YesR ("-Baseline on a feed that names no record still records the build (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'Baseline recorded') $r
     $recorded = Read-BaselineFile $base6
-    Yes '  as hashes' ($recorded.Count -ge 2 -and $recorded['Data\ours.bsa'] -eq (Get-BaselineEntry $ours))
+    Yes '  as hashes' ($recorded.Count -ge 2 -and $recorded['Data\Platform\UI\ours.bsa'] -eq (Get-BaselineEntry $ours))
 
     # That record goes on the site and the feed names it, as a release does.
     $rsha = Put-Asset $site6 'feed' $base6
@@ -385,7 +385,7 @@ try {
     YesR '  having read the record the feed names from the site' ($r.Out -match 'store has no baseline' -and $r.Out -match 'checked against its sha256') $r
 
     # A stale store copy on the stand-in VPS: the feed's record wins.
-    Put (Join-Path $site6 'feed\published.json') '{"Data\\ours.bsa":"1:1"}'
+    Put (Join-Path $site6 'feed\published.json') '{"Data\\Platform\\UI\\ours.bsa":"1:1"}'
     $r = Publish @('-MaxRemovals', '0')
     YesR 'a stale store baseline loses to the feed''s record: nothing of ours to publish' ((Nothing $r) -and $r.Out -match 'not the one the feed') $r
 

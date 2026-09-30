@@ -129,6 +129,43 @@ Yes 'the page tells the person to leave "Skip plugin rules" off' ($doc -match 'S
 Yes 'the page has no em dash' (-not $doc.Contains([string][char]0x2014))
 Yes 'the page never says player' (-not ($doc -match '\bplayers?\b'))
 
+# ------------------------------------------- other people's loose files (#1178) --
+# The mods revision 2 adds are the ones Ship-Rules holds loose files for, no
+# more and no fewer, and at this page's revision: a mod added here and not
+# held there would leave its files out before the collection has them, and one
+# held there and not added here would keep other people's files in the packs
+# for ever.
+function Get-Marked([string]$name) {
+    $a = [Array]::IndexOf($docLines, "<!-- ${name}:start -->")
+    $b = [Array]::IndexOf($docLines, "<!-- ${name}:end -->")
+    if ($a -lt 0 -or $b -le $a) { return $null }
+    return @($docLines[($a + 1)..($b - 1)] | Where-Object { $_ -match '^\|' -and $_ -notmatch '^\|\s*(---|Mod|Files)\s*\|' })
+}
+$adds = Get-Marked 'adds'
+$loose = Get-Marked 'loose'
+Yes 'the page has the table of mods revision 2 adds' ($null -ne $adds -and $adds.Count -gt 0)
+Yes 'and the table of the loose files it takes over' ($null -ne $loose -and $loose.Count -gt 0)
+. (Join-Path $Repo 'scripts\release\Ship-Rules.ps1')
+$heldIds = @($ShipHeldForCollection | ForEach-Object { [regex]::Match([string]$_.Mod, '\((\d+)\)$') } | Where-Object { $_.Success } |
+             ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+$addIds = @($adds | ForEach-Object { ($_ -split '\|')[2].Trim() } | Sort-Object -Unique)
+Yes ('every mod Ship-Rules holds files for is added here ({0})' -f ($heldIds -join ', ')) (
+    $heldIds.Count -gt 0 -and @($heldIds | Where-Object { $addIds -notcontains $_ }).Count -eq 0)
+Yes 'and every mod added here has files held for it' (@($addIds | Where-Object { $heldIds -notcontains $_ }).Count -eq 0)
+Yes 'everything held waits for revision 2, this page''s' (@($ShipHeldForCollection | Where-Object { [int]$_.Revision -ne 2 }).Count -eq 0)
+$heldRows = @($loose | Where-Object { $_ -match '\*\*Held\*\*' })
+Yes 'every held folder or file is named on a Held row of the loose files table' (@($ShipHeldForCollection | Where-Object {
+    $leaf = ([string]$_.Path).TrimEnd('\') -replace '^Data\\meshes\\', ''
+    $leaf = $leaf.Substring($leaf.LastIndexOf('\') + 1)
+    -not @($heldRows | Where-Object { $_.Contains($leaf) }).Count }).Count -eq 0)
+$builtRows = 0
+foreach ($r in @($loose | Where-Object { $_ -match '\*\*Ours for now \(#1259\)\*\*' })) { $c = ($r -split '\|')[2].Trim(); if ($c -match '^\d+$') { $builtRows += [int]$c } }
+Yes ('the rows kept as ours until #1259 count the BodySlide builds Ship-Rules lists ({0} and {1})' -f $builtRows, $ShipBuiltUntil1259.Count) (
+    $builtRows -gt 0 -and $builtRows -eq $ShipBuiltUntil1259.Count)
+$counted = 0
+foreach ($r in $loose) { $c = ($r -split '\|')[2].Trim(); if ($c -match '^\d+$') { $counted += [int]$c } }
+Yes ('the loose files table counts the 424 files measured on 29 September ({0})' -f $counted) ($counted -eq 424)
+
 # -------------------------------------------------------- against the truth --
 function Compare-Order([string]$label, [string[]]$truth) {
     $n = [Math]::Max($truth.Count, $order.Count)

@@ -293,9 +293,18 @@ built on 23 September carries every one of them.
   They are not in the fork, and nothing names them.
 - Files from other people's mods (loose textures, meshes, scripts and interface
   files). That is To Do List entry 168. A notices file does not give anybody
-  the right to hand them on, and this one does not try. Package-Thornswood.ps1
-  names the loose textures and meshes it is about to ship, a folder at a time
-  with its size (Get-ShipLooseArt in Ship-Rules.ps1), and refuses none of them.
+  the right to hand them on, and this one does not try. Since #1178 packs,
+  release records and the installer carry none of them: outside
+  `Data\Platform` only what Ship-Rules.ps1 names as Thornswood's ships
+  (Test-ShipNotOurs). The files of four Nexus mods the collection does not have
+  yet (male face morphs, fitted hoods and robes, children's clothes, a mesh
+  fix) and the message board Thornswood-Content.esp places still ship until
+  collection revision 2 carries them (docs\COLLECTION-REVISION-2.md), and 140
+  outfit meshes built in BodySlide on another machine ship as ours for now,
+  until Thornswood builds them itself from the collection's BodySlide projects
+  (#1259, `scripts\release\built-until-1259.txt`). Packs
+  and records already on the site, and the installer there, still carry the
+  rest until they are scrubbed.
 - Bethesda's `MarketplaceTextures.bsa` went out in every pack and in the
   23 September installer. Ship-Rules.ps1 now holds it back from both
   (Test-ShipBethesdaLeftAlone) without deleting anybody's copy, so builds made

@@ -313,6 +313,10 @@ function Test-ShipPath([string]$where, [string]$key, [string]$inner, $source) {
     # and Scrub-Feed ask. Other servers' files and other people's frameworks
     # are the rest of Test-ShipMachine.
     if ((Test-ShipOneMachine $rel) -or (Test-ShipMachine $rel)) { Write-Hit $where $key '0' 'never-ship-machine' $false; return }
+    # Another author's loose file (#1178). What waits for the collection is
+    # not asked here: Ship-Rules holds it as ours until the revision that adds
+    # its mod.
+    if (Test-ShipNotOurs $rel) { Write-Hit $where $key '0' 'never-ship-not-ours' $false; return }
 }
 
 function Test-TextBytes([string]$where, [string]$key, [byte[]]$b) {
