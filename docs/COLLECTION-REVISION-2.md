@@ -191,6 +191,37 @@ collection. If one of them ever comes out, give the plugin after the gap a
 rule straight onto the plugin before it in the table above;
 `Check-CollectionRules.ps1` names the exact rule.
 
+## 6a. Pandora before the generated-files build (#1247)
+
+Revision 2 must install **Pandora Behaviour Engine+ 4.4.0-beta** (Nexus
+133232), the version verified with the scripted build, and remove **Nemesis
+Unlimited Behavior Engine** (Nexus 60033). The shipping machine needs the
+.NET 10 runtime. This is a prerequisite for #1247, not evidence that the
+collection pass or the installed-game build has happened.
+
+1. In Vortex's Thornswood profile, install and enable Pandora through its
+   Mod Manager Download, remove Nemesis, then deploy. Keep Precision and
+   True Directional Movement: they supply `colis`, `tdmh`, `tdmlen`, `tdmv`.
+2. Add Pandora to the collection's workshop before uploading revision 2.
+   It adds no plugin, so the plugin order above stays the same.
+3. Bring Thornswood's dev folder up to date through the launcher, then close
+   the launcher and game. The folder must have exactly one
+   `Pandora Behaviour Engine+.exe` under `Game\Data`, either loose in Data
+   with its Vortex deployment record or in `Data\Pandora Behaviour Engine`
+   with its libraries and `Pandora_Engine` templates beside it. Nothing is
+   copied into the Steam folder by hand.
+4. Claude Code verifies `Build-Generated.ps1 -Channel dev -DryRun -NoPause`,
+   then runs `Build-Generated.ps1 -Channel dev -NoPause` on the shipping
+   machine. It must finish with a current generated record and covered
+   bodies before the first dev Ship. A missing tool, changed game-folder
+   file, patch mismatch or error stops that pass.
+
+The build runs Pandora from its own scratch copy with explicit Data and
+output settings, using the four patches above. Its output and BodySlide's
+covered bodies are made in Thornswood's own folder and recorded as ours.
+Nemesis's command line cannot generate, which is why the scripted build uses
+Pandora. See [Pandora's source and installation instructions](https://github.com/Monitor221hz/Pandora-Behaviour-Engine-Plus)
+and `scripts\mods\Build-Generated.ps1`.
 ## 7. Check, then upload
 
 1. `.\scripts\mods\Check-CleanInstall.ps1 -Server dev`. It reads the plugin
@@ -269,15 +300,14 @@ lists them). Nothing here is deleted from anybody's game.
 
 Thornswood's own, and still shipping: our main menu (`startmenu.swf`, the empty
 `loadwaitspinner.swf`, the silent `mus_maintheme.xwm`, the backdrop), SkyHUD's
-settings, the SkyMP client's files, and Nemesis's output. The saved mod menu
+settings, the SkyMP client's files, and the generated behavior output. The saved mod menu
 settings for Precision, True Directional Movement and TrueHUD
 (`Data\MCM\Settings`) are Daedric Online's by their own first lines and never
-ship as one machine's files (#1239). Nemesis's output is ours
-because we generate it from the collection: its own record
-(`Data\Nemesis_Engine\cache\mod settings`) names only Precision (72347) and
-True Directional Movement (51614), both in the collection, run by Nemesis
-(60033), also in it, on 10 September. No collection can run the generator.
-
+ship as one machine's files (#1239). The behavior output is ours because we
+make it for this mod list. Before revision 2 it came from Nemesis; from this
+revision Pandora makes it with the four patches `records\generated.json`
+names, in Thornswood's own folder before Ship (step 6a). No collection can
+run the generator.
 ### Mods revision 2 adds
 
 Each is meshes only by its file list on Nexus. If Vortex shows a plugin for any
@@ -301,7 +331,7 @@ plugin moves the load order.
 
 Not part of this revision: Thornswood building the outfits itself from the
 collection's own BodySlide projects, with a recorded body and preset, and
-shipping the output as ours the way Nemesis's is (#1259, Patrick's choice of
+shipping the output as ours the way the behavior files are (#1259, Patrick's choice of
 29 September). Until then the 140 built meshes above keep shipping. The
 Windhelm and Riften townsfolk refits are not among them and show their mods'
 own meshes.
