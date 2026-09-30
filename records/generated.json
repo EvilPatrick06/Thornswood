@@ -1,0 +1,10 @@
+{
+  "about": "What scripts\\mods\\Build-Generated.ps1 builds in Thornswood's own game folder on the shipping machine before a Ship (issue #1247). nemesis.patches are the Nemesis patch codes (the folder names under Data\\Nemesis_Engine\\mod) the behavior files are generated with. bodyslide.sets are the BodySlide slider sets built into the bodies, each at its own slider defaults, never with RaceMenu morphs. bodyslide.sliders may move a slider of one set away from its default, as { \"<set>\": { \"<slider>\": { \"big\": 0, \"small\": 0 } } }, and Build-Generated refuses any that shapes the breasts, the seat, the genitals or the nipples (issue #1004) or takes the underwear off (issue #405).",
+  "nemesis": {
+    "patches": ["colis", "tdmh", "tdmlen", "tdmv"]
+  },
+  "bodyslide": {
+    "sets": ["CBBE 3BBB Amazing NeverNude", "HIMBO Body - Vanilla Nevernude"],
+    "sliders": {}
+  }
+}
