@@ -67,9 +67,21 @@ out the gate carrying and you have broken the Accord.
 You are watched, and you are one bad night from being told to leave.
 That is the Jarl's scene and the Ambassador's. It is not a profession.
 
+## What they make
+
+Imperial and Penitus gear is not found in Skyrim. Not on a body, not
+in a chest, not at a public forge. The embassy roll is who may craft
+it.
+
+The open embassy book is one heavy set and one light set, plus the
+Penitus pieces, plus Imperial cloaks and capes. Knight, legate, and
+captain variants are not made. Their references are in
+[Cut items](cut-items.md), so a ceremony can put one back.
+
 ## Where this is
 
 The Accord is on the site. The building is in the world as a place
 that can be claimed like any other door, and nothing yet reserves it
 for an office, caps a roll at 40, or counts the 12. Solitude's box
-and board already exist and are the hold's.
+and board already exist and are the hold's. Imperial gear is still
+in the crafting lists and still in the world.

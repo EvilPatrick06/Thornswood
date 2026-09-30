@@ -68,6 +68,18 @@ the benches, and how a recipe gets its rank. Each half's own page
 lists every recipe: the name, the rank, what it asks for, the gold,
 and whether the server is asked.
 
+[Masters and apprentices](systems/apprenticeship.md). The sister half
+past novice, and the two outside trades. A master decides, and can
+end it.
+
+[Durability](systems/durability.md). Weapon Kit, Armor Kit, Sewing
+Kit. The right half repairs to 120%. Anyone else repairs to 100%.
+At 0%, a worn piece can break.
+
+[Cut items](systems/cut-items.md). What leaves the open book, and the
+references kept so a row can come back. The recipe file is not
+deleted.
+
 | Profession | Halves |
 | --- | --- |
 | [Warrior](systems/professions/warrior.md) | [Bulwark](systems/professions/warrior/bulwark.md), [Berserker](systems/professions/warrior/berserker.md) |
