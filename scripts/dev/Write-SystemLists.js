@@ -52,6 +52,7 @@ const harvests = JSON.parse(fs.readFileSync(HARVESTS, 'utf8'));
 const ores = JSON.parse(fs.readFileSync(ORES, 'utf8'));
 const hunts = JSON.parse(fs.readFileSync(HUNTS, 'utf8'));
 const races = JSON.parse(fs.readFileSync(RACES, 'utf8'));
+const food = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'food.json'), 'utf8'));
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -188,18 +189,39 @@ write('playable-races.md', head('Races a person can be', 'game/data/races.json',
   playable.map(function (n) { return '- ' + n; }).join('\n') + '\n');
 index.push('- [Playable races](playable-races.md) (' + playable.length + ')');
 
-function distinctWork(title, from, bag, extra) {
+function distinctWork(title, from, bag, extra, opts) {
+  opts = opts || {};
   const groups = {};
   Object.keys(bag).forEach(function (id) {
     const row = bag[id];
     const name = clean(row.name || id);
-    if (!groups[name]) {
-      groups[name] = { name: name, rank: row.rank, n: 0, gives: {}, yield: row.yield };
+    const rank = clean(row.rank);
+    const key = name + '\0' + rank;
+    if (!groups[key]) {
+      groups[key] = {
+        name: name, rank: rank, n: 0, gives: {}, world: {},
+        yield: row.yield, gold: {}, grow: {}
+      };
     }
-    groups[name].n++;
-    (row.gives || []).forEach(function (g) {
-      groups[name].gives[clean(g.name)] = true;
-    });
+    const g = groups[key];
+    g.n++;
+    if (row.gives && row.gives.length) {
+      row.gives.forEach(function (part) {
+        g.gives[clean(part.name)] = true;
+      });
+    } else if (row.name) {
+      g.gives[clean(row.name)] = true;
+    }
+    if (row.from) { g.world[clean(row.from)] = true; }
+    if (row.growMinutes != null) { g.grow[String(row.growMinutes)] = true; }
+    if (opts.gold) {
+      const gold = opts.gold(id, row);
+      if (gold !== '' && gold != null) { g.gold[String(gold)] = true; }
+    }
+    if (opts.world) {
+      const world = opts.world(id, row);
+      if (world) { g.world[clean(world)] = true; }
+    }
   });
   const rows = Object.keys(groups).map(function (k) { return groups[k]; });
   rows.sort(function (a, b) {
@@ -208,38 +230,87 @@ function distinctWork(title, from, bag, extra) {
     if (ar !== br) { return ar - br; }
     return a.name < b.name ? -1 : 1;
   });
-  let body = head(title, from, rows.length + ' distinct names, ' +
-    Object.keys(bag).length + ' placed records. ' + (extra || ''));
-  body += '| Name | Rank | Records | Gives | Yield novice, advanced, expert, master |\n| --- | --- | --- | --- | --- |\n';
+  const showWorld = rows.some(function (row) { return Object.keys(row.world).length; });
+  const showGold = rows.some(function (row) { return Object.keys(row.gold).length; });
+  const showGrow = rows.some(function (row) { return Object.keys(row.grow).length; });
+  const showYield = rows.some(function (row) { return row.yield; });
+  const heads = ['Name', 'Rank', 'Records', 'You receive'];
+  if (showWorld) { heads.push('In the world'); }
+  if (showGold) { heads.push('Gold'); }
+  if (showGrow) { heads.push('Grow minutes'); }
+  if (showYield) { heads.push('Yield novice, advanced, expert, master'); }
+  let table = '| ' + heads.join(' | ') + ' |\n| ' + heads.map(function () { return '---'; }).join(' | ') + ' |\n';
   rows.forEach(function (row) {
-    const gives = Object.keys(row.gives).sort().join(', ');
-    let y = '';
-    if (row.yield) {
-      y = row.yield.map(function (pair) { return pair[0] + '-' + pair[1]; }).join(', ');
+    const cells = [
+      row.name,
+      row.rank,
+      String(row.n),
+      Object.keys(row.gives).sort().join(', ')
+    ];
+    if (showWorld) { cells.push(Object.keys(row.world).sort().join(', ')); }
+    if (showGold) { cells.push(Object.keys(row.gold).sort(function (a, b) { return Number(a) - Number(b); }).join('-')); }
+    if (showGrow) { cells.push(Object.keys(row.grow).sort(function (a, b) { return Number(a) - Number(b); }).join(', ')); }
+    if (showYield) {
+      cells.push(row.yield ? row.yield.map(function (pair) { return pair[0] + '-' + pair[1]; }).join(', ') : '');
     }
-    body += '| ' + row.name + ' | ' + clean(row.rank) + ' | ' + row.n + ' | ' +
-      gives + ' | ' + y + ' |\n';
+    table += '| ' + cells.join(' | ') + ' |\n';
   });
-  return { body: body, names: rows.length, records: Object.keys(bag).length };
+  const body = head(title, from, rows.length + ' rows, ' +
+    Object.keys(bag).length + ' placed records. ' + (extra || '')) + table;
+  return { body: body, names: rows.length, records: Object.keys(bag).length, table: table };
+}
+
+function foodGold(produce) {
+  const item = food.items && food.items[produce];
+  return item && item.gold != null ? item.gold : '';
+}
+
+function harvestGold(id) {
+  const detail = harvests.detail && harvests.detail[id];
+  if (detail && detail.produceValue != null) { return detail.produceValue; }
+  const row = harvests.harvests[id] || harvests.crops[id] || harvests.fish[id] || (harvests.game && harvests.game[id]);
+  return row ? foodGold(row.produce) : '';
+}
+
+function harvestWorld(id) {
+  const detail = harvests.detail && harvests.detail[id];
+  return detail && detail.name ? detail.name : '';
+}
+
+function oreGold(id) {
+  const detail = ores.detail && ores.detail[id];
+  return detail && detail.oreValue != null ? detail.oreValue : '';
+}
+
+function huntGold(id) {
+  const detail = hunts.detail && hunts.detail[id];
+  return detail && detail.bestValue != null ? detail.bestValue : '';
 }
 
 const classFiles = [
   ['miner.md', 'Miner', 'game/data/ores.json', ores.ores,
-    'A pair of zeroes means that rank cannot work the seam. Yield is least-most per swing.'],
+    'A pair of zeroes means that rank cannot work the seam. Yield is least-most per swing. Gold is the ore\'s sell price. Heart stone is 100 gold and is advanced anyway.',
+    { gold: oreGold }],
   ['gatherer.md', 'Gatherer', 'game/data/harvests.json', harvests.harvests,
-    'Reagents. Food plants are the farmer\'s unless the harvest table keeps them here.'],
+    'Reagents. One pick is one of the produce. Gold is the produce\'s sell price, which is also the rank. Wheat is in this table and is a crop: the server treats it as the farmer\'s.',
+    { gold: harvestGold, world: harvestWorld }],
   ['farmer.md', 'Farmer', 'game/data/harvests.json', harvests.crops,
-    'Ranked by how hard the crop is to grow, not by what it sells for.'],
+    'Ranked by how hard the crop is to grow, not by what it sells for. Grow minutes are the novice wait, before the rank multiplier.',
+    { gold: harvestGold }],
   ['fisher.md', 'Fisher', 'game/data/harvests.json', harvests.fish,
-    'Pressed at the water. No rod.'],
+    'Pressed at the water. No rod. Gold is the produce\'s sell price where the food table has it.',
+    { gold: function (id, row) { return foodGold(row.produce); } }],
   ['hunter.md', 'Hunter', 'game/data/hunts.json', hunts.hunts,
-    'Only a hunter loots the body. Yield is least-most of each part.']
+    'Only a hunter loots the body. Yield is least-most of each part. Gold is the best part, and that gold is the rank.',
+    { gold: huntGold }]
 ];
 
+const classGot = {};
 classFiles.forEach(function (spec) {
-  const got = distinctWork(spec[1], spec[2], spec[3] || {}, spec[4]);
+  const got = distinctWork(spec[1], spec[2], spec[3] || {}, spec[4], spec[5]);
   write(spec[0], got.body);
-  index.push('- [' + spec[1] + '](' + spec[0] + ') (' + got.names + ' names, ' + got.records + ' records)');
+  classGot[spec[0]] = got;
+  index.push('- [' + spec[1] + '](' + spec[0] + ') (' + got.names + ' rows, ' + got.records + ' records)');
 });
 
 if (harvests.game) {
@@ -257,4 +328,215 @@ if (harvests.unranked) {
 
 index.push('');
 write('README.md', index.join('\n') + '\n');
+
+// The profession and class pages carry the same rows, so a count is not
+// the only place the item lives. Markers keep the hand-written rules.
+function spellBook() {
+  const gm = fs.readFileSync(path.join(ROOT, 'game', 'gamemode.js'), 'utf8');
+  const block = gm.split('var SPELL_IDS = {')[1].split('};')[0];
+  const book = {};
+  block.replace(/"([^"]+)": "([^"]+)"/g, function (_, name, id) {
+    book[name] = id;
+    return _;
+  });
+  const flat = {};
+  Object.keys(book).forEach(function (name) {
+    flat[name.toLowerCase().replace(/[^a-z0-9]/g, '')] = name;
+  });
+  return { book: book, flat: flat };
+}
+
+function inBook(flat, editorId) {
+  if (!editorId) { return ''; }
+  const key = String(editorId).toLowerCase().replace(/[^a-z0-9]/g, '');
+  return flat[key] ? 'yes, ' + flat[key] : 'no';
+}
+
+function spellOf(row) {
+  const needs = row.needs || [];
+  for (let i = 0; i < needs.length; i++) {
+    if (needs[i].ofType === 'SPEL') { return clean(needs[i].of); }
+  }
+  return '';
+}
+
+function namesByRank(rows, onlyAsked) {
+  const lines = [];
+  ranks.forEach(function (rank) {
+    const names = [];
+    const seen = {};
+    rows.forEach(function (row) {
+      if (onlyAsked && row.fires === false) { return; }
+      if (clean(row.rank) !== rank) { return; }
+      const name = clean(row.name || row.editorId);
+      if (seen[name]) { return; }
+      seen[name] = true;
+      names.push(name);
+    });
+    names.sort();
+    if (!names.length) {
+      lines.push('**' + rank.charAt(0).toUpperCase() + rank.slice(1) + '.** None.');
+      return;
+    }
+    const word = names.length === 1 ? 'name' : 'names';
+    lines.push('**' + rank.charAt(0).toUpperCase() + rank.slice(1) + '** (' + names.length + ' ' + word + '). ' + names.join('. ') + '.');
+  });
+  return lines.join('\n\n');
+}
+
+function spliceDetail(rel, markdown) {
+  const file = path.join(ROOT, rel);
+  if (!fs.existsSync(file)) {
+    console.log('skip missing ' + rel);
+    return;
+  }
+  let text = fs.readFileSync(file, 'utf8');
+  const begin = '<!-- detail:begin -->';
+  const end = '<!-- detail:end -->';
+  const block = begin + '\n\n' + markdown.trim() + '\n\n' + end;
+  if (text.indexOf(begin) !== -1 && text.indexOf(end) !== -1) {
+    text = text.replace(new RegExp(begin + '[\\s\\S]*?' + end), block);
+  } else {
+    const marker = '\n## Where this is\n';
+    const at = text.indexOf(marker);
+    if (at === -1) { text = text.trimEnd() + '\n\n' + block + '\n'; }
+    else { text = text.slice(0, at) + '\n' + block + '\n' + text.slice(at); }
+  }
+  fs.writeFileSync(file, text, 'utf8');
+}
+
+const spells = spellBook();
+
+Object.keys(byHalf).sort().forEach(function (key) {
+  const rows = byHalf[key];
+  const file = key.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.md';
+  const owner = key.split('/')[0].toLowerCase();
+  const half = key.split('/')[1].toLowerCase();
+  const rel = 'docs/systems/professions/' + owner + '/' + half + '.md';
+  const link = '../../lists/' + file;
+  const asked = rows.filter(function (r) { return r.fires !== false; });
+  const silent = rows.length - asked.length;
+  const temperSentence = silent === 0
+    ? 'None of them are tempering.'
+    : (silent + ' are tempering and do not.');
+  let body = '## Every recipe\n\n' +
+    'Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. ' +
+    rows.length + ' recipes. ' + asked.length + ' reach the server. ' +
+    temperSentence + ' The same rows, with ids, are in [' +
+    file.replace('.md', '') + '](' + link + ').\n\n' +
+    'A rank is the dearest ingredient a class produces. If an ingredient is produced by nobody, the rank stays at what the finished piece sells for, and it is not allowed to drop below that. The sell price alone is not the rank when something in the row is produced.\n\n' +
+    '### Names that reach the server\n\n' +
+    namesByRank(rows, true) + '\n\n';
+  if (key === 'Enchanter/Bladebinder') {
+    let inBookCount = 0;
+    let spellRows = 0;
+    rows.forEach(function (row) {
+      const spell = spellOf(row);
+      if (!spell) { return; }
+      spellRows++;
+      if (inBook(spells.flat, spell).indexOf('yes') === 0) { inBookCount++; }
+    });
+    body += 'The spell column is the HasSpell the crafting menu asks for. ' +
+      'In the college book means that editor id is one of the spells on the mage pages. ' +
+      inBookCount + ' of ' + spellRows + ' staves ask for a spell that is in that book. ' +
+      'The rest name a mod spell. A staff whose spell is not in the book can sit at novice in this table and still be unmakeable, because the menu will not list it for someone who was never granted the spell.\n\n';
+    const lines = ['| Item | Rank | Bench | Asks for | Spell the menu asks for | In the college book | Gold |',
+      '| --- | --- | --- | --- | --- | --- | --- |'];
+    rows.slice().sort(function (a, b) {
+      const ar = ranks.indexOf(a.rank);
+      const br = ranks.indexOf(b.rank);
+      if (ar !== br) { return ar - br; }
+      return clean(a.name) < clean(b.name) ? -1 : 1;
+    }).forEach(function (row) {
+      const spell = spellOf(row);
+      lines.push('| ' + [
+        clean(row.name),
+        clean(row.rank),
+        benchShort(row.benchName),
+        inputsOf(row),
+        spell,
+        inBook(spells.flat, spell),
+        row.worth == null ? '' : row.worth
+      ].join(' | ') + ' |');
+    });
+    body += lines.join('\n') + '\n';
+  } else {
+    body += recipeTable(rows);
+  }
+  spliceDetail(rel, body);
+});
+
+const classPages = {
+  'miner.md': 'docs/systems/classes/miner.md',
+  'gatherer.md': 'docs/systems/classes/gatherer.md',
+  'farmer.md': 'docs/systems/classes/farmer.md',
+  'fisher.md': 'docs/systems/classes/fisher.md',
+  'hunter.md': 'docs/systems/classes/hunter.md'
+};
+Object.keys(classPages).forEach(function (file) {
+  const got = classGot[file];
+  if (!got) { return; }
+  spliceDetail(classPages[file],
+    '## Every record\n\n' +
+    'Generated from the work tables by `scripts/dev/Write-SystemLists.js`. ' +
+    'The same rows are in [' + file.replace('.md', '') + '](../lists/' + file + ').\n\n' +
+    got.table);
+});
+
+const schoolOrder = ['novice', 'advanced', 'expert', 'master'];
+const schoolPages = {
+  destruction: 'docs/systems/professions/mage/destruction.md',
+  restoration: 'docs/systems/professions/mage/restoration.md',
+  alteration: 'docs/systems/professions/mage/alteration.md',
+  conjuration: 'docs/systems/professions/mage/conjuration.md',
+  illusion: 'docs/systems/professions/mage/illusion.md'
+};
+const spellLists = {
+  destruction: {
+    novice: ['Flames', 'Frostbite', 'Sparks'],
+    advanced: ['Firebolt', 'Ice Spike', 'Lightning Bolt', 'Fireball', 'Ice Storm', 'Chain Lightning', 'Flame Cloak', 'Frost Cloak', 'Lightning Cloak'],
+    expert: ['Incinerate', 'Icy Spear', 'Thunderbolt', 'Wall of Flames', 'Wall of Frost', 'Wall of Storms'],
+    master: ['Fire Storm', 'Blizzard', 'Lightning Storm']
+  },
+  restoration: {
+    novice: ['Healing', 'Lesser Ward'],
+    advanced: ['Healing Hands', 'Fast Healing', 'Steadfast Ward', 'Turn Undead', 'Close Wounds', 'Heal Other', 'Greater Ward', 'Repel Lesser Undead'],
+    expert: ['Grand Healing', 'Circle of Protection', 'Repel Undead', 'Turn Greater Undead'],
+    master: ['Guardian Circle', 'Bane of the Undead']
+  },
+  alteration: {
+    novice: ['Candlelight', 'Oakflesh'],
+    advanced: ['Magelight', 'Stoneflesh', 'Detect Life', 'Ironflesh', 'Telekinesis', 'Waterbreathing'],
+    expert: ['Ebonyflesh', 'Paralyze', 'Detect Dead'],
+    master: ['Dragonhide', 'Mass Paralysis']
+  },
+  conjuration: {
+    novice: ['Conjure Familiar', 'Raise Zombie', 'Bound Sword'],
+    advanced: ['Conjure Flame Atronach', 'Reanimate Corpse', 'Bound Battleaxe', 'Soul Trap', 'Conjure Frost Atronach', 'Banish Daedra', 'Revenant', 'Bound Bow'],
+    expert: ['Conjure Storm Atronach', 'Dread Zombie', 'Conjure Dremora Lord', 'Expel Daedra', 'Command Daedra'],
+    master: ['Dead Thrall', 'Flame Thrall', 'Frost Thrall', 'Storm Thrall']
+  },
+  illusion: {
+    novice: ['Courage', 'Clairvoyance', 'Fury'],
+    advanced: ['Calm', 'Fear', 'Muffle', 'Frenzy', 'Rally', 'Invisibility'],
+    expert: ['Pacify', 'Rout', 'Call to Arms'],
+    master: ['Harmony', 'Hysteria', 'Mayhem']
+  }
+};
+Object.keys(schoolPages).forEach(function (school) {
+  const lines = ['## The book', '',
+    'Generated from the spell book and `SPELL_IDS` in `game/gamemode.js` by `scripts/dev/Write-SystemLists.js`. ' +
+    'Apprentice and Adept are both Advanced. A blank id means the name is in the book and not yet granted.',
+    '',
+    '| Spell | Rank | Id |',
+    '| --- | --- | --- |'];
+  schoolOrder.forEach(function (rank) {
+    (spellLists[school][rank] || []).forEach(function (name) {
+      const id = spells.book[name] ? '`' + spells.book[name] + '`' : '';
+      lines.push('| ' + name + ' | ' + rank + ' | ' + id + ' |');
+    });
+  });
+  spliceDetail(schoolPages[school], lines.join('\n'));
+});
+
 console.log('wrote ' + fs.readdirSync(OUT).length + ' files to ' + OUT);
