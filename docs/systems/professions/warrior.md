@@ -22,9 +22,12 @@ A person killing a person counts for nothing. See [Death](../death.md).
 No other profession is credited for a kill. Killing is not a way to
 become a tailor.
 
-One kill is one piece of work on the half you hold. The ladder is
-100, then 250, then 600, and the count starts again at each rank.
-The same rest cost as a swing of a pick: 1.5, 1.2, 0.9, 0.6.
+One kill is one piece of work on the half you hold. A chicken and a
+dragon are the same piece today. That is wrong for the finished
+system: a harder kill is more than one piece. The bands are not set.
+The ladder is still 100, then 250, then 600, and the count starts
+again at each rank. The same rest cost as a swing of a pick: 1.5,
+1.2, 0.9, 0.6.
 
 ## What you are handed
 
