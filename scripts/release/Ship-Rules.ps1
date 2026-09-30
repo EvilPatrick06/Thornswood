@@ -383,7 +383,9 @@ $ShipVanillaDataDirs     = @('Video', 'Strings')
 # first and were shipped to everybody as though they were ours.
 #
 # NirnLabUIPlatform is another roleplay server's user interface framework and
-# on its own it is 356 MB. Nemesis, FNIS, BodySlide and xEdit are tools that
+# on its own it is 356 MB. Nemesis, FNIS, BodySlide, xEdit and Pandora (the
+# behavior engine from collection revision 2, #1247, in the folder of its own
+# the collection gives it and its Pandora_Engine patch folder) are tools that
 # belong on the machine of somebody who builds mods, not in a folder handed to
 # somebody who plays. The rest is documentation, installer leftovers and a
 # shader cache that rebuilds itself on first launch. Data\Source, Papyrus script
@@ -408,6 +410,7 @@ $ShipVanillaDataDirs     = @('Video', 'Strings')
 $ShipForeignDataDirs = @(
     'NirnLabUIPlatform',
     'Nemesis_Engine', 'FNIS Behavior SE 7.6', 'CalienteTools', 'tools',
+    'Pandora Behaviour Engine', 'Pandora_Engine',
     'ModderResource', 'FOMod',
     'Docs', 'Docs and Screenshots', 'readmes',
     'ShaderCache'
@@ -713,7 +716,7 @@ function Test-ShipMachine([string]$rel) {
 # the Vortex record keeps them out when the game is the Steam copy.
 #
 # Except what scripts\mods\Build-Generated.ps1 built in the folder (#1247):
-# the Nemesis behavior files and the BodySlide bodies are Thornswood's and
+# the behavior files Pandora makes and the BodySlide bodies are Thornswood's and
 # ship, though several sit where Vortex deploys a file of the same name
 # (Vortex's 3BA body, a mod's own behavior file), and files.txt goes on
 # saying V for those paths. Get-ShipGeneratedFiles reads its record.
@@ -756,7 +759,7 @@ function Get-ShipGeneratedFiles([string]$ProfileDir) {
 # installer leaves out what the collection provides and nothing else, so every
 # one of them went to everybody who installed, and nothing on screen said so.
 #
-# This reports and does not refuse. BodySlide and Nemesis output are
+# This reports and does not refuse. BodySlide and behavior output are
 # Thornswood's since #1247 (Patrick, 29 Sep): scripts\mods\Build-Generated.ps1
 # makes them in Thornswood's own folder before a Ship and records them, and a
 # refusal here would stop every installer build until the other folders are

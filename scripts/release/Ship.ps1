@@ -1254,7 +1254,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # ------------------------------------------------------------ generated files
-# Issue #1247, Patrick 29 Sep: Nemesis' behavior files and BodySlide's bodies
+# Issue #1247, Patrick 29 Sep: the behavior files (Pandora) and BodySlide's bodies
 # are made in Thornswood's own folder on this machine, by
 # scripts\mods\Build-Generated.ps1, as a step before a Ship; the Steam copy is
 # the person's own. A release carries what is in the folder, so a folder whose

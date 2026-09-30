@@ -5,9 +5,12 @@
   Build-Generated.ps1, Ship.ps1 and Check-ShipReady.ps1.
 
 .DESCRIPTION
-  Issue #1247. Patrick, 29 Sep: Nemesis (behavior files) and BodySlide (body
-  meshes) output is made in Thornswood's own folder, as a scripted step on the
-  shipping PC before a Ship. Steam's copy stays the person's own.
+  Issue #1247. Patrick, 29 Sep: the behavior files (Nemesis' output until
+  then) and BodySlide's body meshes are made in Thornswood's own folder, as a
+  scripted step on the shipping PC before a Ship. Steam's copy stays the
+  person's own. The behavior files are made by Pandora Behaviour Engine+,
+  Nemesis' successor, which reads the same patches and has a command line that
+  works; Nemesis' -generate never starts its work (Build-Generated.ps1).
 
   Until then both tools were run into the Steam copy, and Thornswood's folder
   took their output from there. Since #1232 the folder takes only Skyrim's own
@@ -22,7 +25,7 @@
       built 2026-09-29T21:04:11
       part list <sha256>          records\generated.json and the recipe
       part plugins <sha256>       the mod list, Profile\OwnGame\plugins.txt
-      part nemesis <sha256>       Vortex's files Nemesis reads
+      part behaviors <sha256>     Vortex's files Pandora reads
       part bodyslide <sha256>     Vortex's files BodySlide builds from
       inputs <sha256>             all four together
       file <sha256> <path>        one line per file it made, path under the game folder
@@ -38,31 +41,36 @@
   it was built with. The parts are read from the launcher's own record of what
   Vortex deployed (files.txt, the V lines, with the size and time of Vortex's
   own copy), never from the folder's files, which the tools rewrite. So a
-  collection revision that changes a Nemesis patch, an animation list, a
+  collection revision that changes a behavior patch, an animation list, a
   slider set or BodySlide itself makes it stale, and so does a changed mod
   list or a change to records\generated.json.
 #>
 
 # Move this when Build-Generated.ps1 changes what it builds or how, so every
 # record made the old way reads as stale.
-$GeneratedRecipe = 1
+$GeneratedRecipe = 2
 
 # Vortex's files each tool reads, by path under the game folder. What one of
 # them is changes the tool's output, so a change to any makes the build stale.
-$GeneratedNemesisInputs = @(
-    '^Data\\Nemesis_Engine\\',
+# Pandora: the patches (Nemesis' format and its own), Pandora itself in the
+# folder the collection puts it in, and the animations and lists under meshes.
+$GeneratedBehaviorInputs = @(
+    '^Data\\Nemesis_Engine\\mod\\',
+    '^Data\\Pandora_Engine\\',
+    '^Data\\[^\\]*pandora[^\\]*\\',
     '^Data\\meshes\\actors\\.+\.(hkx|txt)$',
-    '^Data\\meshes\\[^\\]+\.txt$',
-    '^Data\\scripts\\(fnis|fnbe|nemesis)[^\\]*\.pex$'
+    '^Data\\meshes\\[^\\]+\.txt$'
 )
 $GeneratedBodySlideInputs = @(
     '^Data\\CalienteTools\\BodySlide\\',
     '^Data\\meshes\\actors\\character\\character assets\\'
 )
 
-# The tools' own folders. What they write there (logs, caches, settings) is the
-# tool's, never output, and Ship-Rules keeps both folders out of every pack.
-$GeneratedToolDirs = @('Data\Nemesis_Engine\', 'Data\CalienteTools\')
+# The tools' own folders. What BodySlide writes there (its settings, its log,
+# the group and preset made for a build) is the tool's, never output, and
+# Ship-Rules keeps the folder out of every pack. Pandora runs from a copy in
+# the work folder and writes nothing in the game folder at all.
+$GeneratedToolDirs = @('Data\CalienteTools\')
 
 # BODY SHAPE (issue #1004). Patrick, 28 Sep: nothing that changes breasts, the
 # seat, genitals or nipples. A slider whose name says it shapes one of them
@@ -144,9 +152,9 @@ function Get-GeneratedBuildList([string]$Path) {
     try { $doc = ([IO.File]::ReadAllText($Path) -replace '^\uFEFF', '') | ConvertFrom-Json }
     catch { throw ("$Path is not valid JSON: " + $_.Exception.Message) }
     $patches = @()
-    if ($doc.PSObject.Properties['nemesis'] -and $doc.nemesis.PSObject.Properties['patches']) { $patches = @($doc.nemesis.patches | ForEach-Object { [string]$_ }) }
+    if ($doc.PSObject.Properties['pandora'] -and $doc.pandora.PSObject.Properties['patches']) { $patches = @($doc.pandora.patches | ForEach-Object { [string]$_ }) }
     foreach ($p in $patches) {
-        if ($p -notmatch '^[A-Za-z0-9_]+$') { throw "$Path names a Nemesis patch '$p', which is not a patch code (the folder name under Data\Nemesis_Engine\mod)." }
+        if ($p -notmatch '^[A-Za-z0-9_]+$') { throw "$Path names a behavior patch '$p', which is not a patch code (the folder name under Data\Nemesis_Engine\mod or Data\Pandora_Engine\mod)." }
     }
     $sets = @()
     if ($doc.PSObject.Properties['bodyslide'] -and $doc.bodyslide.PSObject.Properties['sets']) { $sets = @($doc.bodyslide.sets | ForEach-Object { [string]$_ }) }
@@ -170,12 +178,35 @@ function Get-GeneratedBuildList([string]$Path) {
     return [pscustomobject]@{ Path = $Path; Patches = $patches; Sets = $sets; Sliders = $sliders }
 }
 
+# The files of Pandora's mod when Vortex deployed its archive loose into Data.
+# The build and its freshness check must agree on the exe and every library.
+function Get-GeneratedLoosePandoraFiles([string]$Root) {
+    $made = Join-Path $Root 'Profile\OwnGame\made.txt'
+    $source = ''
+    if (Test-Path -LiteralPath $made) {
+        foreach ($line in [IO.File]::ReadAllLines($made)) {
+            $m = [regex]::Match($line, '^source=(.+)$')
+            if ($m.Success) { $source = $m.Groups[1].Value.Trim() }
+        }
+    }
+    if (-not $source) { throw "$made names no source, so the files of Pandora's mod cannot be read." }
+    $manifest = Join-Path $source 'Data\vortex.deployment.json'
+    if (-not (Test-Path -LiteralPath $manifest)) { throw "Vortex's record ($manifest) cannot be read, so the files of Pandora's mod cannot be read." }
+    $doc = ([IO.File]::ReadAllText($manifest) -replace '^\uFEFF', '') | ConvertFrom-Json
+    $mine = @($doc.files | Where-Object { ([string]$_.relPath) -ieq 'Pandora Behaviour Engine+.exe' })
+    if ($mine.Count -ne 1) { throw "Vortex's record ($manifest) does not name one mod for Pandora Behaviour Engine+.exe." }
+    return @($doc.files | Where-Object { [string]$_.source -eq [string]$mine[0].source } | ForEach-Object { ([string]$_.relPath).TrimStart('\') })
+}
 # The four parts a build depends on, each as a sha256, and all four together.
 # Reads the launcher's record of what Vortex deployed, never the folder itself.
 function Get-GeneratedInputs([string]$Root, [string]$ListPath) {
     $filesTxt = Join-Path $Root 'Profile\OwnGame\files.txt'
     if (-not (Test-Path -LiteralPath $filesTxt)) {
         throw "There is no $filesTxt, the launcher's record of what Vortex deployed into this folder, so what the tools build from cannot be read."
+    }
+    $loose = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    if (Test-Path -LiteralPath (Join-Path $Root 'Game\Data\Pandora Behaviour Engine+.exe')) {
+        foreach ($rel in @(Get-GeneratedLoosePandoraFiles $Root)) { [void]$loose.Add('Data\' + $rel) }
     }
     $nem = New-Object 'System.Collections.Generic.List[string]'
     $bs = New-Object 'System.Collections.Generic.List[string]'
@@ -184,7 +215,8 @@ function Get-GeneratedInputs([string]$Root, [string]$ListPath) {
         if ($p.Count -ne 5 -or $p[1] -ne 'V') { continue }
         $rel = $p[4]
         $row = $rel.ToLowerInvariant() + '|' + $p[2] + '|' + $p[3]
-        foreach ($rx in $GeneratedNemesisInputs) { if ($rel -match "(?i)$rx") { $nem.Add($row); break } }
+        if ($loose.Contains($rel)) { $nem.Add($row) }
+        else { foreach ($rx in $GeneratedBehaviorInputs) { if ($rel -match "(?i)$rx") { $nem.Add($row); break } } }
         foreach ($rx in $GeneratedBodySlideInputs) { if ($rel -match "(?i)$rx") { $bs.Add($row); break } }
     }
     $nemA = $nem.ToArray(); [Array]::Sort($nemA, [StringComparer]::Ordinal)
@@ -200,11 +232,11 @@ function Get-GeneratedInputs([string]$Root, [string]$ListPath) {
     $parts = [ordered]@{
         list      = (Get-GeneratedTextSha $list)
         plugins   = (Get-GeneratedTextSha $pl)
-        nemesis   = (Get-GeneratedTextSha ($nemA -join "`n"))
+        behaviors = (Get-GeneratedTextSha ($nemA -join "`n"))
         bodyslide = (Get-GeneratedTextSha ($bsA -join "`n"))
     }
     $all = @($parts.Keys | ForEach-Object { $_ + '=' + $parts[$_] }) -join "`n"
-    return [pscustomobject]@{ Sha = (Get-GeneratedTextSha $all); Parts = $parts; NemesisFiles = $nemA.Count; BodySlideFiles = $bsA.Count }
+    return [pscustomobject]@{ Sha = (Get-GeneratedTextSha $all); Parts = $parts; BehaviorFiles = $nemA.Count; BodySlideFiles = $bsA.Count }
 }
 
 # What a part changing means, in plain words.
@@ -212,7 +244,7 @@ function Get-GeneratedPartSays([string]$Part) {
     switch ($Part) {
         'list'      { return 'what records\generated.json says to build, or how Build-Generated.ps1 builds it, changed' }
         'plugins'   { return 'the mod list changed (Profile\OwnGame\plugins.txt)' }
-        'nemesis'   { return 'a file Nemesis reads changed in Vortex (a Nemesis patch, an animation list or Nemesis itself)' }
+        'behaviors' { return 'a file Pandora reads changed in Vortex (a behavior patch, an animation list or Pandora itself)' }
         'bodyslide' { return 'a file BodySlide builds from changed in Vortex (a slider set, its shape data, a body mesh or BodySlide itself)' }
     }
     return "$Part changed"
@@ -255,7 +287,7 @@ function Get-GeneratedState([string]$Root, [string]$ListPath) {
 
 # The sentence Ship and Check-ShipReady stop with.
 function Get-GeneratedStaleSays($State, [string]$Channel) {
-    return ("Thornswood's animation and body files (Nemesis and BodySlide) in " + $State.Game + " are out of date: " +
+    return ("Thornswood's animation and body files (Pandora and BodySlide) in " + $State.Game + " are out of date: " +
             ($State.Why -join '; ') + ". Close the game and the launcher, run .\scripts\mods\Build-Generated.ps1 -Channel " +
             $Channel + " on this machine, then Ship again. It builds them in Thornswood's own folder and never writes into the Steam copy.")
 }
