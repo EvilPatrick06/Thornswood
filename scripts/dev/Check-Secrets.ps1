@@ -307,8 +307,16 @@ function Test-ShipPath([string]$where, [string]$key, [string]$inner, $source) {
     # rollback filter ask (Test-ShipBethesda, #1229).
     if (Test-ShipBethesda $rel) { Write-Hit $where $key '0' 'never-ship-bethesda' $false; return }
     if (Test-ShipBackup $rel) { Write-Hit $where $key '0' 'never-ship-backup' $false; return }
-    if (Test-ShipMachine $rel) { Write-Hit $where $key '0' 'never-ship-machine' $false; return }
-    if ($rel -like '*.log') { Write-Hit $where $key '0' 'never-ship-log' $false }
+    # One machine's own by kind (#1239): its runtime state and tokens in
+    # Data\Platform, logs, Vortex's records, window layouts, settings saved from
+    # a mod's menu, saves. The question the record guard, the rollback filter
+    # and Scrub-Feed ask. Other servers' files and other people's frameworks
+    # are the rest of Test-ShipMachine.
+    if ((Test-ShipOneMachine $rel) -or (Test-ShipMachine $rel)) { Write-Hit $where $key '0' 'never-ship-machine' $false; return }
+    # Another author's loose file (#1178). What waits for the collection is
+    # not asked here: Ship-Rules holds it as ours until the revision that adds
+    # its mod.
+    if (Test-ShipNotOurs $rel) { Write-Hit $where $key '0' 'never-ship-not-ours' $false; return }
 }
 
 function Test-TextBytes([string]$where, [string]$key, [byte[]]$b) {
