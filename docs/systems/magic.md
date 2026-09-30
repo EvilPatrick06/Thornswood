@@ -19,6 +19,9 @@ their rank in that school.
 Anybody else casts nothing until a master mage apprentices them. Then
 they hold 2 spells at most, novice, one school, learned from the tome.
 Those 2 places never become a third school and never climb past novice.
+That teaching is one of the two outside trades. The whole arrangement,
+including a sister half that is not magic, is
+[Masters and apprentices](apprenticeship.md).
 
 There is no licence, and the College does not sell one. Magic in a
 hold street is legal. Destruction that hits a person is a fight under

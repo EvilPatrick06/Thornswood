@@ -1,62 +1,66 @@
 # Miner
 
 A pickaxe in the pack, not necessarily equipped. Any pickaxe except a
-war pick. 100 uses. When it breaks, a smith makes the next one.
+war pick. 50 uses. When it breaks, a smith makes the next one.
 Nothing hands you another.
 
 18 names, 581 veins. Every name:
 [lists/miner.md](../lists/miner.md).
 
-| Ore | Rank | Veins | Yield if you may work it |
+| Ore | Rank | Veins | One swing, if you may work it |
 | --- | --- | --- | --- |
-| Clay | Novice | 5 | 1-2, 1-3, 1-4, 1-5 |
-| Iron | Novice | 82 | 1-2, 1-3, 1-4, 1-5 |
-| Quarried stone | Novice | 1 | 1-2, 1-3, 1-4, 1-5 |
-| Corundum | Advanced | 81 | 0-0, 1-3, 1-4, 1-5 |
-| Heart stone | Advanced | 4 | 0-0, 1-3, 1-4, 1-5 |
-| Orichalcum | Advanced | 76 | 0-0, 1-3, 1-4, 1-5 |
-| Quicksilver | Advanced | 76 | 0-0, 1-3, 1-4, 1-5 |
-| Shellbug chitin | Advanced | 1 | 0-0, 1-3, 1-4, 1-5 |
-| Silver | Advanced | 76 | 0-0, 1-3, 1-4, 1-5 |
-| Gold | Expert | 76 | 0-0, 0-0, 1-4, 1-5 |
-| Malachite | Expert | 7 | 0-0, 0-0, 1-4, 1-5 |
-| Moonstone | Expert | 76 | 0-0, 0-0, 1-4, 1-5 |
-| Amethyst | Master | 3 | 0-0, 0-0, 0-0, 1-5 |
-| Ebony | Master | 6 | 0-0, 0-0, 0-0, 1-5 |
-| Emerald | Master | 3 | 0-0, 0-0, 0-0, 1-5 |
-| Ruby | Master | 3 | 0-0, 0-0, 0-0, 1-5 |
-| Sapphire | Master | 3 | 0-0, 0-0, 0-0, 1-5 |
-| Stalhrim | Master | 2 | 0-0, 0-0, 0-0, 1-5 |
+| Clay | Novice | 5 | 1, and a chance of one more |
+| Iron | Novice | 82 | 1, and a chance of one more |
+| Quarried stone | Novice | 1 | 1, and a chance of one more |
+| Corundum | Advanced | 81 | 1, and a chance of one more |
+| Orichalcum | Advanced | 76 | 1, and a chance of one more |
+| Quicksilver | Advanced | 76 | 1, and a chance of one more |
+| Shellbug chitin | Advanced | 1 | 1, and a chance of one more |
+| Silver | Advanced | 76 | 1, and a chance of one more |
+| Gold | Expert | 76 | 1, and a chance of one more |
+| Malachite | Expert | 7 | 1, and a chance of one more |
+| Moonstone | Expert | 76 | 1, and a chance of one more |
+| Amethyst | Master | One place | 1, and a chance of one more |
+| Ebony | Master | One place | 1, and a chance of one more |
+| Emerald | Master | One place | 1, and a chance of one more |
+| Ruby | Master | One place | 1, and a chance of one more |
+| Sapphire | Master | One place | 1, and a chance of one more |
+| Stalhrim | Master | One place | 1, and a chance of one more |
+| Heart stone | Master | One place | 1, and a chance of one more |
 
-The four pairs are novice, advanced, expert, master. A 0-0 means that
-rank cannot work the seam. The pair that is open is the least and the
-most taken off the seam in one swing.
+A rank below the row cannot work that seam. The swing, when it is
+allowed, takes 1 ore of that seam. It is one piece of work, not one
+per piece of ore.
 
-Heart stone would be master by its price. It is advanced anyway, so a
-[Bladebinder](../professions/enchanter/bladebinder.md) can buy it from
-someone who is not a master miner. 160 of the 161 staves ask for one.
+Each rank above novice spends less rest on the swing, and has a
+higher chance that the same swing also drops one extra ore. The extra
+can be a different metal. An iron seam can hand you an iron ore and a
+gold ore. The chances are not set. The rest costs are the ones on
+[Professions](../professions.md): 1.5, 1.2, 0.9, 0.6. A further cut
+was not named.
+
+Heart stone is master, by its price. The staves that still ask for it
+are the ones left in the college book. See
+[Bladebinder](../professions/enchanter/bladebinder.md).
 
 The price bands, for anything added later: up to 14 gold novice, up
-to 29 advanced, up to 59 expert, otherwise master. Heart stone is the
-exception already made.
+to 29 advanced, up to 59 expert, otherwise master.
 
 ## The seam
 
-A seam holds 20. One swing takes the yield and is one piece of work,
-not one per piece of ore. A novice taking 2 empties the seam in fewer
-swings than a novice taking 1, and climbs more slowly off that seam
-because the work is the swing.
-
-Five full seams of 20, if every swing took 1, is the 100 to advanced.
-A swing that takes more finishes the seam early. Expert is 250 swings
-after that, master 600 after that.
+A seam holds 20. One swing takes 1, and sometimes 1 more, and is one
+piece of work. Five full seams of 20 is the 100 to advanced. Expert
+is 250 swings after that, master 600 after that.
 
 The seam comes back for everybody at once, not per person.
 
 | Seams | Back in |
 | --- | --- |
-| Iron, gold, corundum, silver | 10 minutes |
-| Everything else, including heart stone, ebony, the gems, stalhrim, moonstone, quicksilver | 30 minutes |
+| Iron | 15 minutes |
+| Gold | 20 minutes |
+| Corundum, silver | 10 minutes |
+| Clay, quarried stone, orichalcum, quicksilver, moonstone, malachite, shellbug | 30 minutes |
+| Ebony, the gems, stalhrim, heart stone | One place. A custom steward stands on it. Someone who has not been let in takes nothing, and the place does not refill for them. |
 
 Clicking again while the pick is still in the air is not a second
 swing. Nothing is said. The ore is not given twice.
@@ -69,8 +73,9 @@ forge burns a charcoal. See [Smith](../professions/smith.md).
 One quarry this server placed, `dde4ef:Thornswood-Content.esp`. It is
 not one of the 581 veins and it does not use the deposit of 20.
 
-Any miner, from novice. A pickaxe, the same 100 uses. One swing is
-one piece of work.
+Any miner, from novice. A pickaxe, the same 50 uses. One swing is
+one piece of work. The "always 1" rule above is the ore seams. This
+quarry still uses the pairs in the table.
 
 | Your rank | Salt |
 | --- | --- |
@@ -123,5 +128,9 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 
 ## Where this is
 
-The 581 veins, the 20, the two clocks, the heart-stone exception, and
-the pickaxe wear are in the server.
+The server still has 581 veins, a deposit of 20, yields that climb
+from 1-2 up to 1-5, heart stone forced to advanced, and a pickaxe of
+100 uses. Iron, gold, corundum and silver all come back in 10
+minutes. Ebony is 6 veins, the gems are 3 each, stalhrim is 2, heart
+stone is 4. There is no steward on a single place. The table under
+Every record is that server book. The numbers above it are the plan.

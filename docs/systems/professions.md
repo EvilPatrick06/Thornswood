@@ -86,9 +86,12 @@ Anything else. It is not made. You keep the materials. The line says
 whose work it is and what rank it asks for.
 
 Until a profession is picked, nothing that belongs to a half is made.
-Smelting and tanning stay open, because they belong to nobody. That
-list is [lists/anybody.md](lists/anybody.md). Nails, hinges, locks and
-iron fittings are refused: [lists/refused.md](lists/refused.md).
+Smelting an ingot belongs to the smith halves. Tanning a hide into
+leather belongs to the Platewright. One row of each stays. The
+duplicate rows are in [Cut items](cut-items.md). House walls, roofs
+and furniture are still on the anybody list:
+[lists/anybody.md](lists/anybody.md). Nails, hinges, locks and iron
+fittings are refused: [lists/refused.md](lists/refused.md).
 
 A recipe can also demand a race. [Races](races.md). The locked rows
 are marked in the lists and collected in
@@ -96,14 +99,13 @@ are marked in the lists and collected in
 
 ## Apprentices
 
-A master decides who, and can end it. Nobody is owed one.
+The rules, the two arrangements, and what a taught novice can and
+cannot make are [Masters and apprentices](apprenticeship.md).
 
-Inside the same profession, past novice on the sister half, you need a
-master of that half. The hours under them are what move that half. The
-sister half does not count against the two outside trades.
-
-Outside the profession, a master can teach a novice's worth of their
-own half. Twice in a life. It never goes past novice.
+A master decides who, and can end it. Nobody is owed one. The sister
+half, past novice, needs a master of that half and does not use one
+of the two outside trades. An outside trade is a novice list, twice
+in a life, and it never climbs.
 
 ## Benches, in one picture
 
@@ -156,12 +158,15 @@ grant no recipe, no verb and no rank. Bardic rest is on
 ## Where this is
 
 The eight professions, the halves, the ladder with the count resetting,
-the sister-half rule, the two outside trades, the bench table, the
-charcoal and the handle, and the recipe lists are in the server.
+the sister half at novice, the bench table, the charcoal and the
+handle, and the recipe lists are in the server. Smelting and tanning
+are still open to anybody. Taking a sister half past novice, and the
+two outside trades, are rules with no command. See
+[Masters and apprentices](apprenticeship.md).
 
 Not in the world yet: a warrior's master maneuvers as a mechanic,
-Mastercraft as a gate on tempering, Twin Souls as a second enchantment,
-Master Weaver's hidden armour, Master Carver's hotter fire, and the
-vanilla perk lines that still hide some recipes in the crafting menu
-even when the server would allow them. Each profession page says which
-of those is its own.
+the repair kits on [Durability](durability.md), Twin Souls as a second
+enchantment, Master Weaver's hidden armour, Master Carver's hotter
+fire, and the vanilla perk lines that still hide some recipes in the
+crafting menu even when the server would allow them. Each profession
+page says which of those is its own.

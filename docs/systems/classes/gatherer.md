@@ -34,10 +34,12 @@ different ladder.
 
 ## The wait
 
-Ten minutes after a pick, that plant, for the person who picked it.
-The key is who pressed and which plant. Somebody else can pick the
-same flower while you wait, and you can pick the one beside it. A
-restart clears the wait, and the flower is ready again.
+Ten minutes after a pick, that plant, for everybody. The key is the
+plant, not the person. The flower beside it is a different plant.
+
+A press from someone who is not a gatherer does not pick it. The
+plant stays. They are told it is not their work. A gatherer below
+the plant's rank is the same: nothing is taken.
 
 ## Wheat, nirnroot, and the hive
 
@@ -137,3 +139,6 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 ## Where this is
 
 The verb, the prices, the ten minutes, and the list are in the server.
+The wait is still per person: someone else can take the same flower
+while you wait. A press from someone who is not a gatherer is not
+specially refused before the plant is consumed.

@@ -2,7 +2,12 @@
 
 Press E at the water. No rod, no net, and no fishing power. The rods
 from the fishing mod run on scripts, and those scripts do not fire.
-Six names, fifteen placed records.
+
+Six catches is too small for the class. Salmon staying on eight
+spots, ten minutes apart, is on purpose. The rest of a fisher's work
+is not listed yet: more species, more water, something to do between
+salmon. The names of those catches are not chosen. What is in the
+world today is six names, fifteen placed records.
 
 The full table: [lists/fisher.md](../lists/fisher.md).
 

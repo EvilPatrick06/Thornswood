@@ -1,6 +1,7 @@
 # Gold
 
-Coin enters the world once. After that it moves.
+Coin enters the world once, as the first purse. After that it moves,
+or it leaves. It is not minted again.
 
 ## Where coin comes from
 
@@ -60,6 +61,20 @@ There is one way coin is created: the 40. Fees destroy it from a pack
 and count it on the hold's ledger. A payout, when one exists, creates
 it back into a pack and subtracts the same count from that ledger. The
 coin was already in the world. A payout is not a second mint.
+
+Two things destroy coin without putting it on a ledger. A company
+event can buy a thing and the thing leaves the world, and the gold
+paid for it leaves with it. When the company buys from someone, the
+worker who handled it takes a cut, and some of that gold leaves the
+server rather than staying in a pack or a box. The size of the cut is
+not set. See [Free Skyrim Trading Company](trading-company.md).
+
+## Dull
+
+A crafted good or a shop good that sits loses condition. That is
+[Durability](durability.md). The rate is not set, and neither is the
+question of whether a shop chest is the only container that does it,
+or any container.
 
 See [Property](property.md) for the box, and
 [Free Skyrim Trading Company](trading-company.md) for the payout.
