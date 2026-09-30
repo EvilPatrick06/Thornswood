@@ -68,7 +68,7 @@ function Hash([string]$path) {
 # One made up install per case, so nothing one case writes reaches the next.
 function New-Install([string]$name, [string[]]$record, [int64]$bytes) {
     $root = Join-Path $work $name
-    foreach ($d in 'Game\Data\Platform', 'Profile\OwnGame', 'rel', 'dist', 'appdata\Thornswood') {
+    foreach ($d in 'Game\Data\Platform\UI', 'Profile\OwnGame', 'rel', 'dist', 'appdata\Thornswood') {
         New-Item -ItemType Directory -Path (Join-Path $root $d) -Force | Out-Null
     }
     [IO.File]::WriteAllText((Join-Path $root 'rel\version.json'), '{"packs":[],"news":[]}')
@@ -78,9 +78,9 @@ function New-Install([string]$name, [string[]]$record, [int64]$bytes) {
     if ($null -ne $record) {
         [IO.File]::WriteAllLines((Join-Path $root 'Profile\OwnGame\files.txt'), $record)
     }
-    # One file of ours, the size the case asks for. Under Data\Platform, since
+    # One file of ours, the size the case asks for. Under Data\Platform\UI, since
     # outside it only what Ship-Rules names is ours (#1178).
-    $fs = [IO.File]::Create((Join-Path $root 'Game\Data\Platform\ours.bsa'))
+    $fs = [IO.File]::Create((Join-Path $root 'Game\Data\Platform\UI\ours.bsa'))
     try { $fs.SetLength($bytes) } finally { $fs.Dispose() }
     return $root
 }
@@ -168,7 +168,7 @@ try {
     Unchanged $r
 
     # ---- a record that names nothing from Vortex is no record ------------------
-    $r = Invoke-Publish (New-Install 'empty-record' @('F|O|4096|638000000000000000|Data\Platform\ours.bsa') $small) @()
+    $r = Invoke-Publish (New-Install 'empty-record' @('F|O|4096|638000000000000000|Data\Platform\UI\ours.bsa') $small) @()
     Yes 'with a files.txt that names nothing from Vortex the publisher stops' ($r.Code -eq 1)
     Yes '  and says the record lists nothing' ($r.Out -match 'lists nothing')
     Unchanged $r

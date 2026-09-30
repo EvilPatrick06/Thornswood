@@ -218,7 +218,7 @@ $scrub = [IO.File]::ReadAllText((Join-Path $repo 'scripts\release\Scrub-Feed.ps1
 Yes 'Test-ShipMachine asks it, so packs and the installer leave them out' ($rules -match 'function Test-ShipMachine\([^)]*\) \{[\s\S]*?if \(\(Test-ShipOneMachine \$rel\) -and -not \(Test-ShipRuntime \$rel\)\) \{ return \$true \}')
 Yes 'Publish-Update''s scan asks Test-Machine and Test-Runtime' ($pub -match 'if \(Test-Runtime \$rel\) \{ continue \}' -and $pub -match 'if \(Test-Machine \$rel\) \{ continue \}')
 Yes 'Check-Secrets asks it' ($sec -match "if \(\(Test-ShipOneMachine \`$rel\) -or \(Test-ShipMachine \`$rel\)\) \{ Write-Hit")
-Yes 'Scrub-Feed asks it beside Bethesda''s' ($scrub -match 'function Test-ScrubPath\([^)]*\) \{\s*return \(\(Test-ShipBethesda \$rel\) -or \(Test-ShipOneMachine \$rel\)\)')
+Yes 'Scrub-Feed asks it beside Bethesda''s' ($scrub -match 'function Test-ScrubMachinePath\([^)]*\) \{\s*return \(\(Test-ShipBethesda \$rel\) -or \(Test-ShipOneMachine \$rel\)\)' -and $scrub -match 'function Test-ScrubPath\([^)]*\) \{\s*return \(\(Test-ScrubMachinePath \$rel\)')
 Yes 'the record guard and the rollback filter ask it' ($null -ne $guard -and $guard -match 'Test-ShipOneMachine \$_' -and $null -ne $filter -and $filter -match 'Test-ShipOneMachine \$p')
 Yes 'the note over voice-token.txt no longer says the packs are left alone' ($rules -notmatch 'THE PUBLISHED PACKS ARE DELIBERATELY LEFT ALONE')
 

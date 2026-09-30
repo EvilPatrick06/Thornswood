@@ -226,15 +226,15 @@ function Set-Build([string]$relPath, $content) {
 function Drop-Build([string]$relPath) { Remove-Item -LiteralPath (Join-Path (Join-Path $pub 'Game') $relPath) -Force; $script:build.Remove($relPath) }
 function Bytes([int]$n, [int]$seed) { $r = New-Object Random $seed; $b = New-Object byte[] $n; $r.NextBytes($b); return ,$b }
 
-Set-Build 'Data\Platform\ours.esp' 'the plugin, as the installer had it'
-Set-Build 'Data\Platform\ours.bsa' ('x' * 4096)
+Set-Build 'Data\Platform\UI\ours.esp' 'the plugin, as the installer had it'
+Set-Build 'Data\Platform\UI\ours.bsa' ('x' * 4096)
 Set-Build 'Data\Platform\Plugins\thornswood-ui.js' 'ui as the installer had it'
-Set-Build 'Data\Platform\old.esp' 'a plugin the first release drops'
-Set-Build 'Data\Platform\keep.txt' 'the same the whole time'
+Set-Build 'Data\Platform\UI\old.esp' 'a plugin the first release drops'
+Set-Build 'Data\Platform\UI\keep.txt' 'the same the whole time'
 # The collection's, which no release carries.
 $f = Join-Path $pub 'Game\Data\collection.esp'; [IO.File]::WriteAllText($f, 'from Vortex', $ascii)
 
-# A pack from before any record, already on the feed: it took Data\Platform\ancient.esp out.
+# A pack from before any record, already on the feed: it took Data\Platform\UI\ancient.esp out.
 function New-Zip([string]$path, [hashtable]$files, [string[]]$deletes) {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
     $z = [IO.Compression.ZipFile]::Open($path, 'Create')
@@ -244,10 +244,10 @@ function New-Zip([string]$path, [hashtable]$files, [string[]]$deletes) {
     } finally { $z.Dispose() }
 }
 $ancientZip = Join-Path $T 'ancient.zip'
-New-Zip $ancientZip @{ 'Data\Platform\filler.txt' = 'a file an old pack wrote' } @('Data\Platform\ancient.esp')
+New-Zip $ancientZip @{ 'Data\Platform\UI\filler.txt' = 'a file an old pack wrote' } @('Data\Platform\UI\ancient.esp')
 $ancientSha = Get-BaselineFileSha $ancientZip
 Copy-Item -LiteralPath $ancientZip -Destination (Join-Path $feedDir "assets\$ancientSha")
-Set-Build 'Data\Platform\filler.txt' 'a file an old pack wrote'
+Set-Build 'Data\Platform\UI\filler.txt' 'a file an old pack wrote'
 Put (Join-Path $feedDir 'version.json') ((@{
     launcherVersion = '1.1.102'; launcherUrl = ''; launcherSha256 = ''; minLauncher = '1.1.102'; message = ''; news = @()
     packs = @(@{ id = '20260101-0000'; url = "https://thornswood.net/feed/assets/$ancientSha"; sha256 = $ancientSha; notes = 'An old update' })
@@ -295,9 +295,9 @@ foreach ($f in @(Get-ChildItem -LiteralPath $gameAt -Recurse -File)) {
 }
 
 $R1 = '20260930-0100'; $R2 = '20260930-0200'; $R3 = '20260930-0300'
-Set-Build 'Data\Platform\ours.esp' 'the plugin, first release'
-Drop-Build 'Data\Platform\old.esp'
-Set-Build 'Data\Platform\new1.esp' 'added by the first release'
+Set-Build 'Data\Platform\UI\ours.esp' 'the plugin, first release'
+Drop-Build 'Data\Platform\UI\old.esp'
+Set-Build 'Data\Platform\UI\new1.esp' 'added by the first release'
 Yes 'the first release goes out' (Release $R1 'The first release of the test')
 $d1 = Feed; $m1 = $records[$R1]
 Yes '  its record says every file is on the site beside it' ($null -ne $m1 -and [string]$m1[':record:files'] -eq '1')
@@ -315,21 +315,21 @@ $packZip = Join-Path $feedDir ("assets\" + [string]@($d1.packs)[-1].sha256)
 $z = [IO.Compression.ZipFile]::OpenRead($packZip)
 try { $e = $z.GetEntry('profile/plugins.txt'); $s = $e.Open(); try { $packList = Get-BaselineStreamSha $s } finally { $s.Dispose() } } finally { $z.Dispose() }
 Yes '  it carries the plugin list as the pack carries it' ($m1.ContainsKey(':golden:plugins.txt') -and ([string]$m1[':golden:plugins.txt']).EndsWith(':' + $packList) -and $m1.ContainsKey(':golden:loadorder.txt'))
-Yes '  the file the release dropped is gone' ([string]$m1[':gone:Data\Platform\old.esp'] -eq 'removed')
-Yes '  and so is the one a pack took out before any record, read off that pack''s delete.txt' ([string]$m1[':gone:Data\Platform\ancient.esp'] -eq 'removed')
+Yes '  the file the release dropped is gone' ([string]$m1[':gone:Data\Platform\UI\old.esp'] -eq 'removed')
+Yes '  and so is the one a pack took out before any record, read off that pack''s delete.txt' ([string]$m1[':gone:Data\Platform\UI\ancient.esp'] -eq 'removed')
 Yes '  the packs are still on the feed, for launchers that replay them' (@($d1.packs).Count -eq 2 -and [string]@($d1.packs)[-1].id -eq $R1)
 
 Set-Build 'Data\Platform\Plugins\thornswood-ui.js' 'ui, second release'
 $big = Bytes (3 * 1048576 + 12345) 7
-Set-Build 'Data\Platform\big.bsa' $big
+Set-Build 'Data\Platform\UI\big.bsa' $big
 Yes 'the second release goes out' (Release $R2 'The second release of the test')
-Set-Build 'Data\Platform\ours.bsa' ('y' * 4096)
-Set-Build 'Data\Platform\new3.esp' 'added by the third release'
+Set-Build 'Data\Platform\UI\ours.bsa' ('y' * 4096)
+Set-Build 'Data\Platform\UI\new3.esp' 'added by the third release'
 Yes 'the third release goes out' (Release $R3 'The third release of the test')
 $d3 = Feed
 Yes '  every release''s record says its files are up, and the gone list carries forward' (
     [string]$records[$R2][':record:files'] -eq '1' -and [string]$records[$R3][':record:files'] -eq '1' -and
-    [string]$records[$R3][':gone:Data\Platform\old.esp'] -eq 'removed' -and [string]$records[$R3][':gone:Data\Platform\ancient.esp'] -eq 'removed')
+    [string]$records[$R3][':gone:Data\Platform\UI\old.esp'] -eq 'removed' -and [string]$records[$R3][':gone:Data\Platform\UI\ancient.esp'] -eq 'removed')
 Yes ("  the feed still lists the packs ({0}) beside the record" -f @($d3.packs).Count) (@($d3.packs).Count -eq 4)
 
 # ---- the launcher reads it ----------------------------------------------------
@@ -486,20 +486,20 @@ Yes ("an empty install syncs to the second release by its record in the feed's l
 Yes 'one release behind, it downloads only the two files the third release changed' ((Test-Lands $one $records[$R3]) -and (Fetched) -eq 2)
 
 # Several behind: as the installer left it, and it never took the old pack that
-# removed Data\Platform\ancient.esp.
+# removed Data\Platform\UI\ancient.esp.
 $several = @{}; foreach ($k in $installerFiles.Keys) { $several[$k] = $installerFiles[$k] }
-$several['Data\Platform\ancient.esp'] = 'an old plugin an old pack took out'
+$several['Data\Platform\UI\ancient.esp'] = 'an old plugin an old pack took out'
 $sev = New-Install 'several-behind' $several @()
 [void](Update-New $sev)
 Yes 'several releases behind, it lands on the third release' (Test-Lands $sev $records[$R3])
-Yes '  having taken out what the first release dropped and what the old pack took out' ((Said '^removed Data\\Platform\\old\.esp') -and (Said '^removed Data\\Platform\\ancient\.esp'))
+Yes '  having taken out what the first release dropped and what the old pack took out' ((Said '^removed Data\\Platform\\UI\\old\.esp') -and (Said '^removed Data\\Platform\\UI\\ancient\.esp'))
 
 # A file Vortex deploys now is the collection's, not ours, whatever a record says.
 $vx = New-Install 'vortex' $installerFiles $ids
-Put (Join-Path $vx 'Game\Data\vortex.deployment.json') '{"files":[{"relPath":"Platform\\old.esp","source":"a mod"}]}'
+Put (Join-Path $vx 'Game\Data\vortex.deployment.json') '{"files":[{"relPath":"Platform\\UI\\old.esp","source":"a mod"}]}'
 [void](Update-New $vx)
 Yes 'a file of ours a release dropped stays when Vortex deploys that path now' (
-    (Test-Lands $vx $records[$R3] @('Data\Platform\old.esp', 'Data\vortex.deployment.json')) -and (Test-Path -LiteralPath (Join-Path $vx 'Game\Data\Platform\old.esp')) -and (Said 'collection''s now and stayed'))
+    (Test-Lands $vx $records[$R3] @('Data\Platform\UI\old.esp', 'Data\vortex.deployment.json')) -and (Test-Path -LiteralPath (Join-Path $vx 'Game\Data\Platform\UI\old.esp')) -and (Said 'collection''s now and stayed'))
 
 # ---- the old launcher beside it -----------------------------------------------
 Write-Host ''; Write-Host 'an old launcher on the same feed'
@@ -509,7 +509,7 @@ Yes '  and lands on the same files as the record' (Test-Lands $oldL $records[$R3
 
 # ---- verified, resumed, finished ---------------------------------------------
 Write-Host ''; Write-Host 'every download is checked, and a cut off one carries on'
-$bigSha = ([string]$records[$R3]['Data\Platform\big.bsa']).Split(':')[1]
+$bigSha = ([string]$records[$R3]['Data\Platform\UI\big.bsa']).Split(':')[1]
 $bigAsset = Join-Path $feedDir "assets\$bigSha"
 $half = [int]($big.Length / 2)
 $bad = New-Object byte[] $big.Length
@@ -533,16 +533,16 @@ Yes 'a download cut off halfway carries on from where it stopped (only a Range r
 
 # Cut off after the downloads: one file could not be put in place.
 $stop = New-Install 'stopped' $installerFiles $ids
-New-Item -ItemType Directory -Force -Path (Join-Path $stop 'Game\Data\Platform\new3.esp') | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $stop 'Game\Data\Platform\UI\new3.esp') | Out-Null
 $why = Err { [void](Update-New $stop) }
 Yes 'a sync that stops after its downloads is not written down as done' ($why -ne '' -and -not (Synced $stop) -and (Test-Path -LiteralPath (Join-Path $stop "Profile\Sync\$bigSha")))
-Remove-Item -LiteralPath (Join-Path $stop 'Game\Data\Platform\new3.esp') -Recurse -Force
+Remove-Item -LiteralPath (Join-Path $stop 'Game\Data\Platform\UI\new3.esp') -Recurse -Force
 $why = Err { [void](Update-New $stop "http://127.0.0.1:$dead/feed/assets/") }
 Yes '  and the next one finishes from what it had fetched, with the site out of reach' ($why -eq '' -and (Test-Lands $stop $records[$R3]))
 Yes '  then tidies what it fetched away' (-not (Test-Path -LiteralPath (Join-Path $stop 'Profile\Sync')))
 
 # A file changed by hand.
-$tamper = Join-Path $fresh 'Game\Data\Platform\ours.bsa'
+$tamper = Join-Path $fresh 'Game\Data\Platform\UI\ours.bsa'
 [IO.File]::WriteAllText($tamper, ('z' * 4096), $ascii)
 Use-Install $fresh
 Yes 'a file changed by hand is not a new release: nothing is offered' ((Pending-Of (Parse-Feed)).Count -eq 0)
@@ -586,7 +586,7 @@ $db = Feed; $mb = Record-Of $db
 Yes 'the feed goes back a release, as one more pack and a new record' ($r.Code -eq 0 -and [string]$db.baseline.id -eq $RB -and [string]@($db.packs)[-1].id -eq $RB)
 Yes '  the record says its files are up, and they are' ([string]$mb[':record:files'] -eq '1' -and
     @((Get-RecordFileShas $mb).Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $feedDir "assets\$_")) }).Count -eq 0)
-Yes '  and says the file the third release added is gone' ([string]$mb[':gone:Data\Platform\new3.esp'] -eq 'removed')
+Yes '  and says the file the third release added is gone' ([string]$mb[':gone:Data\Platform\UI\new3.esp'] -eq 'removed')
 [void](Update-New $fresh)
 Yes 'a launcher that syncs lands on the second release''s files' ((Test-Lands $fresh $records[$R2]) -and (Plugins-Match $fresh $records[$R2]))
 Yes '  downloading only the file that went back' ((Fetched) -eq 1)

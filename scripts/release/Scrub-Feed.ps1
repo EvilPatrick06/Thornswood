@@ -36,6 +36,15 @@
   site the same way as the Bethesda files, and stop them ever being packed
   again.
 
+  OTHER PEOPLE'S LOOSE FILES (#1178, #1253), the same way again, as files:
+  RaceMenu's menus, other mods' scripts, BodySlide builds, leftovers of mods
+  nothing loads, another server's haybale and boss list (Test-ShipNotOurs).
+  Patrick, 29 September: "we can scrub already published copies". Unlike the
+  two rules above, a delete line or a gone entry naming one stays: an earlier
+  release took that file out of installs on purpose, and it keeps doing so. And
+  what Ship-Rules holds for the collection stays until a run made on a machine
+  whose Vortex has the revision that carries it.
+
   WHAT CHANGES, AND WHAT A LAUNCHER SEES.
     - A pack keeps its id and every other entry, byte for byte and in the same
       order, with the same file times; only the entries that go (and any line of
@@ -105,7 +114,10 @@ param(
     [string]$ReleaseDir,
     [string]$SiteUrl = 'https://thornswood.net',
     # A folder standing in for C:\Thornswood-Docs. Tests only.
-    [string]$SiteDir
+    [string]$SiteDir,
+    # The install whose config.json names the collection, for the revision
+    # Ship-Rules holds loose files against (#1178).
+    [string]$Root = 'C:\Thornswood'
 )
 
 Set-StrictMode -Version Latest
@@ -120,6 +132,10 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Wr
 . (Join-Path $Here 'Feed-Store.ps1')
 . (Join-Path $Here 'Release-Baseline.ps1')
 . (Join-Path $Here 'Ship-Rules.ps1')
+# What Ship-Rules holds for the collection leaves the site only from the
+# revision that carries it, as it leaves new packs (#1178). LoadOrder.ps1 is
+# loaded only to ask this machine's Vortex.
+$ShipCollectionRevision = & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); Get-ShipCollectionRevision $Root }
 # Test-SiteAsset, which checks each new pack answers on the real site after the
 # send. The first dev run on 29 September stopped there without it, after the
 # feed had gone out, because the tests run on a folder and never reach that line.
@@ -156,17 +172,24 @@ function Set-UrlSha([string]$url, [string]$sha) {
 
 # ---- what goes: Bethesda's, and one machine's --------------------------------
 
-# A path that is never on the site: Bethesda's (Test-ShipBethesda, #1152) or one
-# machine's own (Test-ShipOneMachine, #1239).
-function Test-ScrubPath([string]$rel) {
+# Bethesda's (Test-ShipBethesda, #1152) or one machine's own
+# (Test-ShipOneMachine, #1239): never on the site, as a file or as gone.
+function Test-ScrubMachinePath([string]$rel) {
     return ((Test-ShipBethesda $rel) -or (Test-ShipOneMachine $rel))
 }
 
-# A path that is never listed as gone: the same, except what every release
-# deletes on purpose ($ShipDeleteAlways in Ship-Rules, voice-token.txt), which
-# current packs and records name as gone too and so keep.
+# A file that is never on the site: those, and another author's loose file
+# (Test-ShipNotOurs, #1178).
+function Test-ScrubPath([string]$rel) {
+    return ((Test-ScrubMachinePath $rel) -or (Test-ShipNotOurs $rel))
+}
+
+# A path that is never listed as gone: Bethesda's and one machine's, except
+# what every release deletes on purpose ($ShipDeleteAlways in Ship-Rules,
+# voice-token.txt), which current packs and records name as gone too and so
+# keep. Another author's file an earlier release took out stays gone (#1178).
 function Test-ScrubGone([string]$rel) {
-    return ((Test-ScrubPath $rel) -and (@(Get-ShipDeleteAlways) -notcontains $rel))
+    return ((Test-ScrubMachinePath $rel) -and (@(Get-ShipDeleteAlways) -notcontains $rel))
 }
 
 # A zip entry's game path, or '' for anything not under game/.
@@ -186,7 +209,9 @@ function Test-DropEntry($e) {
     if (-not $rel) { return $false }
     if ($e.Name) { return (Test-ScrubPath $rel) }
     $dir = $rel.TrimEnd('\')
-    return ($dir -and (Test-ScrubPath ($dir + '\x')) -and (Test-ScrubPath ($dir + '\y.txt')) -and (Test-ScrubPath ($dir + '\z\w.dds')))
+    # A folder goes by the first two rules only: under Data\meshes a folder can
+    # hold Nemesis's output, which is ours, beside other people's files.
+    return ($dir -and (Test-ScrubMachinePath ($dir + '\x')) -and (Test-ScrubMachinePath ($dir + '\y.txt')) -and (Test-ScrubMachinePath ($dir + '\z\w.dds')))
 }
 
 function Read-EntryText($e) {
@@ -412,7 +437,7 @@ foreach ($p in $packs) {
         Remove-Item -LiteralPath $rebuilt -Force -ErrorAction SilentlyContinue
         Die "Pack $id did not rebuild as itself without the files that go. Nothing was sent."
     }
-    if ((Get-PackDrops $rebuilt).Entries.Count) { Die "Pack $id still carries a file of Bethesda's or one machine's after the rebuild. Nothing was sent." }
+    if ((Get-PackDrops $rebuilt).Entries.Count) { Die "Pack $id still carries a file of Bethesda's, one machine's or another author's after the rebuild. Nothing was sent." }
     $newSha = Get-BaselineFileSha $rebuilt
     $newBytes = (Get-Item -LiteralPath $rebuilt).Length
     $packSwap[$sha] = [pscustomobject]@{ Id = $id; Sha = $newSha; Bytes = $newBytes; Prefix = $prefix; File = $rebuilt; OldBytes = (Get-Item -LiteralPath $local).Length }
@@ -421,10 +446,10 @@ foreach ($p in $packs) {
     $droppedFiles += $b.Entries.Count; $droppedBytes += $b.Bytes
     $eg = @($b.Entries | Select-Object -First 3) -join ', '
     if ($b.Entries.Count) {
-        Say ("  {0}: {1:n0} file(s) of Bethesda's or one machine's, {2:n1} MB ({3}{4}){5}" -f $id, $b.Entries.Count, ($b.Bytes / 1MB), $eg,
+        Say ("  {0}: {1:n0} file(s) of Bethesda's, one machine's or another author's, {2:n1} MB ({3}{4}){5}" -f $id, $b.Entries.Count, ($b.Bytes / 1MB), $eg,
              $(if ($b.Entries.Count -gt 3) { ', ...' } else { '' }), $(if ($b.Deletes) { ", $($b.Deletes) delete line(s)" } else { '' })) 'Yellow'
     } else {
-        Say ("  {0}: {1} delete line(s) naming files of Bethesda's or one machine's, and no such file" -f $id, $b.Deletes) 'Yellow'
+        Say ("  {0}: {1} delete line(s) naming files of Bethesda's, one machine's or another author's, and no such file" -f $id, $b.Deletes) 'Yellow'
     }
     Say ("      {0} ({1:n0} bytes) becomes {2} ({3:n0} bytes)" -f $sha, $packSwap[$sha].OldBytes, $newSha, $newBytes) 'DarkGray'
 }
@@ -464,7 +489,7 @@ foreach ($ptr in $ptrs) {
     $sendByPrefix[$prefix] += $nf
     $newLedger[$rsha] = "record $([string]$ptr.id)"
     foreach ($l in $loose) { $newLedger[$l] = "a file record $([string]$ptr.id) named" }
-    Say ("  {0}: {1:n0} entr{2} naming files of Bethesda's or one machine's ({3}{4})" -f [string]$ptr.id, $drop.Count, $(if ($drop.Count -eq 1) { 'y' } else { 'ies' }),
+    Say ("  {0}: {1:n0} entr{2} naming files of Bethesda's, one machine's or another author's ({3}{4})" -f [string]$ptr.id, $drop.Count, $(if ($drop.Count -eq 1) { 'y' } else { 'ies' }),
          (@($drop | Select-Object -First 3) -join ', '), $(if ($drop.Count -gt 3) { ', ...' } else { '' })) 'Yellow'
     Say ("      {0} ({1:n0} entries) becomes {2} ({3:n0} entries){4}" -f $rsha, ($map.Count + $drop.Count), $nsha, $map.Count,
          $(if ($loose.Count) { "; $($loose.Count) file(s) it named went up loose" } else { '' })) 'DarkGray'
@@ -494,14 +519,14 @@ if (Test-Path -LiteralPath $StateFile) {
             foreach ($k in $sdrop) { $sm.Remove($k) }
             $stateSwap = Join-Path $WorkDir ("published-$Channel-scrubbed.json")
             [void](Write-BaselineFile $sm $stateSwap)
-            Say ("  the store's published.json names {0:n0} file(s) of Bethesda's or one machine's, and is written again without them ({1:n0} entries)" -f $sdrop.Count, $sm.Count) 'Yellow'
+            Say ("  the store's published.json names {0:n0} file(s) of Bethesda's, one machine's or another author's, and is written again without them ({1:n0} entries)" -f $sdrop.Count, $sm.Count) 'Yellow'
         }
     }
 }
 
 if (-not $packSwap.Count -and -not $recSwap.Count -and -not $stateSwap) {
     Say ''
-    Say "Nothing on the $Channel feed names a file of Bethesda's or one machine's." 'Green'
+    Say "Nothing on the $Channel feed names a file of Bethesda's, one machine's or another author's." 'Green'
 }
 
 # The files every new record lists are on the site beside it.
@@ -513,7 +538,7 @@ foreach ($rs in $recSwap.Values) {
 }
 
 Head 'Summary'
-Say ("  {0} pack(s) rebuilt without {1:n0} file(s) of Bethesda's or one machine's, {2:n1} MB" -f $packSwap.Count, $droppedFiles, ($droppedBytes / 1MB)) 'Green'
+Say ("  {0} pack(s) rebuilt without {1:n0} file(s) of Bethesda's, one machine's or another author's, {2:n1} MB" -f $packSwap.Count, $droppedFiles, ($droppedBytes / 1MB)) 'Green'
 Say ("  {0} record(s) written again" -f $recSwap.Count) 'Green'
 if ($DryRun) {
     Say ''
@@ -639,6 +664,6 @@ else {
 }
 
 Write-Host ''
-Say "Done: the $Channel feed names no file of Bethesda's or one machine's." 'Green'
+Say "Done: the $Channel feed names no file of Bethesda's, one machine's or another author's." 'Green'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 exit 0
