@@ -374,6 +374,12 @@ $prefix = $GameDir.TrimEnd('\') + '\'
 
 $ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0; $machineCount = 0
 $collectionBytes = 0; $collectionCount = 0
+$notOursBytes = 0; $notOursCount = 0
+# What waits for the collection (Ship-Rules, #1178) is asked at the revision
+# this machine's Vortex has installed. LoadOrder.ps1 is loaded only in here,
+# so its functions do not change anything else this script asks.
+$ShipCollectionRevision = & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); Get-ShipCollectionRevision $Root }
+Say ("  collection revision {0}: loose files held for the collection until then still ship" -f $ShipCollectionRevision) 'DarkGray'
 $clientShipped = 0
 $clientWrong = @()
 foreach ($f in $all) {
@@ -397,6 +403,9 @@ foreach ($f in $all) {
     if (Test-ShipDevOnly $rel) { $skipBytes += $f.Length; continue }
     if (Test-Optional $rel) { $optionalBytes += $f.Length; $optionalCount++; continue }
     if (Test-FromCollection $rel) { $collectionBytes += $f.Length; $collectionCount++; continue }
+    # Other people's loose files (#1178), after the collection's so those are
+    # counted as the collection's.
+    if (Test-ShipNotOurs $rel) { $skipBytes += $f.Length; $notOursBytes += $f.Length; $notOursCount++; continue }
     if ($f.Extension -in '.pdb', '.log') { $skipBytes += $f.Length; continue }
     $ship += [pscustomobject]@{ Rel = $rel; Full = $f.FullName; Len = $f.Length; Time = $f.LastWriteTimeUtc }
     $shipBytes += $f.Length
@@ -457,6 +466,7 @@ if ($shipClientFiles.Count -gt 0) {
     }
 }
 if ($machineCount) { Say ("  {0:n0} of this machine's own files, other servers' files and sign in tokens left out" -f $machineCount) 'DarkGray' }
+if ($notOursCount) { Say ("  {0:n0} loose file(s) of other people's mods left out ({1:n1} MB), never ours to hand out" -f $notOursCount, ($notOursBytes / 1MB)) 'DarkGray' }
 if ($collectionCount) {
     Say ("  {0:n0} of the left out ({1:n1} GB) are files the collection provides." -f `
         $collectionCount, ($collectionBytes / 1GB)) 'Green'
