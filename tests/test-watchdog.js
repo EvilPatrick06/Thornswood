@@ -76,7 +76,9 @@ function harness(server) {
     };
   };
   const FakeDate = { now: function () { return clock.t; } };
-  const fn = new Function('sp', 'HOST', 'guard', 'log', 'say', 'Date',
+  // RESOURCE_URL is the address the plugin makes from its settings (#1264);
+  // HOST is kept for a copy of the plugin from before that.
+  const fn = new Function('sp', 'HOST', 'RESOURCE_URL', 'guard', 'log', 'say', 'Date',
     'let serverBasesAsked = 0; const serverBases = {};\n' + block +
     '\nreturn {' +
     '  check: checkServer,' +
@@ -86,7 +88,7 @@ function harness(server) {
     '  every: PROBE_MS, max: PROBE_STRIKES, grace: RESTART_GRACE_MS,' +
     '  deadline: typeof PROBE_DEADLINE_MS === "number" ? PROBE_DEADLINE_MS : 0' +
     '};');
-  const api = fn(sp, 'test.invalid', guard, log, say, FakeDate);
+  const api = fn(sp, 'test.invalid', 'http://test.invalid:3000', guard, log, say, FakeDate);
   api.clock = clock; api.sent = sent; api.logs = logs; api.said = said;
   // One call of the plugin's update handler at time t.
   api.at = function (t) { clock.t = t; api.check(t); };
