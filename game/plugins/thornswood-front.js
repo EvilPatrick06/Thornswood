@@ -363,6 +363,24 @@
   const HOST = String(client['server-ip'] || '');
 
   /*
+    THE SERVER'S OWN RESOURCE PORT, the HTTP beside the game port that serves
+    online.json, server-bases.json and the load order manifest. The rule is
+    SkyMp.ResourcePortFor's: 3000 for the main server on 7777, the game port
+    plus one for any other, so 7788 for the dev server on 7787.
+
+    Every address here that talks to the game server's HTTP is made from this
+    one line (#1264). Until 29 Sep the server probe and the server handled
+    bases asked port 3000 whatever server the game was on, so a game on the
+    dev server watched the live server. On 29 Sep the dev server went down
+    three times under people in the world, the probe kept hearing live answer,
+    and nobody was taken back to the menu: they stood in a world with no
+    server behind it until they closed the game themselves.
+  */
+  const SERVER_PORT = Number(client['server-port']) || 7777;
+  const RESOURCE_PORT = SERVER_PORT === 7777 ? 3000 : SERVER_PORT + 1;
+  const RESOURCE_URL = HOST ? 'http://' + HOST + ':' + RESOURCE_PORT : '';
+
+  /*
     The token that says which profile may join the voice room.
 
     Fetched by the launcher, which is the only thing here holding a Discord
@@ -1057,15 +1075,12 @@
   const LINE_ASK_MS = 5000;
   const LINE_EVERY_MS = 10000;
   const LINE_PASS_EVERY_MS = 60000;
-  // Made when first needed. The server's own resource port, as
-  // SkyMp.ResourcePortFor has it: 3000 for the main server on 7777, the game
-  // port plus one for any other (dev).
+  // Made when first needed, on the server's own resource port (RESOURCE_URL).
   let lineHttp = null;
   function lineClient() {
     if (lineHttp) { return lineHttp; }
     try {
-      const p = Number(client['server-port']) || 7777;
-      lineHttp = HOST ? new sp.HttpClient('http://' + HOST + ':' + (p === 7777 ? 3000 : p + 1)) : null;
+      lineHttp = RESOURCE_URL ? new sp.HttpClient(RESOURCE_URL) : null;
     } catch (e) { lineHttp = null; }
     return lineHttp;
   }
@@ -6947,8 +6962,8 @@
   // only way out is the task manager.
   //
   // There is nothing in the client to hook for this, so it is asked directly.
-  // The resources folder on 3000 is the same HTTP the load order manifest comes
-  // from: if it answers, the server is up; if it stops answering several times
+  // The server's resources folder (RESOURCE_URL: 3000 on the main server, 7788
+  // on dev) is the same HTTP the load order manifest comes from: if it answers, the server is up; if it stops answering several times
   // in a row, it is not. Several, because one slow reply is not an outage and
   // throwing somebody out of Windhelm over a dropped packet is worse than the
   // thing being fixed.
@@ -7001,7 +7016,7 @@
   const PROBE_DEADLINE_MS = 15000;
 
   let probe = null;
-  try { probe = HOST ? new sp.HttpClient('http://' + HOST + ':3000') : null; } catch (e) { probe = null; }
+  try { probe = RESOURCE_URL ? new sp.HttpClient(RESOURCE_URL) : null; } catch (e) { probe = null; }
 
   // Asked for once, and again every ten minutes in case the server was
   // deployed while somebody was playing. Failure is silent and harmless.

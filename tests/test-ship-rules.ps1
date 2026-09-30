@@ -368,6 +368,8 @@ if (-not $tm.Success -or -not $diff.Success) { Done }
 $prev = @{}
 $prev[$bsa] = '2938167:639246568900000000'
 $prev['Data\meshes\gone\old.nif'] = '100:1'
+# #1178: and one of our own pages that has since gone.
+$prev['Data\Platform\UI\thornswood-old.js'] = '100:1'
 $prev['Data\Platform\Plugins\thornswood-hud.js'] = '10:1'
 # #1152: the last record listed the Creation Kit and the copy of the game.
 $prev['CreationKit.exe'] = '48685408:1'
@@ -385,7 +387,8 @@ foreach ($rel in $onDisk) {
 Yes 'the next pack does not carry MarketplaceTextures.bsa' (-not $now.ContainsKey($bsa))
 Yes 'and does not list it as changed' ($changed -notcontains $bsa)
 Yes 'and does not list it as removed, so no tester loses it' ($removed -notcontains $bsa)
-Yes 'the lifted diff is live: a mesh that really went is still removed' ($removed -contains 'Data\meshes\gone\old.nif')
+Yes 'the lifted diff is live: a page of ours that really went is still removed' ($removed -contains 'Data\Platform\UI\thornswood-old.js')
+Yes 'while another author''s mesh that went is not listed as removed (#1178)' ($removed -notcontains 'Data\meshes\gone\old.nif')
 Yes 'the next pack does not carry the Creation Kit, nor list it as removed' (-not $now.ContainsKey('CreationKit.exe') -and $removed -notcontains 'CreationKit.exe')
 Yes 'nor list the copy of SkyrimSE.exe as removed, which could reach a Steam copy' ($removed -notcontains 'SkyrimSE.exe.bak-1160-for-369')
 Yes 'the next pack carries no script source and lists none as removed (#1227)' (
@@ -406,6 +409,7 @@ $ship = @(
     (Row 'Data\Textures\LostArk\a.dds' 1000),
     (Row 'Data\textures\lostark\b.dds' 500),
     (Row 'Data\meshes\armor\commonclothes\travel.nif' 4000),
+    (Row 'Data\meshes\leftover.nif' 700),
     (Row 'Data\meshes\animationdatasinglefile.txt' 700),
     (Row 'Data\meshes\interface\logo\logo.nif' 10562),
     (Row 'Data\meshes\interface\logo\logo01ae.nif' 10562),

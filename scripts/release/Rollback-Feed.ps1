@@ -224,10 +224,36 @@ foreach ($m in @($curMap, $tgtMap)) {
     foreach ($k in @($m.Keys)) {
         $p = $(if ($k.StartsWith(':gone:')) { $k.Substring(6) } elseif ($k.StartsWith(':')) { '' } else { $k })
         if ($p -and ((Test-ShipBethesda $p) -or (Test-ShipBackup $p))) { $m.Remove($k); $notOurs++ }
+        # Another author's loose file, as a file only (#1178): going back must
+        # not hand it out again. A gone entry for one stays, because an earlier
+        # release already took it out of installs.
+        elseif (-not $k.StartsWith(':') -and (Test-ShipNotOurs $k)) { $m.Remove($k); $notOurs++ }
     }
 }
-if ($notOurs) { Say ("  left out {0} record entries naming Bethesda's files or backups; they are never ours to send" -f $notOurs) 'DarkGray' }
+if ($notOurs) { Say ("  left out {0} record entries naming Bethesda's files, backups or other people's loose files; they are never ours to send" -f $notOurs) 'DarkGray' }
 # ==== end thornswood no bethesda in a rollback ====
+
+# ==== thornswood no one machine's files in a rollback ====
+# tests\test-no-machine-files.ps1 runs this block on its own.
+#
+# Records from before #1239 name one machine's own files as files of ours: the
+# join pass, settings saved from a mod's menu, window layouts, a face export,
+# backups. Going back to one must not hand them out, and going forward from one
+# must not list them as gone, since a delete reaches every install where they
+# are that person's own. Test-ShipOneMachine is the question Check-Secrets, the
+# record guard and Scrub-Feed ask. What every release deletes on purpose
+# ($ShipDeleteAlways, voice-token.txt) stays as gone.
+$notThisMachine = 0
+foreach ($m in @($curMap, $tgtMap)) {
+    foreach ($k in @($m.Keys)) {
+        $p = $(if ($k.StartsWith(':gone:')) { $k.Substring(6) } elseif ($k.StartsWith(':')) { '' } else { $k })
+        if (-not $p -or -not (Test-ShipOneMachine $p)) { continue }
+        if ($k.StartsWith(':gone:') -and @(Get-ShipDeleteAlways) -contains $p) { continue }
+        $m.Remove($k); $notThisMachine++
+    }
+}
+if ($notThisMachine) { Say ("  left out {0} record entries naming one machine's own files; they never leave it" -f $notThisMachine) 'DarkGray' }
+# ==== end thornswood no one machine's files in a rollback ====
 
 # The six client runtime files stay with the launcher, and so does its source
 # record (:src:), because the launcher is not rolled back.

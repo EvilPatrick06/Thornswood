@@ -1,0 +1,161 @@
+# Outfits built in BodySlide that ship as Thornswood's FOR NOW, until #1259.
+#
+# Read by scripts\release\Ship-Rules.ps1 ($ShipBuiltUntil1259). One path per
+# line, under the game folder, exactly as the dev record of 29 September
+# spelled it; a line starting with # is a note.
+#
+# Built on some other machine, for a body and preset nothing records: Common
+# Clothes' travel clothes from Common Clothes and Armors 3BA BodySlide (Nexus
+# 83980, 120 files), Immersive Armours' Bosmer armour from its 3BA BodySlide
+# project (22382, in the collection, 18 files) and More Craftable Equipment's
+# executioner from its CBBE BodySlide file (44666, 2 files). Built output is
+# ours only when we build it from the collection, as Nemesis's is.
+#
+# Patrick, 29 September: Thornswood builds the outfits itself from the
+# collection's BodySlide projects (#1259), and until that build replaces these
+# they keep shipping so nothing looks broken. The build that closes #1259 names
+# its own output in Ship-Rules and deletes this file in the same pull request;
+# every line here then stops shipping by itself (tests\test-not-ours.ps1).
+#
+# Not here, on purpose: the 30 travel clothes that are byte for byte the ones
+# inside Common Clothes' own archive. The collection installs those.
+Data\meshes\armor\bosmerarmormaty743\1stpersonarmortorso.tri
+Data\meshes\armor\bosmerarmormaty743\boots.tri
+Data\meshes\armor\bosmerarmormaty743\bracers.tri
+Data\meshes\armor\bosmerarmormaty743\bracersengravedf.tri
+Data\meshes\armor\bosmerarmormaty743\cape\fullcape.tri
+Data\meshes\armor\bosmerarmormaty743\cape\fullcapef.tri
+Data\meshes\armor\bosmerarmormaty743\cape\shouldercape.tri
+Data\meshes\armor\bosmerarmormaty743\cape\shouldercapef.tri
+Data\meshes\armor\bosmerarmormaty743\cape\shoulderengravedcapef.tri
+Data\meshes\armor\bosmerarmormaty743\metalglovesm.tri
+Data\meshes\armor\bosmerarmormaty743\torso.tri
+Data\meshes\armor\bosmerarmormaty743\torsofengraved.tri
+Data\meshes\armor\bosmerarmormaty743\torsometal.tri
+Data\meshes\armor\bosmerarmormaty743\wildhunt\huntbootsm.tri
+Data\meshes\armor\bosmerarmormaty743\wildhunt\huntfemaletorsolight.tri
+Data\meshes\armor\bosmerarmormaty743\wildhunt\huntgloves.tri
+Data\meshes\armor\bosmerarmormaty743\wildhunt\huntlightglovesf.tri
+Data\meshes\armor\bosmerarmormaty743\wildhunt\hunttorso.tri
+Data\meshes\armor\travel clothes\beltedrobe\1beltedrobef_0.nif
+Data\meshes\armor\travel clothes\beltedrobe\1beltedrobef_1.nif
+Data\meshes\armor\travel clothes\beltedrobe\1beltedrobenhf_0.nif
+Data\meshes\armor\travel clothes\beltedrobe\1beltedrobenhf_1.nif
+Data\meshes\armor\travel clothes\beltedrobe\2beltedrobef_0.nif
+Data\meshes\armor\travel clothes\beltedrobe\2beltedrobef_1.nif
+Data\meshes\armor\travel clothes\beltedrobe\2beltedrobenhf_0.nif
+Data\meshes\armor\travel clothes\beltedrobe\2beltedrobenhf_1.nif
+Data\meshes\armor\travel clothes\beltedrobe\3beltedrobef_0.nif
+Data\meshes\armor\travel clothes\beltedrobe\3beltedrobef_1.nif
+Data\meshes\armor\travel clothes\beltedrobe\3beltedrobenhf_0.nif
+Data\meshes\armor\travel clothes\beltedrobe\3beltedrobenhf_1.nif
+Data\meshes\armor\travel clothes\beltedrobe\4beltedrobef_0.nif
+Data\meshes\armor\travel clothes\beltedrobe\4beltedrobef_1.nif
+Data\meshes\armor\travel clothes\beltedrobe\4beltedrobenhf_0.nif
+Data\meshes\armor\travel clothes\beltedrobe\4beltedrobenhf_1.nif
+Data\meshes\armor\travel clothes\beltedrobe\5beltedrobef_0.nif
+Data\meshes\armor\travel clothes\beltedrobe\5beltedrobef_1.nif
+Data\meshes\armor\travel clothes\beltedrobe\5beltedrobenhf_0.nif
+Data\meshes\armor\travel clothes\beltedrobe\5beltedrobenhf_1.nif
+Data\meshes\armor\travel clothes\clothes\1clothesaf_0.nif
+Data\meshes\armor\travel clothes\clothes\1clothesaf_1.nif
+Data\meshes\armor\travel clothes\clothes\1clothesbf_0.nif
+Data\meshes\armor\travel clothes\clothes\1clothesbf_1.nif
+Data\meshes\armor\travel clothes\clothes\1clothesf_0.nif
+Data\meshes\armor\travel clothes\clothes\1clothesf_1.nif
+Data\meshes\armor\travel clothes\clothes\2bclothesf_0.nif
+Data\meshes\armor\travel clothes\clothes\2bclothesf_1.nif
+Data\meshes\armor\travel clothes\clothes\2clothesf_0.nif
+Data\meshes\armor\travel clothes\clothes\2clothesf_1.nif
+Data\meshes\armor\travel clothes\clothes\4clothesf_0.nif
+Data\meshes\armor\travel clothes\clothes\4clothesf_1.nif
+Data\meshes\armor\travel clothes\clothes\5clothesf_0.nif
+Data\meshes\armor\travel clothes\clothes\5clothesf_1.nif
+Data\meshes\armor\travel clothes\clothes\6aclothesf_0.nif
+Data\meshes\armor\travel clothes\clothes\6aclothesf_1.nif
+Data\meshes\armor\travel clothes\clothes\6bclothesf_0.nif
+Data\meshes\armor\travel clothes\clothes\6bclothesf_1.nif
+Data\meshes\armor\travel clothes\clothes\torso2f_0.nif
+Data\meshes\armor\travel clothes\clothes\torso2f_1.nif
+Data\meshes\armor\travel clothes\clothes\torsof_0.nif
+Data\meshes\armor\travel clothes\clothes\torsof_1.nif
+Data\meshes\armor\travel clothes\new robes\3arobesf_0.nif
+Data\meshes\armor\travel clothes\new robes\3arobesf_1.nif
+Data\meshes\armor\travel clothes\new robes\3brobesf_0.nif
+Data\meshes\armor\travel clothes\new robes\3brobesf_1.nif
+Data\meshes\armor\travel clothes\new robes\3crobesf_0.nif
+Data\meshes\armor\travel clothes\new robes\3crobesf_1.nif
+Data\meshes\armor\travel clothes\new robes\3hrobesf_0.nif
+Data\meshes\armor\travel clothes\new robes\3hrobesf_1.nif
+Data\meshes\armor\travel clothes\new robes\3robesf_0.nif
+Data\meshes\armor\travel clothes\new robes\3robesf_1.nif
+Data\meshes\armor\travel clothes\new robes\6arobesf_0.nif
+Data\meshes\armor\travel clothes\new robes\6arobesf_1.nif
+Data\meshes\armor\travel clothes\new robes\6drobesf_0.nif
+Data\meshes\armor\travel clothes\new robes\6drobesf_1.nif
+Data\meshes\armor\travel clothes\new variants\1cclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\1cclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\1dclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\1dclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\1fclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\1fclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\1gclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\1gclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\1hclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\1hclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\1iclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\1iclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\1jclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\1jclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\5bclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\5bclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\5cclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\5cclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\5dclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\5dclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\5eclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\5eclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\5fclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\5fclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\mineraclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\mineraclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\minerbclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\minerbclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\minercclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\minercclothesf_1.nif
+Data\meshes\armor\travel clothes\new variants\minerdclothesf_0.nif
+Data\meshes\armor\travel clothes\new variants\minerdclothesf_1.nif
+Data\meshes\armor\travel clothes\quiltedrobe\1quiltedtunicf_0.nif
+Data\meshes\armor\travel clothes\quiltedrobe\1quiltedtunicf_1.nif
+Data\meshes\armor\travel clothes\quiltedrobe\2bquiltedtunicf_0.nif
+Data\meshes\armor\travel clothes\quiltedrobe\2bquiltedtunicf_1.nif
+Data\meshes\armor\travel clothes\quiltedrobe\2quiltedtunicf_0.nif
+Data\meshes\armor\travel clothes\quiltedrobe\2quiltedtunicf_1.nif
+Data\meshes\armor\travel clothes\quiltedrobe\3clothesf_0.nif
+Data\meshes\armor\travel clothes\quiltedrobe\3clothesf_1.nif
+Data\meshes\armor\travel clothes\quiltedrobe\6bclothesf_0.nif
+Data\meshes\armor\travel clothes\quiltedrobe\6bclothesf_1.nif
+Data\meshes\armor\travel clothes\quiltedrobe\6clothesf_0.nif
+Data\meshes\armor\travel clothes\quiltedrobe\6clothesf_1.nif
+Data\meshes\armor\travel clothes\robes\16hcuirassmediumf_0.nif
+Data\meshes\armor\travel clothes\robes\16hcuirassmediumf_1.nif
+Data\meshes\armor\travel clothes\robes\2robesf_0.nif
+Data\meshes\armor\travel clothes\robes\2robesf_1.nif
+Data\meshes\armor\travel clothes\robes\3hrobesf_0.nif
+Data\meshes\armor\travel clothes\robes\3hrobesf_1.nif
+Data\meshes\armor\travel clothes\robes\3robesf_0.nif
+Data\meshes\armor\travel clothes\robes\3robesf_1.nif
+Data\meshes\armor\travel clothes\robes\4hrobesf_0.nif
+Data\meshes\armor\travel clothes\robes\4hrobesf_1.nif
+Data\meshes\armor\travel clothes\robes\4robesf_0.nif
+Data\meshes\armor\travel clothes\robes\4robesf_1.nif
+Data\meshes\armor\travel clothes\robes\5robesf_0.nif
+Data\meshes\armor\travel clothes\robes\5robesf_1.nif
+Data\meshes\armor\travel clothes\robes\6rrobesf_0.nif
+Data\meshes\armor\travel clothes\robes\6rrobesf_1.nif
+Data\meshes\armor\travel clothes\robes\7hrobesf_0.nif
+Data\meshes\armor\travel clothes\robes\7hrobesf_1.nif
+Data\meshes\armor\travel clothes\robes\7robesf_0.nif
+Data\meshes\armor\travel clothes\robes\7robesf_1.nif
+Data\meshes\MCE\clothes\executioner\f\body_0.nif
+Data\meshes\MCE\clothes\executioner\f\body_1.nif

@@ -3,9 +3,10 @@
 
       pwsh -NoProfile -File .\tests\test-scrub-feed.ps1
 
-  Scrub-Feed.ps1 takes Bethesda's files out of what the feeds already
-  published, and every kind of install still ends with the right files
-  (#1152, #1227, #1229).
+  Scrub-Feed.ps1 takes Bethesda's files and one machine's own files out of
+  what the feeds already published, and every kind of install still ends with
+  the right files (#1152, #1227, #1229, #1239). A run stopped right after it
+  sent the feed leaves the next run knowing what to delete (#1244).
 
   WHY THIS EXISTS. Main packs on the site carried the Creation Kit, a copy of
   SkyrimSE.exe and the script extender's script sources, and the dev records
@@ -31,6 +32,13 @@
        and an old launcher replaying the dev feed's packs
     5. the real Rollback-Feed.ps1 going back a release on the scrubbed dev feed
     6. the delete refuses when a feed moved, and keeps what a feed still names
+
+  One machine's files ride beside Bethesda's in the same packs and records
+  (#1239): key binds, a Vortex record, a report a session left, an expired
+  voice token and join pass, a face tint, settings saved from a mod's menu, a
+  backup, and delete lines naming a face export and the report. They go, the
+  delete line every release carries on purpose (voice-token.txt) stays, and a
+  folder entry for Data\Platform, whose folders are ours, stays.
 
   Runs under Windows PowerShell 5.1 (the launcher runs on the .NET Framework)
   and restarts itself there from pwsh; Scrub-Feed and Rollback-Feed run in a
@@ -198,30 +206,45 @@ function Put-Text([string]$dir, [string]$text) { $sha = Sha-Text $text; [IO.File
 
 $src = Join-Path $T 'src'
 # Main pack A (15 Sep): ours, and the script extender's sources beside them.
-$A = @('game/Data/ours.esp', 'ours one', 'game/Data/Scripts/Source/SKSE.psc', 'skse source', 'game/Data/Scripts/Source/Actor.psc', 'actor source',
-       'game/Data/Scripts/ours.pex', 'compiled ours', 'profile/plugins.txt', "*ours.esp`r`n")
+# And one machine's own: its key binds, Vortex's record of its deployment, and a
+# report a session left in the game folder, with that folder's own entry.
+$A = @('game/Data/Platform/UI/ours.esp', 'ours one', 'game/Data/Scripts/Source/SKSE.psc', 'skse source', 'game/Data/Scripts/Source/Actor.psc', 'actor source',
+       'game/Data/Platform/Scripts/ours.pex', 'compiled ours', 'game/Data/SKSE/Plugins/Thornswood.ini', 'one person''s key binds',
+       'game/Data/vortex.deployment.json', 'what vortex put in one skyrim', 'game/Claude outputs/', '', 'game/Claude outputs/Report.md', 'a report',
+       'game/Data/Interface/racesex_menu.swf', 'racemenu''s menu', 'profile/plugins.txt', "*ours.esp`r`n")
+# RaceMenu's loose menu is another author's (#1178) and goes as well.
+$dropA = @('game/Data/Interface/racesex_menu.swf', 'game/Data/Scripts/Source/SKSE.psc', 'game/Data/Scripts/Source/Actor.psc', 'game/Data/SKSE/Plugins/Thornswood.ini', 'game/Data/vortex.deployment.json',
+           'game/Claude outputs/', 'game/Claude outputs/Report.md')
 # Main pack B (26 Sep): the Creation Kit, a copy of the game, its dialogue views
 # and tools, next to a change of ours, and a delete list naming one of ours and
-# Bethesda's archive.
-$B = @('delete.txt', "Data/old.esp`r`nData/MarketplaceTextures.bsa`r`n", 'game/CreationKit.exe', 'the creation kit', 'game/CreationKit.ini', 'ck settings',
-       'game/SkyrimSE.exe.bak-1160-for-369', 'a copy of skyrim', 'game/Data/ours.esp', 'ours two', 'game/Data/DialogueViews/', '',
-       'game/Data/DialogueViews/0001.xml', 'a dialogue view', 'game/Tools/RoboVoicer.exe', 'a tool', 'game/Data/textures/ours.dds', 'a texture of ours')
-# Main pack C: ours alone.
-$C = @('game/Data/new.esp', 'a new plugin of ours')
+# Bethesda's archive. And an expired voice token and a face tint, with delete
+# lines for the token (every release carries that one on purpose), a face
+# export and the report.
+$B = @('delete.txt', "Data/Platform/UI/old.esp`r`nData/meshes/LostArk/KamenSword.nif`r`nData/MarketplaceTextures.bsa`r`nData/Platform/voice-token.txt`r`nData/SKSE/Plugins/CharGen/Exported/Adventurer.jslot`r`nClaude outputs/Report.md`r`n",
+       'game/CreationKit.exe', 'the creation kit', 'game/CreationKit.ini', 'ck settings',
+       'game/SkyrimSE.exe.bak-1160-for-369', 'a copy of skyrim', 'game/Data/Platform/UI/ours.esp', 'ours two', 'game/Data/DialogueViews/', '',
+       'game/Data/DialogueViews/0001.xml', 'a dialogue view', 'game/Tools/RoboVoicer.exe', 'a tool', 'game/Data/Platform/textures/ours.dds', 'a texture of ours',
+       'game/Data/Platform/voice-token.txt', 'v1.7.1726700000000.expired', 'game/Data/textures/CharGen/Exported/Adventurer43553.dds', 'one person''s face tint')
+# Main pack C: ours alone, and the folder entry for Data\Platform, which is ours
+# although the files straight in it are one machine's.
+$C = @('game/Data/Platform/', '', 'game/Data/Platform/UI/new.esp', 'a new plugin of ours')
 $shaA = New-Pack (Join-Path $src 'A.zip') $A; $shaB = New-Pack (Join-Path $src 'B.zip') $B; $shaC = New-Pack (Join-Path $src 'C.zip') $C
 foreach ($x in 'A', 'B', 'C') { [void](Put-Asset $fa (Join-Path $src "$x.zip")); [void](Put-Asset $da (Join-Path $src "$x.zip")) }
-# Dev pack D.
-$shaD = New-Pack (Join-Path $src 'D.zip') @('game/Data/Platform/Plugins/ui.js', 'the ui, dev')
+# Dev pack D: ours, beside an expired join pass and settings saved from a mod's menu.
+$passText = 'jp1.expired-pass.sig'; $mcmText = 'another server''s values'
+$shaD = New-Pack (Join-Path $src 'D.zip') @('game/Data/Platform/Plugins/ui.js', 'the ui, dev', 'game/Data/Platform/thornswood-pass.txt', $passText,
+                                          'game/Data/MCM/Settings/Precision.ini', $mcmText)
 [void](Put-Asset $da (Join-Path $src 'D.zip'))
 $PA = '20260915-2018'; $PB = '20260926-1603'; $PC = '20260927-1633'; $PD = '20260929-0100-dev'
 function Pack-Entry([string]$id, [string]$prefix, [string]$sha) { return [ordered]@{ id = $id; url = "https://thornswood.net/$prefix/assets/$sha"; sha256 = $sha; notes = "notes for $id" } }
 $mainPacks = @((Pack-Entry $PA 'feed' $shaA), (Pack-Entry $PB 'feed' $shaB), (Pack-Entry $PC 'feed' $shaC))
 
 # The files of the dev release, loose beside its records, and three records.
-$ours = [ordered]@{ 'Data\ours.esp' = 'ours two'; 'Data\Scripts\ours.pex' = 'compiled ours'; 'Data\new.esp' = 'a new plugin of ours';
-                    'Data\textures\ours.dds' = 'a texture of ours'; 'Data\Platform\Plugins\ui.js' = 'the ui, dev' }
+$ours = [ordered]@{ 'Data\Platform\UI\ours.esp' = 'ours two'; 'Data\Platform\Scripts\ours.pex' = 'compiled ours'; 'Data\Platform\UI\new.esp' = 'a new plugin of ours';
+                    'Data\Platform\textures\ours.dds' = 'a texture of ours'; 'Data\Platform\Plugins\ui.js' = 'the ui, dev' }
 $ied = 'Scriptname IED extends Quest'
-foreach ($v in @($ours.Values) + @($ied, "*ours.esp`r`n", 'a texture of ours, older')) { [void](Put-Text $da $v) }
+$raceText = 'racemenu''s menu, loose'
+foreach ($v in @($ours.Values) + @($ied, "*ours.esp`r`n", 'a texture of ours, older', $passText, $mcmText, $raceText)) { [void](Put-Text $da $v) }
 function Record([hashtable]$files, [hashtable]$extra) {
     $m = @{}
     foreach ($k in $files.Keys) { $m[$k] = Entry-Of ([string]$files[$k]) }
@@ -229,10 +252,17 @@ function Record([hashtable]$files, [hashtable]$extra) {
     return $m
 }
 $r3files = @{}; foreach ($k in $ours.Keys) { $r3files[$k] = $ours[$k] }; $r3files['Data\Scripts\Source\IED.psc'] = $ied
-$R3 = Record $r3files @{ ':record:files' = '1'; ':golden:plugins.txt' = (Entry-Of "*ours.esp`r`n"); ':gone:Data\old.esp' = 'removed'; ':order:plugins' = 'abc'; ':src:app\Shell.cs' = 'DEF' }
-$r2files = @{}; foreach ($k in $r3files.Keys) { $r2files[$k] = $r3files[$k] }; $r2files['Data\textures\ours.dds'] = 'a texture of ours, older'
-$R2 = Record $r2files @{ ':record:files' = '1'; ':golden:plugins.txt' = (Entry-Of "*ours.esp`r`n"); ':gone:Data\old.esp' = 'removed'; ':order:plugins' = 'abc' }
-$R1 = Record @{ 'Data\ours.esp' = 'ours one'; 'CreationKit.exe' = 'the creation kit'; 'Data\DialogueViews\0001.xml' = 'a dialogue view' } @{ ':gone:Tools\Old.exe' = 'removed'; ':order:plugins' = 'abc' }
+# One machine's, as files the records name (and so sent loose), and as gone.
+$r3files['Data\Platform\thornswood-pass.txt'] = $passText; $r3files['Data\MCM\Settings\Precision.ini'] = $mcmText
+$r3files['Data\Interface\racesex_menu.swf'] = $raceText
+$notOursKeys = @('Data\Interface\racesex_menu.swf')
+$machineKeys = @('Data\Platform\thornswood-pass.txt', 'Data\MCM\Settings\Precision.ini', ':gone:Data\textures\CharGen\Exported\Adventurer3424.dds')
+$R3 = Record $r3files @{ ':record:files' = '1'; ':golden:plugins.txt' = (Entry-Of "*ours.esp`r`n"); ':gone:Data\Platform\UI\old.esp' = 'removed'; ':order:plugins' = 'abc'; ':src:app\Shell.cs' = 'DEF'
+                         ':gone:Data\Platform\voice-token.txt' = 'always'; ':gone:Data\textures\CharGen\Exported\Adventurer3424.dds' = 'removed'
+                         ':gone:Data\meshes\LostArk\KamenSword.nif' = 'removed' }
+$r2files = @{}; foreach ($k in $r3files.Keys) { $r2files[$k] = $r3files[$k] }; $r2files['Data\Platform\textures\ours.dds'] = 'a texture of ours, older'
+$R2 = Record $r2files @{ ':record:files' = '1'; ':golden:plugins.txt' = (Entry-Of "*ours.esp`r`n"); ':gone:Data\Platform\UI\old.esp' = 'removed'; ':order:plugins' = 'abc' }
+$R1 = Record @{ 'Data\Platform\UI\ours.esp' = 'ours one'; 'CreationKit.exe' = 'the creation kit'; 'Data\DialogueViews\0001.xml' = 'a dialogue view'; 'Data\SKSE\Plugins\SkyrimPlatform.ini.bak' = 'a backup' } @{ ':gone:Tools\Old.exe' = 'removed'; ':order:plugins' = 'abc' }
 $rec = @{}
 foreach ($n in 'R1', 'R2', 'R3') {
     $f = Join-Path $src "$n.json"
@@ -254,7 +284,8 @@ Put (Join-Path $site 'feed-dev\version.json') ($devDoc | ConvertTo-Json -Depth 6
 Put (Join-Path $site 'feed\version.json') ($mainDoc | ConvertTo-Json -Depth 6)
 Copy-Item -LiteralPath $rec['R3'].File -Destination (Join-Path $site 'feed-dev\published.json')
 # Main's baseline from before the feed named one: sizes and file times.
-Put (Join-Path $site 'feed\published.json') (@{ 'Data\ours.esp' = '8:639260000000000000'; 'CreationKit.exe' = '16:639260534800000000'; 'Data\DialogueViews\0001.xml' = '15:1'; ':order:plugins' = 'abc' } | ConvertTo-Json)
+Put (Join-Path $site 'feed\published.json') (@{ 'Data\Platform\UI\ours.esp' = '8:639260000000000000'; 'CreationKit.exe' = '16:639260534800000000'; 'Data\DialogueViews\0001.xml' = '15:1'; ':order:plugins' = 'abc'
+                                                'Data\SKSE\Plugins\Thornswood.ini' = '9:1'; 'Data\Platform\thornswood-spots.txt' = '3:1' } | ConvertTo-Json)
 
 $up = $false
 for ($i = 0; $i -lt 100 -and -not $up; $i++) {
@@ -380,48 +411,81 @@ function Pack-Of($doc, [string]$id) { return @($doc.packs | Where-Object { $_.id
 Write-Host ''; Write-Host 'Scrub-Feed.ps1 -DryRun'
 $before = Snapshot
 $r = Scrub 'dev' @('-DryRun')
-Yes 'a dry run on dev finds both main packs and all three records' ($r.Code -eq 0 -and $r.Out -match "$PA`: 2 of Bethesda" -and $r.Out -match "$PB`: 5 of Bethesda" -and $r.Out -match '2 pack\(s\) rebuilt' -and $r.Out -match '3 record\(s\) written again')
+Yes 'a dry run on dev finds the two main packs, the dev pack and all three records' ($r.Code -eq 0 -and $r.Out -match "$PA`: 6 file\(s\) of Bethesda's, one machine's or another author's" -and
+    $r.Out -match "$PB`: 7 file\(s\) of Bethesda's, one machine's or another author's.*3 delete line" -and $r.Out -match "$PD`: 2 file\(s\)" -and $r.Out -match '3 pack\(s\) rebuilt' -and $r.Out -match '3 record\(s\) written again')
 $afterDry = Snapshot
 Yes '  and sends and deletes nothing' ((@($before.Keys | Where-Object { $afterDry[$_] -ne $before[$_] }).Count -eq 0) -and $afterDry.Count -eq $before.Count)
+Yes '  nor writes anything down to delete' (-not (Test-Path -LiteralPath (Join-Path $work 'scrub-ledger.json')))
 
-Write-Host ''; Write-Host 'Scrub-Feed.ps1 -Channel dev'
+# #1244: a run that stops right after it sent the feed, the way the first dev
+# run of 29 September did. A breakpoint on the line that takes Send-FeedStore's
+# answer ends the process there, as a crash would.
+Write-Host ''; Write-Host 'Scrub-Feed.ps1 -Channel dev, stopped right after the send'
+$stopper = Join-Path $T 'stop-after-send.ps1'
+Put $stopper ("`$target = `$args[0]`r`n`$rest = @(`$args | Select-Object -Skip 1)`r`n" +
+              "`$null = Set-PSBreakpoint -Script `$target -Variable sent -Mode Write -Action { [Environment]::Exit(9) }`r`n& `$target @rest`r`n")
+$a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $stopper, (Join-Path $fake 'scripts\release\Scrub-Feed.ps1'), '-Channel', 'dev', '-NoPause',
+       '-SiteDir', $site, '-SiteUrl', $siteUrl, '-WorkDir', $work, '-ReleaseDir', (Join-Path $T 'rel-dev'))
+$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+$null = & $child @a 2>&1; $rc = $LASTEXITCODE
+$ErrorActionPreference = $old
+$dd = Feed 'feed-dev'
+Yes 'the run stopped after the dev feed went out' ($rc -eq 9 -and (Pack-Of $dd $PA).sha256 -ne $shaA -and $dd.baseline.sha256 -ne $rec['R3'].Sha)
+Yes '  and before it deleted anything' ((Test-Path -LiteralPath (Join-Path $da $rec['R3'].Sha)) -and (Test-Path -LiteralPath (Join-Path $da (Sha-Text $passText))))
+$ledKeys = @()
+if (Test-Path -LiteralPath (Join-Path $work 'scrub-ledger.json')) { $ledKeys = @((Read-Json (Join-Path $work 'scrub-ledger.json')).PSObject.Properties | ForEach-Object { $_.Name }) }
+Yes '  but what it replaced was written down before the send: the packs, the records and the files only they named' (
+    @(@($shaA, $shaB, $shaD, $rec['R1'].Sha, $rec['R2'].Sha, $rec['R3'].Sha, (Sha-Text $ied), (Sha-Text $passText), (Sha-Text $mcmText), (Sha-Text $raceText)) | Where-Object { $ledKeys -notcontains $_ }).Count -eq 0)
+
+Write-Host ''; Write-Host 'Scrub-Feed.ps1 -Channel dev, run again'
 $r = Scrub 'dev' @()
-Yes 'the dev run goes through' ($r.Code -eq 0)
+Yes 'the next dev run goes through, finding nothing left to change' ($r.Code -eq 0 -and $r.Out -match 'Nothing on the dev feed names')
 $dd = Feed 'feed-dev'; $md = Feed 'feed'
-$nA = Pack-Of $dd $PA; $nB = Pack-Of $dd $PB
-Yes 'the dev feed names both packs by the same ids with new sha256s, at /feed/assets' (
+$nA = Pack-Of $dd $PA; $nB = Pack-Of $dd $PB; $nD = Pack-Of $dd $PD
+Yes 'the dev feed names both main packs by the same ids with new sha256s, at /feed/assets' (
     $nA.sha256 -ne $shaA -and $nB.sha256 -ne $shaB -and $nA.url -eq "https://thornswood.net/feed/assets/$($nA.sha256)" -and $nB.url -eq "https://thornswood.net/feed/assets/$($nB.sha256)")
-Yes '  and the packs without Bethesda''s files keep theirs' ((Pack-Of $dd $PC).sha256 -eq $shaC -and (Pack-Of $dd $PD).sha256 -eq $shaD -and @($dd.packs).Count -eq 4)
+Yes '  and the dev pack by its id with a new sha256, at /feed-dev/assets' ($nD.sha256 -ne $shaD -and $nD.url -eq "https://thornswood.net/feed-dev/assets/$($nD.sha256)")
+Yes '  and the pack that carries nothing to take out keeps its own, its Data\Platform folder entry and all' ((Pack-Of $dd $PC).sha256 -eq $shaC -and @($dd.packs).Count -eq 4)
 Yes '  every other field of the feed is as it was' ($dd.launcherVersion -eq '1.1.102.10' -and $dd.news[0].title -eq 'A dev release' -and $dd.release.baseline -eq $IR3 -and (Pack-Of $dd $PA).notes -eq "notes for $PA")
-$zA = Join-Path $fa $nA.sha256; $zB = Join-Path $fa $nB.sha256
-Yes '  the new packs are on the site, named by their bytes' ((Test-Path -LiteralPath $zA) -and (Get-BaselineFileSha $zA) -eq $nA.sha256 -and (Test-Path -LiteralPath $zB) -and (Get-BaselineFileSha $zB) -eq $nB.sha256)
+$zA = Join-Path $fa $nA.sha256; $zB = Join-Path $fa $nB.sha256; $zD = Join-Path $da $nD.sha256
+Yes '  the new packs are on the site, named by their bytes' ((Test-Path -LiteralPath $zA) -and (Get-BaselineFileSha $zA) -eq $nA.sha256 -and (Test-Path -LiteralPath $zB) -and (Get-BaselineFileSha $zB) -eq $nB.sha256 -and
+    (Test-Path -LiteralPath $zD) -and (Get-BaselineFileSha $zD) -eq $nD.sha256)
 $oldA = Zip-Shape (Join-Path $src 'A.zip'); $newA = Zip-Shape $zA
-$keepA = [ordered]@{}; foreach ($k in $oldA.Keys) { if ($k -notlike 'game/Data/Scripts/Source/*') { $keepA[$k] = $oldA[$k] } }
-Yes '  the first is itself without the script sources: every other entry byte for byte, same order, same times' (
-    (($newA.Keys -join ',') -eq ($keepA.Keys -join ',')) -and (@($keepA.Keys | Where-Object { $newA[$_] -ne $keepA[$_] }).Count -eq 0))
+$keepA = [ordered]@{}; foreach ($k in $oldA.Keys) { if ($dropA -notcontains $k) { $keepA[$k] = $oldA[$k] } }
+Yes '  the first is itself without the script sources, the key binds, the Vortex record and the report: every other entry byte for byte, same order, same times' (
+    (($newA.Keys -join ',') -eq ($keepA.Keys -join ',')) -and (@($keepA.Keys | Where-Object { $newA[$_] -ne $keepA[$_] }).Count -eq 0) -and $keepA.Count -eq 3)
 $newB = Zip-Shape $zB
 Yes '  the second has none of the Creation Kit, the copy of the game, its dialogue views or tools' (
-    @($newB.Keys | Where-Object { $_ -match 'CreationKit|SkyrimSE\.exe|DialogueViews|Tools/' }).Count -eq 0 -and $newB.Contains('game/Data/ours.esp') -and $newB.Contains('game/Data/textures/ours.dds'))
-Yes '  and its delete list keeps the line of ours and drops Bethesda''s archive' ((Zip-Text $zB 'delete.txt') -eq "Data/old.esp`r`n")
+    @($newB.Keys | Where-Object { $_ -match 'CreationKit|SkyrimSE\.exe|DialogueViews|Tools/' }).Count -eq 0 -and $newB.Contains('game/Data/Platform/UI/ours.esp') -and $newB.Contains('game/Data/Platform/textures/ours.dds'))
+Yes '  nor the voice token or the face tint' (@($newB.Keys | Where-Object { $_ -match 'voice-token|CharGen' }).Count -eq 0)
+Yes '  and its delete list keeps the line of ours, another author''s file an earlier release took out and the token every release deletes, and drops Bethesda''s archive, the face export and the report' (
+    (Zip-Text $zB 'delete.txt') -eq "Data/Platform/UI/old.esp`r`nData/meshes/LostArk/KamenSword.nif`r`nData/Platform/voice-token.txt`r`n")
+$newD = Zip-Shape $zD
+Yes '  the dev pack keeps ours and drops the join pass and the mod menu settings' (@($newD.Keys) -join ',' -eq 'game/Data/Platform/Plugins/ui.js')
 Yes 'the main feed is not touched by the dev run' ((Pack-Of $md $PA).sha256 -eq $shaA -and (Pack-Of $md $PB).sha256 -eq $shaB)
 Yes '  so the old main packs stay on the site for it' ((Test-Path -LiteralPath (Join-Path $fa $shaA)) -and (Test-Path -LiteralPath (Join-Path $fa $shaB)))
+Yes '  while the old dev pack, which only the dev feed named, is gone' (-not (Test-Path -LiteralPath (Join-Path $da $shaD)))
 
 $b = $dd.baseline
 $nR3 = Read-BaselineFile (Join-Path $da $b.sha256)
-Yes 'the dev baseline is the record again without IED.psc, at a new sha256, with its entry count' (
-    $b.id -eq $IR3 -and $b.sha256 -ne $rec['R3'].Sha -and -not $nR3.ContainsKey('Data\Scripts\Source\IED.psc') -and $b.entries -eq $nR3.Count -and $nR3.Count -eq ($rec['R3'].Map.Count - 1))
-Yes '  every other key as it was' (@($rec['R3'].Map.Keys | Where-Object { $_ -ne 'Data\Scripts\Source\IED.psc' -and $nR3[$_] -ne $rec['R3'].Map[$_] }).Count -eq 0)
-Yes '  and the file is not listed as gone either' (-not $nR3.ContainsKey(':gone:Data\Scripts\Source\IED.psc'))
+$goneR3 = @('Data\Scripts\Source\IED.psc') + $machineKeys + $notOursKeys
+Yes 'the dev baseline is the record again without IED.psc, the join pass, the mod menu settings or the face tint as gone, at a new sha256, with its entry count' (
+    $b.id -eq $IR3 -and $b.sha256 -ne $rec['R3'].Sha -and @($goneR3 | Where-Object { $nR3.ContainsKey($_) }).Count -eq 0 -and $b.entries -eq $nR3.Count -and $nR3.Count -eq ($rec['R3'].Map.Count - 5))
+Yes '  every other key as it was, the voice token every release deletes still listed as gone' (
+    @($rec['R3'].Map.Keys | Where-Object { $goneR3 -notcontains $_ -and $nR3[$_] -ne $rec['R3'].Map[$_] }).Count -eq 0 -and $nR3[':gone:Data\Platform\voice-token.txt'] -eq 'always' -and $nR3[':gone:Data\meshes\LostArk\KamenSword.nif'] -eq 'removed')
+Yes '  and the files are not listed as gone either' (-not $nR3.ContainsKey(':gone:Data\Scripts\Source\IED.psc') -and -not $nR3.ContainsKey(':gone:Data\Platform\thornswood-pass.txt'))
 $rels = @($dd.releases)
 $nR1 = Read-BaselineFile (Join-Path $da $rels[2].sha256)
 Yes 'the release list names the three records again, same ids and order, new sha256s' (
     ($rels | ForEach-Object { $_.id }) -join ',' -eq "$IR3,$IR2,$IR1" -and $rels[0].sha256 -eq $b.sha256 -and $rels[1].sha256 -ne $rec['R2'].Sha -and $rels[2].sha256 -ne $rec['R1'].Sha -and $rels[2].lastPack -eq $PC)
-Yes '  the oldest without the Creation Kit, its dialogue view or its tool as gone' (
-    -not $nR1.ContainsKey('CreationKit.exe') -and -not $nR1.ContainsKey('Data\DialogueViews\0001.xml') -and -not $nR1.ContainsKey(':gone:Tools\Old.exe') -and $nR1.ContainsKey('Data\ours.esp') -and $rels[2].entries -eq 2)
+Yes '  the oldest without the Creation Kit, its dialogue view, its tool as gone, or a backup' (
+    -not $nR1.ContainsKey('CreationKit.exe') -and -not $nR1.ContainsKey('Data\DialogueViews\0001.xml') -and -not $nR1.ContainsKey(':gone:Tools\Old.exe') -and
+    -not $nR1.ContainsKey('Data\SKSE\Plugins\SkyrimPlatform.ini.bak') -and $nR1.ContainsKey('Data\Platform\UI\ours.esp') -and $rels[2].entries -eq 2)
 $pubDev = Join-Path $site 'feed-dev\published.json'
 Yes 'the dev store''s baseline is the new record''s own bytes' ((Get-BaselineFileSha $pubDev) -eq $b.sha256)
 Yes 'the old records are off the site' (-not (Test-Path -LiteralPath (Join-Path $da $rec['R3'].Sha)) -and -not (Test-Path -LiteralPath (Join-Path $da $rec['R2'].Sha)) -and -not (Test-Path -LiteralPath (Join-Path $da $rec['R1'].Sha)))
 Yes '  and so is IED.psc, which only they named' (-not (Test-Path -LiteralPath (Join-Path $da (Sha-Text $ied))))
+Yes '  and the join pass and the mod menu settings they named, which went up loose' (-not (Test-Path -LiteralPath (Join-Path $da (Sha-Text $passText))) -and -not (Test-Path -LiteralPath (Join-Path $da (Sha-Text $mcmText))))
 Yes '  while every file the new records name is still there' (@((Get-RecordFileShas $nR3).Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $da $_)) }).Count -eq 0)
 Yes 'the feed store kept the feed it replaced in its history' (@(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -Filter '*-version.json').Count -ge 1)
 
@@ -434,9 +498,10 @@ Yes '  taken from the dev feed, not made again' ($r.Out -match 'the dev feed alr
 Yes 'the old packs are off the site, from both folders' (
     -not (Test-Path -LiteralPath (Join-Path $fa $shaA)) -and -not (Test-Path -LiteralPath (Join-Path $fa $shaB)) -and
     -not (Test-Path -LiteralPath (Join-Path $da $shaA)) -and -not (Test-Path -LiteralPath (Join-Path $da $shaB)))
-Yes '  and nothing else was deleted' ((Test-Path -LiteralPath (Join-Path $fa $shaC)) -and (Test-Path -LiteralPath (Join-Path $da $shaD)) -and (Test-Path -LiteralPath (Join-Path $da $shaC)))
+Yes '  and nothing else was deleted' ((Test-Path -LiteralPath (Join-Path $fa $shaC)) -and (Test-Path -LiteralPath (Join-Path $da $nD.sha256)) -and (Test-Path -LiteralPath (Join-Path $da $shaC)))
 $pm = Read-BaselineFile (Join-Path $site 'feed\published.json')
-Yes 'main''s baseline is written again without the Creation Kit, keeping the rest' (-not $pm.ContainsKey('CreationKit.exe') -and -not $pm.ContainsKey('Data\DialogueViews\0001.xml') -and $pm['Data\ours.esp'] -eq '8:639260000000000000' -and $pm[':order:plugins'] -eq 'abc')
+Yes 'main''s baseline is written again without the Creation Kit, the key binds or the spots file, keeping the rest' (-not $pm.ContainsKey('CreationKit.exe') -and -not $pm.ContainsKey('Data\DialogueViews\0001.xml') -and
+    -not $pm.ContainsKey('Data\SKSE\Plugins\Thornswood.ini') -and -not $pm.ContainsKey('Data\Platform\thornswood-spots.txt') -and $pm['Data\Platform\UI\ours.esp'] -eq '8:639260000000000000' -and $pm[':order:plugins'] -eq 'abc' -and $pm.Count -eq 2)
 $led = Read-Json (Join-Path $work 'scrub-ledger.json')
 Yes 'nothing is left waiting to be deleted' (@($led.PSObject.Properties).Count -eq 0)
 $allNames = @(Get-ChildItem -LiteralPath $fa, $da -File | ForEach-Object { Join-Path $_.Directory.FullName $_.Name })
@@ -446,11 +511,13 @@ foreach ($f in $allNames) {
     if ($n -notmatch '^[0-9a-f]{64}$') { continue }
     $bytes = [IO.File]::ReadAllBytes($f)
     if ($bytes.Length -gt 2 -and $bytes[0] -eq 0x50 -and $bytes[1] -eq 0x4B) {
-        $left += @((Zip-Shape $f).Keys | Where-Object { $_.StartsWith('game/') -and (Test-ShipBethesda ($_.Substring(5).Replace('/', '\'))) })
+        $left += @((Zip-Shape $f).Keys | Where-Object { $_.StartsWith('game/') -and ((Test-ShipBethesda ($_.Substring(5).Replace('/', '\'))) -or (Test-ShipOneMachine ($_.Substring(5).Replace('/', '\')))) })
     }
     if ($ascii.GetString($bytes) -eq $ied) { $left += 'IED.psc' }
+    if ($ascii.GetString($bytes) -eq $passText -or $ascii.GetString($bytes) -eq $mcmText) { $left += 'a loose file of one machine''s' }
 }
-Yes 'no asset left on either folder of the site carries a file of Bethesda''s' ($left.Count -eq 0)
+Yes 'no asset left on either folder of the site carries a file of Bethesda''s or one machine''s' ($left.Count -eq 0)
+foreach ($l in @($left | Select-Object -First 5)) { Write-Host "      still there: $l" }
 
 Write-Host ''; Write-Host 'a second run'
 $snap = Snapshot
@@ -460,10 +527,10 @@ Yes 'finds nothing on either feed and changes nothing' ($r1.Code -eq 0 -and $r2.
 
 # ---- installs after it ---------------------------------------------------------------
 Write-Host ''; Write-Host 'installs after the scrub'
-$want = @{ 'Data\ours.esp' = 'ours two'; 'Data\Scripts\ours.pex' = 'compiled ours'; 'Data\new.esp' = 'a new plugin of ours'; 'Data\textures\ours.dds' = 'a texture of ours' }
+$want = @{ 'Data\Platform\UI\ours.esp' = 'ours two'; 'Data\Platform\Scripts\ours.pex' = 'compiled ours'; 'Data\Platform\UI\new.esp' = 'a new plugin of ours'; 'Data\Platform\textures\ours.dds' = 'a texture of ours' }
 $fresh = New-Install 'fresh-main'
 Yes 'a fresh main install replaying every pack takes all three' ((Update $fresh 'feed') -eq 3)
-Yes '  and ends with the files of ours and none of Bethesda''s' (Same-Files (Get-Game $fresh) $want)
+Yes '  and ends with the files of ours and none of Bethesda''s or one machine''s' (Same-Files (Get-Game $fresh) $want)
 Use-Install $applied
 Yes 'an install that already applied them is offered nothing: the ids are in its applied.txt' ((Pending-Of (Parse-Feed 'feed')).Count -eq 0)
 Yes '  so nothing is fetched again and its files are as they were' ((Update $applied 'feed') -eq 0 -and (Same-Files (Get-Game $applied) $appliedBefore))
@@ -476,11 +543,11 @@ Yes '  and writes the new record down, so it is not offered again' ((Synced $syn
 $freshDev = New-Install 'fresh-dev'
 [void](Update $freshDev 'feed-dev')
 $wantDev = @{}; foreach ($k in $ours.Keys) { $wantDev[$k] = $ours[$k] }
-Yes 'a fresh dev install syncs to the new record and ends without IED.psc' ((Same-Files (Get-Game $freshDev) $wantDev) -and (Synced $freshDev) -match $dd.baseline.sha256)
+Yes 'a fresh dev install syncs to the new record and ends without IED.psc, the join pass or the mod menu settings' ((Same-Files (Get-Game $freshDev) $wantDev) -and (Synced $freshDev) -match $dd.baseline.sha256)
 $oldL = New-Install 'old-launcher-dev'
 Use-Install $oldL
 foreach ($pk in @((Parse-Feed 'feed-dev').packs)) { Install-Pack $pk }
-Yes 'an old launcher replaying the dev feed''s packs ends without Bethesda''s files too' (Same-Files (Get-Game $oldL) $wantDev)
+Yes 'an old launcher replaying the dev feed''s packs ends without Bethesda''s or one machine''s files too' (Same-Files (Get-Game $oldL) $wantDev)
 
 # ---- a rollback on the scrubbed feed ---------------------------------------------------
 Write-Host ''; Write-Host 'Rollback-Feed.ps1 on the scrubbed dev feed'
@@ -493,9 +560,9 @@ if ($rc -ne 0) { Write-Host ((@($out) | Select-Object -Last 12) -join "`n") -For
 $db = Feed 'feed-dev'
 Yes 'going back a release reads the new records and finds every file it needs' ($rc -eq 0 -and $db.baseline.id -eq '20260929-150000-dev')
 $rbPack = Join-Path $da ([string]@($db.packs)[-1].sha256)
-Yes '  its pack carries none of Bethesda''s files' (@((Zip-Shape $rbPack).Keys | Where-Object { $_.StartsWith('game/') -and (Test-ShipBethesda ($_.Substring(5).Replace('/', '\'))) }).Count -eq 0)
+Yes '  its pack carries none of Bethesda''s or one machine''s files' (@((Zip-Shape $rbPack).Keys | Where-Object { $_.StartsWith('game/') -and ((Test-ShipBethesda ($_.Substring(5).Replace('/', '\'))) -or (Test-ShipOneMachine ($_.Substring(5).Replace('/', '\')))) }).Count -eq 0)
 [void](Update $synced 'feed-dev')
-Yes '  and the synced install follows it to the older texture' ((Get-Game $synced)['Data\textures\ours.dds'] -eq 'a texture of ours, older')
+Yes '  and the synced install follows it to the older texture' ((Get-Game $synced)['Data\Platform\textures\ours.dds'] -eq 'a texture of ours, older')
 
 # ---- the delete itself -----------------------------------------------------------------
 Write-Host ''; Write-Host 'Remove-FeedStoreAssets'

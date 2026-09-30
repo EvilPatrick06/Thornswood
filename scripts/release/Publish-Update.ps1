@@ -451,7 +451,12 @@ $runtimeDirs = $ShipRuntimeDirs
 function Test-Vanilla([string]$rel) { return ((Test-ShipVanilla $rel) -or (Test-ShipForeignFramework $rel)) }
 function Test-Runtime([string]$rel) { return (Test-ShipRuntime $rel) }
 function Test-OtherServer([string]$rel) { return (Test-ShipOtherServer $rel) }
-function Test-Machine([string]$rel) { return (Test-ShipMachine $rel) }
+# Other people's loose files as well (#1178): never packed, never recorded,
+# never listed as removed. What waits for the collection is asked at the
+# revision this release is built against.
+$ShipCollectionRevision = Get-ShipCollectionRevision $Root
+Say ("  collection revision {0}: loose files held for the collection until then still ship" -f $ShipCollectionRevision) 'DarkGray'
+function Test-Machine([string]$rel) { return ((Test-ShipMachine $rel) -or (Test-ShipNotOurs $rel)) }
 
 # ---- another server's menu -------------------------------------------------
 #
@@ -1281,7 +1286,11 @@ foreach ($a in $alwaysGone) { $gone[$a] = 'always' }
 foreach ($k in @($gone.Keys)) {
     if ($now.ContainsKey($k)) { $gone.Remove($k); continue }
     if ($gone[$k] -eq 'always') { continue }
-    if ((Test-FromCollection $k) -or (Test-Vanilla $k) -or (Test-Runtime $k) -or (Test-Machine $k) -or (Test-OtherServer $k)) { $gone.Remove($k) }
+    # Test-ShipMachine, not Test-Machine: another author's file an earlier
+    # release already took out (the Lost Ark armour the dev record lists as
+    # removed) stays gone;
+    # the removals filter above keeps any new one of them off this list (#1178).
+    if ((Test-FromCollection $k) -or (Test-Vanilla $k) -or (Test-Runtime $k) -or (Test-ShipMachine $k) -or (Test-OtherServer $k)) { $gone.Remove($k) }
 }
 foreach ($k in @($gone.Keys)) { $now[':gone:' + $k] = [string]$gone[$k] }
 
@@ -1301,6 +1310,28 @@ if ($bethesdaInRecord.Count) {
          $bethesdaInRecord.Count, (($bethesdaInRecord | Select-Object -First 5) -join ', '))
 }
 # ==== end thornswood no bethesda in the record ====
+
+# ==== thornswood no one machine's files in the record ====
+# tests\test-no-machine-files.ps1 runs this block on its own.
+#
+# Nothing of one machine's goes into the record either (#1239): its runtime
+# state and tokens in Data\Platform, logs, Vortex's records, window layouts,
+# settings saved from a mod's menu, face exports, saves (Test-ShipOneMachine).
+# A launcher that syncs to the record fetches every file it names, so the dev
+# records of 28 and 29 September handed out the join pass and the mod menu
+# settings of the machine that ships. The scan leaves them out through
+# Test-Machine and Test-Runtime; this stops the release if a later change ever
+# puts one back. As gone they are allowed only on $ShipDeleteAlways, which every
+# release deletes on purpose (voice-token.txt).
+$machineInRecord = @(@($now.Keys) | ForEach-Object {
+                        if ($_.StartsWith(':gone:')) { $g = $_.Substring(6); if (@(Get-ShipDeleteAlways) -notcontains $g) { $g } }
+                        elseif (-not $_.StartsWith(':')) { $_ } } |
+                     Where-Object { $_ -and (Test-ShipOneMachine $_) })
+if ($machineInRecord.Count) {
+    Die ("The record of this release names {0} of one machine's own files, which never leave it: {1}. Nothing was sent." -f
+         $machineInRecord.Count, (($machineInRecord | Select-Object -First 5) -join ', '))
+}
+# ==== end thornswood no one machine's files in the record ====
 
 if (-not $NoUpload) {
     $recordFiles = @()
