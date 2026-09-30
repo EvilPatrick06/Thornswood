@@ -21,7 +21,8 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const CR = String.fromCharCode(13);
 function read(...bits) { return fs.readFileSync(path.join(ROOT, ...bits), 'utf8').split(CR).join(''); }
-const front = read('game', 'plugins', 'thornswood-front.js');
+const front = process.env.FRONT ? fs.readFileSync(process.env.FRONT, 'utf8').split(CR).join('') :
+              read('game', 'plugins', 'thornswood-front.js');
 const bridge = read('game', 'ui', 'thornswood-bridge.js');
 
 let pass = 0, fail = 0;
@@ -64,9 +65,16 @@ yes('the menu check takes the one menu a key of ours just opened', busyFn !== nu
 */
 function rig(opt) {
   opt = opt || {};
-  const w = { now: 100000, menus: {}, shut: [], typed: [], said: [], handlers: {}, mapped: 53, events: [] };
+  const w = { now: 100000, menus: {}, shut: [], typed: [], said: [], handlers: {}, mapped: 53, events: [], opened: 0, kept: {}, keptCalls: [] };
   w.menus = Object.assign({}, opt.menus || {});
+  const T = { ready: !opt.notReady };
+  const commandKey = opt.commandKey || 53;
   const sp = {
+    setMenuOpenKeyBlocked: opt.client ? function (event, code, on, except) {
+      w.keptCalls.push({ event: event, code: code, on: on });
+      if (on) { w.kept[event + ':' + code] = except.slice(); }
+      else { delete w.kept[event + ':' + code]; }
+    } : undefined,
     on: function (n, f) { (w.handlers[n] = w.handlers[n] || []).push(f); },
     Ui: { isMenuOpen: function (n) { return !!w.menus[n]; } },
     Utility: { isInMenuMode: function () { return Object.keys(w.menus).some(function (k) { return w.menus[k]; }); } },
@@ -86,8 +94,8 @@ function rig(opt) {
     busyFn + '\n' +
     'function wantTyping(on, prefill) { typed.push([on, prefill]); }\n' +
     block + '\nreturn { press: commandKeyPressed, keyDown: function () { statsOnSlash.keyDown(); magicOnP.keyDown(); } };';
-  const api = new Function('sp', 'say', 'guard', 'claims', 'typed', 'Date', body)(
-    sp, function (t) { w.said.push(t); }, function (n, f) { return f; }, claims, w.typed, clock);
+  const api = new Function('sp', 'say', 'guard', 'claims', 'typed', 'Date', 'T', 'COMMAND_KEY', body)(
+    sp, function (t) { w.said.push(t); }, function (n, f) { return f; }, claims, w.typed, clock, T, commandKey);
   function fire(ev, name) { (w.handlers[ev] || []).forEach(function (f) { f({ name: name }); }); }
   // The events the game has queued for the plugin, in order.
   w.deliver = function () { w.events.splice(0).forEach(function (e) { fire(e[0], e[1]); }); };
@@ -95,17 +103,21 @@ function rig(opt) {
   w.opens = function (n) {
     if (w.menus[n]) { return; }
     w.menus[n] = true;
+    w.opened++;
     w.events.push(['menuOpen', n]);
   };
   // The person presses /. The game takes it first, as Quick Stats.
   w.press = function (name) {
     const control = name === undefined ? 'Quick Stats' : name;
     const took = control ? control === 'Quick Stats' : w.mapped === 53;
-    if (took && !opt.late && !opt.refuse) { w.opens('StatsMenu'); }
+    const nativeControl = control || (w.mapped === commandKey ? 'Quick Stats' : '');
+    const except = w.kept[nativeControl + ':' + commandKey];
+    const blocked = !!except && !except.some(function (n) { return !!w.menus[n]; });
+    if (took && !blocked && !opt.late && !opt.refuse) { w.opens('StatsMenu'); }
     if (opt.eventFirst) { w.now += 20; w.deliver(); }
     api.keyDown();
-    api.press({ code: 53, userEventName: control });
-    if (took && opt.late && !opt.refuse) { w.opens('StatsMenu'); }
+    api.press({ code: commandKey, userEventName: control });
+    if (took && !blocked && opt.late && !opt.refuse) { w.opens('StatsMenu'); }
   };
   // One frame: the update, then what the game queued for the plugin.
   w.tick = function (ms) {
@@ -114,6 +126,12 @@ function rig(opt) {
     w.deliver();
   };
   w.run = function (n, ms) { for (let i = 0; i < n; i++) { w.tick(ms); } };
+  w.ready = function (ready) { T.ready = ready; w.tick(); };
+  w.gamePress = function (code, control) {
+    const except = w.kept[control + ':' + code];
+    const blocked = !!except && !except.some(function (n) { return !!w.menus[n]; });
+    if (control === 'Quick Stats' && !blocked) { w.opens('StatsMenu'); }
+  };
   w.api = api;
   return w;
 }
@@ -218,6 +236,51 @@ if (block && busyFn) {
   }
 }
 
+// The native client consults the registered list BEFORE it queues a menu.
+// Counting creations catches even a menu that is shut in the same frame.
+if (block && busyFn) {
+  for (const opt of [{ client: true }, { client: true, late: true },
+                     { client: true, eventFirst: true }]) {
+    const w = rig(opt);
+    w.tick();
+    w.press();
+    w.run(3);
+    yes('native / never creates StatsMenu in either event order', w.opened === 0);
+    yes('native / opens chat prefilled with /', w.typed.length === 1 && w.typed[0][1] === '/');
+    yes('native / needs no close-after-open fallback', w.shut.length === 0);
+    const count = w.keptCalls.length;
+    w.run(3);
+    yes('native list changes only when readiness changes', w.keptCalls.length === count);
+  }
+  {
+    const w = rig({ client: true });
+    w.tick();
+    w.gamePress(48, 'Quick Stats');
+    yes('rebinding the game skill key preserves that separate key', w.opened === 1);
+  }
+  {
+    const w = rig({ client: true, commandKey: 48 });
+    w.tick();
+    w.gamePress(53, 'Quick Stats');
+    yes('moving CommandKey leaves the original skill key untouched', w.opened === 1);
+  }
+  {
+    const w = rig({ client: true, menus: { InventoryMenu: true } });
+    w.tick();
+    w.press();
+    yes('the native list preserves keys in an existing game menu', w.opened === 1 && w.typed.length === 0);
+  }
+  {
+    const w = rig({ client: true, notReady: true });
+    w.tick();
+    w.ready(true);
+    w.press();
+    yes('ready overlays claim the key before the game can create its tree', w.opened === 0);
+    w.ready(false);
+    w.gamePress(53, 'Quick Stats');
+    yes('page reload releases the native key while overlays are unavailable', w.opened === 1);
+  }
+}
 // ------------------------------------------------------------ the page
 {
   const s = bridge.indexOf('  function focusInput(prefill) {');
