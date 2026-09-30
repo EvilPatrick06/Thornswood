@@ -1,198 +1,167 @@
-# Professions and sub-professions
+# Professions
 
-One profession, then one half of it. The half is what you can make. The
-other half of your own profession is yours at novice and no further,
-unless a master of that half teaches you. Two trades outside your
-profession, novice only, is the ceiling. A master decides who, and can
-end it.
+What you make, or how you fight. One profession, then one half of it.
+The half is a sub-profession. It is what you can make. A class is a
+separate choice and lives under [Classes](classes.md).
 
-Four ranks: novice, advanced, expert, master. You start at novice. The
-hours are the same ladder for every class and every crafting profession:
-100 to advanced, 250 to expert, 600 to master. Each rank gives one skill
-tree point. See [Skill tree](skill-tree.md).
+The pages below are the professions. Each one links to its
+sub-professions, and those pages are where the benches, the rank
+counts, and the item list sit.
 
-Your own half, at or under your rank, gets made, and the work counts.
-Your sister half, up to novice, gets made and does not climb that half
-past novice on its own. Anything else is refused, and you are told whose
-work it is.
+| Profession | Sub-professions |
+| --- | --- |
+| [Warrior](professions/warrior.md) | [Bulwark](professions/warrior/bulwark.md), [Berserker](professions/warrior/berserker.md) |
+| [Mage](professions/mage.md) | The five schools, under that page. Magic law is [Magic and the College](magic.md) |
+| [Alchemist](professions/alchemist.md) | [Blightbrewer](professions/alchemist/blightbrewer.md), [Physicker](professions/alchemist/physicker.md) |
+| [Cook](professions/cook.md) | [Hearthcook](professions/cook/hearthcook.md), [Confectioner](professions/cook/confectioner.md) |
+| [Smith](professions/smith.md) | [Platewright](professions/smith/platewright.md), [Edgewright](professions/smith/edgewright.md) |
+| [Enchanter](professions/enchanter.md) | [Bladebinder](professions/enchanter/bladebinder.md), [Wardweaver](professions/enchanter/wardweaver.md) |
+| [Tailor](professions/tailor.md) | [Liverywright](professions/tailor/liverywright.md), [Haberdasher](professions/tailor/haberdasher.md) |
+| [Woodworker](professions/woodworker.md) | [Charburner](professions/woodworker/charburner.md), [Woodwright](professions/woodworker/woodwright.md) |
 
-Smelting and tanning belong to nobody. The open list is
-[lists/anybody.md](lists/anybody.md). House nails, hinges, locks and iron
-fittings are refused:
-[lists/refused.md](lists/refused.md).
+## The ladder
 
-A recipe can also demand a race. That gate is [Races](races.md). The
-locked rows are marked in the lists.
+Four ranks: novice, advanced, expert, master. Everyone starts at novice.
 
-Tempering at a grindstone or an armour table is in the lists and marked
-"server asked: no". The server never sees it. Master's tempering is
-named below and is not a gate yet.
+Work is counted in pieces, and the count starts again at each rank:
 
-## Warrior
+| Into | Pieces of work | Then |
+| --- | --- | --- |
+| Advanced | 100 | The count returns to 0 |
+| Expert | 250 | The count returns to 0 |
+| Master | 600 | There is no further rank |
 
-Bulwark holds the line. Berserker breaks it. Neither owns a recipe.
-There is no craft list.
+That is 950 pieces from a new novice to master, not 600 in total.
+One successful swing, harvest, or craft is one piece. A master perk
+that makes two items from one craft is still one piece of work.
 
-A warrior climbs by killing what is not a person: an animal, a draugr,
-a bandit. A kill between people counts for nothing. The kill goes
-through the same work counter as a swing of a pick, so the same 100,
-250 and 600 apply, and the same rest cost.
+Each rank hands one skill-tree point. See [Skill tree](skill-tree.md).
 
-**Warlord**, at master. Master-tier combat maneuvers, and you can teach
-novice combat to people who are not warriors.
+The same ladder is used by every class. A miner and a tailor are not
+on different clocks.
 
-## Mage
+A swing of your own work also costs rest, by the rank you are climbing:
 
-No halves and no recipes. Two schools, chosen, and two spell points to
-start. A third school at master, and two more spell points. Learning a
-spell costs a point, needs the rank in that school, and needs a spell
-of that school one rank down. A novice spell needs none below it.
+| Rank | Rest |
+| --- | --- |
+| Novice | 1.5 |
+| Advanced | 1.2 |
+| Expert | 0.9 |
+| Master | 0.6 |
 
-Someone a master taught holds two spell places instead of points, stays
-at novice, and learns from the tome.
+Under 15 rest, crafting is refused. The class verbs still happen, and
+they still cost the rest.
 
-A spell learned is 5 work in its school. A rank gained anywhere else is
-10 work in every school the mage holds. Casting itself is not counted.
+Work done while somebody from your party is in the same cell banks
+15% of a piece. At a whole piece it pays one extra. That is every
+seventh piece. Listed on a party and standing somewhere else pays
+nothing. See [People beside you](people.md).
 
-The book:
+## How a recipe gets its rank
 
-**Destruction.** Novice: Flames, Frostbite, Sparks. Advanced: Firebolt,
-Ice Spike, Lightning Bolt, Fireball, Ice Storm, Chain Lightning, Flame
-Cloak, Frost Cloak, Lightning Cloak. Expert: Incinerate, Icy Spear,
-Thunderbolt, Wall of Flames, Wall of Frost, Wall of Storms. Master:
-Fire Storm, Blizzard, Lightning Storm.
+The rank is the dearest ingredient a class produces. An iron cuirass
+asks for iron, and iron is novice mining, so the cuirass is novice.
+A piece that asks for a steel ingot is advanced, because that is the
+rank recorded for gathering what that ingot is made from. The
+finished piece's own sell price is written down beside that and is
+not the rank, unless nothing in the row is produced by any class.
+Then the sell price is the rank. If some ingredients are produced
+and some are not, the rank is held up at the sell price: something
+nobody gathers is not allowed to make the recipe cheap. Each row
+says the rank that rule produced.
 
-**Restoration.** Novice: Healing, Lesser Ward. Advanced: Healing Hands,
-Fast Healing, Steadfast Ward, Turn Undead, Close Wounds, Heal Other,
-Greater Ward, Repel Lesser Undead. Expert: Grand Healing, Circle of
-Protection, Repel Undead, Turn Greater Undead. Master: Guardian Circle,
-Bane of the Undead.
+## What the server allows
 
-**Alteration.** Novice: Candlelight, Oakflesh. Advanced: Magelight,
-Stoneflesh, Detect Life, Ironflesh, Telekinesis, Waterbreathing.
-Expert: Ebonyflesh, Paralyze, Detect Dead. Master: Dragonhide, Mass
-Paralysis.
+Three answers, and each one names somebody.
 
-**Conjuration.** Novice: Conjure Familiar, Raise Zombie, Bound Sword.
-Advanced: Conjure Flame Atronach, Reanimate Corpse, Bound Battleaxe,
-Soul Trap, Conjure Frost Atronach, Banish Daedra, Revenant, Bound Bow.
-Expert: Conjure Storm Atronach, Dread Zombie, Conjure Dremora Lord,
-Expel Daedra, Command Daedra. Master: Dead Thrall, Flame Thrall, Frost
-Thrall, Storm Thrall.
+Your own half, at or under your rank. It is made, and the work counts
+on that half.
 
-**Illusion.** Novice: Courage, Clairvoyance, Fury. Advanced: Calm, Fear,
-Muffle, Frenzy, Rally, Invisibility. Expert: Pacify, Rout, Call to Arms.
-Master: Harmony, Hysteria, Mayhem.
+Your sister half, up to novice. It is made. It does not climb that
+half past novice unless a master of that half has you as an apprentice.
+An Edgewright can beat out novice plate. A steel cuirass is not novice
+plate.
 
-**Archmage**, at master. The third school, and the standing to
-apprentice people who are not mages.
+Anything else. It is not made. You keep the materials. The line says
+whose work it is and what rank it asks for.
 
-## Alchemist
+Until a profession is picked, nothing that belongs to a half is made.
+Smelting and tanning stay open, because they belong to nobody. That
+list is [lists/anybody.md](lists/anybody.md). Nails, hinges, locks and
+iron fittings are refused: [lists/refused.md](lists/refused.md).
 
-Blightbrewer makes poisons. Physicker makes medicine. Skyrim has no
-alchemy recipe records. A potion is whatever the ingredients share, at
-the alchemy lab. The lab works for either half. Anyone else is turned
-away.
+A recipe can also demand a race. [Races](races.md). The locked rows
+are marked in the lists and collected in
+[lists/race-locks.md](lists/race-locks.md).
 
-**Master Chemist.** Every batch yields two instead of one.
+## Apprentices
 
-There is no item list, because there is no recipe list. The poison bit
-and the medicine bit are the split the day a mod adds a bench recipe.
+A master decides who, and can end it. Nobody is owed one.
 
-## Cook
+Inside the same profession, past novice on the sister half, you need a
+master of that half. The hours under them are what move that half. The
+sister half does not count against the two outside trades.
 
-Hearthcook makes dinners. Confectioner makes desserts.
+Outside the profession, a master can teach a novice's worth of their
+own half. Twice in a life. It never goes past novice.
 
-- [Hearthcook, 112 recipes](lists/cook-hearthcook.md)
-- [Confectioner, 28 recipes](lists/cook-confectioner.md)
+## Benches, in one picture
 
-**Grand Chef.** Every batch yields two instead of one.
+Some furniture turns you away before a recipe is even read. Some
+furniture is open, and the recipe is what refuses you.
 
-A Confectioner's novice rung is eight desserts moved down so the rung
-is not empty. Every one of them wants flour and butter, and flour is
-advanced farm work. A novice confectioner is buying flour, not growing
-the wheat. All 28 are also behind two vanilla food perks the crafting
-menu still asks for, so the menu can hide them even though the server
-would allow them.
+Closed, and the half must be one you can work at the rank named:
 
-## Smith
+| Bench | Who |
+| --- | --- |
+| Oven | Hearthcook or Confectioner, from novice |
+| Cookpot | Open furniture. The recipe is still Hearthcook's |
+| Grain mill | Hearthcook, from novice |
+| Charcoal kiln | Charburner, from novice |
+| Alchemy lab | Blightbrewer or Physicker, from novice |
+| Arcane enchanter | Bladebinder or Wardweaver, from novice |
+| Staff enchanter | Bladebinder, from novice |
+| Sharpening wheel | Edgewright or Woodwright, from novice |
+| Skyforge | Edgewright, Platewright, or Woodwright, at advanced |
+| Dawnguard bench | Woodwright, at advanced |
+| Forge | Open furniture. A forge recipe still has an owner and a rank |
+| Tanning rack | Open. Hides into leather are anybody's work |
+| Loom | Open furniture. The garment still has an owner and a rank |
+| Armour table | Open furniture. Tempering never reaches the server |
+| Aetherium forge | Open furniture. The staff and the plate made there are master recipes |
 
-Platewright makes armour. Edgewright makes weapons.
+A forge or a skyforge burns one charcoal, cheapest grade in the pack
+first. No charcoal, nothing is made. A hafted weapon also takes one
+tool handle. Swords, greatswords, daggers, bows and staves do not.
+Both of those are [Charburner](professions/woodworker/charburner.md)
+goods, and neither is written into the recipe's ingredient list, so
+the rank of a hafted weapon was worked out as if the handle were free.
 
-- [Platewright, 2198 recipes, 864 reach the server](lists/smith-platewright.md)
-- [Edgewright, 700 recipes, 299 reach the server](lists/smith-edgewright.md)
+## The book on K
 
-The rows the server is not asked about are tempering.
+Press K. The recipe book has a column for your half, a column for the
+sister half, and a column for each half a master has taught you. It
+shows kinds and counts, not every garment. The full item rows are the
+lists linked from each sub-profession.
 
-**Mastercraft.** Temper to legendary, past what the metal should take.
-That perk is the tempering rows. They do not reach the server yet.
-
-## Enchanter
-
-Bladebinder makes staves and binds weapon spells. Wardweaver enchants
-armour and apparel. Enchanting a cuirass is the enchanting menu, not a
-recipe, so Wardweaver has no list. The lab works for either half.
-Anyone else is turned away.
-
-- [Bladebinder, 161 staves](lists/enchanter-bladebinder.md)
-
-An enchanter starts with 2 staff-spell points. Each rank gives one
-more, and master gives two. The staff's spell rank cannot pass the
-Bladebinder rank. A Wardweaver holds Bladebinder at novice until a
-master teaches them.
-
-Heart stone is advanced mining, and most staves want one. The novice
-staves are one rung under that stone, so a novice buys the stone.
-
-**Twin Souls.** Two enchantments on one item.
-
-## Tailor
-
-Liverywright makes robes and faction dress. Haberdasher makes common
-and fine clothing.
-
-- [Liverywright, 102 recipes](lists/tailor-liverywright.md)
-- [Haberdasher, 231 recipes, 227 reach the server](lists/tailor-haberdasher.md)
-
-**Master Weaver.** Clothing they make carries hidden armour, or keeps
-the weather off, and still weighs what clothing weighs. The weather
-half is in [Temperature](temperature.md). Hidden armour is a rating on
-that garment, not extra weight. The warmth table does not read tailor
-rank yet.
-
-## Woodworker
-
-Charburner makes firewood through to coke. Woodwright makes bows,
-arrows and instruments. Spears, pikes and halberds are the Woodwright's
-as well.
-
-- [Charburner, 5 recipes](lists/woodworker-charburner.md)
-- [Woodwright, 156 recipes, 86 reach the server](lists/woodworker-woodwright.md)
-
-A woodcutter's axe is the tool, 100 uses.
-
-**Master Carver.** Fires and kilns they build or work are the hottest
-the warmth rules allow. The number is in [Temperature](temperature.md).
+A mage sees the spell book there instead.
 
 ## Names that are not a profession
 
-Bard, merchant, priest, scholar and thief are roleplay. They are not
-picked on K and they grant no recipe, no verb and no rank. Bardic rest
-is `/bard` in the same cell, in [Exhaustion](exhaustion.md). A merchant's
-institution is the [Merchant's Guild](merchants-guild.md), which is not
-this profession list.
+Bard, merchant, priest, scholar and thief are not picked on K. They
+grant no recipe, no verb and no rank. Bardic rest is on
+[People beside you](people.md). A merchant's institution is the
+[Merchant's Guild](merchants-guild.md).
 
 ## Where this is
 
-The eight professions, the halves, the four ranks, the 100 / 250 / 600
-ladder, the sister-half rule, the two outside trades, the craft gate,
-the mage spell book, the staff points and the recipe lists are in the
-server. The lists in this folder are those tables, one row each.
+The eight professions, the halves, the ladder with the count resetting,
+the sister-half rule, the two outside trades, the bench table, the
+charcoal and the handle, and the recipe lists are in the server.
 
-Not in the world yet: Warrior's master maneuvers as a mechanic,
-Mastercraft tempering (the rows exist and the server is never asked),
-Twin Souls as a second enchantment, Master Weaver's hidden armour and
-weather step, Master Carver's hotter fire, and the vanilla perk
-conditions that still hide Confectioner recipes in the crafting menu.
-Alchemy and armour enchanting stay menu skills with a bench gate and
-no recipe rows.
+Not in the world yet: a warrior's master maneuvers as a mechanic,
+Mastercraft as a gate on tempering, Twin Souls as a second enchantment,
+Master Weaver's hidden armour, Master Carver's hotter fire, and the
+vanilla perk lines that still hide some recipes in the crafting menu
+even when the server would allow them. Each profession page says which
+of those is its own.
