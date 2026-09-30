@@ -18,6 +18,13 @@ on K. The robes are not a race lock. An Altmer, a Bosmer, or anyone
 else the race page allows can wear them. Wearing them does not change
 your race.
 
+Thalmor robes, Thalmor armour, and Justiciar weapons are not found in
+the world. They are not in a chest and not on a body. A person on the
+remnant roll may craft them. The roll is an application, the same
+kind as a Jarl, not a button on K. The references are on
+[Cut items](cut-items.md), marked thalmor, so they can come back for
+an event.
+
 Wearing Justiciar robes, Thalmor armour, or carrying a Dominion flag
 in a hold is a hostile marker. A guard, and any person acting as one,
 may start a fight on sight. Starting the fight does not need a yes.
@@ -73,7 +80,8 @@ spend into a second mint.
 ## Where this is
 
 The lore is on the site. The robes are items in the tailor lists and
-they are not race locked. No patrol is spawned by the server. No
+they are not race locked, and the world can still hand them out. No
+remnant roll exists. No patrol is spawned by the server. No
 marker on a character reads Thalmor. Guards do not yet attack on
 sight, because most of them are still the game's own actors and the
 server does not run their AI. The known-issues page still says the

@@ -1,33 +1,37 @@
 # Bladebinder
 
-Staves. 161 recipes, every one reaches the server. 160 are the staff
-enchanter. 1 is the aetherium forge: the Aetherial Staff, the only
-master row.
+Staves whose spell is in the college book. Thirteen of them. The
+other 147, and the Aetherial Staff, are held in
+[Cut items](../../cut-items.md) and are not made.
 
-The full table: [lists/enchanter-bladebinder.md](../../lists/enchanter-bladebinder.md).
+The thirteen that stay:
 
-| Rank | Staves |
+| Staff | Spell in the book |
 | --- | --- |
-| Novice | 66 |
-| Advanced | 55 |
-| Expert | 39 |
-| Master | 1 |
+| Staff of Flames | Flames |
+| Staff of Frostbite | Frostbite |
+| Staff of Sparks | Sparks |
+| Staff of Firebolts | Firebolt |
+| Staff of Ice Spikes | Ice Spike |
+| Staff of Lightning Bolts | Lightning Bolt |
+| Staff of Ice Storms | Ice Storm |
+| Staff of Soul Trapping | Soul Trap |
+| Staff of Turning | Turn Undead |
+| Grand Staff of Turning | Turn Greater Undead |
+| Staff of Incineration | Incinerate |
+| Staff of Icy Spear | Icy Spear |
+| Staff of Thunderbolts | Thunderbolt |
 
-All 161 are the kind Staves. No race lock. Worth runs from 5 gold to
-1250.
+Heart stone is master mining, one place, because the book no longer
+needs a novice to pull it. See [Miner](../../classes/miner.md).
 
-160 of them ask for a heart stone. Heart stone is advanced mining,
-forced onto that rung so it lines up with these staves. See
-[Miner](../../classes/miner.md). A novice stave is novice work and
-still wants the stone, so a novice buys it. They cannot pull it out
-of the ground.
+The table under Every recipe is the server book, all 161 rows. The
+column that says whether the spell is in the college book is how a
+row is told apart from the thirteen above.
 
-The Aetherial Staff does not want a heart stone. It wants an aetherium
+The Aetherial Staff is cut with the Aetherium. It wanted an aetherium
 crest, 2 dwarven metal ingots, 2 ebony ingots and 1 gold ingot. Worth
-1250. The forge it uses is open furniture. The recipe is master, so
-the rank stops everyone else. The bench table also names Bladebinder
-at master on that forge, and then marks the forge open, so the line
-is not a second door. The recipe is the door.
+1250. The reference stays in the cut file.
 
 ## The spell the menu asks for
 
@@ -264,4 +268,5 @@ The spell column is the HasSpell the crafting menu asks for. In the college book
 ## Where this is
 
 The 161 rows, the staff enchanter, and the unlock points are in the
-server. Heart stone's rank is in the ore table.
+server. Heart stone is still advanced in the ore table. Nothing has
+been removed from the recipe file.

@@ -14,10 +14,12 @@ The full table: [lists/woodworker-charburner.md](../../lists/woodworker-charburn
 | Charcoal Briquette | Expert | 7 firewood | 2 | 1 |
 | Coke | Master | 12 firewood | 2 | 1 |
 
-A forge and a skyforge burn one charcoal per piece, cheapest grade in
-the pack first. Poor Charcoal is what they eat if you have it. A
-better grade is saved. No charcoal of any grade, the forge refuses
-the piece, including a smith's.
+A forge and a skyforge burn one charcoal per piece. The four grades
+are how hot the fire is. A higher metal needs a hotter grade. Which
+grade lights which metal is not set. Until it is, the server burns
+the cheapest grade in the pack first, and Poor Charcoal is what it
+eats if you have it. No charcoal of any grade, the forge refuses the
+piece, including a smith's.
 
 A hafted weapon takes one tool handle on top of its own ingredients.
 The handle was not in those ingredients when the weapon's rank was
