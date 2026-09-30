@@ -451,7 +451,12 @@ $runtimeDirs = $ShipRuntimeDirs
 function Test-Vanilla([string]$rel) { return ((Test-ShipVanilla $rel) -or (Test-ShipForeignFramework $rel)) }
 function Test-Runtime([string]$rel) { return (Test-ShipRuntime $rel) }
 function Test-OtherServer([string]$rel) { return (Test-ShipOtherServer $rel) }
-function Test-Machine([string]$rel) { return (Test-ShipMachine $rel) }
+# Other people's loose files as well (#1178): never packed, never recorded,
+# never listed as removed. What waits for the collection is asked at the
+# revision this release is built against.
+$ShipCollectionRevision = Get-ShipCollectionRevision $Root
+Say ("  collection revision {0}: loose files held for the collection until then still ship" -f $ShipCollectionRevision) 'DarkGray'
+function Test-Machine([string]$rel) { return ((Test-ShipMachine $rel) -or (Test-ShipNotOurs $rel)) }
 
 # ---- another server's menu -------------------------------------------------
 #
@@ -1281,7 +1286,11 @@ foreach ($a in $alwaysGone) { $gone[$a] = 'always' }
 foreach ($k in @($gone.Keys)) {
     if ($now.ContainsKey($k)) { $gone.Remove($k); continue }
     if ($gone[$k] -eq 'always') { continue }
-    if ((Test-FromCollection $k) -or (Test-Vanilla $k) -or (Test-Runtime $k) -or (Test-Machine $k) -or (Test-OtherServer $k)) { $gone.Remove($k) }
+    # Test-ShipMachine, not Test-Machine: another author's file an earlier
+    # release already took out (the Lost Ark armour the dev record lists as
+    # removed) stays gone;
+    # the removals filter above keeps any new one of them off this list (#1178).
+    if ((Test-FromCollection $k) -or (Test-Vanilla $k) -or (Test-Runtime $k) -or (Test-ShipMachine $k) -or (Test-OtherServer $k)) { $gone.Remove($k) }
 }
 foreach ($k in @($gone.Keys)) { $now[':gone:' + $k] = [string]$gone[$k] }
 
