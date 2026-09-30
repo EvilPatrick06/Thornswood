@@ -74,8 +74,8 @@ yes('the quit in the update tick is in the plugin', tick !== null);
 yes("the line's client is in the plugin", lineClient !== null);
 if (!(settings && sayFn && noteFn && consts && probeAndBases && server && tick && lineClient)) { done(); }
 
-const LIVE = 'http://192.135.112.23:3000';
-const DEV = 'http://192.135.112.23:7788';
+const LIVE = 'http://server.invalid:3000';
+const DEV = 'http://server.invalid:7788';
 
 /*
   The real code with a clock, a game that refuses calls outside update the
@@ -104,7 +104,7 @@ function harness(port, up) {
     Game: { quitToMainMenu: function () { if (ctx.where !== 'update') { refuse('Game.quitToMainMenu'); } quits.push(clock.t); } }
   };
   const settingsText = port === null ? '{}' :
-    JSON.stringify({ 'server-ip': '192.135.112.23', 'server-port': port, profileId: 4242 });
+    JSON.stringify({ 'server-ip': 'server.invalid', 'server-port': port, profileId: 4242 });
   const readText = function () { return settingsText; };
   const log = function () { logs.push(Array.prototype.join.call(arguments, ' ')); };
   const guard = function (name, fn) { return fn; };
