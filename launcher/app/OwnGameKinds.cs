@@ -196,7 +196,7 @@ namespace Thornswood
 
         /// <summary>
         /// What scripts\mods\Build-Generated.ps1 made in this folder on the
-        /// machine that ships (#1247): the Nemesis behavior files and the
+        /// machine that ships (#1247): the behavior files Pandora makes and the
         /// BodySlide bodies. Patrick, 29 Sep: they are made in Thornswood's
         /// own folder before a Ship, and the Steam copy stays the person's own.
         /// One "file &lt;sha256&gt; &lt;path&gt;" line per file, among lines

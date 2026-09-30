@@ -129,7 +129,7 @@ function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [st
 
 # WHETHER THE GENERATED FILES ARE CURRENT (issue #1247). Ship stops, on both
 # channels, when the record scripts\mods\Build-Generated.ps1 writes of the
-# Nemesis and BodySlide files it made in the game folder is missing, or no
+# behavior and BodySlide files it made in the game folder is missing, or no
 # longer matches the mod list, the files the tools read, records\generated.json
 # or the files themselves (Get-GeneratedState, scripts\mods\Generated.ps1).
 function Get-GeneratedRows([string]$Root, [string]$ListPath, [string]$Channel) {

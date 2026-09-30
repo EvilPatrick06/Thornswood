@@ -8,23 +8,23 @@
   Thornswood's, refuses while the folder is in use, keeps the bodies covered
   and unshaped, and Ship stops when what it built is stale. Issue #1247.
 
-  WHY THIS EXISTS. Patrick, 29 Sep: Nemesis (behavior files) and BodySlide
-  (body meshes) output is made in Thornswood's own folder, as a scripted step
-  on the shipping PC before a Ship; Steam's copy stays the person's own. Most
-  of Thornswood's folder is hard links to Vortex's copies, which the Steam copy
-  links too, and both tools write their files in place, so a tool run there
-  without care writes into Vortex's copy and the Steam copy as well. And a
-  build the launcher or the release does not know is Thornswood's is either
-  put back to Vortex's at the next refresh or left out of the release.
+  WHY THIS EXISTS. Patrick, 29 Sep: the behavior files and BodySlide's body
+  meshes are made in Thornswood's own folder, as a scripted step on the
+  shipping PC before a Ship; Steam's copy stays the person's own. The behavior
+  files come from Pandora Behaviour Engine+, because Nemesis' -generate never
+  starts its work. Most of Thornswood's folder is hard links to Vortex's
+  copies, which the Steam copy links too, and a tool that writes in place
+  there writes into Vortex's copy and the Steam copy as well. And a build the
+  launcher or the release does not know is Thornswood's is either put back to
+  Vortex's at the next refresh or left out of the release.
 
   HOW. Stand-ins for the two tools, compiled here with the .NET Framework csc,
-  do what the real ones do to a game folder: Nemesis reads its data folder
-  from nemesis.ini (auto is the folder above its own), -update writes its cache
-  of full paths, -generate writes every behavior file on that cache, FNIS.pex
-  and the animation list IN PLACE (opened and truncated, which writes through
-  a hard link); BodySlide reads Config.xml, the group, the slider set and the
-  preset, builds each body as a nif with the set's shapes less any the preset
-  zaps, into --targetdir, and writes its own settings file in place. A pretend
+  do what the real ones do: Pandora reads its folders from the Settings.json
+  beside it (never -o), turns on the patches its ActiveMods.json says, and
+  writes its files, in its own letter case, only into its output folder;
+  BodySlide reads Config.xml, the group, the slider set and the preset, builds
+  each body as a nif with the set's shapes less any the preset zaps, into
+  --targetdir, and writes its own settings file in place. A pretend
   Vortex staging folder, Steam copy and Thornswood install are built with
   every mod file hard linked into both game folders, the worst case, and
   Build-Generated.ps1 runs against the install as a child process.
@@ -34,7 +34,7 @@
        are covered; the preset names every slider at its default and no morph
        file is asked for; the record lists every file made and nothing of the
        tools' own folders; Ship-Rules lets the release carry them
-    B  stale: the mod list, a file Nemesis reads, a file BodySlide reads, the
+    B  stale: the mod list, a file Pandora reads, a file BodySlide reads, the
        build list, a built file changed, and no record, each make it stale,
        and Ship and Check-ShipReady stop on it
     C  in use: Skyrim or the launcher run from the install: refused, nothing written
@@ -43,7 +43,10 @@
     E  the body rules: a breast slider moved, the bra zapped: refused before
        BodySlide runs; a nude slider set: built, read, refused, nothing placed
     F  a write through a link the script did not foresee: refused, not recorded
-    G  Nemesis' cache naming a path outside the folder: refused before -generate
+    G  Pandora: it runs from a copy in the work folder with its settings naming
+       only this folder and the work folder; its log with an error, Pandora
+       writing into the game folder, no Pandora, and one that sits waiting
+       (the stall check) are each refused, nothing recorded
     H  BodySlide writing into the game folder itself: refused
     I  what the last build made and this one did not: Vortex's copy put back
     J  a dry run writes nothing
@@ -66,9 +69,14 @@ $pwsh = (Get-Process -Id $PID).Path
 
 $script:pass = 0
 $script:fail = 0
+$script:lastOut = ''
 function Yes([string]$what, [bool]$cond) {
     if ($cond) { $script:pass++; Write-Host "PASS  $what" }
-    else { $script:fail++; Write-Host "FAIL  $what" }
+    else {
+        $script:fail++; Write-Host "FAIL  $what"
+        # What the last run of Build-Generated said, so a failure says why.
+        if ($script:lastOut) { foreach ($l in @($script:lastOut -split "`r?`n" | Where-Object { $_ -match 'STOP|exit code|in use by|Exception|error' } | Select-Object -Last 8)) { Write-Host "      $l" } }
+    }
 }
 function Done {
     Write-Host ''
@@ -120,50 +128,55 @@ static class Standin
 }
 '@
 
-$nemesis = $common + @'
-static class Nemesis
+$pandora = $common + @'
+static class Pandora
 {
+    // Pandora v4.4.0 reads its folders from Settings.json beside itself, not
+    // from -o; with none it would take the registry's Skyrim.
+    static string Field(string json, string name)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(json, "\"" + name + "\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+        return m.Success ? m.Groups[1].Value.Replace("\\\\", "\\") : null;
+    }
+
     static int Main(string[] args)
     {
         string dir = Standin.Dir();
-        Standin.Log("nemesis " + string.Join(" ", args));
-        string data = null;
-        string ini = Path.Combine(dir, "nemesis.ini");
-        if (File.Exists(ini))
-            foreach (string line in File.ReadAllLines(ini))
-                if (line.StartsWith("SkyrimDataDirectory=")) data = line.Substring(20);
-        if (data == null || data == "auto") data = Path.GetDirectoryName(dir) + "\\";
-        string cache = Path.Combine(dir, "cache");
-        if (args.Length > 0 && args[0] == "-update")
+        Standin.Log("pandora from " + dir + " : " + string.Join(" ", args));
+        if (Environment.GetEnvironmentVariable("STANDIN_HANG") != null) { System.Threading.Thread.Sleep(600000); return 0; }
+        // Its own templates beside it, as the real one reads them.
+        if (!Directory.Exists(Path.Combine(dir, "Pandora_Engine\\Skyrim\\Template"))) return 6;
+        string settings = Path.Combine(dir, "Settings.json");
+        if (!File.Exists(settings)) return 8;
+        string json = File.ReadAllText(settings);
+        string data = Field(json, "gameDataPath"), output = Field(json, "outputPath");
+        if (data == null || output == null) return 8;
+        string active = File.ReadAllText(Path.Combine(output, "Pandora_Engine\\ActiveMods.json"));
+        var codes = new List<string>();
+        foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(active, "\"code\"\\s*:\\s*\"(\\w+)\"\\s*,\\s*\"active\"\\s*:\\s*true"))
+            codes.Add(m.Groups[1].Value);
+        Standin.Log("pandora active " + string.Join(" ", codes.ToArray()));
+        var log = new StringBuilder("INFO : Skyrim Patcher 4.4.0-beta\r\n");
+        int i = 1;
+        foreach (string c in codes)
         {
-            var lines = new List<string>();
-            lines.Add("0_master=" + data + "meshes\\actors\\character\\behaviors\\0_master");
-            lines.Add("_1stperson\\firstperson=" + data + "meshes\\actors\\character\\_1stperson\\behaviors\\firstperson");
-            if (Environment.GetEnvironmentVariable("STANDIN_NEMESIS_OUTSIDE") != null)
-                lines.Add("mt_behavior=" + Environment.GetEnvironmentVariable("STANDIN_NEMESIS_OUTSIDE"));
-            Standin.InPlace(Path.Combine(cache, "behavior_path"), string.Join("\r\n", lines.ToArray()) + "\r\n");
-            Standin.InPlace(Path.Combine(cache, "engine_update"), "0.84\r\n" + data + "Nemesis_Engine\\behavior templates\\a.txt>>Fri Mar 27 05:49:39 2020\r\n");
-            Standin.InPlace(Path.Combine(cache, "mod settings"), "updated\r\n");
-            return 0;
+            string name = c;
+            string ini = Path.Combine(data, "Nemesis_Engine\\mod\\" + c + "\\info.ini");
+            if (File.Exists(ini)) foreach (string line in File.ReadAllLines(ini)) if (line.StartsWith("name=")) name = line.Substring(5);
+            log.Append("INFO : Pandora Mod " + (i++) + " : " + name + " - v.1.0.0\r\n");
         }
-        if (args.Length > 0 && args[0] == "-generate")
-        {
-            var codes = new List<string>();
-            for (int i = 1; i < args.Length; i++) codes.Add(args[i]);
-            string said = "NEMESIS " + string.Join(" ", codes.ToArray());
-            foreach (string line in File.ReadAllLines(Path.Combine(cache, "behavior_path")))
-            {
-                int eq = line.IndexOf('=');
-                if (eq > 0) Standin.InPlace(line.Substring(eq + 1) + ".hkx", said);
-            }
-            Standin.InPlace(data + "scripts\\FNIS.pex", "FNIS " + said);
-            Standin.InPlace(data + "meshes\\animationdatasinglefile.txt", "ANIMATIONS " + said);
-            Standin.InPlace(Path.Combine(dir, "PatchLog.txt"), "done");
-            string rogue = Environment.GetEnvironmentVariable("STANDIN_ROGUE");
-            if (!string.IsNullOrEmpty(rogue)) Standin.InPlace(data + rogue, "ROGUE");
-            return 0;
-        }
-        return 9;
+        log.Append("INFO : Pandora Mod " + (i++) + " : Pandora Base - v.1.0.0\r\n");
+        if (Environment.GetEnvironmentVariable("STANDIN_PANDORA_ERROR") != null) log.Append("ERROR : Could not export 0_master\r\n");
+        string said = "PANDORA " + string.Join(" ", codes.ToArray());
+        // Its own letter case, which is not the folder's.
+        Standin.InPlace(Path.Combine(output, "meshes\\actors\\character\\Behaviors\\0_Master.hkx"), said);
+        Standin.InPlace(Path.Combine(output, "meshes\\actors\\character\\Characters\\DefaultMale.hkx"), said);
+        Standin.InPlace(Path.Combine(output, "meshes\\animationdatasinglefile.txt"), "ANIMATIONS " + said);
+        Standin.InPlace(Path.Combine(output, "Pandora_Engine\\PreviousOutput.txt"), "listed");
+        if (Environment.GetEnvironmentVariable("STANDIN_PANDORA_INTO_DATA") != null) Standin.InPlace(Path.Combine(data, "meshes\\pandora_stray.txt"), "stray");
+        if (Environment.GetEnvironmentVariable("STANDIN_PANDORA_DELETE") != null) File.Delete(Path.Combine(data, "meshes\\ts\\bench.nif"));
+        File.WriteAllText(Path.Combine(output, "Engine.log"), log.ToString());
+        return 0;
     }
 }
 '@
@@ -219,6 +232,8 @@ static class BodySlide
         string group = Arg(args, "--groupbuild"), target = Arg(args, "--targetdir"), preset = Arg(args, "--preset");
         if (Environment.GetEnvironmentVariable("STANDIN_BS_INTO_GAME") != null) target = dataPath.InnerText.TrimEnd('\\');
         Standin.InPlace(Path.Combine(dir, "BodySlide.xml"), "<BodySlideConfig><LastPreset>" + preset + "</LastPreset></BodySlideConfig>");
+        string rogue = Environment.GetEnvironmentVariable("STANDIN_ROGUE");
+        if (!string.IsNullOrEmpty(rogue)) Standin.InPlace(Path.Combine(dataPath.InnerText, rogue), "ROGUE");
 
         var members = new List<string>();
         foreach (string f in Directory.GetFiles(Path.Combine(dir, "SliderGroups"), "*.xml"))
@@ -364,10 +379,10 @@ function Same($a, $b) {
 }
 
 try {
-    $okN = Compile 'nemesis' $nemesis
+    $okN = Compile 'pandora' $pandora
     $okB = Compile 'bodyslide' $bodyslide
     $okS = Compile 'sleeper' $sleeper
-    Yes 'the stand-ins for Nemesis, BodySlide and a running game compile' ($okN -and $okB -and $okS)
+    Yes 'the stand-ins for Pandora, BodySlide and a running game compile' ($okN -and $okB -and $okS)
     if (-not ($okN -and $okB -and $okS)) { Done }
 
     # -------------------------------------------------------- the machine
@@ -417,19 +432,21 @@ try {
     # What Vortex has, mod by mod: path under Data, then the bytes (a
     # string, or a script block that writes the file).
     $mods = [ordered]@{
-        'Nemesis' = @(
-            @('Nemesis_Engine\Nemesis Unlimited Behavior Engine.exe', { param($p) Copy-Item -LiteralPath (Join-Path $bin 'nemesis.exe') -Destination $p }),
-            @('Nemesis_Engine\nemesis.ini', "SkyrimDataDirectory=auto`r`nfirst=false`r`n"),
-            # The cache it came with names the Steam copy's files, as the real one did.
-            @('Nemesis_Engine\cache\behavior_path', ("0_master=" + $steam + "\Data\meshes\actors\character\behaviors\0_master`r`n")),
-            @('Nemesis_Engine\cache\engine_update', ("0.84`r`n" + $steam + "\Data\Nemesis_Engine\x>>date`r`n")),
-            @('Nemesis_Engine\cache\mod settings', "Precision`r`n"),
-            @('Nemesis_Engine\mod\colis\info.ini', "name=Precision`r`n"),
-            @('Nemesis_Engine\mod\tdmh\info.ini', "name=TDM Horse`r`n"),
-            @('Nemesis_Engine\mod\tdmlen\info.ini', "name=TDM Leaning`r`n"),
-            @('Nemesis_Engine\mod\tdmv\info.ini', "name=TDM Headtracking`r`n")
+        'Pandora' = @(
+            @('Pandora Behaviour Engine\Pandora Behaviour Engine+.exe', { param($p) Copy-Item -LiteralPath (Join-Path $bin 'pandora.exe') -Destination $p }),
+            @('Pandora Behaviour Engine\Pandora_Engine\Skyrim\Template\vanilla.txt', 'TEMPLATE')
+        )
+        'Precision' = @(
+            ,@('Nemesis_Engine\mod\colis\info.ini', "name=Precision`r`n")
+        )
+        'TK Dodge' = @(
+            # A patch the collection has and the list does not name: it stays off.
+            ,@('Nemesis_Engine\mod\tkuc\info.ini', "name=Ultimate Combat / TK Dodge`r`n")
         )
         'TDM' = @(
+            @('Nemesis_Engine\mod\tdmh\info.ini', "name=TDM Horse`r`n"),
+            @('Nemesis_Engine\mod\tdmlen\info.ini', "name=TDM Leaning`r`n"),
+            @('Nemesis_Engine\mod\tdmv\info.ini', "name=TDM Headtracking`r`n"),
             @('meshes\actors\character\behaviors\0_master.hkx', 'VORTEX-TDM-BEHAVIOR'),
             @('scripts\FNIS.pex', 'VORTEX-FNIS'),
             @('meshes\ts\bench.nif', 'VORTEX-BENCH')
@@ -479,11 +496,11 @@ try {
     Put (Join-Path $own 'made.txt') ("source=$steam`r`ngame=$steam`r`nrules=13`r`nkinds=1`r`n")
     Put (Join-Path $own 'plugins.txt') "*TsOne.esp`r`n*Precision.esp`r`n"
     $list = Join-Path $work 'generated.json'
-    $listText = '{ "nemesis": { "patches": ["colis", "tdmh", "tdmlen", "tdmv"] }, "bodyslide": { "sets": ["CBBE 3BBB Amazing NeverNude", "HIMBO Body - Vanilla Nevernude"], "sliders": {} } }'
+    $listText = '{ "pandora": { "patches": ["colis", "tdmh", "tdmlen", "tdmv"] }, "bodyslide": { "sets": ["CBBE 3BBB Amazing NeverNude", "HIMBO Body - Vanilla Nevernude"], "sliders": {} } }'
     Put $list $listText
     Yes '(every mod file is one file under three names: Vortex''s, the Steam copy''s and Thornswood''s)' (
         [GenTestIds]::Links((Join-Path $game 'Data\meshes\actors\character\character assets\femalebody_1.nif')) -eq 3 -and
-        [GenTestIds]::Links((Join-Path $game 'Data\Nemesis_Engine\cache\mod settings')) -eq 3)
+        [GenTestIds]::Links((Join-Path $game 'Data\Pandora Behaviour Engine\Pandora Behaviour Engine+.exe')) -eq 3)
 
     function Invoke-Build([string[]]$more) {
         $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Build, '-Root', $root, '-BuildList', $list, '-NoPause') + $more
@@ -491,6 +508,8 @@ try {
         $out = & $pwsh @a 2>&1 | Out-String
         $code = $LASTEXITCODE
         $ErrorActionPreference = $old
+        $script:lastOut = $out + "
+exit code $code"
         return [pscustomobject]@{ Code = $code; Out = $out }
     }
     function Log { if (Test-Path -LiteralPath $log) { return [IO.File]::ReadAllText($log) } return '' }
@@ -501,7 +520,7 @@ try {
     $gameBefore = Snap $game; $ownBefore = Snap $own
     $r = Invoke-Build @('-DryRun')
     Yes ('J: a dry run exits 0 (got {0})' -f $r.Code) ($r.Code -eq 0)
-    Yes 'J: and says what it would run, both tools' ($r.Out -match '-update' -and $r.Out -match '-generate colis tdmh tdmlen tdmv' -and $r.Out -match '--groupbuild "Thornswood 1"')
+    Yes 'J: and says what it would run, both tools' ($r.Out -match '--auto_run --auto_close, with the patches colis tdmh tdmlen tdmv' -and $r.Out -match '--groupbuild "Thornswood 1"')
     Yes 'J: and writes nothing: not the game folder, not the records, no tool started' ((Same $gameBefore (Snap $game)) -and (Same $ownBefore (Snap $own)) -and -not (Log))
 
     # ======================================================== A: a build
@@ -512,17 +531,22 @@ try {
     Yes 'A: the Steam copy is byte for byte and time for time what it was' (Same $steamBefore (Snap $steam))
     Yes 'A: and so is Vortex''s staging folder, the tools'' own files in it included' (Same $stagingBefore (Snap $staging))
     $beh = Join-Path $game 'Data\meshes\actors\character\behaviors\0_master.hkx'
-    Yes 'A: Nemesis wrote the behavior files in Thornswood''s folder, with the patches the list names' (
-        (Text $beh) -eq 'NEMESIS colis tdmh tdmlen tdmv' -and
-        (Text (Join-Path $game 'Data\meshes\actors\character\_1stperson\behaviors\firstperson.hkx')) -eq 'NEMESIS colis tdmh tdmlen tdmv' -and
-        (Text (Join-Path $game 'Data\scripts\FNIS.pex')) -eq 'FNIS NEMESIS colis tdmh tdmlen tdmv')
-    Yes 'A: into this folder''s own copies, not Vortex''s' ([GenTestIds]::Links($beh) -eq 1 -and (Text (Join-Path $staging 'TDM\meshes\actors\character\behaviors\0_master.hkx')) -eq 'VORTEX-TDM-BEHAVIOR')
-    Yes 'A: it ran -update, then -generate' ((Log) -match '(?s)nemesis -update.*nemesis -generate colis tdmh tdmlen tdmv')
-    $ini = Text (Join-Path $game 'Data\Nemesis_Engine\nemesis.ini')
-    Yes 'A: Nemesis was pointed at this folder''s Data by name, not left to find the game itself' ($ini -match [regex]::Escape('SkyrimDataDirectory=' + $game + '\Data\'))
-    Yes 'A: and its cache names only this folder''s files now' (
-        (Text (Join-Path $game 'Data\Nemesis_Engine\cache\behavior_path')) -notmatch [regex]::Escape($steam) -and
-        (Text (Join-Path $staging 'Nemesis\Nemesis_Engine\cache\behavior_path')) -match [regex]::Escape($steam))
+    Yes 'A: Pandora''s behavior files are in Thornswood''s folder, made with exactly the patches the list names' (
+        (Text $beh) -eq 'PANDORA colis tdmh tdmlen tdmv' -and
+        (Text (Join-Path $game 'Data\meshes\actors\character\Characters\DefaultMale.hkx')) -eq 'PANDORA colis tdmh tdmlen tdmv')
+    Yes 'A: and every other patch was off (the one the list does not name)' ((Log) -match '(?m)^pandora active colis tdmh tdmlen tdmv\r?$')
+    Yes 'A: each a new file of this folder''s own, and Vortex''s behavior file is as it was' (
+        [GenTestIds]::Links($beh) -eq 1 -and (Text (Join-Path $staging 'TDM\meshes\actors\character\behaviors\0_master.hkx')) -eq 'VORTEX-TDM-BEHAVIOR')
+    Yes 'A: in the letter case the folder already had (behaviors\0_master.hkx, though Pandora wrote Behaviors\0_Master.hkx)' (
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $beh) -File | Where-Object { $_.Name -ceq '0_master.hkx' }).Count -eq 1 -and
+        @(Get-ChildItem -LiteralPath (Join-Path $game 'Data\meshes\actors\character') -Directory | Where-Object { $_.Name -ceq 'behaviors' }).Count -eq 1)
+    Yes 'A: Pandora ran from a copy in the work folder, never the one in the game folder' (
+        (Log) -match '(?m)^pandora from .*\\Profile\\OwnGame\\build-generated\\pandora :' -and (Log) -match [regex]::Escape('--tesv ' + $game) -and
+        -not (Test-Path -LiteralPath (Join-Path $game 'Data\Pandora Behaviour Engine\Settings.json')))
+    Yes 'A: and Pandora''s own files in the game folder are as Vortex put them' (
+        [GenTestIds]::Links((Join-Path $game 'Data\Pandora Behaviour Engine\Pandora Behaviour Engine+.exe')) -eq 3)
+    Yes 'A: its log and its own records stayed in the work folder, not in the game folder' (
+        -not (Test-Path -LiteralPath (Join-Path $game 'Data\Engine.log')) -and -not (Test-Path -LiteralPath (Join-Path $game 'Data\Pandora_Engine')))
     $cov = & $pwsh -NoProfile -File (Join-Path $Repo 'scripts\mods\Check-CoveredBodies.ps1') -Game $game 2>&1 | Out-String
     Yes ('A: every body in Thornswood''s folder is covered now (Check-CoveredBodies exit {0})' -f $LASTEXITCODE) ($LASTEXITCODE -eq 0 -and $cov -match 'covered\s+femalebody_1\.nif\s+shapes: 3BA, 3BA_Anus, 3BA_Vagina, Bra, Panty')
     Yes 'A: the bodies are new files of this folder''s own; Vortex''s nude 3BA body is as it was' (
@@ -544,8 +568,8 @@ try {
 
     . $Lib
     $rec = Read-GeneratedRecord $record
-    $want = @('Data\meshes\actors\character\behaviors\0_master.hkx', 'Data\meshes\actors\character\_1stperson\behaviors\firstperson.hkx',
-              'Data\scripts\FNIS.pex', 'Data\meshes\animationdatasinglefile.txt',
+    $want = @('Data\meshes\actors\character\behaviors\0_master.hkx', 'Data\meshes\actors\character\Characters\DefaultMale.hkx',
+              'Data\meshes\animationdatasinglefile.txt',
               ($A + 'femalebody_0.nif'), ($A + 'femalebody_1.nif'), ($A + 'malebody_0.nif'), ($A + 'malebody_1.nif'))
     $got = @($rec.Files | ForEach-Object { $_.Rel })
     Yes ('A: the record lists every file made, and nothing of the tools'' own folders ({0})' -f $got.Count) (
@@ -553,8 +577,8 @@ try {
     $shaOk = $true
     foreach ($f in $rec.Files) { if ((Get-FileHash -LiteralPath (Join-Path $game $f.Rel) -Algorithm SHA256).Hash.ToLowerInvariant() -ne $f.Sha) { $shaOk = $false } }
     Yes 'A: each with the sha256 of what is in the folder' $shaOk
-    Yes 'A: and what it was built from: the build list, the mod list, Nemesis'' files, BodySlide''s' (
-        $rec.Parts.Contains('list') -and $rec.Parts.Contains('plugins') -and $rec.Parts.Contains('nemesis') -and $rec.Parts.Contains('bodyslide') -and $rec.Game -eq $game)
+    Yes 'A: and what it was built from: the build list, the mod list, Pandora''s files, BodySlide''s' (
+        $rec.Parts.Contains('list') -and $rec.Parts.Contains('plugins') -and $rec.Parts.Contains('behaviors') -and $rec.Parts.Contains('bodyslide') -and $rec.Game -eq $game)
     Yes 'A: its work folder is gone' (-not (Test-Path -LiteralPath (Join-Path $own 'build-generated')))
     $state = Get-GeneratedState $root $list
     Yes 'A: and it reads back as current' ($state.Current)
@@ -562,9 +586,9 @@ try {
     . (Join-Path $Repo 'scripts\release\Ship-Rules.ps1')
     $col = Get-ShipOwnGameCollection (Join-Path $root 'Profile')
     Yes 'A: a release carries them: Ship-Rules no longer counts the body or the behavior file as the collection''s, though Vortex deploys those names' (
-        -not $col.Contains($A + 'femalebody_1.nif') -and -not $col.Contains('Data\meshes\actors\character\behaviors\0_master.hkx') -and -not $col.Contains('Data\scripts\FNIS.pex'))
+        -not $col.Contains($A + 'femalebody_1.nif') -and -not $col.Contains('Data\meshes\actors\character\behaviors\0_master.hkx'))
     Yes 'A: and still counts the rest of Vortex''s files as the collection''s, the tools among them' (
-        $col.Contains('Data\meshes\ts\bench.nif') -and $col.Contains('Data\Nemesis_Engine\Nemesis Unlimited Behavior Engine.exe') -and $col.Contains('Data\CalienteTools\BodySlide\BodySlide.exe'))
+        $col.Contains('Data\meshes\ts\bench.nif') -and $col.Contains('Data\Pandora Behaviour Engine\Pandora Behaviour Engine+.exe') -and $col.Contains('Data\CalienteTools\BodySlide\BodySlide.exe'))
     Yes 'A: Get-ShipGeneratedFiles reads the same files the record has' ((Get-ShipGeneratedFiles (Join-Path $root 'Profile')).Count -eq $want.Count)
 
     # ======================================================== B: stale
@@ -582,13 +606,17 @@ try {
     $line = @($ft -split "`r`n" | Where-Object { $_ -like '*|Data\Nemesis_Engine\mod\colis\info.ini' })[0]
     Put (Join-Path $own 'files.txt') ($ft.Replace($line, ($line -replace '\|(\d+)\|Data', '|999|Data')))
     $s = Get-GeneratedState $root $list
-    Yes 'B: Vortex changing a file Nemesis reads (a patch) makes it stale, and says Nemesis' (-not $s.Current -and ($s.Why -join ';') -match 'Nemesis reads')
+    Yes 'B: Vortex changing a file Pandora reads (a patch) makes it stale, and says Pandora' (-not $s.Current -and ($s.Why -join ';') -match 'Pandora reads')
+    $line3 = @($ft -split "`r`n" | Where-Object { $_ -like '*|Data\Pandora Behaviour Engine\Pandora Behaviour Engine+.exe' })[0]
+    Put (Join-Path $own 'files.txt') ($ft.Replace($line3, ($line3 -replace '\|(\d+)\|Data', '|999|Data')))
+    $s = Get-GeneratedState $root $list
+    Yes 'B: and so does a new Pandora' (-not $s.Current -and ($s.Why -join ';') -match 'Pandora reads')
     $line2 = @($ft -split "`r`n" | Where-Object { $_ -like '*|Data\CalienteTools\BodySlide\SliderSets\Test.osp' })[0]
     Put (Join-Path $own 'files.txt') ($ft.Replace($line2, ($line2 -replace '\|(\d+)\|Data', '|999|Data')))
     $s = Get-GeneratedState $root $list
-    Yes 'B: Vortex changing a slider set makes it stale, and says BodySlide' (-not $s.Current -and ($s.Why -join ';') -match 'BodySlide builds from' -and ($s.Why -join ';') -notmatch 'Nemesis reads')
+    Yes 'B: Vortex changing a slider set makes it stale, and says BodySlide' (-not $s.Current -and ($s.Why -join ';') -match 'BodySlide builds from' -and ($s.Why -join ';') -notmatch 'Pandora reads')
     Put (Join-Path $own 'files.txt') $ft
-    Put $list ($listText.Replace('"tdmv"', '"tdmv", "gender"'))
+    Put $list ($listText.Replace('"tdmv"', '"tdmv", "tkuc"'))
     $s = Get-GeneratedState $root $list
     Yes 'B: a changed build list makes it stale' (-not $s.Current -and ($s.Why -join ';') -match 'records\\generated\.json')
     Put $list $listText
@@ -686,20 +714,37 @@ try {
     $env:STANDIN_ROGUE = 'meshes\ts\bench.nif'
     $r = Invoke-Build @()
     Remove-Item Env:\STANDIN_ROGUE
-    Yes 'F: a tool writing a shared file in place is caught and refused' ($r.Code -eq 1 -and $r.Out -match 'Nemesis wrote into 1 file\(s\) this folder shares with another \(Data\\meshes\\ts\\bench\.nif\)')
+    Yes 'F: a tool writing a shared file in place is caught and refused' ($r.Code -eq 1 -and $r.Out -match 'BodySlide wrote into 1 file\(s\) this folder shares with another \(Data\\meshes\\ts\\bench\.nif\)')
     Yes 'F: and nothing is recorded' ((Text $record) -eq $recBefore)
     Yes '(F: the stand-in really did write through: the Steam copy''s file changed with it)' ((Text (Join-Path $steam 'Data\meshes\ts\bench.nif')) -eq 'ROGUE')
     foreach ($p in (Join-Path $staging 'TDM\meshes\ts\bench.nif')) { [IO.File]::WriteAllText($p, 'VORTEX-BENCH') }
 
-    # ======================================================== G: Nemesis aimed outside
-    [IO.File]::Delete($log)
-    $env:STANDIN_NEMESIS_OUTSIDE = $steam + '\Data\meshes\actors\character\behaviors\mt_behavior'
-    $steamBefore = Snap $steam
+    # ======================================================== G: Pandora's refusals
+    foreach ($case in @(
+        @('its log has an error', 'STANDIN_PANDORA_ERROR', "Pandora's log has errors"),
+        @('it writes into the game folder', 'STANDIN_PANDORA_INTO_DATA', 'Pandora wrote into the game folder itself'),
+        @('it deletes from the game folder', 'STANDIN_PANDORA_DELETE', 'Pandora wrote into the game folder itself'))) {
+        Set-Item -Path ('Env:\' + $case[1]) -Value '1'
+        $gameBefore = Snap $game
+        $r = Invoke-Build @()
+        Remove-Item -Path ('Env:\' + $case[1])
+        Yes ('G: when ' + $case[0] + ', it is refused and nothing is recorded') ($r.Code -eq 1 -and $r.Out.Contains($case[2]) -and (Text $record) -eq $recBefore)
+        Yes ('G: when ' + $case[0] + ', nothing Pandora made is put in the folder') ((Text $beh) -eq 'PANDORA colis tdmh tdmlen tdmv' -and (Test-Path -LiteralPath (Join-Path $own 'build-generated')) -eq $false)
+    }
+    [void][GenTestIds]::CreateHardLink((Join-Path $game 'Data\meshes\ts\bench.nif'), (Join-Path $staging 'TDM\meshes\ts\bench.nif'), [IntPtr]::Zero)
+    Remove-Item -LiteralPath (Join-Path $game 'Data\meshes\pandora_stray.txt') -ErrorAction SilentlyContinue
+    $env:STANDIN_HANG = '1'
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $r = Invoke-Build @('-StallSeconds', '6')
+    Remove-Item Env:\STANDIN_HANG
+    Yes ('G: a Pandora that sits using nothing and writing nothing is stopped by the stall check (' + [int]$sw.Elapsed.TotalSeconds + ' s)') (
+        $r.Code -eq 1 -and $r.Out -match 'used almost no processor time and changed no file for 6 seconds' -and (Text $record) -eq $recBefore)
+    Yes 'G: and it is not left running' (@(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) }).Count -eq 0)
+    $pExe = Join-Path $game 'Data\Pandora Behaviour Engine\Pandora Behaviour Engine+.exe'
+    Rename-Item -LiteralPath $pExe -NewName 'aside.exe'
     $r = Invoke-Build @()
-    Remove-Item Env:\STANDIN_NEMESIS_OUTSIDE
-    Yes 'G: Nemesis'' cache naming a file outside this folder stops it before -generate' ($r.Code -eq 1 -and $r.Out -match 'which is not in' -and (Log) -notmatch '-generate')
-    Yes 'G: and the Steam copy is untouched' (Same $steamBefore (Snap $steam))
-
+    Rename-Item -LiteralPath (Join-Path (Split-Path -Parent $pExe) 'aside.exe') -NewName 'Pandora Behaviour Engine+.exe'
+    Yes 'G: with no Pandora in the folder it stops, and says it comes with collection revision 2' ($r.Code -eq 1 -and $r.Out -match 'Pandora Behaviour Engine\+ is not in this folder' -and $r.Out -match 'revision 2')
     # ======================================================== H: BodySlide aimed at the game
     $env:STANDIN_BS_INTO_GAME = '1'
     $r = Invoke-Build @()
@@ -716,9 +761,53 @@ try {
     Yes 'I: and the men''s body in the folder is Vortex''s again, as its own copy' (
         (Get-FileHash -LiteralPath $male).Hash -eq (Get-FileHash -LiteralPath (Join-Path $staging ('HIMBO\' + $A.Substring(5) + 'malebody_1.nif'))).Hash -and [GenTestIds]::Links($male) -eq 1)
     $rec = Read-GeneratedRecord $record
-    Yes 'I: and the record no longer lists it' (@($rec.Files | Where-Object { $_.Rel -like '*\malebody*' }).Count -eq 0 -and $rec.Files.Count -eq 6)
+    Yes 'I: and the record no longer lists it' (@($rec.Files | Where-Object { $_.Rel -like '*\malebody*' }).Count -eq 0 -and $rec.Files.Count -eq 5)
     Yes 'I: the Steam copy is untouched' (Same $steamBefore (Snap $steam))
     Put $list $listText
+
+    # ======================================================== K: Pandora loose in Data
+    # Its archive has no folder at the top, so Vortex may deploy its exe, its
+    # libraries and its Pandora_Engine folder straight into Data. The script
+    # then takes its files by Vortex's record of Pandora's mod.
+    $looseMod = Join-Path $staging 'PandoraLoose'
+    $looseFiles = @('Pandora Behaviour Engine+.exe', 'Pandora_Engine\Skyrim\Template\vanilla.txt', 'PatcherSupport.dll')
+    Copy-Item -LiteralPath (Join-Path $bin 'pandora.exe') -Destination (New-Item -ItemType Directory -Force -Path $looseMod).FullName
+    Rename-Item -LiteralPath (Join-Path $looseMod 'pandora.exe') -NewName 'Pandora Behaviour Engine+.exe'
+    Put (Join-Path $looseMod 'Pandora_Engine\Skyrim\Template\vanilla.txt') 'TEMPLATE'
+    Put (Join-Path $looseMod 'PatcherSupport.dll') 'SUPPORT'
+    foreach ($rel in $looseFiles) {
+        foreach ($into in (Join-Path $steam "Data\$rel"), (Join-Path $game "Data\$rel")) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $into) | Out-Null
+            [void][GenTestIds]::CreateHardLink($into, (Join-Path $looseMod $rel), [IntPtr]::Zero)
+        }
+    }
+    $manifest = Join-Path $steam 'Data\vortex.deployment.json'
+    $keepManifest = Text $manifest
+    $extra = @($looseFiles | ForEach-Object { '{{ "relPath": "{0}", "source": "PandoraLoose" }}' -f $_.Replace('\', '\\') }) -join ', '
+    Put $manifest ($keepManifest.Replace('"files": [ ', '"files": [ ' + $extra + ', '))
+    $looseRecord = (Text (Join-Path $own 'files.txt')).TrimEnd() + "`r`n"
+    foreach ($rel in $looseFiles) { $looseRecord += ('L|V|123|1|Data\{0}' -f $rel) + "`r`n" }
+    Put (Join-Path $own 'files.txt') $looseRecord
+    $inFolder = Join-Path $game 'Data\Pandora Behaviour Engine'
+    Move-Item -LiteralPath $inFolder -Destination (Join-Path $work 'pandora-folder-aside')
+    [IO.File]::Delete($log)
+    $steamBefore = Snap $steam
+    $r = Invoke-Build @()
+    if ($r.Code -ne 0) { Write-Host $r.Out }
+    Yes 'K: with Pandora loose in Data, the build works, from a copy of the files Vortex''s record lists for it' (
+        $r.Code -eq 0 -and (Log) -match '(?m)^pandora from .*\\build-generated\\pandora :' -and (Log) -match '(?m)^pandora active colis tdmh tdmlen tdmv\r?$')
+    Yes 'K: and nothing of the Steam copy changed' (Same $steamBefore (Snap $steam))
+    Yes 'K: its generated record starts current' ((Get-GeneratedState $root $list).Current)
+    foreach ($rel in @('Pandora Behaviour Engine+.exe', 'PatcherSupport.dll')) {
+        $row = 'L|V|123|1|Data\' + $rel
+        Put (Join-Path $own 'files.txt') ($looseRecord.Replace($row, $row.Replace('|123|', '|456|')))
+        $state = Get-GeneratedState $root $list
+        Yes ('K: a changed loose Pandora input is stale: ' + $rel) (-not $state.Current -and ($state.Why -join ';') -match 'Pandora reads')
+    }
+    Put (Join-Path $own 'files.txt') $looseRecord
+    Move-Item -LiteralPath (Join-Path $work 'pandora-folder-aside') -Destination $inFolder
+    $r = Invoke-Build @('-DryRun')
+    Yes 'K: with it in Data twice (loose and in its folder), which one runs cannot be told, so it stops' ($r.Code -eq 1 -and $r.Out -match 'more than once')
 } finally {
     Remove-Item Env:\STANDIN_LOG -ErrorAction SilentlyContinue
     Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($work, [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -731,8 +820,12 @@ $real = Get-GeneratedBuildList (Join-Path $Repo 'records\generated.json')
 Yes 'records\generated.json builds the women''s NeverNude body and the men''s body with boxers (issue #405)' (
     $real.Sets -contains 'CBBE 3BBB Amazing NeverNude' -and $real.Sets -contains 'HIMBO Body - Vanilla Nevernude')
 Yes 'and moves no slider, so every body is its set''s own default shape (issue #1004)' ($real.Sliders.Count -eq 0)
-Yes 'and generates with the four Nemesis patches the releases were made with' (($real.Patches -join ',') -eq 'colis,tdmh,tdmlen,tdmv')
+Yes 'and generates with the four patches the releases were made with' (($real.Patches -join ',') -eq 'colis,tdmh,tdmlen,tdmv')
 $buildText = [IO.File]::ReadAllText($Build)
+Yes 'Build-Generated.ps1 never runs Nemesis: no -generate, no -update, no manual step' (
+    $buildText -notmatch '''-generate''|''-update''|NemesisDone|Nemesis Unlimited Behavior Engine\.exe')
+Yes 'and gives Pandora its folders by Settings.json beside a copy of it, the game folder''s Data and a work folder' (
+    $buildText -match "Join-Path \`$pRun 'Settings\.json'" -and $buildText -match 'gameDataPath = \$Data; outputPath = \$pOut' -and $buildText -match "\`$pOut = Join-Path \`$script:WorkDir 'pandora-out'")
 Yes 'Build-Generated.ps1 never asks BodySlide for RaceMenu morph files' ($buildText -notmatch '--trimorphs''|"--trimorphs"|''-tri''')
 
 Done
