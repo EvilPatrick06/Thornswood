@@ -32,14 +32,14 @@ is the farmer's and is filed there rather than on the reagent list.
 ## Tools
 
 Three picks need a tool in the pack. It does not have to be equipped.
-It has 100 uses. You are told when it is worn thin. When it breaks,
+It has 50 uses. You are told when it is worn thin. When it breaks,
 the next one comes from a smith. Nothing hands you a free replacement.
 
 | Who | Tool |
 | --- | --- |
 | Miner | Any pickaxe except a war pick. The ancient Nordic pick and the Notched Pickaxe both count |
 | Farmer | A shovel. Skyrim has no hoe. Two shovels that look alike both count |
-| Woodworker | A woodcutter's axe. This is the profession, not a class. It is named here because it is the same 100 uses |
+| Woodworker | A woodcutter's axe. This is the profession, not a class. It is named here because it is the same 50 uses |
 
 Gathering, hunting and fishing need your hands.
 

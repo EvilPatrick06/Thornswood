@@ -1,6 +1,6 @@
 # Farmer
 
-A shovel in the pack, 100 uses. Skyrim has no hoe. The shovel is what
+A shovel in the pack, 50 uses. Skyrim has no hoe. The shovel is what
 a smith forges, and it is what this class asks for.
 
 10 crops, 14 placed records:
@@ -65,6 +65,19 @@ nobody holds. That is where a new farmer starts.
 This circle is not the building claim. A house and its field can be
 two records. See [Property](../property.md). The 14 days is the same
 number.
+
+## Season, weather, and a cook's start
+
+A field starts empty. A cook is handed a starter pack so the first
+meals do not wait on a harvest. What is in that pack is not set.
+
+A crop grows or it does not by the temperature, the weather, and the
+kind of place, the same meters as
+[Temperature and weather](../temperature.md). The hold's name does
+not decide it. Whiterun is not the wheat hold.
+
+Seasons apply on top of that. How many seasons, and whether winter
+stops a crop, is not set.
 
 ## Butter, milk, and the nest
 
@@ -142,6 +155,7 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 ## Where this is
 
 Empty plots, the claim circle, the 14 days, the waits, the yields,
-the shovel, and the starter seed are in the server. The first-harvest
-story on the public classes page, a world already standing full, is
-not what the server does. The server starts empty, on purpose.
+and a shovel of 100 uses are in the server. The plan's shovel is 50.
+A farmer is handed 3 cabbage, 3 leek and 3 potato as seed. A cook's
+starter pack is not. Nothing reads the weather before a crop grows,
+and there is no season.

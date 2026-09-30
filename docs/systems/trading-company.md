@@ -1,8 +1,9 @@
 # Free Skyrim Trading Company
 
-Skyrim's hauler. A haul is a job on a notice board with a pay and a
-destination hold. The company is the tenth that stays in the box when
-the haul is confirmed.
+Skyrim's hauler, and a business. A haul is a job on a notice board
+with a pay and a destination hold. The company is the tenth that
+stays in the box when the haul is confirmed. It also makes, sells,
+and buys.
 
 It is not the East Empire Company. The Accord is grain, wine, paper
 and worked goods coming in, and ore and timber going out, and the
@@ -84,6 +85,28 @@ The gold the hauler receives was the poster's. Creating it back into
 a pack and subtracting it from the ledger is the box paying out. It
 is not a new mint. See [Gold](gold.md).
 
+## Who runs it
+
+An application, the same shape as a Jarl. It is asked for in Discord.
+The people who are accepted run it as a business: they make, they
+sell, and they buy. What they wear on the road while a crate is in
+the pack is their own affair, in the world. It is not a server rule.
+
+Nobody is handed a company ware before the first haul has moved.
+The Riekling pieces that stay in the open book are company wares as
+well as race locked. They are named on [Cut items](cut-items.md).
+
+## Sales that leave the world
+
+Sometimes there is an event where someone sells a thing out of
+Skyrim. The thing leaves the game. That is the point: it is gone, and
+it does not come back into a chest.
+
+When the company buys, the worker who handled the sale takes a cut.
+Some of the gold leaves the server entirely, on top of that cut, so
+coin does not only move from pack to pack. The size of either cut is
+not set. See [Gold](gold.md).
+
 ## What is not a haul
 
 A sale across a counter in the same town is a trade. Rent is rent. A
@@ -95,4 +118,5 @@ tenth, and none of them are posted with `/haul`.
 Not built. The box exists, and the note beside it says company
 payment belongs in that box. Jobs exist, and the server does not pay
 the taker of an ordinary job. There is no `/haul`, no tenth, and no
-withdrawal from the ledger.
+withdrawal from the ledger. There is no application, no event that
+deletes an item, and no gold destroyed for a sale.
