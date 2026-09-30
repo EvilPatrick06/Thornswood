@@ -1,0 +1,193 @@
+# Temperature and weather
+
+One meter. 0 is freezing. 100 is as hot as it goes. 50 is comfortable.
+It moves both ways, toward whatever the place is worth.
+
+## What you see
+
+| Reading | Word |
+| --- | --- |
+| Under 15 | Freezing |
+| Under 30 | Cold |
+| Under 42 | Chilly |
+| 42 to 58 | Fine |
+| Up to 70 | Warm |
+| Up to 85 | Hot |
+| Above 85 | Burning |
+
+`/needs` says the reading, whether you are warming or cooling, the
+target, the roof, the night, the fire, what weather and height are
+worth, and every worn piece it can see.
+
+## What it costs
+
+Cost is a distance from 50.
+
+| Distance | Band | On the meter | Cold | Heat |
+| --- | --- | --- | --- | --- |
+| Under 20 | Fine | about 30 to 70 | Nothing | Nothing |
+| 20 | Weary | about 30 or 70 | -20% stamina recovery, -2 speed | -15% stamina recovery |
+| 30 | Bad | about 20 or 80 | -40% stamina recovery, -6 speed, -20 stamina | -35% stamina recovery, -20% magicka recovery, -15 stamina |
+| 40 | Spent | 10 or below, or 90 or above | -60% stamina recovery, -12 speed, -40 stamina, -25 health | -55% stamina recovery, -40% magicka recovery, -35 stamina |
+
+Heat does not take health. Freezing can. Cold at weary or worse also
+speeds hunger and thirst. See [Hunger](hunger.md) and [Thirst](thirst.md).
+
+## How fast it moves
+
+Warming covers half the remaining gap in 30 seconds. Cooling covers
+half the gap in 90 seconds. A fire is obvious while you stand in it.
+Snow is not an emergency in the first few seconds. An unknown place is
+comfortable. A room nobody has classified is not a trap.
+
+## The place
+
+These are the targets before clothing, fire and weather.
+
+| Place | Target |
+| --- | --- |
+| Indoors | 58 |
+| Outdoors, nothing falling | 40 |
+| Rain | 34 |
+| Wading, about waist deep or less | 26 |
+| Snow | 16 |
+| Swimming | 8 |
+
+A roof stops weather, night, wind and height. A campfire is not a roof.
+
+## Weather, wind, night, height
+
+Only with no roof. Degrees on or off the place.
+
+| Factor | Worth |
+| --- | --- |
+| Wind, up to a full gale | as much as 14 colder, scaled by that weather's own wind |
+| Snow falling | 6 colder, on top of the snow place |
+| Rain falling | 4 colder |
+| Overcast | 1 colder |
+| A clear day, not at night | 4 warmer |
+| Night | 6 colder |
+| Height above 6,000 units | 1.2 colder per thousand, and no more than 14 |
+
+Wind is scaled against this load order's weather table, not against
+255. The blizzard `SkyrimStormSnow` is the check that the wind byte is
+still the wind. The aurora flag on a weather is ignored.
+
+The tundra is near zero. Ivarstead is about 3,000. High Hrothgar is
+about 12,000. The Throat of the World is past 25,000, and the cap of
+14 means the summit does not get colder than that from height alone.
+
+Open blizzard is the worst dry place: snow's 16 minus a gale's 14 is 2
+before clothes. Swimming beats it.
+
+Rain and swimming leave you wet for 3 minutes after you are under a
+roof or out of the water. The exposure from rain or from the water
+place fades across those 3 minutes. It does not snap off at the door.
+
+There is no temperature by hold. The Pale is cold when it is high, it
+is night, and it is snowing.
+
+## Fire
+
+At your feet a fire adds 34. At 300 units it adds nothing. Forges,
+smelters, cooking spits and campfires count, including Embers XD.
+Unlit versions do not.
+
+A master woodworker's fire or kiln adds 48 at your feet and still
+nothing at 300. A blizzard still applies. The fire does not delete the
+weather.
+
+Standing in the coals deals about 7 health a second. That is the flame,
+not the meter. You can read Burning and also be on fire.
+
+Fire spreads. Someone burning sets alight anyone in the same cell
+within about two paces (220 units). The caught burn lasts 5 seconds
+unless they stay next to the person who is alight. It does not run
+through a town.
+
+## Water
+
+Only while swimming or wading.
+
+| Class | On top of the water place |
+| --- | --- |
+| Lava | +90. It is not water |
+| Puddle | +12 |
+| Still water | +10 |
+| Marsh | +6 |
+| Deep water, the sea, most lakes | 0 |
+| A river | -5 |
+| Ice | -8 |
+
+There is no general ice water. The cold-named records are Dawnguard's
+Frostreach. The sea off Dawnstar is the same water as the sea off
+Riften. A freezing swim is the weather, the hour and the height on top
+of being in the water.
+
+## Clothing
+
+Every worn piece counts on its own.
+
+| Slot | Share of a dressed person |
+| --- | --- |
+| Body | 0.26 |
+| Pelvis | 0.09 |
+| Head | 0.10 |
+| Back, a cloak | 0.10 |
+| Feet | 0.07 |
+| Calves | 0.05 |
+| Hands | 0.05 |
+| Chest | 0.05 |
+| Legs | 0.04 |
+| Neck | 0.04 |
+| Arms | 0.04 |
+| Hair | 0.03 |
+| Shoulders | 0.03 |
+| Circlet | 0.01 |
+| Ears | 0.01 |
+
+| Material | How well it keeps weather out |
+| --- | --- |
+| Fur | 1.00 |
+| Leather | 0.75 |
+| Light armour | 0.55 |
+| Cloth | 0.50 |
+| Heavy armour | 0.45 |
+| None | 0 |
+
+An unknown material counts as cloth. The total is capped at 0.80, so a
+cuirass and a cloak on the same torso cannot add without limit.
+
+Warm clothes pull a cold place back toward 50 by that fraction. In a
+hot place they push further away, at half that fraction (the heat
+factor is 0.5). Full kit at a forge is worse than a shirt.
+
+A master tailor's garment ignores 4 degrees of exposure on top of the
+table, and does not weigh more than clothing. It does not replace fur.
+Hidden armour on that garment is the tailor perk, not this meter. See
+[Professions](professions.md).
+
+A burn on a part of the body, from [Injury](injury.md), means the
+clothing on that part counts at half until the burn heals.
+
+The server reads equipment. A piece handed to the client inside its own
+game and never seen by the server cannot count. `/needs` says so.
+
+## A meal
+
+A cooked meal that grants cold resistance shifts the target 4 degrees
+warmer for 20 minutes. A feast shifts it 8 degrees for 10 minutes. See
+[Food](food.md).
+
+## Where this is
+
+The place targets, the weather numbers, the fire of 34 at 300 units,
+the water classes, the clothing table, the cap of 0.80, the heat factor
+of 0.5, the settle times, the on-fire damage, the spread, and `/needs`
+are in the server.
+
+Not in it: the cold link into hunger and thirst, the 3 minutes of wet,
+the master woodworker's 48, the master tailor's 4 degrees, the burn
+cutting clothing, and the meal's warmth. Every fire is 34. Clothing
+does not read tailor rank. A roof dries you the moment the client says
+you are under one.

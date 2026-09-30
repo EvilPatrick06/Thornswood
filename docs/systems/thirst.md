@@ -1,0 +1,53 @@
+# Thirst
+
+Thirst is a meter from 0 to 100. It starts at 100. It falls twice as
+fast as hunger.
+
+## The clock
+
+It empties in 1 hour and 12 minutes. That is 83.33 points an hour.
+Cold speeds it on the same steps as hunger: 1.25 when cold is weary,
+1.5 at bad, 2 at spent. See [Temperature](temperature.md).
+
+## The bands
+
+| Meter | Band | What it does |
+| --- | --- | --- |
+| 50 and up | Fine | Nothing |
+| 25 to 49 | Weary | -20 magicka, -3 speed |
+| 10 to 24 | Bad | -40 magicka, -7 speed |
+| 0 to 9 | Spent | -60 magicka, -12 speed, -30% magicka recovery |
+
+## What a swallow is worth
+
+| Thing | Thirst |
+| --- | --- |
+| An ordinary drink | 20 |
+| The first ale | 30, then less. See [Drink](drink.md) |
+| A potion or a poison | 5 |
+
+A poison counts as a sip because putting it on a blade and drinking it
+are the same event.
+
+A stew or a soup that is food also gives a little thirst when it is a
+liquid meal. See [Food](food.md). A dry ration does not.
+
+## Water
+
+Clean water is a well, an inn, or a skin bought or filled at a well. A
+river is drinkable and better boiled. Marsh, a puddle, and standing
+water you did not boil can foul you. The sea is salt: it quenches at
+half a normal drink, 10, and can sicken. Swimming in that water is
+temperature, not this meter. See [Disease](disease.md).
+
+## Sleep
+
+A night in a real bed adds 25 thirst when you return.
+
+## Where this is
+
+The clock, the bands, the 20, the ale curve and the potion sip of 5 are
+in the server. Cold does not yet speed thirst. The server does not yet
+know whether the water you drank was a well or a ditch. Soups do not
+yet add thirst on top of hunger. The bed check is still the word
+`/rest bed`.
