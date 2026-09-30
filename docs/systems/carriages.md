@@ -1,0 +1,63 @@
+# Carriages and ferries
+
+Fast travel is off. The way between holds is a driver.
+
+The ride is a fade. You are at one stop, you pay, you are at the
+other. It is one position change. An animated cart that parents you to
+a moving actor is not used: the server does not sync that actor, so
+everyone else would watch you stand still, and a save made during the
+ride does not reload.
+
+## The fare
+
+You stand within 400 of the driver, the same reach as a notice board,
+and you name the stop.
+
+| Trip | Gold | Where it goes |
+| --- | --- | --- |
+| A ferry, one river stop to the next | 10 | The departure hold's ledger |
+| A carriage, any mainland hold to any other | 20 | The departure hold's ledger |
+| Either end is Raven Rock | 40 | The departure hold's ledger |
+
+If the gold is not in the pack, you do not move and nothing is taken.
+Dying does not refund a fare already paid.
+
+The driver is a worker of the hold the stop sits in. The fare is that
+hold's, counted the way a notice fee is counted. See [Gold](gold.md)
+and [Property](property.md).
+
+The route list is the one the carriage and ferry mod already ships:
+a carriage in every hold, ferries on the rivers. A stop that is not on
+that list does not take gold and does not move you. The server does
+not teleport you a second time on top of the fade.
+
+There is no word that skips the driver. The map does not offer fast
+travel.
+
+## What a ride is not
+
+A ride is a person changing holds. It is not a crate, and it does not
+pay the company's tenth. Goods go by
+[Free Skyrim Trading Company](trading-company.md), which is a job and
+a pack, not a seat on the cart.
+
+The fare is not a wage for a profession. Standing at the driver is not
+work toward a rank.
+
+## The cities as they are rebuilt
+
+The drivers are patched for the rebuilt city gates, so they stand at
+the stop and not inside a wall. A stop that is still wrong is moved
+the way a board is moved: somebody stands where it should be. Until
+that word exists for a driver, the mod's placement is the placement.
+
+## Where this is
+
+Fast travel is off. The carriage and ferry mod is in the collection,
+and the ride is its fade. The patch that keeps drivers out of the
+rebuilt gates is in the collection with it.
+
+The server does not take a fare, does not keep a route list, and does
+not refuse the ride when the pack is short. Saying where you are going
+to the driver is the mod's own conversation, and it does not ask the
+ledger first.
