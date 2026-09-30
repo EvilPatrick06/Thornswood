@@ -308,13 +308,13 @@ if ($filter) {
     $curMap[':gone:Data\Source\Scripts\Game.psc'] = 'removed'
     $curMap[':gone:Data\MarketplaceTextures.bsa'] = 'removed'
     $tgtMap = @{ 'Data\Platform\UI\index.html' = '1:cc'; 'SkyrimSE.exe.bak-1160-for-369' = '3:dd'; 'Data\DialogueViews\1.xml' = '4:ee';
-                 'Data\Scripts\Source\IED.psc' = '5:ff'; 'Data\Scripts\IED.pex' = '6:aa'; 'Data\MarketplaceTextures.bsa' = '7:bb' }
+                 'Data\Scripts\Source\IED.psc' = '5:ff'; 'Data\Scripts\MpClientPlugin.pex' = '6:aa'; 'Data\MarketplaceTextures.bsa' = '7:bb' }
     Invoke-Expression $filter
     Yes '  going back to an old record hands none of them out' (-not $tgtMap.ContainsKey('SkyrimSE.exe.bak-1160-for-369') -and -not $tgtMap.ContainsKey('Data\DialogueViews\1.xml'))
     Yes '  nor a script source a record of 29 September names' (-not $tgtMap.ContainsKey('Data\Scripts\Source\IED.psc'))
     Yes '  nor MarketplaceTextures.bsa, Bethesda''s archive a pack once carried (#1229)' (-not $tgtMap.ContainsKey('Data\MarketplaceTextures.bsa'))
     Yes '  and going forward lists none of them as gone' (-not $curMap.ContainsKey('CreationKit.exe') -and -not $curMap.ContainsKey(':gone:lex\ssceam.tlx') -and -not $curMap.ContainsKey(':gone:Data\Source\Scripts\Game.psc') -and -not $curMap.ContainsKey(':gone:Data\MarketplaceTextures.bsa'))
-    Yes '  while the files of ours and the plugin list stay' ($curMap.ContainsKey('Data\Platform\UI\index.html') -and $tgtMap.ContainsKey('Data\Platform\UI\index.html') -and $curMap.ContainsKey(':profile:plugins.txt') -and $tgtMap.ContainsKey('Data\Scripts\IED.pex'))
+    Yes '  while the files of ours and the plugin list stay' ($curMap.ContainsKey('Data\Platform\UI\index.html') -and $tgtMap.ContainsKey('Data\Platform\UI\index.html') -and $curMap.ContainsKey(':profile:plugins.txt') -and $tgtMap.ContainsKey('Data\Scripts\MpClientPlugin.pex'))
     Yes ('  and it says how many it left out ({0})' -f $notOurs) ($notOurs -eq 8)
 }
 

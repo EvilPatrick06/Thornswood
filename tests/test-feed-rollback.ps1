@@ -148,8 +148,8 @@ $clientRel = @($cb.files.PSObject.Properties.Name)[0]
 # ---- the scratch feed and three releases --------------------------------------
 #
 # What the installer put down, before any release named a record.
-$installer = @{ 'Data\a.esp' = 'a0'; 'Data\b.bsa' = 'b0 from the installer'; 'Data\Platform\Plugins\thornswood-ui.js' = 'ui0 from the installer'
-                'Data\keep.txt' = 'kept the whole time'; $clientRel = 'client 0' }
+$installer = @{ 'Data\Platform\a.esp' = 'a0'; 'Data\Platform\b.bsa' = 'b0 from the installer'; 'Data\Platform\Plugins\thornswood-ui.js' = 'ui0 from the installer'
+                'Data\Platform\keep.txt' = 'kept the whole time'; $clientRel = 'client 0' }
 $launcherSha = 'c' * 64
 $runtimeSha = 'd' * 64
 Write-Feed ([pscustomobject][ordered]@{
@@ -188,12 +188,12 @@ function Publish-Scratch([string]$Id, [hashtable]$changes, [string[]]$deletes, [
 }
 
 $R1 = '20260901-1000-dev'; $R2 = '20260902-1100-dev'; $R3 = '20260903-1200-dev'
-Publish-Scratch $R1 @{ 'Data\a.esp' = 'a1'; 'Data\new1.esp' = 'new one' } @() "*a.esp`r`n*new1.esp`r`n" ('1' * 64)
+Publish-Scratch $R1 @{ 'Data\Platform\a.esp' = 'a1'; 'Data\Platform\new1.esp' = 'new one' } @() "*a.esp`r`n*new1.esp`r`n" ('1' * 64)
 $d1 = Read-Feed
 Yes 'the first release that names a record starts the list, with only itself' (@($d1.releases).Count -eq 1 -and [string]$d1.releases[0].id -eq $R1 -and [string]$d1.releases[0].lastPack -eq $R1)
-Publish-Scratch $R2 @{ 'Data\a.esp' = 'a2'; 'Data\b.bsa' = 'b2, the first change to the installer''s file'; 'Data\new2.esp' = 'new two'
-                       'Data\Platform\Plugins\thornswood-ui.js' = 'ui2'; $clientRel = 'client 2' } @('Data\new1.esp') "*a.esp`r`n*new2.esp`r`n" ('2' * 64)
-Publish-Scratch $R3 @{ 'Data\a.esp' = 'a3'; 'Data\new2.esp' = 'new two, again'; 'Data\new3.esp' = 'new three' } @() "*a.esp`r`n*new2.esp`r`n" ('3' * 64)
+Publish-Scratch $R2 @{ 'Data\Platform\a.esp' = 'a2'; 'Data\Platform\b.bsa' = 'b2, the first change to the installer''s file'; 'Data\Platform\new2.esp' = 'new two'
+                       'Data\Platform\Plugins\thornswood-ui.js' = 'ui2'; $clientRel = 'client 2' } @('Data\Platform\new1.esp') "*a.esp`r`n*new2.esp`r`n" ('2' * 64)
+Publish-Scratch $R3 @{ 'Data\Platform\a.esp' = 'a3'; 'Data\Platform\new2.esp' = 'new two, again'; 'Data\Platform\new3.esp' = 'new three' } @() "*a.esp`r`n*new2.esp`r`n" ('3' * 64)
 $d3 = Read-Feed
 Yes 'three releases later the list is newest first, each with the pack it ended on' (
     (@($d3.releases | ForEach-Object { [string]$_.id }) -join ',') -eq "$R3,$R2,$R1" -and
@@ -414,14 +414,14 @@ Yes 'no launcher is offered: the version did not move' (-not [bool]$mNewer.Invok
 $before = Feed-Sha
 $r = Rollback @('-To', $R1, '-Id', '20260904-1100-dev')
 Yes 'going back to a file only the installer ever had is refused, naming it, and nothing is sent' (
-    $r.Code -eq 1 -and $r.Out -match [regex]::Escape('Data\b.bsa') -and $r.Out -match 'FilesFrom' -and (Feed-Sha) -eq $before)
+    $r.Code -eq 1 -and $r.Out -match [regex]::Escape('Data\Platform\b.bsa') -and $r.Out -match 'FilesFrom' -and (Feed-Sha) -eq $before)
 $from = Join-Path $T 'old-game'
-foreach ($k in 'Data\b.bsa', 'Data\Platform\Plugins\thornswood-ui.js') {
+foreach ($k in 'Data\Platform\b.bsa', 'Data\Platform\Plugins\thornswood-ui.js') {
     $f = Join-Path $from $k; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $f) | Out-Null
     [IO.File]::WriteAllText($f, [string]$installer[$k], $ascii)
 }
 # A wrong copy beside them is not taken.
-[IO.File]::WriteAllText((Join-Path $from 'Data\a.esp'), 'not what the first release had', $ascii)
+[IO.File]::WriteAllText((Join-Path $from 'Data\Platform\a.esp'), 'not what the first release had', $ascii)
 $RA = '20260904-1200-dev'
 $r = Rollback @('-To', $R1, '-Id', $RA, '-FilesFrom', $from); Show $r
 $d = Read-Feed
@@ -449,7 +449,7 @@ foreach ($k in @($records[$R3].Keys)) { if ([string]$fwd[$k] -ne [string]$record
 foreach ($k in @($fwd.Keys)) { if (-not $k.StartsWith(':gone:') -and -not $k.StartsWith(':golden:') -and $k -ne ':record:files' -and -not $records[$R3].ContainsKey($k)) { $same = $false } }
 Yes '  the record it names is the third release''s, with the launcher''s own source, and what it takes out' (
     (Get-BaselineFileSha (Join-Path $feedDir 'published.json')) -eq [string]$d.baseline.sha256 -and $same -and
-    [string]$fwd[':gone:Data\new1.esp'] -eq 'removed' -and -not $fwd.ContainsKey(':record:files'))
+    [string]$fwd[':gone:Data\Platform\new1.esp'] -eq 'removed' -and -not $fwd.ContainsKey(':record:files'))
 Yes 'the list names every step, newest first' ((@($d.releases | ForEach-Object { [string]$_.id }) -join ',') -eq "$RF,$RA,$RB,$R3,$R2,$R1")
 $r = Rollback @('-Back', '1', '-DryRun', '-Id', '20260904-1400-dev')
 Yes '-Back 1 from there is the release before it in the list' ($r.Code -eq 0 -and $r.Out -match ("going to " + [regex]::Escape($RA)))

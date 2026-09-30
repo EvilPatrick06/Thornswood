@@ -144,7 +144,7 @@ yes('and Test-ShipMachine asks Test-ShipRetired, so packs and the installer leav
 const pu = read(path.join(ROOT, 'scripts', 'release', 'Publish-Update.ps1'));
 const pk = read(path.join(ROOT, 'scripts', 'release', 'Package-Thornswood.ps1'));
 yes('Publish-Update scans through Test-ShipMachine',
-    /function Test-Machine\(\[string\]\$rel\) \{ return \(Test-ShipMachine \$rel\) \}/.test(pu) &&
+    /function Test-Machine\(\[string\]\$rel\) \{ return \(\(?Test-ShipMachine \$rel\)/.test(pu) &&
     /if \(Test-Machine \$rel\) \{ continue \}/.test(pu));
 yes('Package-Thornswood scans through Test-ShipMachine',
     /if \(Test-ShipMachine \$rel\)/.test(pk));
