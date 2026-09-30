@@ -43,7 +43,7 @@ read it (issue #440, phase 8):
   writes it; run it again when the Skyrim pin moves.
 - `generated.json`: what `scripts\mods\Build-Generated.ps1` builds in
   Thornswood's own game folder on the shipping machine before a Ship (issue
-  #1247): the Nemesis patch codes the behavior files are generated with, and
+  #1247): the behavior patch codes Pandora Behaviour Engine+ generates the behavior files with, and
   the BodySlide slider sets built into the bodies, each at its own slider
   defaults. No script writes this one: it is changed by hand, in a pull
   request. Build-Generated refuses a set or a slider move that shapes the
