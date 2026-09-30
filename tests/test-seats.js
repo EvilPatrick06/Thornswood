@@ -478,7 +478,8 @@ yes('the front answers select:want by asking online.json, and waits in line only
     /lineClient\(\)\.get\('\/online\.json'|lineHttp\.get\('\/online\.json'/.test(front) &&
     /if \(o && o\.full === true\) \{ lineStart\(id, o\); return; \}/.test(front));
 yes('the front asks the server the page belongs to: 3000 for main, the port plus one for dev',
-    /p === 7777 \? 3000 : p \+ 1/.test(front));
+    /const RESOURCE_PORT = SERVER_PORT === 7777 \? 3000 : SERVER_PORT \+ 1;/.test(front) &&
+    /lineHttp = RESOURCE_URL \? new sp\.HttpClient\(RESOURCE_URL\) : null;/.test(front));
 yes('the front joins the relay only with this character own voice token',
     /\(Number\(String\(tok\)\.split\('\.'\)\[1\]\) \|\| 0\) !== lineId/.test(front));
 yes('the front says /line every ten seconds, sends the pass, and tells the client to stay',
