@@ -221,6 +221,91 @@ runs, and the plugin order now installs exactly as the server expects."
    out.
 5. Switch back to the Thornswood profile.
 
+## Other people's loose files: what the collection takes over (#1178)
+
+Measured on 29 September: the installer, the dev build, the dev record
+`20260929-140118-dev` and the last main record carried 424 loose files of
+other people's mods (124.7 MB) as if they were Thornswood's. Each was matched
+by path and file hash against every mod in this machine's Vortex, loose and
+inside its archives, and against the game's own archives; the rest were traced
+by path against each mod's file list on Nexus. Patrick, 29 September: anything
+on Nexus goes into the collection, anything else is dropped from our packs and
+the installer.
+
+Since #1178 `scripts\release\Ship-Rules.ps1` names what is Thornswood's
+outside `Data\Platform` and nothing else ships (`Test-ShipNotOurs`). The rows
+marked **Held** still ship until a release is built against revision 2 of the
+collection, then leave by themselves. The rows marked **Ours for now (#1259)**
+are the 140 outfit meshes built in BodySlide on some other machine: Patrick,
+29 September, Thornswood builds the outfits itself from the collection's
+BodySlide projects (#1259), and until that build replaces them they keep
+shipping so nothing looks broken (`scripts\release\built-until-1259.txt`
+lists them). Nothing here is deleted from anybody's game.
+
+<!-- loose:start -->
+| Files | Count | Where they come from | What happens |
+| --- | --- | --- | --- |
+| RaceMenu's menus and translations (`Interface\racesex_menu.swf`, `racemenu\`, `vr\`, `Translations\racemenu_*`) | 18 | RaceMenu (19080), in the collection: the same bytes are inside its RaceMenu.bsa | Out now; the collection installs them |
+| Travel clothes, the same bytes as Common Clothes' archive | 30 | Common Clothes (5063), in the collection | Out now; the collection installs them |
+| Skyrim Sewers' countess dress, an Elysium Estate book texture | 2 | Skyrim Sewers (9320), Elysium Estate (4119), in the collection, same bytes | Out now |
+| Male face expressions and beards (`character assets\MaleHead.tri`, `EyesMale.tri`, `faceparts\`, `mouth\`, `beards\`) | 77 | Expressive Facial Animation - Male Edition (19532) | **Held**: revision 2 adds the mod |
+| Fitted vanilla hoods, and the fishing and apprentice robes (`clothes\robemythicdawn\`, `clothes\thalmor\`, `creationclub\bgssse001\clothes\`) | 14 | CBBE 3BA Vanilla Outfits Redone (109194), its prebuilt meshes | **Held**: revision 2 adds the mod |
+| Children's clothes (`clothes\childrenclothes\`, `_byoh\clothes\childrenclothesvariants\`) | 10 | Styles of Skyrim Mashups - Children Clothes Variations and Mesh Fixes (154063), Vanilla Mesh Fixes Standalone | **Held**: revision 2 adds the mod |
+| A noble end table (`furniture\noble\nobleendtable04.nif`) | 1 | Assorted Mesh Fixes (32117) | **Held**: revision 2 adds the mod |
+| The message board Thornswood-Content.esp places (`olivar-messageboard\missiveboardcotnd.nif`, dev packs only) | 1 | No mod at this path; kept from the other server's kzolivar records | **Held**: the rebuilt Thornswood Content (step 3) must point its board at a mesh the collection installs first |
+| Travel clothes built in BodySlide | 120 | Built on some other machine from Common Clothes and Armors 3BA BodySlide (83980), for a body and preset nothing records | **Ours for now (#1259)**: still ships until Thornswood builds the outfits itself from the collection's BodySlide projects |
+| Bosmer armour built in BodySlide (`armor\bosmerarmormaty743\`) | 18 | Built from Immersive Armours SSE CBBE 3BA BodySlide (22382, in the collection) | **Ours for now (#1259)**, as above |
+| More Craftable Equipment's executioner built in BodySlide (`MCE\clothes\executioner\f\`) | 2 | Built from its CBBE BodySlide file (44666) | **Ours for now (#1259)**, as above |
+| Capital Windhelm's and Crossed Daggers' outfits, refitted (`surarmorcustommeshes\`, `clothes\saviik\`) | 15 | A refit of Capital Windhelm Expansion (42990) and The City of Crossed Daggers (168629) outfits that is not on Nexus | Out now; their own meshes, from the collection, show instead |
+| Vanilla outfits refitted by nobody traced (`clothes\farmclothes03\`, `monk\`, `sheogorath\`, `dlc02\clothes\`), women's tails | 12 | Not found on Nexus | Out now |
+| Leftovers nothing loads: `MCE\Clothing\`, `0CCE\`, `armor\dragon priests\`, `pulcharmsolis\`, `Armor_Replacer\` (3 files), `surwhiterunmeshes\` | 59 | Mage Clothing Expansion (128173), Common Clothing Expansion (134088), Armory of the Dragon Cult (94244), Armors of the Velothi (62752), NordwarUA's compilation (61423), Capital Whiterun Expansion (37982): none of their plugins is on the server, so nothing uses these | Out now. Adding any of them would add a plugin and move the load order |
+| Bethesda's own meshes, notes and a Creation Club script, loose | 23 | The same bytes as the game's own archives | Out now; everybody's game has them |
+| Scripts of mods nobody has: `IED.pex`, `MCM.pex`, `MCM_ConfigBase.pex`, `dlc1vcmoondial*.pex`, `wbptlight*.pex` | 7 | Immersive Equipment Displays (62001) without its program, an old MCM Helper that overrides the collection's newer one (53000), the Unofficial Skyrim Special Edition Patch (266) without its plugin, interior mods' light switches | Out now |
+| Another server's: `weapons\kzl\kzl_haybale.nif`, `TrueHUD\RP_Bosses.ini` | 2 | Keizaal Online; the boss list's own first line says "Daedric Online boss health bars" (#1253, Patrick: it goes) | Out now |
+| Retextures with no mod found: `riftencanalwood01.dds`, Windhelm wood (dev only) | 5 | Not found on Nexus | Out now |
+| The Creation Kit's face tint export for FishingInSkyrim.esp | 2 | Made here by the Creation Kit; Thornswood Content already carries the `.dds` the game reads | Out now |
+| Settings written on one machine: SkyUI's `config.shipped.txt` (the launcher's copy of SkyUI's own), the ImGui window files, Community Shaders' settings and ImGuiVRHelper's (neither mod is in the collection) | 6 | Written on the machine that built the pack | Out now |
+<!-- loose:end -->
+
+Thornswood's own, and still shipping: our main menu (`startmenu.swf`, the empty
+`loadwaitspinner.swf`, the silent `mus_maintheme.xwm`, the backdrop), SkyHUD's
+settings, the SkyMP client's files, and Nemesis's output. The saved mod menu
+settings for Precision, True Directional Movement and TrueHUD
+(`Data\MCM\Settings`) are Daedric Online's by their own first lines and never
+ship as one machine's files (#1239). Nemesis's output is ours
+because we generate it from the collection: its own record
+(`Data\Nemesis_Engine\cache\mod settings`) names only Precision (72347) and
+True Directional Movement (51614), both in the collection, run by Nemesis
+(60033), also in it, on 10 September. No collection can run the generator.
+
+### Mods revision 2 adds
+
+Each is meshes only by its file list on Nexus. If Vortex shows a plugin for any
+of them on the Plugins page after installing it, stop and ask Patrick: a
+plugin moves the load order.
+
+<!-- adds:start -->
+| Mod | Nexus id | File to install | Replaces |
+| --- | --- | --- | --- |
+| Expressive Facial Animation - Male Edition | 19532 | Main file, 1.21 | The male face and beard morphs |
+| CBBE 3BA Vanilla Outfits Redone | 109194 | VOR Prebuilt Meshes - Vanilla and VOR Prebuilt Meshes - CC | The fitted hoods and robes |
+| Styles of Skyrim Mashups - Children Clothes Variations and Mesh Fixes | 154063 | Vanilla Mesh Fixes Standalone | The children's clothes |
+| Assorted Mesh Fixes | 32117 | Main file | The noble end table |
+<!-- adds:end -->
+
+1. Nexus, each mod above: Mod Manager Download of the file named, then in
+   Vortex install and enable it. Deploy.
+2. Collections, Thornswood, workshop, Mods tab: each of the four is listed.
+3. Check in game, before the upload, that the faces, hoods, robes and
+   children's clothes look as they do today.
+
+Not part of this revision: Thornswood building the outfits itself from the
+collection's own BodySlide projects, with a recorded body and preset, and
+shipping the output as ours the way Nemesis's is (#1259, Patrick's choice of
+29 September). Until then the 140 built meshes above keep shipping. The
+Windhelm and Riften townsfolk refits are not among them and show their mods'
+own meshes.
+
 ## Keeping this page true
 
 `tests\test-collection-revision-2.ps1` reads the table above against both

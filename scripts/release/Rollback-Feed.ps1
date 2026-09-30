@@ -224,9 +224,13 @@ foreach ($m in @($curMap, $tgtMap)) {
     foreach ($k in @($m.Keys)) {
         $p = $(if ($k.StartsWith(':gone:')) { $k.Substring(6) } elseif ($k.StartsWith(':')) { '' } else { $k })
         if ($p -and ((Test-ShipBethesda $p) -or (Test-ShipBackup $p))) { $m.Remove($k); $notOurs++ }
+        # Another author's loose file, as a file only (#1178): going back must
+        # not hand it out again. A gone entry for one stays, because an earlier
+        # release already took it out of installs.
+        elseif (-not $k.StartsWith(':') -and (Test-ShipNotOurs $k)) { $m.Remove($k); $notOurs++ }
     }
 }
-if ($notOurs) { Say ("  left out {0} record entries naming Bethesda's files or backups; they are never ours to send" -f $notOurs) 'DarkGray' }
+if ($notOurs) { Say ("  left out {0} record entries naming Bethesda's files, backups or other people's loose files; they are never ours to send" -f $notOurs) 'DarkGray' }
 # ==== end thornswood no bethesda in a rollback ====
 
 # ==== thornswood no one machine's files in a rollback ====

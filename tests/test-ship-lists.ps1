@@ -366,11 +366,18 @@ $rows = @(
     # The client runtime is ours only when its bytes are the recorded build
     # now (entry 128), which a made up file cannot be, so they have their own
     # checks below the removal side.
+    # Nemesis's output, generated from the collection's own patches (#1178).
+    @('Data\meshes\actors\character\behaviors\0_master.hkx', 'ship', 'ship', 'ship'),
+    @('Data\Scripts\FNIS.pex',                                'ship', 'ship', 'ship'),
     # The folder names count only straight under Data, and BStarData only at
-    # the top: a folder of the same name deeper down is anybody's.
-    @('Data\meshes\tools\anvil.nif',                          'ship', 'ship', 'ship'),
-    @('Data\textures\Docs\sign.dds',                          'ship', 'ship', 'ship'),
-    @('Data\BStarData\note.txt',                              'ship', 'ship', 'ship')
+    # the top: a folder of the same name deeper down is not those rules'. Until
+    # #1178 that made these three ours; they are loose files of somebody's
+    # mod, and outside Data\Platform only what Ship-Rules names is ours, so
+    # they are out of both now, like RaceMenu's loose menu the packs carried.
+    @('Data\meshes\tools\anvil.nif',                          'ship', 'ship', 'out'),
+    @('Data\textures\Docs\sign.dds',                          'ship', 'ship', 'out'),
+    @('Data\BStarData\note.txt',                              'ship', 'ship', 'out'),
+    @('Data\Interface\racesex_menu.swf',                      'ship', 'ship', 'out')
 )
 $fixtureCollection = Get-Set @('Data\Nemesis_Engine\Nemesis Unlimited Behavior Engine.exe', 'Data\SkyUI_SE.bsa')
 $paths = [string[]]@($rows | ForEach-Object { $_[0] })
@@ -388,7 +395,11 @@ foreach ($r in $rows) {
         Write-Host ("      pack says {0}, installer says {1}" -f $gotPack, $gotInst) -ForegroundColor Red
     }
 }
-Yes 'the installer does with every row what it did before' (@($rows | Where-Object { $_[2] -ne $_[3] }).Count -eq 0)
+# Other people's loose files left the installer too (#1178), and nothing else
+# changed for it.
+$notOursRows = @('Data\meshes\tools\anvil.nif', 'Data\textures\Docs\sign.dds', 'Data\BStarData\note.txt', 'Data\Interface\racesex_menu.swf')
+Yes 'the installer does with every row what it did before, other people''s loose files apart' (@($rows | Where-Object { $_[2] -ne $_[3] -and $notOursRows -notcontains $_[0] }).Count -eq 0)
+Yes '  and those went from the installer to nowhere' (@($rows | Where-Object { $notOursRows -contains $_[0] -and ($_[2] -ne 'ship' -or $_[3] -ne 'out') }).Count -eq 0)
 $changed = @($rows | Where-Object { $_[1] -ne $_[3] })
 Yes 'every row whose fate changed went from a pack to nowhere, none the other way' (@($changed | Where-Object { $_[1] -ne 'ship' -or $_[3] -ne 'out' }).Count -eq 0)
 Write-Host ("      {0} rows packs carried and no longer do" -f $changed.Count) -ForegroundColor DarkGray
