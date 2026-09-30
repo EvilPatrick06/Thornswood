@@ -1302,6 +1302,28 @@ if ($bethesdaInRecord.Count) {
 }
 # ==== end thornswood no bethesda in the record ====
 
+# ==== thornswood no one machine's files in the record ====
+# tests\test-no-machine-files.ps1 runs this block on its own.
+#
+# Nothing of one machine's goes into the record either (#1239): its runtime
+# state and tokens in Data\Platform, logs, Vortex's records, window layouts,
+# settings saved from a mod's menu, face exports, saves (Test-ShipOneMachine).
+# A launcher that syncs to the record fetches every file it names, so the dev
+# records of 28 and 29 September handed out the join pass and the mod menu
+# settings of the machine that ships. The scan leaves them out through
+# Test-Machine and Test-Runtime; this stops the release if a later change ever
+# puts one back. As gone they are allowed only on $ShipDeleteAlways, which every
+# release deletes on purpose (voice-token.txt).
+$machineInRecord = @(@($now.Keys) | ForEach-Object {
+                        if ($_.StartsWith(':gone:')) { $g = $_.Substring(6); if (@(Get-ShipDeleteAlways) -notcontains $g) { $g } }
+                        elseif (-not $_.StartsWith(':')) { $_ } } |
+                     Where-Object { $_ -and (Test-ShipOneMachine $_) })
+if ($machineInRecord.Count) {
+    Die ("The record of this release names {0} of one machine's own files, which never leave it: {1}. Nothing was sent." -f
+         $machineInRecord.Count, (($machineInRecord | Select-Object -First 5) -join ', '))
+}
+# ==== end thornswood no one machine's files in the record ====
+
 if (-not $NoUpload) {
     $recordFiles = @()
     foreach ($k in @($now.Keys)) {
