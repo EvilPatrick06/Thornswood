@@ -680,6 +680,9 @@ namespace Thornswood
             string temp = Folder + ".new";
             if (Directory.Exists(temp)) Directory.Delete(temp, true);
             Directory.CreateDirectory(Dir);
+            // What Build-Generated made in a folder of this name before
+            // (#1247) went with it, so the record goes before Ours reads it.
+            ForgetGenerated();
 
             HashSet<string> deployed = Deployed(src);
             // Thornswood's own files by its records (#1232): the installer's
@@ -2430,9 +2433,10 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Files a Thornswood update or the installer put into the game, which
-        /// a refresh leaves as they are. What the installer laid down that Vortex
-        /// also deploys stays Vortex's, so collection updates still reach it.
+        /// Files a Thornswood update, the installer or Build-Generated put into
+        /// the game, which a refresh leaves as they are. What the installer laid
+        /// down that Vortex also deploys stays Vortex's, so collection updates
+        /// still reach it.
         /// </summary>
         static HashSet<string> Owned(HashSet<string> deployed)
         {
@@ -2466,6 +2470,10 @@ namespace Thornswood
                     }
             }
             catch (Exception ex) { Swallow.Note("OwnGame.Owned, installed-into-game list", ex); }
+            // What Build-Generated made in this folder (#1247), Vortex's name
+            // or not: a refresh leaves it as built. Read without a catch: one
+            // missed would be put back to Vortex's without a word.
+            foreach (string rel in GeneratedFiles()) set.Add(rel);
             return set;
         }
 

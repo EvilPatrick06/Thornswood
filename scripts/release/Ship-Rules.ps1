@@ -28,6 +28,7 @@
       Test-ShipBackup $rel         any *.bak; never shipped, never removed
       Test-ShipBethesda $rel       Bethesda's by any of the three rules above (vanilla, Creation Kit, left alone); never packed, recorded or on the site
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
+      Get-ShipGeneratedFiles       what Build-Generated.ps1 made in that folder; shipped, even where Vortex deploys the same path
       Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
       Get-ShipRequiredDataRoot     game\required-data in the repo
@@ -711,6 +712,12 @@ function Test-ShipMachine([string]$rel) {
 # are the collection's files and stay out of packs and installers, the same way
 # the Vortex record keeps them out when the game is the Steam copy.
 #
+# Except what scripts\mods\Build-Generated.ps1 built in the folder (#1247):
+# the Nemesis behavior files and the BodySlide bodies are Thornswood's and
+# ship, though several sit where Vortex deploys a file of the same name
+# (Vortex's 3BA body, a mod's own behavior file), and files.txt goes on
+# saying V for those paths. Get-ShipGeneratedFiles reads its record.
+#
 # Returns the set of paths, or $null when this build has no such record (the
 # game is the Steam copy, or Root\Game came from an installer before 1.1).
 function Get-ShipOwnGameCollection([string]$ProfileDir) {
@@ -721,7 +728,22 @@ function Get-ShipOwnGameCollection([string]$ProfileDir) {
         $p = $line.Split([char[]]'|', 5)
         if ($p.Count -eq 5 -and $p[1] -eq 'V') { [void]$set.Add($p[4]) }
     }
+    foreach ($rel in (Get-ShipGeneratedFiles $ProfileDir)) { [void]$set.Remove($rel) }
     return ,$set
+}
+
+# The files Build-Generated.ps1 made in Thornswood's own folder, by its record
+# Profile\OwnGame\generated.txt ("file <sha256> <path>" lines; the rest of the
+# record is scripts\mods\Generated.ps1's). None when it has never run here.
+function Get-ShipGeneratedFiles([string]$ProfileDir) {
+    $record = Join-Path $ProfileDir 'OwnGame\generated.txt'
+    $l = New-Object 'System.Collections.Generic.List[string]'
+    if (-not (Test-Path -LiteralPath $record)) { return ,$l }
+    foreach ($line in [IO.File]::ReadLines($record)) {
+        $m = [regex]::Match($line, '^file [0-9a-f]{64} (.+)$')
+        if ($m.Success) { $l.Add($m.Groups[1].Value) }
+    }
+    return ,$l
 }
 
 # LOOSE ART NOBODY HAS ACCOUNTED FOR, named so a build says what it carries.
@@ -734,9 +756,11 @@ function Get-ShipOwnGameCollection([string]$ProfileDir) {
 # installer leaves out what the collection provides and nothing else, so every
 # one of them went to everybody who installed, and nothing on screen said so.
 #
-# This reports and does not refuse. Which of these may ship at all (BodySlide
-# output, the Nemesis output in meshes\actors) is Patrick's to decide, and a
-# refusal would stop every installer build until the folders are gone.
+# This reports and does not refuse. BodySlide and Nemesis output are
+# Thornswood's since #1247 (Patrick, 29 Sep): scripts\mods\Build-Generated.ps1
+# makes them in Thornswood's own folder before a Ship and records them, and a
+# refusal here would stop every installer build until the other folders are
+# gone.
 #
 # Ours is the main menu backdrop: the three files Go.ps1 writes from
 # game\menu ($menuPairs there; change the two together). Anything else
