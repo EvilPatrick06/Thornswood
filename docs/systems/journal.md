@@ -12,11 +12,21 @@ than refused as a second page.
 J opens the panel. `/journal` is the same. `/journal new` and a title
 starts one.
 
+The title, a page's title, and the page itself can be typed. While
+the panel is open the keyboard stays in it, including in those
+fields.
+
 ## Who else can read it
 
 Nobody, until you share a page. You can share with a friend, and with
 nobody else. See [Friends](friends.md). Sharing does not hand them
 the journal. It hands them that page.
+
+The panel's Share with list is your friends, including one who is
+not online. The name stored with them is enough. If no friend is
+picked, the panel says so and the share does not go out. A shared
+page still only appears for them while you are online. When you
+leave, it waits until you are back.
 
 ## Factions and businesses
 
@@ -31,6 +41,8 @@ the average. See [Merchant's Guild](merchants-guild.md).
 
 ## Where this is
 
-The caps, the panel, the commands, and sharing with a friend are in
-the server. A journal survives a restart. It is not a quest. The
-group tab is not on the panel.
+The caps, the panel, typing in the title and the page, the commands,
+and sharing with a friend are in the server. A friend who is offline
+can be named, and the share is kept. The page still only appears
+while the person who wrote it is online. A journal survives a
+restart. It is not a quest. The group tab is not on the panel.

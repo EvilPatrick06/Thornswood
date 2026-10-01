@@ -4871,11 +4871,13 @@
   // uses for a meter that is fine, so the two read as one game.
   const PARTY_COLOUR = [0.56, 0.72, 0.37, 0.95];
   const PLAIN_COLOUR = [1, 1, 1, 0.8];   // what the client itself uses
+  const HIDDEN_COLOUR = [1, 1, 1, 0];    // the tag stays, the letters do not
 
   let partyAt = 0;
   let partySaid = '';
   const partyMarks = {};      // form id hex -> the marker reference
   const partyTinted = {};     // form id hex -> true while its text is green
+  const nameHidden = {};      // form id hex -> true while its text is clear
 
   function partyList() {
     try {
@@ -4925,6 +4927,56 @@
       const textId = tags[id];
       if (textId === undefined || textId === null) { continue; }
       try { sp.setTextColor(textId, PLAIN_COLOUR); } catch (e) { }
+    }
+  }
+
+  /*
+    A hidden name is the same tag with no ink. Hide every name blanks the
+    whole table. One person is the near list's h flag, or the party row's,
+    for somebody who is in the party and not standing close enough to be
+    near. The marker and the compass strip are left alone. Applied after
+    the green, so a hidden party name stays blank rather than green.
+  */
+  function hideNames(want) {
+    const tags = nameTags();
+    if (!tags) { return; }
+    let hideAll = false;
+    try { hideAll = !!globalThis.thornswoodHideAllNames; } catch (e) { hideAll = false; }
+    const near = nearList() || {};
+    const hide = {};
+    if (hideAll) {
+      for (const key in tags) {
+        if (!Object.prototype.hasOwnProperty.call(tags, key)) { continue; }
+        hide[Number(key).toString(16)] = true;
+      }
+    }
+    for (const hex in near) {
+      if (!Object.prototype.hasOwnProperty.call(near, hex)) { continue; }
+      if (near[hex] && near[hex].h) { hide[String(hex)] = true; }
+    }
+    for (const hex in want) {
+      if (!Object.prototype.hasOwnProperty.call(want, hex)) { continue; }
+      if (want[hex] && want[hex].h) { hide[String(hex)] = true; }
+    }
+    for (const hex in hide) {
+      if (!Object.prototype.hasOwnProperty.call(hide, hex)) { continue; }
+      const id = parseInt(hex, 16);
+      const textId = tags[id];
+      if (textId === undefined || textId === null) { continue; }
+      try { sp.setTextColor(textId, HIDDEN_COLOUR); nameHidden[hex] = true; }
+      catch (e) { }
+    }
+    for (const hex in nameHidden) {
+      if (!Object.prototype.hasOwnProperty.call(nameHidden, hex)) { continue; }
+      if (hide[hex]) { continue; }
+      delete nameHidden[hex];
+      const id = parseInt(hex, 16);
+      const textId = tags[id];
+      if (textId === undefined || textId === null) { continue; }
+      const colour = want[hex] ? PARTY_COLOUR : PLAIN_COLOUR;
+      if (want[hex]) { partyTinted[hex] = true; }
+      else { delete partyTinted[hex]; }
+      try { sp.setTextColor(textId, colour); } catch (e) { }
     }
   }
 
@@ -4979,6 +5031,7 @@
     }
 
     colourNames(want);
+    hideNames(want);
 
     // A marker for everybody in the party, moved to where the server last
     // said they were.

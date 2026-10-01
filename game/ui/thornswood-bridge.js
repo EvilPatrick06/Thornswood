@@ -308,12 +308,32 @@
   // Anything that reaches the document while you are not talking is a game key
   // that leaked in, so it is stopped before React sees it. Capture phase,
   // because the chat's own listener is on the input.
+  //
+  // A journal title, a page, the trade boxes and the emote search are the
+  // exception. Stopping the key here, before it reaches the field, is why
+  // those boxes would not take a single letter. The same stop kept Escape
+  // and J from the panels that close themselves, because their listeners
+  // sit on the bubble and this one is on the capture.
+  function overlayWantsKeys() {
+    try {
+      if (window.thornswoodJournal && window.thornswoodJournal.isOpen()) { return true; }
+      if (window.thornswoodTrade && window.thornswoodTrade.isOpen()) { return true; }
+      if (window.thornswoodParty && window.thornswoodParty.isOpen()) { return true; }
+      var wheel = document.getElementById('thornswood-wheel');
+      if (wheel && String(wheel.className).indexOf('gone') === -1) { return true; }
+      var ask = document.getElementById('ts-ask');
+      if (ask && ask.childNodes && ask.childNodes.length) { return true; }
+    } catch (e) { }
+    return false;
+  }
   document.addEventListener('keydown', function (e) {
     if (window.thornswoodTyping) return;
+    if (overlayWantsKeys()) return;
     e.stopPropagation();
   }, true);
   document.addEventListener('keypress', function (e) {
     if (window.thornswoodTyping) return;
+    if (overlayWantsKeys()) return;
     e.stopPropagation();
     e.preventDefault();
   }, true);
