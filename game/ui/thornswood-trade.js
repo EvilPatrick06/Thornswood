@@ -277,5 +277,9 @@
   };
 
   build();
+  // Owner updates can precede this asynchronously loaded script (#1275).
+  if (window.thornswoodTradeView) {
+    window.thornswoodTrade.setData(window.thornswoodTradeView);
+  }
   tell('ready');
 })();
