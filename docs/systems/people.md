@@ -13,11 +13,16 @@ None of these is a class or a profession. Each one is its own system.
 | Text chat | [Text chat](chat.md) |
 
 A friend is not a party. A party is who is in the cell with you this
-evening, and it is what pays the work bonus. A trade is two people
-and what they are holding. A journal is yours until you share a page
-with a friend. Voice is how far a spoken word carries. The wheel is
-animations. Text is what you type, and out of character is a command
-so it cannot land in the middle of a scene.
+evening, and it is what pays the work bonus. The person who opened
+it leads it. A trade is two people and what they are holding. A
+journal is yours until you share a page with a friend. Voice is how
+far a spoken word carries, and a colored mark above the head while
+the microphone is open. The wheel is animations. Text is what you
+type. A plain line, a `/me`, and an `/ooc` also sit above the head
+for whoever is close enough to read them. Out of character stays in
+brackets, including there, so a scene can see that it stepped out.
+You can stop hearing one person, stop reading them, or hide their
+name, and only for yourself.
 
 ## Bard
 
@@ -37,4 +42,6 @@ unless you also say the word.
 The seven systems are in the server, with the gaps named at the
 bottom of each page. `/bard` for 5 minutes is in the server. The
 party cap of 6 is in the server. Plain text chat still goes to
-everybody, because the local switch ships off.
+everybody, because the local switch ships off. The mark above the
+head, the words above the head, the text and name switches, and the
+leader's kick, lead, and disband are not in the server.

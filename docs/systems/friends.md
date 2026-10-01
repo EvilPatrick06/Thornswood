@@ -29,8 +29,10 @@ You can share a journal page with a friend, and with nobody else. See
 A friend is not let into your house. A key does that. See
 [Property](property.md).
 
-A friend is not a mute. Mute is [Voice](voice.md): you stop hearing
-them, and they can still hear you.
+A friend is not a mute. What you can turn off for one person is on
+[Voice](voice.md): their voice, their text, or their name. Each one
+is only for you. They can still hear you, still read you, and still
+see your name.
 
 ## Where this is
 
