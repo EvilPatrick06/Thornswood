@@ -120,6 +120,10 @@ They are parts for building a house, and a house here is a place
 already standing. The four recipes are in
 [the refused list](lists/refused.md).
 
+The Hearthfire building rows, 487 of them, stay out of
+[Cut items](cut-items.md). They are not a public craft and they are
+not company wares.
+
 ## Where this is
 
 Claims, deeds, the 14 day lapse, locks, molds, keys, stewards,

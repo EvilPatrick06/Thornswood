@@ -13,12 +13,23 @@ Woodwright, at advanced. A novice smith cannot use it. The aetherium
 forge is open furniture, and the things made there are master recipes,
 so the rank still stops a novice.
 
-Every forge and every skyforge burns one charcoal. No charcoal, the
-piece is not made. The four grades are heat, not a discount. A higher
-grade burns hotter, and a higher metal needs more heat. Poor
-charcoal, charcoal, briquette, and coke are the grades a Charburner
-makes. Which grade lights which metal is not set. Until it is, the
-server still burns the cheapest grade in the pack first.
+Every forge and every skyforge burns one charcoal. No charcoal of
+the grade the metal asks for, the piece is not made. The four grades
+are heat, not a discount. A higher grade burns hotter, and a higher
+metal needs more heat. Poor charcoal, charcoal, briquette, and coke
+are the grades a Charburner makes.
+
+| Grade | Metals |
+| --- | --- |
+| Poor Charcoal | Iron, steel, ancient nord, skyforge steel |
+| Charcoal | Silver, dwarven, elven, orcish, falmer |
+| Briquette | Nordic, glass, ebony |
+| Coke | Stalhrim |
+
+Smelting an ingot uses the same grade as that metal. A skyforge asks
+for one grade poorer than the table. Poor Charcoal does not get
+poorer, so iron, steel, ancient nord, and skyforge steel still take
+Poor Charcoal there. Stalhrim at the skyforge takes briquette.
 
 Smelting an ingot is smith work, not anybody's. One row per ingot
 stays. Leather is the Platewright's. The duplicate rows, and the
@@ -56,7 +67,9 @@ half places one more.
 ## Where this is
 
 The recipe gates, the skyforge's advanced line, the charcoal, and
-the taking of one handle are in the server. The ingredient column on
+the taking of one handle are in the server. The forge still burns
+the cheapest grade in the pack, Poor Charcoal first, and it does not
+read the table above. The ingredient column on
 the recipe pages still omits the handle, because the plugin record
 does. A drum, a flute, and a lute are asked for a handle by that same
 check. Mastercraft is not applied to a temper, because the temper

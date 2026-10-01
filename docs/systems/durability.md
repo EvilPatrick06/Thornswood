@@ -25,28 +25,33 @@ The result depends on who they are.
 | The half that makes that kit | 120% |
 | Anyone else, including the other half of the same profession | 100% |
 
-120% is what allows a buff. The buff is not chosen. 100% is a sound
-repair and nothing more.
+120% is what allows a buff. 100% is a sound repair and nothing more.
 
-At 0% there is a chance the piece breaks if it is being worn. The
-chance is not set, and neither is the moment it is rolled: a hit, or
-an hour worn. A piece at 0% that is sitting in a chest is not worn,
-and this chance does not apply to it.
+| Piece | At 120% |
+| --- | --- |
+| Weapon | 5% more damage |
+| Armour | 5% more of that piece's armour rating |
+| Clothing, robes, cloaks, capes | The higher condition, and no buff |
+
+At 0%, a piece that is being worn has a 10% chance to break on a hit.
+An hour of standing around does not roll it. A piece at 0% that is
+sitting in a chest is not worn, and this chance does not apply to it.
 
 Glass, ebony, and stalhrim take the same kits as iron. They are
 scarce to make. They are not a different repair.
 
 Condition on a piece that was made or bought, and then left in a
-container, is the Dull rule on [Gold](gold.md): stockpiled crafted
-goods lose condition. The rate, and whether it is only a shop chest
-or any container, is not set.
+container, is the Dull rule on [Gold](gold.md). 5% per real day, in
+a shop chest or a house container. A pack does not dull. Worn gear
+uses the hit rule above, not this clock.
 
 ## What this replaces
 
 Tempering, the armour table and the sharpening wheel, is not how a
-piece is repaired. Those rows are still in the recipe book and the
-server is not asked about them. They are not in
-[Cut items](cut-items.md) yet.
+piece is repaired. Those 1809 rows are in
+[Cut items](cut-items.md). The recipe book still lists them. The
+server is not asked about them. They are held so a temper can come
+back for an event. `recipes.json` is not edited by that list.
 
 Mastercraft was the smith's master perk for tempering past the metal.
 The 120% repair is that idea now: the right half can put a piece past
