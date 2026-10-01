@@ -90,8 +90,8 @@ If none names a sell price, no trader sells it.
 
 ## The trader's purse
 
-Each guild trader starts with a purse. The amount is not set. It is
-once, when that trader is first stood up. After that the purse
+Each guild trader starts with 250 gold. It is once, when that trader
+is first stood up. After that the purse
 changes only when they buy and sell, the way a person's purse does.
 They do not mint. They do not receive the starting 40. An empty
 purse refuses a buy. An empty shelf refuses a sale.
