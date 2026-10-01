@@ -87,8 +87,10 @@ counts one. The hold's name does not pick it.
 | Autumn | Novice and advanced. An expert crop waits. |
 | Winter | No rank. A sown plot stays sown. The clock does not run. |
 
-Winter stops a crop even on a warm day. Spring, summer, and autumn
-still need the temperature and the weather. A plot that waited
+Winter stops a crop even on a warm day. It does not lock the sky to
+snow. The odds, and the colder outdoor target, are on
+[Temperature and weather](../temperature.md). Spring, summer, and
+autumn still need the temperature and the weather. A plot that waited
 through winter finishes in spring from where the clock stopped.
 
 ## Butter, milk, and the nest
