@@ -58,22 +58,53 @@ striking them is how the debt is dropped.
 
 ## What the guild does not do
 
-It does not set prices. Two people trade, and the gold moves as
-[Gold](gold.md) says.
-
 It does not mint coin. Joining and dues are gold that already existed,
 counted on the hold's box.
 
 It does not own a shop. The shop is a claim. See [Property](property.md).
 
 It does not stop anyone else from posting or selling. A non-member
-pays full fees and trades the same way.
+pays full fees and trades the same way. Two people still agree their
+own price. See [Trade](trade.md).
 
 It does not pay a wage.
+
+## What the traders charge
+
+A guild trader buys and sells at the hold's price. The numbers come
+from the price lists in faction and business books, submitted at
+that hold's drop box. See
+[Factions and businesses](factions.md) and [Property](property.md).
+
+For each item, the buy price is the average of the buy prices
+submitted to that hold. The sell price is the average of the sell
+prices. A blank is not a number. 0 is free, and it counts. The
+average is rounded to the nearest gold. A half rounds up.
+
+A hold with no submitted buy for an item uses the average of the
+holds that did submit one. The same for a sell price. A hold that
+did submit its own price uses that price, so two holds can differ.
+
+If no submitted list anywhere names a buy price, no trader buys it.
+If none names a sell price, no trader sells it.
+
+## The trader's purse
+
+Each guild trader starts with a purse. The amount is not set. It is
+once, when that trader is first stood up. After that the purse
+changes only when they buy and sell, the way a person's purse does.
+They do not mint. They do not receive the starting 40. An empty
+purse refuses a buy. An empty shelf refuses a sale.
+
+They start with gold and no goods. Stock is what they have bought.
+The quests they give are on [Custom quests](quests.md). A supply
+quest pays out of this same purse.
 
 ## Where this is
 
 The hold's box is in the server, and the note beside it says guild
-ledgers belong in that box. There is no roll, no 50, no dues, no
-factor, and no half-fee. Posting is 20 and 30 for everybody. Rent is
-the only debt the box pays down.
+ledgers belong in that box. The box takes gold. It does not take a
+price list. There is no roll, no 50, no dues, no factor, and no
+half-fee. Posting is 20 and 30 for everybody. Rent is the only debt
+the box pays down. Traders do not buy and sell from a purse the
+server tracks.
