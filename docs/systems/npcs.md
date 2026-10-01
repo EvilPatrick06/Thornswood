@@ -16,10 +16,15 @@ something a page can wish away.
 
 The plan's cast is small.
 
-Traders you buy from and sell to. Their stock is not a mint. Coin
-still enters only as the starting 40, and a sale moves gold that
-already exists. See [Gold](gold.md). A trader who pays you from an
-empty chest is a bug, not a wage.
+Traders you buy from and sell to. They are the merchant's guild of
+the hold they stand in. Their prices are the average of the price
+lists submitted to that hold's drop box. Their purse starts once,
+and after that they buy and sell the way a person does. An empty
+purse does not pay. An empty shelf does not sell. Stock is what
+they have bought. See [Merchant's Guild](merchants-guild.md) and
+[Custom quests](quests.md). Coin still enters the world only as the
+starting 40. A trader's starting purse is not a second mint, and
+the amount of it is not set. See [Gold](gold.md).
 
 Carriage and ferry drivers. They are the workers of the hold the stop
 sits in. The fare is that hold's. See
@@ -54,4 +59,5 @@ Traders and drivers are in the world as the game placed them, with
 the carriage mod on top. The known-issues page says those two groups
 stay and the rest is thinned, and that thinning is not done. Thalmor
 patrols are not spawned. No actor is remade yet. The hosting limit
-is the engine's, and it is live.
+is the engine's, and it is live. A trader does not buy and sell from
+a purse the server tracks, and does not read a submitted price list.

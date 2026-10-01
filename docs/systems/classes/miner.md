@@ -78,7 +78,7 @@ The seam comes back for everybody at once, not per person.
 | Gold | 20 minutes |
 | Corundum, silver | 10 minutes |
 | Clay, quarried stone, orichalcum, quicksilver, moonstone, malachite, shellbug | 30 minutes |
-| Ebony, the gems, stalhrim, heart stone | One place. A custom quest is what lets someone take from it. Papyrus quests do not run, so the quest is this server's own. What it asks them to do is not set. A hold's steward does not grant it. A steward is not staff. Someone who has not finished it takes nothing, and the place does not refill for them. |
+| Ebony, the gems, stalhrim, heart stone | One place. A scarce quest opens it. The trader asks for a count, the place holds more than that count, and the extra is what you keep. See [Custom quests](../quests.md). The quest may require Miner. The rank on the seam still applies. A steward does not grant it. |
 
 Clicking again while the pick is still in the air is not a second
 swing. Nothing is said. The ore is not given twice.

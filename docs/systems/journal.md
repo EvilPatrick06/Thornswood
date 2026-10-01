@@ -25,7 +25,9 @@ when the group is not standing together. The tab is absent until the
 Discord account holds Business Owner or Faction Owner, or this
 character has accepted an invite, or the account is staff. The book
 itself is on [Factions and businesses](factions.md). It does not use
-one of the 12 journals.
+one of the 12 journals. A price list from that book can be submitted
+at a hold's drop box, and that hold's traders then buy and sell from
+the average. See [Merchant's Guild](merchants-guild.md).
 
 ## Where this is
 

@@ -89,6 +89,14 @@ still a [trade](trade.md), or coin handed over. The list is what they
 posted, so a customer can read it when they have been invited, and so
 the group can agree a price before anyone meets.
 
+Someone with the Prices permission can submit the list at a hold's
+drop box. The box is on [Property](property.md). The submission is a
+copy. The book stays in the journal. A later submission from the
+same book replaces the earlier one in that hold. The
+[Merchant's Guild](merchants-guild.md) of that hold averages the
+copies it has, and its traders buy and sell at that average. A book
+can be submitted to more than one hold. Each hold keeps its own copy.
+
 ## The people
 
 40 members, counting the owner. A 41st accept is refused.
@@ -145,6 +153,7 @@ no group chat.
 
 The server already knows who is in the world, and a friend row
 already uses that. It does not store the time a character last left.
+Nothing submits a price list to a hold's drop box.
 
 Staff seats already read Owner, Gamemaster, Dev, Loremaster, and
 Moderator off the Discord account. Business Owner and Faction Owner
