@@ -4565,7 +4565,12 @@
     if (!ref) { lookingAt = ''; drawPrompt(null); return; }
 
     let hex = '';
-    try { hex = (ref.getFormID() >>> 0).toString(16); } catch (e) { hex = ''; }
+    // Dynamic references have different local and server IDs (#1275).
+    try {
+      const convert = globalThis.thornswoodSocialServerId;
+      const serverId = typeof convert === 'function' ? convert(ref.getFormID() >>> 0) : 0;
+      if (serverId) { hex = (serverId >>> 0).toString(16); }
+    } catch (e) { hex = ''; }
     if (!hex) { lookingAt = ''; drawPrompt(null); return; }
 
     const row = Object.prototype.hasOwnProperty.call(near, hex) ? near[hex] : null;
@@ -4593,7 +4598,13 @@
   */
   function lookVerb(cmd) {
     if (!lookingAt) { return false; }
-    tellServer('/' + cmd + ' ' + lookingAt);
+    const line = '/' + cmd + ' ' + lookingAt;
+    if (!T.ready) { note('The social connection is loading. Try again in a moment.'); return true; }
+    // These are deliberate actions; chat reports an offline queued request.
+    const sent = T.js('(function(){try{if(window.thornswoodNet&&window.thornswoodNet.say){' +
+      'window.thornswoodNet.say(' + JSON.stringify(line) + ');return;}}catch(e){}' +
+      'try{window.skyrimPlatform.sendMessage("thornswood-front","social:unavailable");}catch(e){}})();');
+    if (!sent) { note('Could not send the social request. Try again in a moment.'); }
     say(cmd + ' on ' + lookingAt);
     return true;
   }
@@ -7380,13 +7391,17 @@
       Escape, and a focus claim left up after that is a keyboard that never
       comes back.
     */
-    if (what === 'party:opened') { T.claimFocus('party', true); return; }
+    if (what === 'social:unavailable') {
+      note('The social connection is loading. Try again in a moment.'); return;
+    }
+    if (what === 'party:opened') { T.claimFocus('party', true); tellServer('/party refresh'); return; }
     if (what === 'party:closed') { T.claimFocus('party', false); return; }
-    if (what === 'journal:opened') { T.claimFocus('journal', true); return; }
+    if (what === 'journal:opened') { T.claimFocus('journal', true); tellServer('/party refresh'); return; }
     if (what === 'journal:closed') { T.claimFocus('journal', false); return; }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
     if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
     if (what === 'party:ready' || what === 'journal:ready' || what === 'trade:ready') {
+      tellServer(what === 'trade:ready' ? '/trade refresh' : '/party refresh');
       log('the ' + what.split(':')[0] + ' panel is in');
       return;
     }
