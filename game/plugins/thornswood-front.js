@@ -6332,12 +6332,11 @@
     Patrick, 27 September: "can we also make / pull up the text chat and enter
     slash and not the vanilla skyrims skill tree thingg and only the chat".
 
-    / is the game's Quick Stats, the skill tree, and a plugin cannot keep a
-    key from the game. So this is the J block's answer again: the tree is shut
-    the moment it opens, when this press opened it, and the chat opens with a
-    / typed. Told by the game's own name for the press ('Quick Stats' in
-    RE::UserEvents), so somebody who moved Quick Stats to another key keeps it
-    there untouched.
+    / is the game's Quick Stats, the skill tree. The native client keeps
+    that control from its menu opener while our overlays are ready, before
+    the game can request StatsMenu. This file still hears the key and opens
+    chat with / typed. A separate rebound Quick Stats key stays available.
+    The shared watcher below remains a fallback for menus opened otherwise.
 
     A tree that was already up before / went down is left alone, and so is
     the /: in the tree, / is the game's key for closing it. The shutting is
@@ -6347,11 +6346,10 @@
   /*
     A GAME MENU THAT OUR KEY OPENED IS SHUT. Issues 957 and 958.
 
-    / is the game's Quick Stats and P its Quick Magic, and no plugin can keep
-    a key from the game (the J block above says why), so each press opens the
-    game's menu as well as ours. That menu is shut when this press opened it,
-    told by the game's own name for the press, so somebody who moved Quick
-    Stats or Quick Magic to another key keeps it there untouched.
+    P is the game's Quick Magic, and its menu is shut when this press opened
+    it. The same watcher handles a skill tree opened outside the native slash
+    block below. It follows the game's name for the press, so somebody who
+    moved Quick Stats or Quick Magic to another key keeps it there untouched.
 
     WHAT WENT WRONG ON DEV, 28 September (Patrick's front log):
       20:37:41.881 / seen, but StatsMenu is open
@@ -6450,6 +6448,30 @@
   }
 
   const STATS_MENU = 'StatsMenu';
+  // The native MenuOpenHandler hook rejects this control before Skyrim asks
+  // for StatsMenu. Closing a menu after buttonEvent cannot prevent a flash.
+  // Both names and codes must match, so a separate rebound skill key remains
+  // the game's. Existing game menus retain their own keyboard handling.
+  let commandKeyKept = null;
+  let commandKeySaid = false;
+  function keepCommandKey(on) {
+    if (commandKeyKept === on) { return; }
+    commandKeyKept = on;
+    try {
+      sp.setMenuOpenKeyBlocked('Quick Stats', COMMAND_KEY, on, KEYBOARD_MENUS);
+    } catch (err) {
+      if (!commandKeySaid) {
+        commandKeySaid = true;
+        say('/: the client could not keep the skill key from the game: ' + err);
+      }
+    }
+  }
+  // Reset an earlier plugin copy's entry, and track overlay availability.
+  keepCommandKey(!!T.ready);
+  sp.on('update', guard('command key kept', () => {
+    keepCommandKey(!!T.ready);
+  }));
+
   const statsOnSlash = ourKeyMenu(STATS_MENU, 'Quick Stats', '/', 'the skill tree');
   const magicOnP = ourKeyMenu('MagicMenu', 'Quick Magic', 'P', 'the magic menu');
 
@@ -6735,6 +6757,7 @@
     if (phase === 2 && now - at > 600) {
       phase = 3; at = now;
       T.ready = true;
+      keepCommandKey(true);
       T.js('try{window.thornswoodChat&&window.thornswoodChat.show();}catch(e){}');
       log('ready');
       // Anything queued for the server before ready, which is always the
@@ -7528,6 +7551,7 @@
         at = Date.now();
         boxReady = false;
         T.ready = false;
+        keepCommandKey(false);
         try { T.claimFocus('chat', false); } catch (e) { }
       }
       return;

@@ -230,7 +230,7 @@ function rig(opts) {
     // crosshair it passes every key on, which is what this stands in for.
     'const MOLD_KEY = 22;\n' +
     'function moldPress() { return false; }\n' +
-    'const ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25,\n' +
+    'const COMMAND_KEY = 53;\nconst ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25,\n' +
     '      FRIEND_KEY = 34, TRADE_KEY = 35, MUTE_KEY = 38;\n';
   const make = new Function('sp', 'say', 'T', 'Date', 'guard', 'JOURNAL_KEY',
     prelude + arbiter + '\n' + jBlock + jStandIns + '\n' + keys + '\nreturn { claims: claims };');
@@ -763,7 +763,7 @@ if (arbiter !== null && keys !== null) {
     h.run(200);
     h.press(J);
     h.run(60);
-    const c = h.game.keptCalls;
+    const c = h.game.keptCalls.filter(function (entry) { return entry.userEvent === 'Journal'; });
     yes('C6 in 263 frames and a J the client is told twice: off at load, on when the panel is in',
         c.length === 2 && c[0].on === false && c[1].on === true &&
         c[1].userEvent === 'Journal' && c[1].code === J);
