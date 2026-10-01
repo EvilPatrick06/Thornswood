@@ -520,14 +520,6 @@
       "produceType": "ALCH",
       "why": "its produce is food, so it is not the gatherer's, and it is named in FOOD_PROP_BY_EDITOR_ID at the top of this script as a prop that is neither a plant anybody grows nor an animal anybody took, so it is in none of the tables this script writes"
     },
-    "cf19:ElysiumEstateSSE.esp": {
-      "editorId": "EE_ShrineofKynarethHarvestKey",
-      "name": "Harvest Elysium Estate Key",
-      "produce": "cf10:ElysiumEstateSSE.esp",
-      "produceName": "Key to Elysium Estate",
-      "produceType": "KEYM",
-      "why": "its produce is a KEYM, which is not material anybody gathers"
-    },
     "d790c:Skyrim.esm": {
       "editorId": "CoinPurseSmall",
       "name": "Coin Purse",

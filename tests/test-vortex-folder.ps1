@@ -1042,7 +1042,9 @@ try {
     Yes 'after Fix points it at the folder, the launcher makes the own folder the way Make it does (AskOwnGame)' `
         ($shell -match 'if\s*\(\s*Verify\.OwnFolderNext\s*\)\s*AskOwnGame\(\s*false\s*\)')
     Yes 'Scan keeps Fix pressable when the missing mods are in the folder Vortex deploys into' `
-        (($shell -match 'VortexFolder\s*!=\s*null') -and ($shell -match 'btnFix\.IsEnabled\s*=\s*blocking\s*>\s*0\s*&&\s*\(absent\s*==\s*0\s*\|\|\s*elsewhere\)'))
+        (($shell -match 'VortexFolder\s*!=\s*null') -and ($shell -match 'btnFix\.IsEnabled\s*=\s*blocking\s*>\s*0\s*&&\s*\(!onlyAbsent\s*\|\|\s*elsewhere\)'))
+    Yes 'Fix stays off only when every blocking problem is a mod that is not installed' `
+        ($shell -match 'bool onlyAbsent = absent > 0 && fixable == 0')
     Yes 'Settings has Choose Vortex''s folder and Forget the chosen folder' `
         (($xaml -match 'x:Name="BtnOwnGamePick"') -and ($xaml -match 'x:Name="BtnOwnGameForget"') -and
          ($own -match 'F<Button>\("BtnOwnGamePick"\)') -and ($own -match 'F<Button>\("BtnOwnGameForget"\)'))

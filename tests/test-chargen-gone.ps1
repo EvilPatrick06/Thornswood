@@ -356,6 +356,8 @@ Yes ('and still takes our {0} plugin(s)' -f $ours.Count) (@($ours | Where-Object
 # bundle is left out of this: Ship-Rules calls it ours by record, and OwnGame
 # answers it before Foreign as a ClientFile.
 $twins = @($rel, 'Data\Platform\Plugins\somebody-else.js', 'Data\Interface\map.swf',
+           # #690: Elysium Estate's old plugin is left out, the collection's is not.
+           'Data\ElysiumEstateSSE.esp', 'Data\ElysiumEstate.esp',
            'Data\Platform\UI\assets\app-1.js', 'Data\Platform\UI\thornswood-chat.js',
            'Data\Platform\PluginsNoLoad\auth-data-no-load.js',
            # #960: SkyUI 5.2's loose scripts are left out, MCM Recorder's are not.
