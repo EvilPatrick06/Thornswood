@@ -30,6 +30,11 @@ and [Notice boards](noticeboards.md).
 A steward names the Merchant's Guild factor, on
 [Merchant's Guild](merchants-guild.md).
 
+A steward is not staff. Staff are the Discord roles named on
+[Voice](voice.md): Owner, Gamemaster, Dev, Loremaster, Moderator.
+A steward does not grant the quest on the rare mine. That quest is
+on [Miner](classes/miner.md).
+
 ## Ambassador
 
 One, for the embassy in Solitude. Keeps the roll of 40, of whom 12 may

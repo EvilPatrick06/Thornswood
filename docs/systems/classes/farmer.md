@@ -68,8 +68,8 @@ number.
 
 ## Season, weather, and a cook's start
 
-A field starts empty. A cook is handed a starter pack so the first
-meals do not wait on a harvest. What is in that pack is not set.
+A field starts empty. A cook is not handed a starter pack. The
+first meals come from a harvest, a trade, or a hunt.
 
 A crop grows or it does not by the temperature, the weather, and the
 kind of place, the same meters as
@@ -156,6 +156,7 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 
 Empty plots, the claim circle, the 14 days, the waits, the yields,
 and a shovel of 100 uses are in the server. The plan's shovel is 50.
-A farmer is handed 3 cabbage, 3 leek and 3 potato as seed. A cook's
-starter pack is not. Nothing reads the weather before a crop grows,
+A farmer is handed 3 cabbage, 3 leek and 3 potato as seed. A cook
+is not handed a pack, in the plan or on the server. Nothing reads
+the weather before a crop grows,
 and there is no season.
