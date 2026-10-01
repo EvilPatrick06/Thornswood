@@ -124,7 +124,7 @@ Closed, and the half must be one you can work at the rank named:
 | Skyforge | Edgewright, Platewright, or Woodwright, at advanced |
 | Dawnguard bench | Woodwright, at advanced |
 | Forge | Open furniture. A forge recipe still has an owner and a rank |
-| Tanning rack | Open. Hides into leather are anybody's work |
+| Tanning rack | Open furniture. A hide into leather is the Platewright's |
 | Loom | Open furniture. The garment still has an owner and a rank |
 | Armour table | Open furniture. Tempering never reaches the server |
 | Aetherium forge | Open furniture. The staff and the plate made there are master recipes |

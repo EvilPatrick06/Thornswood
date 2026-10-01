@@ -1,0 +1,78 @@
+# One push files the plan-gap issues, then this file is removed.
+# The integration token on a cloud session cannot open issues. The
+# workflow token can, when the repository allows it.
+name: File plan gap issues
+on:
+  push:
+    branches:
+      - cursor/plan-gaps-b5eb
+    paths:
+      - .github/plan-gap-issues.json
+permissions:
+  issues: write
+  contents: read
+concurrency:
+  group: file-plan-gaps
+  cancel-in-progress: false
+jobs:
+  file:
+    name: File plan gap issues
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Open one issue per plan gap
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:GH_TOKEN) { throw 'GITHUB_TOKEN was empty' }
+          $headers = @{
+            Authorization = "Bearer $($env:GH_TOKEN)"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+            'User-Agent' = 'thornswood-plan-gaps'
+          }
+          $path = Join-Path $env:GITHUB_WORKSPACE '.github/plan-gap-issues.json'
+          $issues = Get-Content -Raw -Encoding UTF8 $path | ConvertFrom-Json
+          $made = 0
+          $kept = 0
+          foreach ($issue in $issues) {
+            $title = [string]$issue.title
+            $q = [uri]::EscapeDataString("repo:EvilPatrick06/Thornswood is:issue in:title `"$title`"")
+            $search = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/search/issues?q=$q&per_page=10"
+            $existing = $null
+            foreach ($item in @($search.items)) {
+              if ($item.title -eq $title -and -not $item.pull_request) {
+                $existing = $item
+                break
+              }
+            }
+            if ($existing) {
+              Write-Host "exists #$($existing.number) $title"
+              $kept++
+              continue
+            }
+            $labels = @($issue.labels | ForEach-Object { [string]$_ })
+            $payload = @{
+              title = $title
+              body = [string]$issue.body
+              labels = $labels
+            } | ConvertTo-Json -Depth 6 -Compress
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
+            try {
+              $created = Invoke-RestMethod -Method Post -Headers $headers `
+                -Uri 'https://api.github.com/repos/EvilPatrick06/Thornswood/issues' `
+                -Body $bytes -ContentType 'application/json; charset=utf-8'
+            } catch {
+              $detail = $_.ErrorDetails.Message
+              Write-Host "::error title=$title::$detail"
+              throw
+            }
+            Write-Host "created #$($created.number) $($created.html_url)"
+            $made++
+            Start-Sleep -Seconds 2
+          }
+          Write-Host "created=$made already=$kept"
