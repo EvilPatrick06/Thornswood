@@ -5,7 +5,8 @@ Weapons and armour, as magic rather than as metal.
 - [Bladebinder](enchanter/bladebinder.md) makes staves and unlocks the
   spells a staff can bind. 161 staves, all of them reach the server.
 - [Wardweaver](enchanter/wardweaver.md) enchants armour and clothing.
-  That is the enchanting menu. There is no recipe list.
+  The effects that are allowed are [Enchantments](../enchantments.md).
+  There is no recipe row for them.
 
 The arcane enchanter is closed. Either half, from novice. The staff
 enchanter is Bladebinder only, from novice. A Wardweaver does not
