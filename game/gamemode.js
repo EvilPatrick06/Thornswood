@@ -45900,3 +45900,224 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       ' at a person, for the staff roles with a join pass');
 })();
 // ==== end thornswood staff ====
+
+// NPC SERVER RUNTIME BEGIN
+// NVNM geometry follows xEdit's TES5 definitions: 12-byte vertices and
+// 16-byte triangles. Stay inside two adjacent walkable triangles and pass
+// through their shared edge midpoint; do not cross doors or external links.
+function npcLocalRoute(data, pos, preferredRoute) {
+  const b = Buffer.from(data);
+  if (b.length < 24 || b.readUInt32LE(0) !== 12 ||
+      !Array.isArray(pos) || pos.length !== 3 || !pos.every(Number.isFinite)) return null;
+  const nv = b.readUInt32LE(16);
+  const offset = 20 + nv * 12;
+  if (nv > 500000 || offset + 4 > b.length) return null;
+  const nt = b.readUInt32LE(offset);
+  if (nt > 500000 || offset + 4 + nt * 16 > b.length) return null;
+  const vertices = [];
+  for (let i = 0; i < nv; i++) {
+    const v = [0, 4, 8].map(j => b.readFloatLE(20 + i * 12 + j));
+    if (!v.every(Number.isFinite)) return null;
+    vertices.push(v);
+  }
+  const triangles = [];
+  for (let i = 0; i < nt; i++) {
+    const at = offset + 4 + i * 16;
+    const ids = [0, 2, 4].map(j => b.readUInt16LE(at + j));
+    if (ids.some(id => id >= nv)) return null;
+    const flags = b.readUInt16LE(at + 12);
+    if (flags & (7 | 8 | 32 | 512 | 1024)) continue;
+    const points = ids.map(id => vertices[id]);
+    const center = [0, 1, 2].map(j => points.reduce((sum, v) => sum + v[j], 0) / 3);
+    const neighbors = [6, 8, 10].map(j => b.readInt16LE(at + j));
+    triangles.push({ids, points, center, neighbors, index: i});
+  }
+  function height(t, p) {
+    const [a, b, c] = t.points;
+    const area = (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+    if (Math.abs(area) <= 1) return null;
+    const u = ((p[0]-a[0])*(c[1]-a[1])-(p[1]-a[1])*(c[0]-a[0]))/area;
+    const v = ((b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]))/area;
+    return a[2]+u*(b[2]-a[2])+v*(c[2]-a[2]);
+  }
+  function contains(t, p, lift) {
+    const [a, b, c] = t.points;
+    const cross = (u,v) => (v[0]-u[0])*(p[1]-u[1])-(v[1]-u[1])*(p[0]-u[0]);
+    const signs = [cross(a,b),cross(b,c),cross(c,a)];
+    const z = height(t, p);
+    return z !== null && (signs.every(v=>v >= -0.01) || signs.every(v=>v <= 0.01)) &&
+      Math.abs(z+(lift || 0)-p[2]) < (lift === undefined ? 96 : 2);
+  }
+  function pairRoute(a, t, lift) {
+    const shared = a.ids.filter(id => t.ids.includes(id));
+    const distance = Math.hypot(...t.center.map((v,i)=>v-a.center[i]));
+    if (shared.length !== 2 || distance < 24 || distance > 240 ||
+        Math.abs(t.center[2]-a.center[2]) > 96) return null;
+    const edge = triangle => triangle.ids.findIndex((id,j)=>shared.includes(id) && shared.includes(triangle.ids[(j+1)%3]));
+    if (a.neighbors[edge(a)] !== t.index || t.neighbors[edge(t)] !== a.index) return null;
+    const middle = [0,1,2].map(j=>(vertices[shared[0]][j]+vertices[shared[1]][j])/2);
+    return [a.center,middle,t.center,middle].map(v=>[v[0],v[1],v[2]+lift]);
+  }
+  if (Array.isArray(preferredRoute) && preferredRoute.length === 4 &&
+      preferredRoute.every(p=>Array.isArray(p) && p.length===3 && p.every(Number.isFinite))) {
+    const centerMatches = (t,p)=>Math.hypot(t.center[0]-p[0],t.center[1]-p[1]) < 0.1;
+    const a = triangles.find(t=>centerMatches(t,preferredRoute[0]));
+    const t = triangles.find(t=>centerMatches(t,preferredRoute[2]));
+    if (a && t) {
+      const lift = preferredRoute[0][2]-a.center[2];
+      const candidate = pairRoute(a,t,lift);
+      if (Math.abs(lift)<96 && candidate && candidate.every((p,i)=>
+          Math.hypot(...p.map((v,j)=>v-preferredRoute[i][j])) < 0.1) &&
+          (contains(a,pos,lift) || contains(t,pos,lift))) return candidate;
+    }
+  }
+  const a = triangles.filter(t=>contains(t,pos)).sort((a,b)=>
+    Math.abs(height(a,pos)-pos[2])-Math.abs(height(b,pos)-pos[2]))[0];
+  if (!a) return null;
+  for (const t of triangles) {
+    const candidate = pairRoute(a,t,pos[2]-height(a,pos));
+    if (candidate) return candidate;
+  }
+  return null;
+}
+function startNpcServerRuntime(api, timers, now, report) {
+  const property = 'thornswoodNpcRoutine';
+  api.makeProperty(property, {isVisibleByOwner: false, isVisibleByNeighbors: false,
+    updateOwner: '', updateNeighbor: ''});
+  let stopped = false, handle = null, cursor = 0, loaded = 0, total = 0;
+  let actor = 0, route = null, mesh = 0, meshData = null, expectedPos = null, target = 0, dwellUntil = 0;
+  let lastTick = now(), lastReport = now(), moved = 0, cycles = 0;
+  function schedule(fn, delay) {
+    if (!stopped) handle = timers.setTimeout(fn, delay);
+  }
+  function stop() {
+    stopped = true;
+    if (handle !== null) timers.clearTimeout(handle);
+  }
+  function fault(error) {
+    stop();
+    if (actor) {
+      try { api.setNpcServerControlled(actor, false); } catch (e) { }
+    }
+    report('NPC server routine stopped: ' + error);
+  }
+  function save() {
+    api.set(actor, property, {version: 1, mesh, route, target, dwellUntil});
+  }
+  function onSegment(pos, a, b) {
+    const delta = b.map((v,i)=>v-a[i]);
+    const squared = delta.reduce((sum,v)=>sum+v*v,0);
+    const fraction = squared ? Math.max(0,Math.min(1,pos.reduce((sum,v,i)=>sum+(v-a[i])*delta[i],0)/squared)) : 0;
+    return Math.hypot(...pos.map((v,i)=>v-a[i]-fraction*delta[i])) < 2;
+  }
+  function prepare() {
+    actor = api.getIdFromDesc('1a66e:Skyrim.esm');
+    const loc = api.get(actor, 'locationalData');
+    if (loc.cellOrWorldDesc !== '1605e:Skyrim.esm') {
+      throw new Error('Hulda is outside the declared inn routine');
+    }
+    const meshes = api.getNavmeshRecords(api.getIdFromDesc(loc.cellOrWorldDesc));
+    const saved = api.get(actor, property);
+    for (const id of meshes) {
+      const record = api.lookupEspmRecordById(id).record;
+      const field = record.fields.find(f => f.type === 'NVNM');
+      const candidate = field && npcLocalRoute(field.data, loc.pos,
+        saved && saved.mesh === id ? saved.route : null);
+      if (!candidate) continue;
+      mesh = id;
+      meshData = field.data;
+      route = candidate;
+      let recovered = false;
+      if (saved && saved.version === 1 && saved.mesh === mesh &&
+          Array.isArray(saved.route) && saved.route.length === 4 &&
+          saved.route.every(p=>Array.isArray(p) && p.length===3 && p.every(Number.isFinite)) &&
+          Number.isInteger(saved.target) && saved.target >= 0 && saved.target < 4 &&
+          Number.isFinite(saved.dwellUntil)) {
+        // Only recover the old route if its segments are the same walkable
+        // geometry. A changed winning mesh requires rebuilding the route.
+        const same = saved.route.every((p,i)=>Math.hypot(...p.map((v,j)=>v-candidate[i][j])) < 0.1);
+        if (same && onSegment(loc.pos,route[(saved.target+3)%4],route[saved.target])) {
+          target = saved.target; dwellUntil = saved.dwellUntil;
+          recovered = true;
+        }
+      }
+      if (!recovered) {
+        route = npcLocalRoute(field.data,loc.pos);
+        if (!route) continue;
+        target = 0; dwellUntil = 0;
+      }
+      api.setNpcServerControlled(actor, true);
+      expectedPos = loc.pos.slice();
+      save();
+      lastTick = now();
+      report('NPC server routine ready for Hulda on mesh ' + mesh.toString(16));
+      schedule(tick, 200);
+      return;
+    }
+    throw new Error('No adjacent walkable inn triangles for Hulda');
+  }
+  function preload() {
+    try {
+      const batch = api.loadNpcBatch(cursor, 8);
+      if (!Number.isInteger(batch.nextCursor) || !Number.isInteger(batch.total) ||
+          batch.nextCursor <= cursor || batch.nextCursor > batch.total) {
+        if (batch.nextCursor === cursor && cursor === batch.total) {
+          total = batch.total;
+        } else throw new Error('NPC loading cursor did not advance');
+      }
+      cursor = batch.nextCursor; total = batch.total; loaded += batch.actorIds.length;
+      if (cursor < total) { schedule(preload, 10); return; }
+      report('NPC server loading complete: ' + loaded + ' loaded from ' + total + ' candidates');
+      prepare();
+    } catch (e) { fault(e); }
+  }
+  function tick() {
+    try {
+      const at = now(), elapsed = Math.max(0, Math.min(200, at-lastTick));
+      lastTick = at;
+      if (!api.get(actor, 'isDead') && !api.get(actor, 'isDisabled')) {
+        const loc = api.get(actor, 'locationalData');
+        if (loc.cellOrWorldDesc !== '1605e:Skyrim.esm') throw new Error('Routine cell changed');
+        if (Math.hypot(...loc.pos.map((v,i)=>v-expectedPos[i])) >= 2) {
+          const replacement = npcLocalRoute(meshData,loc.pos);
+          if (!replacement) throw new Error('NPC moved outside walkable local navigation');
+          route = replacement; target = 0; dwellUntil = 0; save();
+        }
+        const delta = route[target].map((v,i)=>v-loc.pos[i]);
+        const distance = Math.hypot(...delta);
+        if (distance > 4096) throw new Error('NPC moved outside the local route');
+        const step = Math.min(distance, 60*elapsed/1000);
+        const walking = at >= dwellUntil && distance > 0.5;
+        const pos = walking ? loc.pos.map((v,i)=>v+delta[i]*step/distance) : loc.pos;
+        const rot = walking ? [0,0,Math.atan2(delta[0],delta[1])*180/Math.PI] : loc.rot;
+        api.updateNpcMovement(actor, pos, rot, walking ? 60 : 0);
+        expectedPos = pos.slice();
+        if (walking) moved++;
+        if (at >= dwellUntil && (distance <= 0.5 || step >= distance)) {
+          if (target % 2 === 0) dwellUntil = at + 10000;
+          target = (target+1)%route.length;
+          if (target === 0) cycles++;
+          save();
+        }
+      }
+      if (at-lastReport >= 60000) {
+        report('NPC server routine: moved ' + moved + ' steps, ' + cycles + ' cycles; ' +
+          'activity continues with zero connections');
+        moved = 0; cycles = 0; lastReport = at;
+      }
+      schedule(tick, 200);
+    } catch (e) { fault(e); }
+  }
+  schedule(preload, 0);
+  return {stop};
+}
+// NPC SERVER RUNTIME END
+
+try {
+  const cfgNpc = mp.getServerSettings();
+  if (String(cfgNpc.thornswoodServer || '').toLowerCase() === 'dev') {
+    if (globalThis.__thornswoodNpcRuntime) globalThis.__thornswoodNpcRuntime.stop();
+    globalThis.__thornswoodNpcRuntime = startNpcServerRuntime(
+      mp, {setTimeout, clearTimeout}, Date.now, text=>log(text));
+  }
+} catch (e) { log('NPC server runtime failed to start: ' + e); }
