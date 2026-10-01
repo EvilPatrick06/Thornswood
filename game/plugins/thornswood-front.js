@@ -7417,9 +7417,10 @@
     if (what === 'social:unavailable') {
       note('The social connection is loading. Try again in a moment.'); return;
     }
-    if (what === 'party:opened') { T.claimFocus('party', true); tellServer('/party refresh'); return; }
+    if (what === 'party:opened' || what === 'journal:opened') { tellServer('/party refresh'); }
+    if (what === 'party:opened') { T.claimFocus('party', true); return; }
     if (what === 'party:closed') { T.claimFocus('party', false); return; }
-    if (what === 'journal:opened') { T.claimFocus('journal', true); tellServer('/party refresh'); return; }
+    if (what === 'journal:opened') { T.claimFocus('journal', true); return; }
     if (what === 'journal:closed') { T.claimFocus('journal', false); return; }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
     if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
