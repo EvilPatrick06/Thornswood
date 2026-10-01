@@ -118,8 +118,24 @@ Patrols on the roads. No coin from them.
 [The Imperial Embassy](systems/embassy.md). One house in Solitude.
 40 on the roll, 12 of them armed, and only inside the walls.
 
-[People beside you](systems/people.md). Friends, a party of 6, mute,
-voice, trade, the journal, the bard, and the emote wheel.
+[People beside you](systems/people.md). The index. Each of these is
+its own system.
+
+| System | Page |
+| --- | --- |
+| Friends | [Friends](systems/friends.md) |
+| Party | [Party](systems/party.md) |
+| Trade | [Trade](systems/trade.md) |
+| Journals | [Journals](systems/journal.md) |
+| Voice | [Voice](systems/voice.md) |
+| Emotes | [Emotes](systems/emotes.md) |
+| Text chat | [Text chat](systems/chat.md) |
+
+[Mixtures](systems/mixtures.md). The potions and poisons a lab may
+brew, by rank. Anything else is refused.
+
+[Enchantments](systems/enchantments.md). What may be put on a weapon
+or on clothing, and which soul gem a rank may use.
 
 [People who are not people](systems/npcs.md). Traders, drivers, and
 Thalmor patrols stay. The rest of the cast is thinned. No bounty.
@@ -132,8 +148,9 @@ not a recipe and not a mint.
 [Property](systems/property.md). A claim at the door, a deed, locks, keys,
 rent, and what a home is for.
 
-[Gold](systems/gold.md). 40 gold once. After that coin only moves. It does
-not buy a rank.
+[Gold](systems/gold.md). 40 gold once. After that coin moves, and a
+company sale can take some of it out of the world. It does not buy a
+rank.
 
 [Notice boards](systems/noticeboards.md). One board a hold. 20 gold for a
 notice, 30 for a job. The newest ten show.
