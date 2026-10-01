@@ -23,8 +23,8 @@ and after that they buy and sell the way a person does. An empty
 purse does not pay. An empty shelf does not sell. Stock is what
 they have bought. See [Merchant's Guild](merchants-guild.md) and
 [Custom quests](quests.md). Coin still enters the world only as the
-starting 40. A trader's starting purse is not a second mint, and
-the amount of it is not set. See [Gold](gold.md).
+starting 40. A guild trader is handed 250 when they are first stood
+up, once, and not again. See [Gold](gold.md).
 
 Carriage and ferry drivers. They are the workers of the hold the stop
 sits in. The fare is that hold's. See

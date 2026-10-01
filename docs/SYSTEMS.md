@@ -149,17 +149,17 @@ not a recipe and not a mint.
 [Property](systems/property.md). A claim at the door, a deed, locks, keys,
 rent, and what a home is for.
 
-[Gold](systems/gold.md). 40 gold once. After that coin moves, and a
-company sale can take some of it out of the world. It does not buy a
-rank.
+[Gold](systems/gold.md). 40 gold once for a person. A guild trader
+starts with 250, once. After that coin moves, and a company sale can
+take some of it out of the world. It does not buy a rank.
 
 [Notice boards](systems/noticeboards.md). One board a hold. 20 gold for a
 notice, 30 for a job. The newest ten show.
 
 [Merchant's Guild](systems/merchants-guild.md). The shops of a hold. Dues
-and ledgers go to the hold's box. Traders buy and sell at the average of
-the price lists submitted there. It does not mint coin and it is not a
-profession.
+and ledgers go to the hold's box. Traders start with 250 and buy and
+sell at the average of the price lists submitted there. It does not
+mint coin after that purse, and it is not a profession.
 
 [Custom quests](systems/quests.md). Guild traders ask for goods. A supply
 quest pays from the trader's purse. A scarce quest opens a place that
