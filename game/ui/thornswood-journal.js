@@ -464,5 +464,9 @@
   };
 
   build();
+  // Owner updates can precede this asynchronously loaded script (#1275).
+  if (window.thornswoodSocialView) {
+    window.thornswoodJournal.setData(window.thornswoodSocialView);
+  }
   tell('ready');
 })();

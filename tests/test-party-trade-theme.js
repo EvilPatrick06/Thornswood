@@ -126,7 +126,7 @@ function allHtml(el) {
   return el.html + el.kids.concat(el.children).map(allHtml).join('');
 }
 
-function load(name) {
+function load(name, initial) {
   const page = { told: [], sent: [], keys: {} };
   const doc = {
     head: makeEl('head'),
@@ -142,6 +142,7 @@ function load(name) {
     innerWidth: 1920, innerHeight: 1080,
     addEventListener() { }
   };
+  Object.assign(win, initial || {});
   new Function('window', 'document', SRC[name])(win, doc);
   page.win = win;
   page.style = doc.head.children[0];
@@ -495,6 +496,27 @@ const T = rules(trade.css);
       trade.told.indexOf('thornswood-front trade:closed') >= 0);
 }
 
+
+// Owner state arrives before the async overlay script in a cold browser (#1275).
+{
+  const social = { me: 701, friends: [{ name: 'Second', on: true }], party: [],
+    together: 0, bonus: 15, offer: null, journals: [], shared: [], muted: {} };
+  const p = load('party', { thornswoodSocialView: social });
+  p.win.thornswoodParty.open();
+  yes('a late party script uses the already received friends instead of waiting',
+    /Second/.test(allHtml(p.root)) && !/Waiting for the server/.test(allHtml(p.root)));
+  const j = load('journal', { thornswoodSocialView: social });
+  j.win.thornswoodJournal.open();
+  yes('a late journal script also consumes the already received owner view',
+    !/Waiting for the server/.test(allHtml(j.root)));
+  const accepted = { open: true, them: 'Second', pack: [], mine: [], theirs: [],
+    myGold: 0, theirGold: 0, iAgreed: false, theyAgreed: false };
+  const t = load('trade', { thornswoodTradeView: accepted });
+  yes('a trade accepted before its script mounts opens when the script becomes ready',
+    t.root.className === 'on' && /Second/.test(allHtml(t.root)) && t.told.includes('thornswood-front trade:opened'));
+  const closed = load('trade', { thornswoodTradeView: { open: false } });
+  yes('a closed cached trade never opens a stale window', closed.root.className !== 'on');
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
