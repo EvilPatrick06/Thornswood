@@ -1,0 +1,47 @@
+# Food
+
+A swallowed thing is hunger, thirst, or both. The food table says which
+kind it is. The state says how good a meal it is.
+
+## States
+
+| State | Hunger | Also |
+| --- | --- | --- |
+| Raw meat or fish | 8 | Can start food sickness. What you eat with no fire |
+| Burnt | 8 | Stamina recovery -10% for 10 real minutes |
+| Ordinary food the table does not special-case | 15 | Nothing else |
+| Cooked | 25 | A small help for 20 real minutes, from what went in it |
+| A feast | 40 | A stronger help for 10 real minutes |
+
+A cooked meal's help is one of these, not all of them: stamina recovery
++10%, or the temperature target 4 degrees warmer, or a lower chance of
+disease while it lasts. A feast is the same list at double the help and
+half the time. It is not a heal. A potion still does the healing.
+
+A soup, a stew or a chowder is food and 10 thirst. A dry ration is food
+only.
+
+## Time and a full stomach
+
+Eating takes 8 seconds. Another meal in that window does nothing. At
+90 hunger or above, another meal does not raise the meter and starts
+food sickness instead. That is what stops a stack of stews replacing
+potions.
+
+## Who cooks
+
+Hearthcook and Confectioner own the recipes. The rows are
+[lists/cook-hearthcook.md](lists/cook-hearthcook.md) and
+[lists/cook-confectioner.md](lists/cook-confectioner.md). Grand Chef
+makes two of a batch. A hunter is who brings the meat. This page does
+not move either verb.
+
+Burnt food is an item that already exists, eaten as burnt. A failed
+recipe does not yet become a burnt item. There is no timing minigame.
+
+## Where this is
+
+The table that marks food, drink, ale, potion and poison is in the
+server, and an unknown edible is 15 hunger. Raw, burnt, cooked, feast,
+the 8 seconds, the full-stomach sickness and the soup's thirst are not.
+Every meal is the same 15 until those states exist.
