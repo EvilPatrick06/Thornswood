@@ -22,8 +22,8 @@ panel behind K opens on its own. On it:
 
 They are handed 40 gold once, and nothing else, except a tool at the
 moment a pick that needs one is made: a pickaxe for a Miner, a
-woodcutter's axe for a Woodworker, a shovel and seed for a Farmer. The
-tool has 100 uses.
+woodcutter's axe for a Woodworker, a shovel and seed for a Farmer, a
+crude fishing pole for a Fisher. The tool has 100 uses.
 
 The towns are Whiterun, Riften, Solitude, Windhelm, Markarth, Falkreath,
 Morthal, Dawnstar, Winterhold and Raven Rock. The arrival is that town's
@@ -36,5 +36,6 @@ levelling is off, so the face menu does not start a perk tree.
 ## Where this is
 
 The hall, the face, the K panel, the town, the waiting class and
-profession, the 40 gold and the three tools are in the server. The public
+profession, the 40 gold and the three tools are in the server. A
+fisher is not handed a pole. The public
 steps are on the site's help page.
