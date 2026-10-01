@@ -48,8 +48,9 @@ gets worse with each one inside 45 minutes.
 [Potions and restoration](systems/potions.md). A potion is a small drink.
 Later potions in a short window heal less. Restoration strains.
 
-[The body](systems/body.md). A slow need filled by heavy food and ale.
-An outhouse, a pot, or the woods.
+[The body](systems/body.md). Optional. After the server is fully live,
+a vote decides whether this slow need is added. Until that vote it
+is not built.
 
 [Temperature and weather](systems/temperature.md). One meter, 0 to 100,
 comfort at 50. Place, wind, sky, night, height, fire, water and clothing.
@@ -66,8 +67,8 @@ fever, bite sickness. Not the old survival mod.
 [Professions and sub-professions](systems/professions.md). Eight
 professions, two halves each, four ranks. The overview is the ladder,
 the benches, and how a recipe gets its rank. Each half's own page
-lists every recipe: the name, the rank, what it asks for, the gold,
-and whether the server is asked.
+lists every recipe: the name, the rank, what it asks for, and
+whether the server is asked. An item has no gold price.
 
 [Masters and apprentices](systems/apprenticeship.md). The sister half
 past novice, and the two outside trades. A master decides, and can
