@@ -32,8 +32,9 @@ A steward names the Merchant's Guild factor, on
 
 A steward is not staff. Staff are the Discord roles named on
 [Voice](voice.md): Owner, Gamemaster, Dev, Loremaster, Moderator.
-A steward does not grant the quest on the rare mine. That quest is
-on [Miner](classes/miner.md).
+A steward does not grant a quest. Guild traders do. See
+[Custom quests](quests.md). The rare mine is one of those quests,
+and the seam is on [Miner](classes/miner.md).
 
 ## Ambassador
 
