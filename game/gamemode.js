@@ -6414,7 +6414,7 @@ function spellOn(actorId, spellDesc, on) {
  * privilege for the old bard trade. That trade is RP-only now: chargen no
  * longer calls armBard for it. The WEAP records and PlayInstrumentSpell stay
  * in the load order for anyone who has an instrument (Woodwright craft, the
- * emote wheel Revelry). The helper remains so a stray call cannot throw.
+ * Lute, Flute and Drum emotes). The helper remains so a stray call cannot throw.
  */
 const INSTRUMENT_SPELL = '9456:PlayFluteLuteDrum.esp';
 
@@ -37251,7 +37251,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       '/helpme', '/report', '/stuck',
                       // Everybody's, and they have to be findable: a key
                       // prompt nobody sees is a feature nobody has.
-                      '/friend', '/party', '/mute', '/trade', '/journal',
+                      '/friend', '/party', '/mute', '/hidename', '/trade', '/journal',
                       '/yes', '/no', '/roll'];
 
 // ---------------------------------------------------------------------------
@@ -38087,16 +38087,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         return 'Not shared any more.';
       }
 
-      var target = soc.findPerson(who);
-      if (!target.actorId) { return target.why; }
-      var tp = soc.profileOf(target.actorId);
-      var refused = soc.share(actorId, jid2, pid2 === '-' ? '' : pid2, tp);
+      var resolved = soc.resolveShare(actorId, who);
+      if (!resolved.pid) { return resolved.why || 'Share with which friend?'; }
+      var refused = soc.share(actorId, jid2, pid2 === '-' ? '' : pid2, resolved.pid);
       if (refused) { return refused; }
-      try {
-        say(target.actorId, soc.nameOfPerson(actorId) + ' shared ' +
-            (pid2 === '-' ? 'a journal' : 'a page') + ' with you. Press J.');
-      } catch (e) { }
-      return 'Shared with ' + soc.nameOfPerson(target.actorId) + '.';
+      var there = soc.actorForProfile(resolved.pid);
+      if (there) {
+        try {
+          say(there, soc.nameOfPerson(actorId) + ' shared ' +
+              (pid2 === '-' ? 'a journal' : 'a page') + ' with you. Press J.');
+        } catch (e) { }
+      }
+      var fname = (soc.stateOf(actorId).friends[resolved.pid] || {}).name;
+      return 'Shared with ' + (fname || 'them') + '.';
     }
 
     return 'journal: new, title, page, share, unshare, drop, list.';
@@ -38293,7 +38296,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       prompt nobody has been told about is a feature nobody has.
     */
     if (word === '/friend' || word === '/party' || word === '/mute' ||
-        word === '/trade' || word === '/journal' ||
+        word === '/hidename' || word === '/trade' || word === '/journal' ||
         word === '/yes' || word === '/no') {
       var soc = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodSocial;
       if (!soc) { toProfile(profileId, 'That is not running on this server.'); return true; }
@@ -38371,6 +38374,22 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         soc.push(actorId);
         return true;
       }
+      if (word === '/party' && rest === 'disband') {
+        var ended = soc.disbandParty(mine);
+        toProfile(profileId, ended || 'The party is ended.');
+        soc.push(actorId);
+        return true;
+      }
+      if (word === '/party' && (rest.indexOf('kick ') === 0 || rest.indexOf('lead ') === 0)) {
+        var handing = rest.indexOf('lead ') === 0;
+        var whom = rest.slice(5).trim();
+        var member = soc.partyMember(actorId, whom);
+        if (!member.pid) { toProfile(profileId, member.why); return true; }
+        var did = handing ? soc.leadParty(mine, member.pid) : soc.kickParty(mine, member.pid);
+        toProfile(profileId, did || (handing ? 'They lead the party now.' : 'They left the party.'));
+        soc.push(actorId);
+        return true;
+      }
       if (word === '/friend' && (rest === '' || rest === 'list')) {
         var sv = soc.view(actorId);
         if (!sv.friends.length) { toProfile(profileId, 'No friends yet. Look at somebody and press the friend key.'); return true; }
@@ -38384,11 +38403,52 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (word === '/mute' && (rest === '' || rest === 'list')) {
         var sm = soc.stateOf(actorId);
         var mn = [];
+        var tn = [];
         for (var mk in sm.muted) {
           if (!Object.prototype.hasOwnProperty.call(sm.muted, mk)) { continue; }
           mn.push(typeof sm.muted[mk] === 'string' ? sm.muted[mk] : mk);
         }
-        toProfile(profileId, mn.length ? ('Muted: ' + mn.join(', ')) : 'You have nobody muted.');
+        for (var tk in (sm.textOff || {})) {
+          if (!Object.prototype.hasOwnProperty.call(sm.textOff, tk)) { continue; }
+          tn.push(typeof sm.textOff[tk] === 'string' ? sm.textOff[tk] : tk);
+        }
+        toProfile(profileId, (mn.length ? ('Muted: ' + mn.join(', ') + '. ') : 'You have nobody muted. ') +
+                  (tn.length ? ('Text off: ' + tn.join(', ') + '.') : 'Nobody\'s text is off.'));
+        return true;
+      }
+      if (word === '/mute' && rest.indexOf('text ') === 0) {
+        var textWho = soc.resolveKnown(actorId, rest.slice(5).trim());
+        if (!textWho.pid) { toProfile(profileId, textWho.why); return true; }
+        var textOn = soc.toggleText(actorId, textWho.pid, textWho.name);
+        toProfile(profileId, textOn ? ('You will not read ' + textWho.name + '.')
+                                    : ('You will read ' + textWho.name + ' again.'));
+        soc.push(actorId);
+        return true;
+      }
+      if (word === '/hidename' && (rest === '' || rest === 'list')) {
+        var hn = soc.stateOf(actorId);
+        var nn = [];
+        for (var nk in (hn.namesOff || {})) {
+          if (!Object.prototype.hasOwnProperty.call(hn.namesOff, nk)) { continue; }
+          nn.push(typeof hn.namesOff[nk] === 'string' ? hn.namesOff[nk] : nk);
+        }
+        toProfile(profileId, (hn.namesAll ? 'Every name is hidden. ' : '') +
+                  (nn.length ? ('Names hidden: ' + nn.join(', ') + '.') : 'No single name is hidden.'));
+        return true;
+      }
+      if (word === '/hidename' && rest === 'all') {
+        var allOn = soc.toggleNamesAll(actorId);
+        toProfile(profileId, allOn ? 'Every name above a head is hidden.' : 'Names above heads are shown again.');
+        soc.push(actorId);
+        return true;
+      }
+      if (word === '/hidename') {
+        var nameWho = soc.resolveKnown(actorId, rest);
+        if (!nameWho.pid) { toProfile(profileId, nameWho.why); return true; }
+        var nameOn = soc.toggleName(actorId, nameWho.pid, nameWho.name);
+        toProfile(profileId, nameOn ? ('You will not see ' + nameWho.name + '\'s name.')
+                                    : ('You will see ' + nameWho.name + '\'s name again.'));
+        soc.push(actorId);
         return true;
       }
 
@@ -38433,7 +38493,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           if (verb === 'cancel') { out = tr2.cancel(actorId); }
           else if (verb === 'ok') { out = tr2.confirm(actorId); }
           else if (verb === 'gold') { out = tr2.gold(actorId, parts[2]); }
-          else if (verb === 'remove') { out = tr2.remove(actorId, parts.slice(2).join(' ')); }
+          else if (verb === 'remove') {
+            var rbits = parts.slice(2);
+            var rn = 0;
+            if (rbits.length > 1 && /^[0-9]+$/.test(rbits[rbits.length - 1])) {
+              rn = Number(rbits.pop());
+            }
+            out = tr2.remove(actorId, rbits.join(' '), rn);
+          }
           else if (verb === 'add') {
             /* The count is the last word when it is a number, the same rule
                /give uses, so "add iron ore 2" and "add iron ore" both work. */
@@ -38481,7 +38548,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       var asked = kind === 'friend' ? 'wants to be friends'
                 : (kind === 'party' ? 'is asking you to join their party'
                                     : 'is offering to trade');
-      say(them, soc.nameOfPerson(actorId) + ' ' + asked + '. /yes or /no.');
+      say(them, soc.nameOfPerson(actorId) + ' ' + asked + '. Accept or refuse on the prompt.');
       notify(them, soc.nameOfPerson(actorId) + ' ' + asked);
       toProfile(profileId, 'Asked ' + theirName + '. They have ' +
                 Math.round(soc.SOCIAL.offerFor / 1000) + ' seconds.');
@@ -42382,7 +42449,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   // ------------------------------------------------------------- storage --
 
   function fresh() {
-    return { friends: {}, muted: {}, journals: [], at: 0 };
+    return { friends: {}, muted: {}, textOff: {}, namesOff: {}, namesAll: false, journals: [], at: 0 };
   }
 
   /*
@@ -42419,6 +42486,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var out = fresh();
     if (v.friends && typeof v.friends === 'object') { out.friends = v.friends; }
     if (v.muted && typeof v.muted === 'object') { out.muted = v.muted; }
+    if (v.textOff && typeof v.textOff === 'object') { out.textOff = v.textOff; }
+    if (v.namesOff && typeof v.namesOff === 'object') { out.namesOff = v.namesOff; }
+    out.namesAll = !!v.namesAll;
     if (Array.isArray(v.journals)) { out.journals = v.journals; }
     out.at = Number(v.at) || 0;
     return out;
@@ -42537,6 +42607,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // new Function in the client's own global, so this is the same
       // globalThis a plugin sees; see the note over thornswoodCatchFire.
       '    try { globalThis.thornswoodNear = v.w || {};',
+      '      globalThis.thornswoodHideAllNames = v.hideAll ? 1 : 0;',
       '      globalThis.thornswoodSocialServerId = ctx.getFormIdInServerFormat;',
       '    } catch (e) { }',
       '  } catch (e) { }',
@@ -42578,13 +42649,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           p: them.pid,
           f: s.friends[them.pid] ? 1 : 0,
           m: s.muted[them.pid] ? 1 : 0,
+          h: (s.namesAll || (s.namesOff && s.namesOff[them.pid])) ? 1 : 0,
           y: (party && party.members.indexOf(them.pid) !== -1) ? 1 : 0
         };
       }
-      var sig = JSON.stringify(w);
+      var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');
       if (nearWas[me.id] === sig) { continue; }
       nearWas[me.id] = sig;
-      try { mp.set(me.id, NEAR_PROPERTY, { w: w, at: Date.now() }); } catch (e) { }
+      try { mp.set(me.id, NEAR_PROPERTY, { w: w, hideAll: s.namesAll ? 1 : 0, at: Date.now() }); } catch (e) { }
     }
 
     // Anybody who has gone offline should not keep a slot in the signature
@@ -42667,6 +42739,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       var mine = profileOf(who);
       var p = partyOf(mine);
       var list = [];
+      var viewer = read(who) || fresh();
       if (p && p.members.length > 1) {
         for (var k = 0; k < p.members.length; k++) {
           var pid = p.members[k];
@@ -42674,12 +42747,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           var row = at[pid];
           if (!row) { continue; }             // in the party and not online
           list.push({ a: row.a, n: row.n, p: row.p, c: row.c,
-                      l: pid === p.leader ? 1 : 0 });
+                      l: pid === p.leader ? 1 : 0,
+                      h: (viewer.namesAll || (viewer.namesOff && viewer.namesOff[pid])) ? 1 : 0 });
         }
       }
 
       var sig = list.map(function (r) {
-        return r.a + ':' + r.c + ':' +
+        return r.a + ':' + r.c + ':' + (r.h ? 'h' : '') + ':' +
                Math.round(r.p[0] / 100) + ',' +
                Math.round(r.p[1] / 100) + ',' +
                Math.round(r.p[2] / 100);
@@ -42772,6 +42846,95 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return on;
   }
 
+  function toggleText(actorId, pid, name) {
+    var s = stateOf(actorId);
+    if (!s.textOff) { s.textOff = {}; }
+    var on = !s.textOff[pid];
+    if (on) { s.textOff[pid] = name || true; } else { delete s.textOff[pid]; }
+    write(actorId, s);
+    pushTextMutes();
+    return on;
+  }
+
+  function toggleName(actorId, pid, name) {
+    var s = stateOf(actorId);
+    if (!s.namesOff) { s.namesOff = {}; }
+    var on = !s.namesOff[pid];
+    if (on) { s.namesOff[pid] = name || true; } else { delete s.namesOff[pid]; }
+    write(actorId, s);
+    return on;
+  }
+
+  function toggleNamesAll(actorId) {
+    var s = stateOf(actorId);
+    s.namesAll = !s.namesAll;
+    write(actorId, s);
+    return !!s.namesAll;
+  }
+
+  /*
+    A friend on the list, or somebody standing here. Text and a hidden name
+    are kept on the character, so a friend who has logged off can still be
+    named.
+  */
+  function resolveKnown(actorId, who) {
+    var s = stateOf(actorId);
+    var want = String(who || '').trim();
+    if (!want) { return { pid: 0, name: '', why: 'Who?' }; }
+    var asNum = Number(want);
+    if (String(asNum) === want && asNum > 0) {
+      var stored = s.friends[asNum] && s.friends[asNum].name;
+      return { pid: asNum, name: stored || String(asNum), why: '' };
+    }
+    var low = want.toLowerCase();
+    var hits = [];
+    for (var pid in s.friends) {
+      if (!Object.prototype.hasOwnProperty.call(s.friends, pid)) { continue; }
+      var row = s.friends[pid];
+      var fn = String((row && row.name) || '');
+      var folded = fn.toLowerCase();
+      if (folded && (folded === low || folded.indexOf(low) === 0)) {
+        hits.push({ pid: Number(pid), name: fn });
+      }
+    }
+    if (hits.length === 1) { return { pid: hits[0].pid, name: hits[0].name, why: '' }; }
+    if (hits.length > 1) { return { pid: 0, name: '', why: 'More than one friend by that name.' }; }
+    var target = findPerson(want);
+    if (!target.actorId) { return { pid: 0, name: '', why: target.why || 'Nobody here by that name.' }; }
+    return { pid: profileOf(target.actorId), name: nameOfPerson(target.actorId), why: '' };
+  }
+
+  var lastTextSig = '';
+  function pushTextMutes() {
+    var http;
+    try { http = require('http'); } catch (e) { return; }
+    var by = {};
+    var all = online();
+    for (var i = 0; i < all.length; i++) {
+      var s = read(all[i]);
+      if (!s || !s.textOff) { continue; }
+      var list = [];
+      for (var k in s.textOff) {
+        if (!Object.prototype.hasOwnProperty.call(s.textOff, k)) { continue; }
+        if (s.textOff[k]) { list.push(Number(k)); }
+      }
+      if (list.length) { by[profileOf(all[i])] = list; }
+    }
+    var sig = JSON.stringify(by);
+    if (sig === lastTextSig) { return; }
+    lastTextSig = sig;
+    var body = JSON.stringify({ by: by });
+    try {
+      var req = http.request({
+        host: '127.0.0.1', port: voicePort(), path: '/textmute', method: 'POST', timeout: 2000,
+        headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }
+      }, function (res) { try { res.resume(); } catch (e2) { } });
+      req.on('error', function () { });
+      req.on('timeout', function () { req.destroy(); });
+      req.end(body);
+    } catch (e3) { }
+  }
+
   // ------------------------------------------------------------ parties --
   /*
     A PARTY IS A SESSION AND LIVES IN MEMORY. See the block comment.
@@ -42823,6 +42986,71 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       delete parties[id];
     }
     return true;
+  }
+
+  function partyMember(actorId, who) {
+    var mine = profileOf(actorId);
+    var p = partyOf(mine);
+    if (!p) { return { pid: 0, why: 'You are not in a party.' }; }
+    var want = String(who || '').trim();
+    if (!want) { return { pid: 0, why: 'Who?' }; }
+    var asNum = Number(want);
+    if (String(asNum) === want) {
+      if (p.members.indexOf(asNum) === -1) { return { pid: 0, why: 'They are not in your party.' }; }
+      return { pid: asNum, why: '' };
+    }
+    var low = want.toLowerCase();
+    var hits = [];
+    for (var i = 0; i < p.members.length; i++) {
+      var them = actorForProfile(p.members[i]);
+      var nm = them ? nameOfPerson(them).toLowerCase() : '';
+      if (nm && (nm === low || nm.indexOf(low) === 0)) { hits.push(p.members[i]); }
+    }
+    if (hits.length === 1) { return { pid: hits[0], why: '' }; }
+    if (hits.length > 1) { return { pid: 0, why: 'More than one person in the party by that name.' }; }
+    return { pid: 0, why: 'They are not in your party.' };
+  }
+
+  function pushMembers(pids) {
+    for (var i = 0; i < pids.length; i++) {
+      var actor = actorForProfile(pids[i]);
+      if (actor) { push(actor); }
+    }
+  }
+
+  function kickParty(leaderPid, whoPid) {
+    var p = partyOf(leaderPid);
+    if (!p) { return 'You are not in a party.'; }
+    if (p.leader !== leaderPid) { return 'Only the leader can do that.'; }
+    if (whoPid === leaderPid) { return 'Leave, or disband, rather than kicking yourself.'; }
+    if (p.members.indexOf(whoPid) === -1) { return 'They are not in your party.'; }
+    var left = p.members.slice();
+    leaveParty(whoPid);
+    pushMembers(left);
+    return '';
+  }
+
+  function leadParty(leaderPid, whoPid) {
+    var p = partyOf(leaderPid);
+    if (!p) { return 'You are not in a party.'; }
+    if (p.leader !== leaderPid) { return 'Only the leader can do that.'; }
+    if (p.members.indexOf(whoPid) === -1) { return 'They are not in your party.'; }
+    if (p.leader === whoPid) { return 'They already lead this party.'; }
+    p.leader = whoPid;
+    pushMembers(p.members.slice());
+    return '';
+  }
+
+  function disbandParty(leaderPid) {
+    var p = partyOf(leaderPid);
+    if (!p) { return 'You are not in a party.'; }
+    if (p.leader !== leaderPid) { return 'Only the leader can do that.'; }
+    var id = inParty[leaderPid];
+    var left = p.members.slice();
+    for (var i = 0; i < left.length; i++) { delete inParty[left[i]]; }
+    delete parties[id];
+    pushMembers(left);
+    return '';
   }
 
   /*
@@ -42922,6 +43150,33 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return false;
   }
 
+  /*
+    Who a share is for. A friend on the list, by the profile id the panel
+    sends or by the name stored with them, whether or not they are online.
+    Sharing used to ask who is standing here, so a friend who had logged off
+    could not be given a page at all.
+  */
+  function resolveShare(actorId, who) {
+    var s = stateOf(actorId);
+    var want = String(who || '').trim();
+    if (!want) { return { pid: 0, why: 'Share with which friend?' }; }
+    var asNum = Number(want);
+    if (String(asNum) === want && s.friends[asNum]) { return { pid: asNum, why: '' }; }
+    var low = want.toLowerCase();
+    var hits = [];
+    for (var pid in s.friends) {
+      if (!Object.prototype.hasOwnProperty.call(s.friends, pid)) { continue; }
+      var row = s.friends[pid];
+      var nm = String((row && row.name) || '').toLowerCase();
+      if (nm && nm === low) { hits.push(Number(pid)); }
+    }
+    if (hits.length === 1) { return { pid: hits[0], why: '' }; }
+    if (hits.length > 1) { return { pid: 0, why: 'More than one friend by that name.' }; }
+    var target = findPerson(want);
+    if (!target.actorId) { return { pid: 0, why: 'Nobody on your friends list by that name.' }; }
+    return { pid: profileOf(target.actorId), why: '' };
+  }
+
   function share(actorId, journalId, pageId, pid) {
     var s = stateOf(actorId);
     var j = findJournal(s, journalId);
@@ -42997,6 +43252,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         name: (s.friends[pid] && s.friends[pid].name) || here[n] || 'somebody',
         on: !!here[n],
         muted: !!s.muted[pid],
+        textOff: !!(s.textOff && s.textOff[n]),
+        nameOff: !!(s.namesAll || (s.namesOff && s.namesOff[n])),
         party: !!(p && p.members.indexOf(n) !== -1)
       });
     }
@@ -43023,6 +43280,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       party: party,
       together: partyNear(actorId),
       bonus: Math.round(SOCIAL.partyBonus * 100),
+      namesAll: !!s.namesAll,
       offer: offerNow ? { kind: offerNow.kind, from: offerNow.from, name: offerNow.fromName } : null,
       journals: s.journals,
       shared: sharedWithMe(actorId),
@@ -43087,6 +43345,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function tickBody() {
     try { nearTick(); } catch (e) { slog('near tick:', e); }
     try { partyTick(); } catch (e) { slog('party tick:', e); }
+    try { pushTextMutes(); } catch (e) { slog('text mute:', e); }
     var all = online();
     for (var i = 0; i < all.length; i++) {
       try { push(all[i]); } catch (e) { }
@@ -43146,11 +43405,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     actorForProfile: actorForProfile,
     offer: offer, standingOffer: standingOffer, offers: offers,
     addFriend: addFriend, dropFriend: dropFriend, isFriend: isFriend,
-    toggleMute: toggleMute,
+    toggleMute: toggleMute, toggleText: toggleText, toggleName: toggleName,
+    toggleNamesAll: toggleNamesAll, resolveKnown: resolveKnown,
     partyOf: partyOf, joinParty: joinParty, leaveParty: leaveParty,
+    partyMember: partyMember, kickParty: kickParty, leadParty: leadParty,
+    disbandParty: disbandParty,
     partyNear: partyNear, workBonus: workBonus, parties: parties, inParty: inParty,
     newJournal: newJournal, writePage: writePage, dropJournal: dropJournal,
-    share: share, sharedWithMe: sharedWithMe, findJournal: findJournal,
+    share: share, resolveShare: resolveShare, sharedWithMe: sharedWithMe, findJournal: findJournal,
     view: view, push: push, tick: tick, nearTick: nearTick,
     partyTick: partyTick, PARTY_PROPERTY: PARTY_PROPERTY
   };
@@ -43265,8 +43527,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     trades.push(t);
     push(t);
     try {
-      say(aActor, 'Trading with ' + nameOf(bActor) + '. /trade add <thing> [count], /trade gold <n>, /trade ok, /trade cancel.');
-      say(bActor, 'Trading with ' + nameOf(aActor) + '. /trade add <thing> [count], /trade gold <n>, /trade ok, /trade cancel.');
+      say(aActor, 'Trading with ' + nameOf(bActor) + '.');
+      say(bActor, 'Trading with ' + nameOf(aActor) + '.');
     } catch (e) { }
     return '';
   }
@@ -43314,27 +43576,83 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     NOT A CACHE. An inventory changes constantly and a stale list in a trade
     panel is how somebody offers a thing they no longer have.
   */
+  /*
+    A name somebody can read.
+
+    Skyrim.esm and the DLCs are localized. A FULL field there is not a name:
+    it is a four byte index into the strings file. String() of those bytes is
+    a row of numbers, which is what the trade list was showing. A FULL is
+    used only when it is real text. Otherwise the editor id is spaced out
+    (SteelSword becomes Steel Sword). A string index is never shown.
+  */
+  function fieldText(data) {
+    if (typeof data === 'string') {
+      var s = data.replace(/\0/g, '').trim();
+      if (!s || !/[A-Za-z]/.test(s) || /^[\d,.\s]+$/.test(s)) { return ''; }
+      return s;
+    }
+    if (!data || typeof data.length !== 'number') { return ''; }
+    var text = '';
+    for (var b = 0; b < data.length; b++) {
+      var n = Number(data[b]);
+      if (!n) { break; }
+      if (n < 32 || n > 126) { return ''; }
+      text += String.fromCharCode(n);
+    }
+    if (!text || !/[A-Za-z]/.test(text) || /^[\d,.\s]+$/.test(text)) { return ''; }
+    return text;
+  }
+
+  function prettyName(s) {
+    s = String(s || '').replace(/[_\-]+/g, ' ').trim();
+    if (!s) { return ''; }
+    if (s.indexOf(' ') < 0) {
+      s = s.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/\d+$/g, '').trim();
+    }
+    return s.replace(/\s+/g, ' ');
+  }
+
+  var KIND_NAMES = {
+    WEAP: 'Weapons', ARMO: 'Armor and clothes', AMMO: 'Ammunition',
+    ALCH: 'Potions and food', INGR: 'Ingredients', BOOK: 'Books and notes',
+    KEYM: 'Keys', MISC: 'Miscellaneous', SLGM: 'Soul gems', SCRL: 'Scrolls',
+    LIGH: 'Lights'
+  };
+
   var nameCache = {};
   function labelOf(baseId) {
     if (Object.prototype.hasOwnProperty.call(nameCache, baseId)) { return nameCache[baseId]; }
     var label = '';
+    var edid = '';
     try {
       var res = mp.lookupEspmRecordById(baseId);
       var rec = res && res.record;
       if (rec) {
-        if (rec.editorId) { label = String(rec.editorId); }
+        if (rec.editorId) { edid = fieldText(rec.editorId) || String(rec.editorId); }
         var fields = rec.fields || [];
         for (var i = 0; i < fields.length; i++) {
-          if (fields[i] && fields[i].type === 'FULL' && fields[i].data) {
-            label = String(fields[i].data);
-            break;
-          }
+          if (!fields[i]) { continue; }
+          var t = String(fields[i].type || '');
+          if (t === 'FULL' && !label) { label = fieldText(fields[i].data); }
+          else if (t === 'EDID' && !edid) { edid = fieldText(fields[i].data); }
         }
       }
     } catch (e) { }
-    if (!label) { label = '0x' + baseId.toString(16); }
+    if (!label && edid) { label = prettyName(edid); }
+    if (!label) { label = 'Unknown item'; }
     nameCache[baseId] = label;
     return label;
+  }
+
+  function categoryOf(baseId) {
+    var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+    if (Number(baseId) === GOLD) { return 'Gold'; }
+    var type = '';
+    try {
+      var res = mp.lookupEspmRecordById(baseId);
+      if (res && res.record && res.record.type) { type = String(res.record.type); }
+    } catch (e) { type = ''; }
+    return KIND_NAMES[type] || 'Other';
   }
 
   function carrying(actorId) {
@@ -43348,9 +43666,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         if (!e || !e.baseId) { continue; }
         byBase[e.baseId] = (byBase[e.baseId] || 0) + (e.count || 1);
       }
+      var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
       for (var b in byBase) {
         if (!Object.prototype.hasOwnProperty.call(byBase, b)) { continue; }
-        out.push({ id: Number(b), n: labelOf(Number(b)), c: byBase[b] });
+        if (Number(b) === GOLD) { continue; }
+        out.push({ id: Number(b), n: labelOf(Number(b)), c: byBase[b], k: categoryOf(Number(b)) });
       }
       out.sort(function (x, y) { return x.n.toLowerCase() < y.n.toLowerCase() ? -1 : 1; });
     } catch (e) { }
@@ -43397,15 +43717,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return '';
   }
 
-  function remove(actorId, what) {
+  function remove(actorId, what, count) {
     var t = tradeOf(actorId);
     if (!t) { return 'You are not trading.'; }
     var want = String(what || '').trim().toLowerCase();
     var side = sideOf(t, actorId);
+    var n = Math.floor(Number(count) || 0);
     for (var i = 0; i < side.length; i++) {
       if (side[i].n.toLowerCase().indexOf(want) !== -1 ||
           String(side[i].id) === want || side[i].id.toString(16) === want) {
-        side.splice(i, 1);
+        if (n > 0 && side[i].c > n) { side[i].c -= n; }
+        else { side.splice(i, 1); }
         unconfirm(t); push(t);
         return '';
       }
@@ -43434,7 +43756,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     push(t);
     var them = other(t, actorId);
     if (!(t.okA && t.okB)) {
-      try { say(them, nameOf(actorId) + ' has agreed. /trade ok when you are ready.'); } catch (e) { }
+      try { say(them, nameOf(actorId) + ' has agreed. Agree on the trade when you are ready.'); } catch (e) { }
       return '';
     }
     return swap(t);
@@ -43580,6 +43902,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       iAgreed: meA ? t.okA : t.okB,
       theyAgreed: meA ? t.okB : t.okA,
       pack: carrying(actorId),
+      heldGold: holding(actorId, (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F),
       at: Date.now()
     };
   }
