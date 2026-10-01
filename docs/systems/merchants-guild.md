@@ -100,7 +100,8 @@ They start with gold and no goods. Stock is what they have bought.
 The quests they give are on [Custom quests](quests.md). A supply
 quest pays out of this same purse. A scene quest does not. Its gold
 is created, at the amount written on that quest, and it does not
-run out.
+run out. A letter is not a quest of theirs. The sender pays the
+courier, on the notice board.
 
 ## Where this is
 
