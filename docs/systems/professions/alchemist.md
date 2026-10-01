@@ -18,10 +18,13 @@ second door on the furniture. The day bench recipes exist, the poison
 rows go to Blightbrewer and the medicine rows go to Physicker. Until
 then the menu is the work.
 
-A batch is two or more ingredients that share an effect. The effect
-list is the game's. This repo does not have a table of which
-ingredient carries which effect, so this page cannot honestly list
-"nightshade makes this poison" as if that row had been measured.
+A batch is two or more ingredients that share an effect on the short
+list. The effects that are allowed, and the rank each one asks for,
+are [Mixtures](../mixtures.md). An effect that is not on that list is
+refused, even if the ingredients share it. This repo does not have a
+table of which ingredient carries which effect, so this page cannot
+honestly list "nightshade makes this poison" as if that row had been
+measured.
 The ingredients you can take out of the world are the gatherer's
 plants, the hunter's parts, and the salts a miner can pull from the
 quarry at expert and master. See [Gatherer](../classes/gatherer.md)

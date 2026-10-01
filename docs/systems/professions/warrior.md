@@ -22,12 +22,41 @@ A person killing a person counts for nothing. See [Death](../death.md).
 No other profession is credited for a kill. Killing is not a way to
 become a tailor.
 
-One kill is one piece of work on the half you hold. A chicken and a
-dragon are the same piece today. That is wrong for the finished
-system: a harder kill is more than one piece. The bands are not set.
 The ladder is still 100, then 250, then 600, and the count starts
 again at each rank. The same rest cost as a swing of a pick: 1.5,
 1.2, 0.9, 0.6.
+
+## How much one kill is worth
+
+A chicken and a dragon are not the same fight. The piece count follows
+how hard the thing was. A person killed by a person is still nothing.
+
+When the body is on the hunter list, the piece count is that body's
+own hunter rank, the gold of its best part, on
+[Hunter](../classes/hunter.md). A named body uses its own row. Karhu
+is master on that list, so Karhu is 8, even though a bear is 4.
+
+| Strength | What that is | Pieces |
+| --- | --- | --- |
+| Novice | Chicken, rabbit, fox, deer, wolf, skeever, mudcrab, goat, cow, dog | 1 |
+| Advanced | Sabre cat, troll, spider, horse, horker, netch calf | 2 |
+| Expert | Bear, chaurus | 4 |
+| Master animal | Mammoth, a grown netch | 8 |
+
+A hunter does not dress a person-shaped body. Those still count for a
+warrior, on their own line:
+
+| What died | Pieces |
+| --- | --- |
+| Bandit, guard, forsworn, skeleton | 2 |
+| Draugr, falmer, hagraven | 4 |
+| Giant, dragon priest, centurion, lurker | 8 |
+| Dragon | 16 |
+
+A named animal uses the rank of its kind. A pit wolf is still a wolf.
+One kill is that many pieces, all on the half you hold. The party
+bonus is 15% of that total, banked the same way as any other work, and
+only if somebody from the party is in the same cell.
 
 ## What you are handed
 
@@ -47,6 +76,8 @@ is the rank, the teaching, and the placed points, and nothing else.
 
 ## Where this is
 
-The profession, the two halves, the kill credit, and the placed points
-are in the server. A kill between people already counts for nothing.
-The maneuvers are not a mechanic.
+The profession, the two halves, the placed points, and a kill that
+counts as one piece are in the server. A kill between people already
+counts for nothing. The strength table above is not applied: a
+chicken and a dragon are both one piece. The maneuvers are not a
+mechanic.
