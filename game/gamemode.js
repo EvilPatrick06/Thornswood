@@ -38348,6 +38348,11 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
 
       /* /party with nothing after it is about your own party rather than
          about somebody else, so those two go first. */
+      // Opening or mounting a panel requests its owner's current view (#1275).
+      if (word === '/party' && rest === 'refresh') {
+        soc.push(actorId, true);
+        return true;
+      }
       if (word === '/party' && (rest === '' || rest === 'list')) {
         var pp = soc.partyOf(mine);
         if (!pp) { toProfile(profileId, 'You are not in a party. Look at somebody and press the party key, or /party <name>.'); return true; }
@@ -38415,6 +38420,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (word === '/trade') {
         var tr2 = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodTrade;
         if (!tr2) { toProfile(profileId, 'Trading is not running on this server.'); return true; }
+        if (String(parts[1] || '').toLowerCase() === 'refresh') {
+          tr2.refresh(actorId);
+          return true;
+        }
         var live = tr2.tradeOf(actorId);
         var verb = String(parts[1] || '').toLowerCase();
         if (live || verb === 'cancel' || verb === 'ok' || verb === 'add' ||
@@ -42527,7 +42536,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // The plugin reads this. updateOwner bodies are compiled with
       // new Function in the client's own global, so this is the same
       // globalThis a plugin sees; see the note over thornswoodCatchFire.
-      '    try { globalThis.thornswoodNear = v.w || {}; } catch (e) { }',
+      '    try { globalThis.thornswoodNear = v.w || {};',
+      '      globalThis.thornswoodSocialServerId = ctx.getFormIdInServerFormat;',
+      '    } catch (e) { }',
       '  } catch (e) { }',
       '})();'
     ].join('\n');
@@ -43036,7 +43047,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '    st.thornswoodSocialAt = v.at;',
       '    var body = JSON.stringify(v);',
       '    var src = "(function(){try{" +',
-      '      "var d=" + body + ";" +',
+      '      "var d=" + body + ";window.thornswoodSocialView=d;" +',
       '      "if(window.thornswoodParty&&window.thornswoodParty.setData){window.thornswoodParty.setData(d);}" +',
       '      "if(window.thornswoodJournal&&window.thornswoodJournal.setData){window.thornswoodJournal.setData(d);}" +',
       // The voice page holds the gain nodes. Handing it the mute list is the
@@ -43050,16 +43061,20 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   var panelWas = {};
+  var panelAt = {};
 
-  /** Push the panel view at one person, when it has actually changed. */
-  function push(actorId) {
+  /** Push changes, or resend after a panel opens or mounts (#1275). */
+  function push(actorId, force) {
     var v;
     try { v = view(actorId); } catch (e) { return; }
     var sig = JSON.stringify(v);
-    if (panelWas[actorId] === sig) { return; }
-    panelWas[actorId] = sig;
-    v.at = Date.now();
-    try { mp.set(actorId, SOCIAL_PROPERTY + 'View', v); } catch (e) { }
+    if (!force && panelWas[actorId] === sig) { return; }
+    v.at = Math.max(Date.now(), (panelAt[actorId] || 0) + 1);
+    try {
+      mp.set(actorId, SOCIAL_PROPERTY + 'View', v);
+      panelWas[actorId] = sig;
+      panelAt[actorId] = v.at;
+    } catch (e) { }
   }
 
   // ------------------------------------------------------------ the tick --
@@ -43272,8 +43287,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     delete open[t.a]; delete open[t.b];
     var at = trades.indexOf(t);
     if (at !== -1) { trades.splice(at, 1); }
-    try { mp.set(t.a, TRADE_PROPERTY, { open: false, at: Date.now() }); } catch (e) { }
-    try { mp.set(t.b, TRADE_PROPERTY, { open: false, at: Date.now() }); } catch (e) { }
+    sendView(t.a, { open: false });
+    sendView(t.b, { open: false });
     if (why) {
       try { say(t.a, why); say(t.b, why); } catch (e) { }
     }
@@ -43569,9 +43584,24 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     };
   }
 
+  // A fresh browser has no previous view; its ready event asks again (#1275).
+  var viewAt = {};
+  function sendView(actorId, v) {
+    v.at = Math.max(Date.now(), (viewAt[actorId] || 0) + 1);
+    try {
+      mp.set(actorId, TRADE_PROPERTY, v);
+      viewAt[actorId] = v.at;
+    } catch (e) { }
+  }
+
+  function refresh(actorId) {
+    var t = tradeOf(actorId);
+    sendView(actorId, t ? view(t, actorId) : { open: false });
+  }
+
   function push(t) {
-    try { mp.set(t.a, TRADE_PROPERTY, view(t, t.a)); } catch (e) { }
-    try { mp.set(t.b, TRADE_PROPERTY, view(t, t.b)); } catch (e) { }
+    refresh(t.a);
+    refresh(t.b);
   }
 
   function panelScript() {
@@ -43586,7 +43616,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '    st.thornswoodTradeAt = v.at;',
       '    var body = JSON.stringify(v);',
       '    var src = "(function(){try{" +',
-      '      "if(window.thornswoodTrade&&window.thornswoodTrade.setData){window.thornswoodTrade.setData(" + body + ");}" +',
+      '      "var d=" + body + ";window.thornswoodTradeView=d;" +',
+      '      "if(window.thornswoodTrade&&window.thornswoodTrade.setData){window.thornswoodTrade.setData(d);}" +',
       '      "}catch(e){}})();";',
       '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
       '  } catch (e) { }',
@@ -43627,7 +43658,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     begin: begin, add: add, remove: remove, gold: gold,
     confirm: confirm, cancel: cancel, tradeOf: tradeOf,
     carrying: carrying, labelOf: labelOf, within: within,
-    view: view, push: push, tick: tick, swap: swap, moveById: moveById,
+    view: view, push: push, refresh: refresh, tick: tick, swap: swap, moveById: moveById,
     open: open, trades: trades, describe: describe
   };
 

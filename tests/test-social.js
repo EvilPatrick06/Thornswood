@@ -57,10 +57,11 @@ function world() {
   const said = [];
   const timers = [];
   const kinds = {};
+  const properties = {};
   const g = {};
 
   const mp = {
-    makeProperty: function () { },
+    makeProperty: function (name, config) { properties[name] = config; },
     get: function (id, key) {
       if (id === 0 && key === 'onlinePlayers') {
         return Object.keys(store).filter(k => store[k].here).map(Number);
@@ -107,6 +108,7 @@ function world() {
     mp: mp,
     said: said,
     store: store,
+    properties: properties,
     clock: clock,
     tick: function () { timers.forEach(f => f()); },
     /** Put somebody in the world. */
@@ -419,6 +421,171 @@ if (social && trade) {
   }
 }
 
+// The view can arrive before the asynchronous browser overlays mount (#1275).
+// Run the property's real updateOwner script and the real command branch.
+if (social && trade) {
+  const a = src.indexOf("    if (word === '/friend' || word === '/party' || word === '/mute' ||");
+  const b = src.indexOf("    if (word === '/needs' || word === '/rest'", a);
+  const commands = src.slice(a, b);
+  function command(w, actor, text) {
+    const parts = text.split(/\s+/);
+    return new Function('globalThis', 'actorId', 'profileId', 'parts', 'word',
+      'toProfile', 'say', 'notify', 'journalCommand', commands)(
+      w.g, actor, w.soc.profileOf(actor), parts, parts[0],
+      function (pid, line) { w.said.push({ to: w.soc.actorForProfile(pid), line: line }); },
+      function (to, line) { w.said.push({ to: to, line: line }); }, function () {}, function () {});
+  }
+  function deliver(w, property, actor, page, state) {
+    const ctx = { value: w.store[actor][property], state: state, sp: {
+      browser: { executeJavaScript(code) { new Function('window', code)(page); } }
+    } };
+    new Function('ctx', w.properties[property].updateOwner)(ctx);
+  }
+  {
+    const w = world();
+    const A = w.person(0xff000003, 'First', 701);
+    const page = {}, state = {};
+    w.soc.push(A);
+    deliver(w, 'thornswoodSocialView', A, page, state);
+    yes('D1: a view arriving before the panels mount is retained in the browser',
+      !!page.thornswoodSocialView && page.thornswoodSocialView.me === 701);
+    const before = w.store[A].thornswoodSocialView.at;
+    command(w, A, '/party refresh');
+    yes('D1: opening a panel forces a fresh owner view, even in the same millisecond',
+      w.store[A].thornswoodSocialView.at > before);
+    let received = null;
+    page.thornswoodParty = { setData(v) { received = v; } };
+    deliver(w, 'thornswoodSocialView', A, page, state);
+    yes('D1: the ready party panel receives the refreshed connected character state',
+      !!received && received.me === 701 && Array.isArray(received.friends));
+  }
+  {
+    const w = world();
+    const A = w.person(0xff000003, 'First', 701), B = w.person(0xff000004, 'Second', 702);
+    command(w, A, '/friend ff000004');
+    yes('D2: the friend command reaches the target and acknowledges the sender',
+      !!w.soc.standingOffer(702) && w.lines(A).some(s => /Asked Second/.test(s)));
+    command(w, B, '/yes');
+    yes('D2: accepting the request updates both friends lists',
+      w.soc.isFriend(A, 702) && w.soc.isFriend(B, 701));
+    command(w, A, '/trade ff000004');
+    yes('D2: the trade command reaches the target and acknowledges the sender',
+      w.soc.standingOffer(702).kind === 'trade' && w.lines(A).some(s => /Asked Second/.test(s)));
+    command(w, B, '/yes');
+    const page = {}, state = {};
+    deliver(w, 'thornswoodTrade', A, page, state);
+    yes('D2: an accepted trade arriving before its panel mounts is retained',
+      !!page.thornswoodTradeView && page.thornswoodTradeView.open === true);
+    command(w, A, '/trade missing');
+    yes('D2: invalid trade actions give a refusal rather than vanishing',
+      w.lines(A).some(s => /trade: add/.test(s)));
+  }
+
+  // A whole browser reload also loses the cache while owner state survives.
+  {
+    const w=world(), A=w.person(0xff000003,'First',701), B=w.person(0xff000004,'Second',702);
+    w.trade.begin(A,B);
+    const state={}, oldPage={};
+    deliver(w,'thornswoodTrade',A,oldPage,state);
+    const before=w.store[A].thornswoodTrade.at, otherBefore=w.store[B].thornswoodTrade.at;
+    let received=null;
+    const newPage={thornswoodTrade:{setData(v){received=v;}}};
+    command(w,A,'/trade refresh');
+    deliver(w,'thornswoodTrade',A,newPage,state);
+    yes('D6: a fresh browser receives the current trade after ready even in the same millisecond', !!received&&received.open===true&&received.them==='Second'&&received.at>before);
+    yes('D6: refreshing a trade changes only the requesting owner view', w.store[B].thornswoodTrade.at===otherBefore);
+    command(w,A,'/trade cancel');
+    command(w,A,'/trade refresh');
+    deliver(w,'thornswoodTrade',A,newPage,state);
+    yes('D6: refresh with no session closes a cached trade rather than creating an offer', !!received&&received.open===false&&!w.soc.standingOffer(702));
+  }
+  // The relay proof and connected profile decide whose actor runs.
+  {
+    const w=world(), A=w.person(0xff000003,'First',701), B=w.person(0xff000004,'Second',702);
+    w.g.__thornswoodJoinPass={requiring(){return true;}};
+    const da=src.indexOf('  if (!globalThis.__thornswoodLastActor)'), db=src.indexOf('  /** key -> the arrival point',da);
+    const words=/^const WORDS = (\[[\s\S]*?\]);$/m.exec(src);
+    const api=new Function('globalThis','g','mp','WORDS','handle','toProfile','log','Date',src.slice(da,db)+'; return {dispatch,actorOf};')(
+      w.g,w.g,w.mp,new Function('return '+words[1])(),
+      cmd=>command(w,api.actorOf(Number(cmd.profileId)),cmd.text),
+      (pid,line)=>w.said.push({to:w.soc.actorForProfile(pid),line}),()=>{}, {now(){return w.clock.now;}});
+    api.dispatch({profileId:701,actorId:B,name:'Second',text:'/friend ff000004',proven:false});
+    yes('D4: an unproven social request produces neither an offer nor a reply under a claimed profile', !w.soc.standingOffer(702)&&w.said.length===0);
+    api.dispatch({profileId:701,actorId:B,name:'Second',text:'/friend ff000004',proven:true});
+    yes('D4: a proven request uses the connected profile rather than a supplied actor or name', w.soc.standingOffer(702).from===701&&w.lines(A).some(x=>/Asked Second/.test(x)));
+    api.dispatch({profileId:702,text:'/yes',proven:true});
+    yes('D4: acceptance through dispatch updates the two authenticated characters', w.soc.isFriend(A,702)&&w.soc.isFriend(B,701));
+    api.dispatch({profileId:701,text:'/party refresh',proven:true});
+    yes('D4: party refresh returns the connected profile own state', w.store[A].thornswoodSocialView.me===701&&w.store[B].thornswoodSocialView.me===702);
+    w.trade.begin(A, B);
+    const atA = w.store[A].thornswoodTrade.at, atB = w.store[B].thornswoodTrade.at;
+    api.dispatch({ profileId: 701, actorId: B, text: '/trade refresh', proven: false });
+    yes('D4: an unproven trade refresh cannot publish private owner state',
+      w.store[A].thornswoodTrade.at === atA && w.store[B].thornswoodTrade.at === atB);
+    api.dispatch({ profileId: 701, actorId: B, text: '/trade refresh', proven: true });
+    yes('D4: authenticated trade refresh publishes only the connected character view',
+      w.store[A].thornswoodTrade.at > atA && w.store[A].thornswoodTrade.them === 'Second' && w.store[B].thornswoodTrade.at === atB);
+
+  }
+}
+
+// The crosshair's dynamic ID belongs to the client, not the server (#1275).
+{
+  const w = world(), A = w.person(0xff000003, 'First', 701), B = w.person(0xff000004, 'Second', 702);
+  w.soc.nearTick();
+  const client = {}, state = {};
+  const ctx = { value: w.store[A].thornswoodNear, state,
+    getFormIdInServerFormat(id) { return id === 0xff001234 ? B : 0; } };
+  new Function('ctx', 'globalThis', w.properties.thornswoodNear.updateOwner)(ctx, client);
+  const start = FRONT.indexOf("  sp.on('update', guard('crosshair', () => {");
+  const end = FRONT.indexOf('\n  }));', start);
+  let update, target = '', prompt = null;
+  const sp = { on(event, fn) { update = fn; }, Game: { getCurrentCrosshairRef() { return { getFormID() { return 0xff001234; } }; } } };
+  const run = new Function('sp', 'guard', 'globalThis', 'nearList', 'drawPrompt', 'say',
+    'let nearAt=0, lookingAt=""; const NEAR_EVERY=1; ' + FRONT.slice(start,end+8) + '; return function(fn){ fn(); return lookingAt; };');
+  const next = run(sp, (label, fn) => fn, client, () => client.thornswoodNear, row => { prompt=row; }, () => {});
+  target = next(update);
+  yes('D3: a differently mapped client actor arms the prompt with its server ID', target === 'ff000004' && !!prompt && prompt.n === 'Second');
+  const va=FRONT.indexOf('  function lookVerb(cmd) {'), vb=FRONT.indexOf('\n  }',va);
+  const scripts=[], lines=[], notices=[];
+  const page={ thornswoodNet: { say(line, auto) { lines.push({line,auto}); return true; } },
+    skyrimPlatform: { sendMessage(target, text) { notices.push(text); } } };
+  const T={ready:true,js(code){ scripts.push(code); new Function('window',code)(page); return true; }};
+  const verb = new Function('T','lookingAt','tellServer','say','note',FRONT.slice(va,vb+4)+'; return lookVerb;')(
+    T,'ff000004',line=>lines.push({line,auto:true}),()=>{},text=>notices.push(text));
+  verb('friend'); verb('trade');
+  yes('D3: friend and trade key actions send the server target through chat', lines.length===2 && lines[0].line==='/friend ff000004' && lines[1].line==='/trade ff000004');
+  yes('D3: deliberate actions use the chat connection feedback rather than silent telemetry', lines.every(x=>x.auto!==true));
+  // Run chat's real offline queue path, not a stand-in acknowledgement.
+  const chat = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-chat.js'), 'utf8');
+  const sa = chat.indexOf('    say: function (text, auto)'), sb = chat.indexOf('    state: function', sa);
+  const offline = new Function('note',
+    'var ws=null, joined=false, queue=[]; const ROLL=/^\\/roll /, C_WARN="warn"; ' +
+    'return {net:{' + chat.slice(sa,sb) + '},queue};')(text=>notices.push(text));
+  page.thornswoodNet = offline.net;
+  verb('friend');
+  yes('D3: an offline deliberate action is queued once and visibly acknowledged',
+    offline.queue.length===1 && offline.queue[0]==='/friend ff000004' && notices.length===1 && /queued/.test(notices[0]));
+  notices.length=0;
+  delete page.thornswoodNet; verb('friend');
+  yes('D3: an unavailable command transport reports that the action could not be sent', notices.length===1);
+}
+
+// Mount/open events keep focus claims and use the normal command route.
+{
+  const start=FRONT.indexOf("    if (what === 'social:unavailable')"), end=FRONT.indexOf("    /*",start);
+  const lines=[],focus=[],notes=[];
+  const event=new Function('what','T','tellServer','log','note',FRONT.slice(start,end));
+  for(const what of ['party:ready','journal:ready','party:opened','journal:opened']) {
+    event(what,{claimFocus(name,value){focus.push([name,value]);}},line=>lines.push(line),()=>{},text=>notes.push(text));
+  }
+  yes('D5: mounting and opening social panels request an owner refresh', lines.length===4&&lines.every(x=>x==='/party refresh'));
+  event('trade:ready',{},line=>lines.push(line),()=>{},()=>{});
+  yes('D5: a ready trade panel requests its own current session',lines[4]==='/trade refresh');
+  yes('D5: open events still claim the correct keyboard focus', JSON.stringify(focus)==='[["party",true],["journal",true]]');
+  event('social:unavailable',{},()=>{},()=>{},text=>notes.push(text));
+  yes('D5: missing transport gets a native visible retry instruction',notes.length===1&&/Try again/.test(notes[0]));
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
