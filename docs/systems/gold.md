@@ -77,11 +77,13 @@ it back into a pack and subtracts the same count from that ledger. The
 coin was already in the world. A payout is not a second mint.
 
 Two things destroy coin without putting it on a ledger. A company
-event can buy a thing and the thing leaves the world, and the gold
-paid for it leaves with it. When the company buys from someone, the
-worker who handled it takes a cut, and some of that gold leaves the
-server rather than staying in a pack or a box. The size of the cut is
-not set. See [Free Skyrim Trading Company](trading-company.md).
+event can buy a thing and the thing leaves the world. When the company
+buys from someone, the worker who handled it takes 10% of the price,
+rounded down, and another 10% leaves the server rather than staying
+in a pack or a box. The seller receives what is left. A price under
+10 gold pays the whole price, and neither cut is taken. See
+[Free Skyrim Trading Company](trading-company.md). An item has no
+gold price of its own. What it sells for is the price a person posts.
 
 ## Dull
 

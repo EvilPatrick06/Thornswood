@@ -11,21 +11,21 @@ five in one sub-skill are refused.
 
 | Sub-skill | One point | Filled, the perk |
 | --- | --- | --- |
-| Vitality | +10 health | Cheat Death. Once a day, the blow that would kill you leaves you on one |
-| Fortitude | +10% health recovery | Troll's Blood. Health keeps returning during a fight |
-| Might | +0.05 melee damage | Devastating Blow. Power attacks usually put people down |
-| Resilience | +10 armour | Unshakeable. Nothing staggers you while you block |
-| Toughness | +10 poison resistance and +10 disease resistance | Purified Blood. No disease touches you, and poison barely does |
-| Capacity | +10 magicka | Archmage's Vessel. Drop below a tenth and it floods back |
-| Clarity | +10% magicka recovery | Leyline Attunement. It refills while you are still casting |
-| Potency | +5 spell power, in the schools you hold | Overcharge. Now and then a spell lands twice as hard or holds twice as long |
-| Ward | +5 magic resistance | Spellbreaker. Some of what is thrown at you becomes your magicka |
-| Efficiency | -3 spell cost, in the schools you hold | Font of Magic. Once a day, fifteen seconds where nothing costs anything |
-| Endurance | +10 stamina | Tireless. Running and swinging cost half |
-| Vigor | +10% stamina recovery | Second Wind. Empty it and it fills, once every five minutes |
-| Agility | +2 speed | Windwalker. Faster on your feet, and falls do not hurt you |
-| Burden | +15 carry weight | Pack Mule. Being overloaded stops slowing you |
-| Precision | +2 critical chance | Lethal Aim. Arrows go through half of whatever armour is in the way |
+| Vitality | +10 health | Cheat Death. Once a day, the blow that would kill you leaves you at 1 health |
+| Fortitude | +10% health recovery | Troll's Blood. During a fight, health returns at 2 a second |
+| Might | +0.05 melee damage | Devastating Blow. A power attack deals 25% more |
+| Resilience | +10 armour | Unshakeable. A block cannot stagger you |
+| Toughness | +10 poison resistance and +10 disease resistance | Purified Blood. Disease does not take. Poison deals 25% |
+| Capacity | +10 magicka | Archmage's Vessel. Drop below a tenth of magicka and it returns to half, once a day |
+| Clarity | +10% magicka recovery | Leyline Attunement. Magicka still returns while you cast, at half the usual rate |
+| Potency | +5 spell power, in the schools you hold | Overcharge. One spell in five deals double, or holds twice as long |
+| Ward | +5 magic resistance | Spellbreaker. 20% of the magicka in a spell that hits you is added to yours |
+| Efficiency | -3 spell cost, in the schools you hold | Font of Magic. Once a day, 15 seconds where a spell costs nothing |
+| Endurance | +10 stamina | Tireless. Running and swinging cost half stamina |
+| Vigor | +10% stamina recovery | Second Wind. When stamina hits 0 it fills, once every 5 minutes |
+| Agility | +2 speed | Windwalker. +4 speed, and a fall deals no damage |
+| Burden | +15 carry weight | Pack Mule. Being overloaded does not slow you |
+| Precision | +2 critical chance | Lethal Aim. An arrow ignores half the armour it hits |
 
 Might is a fraction added to a multiplier whose base is 1. Five points is
 a quarter more melee damage, not five times. Potency and Efficiency do

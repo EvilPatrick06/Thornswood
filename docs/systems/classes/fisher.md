@@ -6,9 +6,8 @@ pieces of water are not a class.
 
 The poles are remade as our own records when that mod goes: Crude,
 Fine, and Master. A woodwright still makes them. The master pole
-does not take dragon bone. Dragon bone is cut. What the remade poles
-take is a woodwright recipe at that rank, written when the records
-are made.
+does not take dragon bone. Dragon bone is cut. What they take is
+the table under The poles and the trap.
 
 50 uses, the same as the pick, the axe, and the shovel. Crude fishes
 novice water. Fine fishes novice through expert. Master fishes every
@@ -58,6 +57,21 @@ catch of that water. Setting it and collecting it are each one piece
 of work.
 
 A cook turns the meat into a meal. The fisher does not.
+
+## The poles and the trap
+
+A woodwright makes them. The fishing mod's rows are not the plan.
+The master pole does not take dragon bone. Dragon bone is cut.
+
+| Piece | Rank | Asks for |
+| --- | --- | --- |
+| Crude pole | Novice | 2 firewood, 1 leather strips, 2 tundra cotton |
+| Fine pole | Expert | 2 firewood, 1 leather strips, 1 steel ingot, 3 tundra cotton |
+| Master pole | Master | 3 firewood, 2 leather strips, 1 steel ingot, 1 refined moonstone |
+| Fish trap | Novice | 3 firewood, 2 leather strips, 1 iron ingot |
+
+50 uses on a pole. A trap is not a pole. It is the trap above, up to
+3 at once.
 
 ## How much, and how often
 
@@ -109,14 +123,14 @@ The egg nest is yours.
 
 Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same rows are in [fisher](../lists/fisher.md).
 
-| Name | Rank | Records | You receive | In the world | Gold |
-| --- | --- | --- | --- | --- | --- |
-| Clam Meat | novice | 3 | Clam Meat | Clam | 2 |
-| Salmon Meat | novice | 8 | Salmon Meat | Salmon | 2 |
-| Horker Meat | advanced | 1 | Horker Meat | Horker meat | 2 |
-| Small Pearl | advanced | 1 | Small Pearl | Pearl Oyster |  |
-| Pearl | expert | 1 | Pearl | Pearl Oyster |  |
-| Slaughterfish Egg | master | 1 | Slaughterfish Egg | Slaughterfish Egg Nest |  |
+| Name | Rank | Records | You receive | In the world |
+| --- | --- | --- | --- | --- |
+| Clam Meat | novice | 3 | Clam Meat | Clam |
+| Salmon Meat | novice | 8 | Salmon Meat | Salmon |
+| Horker Meat | advanced | 1 | Horker Meat | Horker meat |
+| Small Pearl | advanced | 1 | Small Pearl | Pearl Oyster |
+| Pearl | expert | 1 | Pearl | Pearl Oyster |
+| Slaughterfish Egg | master | 1 | Slaughterfish Egg | Slaughterfish Egg Nest |
 
 <!-- detail:end -->
 

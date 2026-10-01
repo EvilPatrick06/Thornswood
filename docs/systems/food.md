@@ -14,9 +14,10 @@ kind it is. The state says how good a meal it is.
 | A feast | 40 | A stronger help for 10 real minutes |
 
 A cooked meal's help is one of these, not all of them: stamina recovery
-+10%, or the temperature target 4 degrees warmer, or a lower chance of
-disease while it lasts. A feast is the same list at double the help and
-half the time. It is not a heal. A potion still does the healing.
++10%, or the temperature target 4 degrees warmer, or the chance of
+catching a disease cut in half while it lasts. A feast is the same
+list at double the help and half the time, so the disease chance is
+a quarter. It is not a heal. A potion still does the healing.
 
 A soup, a stew or a chowder is food and 10 thirst. A dry ration is food
 only.

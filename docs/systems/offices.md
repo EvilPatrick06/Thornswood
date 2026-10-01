@@ -38,7 +38,7 @@ and the seam is on [Miner](classes/miner.md).
 
 ## Ambassador
 
-One, for the embassy in Solitude. Keeps the roll of 40, of whom 12 may
+One, for the embassy in Solitude. Keeps the roll of 20, of whom 6 may
 be armed. Does not evict the Accord and is not evicted by Haafingar's
 steward. See [The Imperial Embassy](embassy.md).
 
@@ -53,6 +53,19 @@ halls does not require it. Holding the doors does. See
 
 Not in the server as a title. The perk is the profession, and it is
 the third school plus the right to teach.
+
+## What a hold sets
+
+A hold sets its own titles beyond jarl and steward, what each of those
+titles may do, how many people hold one, and what they are paid. The
+pay is gold that already exists. A hold does not mint it.
+
+Housecarl, thane, captain, priest, and a guard are that list. The
+server does not set their number, their pay, or their powers. A guard
+is not a bounty and is not staff.
+
+Jarl and steward stay the offices the server already runs. A hold does
+not turn eviction, rent, the box, the board, or naming the factor off.
 
 ## What an office does not do
 

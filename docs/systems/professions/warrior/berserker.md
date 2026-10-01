@@ -23,8 +23,8 @@ You cannot craft on the strength of this half.
 
 You cannot be credited for killing a person.
 
-Warlord maneuvers for this half are the ones that break a line. They
-are not built. See [Warrior](../warrior.md).
+The maneuvers for this half are Rush, Heavy, Break, and Wreck. The
+numbers are on [Warrior](../warrior.md). They are not in the server.
 
 ## Where this is
 
