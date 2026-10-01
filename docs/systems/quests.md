@@ -36,9 +36,9 @@ rank on the seam still applies.
 A scene quest is a deed, not a purchase. The trader does not buy
 food, cooked meals, ore, or anything a person made. Those prices
 stay with the people who sell them. A supply quest is the purchase.
-Most scene quests are a retrieval, the same kind as the signet. A
-few are a kill. The server can already see both: the quest item in
-your pack, or the death.
+Most scene quests are a retrieval, the same kind as the signet. The
+others are a kill. The server can already see both: the quest item
+in your pack, or the death.
 
 The gold is the amount written on that quest. It is created when
 you finish. It does not come out of the trader's 250, and it does
@@ -61,7 +61,10 @@ case, not a letter a person wrote.
 | The dispatch | That same kind of case, in a chest in this hold, handed to the trader in a hold they name. | 60 | 12 hours |
 | The seal | A stamp in a chest in a ruin they name. | 70 | 14 hours |
 | A wolf | You kill a wolf in the place they name in this hold. | 25 | 3 hours |
+| A sabre cat | You kill a sabre cat in the place they name. | 40 | 6 hours |
 | The camp | You kill three bandits in the camp they name. | 45 | 6 hours |
+| A bear | You kill a bear in the place they name. | 50 | 8 hours |
+| The barrow | You kill a draugr in the barrow they name. | 60 | 10 hours |
 | A giant | You kill a giant in this hold. | 100 | 18 hours |
 
 A retrieval is one item. It is not a craft, not food, not ore, and
