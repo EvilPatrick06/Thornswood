@@ -30,10 +30,8 @@ trades.
 
 You cannot be credited for killing a person.
 
-You do not have a maneuver list. Warlord, at master, is the rank that
-is supposed to open master-tier maneuvers for this half: holding a
-line, not breaking one. Those maneuvers are not built. See
-[Warrior](../warrior.md).
+The maneuvers for this half are Set, Plant, Cover, and Wall. The
+numbers are on [Warrior](../warrior.md). They are not in the server.
 
 ## Where this is
 

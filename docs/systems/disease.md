@@ -10,25 +10,27 @@ See [Death](death.md).
 
 ## The kinds
 
-**Chill.** From sleeping on open ground, or from an hour of real time
-at spent cold. Mild. A fire, a bed, warmth back to fine, or 2 hours
-clears it. A minute in the snow does not.
+**Chill.** An hour of sleep on open ground, or an hour of real time at
+spent cold. Shorter than an hour does not catch it. A fire, a bed,
+warmth back to fine, or 2 hours clears it.
 
-**Food sickness.** Raw meat or fish, or eating at 90 hunger or above.
-Lasts 30 minutes. Weakness: the weary hunger penalties, and the body
-meter fills at double if that meter is in. See [Food](food.md) and
-[The body](body.md).
+**Food sickness.** Raw meat or fish catches it 40% of the time. Eating
+at 90 hunger or above catches it. Lasts 30 minutes. Weakness: the
+weary hunger penalties, and the body meter fills at double if that
+meter is in. See [Food](food.md) and [The body](body.md).
 
-**Fouled water.** Marsh, a puddle, standing water you did not boil, or
-the sea. See [Thirst](thirst.md). Lasts 45 minutes at the weary thirst
-penalties. Boiling for a minute at a cook fire clears the risk before
-you drink.
+**Fouled water.** Marsh, a puddle, or standing water you did not boil
+catches it 80% of the time. The sea catches it 40%. A river, unboiled,
+catches it 15%. See [Thirst](thirst.md) and [Drink](drink.md). Lasts
+45 minutes at the weary thirst penalties. Boiling for a minute at a
+cook fire clears the risk before you drink.
 
-**Wound fever.** An open cut or an untreated burn left 10 minutes.
-Lasts until cured. See [Injury](injury.md).
+**Wound fever.** An open cut or an untreated burn. The chance is on
+[Injury](injury.md): 40%, or 10% with a bandage, or 5% with a poultice.
+Lasts until cured.
 
-**Bite sickness.** From an animal bite, more likely if the wound stays
-open. Lasts until cured. Ordinary disease.
+**Bite sickness.** 25% if the bite is closed inside 10 minutes. 60% if
+it stays open. Lasts until cured. Ordinary disease.
 
 ## How sick
 

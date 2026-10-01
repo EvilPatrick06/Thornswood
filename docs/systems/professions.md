@@ -62,13 +62,10 @@ nothing. See [People beside you](people.md).
 The rank is the dearest ingredient a class produces. An iron cuirass
 asks for iron, and iron is novice mining, so the cuirass is novice.
 A piece that asks for a steel ingot is advanced, because that is the
-rank recorded for gathering what that ingot is made from. The
-finished piece's own sell price is written down beside that and is
-not the rank, unless nothing in the row is produced by any class.
-Then the sell price is the rank. If some ingredients are produced
-and some are not, the rank is held up at the sell price: something
-nobody gathers is not allowed to make the recipe cheap. Each row
-says the rank that rule produced.
+rank recorded for gathering what that ingot is made from. An item
+has no gold price. What it sells for is the price a person posts.
+If nothing in the row is produced by any class, the rank is the one
+written on the row when the recipe was added. Each row says that rank.
 
 ## What the server allows
 

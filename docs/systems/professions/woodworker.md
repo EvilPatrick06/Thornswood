@@ -7,7 +7,7 @@ Fire, handles, bows, and instruments.
 - [Woodwright](woodworker/woodwright.md). 156 recipes. 86 reach the
   server. 70 are a sharpening wheel and do not.
 
-The tool is a woodcutter's axe in the pack, 100 uses, handed when the
+The tool is a woodcutter's axe in the pack, 50 uses, handed when the
 profession is picked. Chopping a block is this profession's work in
 the world. The emote called Chop wood is an animation. It does not
 fell a log and it does not count.

@@ -100,6 +100,14 @@ A bed you own, rent, or were allowed to use is the bed on
 A bedroll is the campfire rate, 35. Saying `/rest bed` in the street
 is not a bed.
 
+The holder sets who may sleep there, and what the night costs.
+`/bed 20` at the building sets the gold for one night. `/bed -` means
+a night is free for someone the holder has allowed. `/bed` with no
+amount says the price. The gold is handed to the holder. It is not a
+server price, and it is not the same in every house. An inn is this
+rule. The person who holds the inn sets the night. Once that gold is
+paid, the inn room is 50 rest an hour.
+
 The fire in the hearth is a fire. It warms the way any fire does on
 [Temperature and weather](temperature.md). A claim does not make it
 hotter.
@@ -137,6 +145,7 @@ eviction, rent, and the gold-only box are in the server. The register
 is `private/property.json`.
 
 `/rest bed` still believes the word. It does not look for a bed.
+A holder cannot set a price for a night. `/bed` does not exist.
 Outhouses and pots are not known furniture. The company payout that
 withdraws from the ledger is not built. The four house parts are
 already refused. The drop box does not accept a price list.
