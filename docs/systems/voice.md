@@ -44,9 +44,9 @@ either.
 ## What you can turn off
 
 Three switches, each for one person, and each only for you. They
-work on anyone, not only a friend. None of them is a staff silence.
-None of them tells the other person. They are saved on the character
-and they survive a restart.
+work on anyone, not only a friend. None of them tells the other
+person. They are saved on the character and they survive a restart.
+A staff silence is a different tool, further down.
 
 | Switch | What you stop | How |
 | --- | --- | --- |
@@ -66,6 +66,31 @@ find someone in your party. That is on [Party](party.md).
 P lists the three switches for each friend and for each person in
 your party. The look-at prompt offers the same three.
 
+## Every name
+
+`/hidename all` hides every name above a head, for you. The same
+command again puts them back. A name you hid one person at a time
+stays hidden after you turn this off. The party map marker and the
+arrow on the strip stay, the same as hiding one name. It is saved on
+the character.
+
+## Staff silence
+
+Staff are the Discord roles that already take a staff seat: Owner,
+Gamemaster, Dev, Loremaster, Moderator.
+
+`/silence` and the name. Their voice, their local text, the words
+above their head, and the speaking mark stop for everybody. They are
+told. They cannot lift it. `/silence` and the same name again, from
+any staff member, lifts it.
+
+`/silence` with nothing after it lists who is silenced.
+
+It also stops them writing in a faction or business chat. That chat
+is on [Factions and businesses](factions.md). It does not hide their
+name. The three switches above stay personal, and a personal mute
+does not lift a silence.
+
 ## Where this is
 
 The three distances, V, O, B, and the voice mute are in the server.
@@ -75,6 +100,6 @@ sound, and it does not touch text.
 
 The mark above the head is not in the world. The launcher draws its
 own speaking light, and that light is not above a head and is not
-colored by the distance. Text mute, hiding a name, and saving those
-two are not in the server. `/mute` is voice only. P has one Mute
-button, on friends.
+colored by the distance. Text mute, hiding a name, hiding every
+name, and saving those are not in the server. `/mute` is voice only.
+P has one Mute button, on friends. `/silence` is not a command.
