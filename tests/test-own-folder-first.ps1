@@ -743,7 +743,7 @@ namespace Thornswood
             }
             File.WriteAllLines(Path.Combine(OwnGame.Dir, "files.txt"), legacy.ToArray());
             string madeTxt = Path.Combine(OwnGame.Dir, "made.txt");
-            File.WriteAllText(madeTxt, File.ReadAllText(madeTxt).Replace("rules=13", "rules=12"));
+            var made12a = new List<string>(); foreach (string l in File.ReadAllLines(madeTxt)) made12a.Add(l.StartsWith("rules=") ? "rules=12" : l); File.WriteAllLines(madeTxt, made12a.ToArray());
 
             // A game started from Steam holds one of the files open.
             string held = Path.Combine(s.Game, "Data\\Platform\\Plugins\\thornswood-front.js");

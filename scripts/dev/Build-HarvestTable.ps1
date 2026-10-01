@@ -348,8 +348,9 @@ $ALCH_FLAG_FOOD = 0x00000002
 $PRODUCE_WITHOUT_A_PRICE = @('LVLI', 'FLST', 'LVLN')
 #
 # PRODUCE_NOT_GATHERED: kinds of record that are a real item with a real price
-# and still are not material anybody gathers. KEYM is the one this build has:
-# ElysiumEstateSSE.esp hangs the key to the house on a FLOR record. Rank
+# and still are not material anybody gathers. KEYM is the kind: Elysium
+# Estate 4.3.5 (ElysiumEstateSSE.esp, until #690) hung the key to the house on
+# a FLOR record, and 5.0.1 does not, but a key on flora is never gathering. Rank
 # decides who may work a source at all, so leaving that in the table would
 # mean only a gatherer could ever pick up their own front door key. They are
 # reported by name every run and listed in the json under 'unranked'.

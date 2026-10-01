@@ -310,6 +310,11 @@ function Test-ShipOtherServer([string]$rel) {
     # SkyUI 5.2's own scripts, loose, issue #960. See $ShipOldSkyUIScripts.
     # OwnGame.Foreign carries the same rule; change the two together.
     if ($ShipOldSkyUIScripts -contains $rel) { return $true }
+    # Elysium Estate 4.3.5's plugin, issue #690: the servers load the
+    # collection's ElysiumEstate.esp since 29 September, and every pack deletes
+    # this name (see $ShipDeleteAlways). OwnGame.Foreign carries the same rule;
+    # change the two together.
+    if ($rel -ieq 'Data\ElysiumEstateSSE.esp') { return $true }
     if (-not $rel.StartsWith('Data\Platform\', 'OrdinalIgnoreCase')) { return $false }
     $leaf = Split-Path $rel -Leaf
     if ($rel.StartsWith('Data\Platform\PluginsNoLoad\', 'OrdinalIgnoreCase')) { return $true }
@@ -1224,7 +1229,16 @@ $ShipDeleteAlways = @(
     # refresh copies whatever the Steam copy has and the folder lacks straight
     # back in. OwnGame.Foreign refuses it, which is what makes the deletion
     # stick. The name is never used again, so nothing legitimate is lost.
-    'Data\Platform\Plugins\thornswood-chargen.js'
+    'Data\Platform\Plugins\thornswood-chargen.js',
+
+    # ELYSIUM ESTATE'S OLD PLUGIN, issue #690. Packs carried it from
+    # game\required-data from 27 September, while the servers loaded 4.3.5.
+    # On 29 September the servers moved to the collection's 5.0.1, whose
+    # plugin is ElysiumEstate.esp, so this name is nobody's any more: no mod in
+    # the collection has it, and a copy left switched on would take a place
+    # the server does not have. Every install that took one of those packs
+    # loses it.
+    'Data\ElysiumEstateSSE.esp'
 )
 # SkyUI 5.2's loose scripts, issue #960: dev packs carried them, so leaving
 # them out of new packs would do nothing for the machines showing the SkyUI
@@ -1275,11 +1289,11 @@ function Get-ShipTravelsWith([string[]]$changed) {
 
 # REQUIRED DATA THE COLLECTION DOES NOT YET DEPLOY UNDER THE LOAD ORDER NAME.
 #
-# game\required-data holds plugins (today: ElysiumEstateSSE.esp) that plugins.txt
-# and the server enable by exact filename, while Vortex still deploys a different
-# name (ElysiumEstate.esp 4.3.5). OwnGame links only what Vortex deployed, so the
-# SSE file was only on one machine until it was copied by hand, and every other
-# player hit the same missing-plugin warning.
+# game\required-data holds plugins that plugins.txt and the server enable by
+# exact filename while Vortex deploys a different name. OwnGame links only what
+# Vortex deployed, so such a file is on one machine only unless a pack carries
+# it. It is empty today: ElysiumEstateSSE.esp was here from 27 to 29 September,
+# until the servers moved to the collection's ElysiumEstate.esp (#690).
 #
 # Go.ps1, Publish-Update and Package-Thornswood call Ensure-ShipRequiredData so
 # each file here lands at Data\<name> before the pack / installer scan. They are

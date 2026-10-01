@@ -358,8 +358,10 @@ $reqFiles = @()
 if (Test-Path -LiteralPath $reqSrc) {
   $reqFiles = @(Get-ChildItem -LiteralPath $reqSrc -File -EA SilentlyContinue | Where-Object { $_.Name -ne 'README.md' })
 }
-Ready 'game\required-data has plugins to place' ($reqFiles.Count -gt 0) ("$($reqFiles.Count) file(s)") `
-  'Nothing to do; the repo is missing its required-data plugins'
+# Empty is the usual case: a file is here only while the collection does not
+# deploy it under the name the load order uses (#690 took the last one out).
+Ready 'game\required-data is in the repo' (Test-Path -LiteralPath $reqSrc) ("$($reqFiles.Count) plugin(s) to place") `
+  'Nothing to do; the repo is missing its game\required-data folder'
 if ($hasGame -and $reqFiles.Count -gt 0) {
   $stale = @()
   foreach ($f in $reqFiles) {

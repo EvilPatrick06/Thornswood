@@ -669,7 +669,7 @@ namespace Thornswood
             Put(Path.Combine(Paths.PacksDir, "20260920-0000.files"), "abc|game\\" + packFile + "\r\n");
             Put(Path.Combine(Paths.ProfileDir, "installed-into-game.txt"), installerFile + "\r\n");
             string madeTxt = Path.Combine(OwnGame.Dir, "made.txt");
-            File.WriteAllText(madeTxt, File.ReadAllText(madeTxt).Replace("rules=13", "rules=12"));
+            var made12 = new List<string>(); foreach (string l in File.ReadAllLines(madeTxt)) made12.Add(l.StartsWith("rules=") ? "rules=12" : l); File.WriteAllLines(madeTxt, made12.ToArray());
             Yes("(the folder now holds the hand placed mods, as one made before this did)", AllIn(own, Hand));
 
             var steamNow = Snap(s.Game);
@@ -808,7 +808,8 @@ Yes 'Make keeps to the three kinds on both walks of the Steam copy (Gather calls
 Yes 'Skyrim''s own is the embedded list of the pinned build''s files, not a guess by folder' `
     (($kinds -match 'GetManifestResourceStream\("skyrim-files\.json"\)') -and ($kinds -match 'public static bool SkyrimOwn\(string rel\)\s*\{\s*return SkyrimFiles\(\)\.Contains\(rel\);'))
 Yes 'without the list nothing is made or refreshed (WhyNot asks NoSkyrimList first)' ($own -match 'string noList = NoSkyrimList\(\);\s*if \(noList != null\) return noList;')
-Yes 'OwnGame''s Rules is 13, so every folder made before refreshes once' ($own -match '(?m)^\s*const int Rules = 13;')
+$rulesNum = [regex]::Match($own, '(?m)^\s*const int Rules = (\d+);')
+Yes 'OwnGame''s Rules is at least 13, so every folder made before #1232 refreshes once' ($rulesNum.Success -and [int]$rulesNum.Groups[1].Value -ge 13)
 $refreshNow = $own.Substring($own.IndexOf('static string RefreshNow('))
 Yes 'the refresh takes out what is none of the three and records the kind of the rest' `
     ($refreshNow -match '(?s)origin = KindOf\(kv\.Key, null, ours\);\s*if \(origin == ''\\0'' && !sortNow\)\s*\{.*?else if \(origin == ''\\0''\)\s*\{\s*try\s*\{\s*DropName\(at\);')

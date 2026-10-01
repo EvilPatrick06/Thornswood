@@ -12,14 +12,14 @@
  },
  "counts": {
   "deleted": 10,
-  "everyoneElse": 3377,
+  "everyoneElse": 3378,
   "failedToInflate": 0,
   "guards": 393,
   "noHold": 591,
   "notPeople": 7722,
   "offAtStart": 2548,
-  "people": 6931,
-  "placed": 14663,
+  "people": 6932,
+  "placed": 14664,
   "stringTables": 6,
   "traders": 588,
   "transport": 25,
@@ -29,7 +29,7 @@
  "holdFrom": {
   "its own location": 3149,
   "nothing placed it": 591,
-  "the cell it stands in": 2146,
+  "the cell it stands in": 2147,
   "the ground it stands on": 99,
   "the nearest named place": 640,
   "whose law it answers to": 306
@@ -6248,11 +6248,11 @@
   },
   "Whiterun": {
    "counts": {
-    "everyoneElse": 315,
+    "everyoneElse": 316,
     "guards": 60,
     "notPeople": 674,
     "offAtStart": 290,
-    "people": 702,
+    "people": 703,
     "traders": 36,
     "transport": 1
    },
@@ -6377,6 +6377,7 @@
     "Subjugated Ghost": 7,
     "Sven": 1,
     "TestCarryFirewood": 2,
+    "The Caretaker": 1,
     "The Vindicator": 1,
     "Tilma the Haggard": 1,
     "Torvar": 1,
