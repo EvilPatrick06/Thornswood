@@ -1,9 +1,10 @@
 # Gold
 
-Coin enters the world in two places, and each happens once. A person
-is handed 40 the first time they are in the world. A guild trader is
-handed 250 when that trader is first stood up. After that it moves,
-or it leaves. It is not minted again.
+Coin enters the world as the 40, as a trader's 250, and as the set
+reward on a scene quest. The 40 and the 250 happen once. The scene
+reward is created each time that quest is finished, and the cooldown
+on the quest is what spaces it. A supply quest does not create coin.
+It pays from the trader's 250. After that, coin moves, or it leaves.
 
 ## Where coin comes from
 
@@ -38,6 +39,7 @@ Gold pays, when the system that asks for it exists:
 | --- | --- | --- |
 | The first purse | 40, once | The new character |
 | A guild trader's purse | 250, once | That trader, when they are first stood up |
+| A scene quest | The amount on that quest | The person who finished it. Created. Not the trader's purse |
 | A notice | 20, or 10 for a guild member | The hold's ledger |
 | A job, including a haul's posting fee | 30, or 15 for a guild member | The hold's ledger |
 | A haul's pay | Whatever was posted | The hold's ledger, then out to the hauler minus the company's tenth |
@@ -60,10 +62,12 @@ Gold does not buy a second purse. Dying does not pay the 40 again.
 
 ## The two purses
 
-There are two ways coin is created, and each happens once. A person
-receives 40. A guild trader receives 250 when they are first stood
-up. See [Merchant's Guild](merchants-guild.md). A trader who goes
-broke is not paid the 250 again. Fees destroy it from a pack
+A person receives 40, once. A guild trader receives 250 when they
+are first stood up, once. See [Merchant's Guild](merchants-guild.md).
+A trader who goes broke is not paid the 250 again. A scene quest
+creates the gold written on it, each time it is finished, and that
+gold does not come out of the 250. The quests and the amounts are
+on [Custom quests](quests.md). Fees destroy it from a pack
 and count it on the hold's ledger. A payout, when one exists, creates
 it back into a pack and subtracts the same count from that ledger. The
 coin was already in the world. A payout is not a second mint.
@@ -90,6 +94,7 @@ See [Property](property.md) for the box, and
 
 The 40, the mark that stops a second purse, the stripping of spawned
 gold, the six refused purses, and trade between two people are in the
-server. A guild trader's 250 is not. Rank is not for sale. Nothing loses 5% a day for sitting
+server. A guild trader's 250 is not. A scene quest does not create
+its gold. Rank is not for sale. Nothing loses 5% a day for sitting
 in a chest. The ledger only goes up: notice fees,
 job fees and rent are counted, and nothing pays back out.
