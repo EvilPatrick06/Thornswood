@@ -31,6 +31,7 @@
   var shown = false;
   var root = null;
   var filter = '';
+  var cat = '';
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'trade:' + what); }
@@ -86,25 +87,29 @@
     '  color:#f6e9c8;border-bottom:1px solid rgba(198,170,109,.22)}',
     '#' + ID + ' .cols{display:grid;grid-template-columns:1fr 1fr 1fr;overflow:hidden}',
     '#' + ID + ' .col{overflow:auto;padding:14px 16px;border-right:1px solid rgba(198,170,109,.22);',
-    '  font-size:13.5px}',
+    '  font-size:16px}',
     '#' + ID + ' .col:last-child{border-right:none}',
     '#' + ID + ' h3{margin:0 0 9px;padding-bottom:6px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;',
     '  color:rgba(198,170,109,.85);font-weight:normal;border-bottom:1px solid rgba(198,170,109,.22)}',
-    '#' + ID + ' .line{display:flex;align-items:center;gap:8px;padding:6px 8px;',
-    '  border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);margin-bottom:5px}',
+    '#' + ID + ' .line{display:flex;align-items:center;gap:8px;padding:8px 10px;flex-wrap:wrap;',
+    '  border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);margin-bottom:6px}',
     '#' + ID + ' .line .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '#' + ID + ' .line .c{color:rgba(217,207,180,.66);font-variant-numeric:tabular-nums}',
     '#' + ID + ' button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
     '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
-    '  padding:3px 9px;font-size:12.5px;line-height:16px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
-    '#' + ID + ' .foot button{padding:7px 16px;font-size:14px;line-height:19px}',
+    '  padding:5px 10px;font-size:15px;line-height:20px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
+    '#' + ID + ' .foot button{padding:8px 18px;font-size:16px;line-height:22px}',
     '#' + ID + ' button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
     '#' + ID + ' button.off{opacity:.55}',
-    '#' + ID + ' input{font:inherit;line-height:18px;color:#f6e9c8;background:rgba(0,0,0,.35);',
-    '  border:1px solid rgba(198,170,109,.30);padding:6px 9px;width:100%;margin-bottom:9px}',
+    '#' + ID + ' input{font-family:inherit;font-size:16px;line-height:22px;color:#f6e9c8;background:rgba(0,0,0,.35);',
+    '  border:1px solid rgba(198,170,109,.30);padding:8px 10px;width:100%;margin-bottom:9px}',
     '#' + ID + ' input:focus{border-color:rgba(198,170,109,.55)}',
     '#' + ID + ' .none{color:rgba(217,207,180,.6);font-style:italic;padding:6px 2px;line-height:1.5}',
-    '#' + ID + ' .gold{display:flex;gap:8px;align-items:center;margin-top:10px}',
+    '#' + ID + ' .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}',
+    '#' + ID + ' .chips button.on{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
+    '#' + ID + ' .cat{margin:12px 0 6px;font-size:15px;letter-spacing:.16em;text-transform:uppercase;',
+    '  color:rgba(198,170,109,.85);font-weight:normal}',
+    '#' + ID + ' .gold{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}',
     '#' + ID + ' .gold input{width:110px;margin:0}',
     '#' + ID + ' .ok{color:#9fcf92}',
     '#' + ID + ' .wait{color:rgba(217,207,180,.6)}',
@@ -167,20 +172,49 @@
     // hundred things is not a list anybody reads.
     var pack = root.querySelector('#' + ID + '-pack');
     var low = filter.toLowerCase();
+    var kinds = [];
+    (data.pack || []).forEach(function (it) {
+      var k = it.k || 'Other';
+      if (kinds.indexOf(k) < 0) { kinds.push(k); }
+    });
+    kinds.sort();
+    if (cat && kinds.indexOf(cat) < 0) { cat = ''; }
     var ph = '<h3>Your pack</h3>' +
-             '<input id="' + ID + '-find" placeholder="find" value="' + esc(filter) + '">';
+             '<input id="' + ID + '-find" placeholder="Find by name" value="' + esc(filter) + '">';
+    ph += '<div class="chips"><button data-cat=""' + (cat ? '' : ' class="on"') + '>All</button>';
+    for (var c = 0; c < kinds.length; c++) {
+      ph += '<button data-cat="' + esc(kinds[c]) + '"' + (cat === kinds[c] ? ' class="on"' : '') + '>' +
+            esc(kinds[c]) + '</button>';
+    }
+    ph += '</div>';
     var items = (data.pack || []).filter(function (it) {
-      return !low || it.n.toLowerCase().indexOf(low) !== -1;
+      if (cat && (it.k || 'Other') !== cat) { return false; }
+      return !low || String(it.n).toLowerCase().indexOf(low) !== -1 ||
+        String(it.k || '').toLowerCase().indexOf(low) !== -1;
     });
     if (!items.length) {
-      ph += '<div class="none">' + (low ? 'Nothing by that name.' : 'You are carrying nothing.') + '</div>';
+      ph += '<div class="none">' + (low || cat ? 'Nothing in that category.' : 'You are carrying nothing.') + '</div>';
     } else {
+      var grouped = {};
+      var order = [];
       for (var i = 0; i < items.length && i < 200; i++) {
-        ph += '<div class="line"><span class="nm">' + esc(items[i].n) + '</span>' +
-              '<span class="c">' + items[i].c + '</span>' +
-              '<button data-add="' + esc(items[i].n) + '" data-n="1">+1</button>' +
-              (items[i].c > 1 ? '<button data-add="' + esc(items[i].n) + '" data-n="' + items[i].c + '">all</button>' : '') +
-              '</div>';
+        var key = items[i].k || 'Other';
+        if (!grouped[key]) { grouped[key] = []; order.push(key); }
+        grouped[key].push(items[i]);
+      }
+      for (var g = 0; g < order.length; g++) {
+        ph += '<div class="cat">' + esc(order[g]) + '</div>';
+        var rows = grouped[order[g]];
+        for (var r = 0; r < rows.length; r++) {
+          var it = rows[r];
+          ph += '<div class="line"><span class="nm">' + esc(it.n) + '</span>' +
+                '<span class="c">' + it.c + '</span>' +
+                '<button data-add="' + esc(it.n) + '" data-n="1">Add 1</button>' +
+                (it.c >= 5 ? '<button data-add="' + esc(it.n) + '" data-n="5">Add 5</button>' : '') +
+                (it.c >= 10 ? '<button data-add="' + esc(it.n) + '" data-n="10">Add 10</button>' : '') +
+                (it.c > 1 ? '<button data-add="' + esc(it.n) + '" data-n="' + it.c + '">All</button>' : '') +
+                '</div>';
+        }
       }
     }
     pack.innerHTML = ph;
@@ -189,13 +223,17 @@
     var mh = '<h3>You are offering ' + (data.iAgreed ? '<span class="ok">&#10003; agreed</span>' : '') + '</h3>';
     if (!(data.mine || []).length) { mh += '<div class="none">Nothing yet.</div>'; }
     for (var j = 0; j < (data.mine || []).length; j++) {
-      mh += '<div class="line"><span class="nm">' + esc(data.mine[j].n) + '</span>' +
-            '<span class="c">' + data.mine[j].c + '</span>' +
-            '<button data-rem="' + esc(data.mine[j].n) + '">take back</button></div>';
+      var mineRow = data.mine[j];
+      mh += '<div class="line"><span class="nm">' + esc(mineRow.n) + '</span>' +
+            '<span class="c">' + mineRow.c + '</span>' +
+            (mineRow.c > 1 ? '<button data-rem="' + esc(mineRow.n) + '" data-n="1">Take 1</button>' : '') +
+            '<button data-rem="' + esc(mineRow.n) + '">Take back</button></div>';
     }
-    mh += '<div class="gold"><span>gold</span>' +
+    mh += '<div class="gold"><span>Gold</span>' +
           '<input id="' + ID + '-gold" value="' + (data.myGold || 0) + '">' +
-          '<button data-do="gold">Set</button></div>';
+          '<button data-do="gold">Set</button>' +
+          '<button data-do="goldall">All</button>' +
+          '<button data-do="goldclear">None</button></div>';
     mine.innerHTML = mh;
 
     var theirs = root.querySelector('#' + ID + '-theirs');
@@ -223,6 +261,10 @@
     if (find) {
       find.oninput = function () { filter = this.value; draw(); this.focus(); };
     }
+    var chips = pack.querySelectorAll('button[data-cat]');
+    for (var ci = 0; ci < chips.length; ci++) {
+      chips[ci].onclick = function () { cat = this.getAttribute('data-cat') || ''; draw(); };
+    }
     wire(pack); wire(mine);
   }
 
@@ -233,10 +275,22 @@
         var addWhat = this.getAttribute('data-add');
         var remWhat = this.getAttribute('data-rem');
         if (addWhat) { net('/trade add ' + addWhat + ' ' + (this.getAttribute('data-n') || '1')); return; }
-        if (remWhat) { net('/trade remove ' + remWhat); return; }
-        if (this.getAttribute('data-do') === 'gold') {
-          var g = root.querySelector('#' + ID + '-gold');
-          net('/trade gold ' + (g ? g.value : '0'));
+        if (remWhat) {
+          var n = this.getAttribute('data-n');
+          net('/trade remove ' + remWhat + (n ? ' ' + n : ''));
+          return;
+        }
+        var act = this.getAttribute('data-do');
+        var g = root.querySelector('#' + ID + '-gold');
+        if (act === 'gold') { net('/trade gold ' + (g ? g.value : '0')); }
+        else if (act === 'goldall') {
+          var all = (data && data.heldGold) || 0;
+          if (g) { g.value = String(all); }
+          net('/trade gold ' + all);
+        }
+        else if (act === 'goldclear') {
+          if (g) { g.value = '0'; }
+          net('/trade gold 0');
         }
       };
     }
@@ -255,6 +309,7 @@
     if (!shown) { return; }
     shown = false;
     filter = '';
+    cat = '';
     if (root) { root.className = ''; }
     tell('closed');
   }

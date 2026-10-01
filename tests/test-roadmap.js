@@ -15,13 +15,14 @@
 // twice over: "B opens it" and "twenty four emotes". B is the plugin's fallback
 // for when the ini has no WheelKey line at all (thornswood-emotes.js,
 // key('WheelKey', 48)); the ini that ships says 34, which is G. Twenty four was
-// the count when the wheel was two rings of twelve; it is six categories and
-// thirty four emotes now. Both numbers had been copied out of a note rather
-// than out of the code, which is how a wrong one gets onto a page.
+// the count when the wheel was two rings of twelve, and again when it was
+// six categories and thirty four emotes. Both numbers had been copied out of
+// a note rather than out of the code, which is how a wrong one gets onto a
+// page. The wheel is one list now, with eight quick slots.
 //
 // So nothing below takes a key or a count on trust. The letter comes out of
 // launcher/Thornswood.ini, decoded with that file's own A to Z table, and
-// the count comes out of the plugin's CATEGORIES array. A key that moves or a
+// the count comes out of the plugin's EMOTES array. A key that moves or a
 // wheel that grows fails here until the words say so too.
 //
 // Read only.
@@ -42,7 +43,7 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-/* Numbers as the site writes them: "thirty four", "thirty-four" or "34". */
+/* Numbers as the site writes them: "fifty nine", "fifty-nine" or "59". */
 const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
   'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen',
   'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
@@ -167,22 +168,22 @@ yes('the launcher\'s Controls page does list WheelKey, PageKey and StopKey, as t
 
 // ------------------------------------------------------------ the emotes ----
 const plugin = read('game/plugins/thornswood-emotes.js');
-const a = plugin.indexOf('const CATEGORIES = [');
+const a = plugin.indexOf('const EMOTES = [');
 const b = a < 0 ? -1 : plugin.indexOf('\n];', a);
-let cats = null;
+let list = null;
 try {
   if (a >= 0 && b >= 0) {
-    cats = new Function('return ' + plugin.slice(a + 'const CATEGORIES = '.length, b + 2) + ';')();
+    list = new Function('return ' + plugin.slice(a + 'const EMOTES = '.length, b + 2) + ';')();
   }
-} catch (e) { console.log('      CATEGORIES: ' + e.message); }
-yes('the plugin\'s CATEGORIES array evaluates', Array.isArray(cats) && cats.length > 0);
-const nCats = cats ? cats.length : 0;
-const nEmotes = cats ? cats.reduce(function (n, c) { return n + (c.items || []).length; }, 0) : 0;
+} catch (e) { console.log('      EMOTES: ' + e.message); }
+yes('the plugin\'s EMOTES array evaluates', Array.isArray(list) && list.length > 0);
+const nEmotes = list ? list.length : 0;
 const events = (a >= 0 && b >= 0) ? (plugin.slice(a, b).match(/event: '/g) || []).length : -1;
 yes('and it agrees with a plain count of its event lines, ' + nEmotes + ' and ' + events,
     nEmotes > 0 && nEmotes === events);
 yes('the row gives the plugin\'s count, ' + nEmotes + ' emotes', !!w && says(text, nEmotes));
-yes('and its ' + nCats + ' categories', !!w && says(text, nCats));
+yes('the row names the eight quick slots and the search',
+    !!w && says(text, 8) && /quick slots/.test(text) && /search/.test(text));
 
 // ----------------------------------------------------------------- words ----
 yes('the row has no em dash in it', text.indexOf(String.fromCharCode(0x2014)) === -1);

@@ -115,7 +115,7 @@ const DEAD = [
   [/Carried:|Plus what everyone gets/, 'the sixteen starting kits, gone on 20 September'],
   [/A, S, D, F/, 'a flute played on the keyboard'],
   [/two fifths of the gold/i, 'the death penalty of a mod that is out'],
-  [/twelve gestures|second ring/i, 'a wheel of twelve, when it is six groups'],
+  [/twelve gestures|second ring|six groups/i, 'an old wheel of twelve, or of six groups'],
   [/switch for it in Settings|change it in Settings/i, 'an address switch Settings no longer has'],
   [/every half minute/i, 'a reminder in the chat, which is silent now unless the panel failed'],
   [/after yourself/i, 'naming the character after yourself (entry 163)'],
@@ -355,19 +355,16 @@ function freshKey(name) {
 
 // --------------------------------------------------------------- the wheel
 {
-  const cats = [];
-  const cr = /\{ name: '([^']+)', items: \[/g;
-  let c;
-  while ((c = cr.exec(emotes)) !== null) { cats.push(c[1]); }
-  const count = (emotes.slice(emotes.indexOf('const CATEGORIES'), emotes.indexOf('];', emotes.indexOf('const CATEGORIES')))
-    .match(/event: '/g) || []).length;
+  const start = emotes.indexOf('const EMOTES = [');
+  const end = start < 0 ? -1 : emotes.indexOf('\n];', start);
+  const body = (start >= 0 && end >= 0) ? emotes.slice(start, end) : '';
+  const count = (body.match(/event: '/g) || []).length;
   const wheel = item('Emotes', 'The wheel');
-  yes('the wheel has groups (' + cats.join(', ') + ')', cats.length >= 4);
-  const unnamed = cats.filter(function (x) { return wheel.indexOf(x) === -1; });
-  yes('and the page names every one of them' + (unnamed.length ? ' (not: ' + unnamed.join(', ') + ')' : ''),
-      unnamed.length === 0);
+  yes('the wheel lists ' + count + ' emotes', count >= 8);
   yes('the page says ' + count + ' emotes, which is how many the wheel carries',
       count > 0 && wheel.indexOf(count + ' emotes') !== -1);
+  yes('the page names the quick slots and the search',
+      /quick slots/.test(wheel) && /search/.test(wheel));
 }
 
 // ---------------------------------------------------- classes, towns, purse

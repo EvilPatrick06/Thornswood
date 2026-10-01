@@ -16,18 +16,23 @@ None of these is a class or a profession. Each one is its own system.
 A friend is not a party. A party is who is in the cell with you this
 evening, and it is what pays the work bonus. The person who opened
 it leads it. A trade is two people and what they are holding. A
-journal is yours until you share a page with a friend. A faction or
-a business is a second tab on that same panel, and most people never
-see it. Voice is how far a spoken word carries, and a colored mark
-above the head while the microphone is open. The wheel is
-animations, and playing one puts its name on the same line as typed
-speech. Text is what you type. A plain line, a `/me`, a `/do`, a
-whisper, a shout, and an `/ooc` also sit above the head for whoever
-is close enough to read them. Out of character stays in brackets,
-including there, so a scene can see that it stepped out. You can
-stop hearing one person, stop reading them, or hide their name, and
-only for yourself. `/hidename all` hides every name. A staff silence
-is everybody's, and the person cannot lift it.
+friend request, a party invite, and a trade offer are answered on a
+prompt, with Accept and Refuse, and the offer stands for 45 seconds.
+A journal is yours until you share a page with a friend, including
+one who is not online. They see that page while you are online. A faction
+or a business is a second tab on that same panel, and most people
+never see it. Voice is how far a spoken word carries, and a colored
+mark above the head while the microphone is open. The wheel is
+animations: eight quick slots in the middle, and every emote in a
+searchable list. Playing one puts its name on the same line as typed
+speech. The number keys 1 to 8 play a slot with the wheel shut. Text
+is what you type. A plain line, a `/me`, a `/do`, a whisper, a shout,
+and an `/ooc` also sit above the head for whoever is close enough to
+read them. Out of character stays in brackets, including there, so a
+scene can see that it stepped out. You can stop hearing one person,
+stop reading them, or hide their name, and only for yourself.
+`/hidename all` hides every name. A staff silence is everybody's,
+and the person cannot lift it.
 
 ## Bard
 
@@ -48,8 +53,11 @@ float.
 The systems in the table are in the server, with the gaps named at
 the bottom of each page, except factions and businesses, which are
 not in the server at all. `/bard` for 5 minutes is in the server.
-The party cap of 6 is in the server. Plain text chat still goes to
-everybody, because the local switch ships off. The mark above the
-head, the words above the head, an emote's name above the head, the
-text and name switches, hiding every name, staff silence, and the
-leader's kick, lead, and disband are not in the server.
+The party cap of 6 is in the server. A friend request, a party
+invite, and a trade offer are answered on the prompt. The wheel's
+eight quick slots, the search, and the fifty nine emotes are in the
+server. Plain text chat still goes to everybody, because the local
+switch ships off. The mark above the head, the words above the head,
+an emote's name above the head, the text and name switches, hiding
+every name, staff silence, and the leader's kick, lead, and disband
+are not in the server.

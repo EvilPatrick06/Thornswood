@@ -92,7 +92,7 @@
     '#' + ID + ' .cols{display:grid;grid-template-columns:280px 1fr;overflow:hidden}',
     '#' + ID + ' .side{overflow:auto;border-right:1px solid rgba(198,170,109,.22);padding:14px;',
     '  font-size:13.5px}',
-    '#' + ID + ' .main{overflow:auto;padding:16px 22px;font-size:14px}',
+    '#' + ID + ' .main{overflow:auto;padding:16px 22px;font-size:16px}',
     '#' + ID + ' .foot{padding:12px 24px;border-top:1px solid rgba(198,170,109,.22);display:flex;gap:10px;',
     '  align-items:center;font-size:13.5px;font-style:italic;color:rgba(217,207,180,.7)}',
     '#' + ID + ' h3{margin:14px 0 7px;padding-bottom:6px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;',
@@ -104,7 +104,7 @@
     // the text box down (measured in Edge at 1920 by 1080, 24 September).
     '#' + ID + ' button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
     '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
-    '  padding:5px 10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
+    '  padding:6px 12px;font-size:14px;line-height:18px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
     '#' + ID + ' button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
     // A journal in the list and a page tab are names rather than actions, so
     // they read as the K panel's cards and choices do, not as its buttons.
@@ -119,7 +119,7 @@
     '#' + ID + ' button[data-page]{font-size:13.5px;letter-spacing:.02em;text-transform:none;color:#d9cfb4;',
     '  border-color:rgba(198,170,109,.30);background:rgba(0,0,0,.20)}',
     '#' + ID + ' button[data-page].go{border-color:#e9d19b;background:rgba(201,162,75,.20);color:#f6e9c8}',
-    '#' + ID + ' input,#' + ID + ' textarea,#' + ID + ' select{font:inherit;color:#f6e9c8;',
+    '#' + ID + ' input,#' + ID + ' textarea,#' + ID + ' select{font-family:inherit;font-size:16px;color:#f6e9c8;',
     '  background:rgba(0,0,0,.35);border:1px solid rgba(198,170,109,.30);padding:8px 10px;width:100%}',
     '#' + ID + ' input:focus,#' + ID + ' textarea:focus,#' + ID + ' select:focus{border-color:rgba(198,170,109,.55)}',
     // the list the select drops down is drawn on its own, so it gets a solid
@@ -317,20 +317,23 @@
     var friends = ((data && data.friends) || []).filter(function (f) { return true; });
     var pick = '<select id="' + ID + '-who"><option value="">a friend...</option>';
     for (var f = 0; f < friends.length; f++) {
-      pick += '<option value="' + esc(friends[f].name) + '">' + esc(friends[f].name) + '</option>';
+      var whoId = friends[f].p != null && friends[f].p !== '' ? String(friends[f].p) : friends[f].name;
+      pick += '<option value="' + esc(whoId) + '">' + esc(friends[f].name) + '</option>';
     }
     pick += '</select>';
 
     var html =
       '<div class="bar">' +
-      '<input id="' + ID + '-title" value="' + esc(book.title) + '" style="max-width:280px">' +
+      '<input id="' + ID + '-title" value="' + esc(book.title) + '" style="max-width:360px">' +
       '<button data-do="rename">Rename</button>' +
       '<span class="grow"></span>' +
-      '<span style="color:rgba(198,170,109,.85);font-size:11.5px;letter-spacing:.24em;text-transform:uppercase">share</span>' +
+      '<button data-do="dropbook">Throw away</button>' +
+      '</div>' +
+      '<div class="bar">' +
+      '<span style="color:rgba(198,170,109,.85);font-size:13px;letter-spacing:.18em;text-transform:uppercase">Share with</span>' +
       pick +
       '<button data-do="sharebook">Whole journal</button>' +
-      '<button data-do="unsharebook">Stop</button>' +
-      '<button data-do="dropbook">Throw away</button>' +
+      '<button data-do="unsharebook">Stop sharing</button>' +
       '</div>';
 
     html += '<div class="bar">';
@@ -371,6 +374,11 @@
     }
   }
 
+  function sayNeedFriend() {
+    var foot = root && root.querySelector('#' + ID + '-foot');
+    if (foot) { foot.textContent = 'Pick a friend first. Sharing only works with somebody on your list.'; }
+  }
+
   function val(id) {
     var el = root.querySelector('#' + ID + '-' + id);
     return el ? String(el.value || '') : '';
@@ -399,13 +407,14 @@
     }
     if (verb === 'dropbook') { net('/journal drop ' + book.id); openBook = ''; return; }
     if (verb === 'sharebook') {
-      if (!who) { return; }
+      if (!who) { sayNeedFriend(); return; }
       net('/journal share ' + book.id + ' - ' + who);
       return;
     }
     if (verb === 'unsharebook') { net('/journal unshare ' + book.id + ' -'); return; }
     if (verb === 'sharepage') {
-      if (!who || !openPage) { return; }
+      if (!openPage) { return; }
+      if (!who) { sayNeedFriend(); return; }
       net('/journal share ' + book.id + ' ' + openPage + ' ' + who);
       return;
     }
@@ -457,8 +466,8 @@
         while it has focus.
       */
       if (!shown) { return; }
-      var el = root && root.querySelector('#' + ID + '-text');
-      if (el && document.activeElement === el) { drawSide(); return; }
+      var el = document.activeElement;
+      if (el && root && root.contains && root.contains(el) && typing(el)) { return; }
       draw();
     }
   };

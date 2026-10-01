@@ -27,7 +27,8 @@ blue. Ordinary is white. Yell is amber. A party name stays green, on
 [Party](party.md).
 
 The mark is its own mark, above the name. It does not recolor the
-name.
+name. A friend request, a party invite, or a trade offer is a
+different prompt, with Accept and Refuse. It is not this mark.
 
 You see it only when you are inside that person's range. A whisper
 is gone at 7 metres, ordinary speech at 30, a yell at 85. Outside

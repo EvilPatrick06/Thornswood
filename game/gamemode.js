@@ -6414,7 +6414,7 @@ function spellOn(actorId, spellDesc, on) {
  * privilege for the old bard trade. That trade is RP-only now: chargen no
  * longer calls armBard for it. The WEAP records and PlayInstrumentSpell stay
  * in the load order for anyone who has an instrument (Woodwright craft, the
- * emote wheel Revelry). The helper remains so a stray call cannot throw.
+ * Lute, Flute and Drum emotes). The helper remains so a stray call cannot throw.
  */
 const INSTRUMENT_SPELL = '9456:PlayFluteLuteDrum.esp';
 
@@ -38087,16 +38087,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         return 'Not shared any more.';
       }
 
-      var target = soc.findPerson(who);
-      if (!target.actorId) { return target.why; }
-      var tp = soc.profileOf(target.actorId);
-      var refused = soc.share(actorId, jid2, pid2 === '-' ? '' : pid2, tp);
+      var resolved = soc.resolveShare(actorId, who);
+      if (!resolved.pid) { return resolved.why || 'Share with which friend?'; }
+      var refused = soc.share(actorId, jid2, pid2 === '-' ? '' : pid2, resolved.pid);
       if (refused) { return refused; }
-      try {
-        say(target.actorId, soc.nameOfPerson(actorId) + ' shared ' +
-            (pid2 === '-' ? 'a journal' : 'a page') + ' with you. Press J.');
-      } catch (e) { }
-      return 'Shared with ' + soc.nameOfPerson(target.actorId) + '.';
+      var there = soc.actorForProfile(resolved.pid);
+      if (there) {
+        try {
+          say(there, soc.nameOfPerson(actorId) + ' shared ' +
+              (pid2 === '-' ? 'a journal' : 'a page') + ' with you. Press J.');
+        } catch (e) { }
+      }
+      var fname = (soc.stateOf(actorId).friends[resolved.pid] || {}).name;
+      return 'Shared with ' + (fname || 'them') + '.';
     }
 
     return 'journal: new, title, page, share, unshare, drop, list.';
@@ -38433,7 +38436,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           if (verb === 'cancel') { out = tr2.cancel(actorId); }
           else if (verb === 'ok') { out = tr2.confirm(actorId); }
           else if (verb === 'gold') { out = tr2.gold(actorId, parts[2]); }
-          else if (verb === 'remove') { out = tr2.remove(actorId, parts.slice(2).join(' ')); }
+          else if (verb === 'remove') {
+            var rbits = parts.slice(2);
+            var rn = 0;
+            if (rbits.length > 1 && /^[0-9]+$/.test(rbits[rbits.length - 1])) {
+              rn = Number(rbits.pop());
+            }
+            out = tr2.remove(actorId, rbits.join(' '), rn);
+          }
           else if (verb === 'add') {
             /* The count is the last word when it is a number, the same rule
                /give uses, so "add iron ore 2" and "add iron ore" both work. */
@@ -38481,7 +38491,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       var asked = kind === 'friend' ? 'wants to be friends'
                 : (kind === 'party' ? 'is asking you to join their party'
                                     : 'is offering to trade');
-      say(them, soc.nameOfPerson(actorId) + ' ' + asked + '. /yes or /no.');
+      say(them, soc.nameOfPerson(actorId) + ' ' + asked + '. Accept or refuse on the prompt.');
       notify(them, soc.nameOfPerson(actorId) + ' ' + asked);
       toProfile(profileId, 'Asked ' + theirName + '. They have ' +
                 Math.round(soc.SOCIAL.offerFor / 1000) + ' seconds.');
@@ -42922,6 +42932,33 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return false;
   }
 
+  /*
+    Who a share is for. A friend on the list, by the profile id the panel
+    sends or by the name stored with them, whether or not they are online.
+    Sharing used to ask who is standing here, so a friend who had logged off
+    could not be given a page at all.
+  */
+  function resolveShare(actorId, who) {
+    var s = stateOf(actorId);
+    var want = String(who || '').trim();
+    if (!want) { return { pid: 0, why: 'Share with which friend?' }; }
+    var asNum = Number(want);
+    if (String(asNum) === want && s.friends[asNum]) { return { pid: asNum, why: '' }; }
+    var low = want.toLowerCase();
+    var hits = [];
+    for (var pid in s.friends) {
+      if (!Object.prototype.hasOwnProperty.call(s.friends, pid)) { continue; }
+      var row = s.friends[pid];
+      var nm = String((row && row.name) || '').toLowerCase();
+      if (nm && nm === low) { hits.push(Number(pid)); }
+    }
+    if (hits.length === 1) { return { pid: hits[0], why: '' }; }
+    if (hits.length > 1) { return { pid: 0, why: 'More than one friend by that name.' }; }
+    var target = findPerson(want);
+    if (!target.actorId) { return { pid: 0, why: 'Nobody on your friends list by that name.' }; }
+    return { pid: profileOf(target.actorId), why: '' };
+  }
+
   function share(actorId, journalId, pageId, pid) {
     var s = stateOf(actorId);
     var j = findJournal(s, journalId);
@@ -43150,7 +43187,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     partyOf: partyOf, joinParty: joinParty, leaveParty: leaveParty,
     partyNear: partyNear, workBonus: workBonus, parties: parties, inParty: inParty,
     newJournal: newJournal, writePage: writePage, dropJournal: dropJournal,
-    share: share, sharedWithMe: sharedWithMe, findJournal: findJournal,
+    share: share, resolveShare: resolveShare, sharedWithMe: sharedWithMe, findJournal: findJournal,
     view: view, push: push, tick: tick, nearTick: nearTick,
     partyTick: partyTick, PARTY_PROPERTY: PARTY_PROPERTY
   };
@@ -43265,8 +43302,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     trades.push(t);
     push(t);
     try {
-      say(aActor, 'Trading with ' + nameOf(bActor) + '. /trade add <thing> [count], /trade gold <n>, /trade ok, /trade cancel.');
-      say(bActor, 'Trading with ' + nameOf(aActor) + '. /trade add <thing> [count], /trade gold <n>, /trade ok, /trade cancel.');
+      say(aActor, 'Trading with ' + nameOf(bActor) + '.');
+      say(bActor, 'Trading with ' + nameOf(aActor) + '.');
     } catch (e) { }
     return '';
   }
@@ -43314,27 +43351,83 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     NOT A CACHE. An inventory changes constantly and a stale list in a trade
     panel is how somebody offers a thing they no longer have.
   */
+  /*
+    A name somebody can read.
+
+    Skyrim.esm and the DLCs are localized. A FULL field there is not a name:
+    it is a four byte index into the strings file. String() of those bytes is
+    a row of numbers, which is what the trade list was showing. A FULL is
+    used only when it is real text. Otherwise the editor id is spaced out
+    (SteelSword becomes Steel Sword). A string index is never shown.
+  */
+  function fieldText(data) {
+    if (typeof data === 'string') {
+      var s = data.replace(/\0/g, '').trim();
+      if (!s || !/[A-Za-z]/.test(s) || /^[\d,.\s]+$/.test(s)) { return ''; }
+      return s;
+    }
+    if (!data || typeof data.length !== 'number') { return ''; }
+    var text = '';
+    for (var b = 0; b < data.length; b++) {
+      var n = Number(data[b]);
+      if (!n) { break; }
+      if (n < 32 || n > 126) { return ''; }
+      text += String.fromCharCode(n);
+    }
+    if (!text || !/[A-Za-z]/.test(text) || /^[\d,.\s]+$/.test(text)) { return ''; }
+    return text;
+  }
+
+  function prettyName(s) {
+    s = String(s || '').replace(/[_\-]+/g, ' ').trim();
+    if (!s) { return ''; }
+    if (s.indexOf(' ') < 0) {
+      s = s.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/\d+$/g, '').trim();
+    }
+    return s.replace(/\s+/g, ' ');
+  }
+
+  var KIND_NAMES = {
+    WEAP: 'Weapons', ARMO: 'Armor and clothes', AMMO: 'Ammunition',
+    ALCH: 'Potions and food', INGR: 'Ingredients', BOOK: 'Books and notes',
+    KEYM: 'Keys', MISC: 'Miscellaneous', SLGM: 'Soul gems', SCRL: 'Scrolls',
+    LIGH: 'Lights'
+  };
+
   var nameCache = {};
   function labelOf(baseId) {
     if (Object.prototype.hasOwnProperty.call(nameCache, baseId)) { return nameCache[baseId]; }
     var label = '';
+    var edid = '';
     try {
       var res = mp.lookupEspmRecordById(baseId);
       var rec = res && res.record;
       if (rec) {
-        if (rec.editorId) { label = String(rec.editorId); }
+        if (rec.editorId) { edid = fieldText(rec.editorId) || String(rec.editorId); }
         var fields = rec.fields || [];
         for (var i = 0; i < fields.length; i++) {
-          if (fields[i] && fields[i].type === 'FULL' && fields[i].data) {
-            label = String(fields[i].data);
-            break;
-          }
+          if (!fields[i]) { continue; }
+          var t = String(fields[i].type || '');
+          if (t === 'FULL' && !label) { label = fieldText(fields[i].data); }
+          else if (t === 'EDID' && !edid) { edid = fieldText(fields[i].data); }
         }
       }
     } catch (e) { }
-    if (!label) { label = '0x' + baseId.toString(16); }
+    if (!label && edid) { label = prettyName(edid); }
+    if (!label) { label = 'Unknown item'; }
     nameCache[baseId] = label;
     return label;
+  }
+
+  function categoryOf(baseId) {
+    var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+    if (Number(baseId) === GOLD) { return 'Gold'; }
+    var type = '';
+    try {
+      var res = mp.lookupEspmRecordById(baseId);
+      if (res && res.record && res.record.type) { type = String(res.record.type); }
+    } catch (e) { type = ''; }
+    return KIND_NAMES[type] || 'Other';
   }
 
   function carrying(actorId) {
@@ -43348,9 +43441,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         if (!e || !e.baseId) { continue; }
         byBase[e.baseId] = (byBase[e.baseId] || 0) + (e.count || 1);
       }
+      var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
       for (var b in byBase) {
         if (!Object.prototype.hasOwnProperty.call(byBase, b)) { continue; }
-        out.push({ id: Number(b), n: labelOf(Number(b)), c: byBase[b] });
+        if (Number(b) === GOLD) { continue; }
+        out.push({ id: Number(b), n: labelOf(Number(b)), c: byBase[b], k: categoryOf(Number(b)) });
       }
       out.sort(function (x, y) { return x.n.toLowerCase() < y.n.toLowerCase() ? -1 : 1; });
     } catch (e) { }
@@ -43397,15 +43492,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return '';
   }
 
-  function remove(actorId, what) {
+  function remove(actorId, what, count) {
     var t = tradeOf(actorId);
     if (!t) { return 'You are not trading.'; }
     var want = String(what || '').trim().toLowerCase();
     var side = sideOf(t, actorId);
+    var n = Math.floor(Number(count) || 0);
     for (var i = 0; i < side.length; i++) {
       if (side[i].n.toLowerCase().indexOf(want) !== -1 ||
           String(side[i].id) === want || side[i].id.toString(16) === want) {
-        side.splice(i, 1);
+        if (n > 0 && side[i].c > n) { side[i].c -= n; }
+        else { side.splice(i, 1); }
         unconfirm(t); push(t);
         return '';
       }
@@ -43434,7 +43531,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     push(t);
     var them = other(t, actorId);
     if (!(t.okA && t.okB)) {
-      try { say(them, nameOf(actorId) + ' has agreed. /trade ok when you are ready.'); } catch (e) { }
+      try { say(them, nameOf(actorId) + ' has agreed. Agree on the trade when you are ready.'); } catch (e) { }
       return '';
     }
     return swap(t);
@@ -43580,6 +43677,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       iAgreed: meA ? t.okA : t.okB,
       theyAgreed: meA ? t.okB : t.okA,
       pack: carrying(actorId),
+      heldGold: holding(actorId, (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F),
       at: Date.now()
     };
   }

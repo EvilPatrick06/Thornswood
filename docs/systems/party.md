@@ -5,10 +5,12 @@ it does not survive a restart. Friends are [Friends](friends.md).
 
 ## How it is made
 
-Look at them and offer, or `/party` and their name. They accept. The
-offer stands for 45 seconds. `/party` lists who is in it and how many
-of them are in the cell with you. `/party leave` drops you. P opens
-the same list.
+Look at them and offer, or `/party` and their name. A prompt appears
+on their screen with Accept and Refuse, the same prompt a friend
+request and a trade offer use. They do not type a command to answer.
+The offer stands for 45 seconds. `/party` lists who is in it and how
+many of them are in the cell with you. `/party leave` drops you. P
+opens the same list.
 
 Six, including you. A seventh accept is refused. Six is enough for a
 scene and small enough that the bonus below does not become a second
@@ -63,10 +65,11 @@ above the green name.
 
 ## Where this is
 
-The offer, the accept, the leave, the cap of 6, the 15%, and the
-same-cell test are in the server. Anyone in the party can already
-invite. The bonus is paid as a whole extra piece, not as a fraction
-on the screen.
+The offer, the prompt, the leave, the cap of 6, the 15%, and the
+same-cell test are in the server. Accept and Refuse on that prompt
+are what a person presses. Anyone in the party can already invite.
+The bonus is paid as a whole extra piece, not as a fraction on the
+screen.
 
 The leader is stored, and P tags them. If the leader leaves, the lead
 already passes, and a party of one already ends. The green name, the

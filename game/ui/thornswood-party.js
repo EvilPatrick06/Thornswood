@@ -35,6 +35,7 @@
   var data = null;
   var shown = false;
   var root = null;
+  var askEl = null;
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'party:' + what); }
@@ -102,7 +103,7 @@
     '  color:#f6e9c8;border-bottom:1px solid rgba(198,170,109,.22);display:flex;align-items:baseline;gap:14px}',
     '#' + ID + ' h2 .sub{font-size:14px;color:rgba(217,207,180,.6);font-style:italic}',
     '#' + ID + ' .body{overflow:auto;padding:16px 24px;display:grid;gap:18px;',
-    '  align-content:start;font-size:14px}',
+    '  align-content:start;font-size:16px}',
     '#' + ID + ' .foot{padding:12px 24px;border-top:1px solid rgba(198,170,109,.22);',
     '  display:flex;gap:10px;align-items:center;font-size:13.5px;font-style:italic;color:rgba(217,207,180,.7)}',
     '#' + ID + ' h3{margin:0 0 8px;padding-bottom:6px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;',
@@ -116,11 +117,22 @@
     '#' + ID + ' .dot.on{background:#7fb877;border-color:#9fcf92}',
     '#' + ID + ' button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
     '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
-    '  padding:5px 11px;font-size:13px;line-height:17px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
+    '  padding:6px 12px;font-size:15px;line-height:20px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
     '#' + ID + ' button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
     '#' + ID + ' .none{color:rgba(217,207,180,.6);font-style:italic;padding:6px 2px}',
     '#' + ID + ' .ask{border:1px solid #e9d19b;background:rgba(201,162,75,.16);',
-    '  padding:12px 14px;display:flex;gap:10px;align-items:center}',
+    '  padding:14px 16px;display:flex;gap:12px;align-items:center}',
+    '#ts-ask{position:fixed;left:50%;top:16%;transform:translateX(-50%);z-index:2147483200;',
+    '  pointer-events:none;font-family:"Palatino Linotype",Palatino,Georgia,serif;color:#d9cfb4}',
+    '#ts-ask .card{pointer-events:auto;min-width:420px;max-width:calc(100vw - 48px);',
+    '  background:rgba(11,10,8,.94);border:1px solid rgba(198,170,109,.42);',
+    '  outline:1px solid rgba(198,170,109,.14);outline-offset:4px;',
+    '  box-shadow:0 24px 80px rgba(0,0,0,.7);padding:22px 26px;display:flex;gap:16px;align-items:center}',
+    '#ts-ask .who{flex:1;font-size:20px;line-height:1.35;color:#f6e9c8}',
+    '#ts-ask button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
+    '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
+    '  padding:8px 18px;font-size:16px;line-height:22px;letter-spacing:.14em;text-transform:uppercase}',
+    '#ts-ask button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
     '#' + ID + ' .ask .who{flex:1}',
     '#' + ID + ' .ask b{font-weight:normal;font-size:16.5px;color:#f6e9c8}',
     '#' + ID + ' .note{color:rgba(217,207,180,.7);font-size:12.5px;line-height:1.5}',
@@ -317,6 +329,9 @@
       '<button id="' + ID + '-close">Close</button></div>' +
       '</div>';
     document.body.appendChild(root);
+    askEl = document.createElement('div');
+    askEl.id = 'ts-ask';
+    document.body.appendChild(askEl);
     root.querySelector('#' + ID + '-close').onclick = close;
 
     /*
@@ -360,8 +375,8 @@
                                        : 'is offering to trade');
       html += '<div class="ask"><span class="who"><b>' + esc(data.offer.name) +
               '</b> ' + what + '</span>' +
-              '<button class="go" data-do="yes">Yes</button>' +
-              '<button data-do="no">No</button></div>';
+              '<button class="go" data-do="yes">Accept</button>' +
+              '<button data-do="no">Refuse</button></div>';
     }
 
     html += '<div><h3>Your party</h3>';
@@ -443,6 +458,28 @@
     }
   }
 
+  function offerWords(kind) {
+    if (kind === 'friend') { return 'wants to be friends.'; }
+    if (kind === 'party') { return 'is asking you to join their party.'; }
+    return 'is offering to trade.';
+  }
+
+  function drawAsk() {
+    if (!askEl) { return; }
+    if (!data || !data.offer) { askEl.innerHTML = ''; return; }
+    askEl.innerHTML =
+      '<div class="card"><span class="who"><b>' + esc(data.offer.name) + '</b> ' +
+      offerWords(data.offer.kind) + '</span>' +
+      '<button class="go" data-do="yes">Accept</button>' +
+      '<button data-do="no">Refuse</button></div>';
+    var buttons = askEl.querySelectorAll('button[data-do]');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].onclick = function () {
+        net(this.getAttribute('data-do') === 'yes' ? '/yes' : '/no');
+      };
+    }
+  }
+
   function open() {
     build();
     if (shown) { return; }
@@ -466,7 +503,12 @@
     close: close,
     toggle: toggle,
     isOpen: function () { return shown; },
-    setData: function (d) { data = d || null; if (shown) { draw(); } },
+    setData: function (d) {
+      data = d || null;
+      build();
+      drawAsk();
+      if (shown) { draw(); }
+    },
 
     /*
       Where your party is, handed over by thornswood-front.js.

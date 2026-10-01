@@ -446,12 +446,12 @@ const T = rules(trade.css);
   function lastSent() { return trade.sent[trade.sent.length - 1]; }
   const pack = tr.querySelector('#ts-trade-pack');
   const adds = pack.querySelectorAll('button[data-add]');
-  yes('every item in your pack has +1, and all when there is more than one',
-      adds.length === 3 && adds.filter(function (b) { return b.textContent === 'all'; }).length === 1);
+  yes('every item in your pack has Add 1, and All when there is more than one',
+      adds.length === 3 && adds.filter(function (b) { return b.textContent === 'All'; }).length === 1);
   adds[0].onclick.call(adds[0]);
-  yes('+1 offers one', lastSent() === '/trade add Iron Sword 1');
+  yes('Add 1 offers one', lastSent() === '/trade add Iron Sword 1');
   adds[1].onclick.call(adds[1]);
-  yes('all offers every one of them', lastSent() === '/trade add Iron Sword 3');
+  yes('All offers every one of them', lastSent() === '/trade add Iron Sword 3');
   const back = tr.querySelector('#ts-trade-mine').querySelector('button[data-rem]');
   back.onclick.call(back);
   yes('take back takes it back', lastSent() === '/trade remove Iron Dagger');

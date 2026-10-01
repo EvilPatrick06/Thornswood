@@ -2,47 +2,71 @@
 /*
   The emote wheel, as an overlay inside the front rather than a page of its own.
 
-  It used to be thornswood-emotes.html, loaded with browser.loadUrl. There is
-  only one browser, so that replaced whatever was already in it: the chat, the
-  names above heads, the whole front. Last call to loadUrl won, and since the
-  wheel opened later than the front started, the wheel always won. That is why
-  the chat never appeared even once the files were installed.
+  The middle of the wheel is eight quick slots. Click one to play it. The same
+  eight are the number keys 1 to 8, and those play with the wheel shut. On the
+  right is a search and every emote, in alphabetical order. Click a name to
+  play it. Click a slot number under the search, then a name, to put that
+  emote on the slot.
 
-  So nothing loads a page any more except thornswood-front.js. This mounts
-  itself into whatever is already there, at the end of the body, where React
-  is not looking.
+  The page draws and reports. Which animation a name means, and playing it,
+  belong to the plugin.
 */
 
 (function () {
-  if (window.thornswoodSetRing) return;
+  if (window.thornswoodSetWheel) return;
 
-  var R_IN = 62, R_OUT = 244, R_LABEL = 158;
   var items = [];
+  var slots = [];
+  var pin = 0;
+  var query = '';
 
-  // ------------------------------------------------------------------ css --
   var css = [
     '#thornswood-wheel{position:fixed;inset:0;z-index:2147483000;display:flex;',
-    'align-items:center;justify-content:center;pointer-events:none;',
-    'font-family:"Palatino Linotype",Palatino,Georgia,serif;user-select:none}',
-    '#thornswood-wheel svg{overflow:visible;pointer-events:auto}',
+    'align-items:center;justify-content:center;pointer-events:auto;',
+    'background:radial-gradient(ellipse at center,rgba(0,0,0,.28) 0%,rgba(0,0,0,.55) 100%);',
+    'font-family:"Palatino Linotype",Palatino,Georgia,serif;color:#d9cfb4;user-select:none}',
     '#thornswood-wheel.gone{display:none}',
-    '#thornswood-wheel .seg{fill:rgba(14,13,11,.72);stroke:rgba(198,170,109,.28);',
-    'stroke-width:1;transition:fill 90ms linear}',
+    '#thornswood-wheel .frame{display:flex;align-items:stretch;gap:0;',
+    'background:rgba(11,10,8,.94);border:1px solid rgba(198,170,109,.42);',
+    'outline:1px solid rgba(198,170,109,.14);outline-offset:4px;',
+    'box-shadow:0 24px 80px rgba(0,0,0,.7);overflow:hidden}',
+    '#thornswood-wheel .wheelwrap{width:520px;height:560px;display:flex;align-items:center;justify-content:center;',
+    'border-right:1px solid rgba(198,170,109,.22)}',
+    '#thornswood-wheel svg{overflow:visible}',
+    '#thornswood-wheel .seg{fill:rgba(14,13,11,.72);stroke:rgba(198,170,109,.28);stroke-width:1}',
     '#thornswood-wheel .seg.hot{fill:rgba(120,94,44,.88);stroke:rgba(233,209,155,.9)}',
-    '#thornswood-wheel .label{fill:#d9cfb4;font-size:13px;text-anchor:middle;',
+    '#thornswood-wheel .label{fill:#f6e9c8;font-size:15px;text-anchor:middle;',
     'dominant-baseline:middle;pointer-events:none}',
-    '#thornswood-wheel .label.hot{fill:#f6e9c8}',
-    '#thornswood-wheel .num{fill:rgba(198,170,109,.5);font-size:10px;text-anchor:middle;',
-    'dominant-baseline:middle;pointer-events:none}',
-    '#thornswood-hub{fill:rgba(14,13,11,.86);stroke:rgba(198,170,109,.45);',
-    'stroke-width:1.5;transition:fill 90ms linear}',
+    '#thornswood-wheel .num{fill:rgba(198,170,109,.85);font-size:13px;text-anchor:middle;',
+    'dominant-baseline:middle;pointer-events:none;letter-spacing:.12em}',
+    '#thornswood-hub{fill:rgba(14,13,11,.86);stroke:rgba(198,170,109,.45);stroke-width:1.5}',
     '#thornswood-hub.hot{fill:rgba(120,44,44,.9);stroke:rgba(233,170,155,.9)}',
-    '#thornswood-hubtext{fill:#c6aa6d;font-size:15px;text-anchor:middle;',
-    'dominant-baseline:middle;pointer-events:none;letter-spacing:.08em}',
-    '#thornswood-ringname{fill:#c6aa6d;font-size:13px;text-anchor:middle;',
-    'letter-spacing:.22em;text-transform:uppercase;pointer-events:none}',
-    '#thornswood-hint{fill:rgba(217,207,180,.55);font-size:11.5px;text-anchor:middle;',
-    'pointer-events:none;letter-spacing:.04em}'
+    '#thornswood-hubtext{fill:#c6aa6d;font-size:15px;text-anchor:middle;dominant-baseline:middle;',
+    'pointer-events:none;letter-spacing:.12em}',
+    '#thornswood-ringname{fill:#c6aa6d;font-size:13px;text-anchor:middle;letter-spacing:.22em;',
+    'text-transform:uppercase;pointer-events:none}',
+    '#thornswood-hint{fill:rgba(217,207,180,.7);font-size:13px;text-anchor:middle;pointer-events:none}',
+    '#thornswood-wheel .side{width:360px;display:flex;flex-direction:column;padding:18px 18px 14px}',
+    '#thornswood-wheel .side h2{margin:0 0 10px;font-size:26px;font-weight:normal;color:#f6e9c8}',
+    '#thornswood-wheel .side input{font-family:inherit;font-size:16px;line-height:22px;color:#f6e9c8;',
+    'background:rgba(0,0,0,.35);border:1px solid rgba(198,170,109,.30);padding:8px 10px;width:100%}',
+    '#thornswood-wheel .side input:focus{border-color:rgba(198,170,109,.55)}',
+    '#thornswood-wheel .mode{margin:10px 0;font-size:14px;font-style:italic;color:rgba(217,207,180,.7);',
+    'min-height:20px}',
+    '#thornswood-wheel .pins{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}',
+    '#thornswood-wheel .pins button,#thornswood-wheel .row button{font-family:inherit;cursor:pointer;',
+    'border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
+    'padding:5px 8px;font-size:14px;letter-spacing:.08em;text-transform:uppercase}',
+    '#thornswood-wheel .pins button.on,#thornswood-wheel button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
+    '#thornswood-wheel .rows{overflow:auto;flex:1;border-top:1px solid rgba(198,170,109,.22);padding-top:8px}',
+    '#thornswood-wheel .row{display:flex;align-items:center;gap:8px;margin-bottom:5px}',
+    '#thornswood-wheel .row .nm{flex:1;text-align:left;font-size:16px;letter-spacing:.02em;',
+    'text-transform:none;color:#f6e9c8;padding:7px 10px}',
+    '#thornswood-wheel .none{color:rgba(217,207,180,.6);font-style:italic;padding:8px 2px}',
+    '#thornswood-wheel ::-webkit-scrollbar{width:10px;height:10px}',
+    '#thornswood-wheel ::-webkit-scrollbar-track{background:rgba(0,0,0,.25)}',
+    '#thornswood-wheel ::-webkit-scrollbar-thumb{background:rgba(198,170,109,.35);border:2px solid transparent;',
+    'background-clip:padding-box;border-radius:6px}'
   ].join('');
 
   var style = document.createElement('style');
@@ -50,33 +74,42 @@
   style.textContent = css;
   (document.head || document.documentElement).appendChild(style);
 
-  // The overlay composites straight over the game, so anything behind the
-  // wheel has to be genuinely transparent rather than dark.
   try {
     document.documentElement.style.background = 'transparent';
     document.body.style.background = 'transparent';
   } catch (e) { }
 
-  // ----------------------------------------------------------------- dom ---
   var SVGNS = 'http://www.w3.org/2000/svg';
   var host = document.createElement('div');
   host.id = 'thornswood-wheel';
   host.className = 'gone';
   host.innerHTML =
-    '<svg width="520" height="560" viewBox="-260 -270 520 560" aria-label="Emote wheel">' +
-    '<text id="thornswood-ringname" x="0" y="-238">ThornsWood</text>' +
+    '<div class="frame">' +
+    '<div class="wheelwrap">' +
+    '<svg width="500" height="540" viewBox="-250 -270 500 540" aria-label="Emote wheel">' +
+    '<text id="thornswood-ringname" x="0" y="-236">Quick slots</text>' +
     '<g id="thornswood-segments"></g>' +
-    '<circle id="thornswood-hub" cx="0" cy="0" r="54"></circle>' +
-    '<text id="thornswood-hubtext" x="0" y="0">STOP</text>' +
-    '<text id="thornswood-hint" x="0" y="258">click, or press 1–9 and 0 · Tab for the next ring · Esc to close</text>' +
-    '</svg>';
+    '<circle id="thornswood-hub" cx="0" cy="0" r="46"></circle>' +
+    '<text id="thornswood-hubtext" x="0" y="1">STOP</text>' +
+    '<text id="thornswood-hint" x="0" y="248">click a slot, or 1 to 8 with the wheel shut</text>' +
+    '</svg></div>' +
+    '<div class="side">' +
+    '<h2>Emotes</h2>' +
+    '<input id="thornswood-emote-find" placeholder="Search" autocomplete="off">' +
+    '<div class="pins" id="thornswood-emote-pins"></div>' +
+    '<div class="mode" id="thornswood-emote-mode"></div>' +
+    '<div class="rows" id="thornswood-emote-rows"></div>' +
+    '</div></div>';
   document.body.appendChild(host);
 
   var segs = document.getElementById('thornswood-segments');
   var hub = document.getElementById('thornswood-hub');
-  var ringName = document.getElementById('thornswood-ringname');
-  var hubText = document.getElementById('thornswood-hubtext');
-  var hintText = document.getElementById('thornswood-hint');
+  var find = document.getElementById('thornswood-emote-find');
+  var pins = document.getElementById('thornswood-emote-pins');
+  var mode = document.getElementById('thornswood-emote-mode');
+  var rows = document.getElementById('thornswood-emote-rows');
+
+  var R_IN = 78, R_OUT = 210, R_LABEL = 148;
 
   function polar(r, deg) {
     var a = (deg - 90) * Math.PI / 180;
@@ -98,57 +131,46 @@
     catch (e) { try { console.log('[emotes] sendMessage failed: ' + e); } catch (e2) { } }
   }
 
-  function draw(list) {
-    while (segs.firstChild) segs.removeChild(segs.firstChild);
-    var n = list.length;
-    if (!n) return;
-    var step = 360 / n;
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
 
+  function open() { return host.className.indexOf('gone') === -1; }
+
+  function searching() {
+    return document.activeElement === find;
+  }
+
+  function drawSlots() {
+    while (segs.firstChild) segs.removeChild(segs.firstChild);
+    var n = slots.length || 8;
+    var step = 360 / n;
     for (var i = 0; i < n; i++) {
       (function (i) {
-        var item = list[i];
-        // The first wedge is centred on straight up, so the labels sit in the
-        // order people read them.
         var from = i * step - step / 2;
         var to = from + step;
-
         var path = document.createElementNS(SVGNS, 'path');
         path.setAttribute('class', 'seg');
         path.setAttribute('d', wedge(from, to));
-
         var mid = polar(R_LABEL, from + step / 2);
         var label = document.createElementNS(SVGNS, 'text');
         label.setAttribute('class', 'label');
         label.setAttribute('x', mid[0]);
-        label.setAttribute('y', mid[1]);
-        label.textContent = item.name;
-
-        // Under the label rather than further along the radius: on the
-        // horizontal wedges a radial offset puts the digit beside the word and
-        // the two read as one string.
+        label.setAttribute('y', mid[1] - 8);
+        var name = slots[i] || 'Empty';
+        label.textContent = name.length > 14 ? name.slice(0, 13) + '.' : name;
         var num = document.createElementNS(SVGNS, 'text');
         num.setAttribute('class', 'num');
         num.setAttribute('x', mid[0]);
-        num.setAttribute('y', mid[1] + 15);
-        num.textContent = i < 9 ? String(i + 1) : (i === 9 ? '0' : '');
-
-        function hot(on) {
-          path.setAttribute('class', on ? 'seg hot' : 'seg');
-          label.setAttribute('class', on ? 'label hot' : 'label');
-        }
+        num.setAttribute('y', mid[1] + 14);
+        num.textContent = String(i + 1);
+        function hot(on) { path.setAttribute('class', on ? 'seg hot' : 'seg'); }
         path.addEventListener('mouseenter', function () { hot(true); });
         path.addEventListener('mouseleave', function () { hot(false); });
         path.addEventListener('click', function () {
-          // The index, not the event.
-          //
-          // The wheel has two levels now, categories and then the emotes in
-          // one, so a wedge is not always an animation: picking "Revelry" is
-          // not something to play. The page draws whatever list it was handed
-          // and says which one was chosen; deciding what that means belongs
-          // with the plugin, which is the side that knows which level is up.
-          say('__pick ' + i + ' ' + item.name);
+          if (slots[i]) { say('__slot ' + (i + 1)); }
         });
-
         segs.appendChild(path);
         segs.appendChild(label);
         segs.appendChild(num);
@@ -156,144 +178,145 @@
     }
   }
 
+  function drawPins() {
+    var html = '';
+    for (var i = 0; i < (slots.length || 8); i++) {
+      html += '<button data-pin="' + (i + 1) + '"' + (pin === i + 1 ? ' class="on"' : '') + '>' +
+              (i + 1) + '</button>';
+    }
+    pins.innerHTML = html;
+    var buttons = pins.querySelectorAll('button');
+    for (var b = 0; b < buttons.length; b++) {
+      buttons[b].onclick = function () {
+        var n = Number(this.getAttribute('data-pin'));
+        pin = pin === n ? 0 : n;
+        drawPins();
+        drawMode();
+      };
+    }
+  }
+
+  function drawMode() {
+    if (!pin) {
+      mode.textContent = 'Click a name to play it. Click a number to assign that slot.';
+      return;
+    }
+    mode.textContent = 'Slot ' + pin + ' is ' + (slots[pin - 1] || 'empty') +
+      '. Click a name to put it there.';
+  }
+
+  function drawRows() {
+    var low = query.toLowerCase();
+    var list = items.filter(function (it) {
+      return !low || it.name.toLowerCase().indexOf(low) !== -1;
+    });
+    if (!list.length) {
+      rows.innerHTML = '<div class="none">No emote by that name.</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < list.length; i++) {
+      html += '<div class="row"><button class="nm" data-play="' + esc(list[i].name) + '">' +
+              esc(list[i].name) + '</button></div>';
+    }
+    rows.innerHTML = html;
+    var buttons = rows.querySelectorAll('button[data-play]');
+    for (var b = 0; b < buttons.length; b++) {
+      buttons[b].onclick = function () {
+        var name = this.getAttribute('data-play');
+        if (pin) {
+          slots[pin - 1] = name;
+          say('__assign ' + pin + ' ' + name);
+          drawSlots();
+          drawMode();
+          return;
+        }
+        say('__play ' + name);
+      };
+    }
+  }
+
+  find.oninput = function () { query = find.value; drawRows(); };
+  find.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+
   hub.addEventListener('mouseenter', function () { hub.setAttribute('class', 'hot'); });
   hub.addEventListener('mouseleave', function () { hub.setAttribute('class', ''); });
   hub.addEventListener('click', function () { say('__hub'); });
 
-  document.addEventListener('contextmenu', function (e) {
-    if (host.className.indexOf('gone') !== -1) return;
-    e.preventDefault();
-    say('__back');
+  host.addEventListener('mousedown', function (e) {
+    if (e.target === host) { say('__close'); }
   });
 
-  // ---------------------------------------------------------------- keys ---
-  // The wheel's own keys have to be read here, not in the plugin.
-  //
-  // Opening the wheel raises browser focus, and raising focus makes
-  // DInputHook withhold DirectInput from the game. SkyrimPlatform's
-  // buttonEvent is built out of the game's input, so from the moment the wheel
-  // is up the plugin is deaf: escape, tab, the digits and the key that opened
-  // it all went nowhere. The only way out was the mouse, and if the mouse was
-  // not landing either then the wheel was a thing you could open and not
-  // close. CEF still gets keys, through a raw input hook that does not care
-  // about focus, so they are read from the page instead.
-  var closeChar = 'g';
+  document.addEventListener('contextmenu', function (e) {
+    if (!open()) return;
+    e.preventDefault();
+  });
 
-  // When the wheel went up, so the key that put it there can be ignored.
-  //
-  // The same trap as the chat, and it is why the wheel looked like it never
-  // opened at all. CEF is fed every keystroke whenever the browser is visible,
-  // focused or not, so the G that the plugin reads as "open the wheel" also
-  // arrives here a moment later, where it reads as "close the wheel". The log
-  // proves it: the overlay came up and then said "the page asked to close",
-  // twice, without anybody pressing anything else.
-  /*
-   * Whether the key that opened the wheel has been let go yet.
-   *
-   * This was a 400 millisecond timer and the timer was the bug. Holding G for
-   * half a second is not a second press, but the browser sends autorepeat
-   * keydowns the whole time it is held, and the first one past the deadline
-   * closed the wheel. Worse, closing is a round trip through the plugin, so
-   * every repeat after it sent another close while the wheel was still up:
-   *
-   *     [emotes] the page asked to close
-   *     [emotes] the page asked to close
-   *
-   * From the chair that is a wheel that never appeared, a G that went to the
-   * game instead and drew your fists, and a second or two with no keyboard
-   * while focus went up and came back down.
-   *
-   * A release is not a guess. The wheel cannot be closed by the key that
-   * opened it until that key has actually come up.
-   */
-  function open() { return host.className.indexOf('gone') === -1; }
+  var closeChar = 'g';
 
   document.addEventListener('keydown', function (e) {
     if (!open()) return;
-    // Autorepeat is one press being held, never a new one.
     if (e.repeat) { e.preventDefault(); return; }
     var k = e.key || '';
-
-    // Back rather than close. On the emote list it steps up to the categories,
-    // and only closes from there, so getting out of a category you opened by
-    // mistake does not throw the whole wheel away.
-    /*
-      Swallowed here, decided by the plugin. Same rule as the close key below,
-      and for the same reason.
-
-      Both ends were acting on these. The page sent __back and the plugin also
-      ran back() off its own buttonEvent, so one press of Escape inside a
-      category stepped up to the categories and then closed the wheel. Tab
-      turned the ring twice. A digit on the category ring opened the category
-      and then played whatever emote sat at that index in it.
-
-      preventDefault still matters: it stops the key reaching the game
-      underneath. It is only the message that goes.
-    */
+    if (searching() && k !== 'Escape' && k !== 'Tab') { return; }
     if (k === 'Escape' || e.keyCode === 27) { e.preventDefault(); return; }
-    if (k === 'Tab' || e.keyCode === 9) { e.preventDefault(); return; }
-    /*
-      The close key is swallowed here and decided by the plugin.
-
-      This page used to close the wheel itself, on the theory that raising
-      browser focus stops the plugin hearing keys at all. That theory is wrong.
-      DInputHook feeds plugins from the keyboard snapshot and only withholds
-      the buffer from the game, so the plugin sees every press whether the
-      wheel holds focus or not. The front log says so outright:
-
-          input: 145 keys in 5s, browser focus yes, menu no
-
-      With both ends acting on the same key they raced, and the page won. One
-      tap opened the wheel and shut it again in the same frame:
-
-          [emotes] opening the wheel
-          [emotes] the page asked to close
-          [emotes] closing the wheel
-
-      Eleven times in one session, which from the chair is a wheel that never
-      appears. One end owns the decision now, and it is the end that can see
-      whether the wheel is already open.
-    */
+    if (k === 'Tab' || e.keyCode === 9) {
+      e.preventDefault();
+      try { find.focus(); } catch (err) { }
+      return;
+    }
     if (closeChar && k.toLowerCase() === closeChar) {
       e.preventDefault();
       return;
     }
-
-    // 1 to 9, then 0, matching the digit printed under each label. Swallowed
-    // so the game does not also get them, and left to the plugin to act on.
-    // A click on a wedge still sends __pick, which is the mouse and has no
-    // second handler anywhere.
-    if (k >= '0' && k <= '9') {
-      var at = k === '0' ? 9 : (k.charCodeAt(0) - 49);
-      if (items[at]) { e.preventDefault(); }
+    if (k >= '1' && k <= '8') {
+      e.preventDefault();
+      say('__slot ' + k);
     }
   }, true);
 
-  // Called by the plugin every time it shows the wheel or turns the ring.
-  /**
-   * Show a list.
-   *
-   * Everything about what the list means is decided by the plugin: the title
-   * across the top, the word in the hub, the line along the bottom. This file
-   * knows how to draw a ring and how to report a click, and deliberately
-   * nothing else, so adding a third level or reordering the categories never
-   * touches it.
-   */
-  window.thornswoodSetRing = function (list, title, hubWord, hint, closeKeyChar) {
-    items = list || [];
+  window.thornswoodSetWheel = function (list, slotNames, closeKeyChar) {
+    items = (list || []).slice().sort(function (a, b) {
+      return String(a.name).toLowerCase() < String(b.name).toLowerCase() ? -1 : 1;
+    });
+    slots = (slotNames || []).slice();
+    while (slots.length < 8) { slots.push(''); }
     if (typeof closeKeyChar === 'string' && closeKeyChar) {
       closeChar = closeKeyChar.toLowerCase();
     }
-    host.className = items.length ? '' : 'gone';
-    ringName.textContent = title || 'Emotes';
-    hubText.textContent = hubWord || 'STOP';
-    hintText.textContent = hint || '';
-    draw(items);
+    host.className = '';
+    query = '';
+    find.value = '';
+    pin = 0;
+    drawSlots();
+    drawPins();
+    drawMode();
+    drawRows();
   };
 
-  // Hiding is now a class on the overlay rather than a page being unloaded,
-  // so the plugin needs a way to put it away without clearing the ring.
-  window.thornswoodHideWheel = function () { host.className = 'gone'; };
+  // Older callers. The wheel no longer has a second ring, so a list handed
+  // this way is the emote list and the slots stay as they are.
+  window.thornswoodSetRing = function (list, title, hubWord, hint, closeKeyChar) {
+    window.thornswoodSetWheel(list, slots.length ? slots : [], closeKeyChar);
+    if (title) {
+      var ring = document.getElementById('thornswood-ringname');
+      if (ring) { ring.textContent = title; }
+    }
+    if (hubWord) {
+      var word = document.getElementById('thornswood-hubtext');
+      if (word) { word.textContent = hubWord; }
+    }
+    if (hint) {
+      var line = document.getElementById('thornswood-hint');
+      if (line) { line.textContent = hint; }
+    }
+  };
+
+  window.thornswoodHideWheel = function () {
+    host.className = 'gone';
+    pin = 0;
+    try { find.blur(); } catch (e) { }
+  };
 
   say('__ready');
 })();
