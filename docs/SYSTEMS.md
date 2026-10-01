@@ -157,8 +157,13 @@ rank.
 notice, 30 for a job. The newest ten show.
 
 [Merchant's Guild](systems/merchants-guild.md). The shops of a hold. Dues
-and ledgers go to the hold's box. It does not mint coin and it is not a
+and ledgers go to the hold's box. Traders buy and sell at the average of
+the price lists submitted there. It does not mint coin and it is not a
 profession.
+
+[Custom quests](systems/quests.md). Guild traders ask for goods. A supply
+quest pays from the trader's purse. A scarce quest opens a place that
+holds more than the turn-in, for a class, a profession, or a race.
 
 [Free Skyrim Trading Company](systems/trading-company.md). Hauls between
 holds. The hauler is paid out of the box. The company keeps 10%. It is not

@@ -76,6 +76,12 @@ Each hold has one box. A steward opens the container and says
 `/box whiterun` (or whichever hold). After that, only gold goes in.
 Anything else is handed back, still in the hand.
 
+A price list is not dropped in as an item. Someone with the Prices
+permission on a faction or business book stands at the box and
+submits the list. The guild of that hold keeps the copy. The rules
+are on [Factions and businesses](factions.md) and
+[Merchant's Guild](merchants-guild.md).
+
 The number `/box` reports is a ledger of what has been paid in. Gold
 dropped in the chest is also in the chest. A fee taken for a notice is
 counted on the ledger and is not sitting in the chest. Nothing
@@ -133,4 +139,4 @@ is `private/property.json`.
 `/rest bed` still believes the word. It does not look for a bed.
 Outhouses and pots are not known furniture. The company payout that
 withdraws from the ledger is not built. The four house parts are
-already refused.
+already refused. The drop box does not accept a price list.
