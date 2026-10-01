@@ -72,9 +72,10 @@ not set. See [Free Skyrim Trading Company](trading-company.md).
 ## Dull
 
 A crafted good or a shop good that sits loses condition. That is
-[Durability](durability.md). The rate is not set, and neither is the
-question of whether a shop chest is the only container that does it,
-or any container.
+[Durability](durability.md). It loses 5% of its condition per real
+day. The containers are a shop chest and a house container. A pack
+does not dull. Worn gear does not dull this way. Opening the chest
+does not reset the day.
 
 See [Property](property.md) for the box, and
 [Free Skyrim Trading Company](trading-company.md) for the payout.
@@ -83,5 +84,6 @@ See [Property](property.md) for the box, and
 
 The 40, the mark that stops a second purse, the stripping of spawned
 gold, the six refused purses, and trade between two people are in the
-server. Rank is not for sale. The ledger only goes up: notice fees,
+server. Rank is not for sale. Nothing loses 5% a day for sitting
+in a chest. The ledger only goes up: notice fees,
 job fees and rent are counted, and nothing pays back out.

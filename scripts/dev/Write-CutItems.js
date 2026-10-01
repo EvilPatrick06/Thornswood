@@ -204,7 +204,13 @@ function record(row, disposition, why) {
 }
 
 owned.forEach(function (row) {
-  if (row.fires === false) { return; }
+  if (row.fires === false) {
+    const bench = String(row.benchName || '');
+    if (bench.indexOf('SharpeningWheel') !== -1 || bench.indexOf('ArmorTable') !== -1) {
+      record(row, 'cut', 'Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event.');
+    }
+    return;
+  }
   const name = row.name || '';
 
   if (isThalmor(name)) {
@@ -430,7 +436,7 @@ md += 'One suit per material. Where a material has a heavy set and a light set, 
 md += 'A suit is body, head, hands, and feet. Shields are fewer than suits: one shield named Shield, not the buckler and not the painted variants.\n\n';
 md += 'One weapon per type per metal. The type is sword, greatsword, dagger, war axe, battleaxe, mace, warhammer, or bow. ';
 md += 'The name that stays is the plain one, such as Iron Sword. Cutlass, katana, scimitar, and the other shapes of that same metal are cut. ';
-md += 'Which of those shapes should be company wares instead of a cut has not been named, so they are all held here until one is.\n\n';
+md += 'None of those shapes are standing company wares. A company event can bring one named shape back for that event, and then it leaves again.\n\n';
 md += 'One set per culture. Bosmer keeps the plain set, not the engraved or the reinforced. Stormcloak keeps the plain cuirass and helmet. Forsworn keeps one set, a sword and an axe. Dawnguard keeps one light set and one heavy set. Tribunal keeps the black heavy set and the black light set. Wolf keeps the wolf set and the Wolf Sword. The other colors and the officer and heroic variants are cut.\n\n';
 md += 'Named uniques, Chillrend and Dawnbreaker and the rest, are cut. They are not found either. A piece named for a Daedric prince is cut with the Daedric.\n\n';
 md += 'The kiln stays: poor charcoal, the tool handle, charcoal, briquette, and coke. The woodcutter\'s axe, the shovel, the fishing poles, and the drum, flute and lute stay.\n\n';
@@ -446,8 +452,8 @@ md += 'Those stay race locked, and they are company wares: the company may haul 
 md += 'Imperial and Penitus pieces are not in the open book. One heavy set and one light set, plus Penitus pieces, are embassy craft. The knight, legate, and captain variants are cut.\n\n';
 md += 'Thalmor robes and Justiciar weapons are not found. The remnant roll may craft them.\n\n';
 md += 'Smelting and tanning are not anybody\'s work. One row per ingot and one row for leather stay, and they belong to the smith halves. Duplicate ingot rows are cut. ';
-md += 'House walls, roofs, and furniture in the anybody list are not in this file yet.\n\n';
-md += 'Tempering rows, the grindstone and the armour table, are not in this file. Repair is the kit system on [Durability](durability.md), and whether those old temper recipes leave the menu is still a question.\n\n';
+md += 'The Hearthfire building rows, 487 of them in the unowned list, are not in this file. A house is a place already standing. They are not company wares and they are not cut.\n\n';
+md += 'Tempering rows, the grindstone and the armour table, are in this file. Repair is the kit system on [Durability](durability.md). The references stay so a temper can come back for an event.\n\n';
 md += '## Riekling pieces that stay\n\n';
 md += 'Race locked, and company wares. Not cut.\n\n';
 RIEKLING_KEEP.forEach(function (name) {

@@ -34,10 +34,28 @@ per piece of ore.
 
 Each rank above novice spends less rest on the swing, and has a
 higher chance that the same swing also drops one extra ore. The extra
-can be a different metal. An iron seam can hand you an iron ore and a
-gold ore. The chances are not set. The rest costs are the ones on
+can be a different metal. The rest costs are the ones on
 [Professions](../professions.md): 1.5, 1.2, 0.9, 0.6. A further cut
 was not named.
+
+The extra is one ore. The tiers are iron, clay, and quarried stone,
+then corundum, silver, orichalcum, and quicksilver, then gold,
+moonstone, and malachite. Ebony, the gems, stalhrim, and heart stone
+are never an extra. They stay the one place below. Shellbug chitin
+is never an extra from another seam.
+
+| Your rank | Same ore | Next tier | Two tiers up |
+| --- | --- | --- | --- |
+| Novice | 5% | | |
+| Advanced | 10% | 2% | |
+| Expert | 15% | 5% | 1% |
+| Master | 20% | 8% | 2% |
+
+An empty cell is no roll. Two tiers up from iron is how an iron seam
+hands a gold ore, a moonstone, or a malachite. The ore inside a tier
+is an equal chance among the names in that tier. A roll that would
+land on ebony, a gem, stalhrim, or heart stone does not happen. The
+same-ore roll still does.
 
 Heart stone is master, by its price. The staves that still ask for it
 are the ones left in the college book. See
@@ -60,7 +78,7 @@ The seam comes back for everybody at once, not per person.
 | Gold | 20 minutes |
 | Corundum, silver | 10 minutes |
 | Clay, quarried stone, orichalcum, quicksilver, moonstone, malachite, shellbug | 30 minutes |
-| Ebony, the gems, stalhrim, heart stone | One place. A custom steward stands on it. Someone who has not been let in takes nothing, and the place does not refill for them. |
+| Ebony, the gems, stalhrim, heart stone | One place. A custom quest is what lets someone take from it. Papyrus quests do not run, so the quest is this server's own. What it asks them to do is not set. A hold's steward does not grant it. A steward is not staff. Someone who has not finished it takes nothing, and the place does not refill for them. |
 
 Clicking again while the pick is still in the air is not a second
 swing. Nothing is said. The ore is not given twice.
@@ -132,5 +150,6 @@ The server still has 581 veins, a deposit of 20, yields that climb
 from 1-2 up to 1-5, heart stone forced to advanced, and a pickaxe of
 100 uses. Iron, gold, corundum and silver all come back in 10
 minutes. Ebony is 6 veins, the gems are 3 each, stalhrim is 2, heart
-stone is 4. There is no steward on a single place. The table under
+stone is 4. There is no custom quest on a single place, and a
+steward does not guard it. The table under
 Every record is that server book. The numbers above it are the plan.
