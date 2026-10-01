@@ -1,6 +1,8 @@
 # Gold
 
-Coin enters the world once, as the first purse. After that it moves,
+Coin enters the world in two places, and each happens once. A person
+is handed 40 the first time they are in the world. A guild trader is
+handed 250 when that trader is first stood up. After that it moves,
 or it leaves. It is not minted again.
 
 ## Where coin comes from
@@ -11,7 +13,7 @@ It is not a wage, and it is not paid again on a later login.
 
 The record is the base game's gold, form `0xF`.
 
-Nothing else mints. A sack, a chest, a draugr, a purse growing in the
+The world does not mint the rest. A sack, a chest, a draugr, a purse growing in the
 world: the gold in those is stripped. The six coin purses the world
 can hand you are refused and put back. Weapons and armour left by the
 world are stripped the same way. What a person made, traded, or was
@@ -35,6 +37,7 @@ Gold pays, when the system that asks for it exists:
 | What | Gold | Where it goes |
 | --- | --- | --- |
 | The first purse | 40, once | The new character |
+| A guild trader's purse | 250, once | That trader, when they are first stood up |
 | A notice | 20, or 10 for a guild member | The hold's ledger |
 | A job, including a haul's posting fee | 30, or 15 for a guild member | The hold's ledger |
 | A haul's pay | Whatever was posted | The hold's ledger, then out to the hauler minus the company's tenth |
@@ -55,9 +58,12 @@ See [Professions](professions.md) and [Skill tree](skill-tree.md).
 
 Gold does not buy a second purse. Dying does not pay the 40 again.
 
-## One mint
+## The two purses
 
-There is one way coin is created: the 40. Fees destroy it from a pack
+There are two ways coin is created, and each happens once. A person
+receives 40. A guild trader receives 250 when they are first stood
+up. See [Merchant's Guild](merchants-guild.md). A trader who goes
+broke is not paid the 250 again. Fees destroy it from a pack
 and count it on the hold's ledger. A payout, when one exists, creates
 it back into a pack and subtracts the same count from that ledger. The
 coin was already in the world. A payout is not a second mint.
@@ -84,6 +90,6 @@ See [Property](property.md) for the box, and
 
 The 40, the mark that stops a second purse, the stripping of spawned
 gold, the six refused purses, and trade between two people are in the
-server. Rank is not for sale. Nothing loses 5% a day for sitting
+server. A guild trader's 250 is not. Rank is not for sale. Nothing loses 5% a day for sitting
 in a chest. The ledger only goes up: notice fees,
 job fees and rent are counted, and nothing pays back out.
