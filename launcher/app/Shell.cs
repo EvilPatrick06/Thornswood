@@ -3242,18 +3242,30 @@ namespace Thornswood
                     shown++;
                 }
                 // Absent ("is not installed") means Vortex never put the mod on
-                // this machine's list. FileMissing means the list still names it
-                // and Data does not have the file: Fix restores those from Vortex
-                // (and from the server when it serves them). Greying the button
-                // for Absent alone is still right; FileMissing keeps Fix on.
+                // this machine. FileMissing means the list still names it and
+                // Data does not have the file: Fix restores those from Vortex
+                // (and from the server when it serves them). Greying Fix for
+                // one absent plugin also greyed the light flags, another
+                // server's menu files and the plugins that are simply extra,
+                // which Fix does put right. 1 October that was a clean
+                // collection install with one plugin the collection does not
+                // ship. Fix stays off only when every blocking issue is a mod
+                // that is not installed at all.
                 int absent = 0;
                 int fileMissing = 0;
+                int fixable = 0;
                 foreach (Issue i in issues) if (i.Absent) absent++;
                 foreach (Issue i in issues) if (i.FileMissing) fileMissing++;
-                if (absent > 0 && !elsewhere)
+                foreach (Issue i in issues) if (i.Blocking && !i.Absent) fixable++;
+                bool onlyAbsent = absent > 0 && fixable == 0;
+                if (onlyAbsent && !elsewhere)
                 {
                     sb.Append("\n\nThese are not installed at all. Fix cannot help. In Vortex, " +
                               "Profiles, press Enable under Thornswood.");
+                }
+                else if (absent > 0 && !elsewhere)
+                {
+                    sb.Append("\n\nFix cannot install a mod Vortex does not have. It still puts right the rest of this list.");
                 }
                 else if (fileMissing > 0 && !elsewhere)
                 {
@@ -3270,7 +3282,7 @@ namespace Thornswood
                               "and Vortex writes its own again the next time it deploys.");
 
                 txtVerifyNote.Text = sb.ToString();
-                btnFix.IsEnabled = blocking > 0 && (absent == 0 || elsewhere);
+                btnFix.IsEnabled = blocking > 0 && (!onlyAbsent || elsewhere);
             }
             // The count alone read the same after every press: 182, 182, 182.
             // When most of them are mods that are simply not in the game folder,
@@ -3282,8 +3294,11 @@ namespace Thornswood
             foreach (Issue i in issues) if (i.Absent) missing++;
             Log("Scan finished. " + issues.Count + " issue" + (issues.Count == 1 ? "" : "s") + " found." +
                 (missing > 0 && !elsewhere
-                    ? " " + missing + " of them are mods that are not in the game folder at all, which Scan and Fix cannot change." +
-                      (Paths.Collection ? " Vortex most likely has another profile deployed." : "")
+                    ? " " + missing + (missing == 1
+                        ? " of them is a mod that is not in the game folder at all, which Scan and Fix cannot change."
+                        : " of them are mods that are not in the game folder at all, which Scan and Fix cannot change.") +
+                      (Paths.Collection && OwnGame.NotThisCollection(missing, Verify.Expected)
+                        ? " Vortex most likely has another profile deployed." : "")
                     : ""));
 
             /*

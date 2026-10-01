@@ -462,8 +462,17 @@ namespace Thornswood
             // Not only another profile: Vortex may be deploying Thornswood into
             // a different folder while an old record sits here, which is the
             // one case the search cannot see past. The picker is the way out.
-            if (missing + unstaged > 0)
-                return (missing + unstaged) + " of Thornswood's " + want.Count + " plugins are not in " + src +
+            //
+            // A handful missing is a gap in a collection that is deployed, not
+            // another profile. 1 October, a clean install of the published
+            // collection had 95 of 96 plugins in the Steam folder Vortex
+            // deploys into. The one the collection does not ship refused the
+            // own folder with the sentence below, and Diagnostics greyed Fix
+            // for the same reason, so neither could be used. Half the
+            // reference list gone is another profile. See NotThisCollection.
+            int gap = missing + unstaged;
+            if (gap > 0 && NotThisCollection(gap, want.Count))
+                return gap + " of Thornswood's " + want.Count + " plugins are not in " + src +
                        ", so Vortex has another profile deployed, or deploys Thornswood into another folder. In Vortex, enable the Thornswood profile and let it deploy. " +
                        "If it is deployed, Mods, Open, Open Game Folder in Vortex shows where, and Choose Vortex's folder in Settings points Thornswood at it.";
 
@@ -543,6 +552,21 @@ namespace Thornswood
         }
 
 
+        /// <summary>
+        /// True when so many of the shipped plugins are missing that this is
+        /// not Thornswood's collection. Less than half missing is a gap in a
+        /// collection that is on. On a list of twenty or more, fewer than ten
+        /// missing is that same gap: Diagnostics uses ten and half together
+        /// before it says the collection is not deployed.
+        /// </summary>
+        public static bool NotThisCollection(int missing, int expected)
+        {
+            if (expected <= 0 || missing <= 0) return false;
+            if (missing * 2 < expected) return false;
+            if (expected >= 20 && missing < 10) return false;
+            return true;
+        }
+
         /// <summary>True when Vortex has deployed since the folder was last made or refreshed.</summary>
         /// <summary>
         /// Which build of the rules in this file a folder was made under.
@@ -603,8 +627,11 @@ namespace Thornswood
         ///    What Make took from the Steam copy that is none of them, mods put
         ///    there by hand, is taken out of the folder and logged, and each file
         ///    is recorded as which kind it is (O, V or T). See OwnGameKinds.cs.
+        /// 14: Elysium Estate's old plugin, ElysiumEstateSSE.esp, is left out,
+        ///    so a refresh cannot copy it back after a pack deletes it. See
+        ///    Foreign, issue #690.
         /// </summary>
-        const int Rules = 13;
+        const int Rules = 14;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -1774,6 +1801,13 @@ namespace Thornswood
             // Ship-Rules.ps1 carries the same rule ($ShipOldSkyUIScripts);
             // change the two together.
             if (Regex.IsMatch(rel, @"^Data\\Scripts\\ski_(activeeffectswidget|configmenu|favoritesmanager|main|playerloadgamealias|qf_configmanagerinstance|questbase|settingsmanager|widgetbase|widgetmanager)\.pex$", I)) return true;
+
+            // Elysium Estate 4.3.5's plugin, issue #690. The servers load the
+            // collection's 5.0.1, ElysiumEstate.esp, since 29 September. The old
+            // name was only ever a hand copy in a Steam copy or a pack's copy,
+            // so packs delete it and this keeps a refresh from bringing it back.
+            // Ship-Rules.ps1 carries the same rule; change the two together.
+            if (rel.Equals("Data\\ElysiumEstateSSE.esp", StringComparison.OrdinalIgnoreCase)) return true;
 
             if (!rel.StartsWith("Data\\Platform\\", StringComparison.OrdinalIgnoreCase)) return false;
             if (leaf.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)) return true;

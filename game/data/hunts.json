@@ -372,7 +372,7 @@
     "4d081:OarsRest.esp": { "name": "Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
     "4d083:OarsRest.esp": { "name": "Constipated Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
     "60ec2:Immersive Patrols II.esp": { "name": "Dawnguard Husky", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
-    "375af:ElysiumEstateSSE.esp": { "name": "Chloe", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
+    "375af:ElysiumEstate.esp": { "name": "Chloe", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
     "863:YokuWeapons.esp": { "name": "Jar Bomb", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
     "d64:FishingInSkyrim.esp": { "name": "FishingNetSlaughterfish", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad70:Skyrim.esm", "name": "Slaughterfish Scales", "count": 1 }, { "item": "8ae:Gourmet.esp", "name": "Slaughterfish Meat", "count": 1 }] }
   },
@@ -438,7 +438,7 @@
     { "desc": "6036:Solitude Arena.esp", "editorId": "LSDennemisdelarene34", "why": "nothing in its traits chain names a death item, so its body gives nothing" },
     { "desc": "1458a:Solitude Arena.esp", "editorId": "LSDbestiole", "why": "nothing in its traits chain names a death item, so its body gives nothing" },
     { "desc": "145db:Solitude Arena.esp", "editorId": "LSDbestiole2", "why": "nothing in its traits chain names a death item, so its body gives nothing" },
-    { "desc": "5fda:ElysiumEstateSSE.esp", "editorId": "EE_CowAnimal01", "why": "nothing in its traits chain names a death item, so its body gives nothing" },
+    { "desc": "5fda:ElysiumEstate.esp", "editorId": "EE_CowAnimal01", "why": "nothing in its traits chain names a death item, so its body gives nothing" },
     { "desc": "17ce35:Triumvirate - Mage Archetypes.esp", "editorId": "TVR_Primal_Actor_CallWolf", "why": "nothing in its traits chain names a death item, so its body gives nothing" },
     { "desc": "14f4e2:Triumvirate - Mage Archetypes.esp", "editorId": "TVR_Primal_Actor_CallRaven", "why": "nothing in its traits chain names a death item, so its body gives nothing" },
     { "desc": "2c625c:Triumvirate - Mage Archetypes.esp", "editorId": "TVR_Warrior_Actor_FylgjaWind", "why": "nothing in its traits chain names a death item, so its body gives nothing" },
@@ -5485,12 +5485,12 @@
       "couldAlsoBe": "",
       "readFrom": "the race at the end of the traits chain, and the INAM that came with it"
     },
-    "375af:ElysiumEstateSSE.esp": {
+    "375af:ElysiumEstate.esp": {
       "editorId": "EE_GoatAnimal01",
       "name": "Chloe",
       "nameFrom": "the record",
-      "plugin": "ElysiumEstateSSE.esp",
-      "definedIn": "ElysiumEstateSSE.esp",
+      "plugin": "ElysiumEstate.esp",
+      "definedIn": "ElysiumEstate.esp",
       "race": "EE_GoatAnimalRace01",
       "deathItem": "3ad8d:Skyrim.esm",
       "deathEdid": "DeathItemGoat",
