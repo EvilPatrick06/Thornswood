@@ -87,6 +87,59 @@ place fades across those 3 minutes. It does not snap off at the door.
 There is no temperature by hold. The Pale is cold when it is high, it
 is night, and it is snowing.
 
+## The season and the sky
+
+The season is the one on [Farmer](classes/farmer.md): four of them, 7
+real days each, one for the whole province. It changes two things. It
+does not pick a single sky and hold it for the week.
+
+A season shifts the outdoor target, before clothing, fire, and the
+sky. Indoors ignores it, the same way a roof ignores the sky.
+
+| Season | On an outdoor target |
+| --- | --- |
+| Spring | 0 |
+| Summer | 4 warmer |
+| Autumn | 2 colder |
+| Winter | 6 colder |
+
+The sky is a roll. Clear, cloudy, rain, and snow can all come up in
+every season. Winter makes snow more likely. It does not make snow
+certain, and a clear winter day is still a clear day. Summer makes
+snow rare. It does not forbid it.
+
+The chances are out of 100.
+
+| Season | Clear | Cloudy | Rain | Snow |
+| --- | --- | --- | --- | --- |
+| Spring | 30 | 30 | 35 | 5 |
+| Summer | 40 | 30 | 28 | 2 |
+| Autumn | 25 | 30 | 35 | 10 |
+| Winter | 20 | 35 | 25 | 20 |
+
+A snowy climate moves 10 from clear onto snow. Clear does not go
+under 10. If it would, the rest comes off rain. Winterhold, the Pale,
+and the high mountains are the snowy climates. A mild climate moves 5
+from snow onto clear, and snow may land on 0. Whiterun, the Rift, and
+Falkreath are the mild climates. Every other climate uses the table
+as it is written.
+
+One roll is one climate, and everybody standing in it has that sky.
+It lasts 20 to 60 real minutes, a whole number of minutes, each
+length as likely as the others. Then it rolls again. The next sky is
+not announced.
+
+The records are Cathedral Weathers, the mod already in the collection.
+Each record is already clear, cloudy, rain, or snow, which is what
+the meter reads. A season mod that follows the game's months, or that
+turns winter into snow and summer into sun, is not this roll. The 7
+days are real days, and a week of one sky is not the point.
+
+Falling snow is still the snow line in the table above, 6 colder, on
+top of the season. A clear winter day does not take that 6. The snow
+place, target 16, is standing in snow on the ground. A clear sky over
+bare ground is not that place.
+
 ## Fire
 
 At your feet a fire adds 34. At 300 units it adds nothing. Forges,
@@ -186,7 +239,7 @@ the water classes, the clothing table, the cap of 0.80, the heat factor
 of 0.5, the settle times, the on-fire damage, the spread, and `/needs`
 are in the server.
 
-Not in it: the cold link into hunger and thirst, the 3 minutes of wet,
+Not in it: a season, the roll of the sky, the cold link into hunger and thirst, the 3 minutes of wet,
 the master woodworker's 48, the master tailor's 4 degrees, the burn
 cutting clothing, and the meal's warmth. Every fire is 34. Clothing
 does not read tailor rank. A roof dries you the moment the client says
