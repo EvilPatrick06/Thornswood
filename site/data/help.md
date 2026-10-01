@@ -107,10 +107,14 @@ closed.
 - **Enter** opens the chat, and **/** opens it with the slash already typed.
 - **K** your character panel, **P** your friends and party, **J** your journals.
 - Looking at somebody: **Y** asks them to be friends, **H** offers a trade, **L**
-  stops you hearing them.
+  stops you hearing them. A friend request, a party invite, or a trade offer
+  shows on their screen with Accept and Refuse.
 - **V** held to talk, **O** keeps the microphone open until you press it again,
   **B** steps between a whisper, your normal voice and a yell.
-- **G** opens the emote wheel, and **N** stands you up out of an emote.
+- **G** opens the emote wheel. Eight quick slots sit in the middle, and the
+  rest of the emotes are a list you can search. **Tab** moves to that search.
+  **N** stands you up out of an emote. The number keys **1** to **8** play a
+  slot with the wheel shut.
 - **U** presses a blank key mold into the lock of the door you are looking at.
 - **F1** turns the names over heads off and on, and **F2** hides and shows the
   overlay.

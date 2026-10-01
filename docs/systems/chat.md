@@ -51,6 +51,10 @@ What does not float: every other command. `/trade`, `/party`,
 the rest on [People beside you](people.md). A lyric above the head
 is a plain line or a `/me`.
 
+A friend request, a party invite, and a trade offer are not answered
+in the box. A prompt appears with Accept and Refuse. See
+[Friends](friends.md), [Party](party.md), and [Trade](trade.md).
+
 The float uses the same reach as the table above, and the same cell.
 A plain line, a `/me`, a `/do`, and an `/ooc` float inside about 57
 metres. A whisper floats inside about 14 metres. A shout floats

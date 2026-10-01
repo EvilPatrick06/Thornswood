@@ -175,8 +175,10 @@ yes('and the page says ' + spoken(LAPSE) + ' seconds', says(text, LAPSE, '', ' s
   const named = (text.match(/\/[a-z]+/g) || []).filter(function (w, i, all) {
     return all.indexOf(w) === i;
   });
-  yes('the page names /party, /yes and /no',
-      named.indexOf('/party') !== -1 && named.indexOf('/yes') !== -1 && named.indexOf('/no') !== -1);
+  yes('the page names /party', named.indexOf('/party') !== -1);
+  yes('an ask is answered on the prompt, not by typing /yes or /no',
+      named.indexOf('/yes') === -1 && named.indexOf('/no') === -1 &&
+      /Accept or Refuse on the prompt/.test(text));
   const refused = named.filter(function (w) { return words.indexOf(w) === -1; });
   yes('every command the page names is one everybody may use' +
       (refused.length ? ' (not: ' + refused.join(', ') + ')' : ''), refused.length === 0);
@@ -196,10 +198,11 @@ yes('and the page says ' + spoken(LAPSE) + ' seconds', says(text, LAPSE, '', ' s
       /Ask to party beside a friend who is online/.test(text) &&
       /f\.on && !f\.party \? '<button data-do="ask"/.test(p) &&
       /verb === 'ask'\) \{ net\('\/party ' \+ who\); \}/.test(p));
-  yes('and the Yes and No buttons for an ask',
-      /press Yes or No on their own P panel/.test(text) &&
-      p.indexOf('data-do="yes">Yes</button>') !== -1 &&
-      p.indexOf('data-do="no">No</button>') !== -1);
+  yes('and Accept and Refuse, on the panel and on the prompt',
+      /Accept or Refuse on the prompt/.test(text) &&
+      p.indexOf('data-do="yes">Accept</button>') !== -1 &&
+      p.indexOf('data-do="no">Refuse</button>') !== -1 &&
+      p.indexOf("askEl.id = 'ts-ask'") !== -1);
 }
 
 // --------------------------------------------------- finding your party

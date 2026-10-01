@@ -194,6 +194,12 @@ if (social && trade) {
     w.soc.offer('friend', A, B);
     yes('an offer stands for the person it was made to', !!w.soc.standingOffer(102));
     yes('and not for anybody else', !w.soc.standingOffer(101));
+    const asked = w.soc.view(B);
+    yes('the offer is on the view the prompt reads, with a name',
+        !!asked.offer && asked.offer.kind === 'friend' && asked.offer.name === 'Bjorn');
+    yes('the person who was asked is told to use the prompt',
+        src.indexOf('Accept or refuse on the prompt.') >= 0 &&
+        src.indexOf('/yes or /no') < 0);
 
     // The accept path, the way the command does it.
     w.soc.addFriend(B, A);
@@ -277,6 +283,36 @@ if (social && trade) {
     w2.gone(0xff000002);
     w2.soc.tick();
     yes('somebody who logs out leaves the party', !w2.soc.partyOf(102));
+
+    const w3 = world();
+    w3.person(0xff000001, 'Bjorn', 101, 'town:X.esm', [0, 0, 0]);
+    w3.person(0xff000002, 'Sera', 102, 'town:X.esm', [100, 0, 0]);
+    w3.person(0xff000003, 'Thora', 103, 'town:X.esm', [200, 0, 0]);
+    w3.soc.joinParty(101, 102);
+    w3.soc.joinParty(101, 103);
+    yes('a member cannot disband', w3.soc.disbandParty(102) === 'Only the leader can do that.');
+    yes('the leader can hand the lead across', w3.soc.leadParty(101, 102) === '');
+    yes('and that person leads', w3.soc.partyOf(101).leader === 102);
+    yes('the new leader can kick', w3.soc.kickParty(102, 103) === '');
+    yes('and the kicked person is out', !w3.soc.partyOf(103) && w3.soc.partyOf(101).members.length === 2);
+    yes('the leader can end it', w3.soc.disbandParty(102) === '');
+    yes('and nobody is left in it', !w3.soc.partyOf(101) && !w3.soc.partyOf(102));
+  }
+
+  // ------------------------------------------------ text and name switches
+  {
+    const w = world();
+    const A = w.person(0xff000001, 'Bjorn', 101, 'town:X.esm', [0, 0, 0]);
+    w.person(0xff000002, 'Sera', 102, 'town:X.esm', [100, 0, 0]);
+    yes('text mute turns on', w.soc.toggleText(A, 102, 'Sera') === true);
+    yes('and it is kept on the character', !!w.soc.stateOf(A).textOff[102]);
+    yes('pressing again turns text back on', w.soc.toggleText(A, 102, 'Sera') === false);
+    yes('hiding a name turns on', w.soc.toggleName(A, 102, 'Sera') === true);
+    yes('and it is kept', !!w.soc.stateOf(A).namesOff[102]);
+    yes('hiding every name turns on', w.soc.toggleNamesAll(A) === true);
+    yes('and again puts them back', w.soc.toggleNamesAll(A) === false);
+    const known = w.soc.resolveKnown(A, 'Sera');
+    yes('a known name resolves to the profile', known.pid === 102 && known.why === '');
   }
 
   // -------------------------------------------------------------- journals
@@ -327,6 +363,24 @@ if (social && trade) {
 
     yes('and a journal can be thrown away', w2.soc.dropJournal(X, j2.id) &&
         w2.soc.stateOf(X).journals.length === 0);
+
+    // A friend who has logged off is still on the list, and a share is for them.
+    const w3 = world();
+    const P = w3.person(0xff000001, 'Bjorn', 101, 'town:X.esm', [0, 0, 0]);
+    const Q = w3.person(0xff000002, 'Sera', 102, 'town:X.esm', [100, 0, 0]);
+    w3.soc.addFriend(P, Q);
+    w3.gone(Q);
+    const who = w3.soc.resolveShare(P, 'Sera');
+    yes('a share finds a friend who is not online, by the stored name',
+        who.pid === 102 && who.why === '');
+    yes('and by the profile id the panel sends',
+        w3.soc.resolveShare(P, '102').pid === 102);
+    const notes = w3.soc.newJournal(P, 'Notes');
+    yes('the page can be marked shared with them',
+        !!notes.journal && w3.soc.share(P, notes.journal.id, '', who.pid) === '');
+    w3.gone(P);
+    yes('it still only appears while the person who wrote it is here',
+        w3.soc.sharedWithMe(Q).length === 0);
   }
 
   // ---------------------------------------------------------------- trading
@@ -345,6 +399,23 @@ if (social && trade) {
     yes('you can only offer what you are carrying',
         w.trade.add(A, 'Leek', 1) === 'You are not carrying that.');
     yes('and what you are', w.trade.add(A, 'Iron Sword', 2) === '');
+
+    // A localized FULL is a string index. The trade list must not print it.
+    const named = world();
+    const holder = named.person(0xff000001, 'Bjorn', 101, 'town:X.esm', [0, 0, 0]);
+    named.give(holder, 0x12AB, 1, 'ignored');
+    named.mp.lookupEspmRecordById = function (baseId) {
+      if (Number(baseId) !== 0x12AB) { return null; }
+      return { record: {
+        type: 'WEAP',
+        editorId: 'SteelSword',
+        fields: [{ type: 'FULL', data: [4, 0, 18, 0] }]
+      } };
+    };
+    const held = named.trade.carrying(holder);
+    yes('a localized name is the editor id, spaced, and not a row of numbers',
+        held.length === 1 && held[0].n === 'Steel Sword' && !/\d/.test(held[0].n));
+    yes('and the record type is a category', held.length === 1 && held[0].k === 'Weapons');
     const t = w.trade.tradeOf(A);
     yes('it lands on your side and not theirs', t.offerA.length === 1 && t.offerB.length === 0);
     yes('and not more than you have', (w.trade.add(A, 'Iron Sword', 99), t.offerA[0].c === 3));
