@@ -3,8 +3,8 @@
 Coin enters the world as the 40, as a trader's 250, and as the set
 reward on a scene quest. The 40 and the 250 happen once. The scene
 reward is created each time that quest is finished, and the cooldown
-on the quest is what spaces it. A scene quest is usually a
-retrieval. A few are a bounty. It does not buy goods. A supply quest does not create
+on the quest is what spaces it. A scene quest is a retrieval or a
+bounty. It does not buy goods. A supply quest does not create
 coin. It pays from the trader's 250. A letter does not create coin
 either. The sender pays the courier. After that, coin moves, or it
 leaves.
