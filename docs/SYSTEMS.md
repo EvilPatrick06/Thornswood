@@ -150,8 +150,9 @@ not a recipe and not a mint.
 rent, and what a home is for.
 
 [Gold](systems/gold.md). 40 gold once for a person. A guild trader
-starts with 250, once. After that coin moves, and a company sale can
-take some of it out of the world. It does not buy a rank.
+starts with 250, once. A scene quest creates the gold written on it,
+on that quest's cooldown. A company sale can take some coin out of
+the world. It does not buy a rank.
 
 [Notice boards](systems/noticeboards.md). One board a hold. 20 gold for a
 notice, 30 for a job. The newest ten show.
@@ -163,7 +164,8 @@ mint coin after that purse, and it is not a profession.
 
 [Custom quests](systems/quests.md). Guild traders ask for goods. A supply
 quest pays from the trader's purse. A scarce quest opens a place that
-holds more than the turn-in, for a class, a profession, or a race.
+holds more than the turn-in, for a class, a profession, or a race. A
+scene quest pays a set amount, and that gold does not run out.
 
 [Free Skyrim Trading Company](systems/trading-company.md). Hauls between
 holds. The hauler is paid out of the box. The company keeps 10%. It is not
