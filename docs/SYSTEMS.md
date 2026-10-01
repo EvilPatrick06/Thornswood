@@ -127,6 +127,7 @@ its own system.
 | Party | [Party](systems/party.md) |
 | Trade | [Trade](systems/trade.md) |
 | Journals | [Journals](systems/journal.md) |
+| Factions and businesses | [Factions and businesses](systems/factions.md) |
 | Voice | [Voice](systems/voice.md) |
 | Emotes | [Emotes](systems/emotes.md) |
 | Text chat | [Text chat](systems/chat.md) |

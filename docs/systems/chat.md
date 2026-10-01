@@ -41,23 +41,34 @@ What floats:
 
 - A line that does not start with `/`.
 - `/me`, and what the character does.
+- `/do`, and what there is to see.
 - `/ooc` and `/o`.
+- `/w` or `/whisper`, for people inside the whisper reach.
+- `/s`, `/shout`, `/y`, or `/yell`, for people inside the shout reach.
 
-What does not float: every other command. `/do`, `/w`, `/whisper`,
-`/s`, `/shout`, `/yell`, `/y`, `/trade`, `/party`, and the rest stay
-in the box.
+What does not float: every other command. `/trade`, `/party`,
+`/bard`, `/book`, and the rest stay in the box. `/bard` still pays
+the rest on [People beside you](people.md). A lyric above the head
+is a plain line or a `/me`.
 
-The float uses the same reach as the table above. A plain line, a
-`/me`, and an `/ooc` float for people in the same cell and inside
-about 57 metres. A `/do` does not float, even for the people inside
-that distance.
+The float uses the same reach as the table above, and the same cell.
+A plain line, a `/me`, a `/do`, and an `/ooc` float inside about 57
+metres. A whisper floats inside about 14 metres. A shout floats
+inside about 171 metres. Outside that reach, that line is not above
+the head.
 
 One line at a time. A newer line replaces it. It stays for 6 seconds.
 The float is cut at 80 characters. The full line stays in the box,
 and an `/ooc` in the box is still cut at 300.
 
 The float has the same shape as the box. A plain line is the words.
-A `/me` is the action. An `/ooc` is in brackets.
+A `/me` is the action. A `/do` is what there is to see. An `/ooc` is
+in brackets. A whisper and a shout use the same words they use in
+the box.
+
+An emote uses this same one line. The names are on
+[Emotes](emotes.md). A newer typed line replaces it, and an emote
+replaces a typed line.
 
 You see your own float. Someone who has turned off your text does not
 see it, in the box or above the head. That switch is on
