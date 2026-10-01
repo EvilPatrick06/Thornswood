@@ -97,10 +97,17 @@ does not lift a silence.
 The three distances, V, O, B, and the voice mute are in the server.
 The microphone is the launcher's. The voice mute sets the level to
 nothing on your machine. It is not a mute the server enforces on the
-sound, and it does not touch text.
+sound.
+
+Text mute is remembered on the character, and the chat service drops
+those lines for the person who turned them off. Hiding a name, and
+hiding every name, are remembered too, and the name tag is drawn
+clear. P lists Mute, Text, and Name for each friend, and Hide every
+name for the whole list.
 
 The mark above the head is not in the world. The launcher draws its
 own speaking light, and that light is not above a head and is not
-colored by the distance. Text mute, hiding a name, hiding every
-name, and saving those are not in the server. `/mute` is voice only.
-P has one Mute button, on friends. `/silence` is not a command.
+colored by the distance. Words above the head are not drawn. Staff
+`/silence` is a staff command. It stops what they type through the
+game server. It does not hide a name, and it cannot stop words above
+a head, because those words are not drawn.

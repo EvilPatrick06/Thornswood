@@ -113,14 +113,14 @@ namespace Thornswood
                 "Hold V to talk, or press O to keep the microphone open until you press O again, for a song or a long speech. Voice runs in the launcher rather than in the game, so leave the launcher open while you play; it minimises by itself. B steps your voice between a whisper, which carries about 7 metres, your normal voice, about 30 metres, and a yell, about 85 metres. The further away somebody is standing, the quieter you are to them. If nobody can hear you, check that the launcher is still open and that Windows has not given your microphone to something else."),
 
             new HelpItem("Chat and commands", "Friends and trading",
-                "Look at somebody and press Y to ask them to be friends, H to offer a trade, or L to stop hearing them. Those three only work with somebody under your crosshair. A request shows on their screen with Accept and Refuse, and it stands for forty five seconds. Your friends are on the P panel, and friends are kept."),
+                "Look at somebody and press Y to ask them to be friends, H to offer a trade, or L to stop hearing them. Those three only work with somebody under your crosshair. A request shows on their screen with Accept and Refuse, and it stands for forty five seconds. Your friends are on the P panel, and friends are kept. On that panel, Mute stops their voice, Text stops their lines in the chat, and Name hides the name above their head. Hide every name does that for everyone."),
 
             // The two party items came from main (entry 336, #281).
             // tests\test-help-parties.js finds them by what they are about
             // and holds every number, key and command in them to the gamemode,
             // the plugin and the P panel.
             new HelpItem("Chat and commands", "Parties",
-                "P, unless you have moved it on the Controls page, opens your friends and your party. To bring somebody in, press Enter and type /party and their name, or press Ask to party beside a friend who is online. They have forty five seconds to press Accept or Refuse on the prompt. A party holds up to six. /party on its own says who is in yours, and /party leave takes you out. Logging out takes you out too, and every party ends when the server restarts."),
+                "P, unless you have moved it on the Controls page, opens your friends and your party. To bring somebody in, press Enter and type /party and their name, or press Ask to party beside a friend who is online. They have forty five seconds to press Accept or Refuse on the prompt. A party holds up to six. /party on its own says who is in yours, and /party leave takes you out. Logging out takes you out too, and every party ends when the server restarts. The leader sees Kick and Lead beside each other person, and Disband. Everyone else sees Leave."),
 
             new HelpItem("Chat and commands", "Finding your party",
                 "Everybody in your party has their name in green above their head, a marker on your map, and an arrow on a strip under your compass with how far away they are. Green on the strip means the same place as you, gold means somewhere else. You cannot fast travel to the marker. Work done with somebody from your party in the same place counts 15 per cent more."),

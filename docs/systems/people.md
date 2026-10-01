@@ -57,7 +57,7 @@ The party cap of 6 is in the server. A friend request, a party
 invite, and a trade offer are answered on the prompt. The wheel's
 eight quick slots, the search, and the fifty nine emotes are in the
 server. Plain text chat still goes to everybody, because the local
-switch ships off. The mark above the head, the words above the head,
-an emote's name above the head, the text and name switches, hiding
-every name, staff silence, and the leader's kick, lead, and disband
-are not in the server.
+switch ships off. Text mute, hiding a name, hiding every name, and
+the leader's kick, lead, and disband are in the server. Staff
+silence is a staff command. The mark above the head, the words above
+the head, and an emote's name above the head are not in the server.

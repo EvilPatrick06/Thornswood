@@ -269,6 +269,15 @@ function lineClosed(me) {
   only: the gamemode sends the whole list again every thirty seconds.
 */
 const silenced = new Map();
+/* Personal text mutes: listener profile -> set of speaker profiles. The
+   whole map arrives from the gamemode (POST /textmute). A listener who has
+   turned somebody's text off does not get that person's lines. */
+const textOff = new Map();
+
+function textBlocked(listener, speaker) {
+  const set = textOff.get(Number(listener) || 0);
+  return !!(speaker && set && set.has(Number(speaker)));
+}
 const SILENCED_TOLD_EVERY_MS = 10000;
 function silencedLeft(profileId, now) {
   const pid = Number(profileId) || 0;
@@ -1571,6 +1580,27 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && route === '/textmute') {
+    if (!isLoopback(req)) { res.writeHead(403).end('no'); return; }
+    readBody(req, res, 200000, (doc) => {
+      const by = (doc && doc.by && typeof doc.by === 'object') ? doc.by : {};
+      textOff.clear();
+      for (const k of Object.keys(by)) {
+        const listener = Number(k) || 0;
+        const raw = Array.isArray(by[k]) ? by[k] : [];
+        const set = new Set();
+        for (let i = 0; i < raw.length; i++) {
+          const speaker = Number(raw[i]) || 0;
+          if (speaker) set.add(speaker);
+        }
+        if (listener && set.size) textOff.set(listener, set);
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ listeners: textOff.size }));
+    });
+    return;
+  }
+
   // And the way back. The gamemode answers a command by writing a line into
   // the chat, either to one person or to the room.
   if (req.method === 'POST' && route === '/say') {
@@ -1837,7 +1867,10 @@ server.on('upgrade', (req, socket, head) => {
         if (verb) out.text = verb.text;
         const heard = hearers(myId, me, chatReach(out.kind));
         if (heard) {
-          for (const p of heard.to) p.ws.send(out);
+          for (const p of heard.to) {
+            if (textBlocked(p.profileId, out.profileId)) continue;
+            p.ws.send(out);
+          }
           if (heard.to.length <= 1) {
             ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', at: Date.now(),
                       text: heard.placed ? 'Nobody near enough to hear that.'
@@ -1846,7 +1879,10 @@ server.on('upgrade', (req, socket, head) => {
           return;
         }
       }
-      for (const [, p] of peers) p.ws.send(out);
+      for (const [, p] of peers) {
+        if (textBlocked(p.profileId, out.profileId)) continue;
+        p.ws.send(out);
+      }
       return;
     }
   };

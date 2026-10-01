@@ -32,6 +32,9 @@
   var root = null;
   var filter = '';
   var cat = '';
+  // Counts typed into a row, kept across a redraw so a server push does not
+  // wipe the box while somebody is still deciding how many to offer.
+  var typed = {};
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'trade:' + what); }
@@ -91,10 +94,13 @@
     '#' + ID + ' .col:last-child{border-right:none}',
     '#' + ID + ' h3{margin:0 0 9px;padding-bottom:6px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;',
     '  color:rgba(198,170,109,.85);font-weight:normal;border-bottom:1px solid rgba(198,170,109,.22)}',
-    '#' + ID + ' .line{display:flex;align-items:center;gap:8px;padding:8px 10px;flex-wrap:wrap;',
-    '  border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);margin-bottom:6px}',
-    '#' + ID + ' .line .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-    '#' + ID + ' .line .c{color:rgba(217,207,180,.66);font-variant-numeric:tabular-nums}',
+    '#' + ID + ' .line{display:flex;align-items:stretch;gap:8px;padding:10px 12px;flex-wrap:wrap;',
+    '  border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);margin-bottom:8px}',
+    '#' + ID + ' .top{display:flex;align-items:center;gap:10px;flex:1 1 100%;min-width:0}',
+    '#' + ID + ' .acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%}',
+    '#' + ID + ' .line .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px}',
+    '#' + ID + ' .line .c{color:rgba(217,207,180,.66);font-variant-numeric:tabular-nums;font-size:16px}',
+    '#' + ID + ' .qty{width:88px;margin:0;flex:none}',
     '#' + ID + ' button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
     '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
     '  padding:5px 10px;font-size:15px;line-height:20px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
@@ -207,13 +213,16 @@
         var rows = grouped[order[g]];
         for (var r = 0; r < rows.length; r++) {
           var it = rows[r];
-          ph += '<div class="line"><span class="nm">' + esc(it.n) + '</span>' +
-                '<span class="c">' + it.c + '</span>' +
+          var addKey = 'add:' + it.n;
+          ph += '<div class="line"><div class="top"><span class="nm">' + esc(it.n) + '</span>' +
+                '<span class="c">' + it.c + '</span></div><div class="acts">' +
+                '<input class="qty" data-side="add" data-for="' + esc(it.n) + '" placeholder="How many" value="' + esc(typed[addKey] || '') + '">' +
+                '<button data-qty="' + esc(it.n) + '">Add</button>' +
                 '<button data-add="' + esc(it.n) + '" data-n="1">Add 1</button>' +
                 (it.c >= 5 ? '<button data-add="' + esc(it.n) + '" data-n="5">Add 5</button>' : '') +
                 (it.c >= 10 ? '<button data-add="' + esc(it.n) + '" data-n="10">Add 10</button>' : '') +
                 (it.c > 1 ? '<button data-add="' + esc(it.n) + '" data-n="' + it.c + '">All</button>' : '') +
-                '</div>';
+                '</div></div>';
         }
       }
     }
@@ -224,10 +233,13 @@
     if (!(data.mine || []).length) { mh += '<div class="none">Nothing yet.</div>'; }
     for (var j = 0; j < (data.mine || []).length; j++) {
       var mineRow = data.mine[j];
-      mh += '<div class="line"><span class="nm">' + esc(mineRow.n) + '</span>' +
-            '<span class="c">' + mineRow.c + '</span>' +
+      var remKey = 'rem:' + mineRow.n;
+      mh += '<div class="line"><div class="top"><span class="nm">' + esc(mineRow.n) + '</span>' +
+            '<span class="c">' + mineRow.c + '</span></div><div class="acts">' +
+            '<input class="qty" data-side="rem" data-for="' + esc(mineRow.n) + '" placeholder="How many" value="' + esc(typed[remKey] || '') + '">' +
+            '<button data-take="' + esc(mineRow.n) + '">Take</button>' +
             (mineRow.c > 1 ? '<button data-rem="' + esc(mineRow.n) + '" data-n="1">Take 1</button>' : '') +
-            '<button data-rem="' + esc(mineRow.n) + '">Take back</button></div>';
+            '<button data-rem="' + esc(mineRow.n) + '">Take back</button></div></div>';
     }
     mh += '<div class="gold"><span>Gold</span>' +
           '<input id="' + ID + '-gold" value="' + (data.myGold || 0) + '">' +
@@ -241,11 +253,11 @@
              (data.theyAgreed ? '<span class="ok">&#10003; agreed</span>' : '<span class="wait">still deciding</span>') + '</h3>';
     if (!(data.theirs || []).length && !data.theirGold) { th += '<div class="none">Nothing yet.</div>'; }
     for (var k = 0; k < (data.theirs || []).length; k++) {
-      th += '<div class="line"><span class="nm">' + esc(data.theirs[k].n) + '</span>' +
-            '<span class="c">' + data.theirs[k].c + '</span></div>';
+      th += '<div class="line"><div class="top"><span class="nm">' + esc(data.theirs[k].n) + '</span>' +
+            '<span class="c">' + data.theirs[k].c + '</span></div></div>';
     }
     if (data.theirGold) {
-      th += '<div class="line"><span class="nm">gold</span><span class="c">' + data.theirGold + '</span></div>';
+      th += '<div class="line"><div class="top"><span class="nm">gold</span><span class="c">' + data.theirGold + '</span></div></div>';
     }
     theirs.innerHTML = th;
 
@@ -268,12 +280,37 @@
     wire(pack); wire(mine);
   }
 
+  function readQty(where, name) {
+    var boxes = where.querySelectorAll('input');
+    for (var i = 0; i < boxes.length; i++) {
+      if (boxes[i].getAttribute('data-for') !== name) { continue; }
+      var raw = String(boxes[i].value || '').replace(/[^0-9]/g, '');
+      var n = parseInt(raw, 10);
+      if (!n || n < 1) { n = 1; }
+      if (n > 9999) { n = 9999; }
+      return n;
+    }
+    return 1;
+  }
+
   function wire(where) {
-    var b = where.querySelectorAll('button[data-add],button[data-rem],button[data-do]');
+    var boxes = where.querySelectorAll('input');
+    for (var q = 0; q < boxes.length; q++) {
+      if (!boxes[q].getAttribute('data-for')) { continue; }
+      boxes[q].oninput = function () {
+        var side = this.getAttribute('data-side') || 'add';
+        typed[side + ':' + this.getAttribute('data-for')] = this.value;
+      };
+    }
+    var b = where.querySelectorAll('button[data-add],button[data-rem],button[data-do],button[data-qty],button[data-take]');
     for (var i = 0; i < b.length; i++) {
       b[i].onclick = function () {
         var addWhat = this.getAttribute('data-add');
         var remWhat = this.getAttribute('data-rem');
+        var qtyWhat = this.getAttribute('data-qty');
+        var takeWhat = this.getAttribute('data-take');
+        if (qtyWhat) { net('/trade add ' + qtyWhat + ' ' + readQty(where, qtyWhat)); return; }
+        if (takeWhat) { net('/trade remove ' + takeWhat + ' ' + readQty(where, takeWhat)); return; }
         if (addWhat) { net('/trade add ' + addWhat + ' ' + (this.getAttribute('data-n') || '1')); return; }
         if (remWhat) {
           var n = this.getAttribute('data-n');

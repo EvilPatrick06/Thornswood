@@ -33,11 +33,14 @@ Chips along the top narrow the list to one group, and a find box
 narrows it by name. The type is the same size as the rest of the K
 panel, large enough to read at the distance the window sits.
 
-Each line you are holding has Add 1. Add 5 appears when you have at
-least five, Add 10 when you have at least ten, and All when you have
-more than one. A line you have offered has Take 1 when the count is
-more than one, and Take back for the whole line. Gold has Set for the
-amount in the box, All for every coin you are holding, and None.
+Each line you are holding has a box for a count, and Add sends that
+count. An empty box, or a count of zero, sends one. Add 1 is always
+there. Add 5 appears when you have at least five, Add 10 when you
+have at least ten, and All when you have more than one. A line you
+have offered has the same box, Take for that count, Take 1 when the
+count is more than one, and Take back for the whole line. Gold has
+Set for the amount in the box, All for every coin you are holding,
+and None.
 
 ## What goes on the table
 

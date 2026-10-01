@@ -71,8 +71,10 @@ are what a person presses. Anyone in the party can already invite.
 The bonus is paid as a whole extra piece, not as a fraction on the
 screen.
 
-The leader is stored, and P tags them. If the leader leaves, the lead
-already passes, and a party of one already ends. The green name, the
-map marker, and the strip are in the server. Kick, handing the lead
-across, and disband are not commands. P offers Leave to everyone in
-the party, including the leader.
+The leader is stored. Kick, handing the lead across, and disband are
+commands, and P shows Kick, Lead, and Disband to the leader. Everyone
+else sees Leave. If the leader leaves, the lead already passes, and
+a party of one already ends. The green name, the map marker, and the
+strip are in the server.
+
+The speaking mark above the green name is not in the world.

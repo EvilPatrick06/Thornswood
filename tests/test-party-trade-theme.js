@@ -450,6 +450,15 @@ const T = rules(trade.css);
       adds.length === 3 && adds.filter(function (b) { return b.textContent === 'All'; }).length === 1);
   adds[0].onclick.call(adds[0]);
   yes('Add 1 offers one', lastSent() === '/trade add Iron Sword 1');
+  const qty = pack.querySelectorAll('input').filter(function (el) {
+    return el.getAttribute('data-for') === 'Iron Sword';
+  })[0];
+  yes('each pack line has a box for a count', !!qty);
+  qty.value = '2';
+  if (qty.oninput) { qty.oninput.call(qty); }
+  const addTyped = pack.querySelector('button[data-qty]');
+  addTyped.onclick.call(addTyped);
+  yes('a typed count offers that many', lastSent() === '/trade add Iron Sword 2');
   adds[1].onclick.call(adds[1]);
   yes('All offers every one of them', lastSent() === '/trade add Iron Sword 3');
   const back = tr.querySelector('#ts-trade-mine').querySelector('button[data-rem]');

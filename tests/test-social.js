@@ -283,6 +283,36 @@ if (social && trade) {
     w2.gone(0xff000002);
     w2.soc.tick();
     yes('somebody who logs out leaves the party', !w2.soc.partyOf(102));
+
+    const w3 = world();
+    w3.person(0xff000001, 'Bjorn', 101, 'town:X.esm', [0, 0, 0]);
+    w3.person(0xff000002, 'Sera', 102, 'town:X.esm', [100, 0, 0]);
+    w3.person(0xff000003, 'Thora', 103, 'town:X.esm', [200, 0, 0]);
+    w3.soc.joinParty(101, 102);
+    w3.soc.joinParty(101, 103);
+    yes('a member cannot disband', w3.soc.disbandParty(102) === 'Only the leader can do that.');
+    yes('the leader can hand the lead across', w3.soc.leadParty(101, 102) === '');
+    yes('and that person leads', w3.soc.partyOf(101).leader === 102);
+    yes('the new leader can kick', w3.soc.kickParty(102, 103) === '');
+    yes('and the kicked person is out', !w3.soc.partyOf(103) && w3.soc.partyOf(101).members.length === 2);
+    yes('the leader can end it', w3.soc.disbandParty(102) === '');
+    yes('and nobody is left in it', !w3.soc.partyOf(101) && !w3.soc.partyOf(102));
+  }
+
+  // ------------------------------------------------ text and name switches
+  {
+    const w = world();
+    const A = w.person(0xff000001, 'Bjorn', 101, 'town:X.esm', [0, 0, 0]);
+    w.person(0xff000002, 'Sera', 102, 'town:X.esm', [100, 0, 0]);
+    yes('text mute turns on', w.soc.toggleText(A, 102, 'Sera') === true);
+    yes('and it is kept on the character', !!w.soc.stateOf(A).textOff[102]);
+    yes('pressing again turns text back on', w.soc.toggleText(A, 102, 'Sera') === false);
+    yes('hiding a name turns on', w.soc.toggleName(A, 102, 'Sera') === true);
+    yes('and it is kept', !!w.soc.stateOf(A).namesOff[102]);
+    yes('hiding every name turns on', w.soc.toggleNamesAll(A) === true);
+    yes('and again puts them back', w.soc.toggleNamesAll(A) === false);
+    const known = w.soc.resolveKnown(A, 'Sera');
+    yes('a known name resolves to the profile', known.pid === 102 && known.why === '');
   }
 
   // -------------------------------------------------------------- journals

@@ -247,7 +247,7 @@ yes('the gamemode\'s list of everybody\'s commands can be read', Array.isArray(e
       /\[string\]\$ChatRange = 'off'/.test(vinstall) &&
       /set THORNSWOOD_CHAT_RANGE=\$ChatRange/.test(vinstall));
   yes('the voice service still sends a plain chat line to every peer when the range is off',
-      /for \(const \[, p\] of peers\) p\.ws\.send\(out\);/.test(block));
+      /for \(const \[, p\] of peers\) \{/.test(block) && /p\.ws\.send\(out\)/.test(block));
   yes('so the page says a chat line goes to everybody connected',
       /goes to everybody connected/.test(item('Chat and commands', 'The chat box')));
   yes('and that a slash line is a command, which the voice service holds back',

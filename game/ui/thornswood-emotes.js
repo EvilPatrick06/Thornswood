@@ -46,22 +46,25 @@
     '#thornswood-ringname{fill:#c6aa6d;font-size:13px;text-anchor:middle;letter-spacing:.22em;',
     'text-transform:uppercase;pointer-events:none}',
     '#thornswood-hint{fill:rgba(217,207,180,.7);font-size:13px;text-anchor:middle;pointer-events:none}',
-    '#thornswood-wheel .side{width:360px;display:flex;flex-direction:column;padding:18px 18px 14px}',
-    '#thornswood-wheel .side h2{margin:0 0 10px;font-size:26px;font-weight:normal;color:#f6e9c8}',
-    '#thornswood-wheel .side input{font-family:inherit;font-size:16px;line-height:22px;color:#f6e9c8;',
-    'background:rgba(0,0,0,.35);border:1px solid rgba(198,170,109,.30);padding:8px 10px;width:100%}',
+    '#thornswood-wheel .side{width:420px;display:flex;flex-direction:column;padding:22px 22px 16px;',
+    'background:rgba(0,0,0,.20)}',
+    '#thornswood-wheel .side h2{margin:0 0 12px;font-size:26px;font-weight:normal;color:#f6e9c8;',
+    'letter-spacing:.04em}',
+    '#thornswood-wheel .side input{font-family:inherit;font-size:18px;line-height:24px;color:#f6e9c8;',
+    'background:rgba(0,0,0,.35);border:1px solid rgba(198,170,109,.42);padding:10px 12px;width:100%}',
     '#thornswood-wheel .side input:focus{border-color:rgba(198,170,109,.55)}',
     '#thornswood-wheel .mode{margin:10px 0;font-size:14px;font-style:italic;color:rgba(217,207,180,.7);',
     'min-height:20px}',
     '#thornswood-wheel .pins{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}',
     '#thornswood-wheel .pins button,#thornswood-wheel .row button{font-family:inherit;cursor:pointer;',
     'border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
-    'padding:5px 8px;font-size:14px;letter-spacing:.08em;text-transform:uppercase}',
+    'padding:7px 12px;font-size:15px;letter-spacing:.1em;text-transform:uppercase}',
     '#thornswood-wheel .pins button.on,#thornswood-wheel button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
     '#thornswood-wheel .rows{overflow:auto;flex:1;border-top:1px solid rgba(198,170,109,.22);padding-top:8px}',
-    '#thornswood-wheel .row{display:flex;align-items:center;gap:8px;margin-bottom:5px}',
-    '#thornswood-wheel .row .nm{flex:1;text-align:left;font-size:16px;letter-spacing:.02em;',
-    'text-transform:none;color:#f6e9c8;padding:7px 10px}',
+    '#thornswood-wheel .row{display:flex;align-items:center;gap:8px;margin-bottom:6px;',
+    'padding:2px 0;border-bottom:1px solid rgba(198,170,109,.14)}',
+    '#thornswood-wheel .row .nm{flex:1;text-align:left;font-size:17px;letter-spacing:.02em;',
+    'text-transform:none;color:#f6e9c8;padding:8px 10px}',
     '#thornswood-wheel .none{color:rgba(217,207,180,.6);font-style:italic;padding:8px 2px}',
     '#thornswood-wheel ::-webkit-scrollbar{width:10px;height:10px}',
     '#thornswood-wheel ::-webkit-scrollbar-track{background:rgba(0,0,0,.25)}',
@@ -95,7 +98,7 @@
     '</svg></div>' +
     '<div class="side">' +
     '<h2>Emotes</h2>' +
-    '<input id="thornswood-emote-find" placeholder="Search" autocomplete="off">' +
+    '<input id="thornswood-emote-find" placeholder="Search emotes" autocomplete="off">' +
     '<div class="pins" id="thornswood-emote-pins"></div>' +
     '<div class="mode" id="thornswood-emote-mode"></div>' +
     '<div class="rows" id="thornswood-emote-rows"></div>' +
