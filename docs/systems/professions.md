@@ -133,11 +133,12 @@ Closed, and the half must be one you can work at the rank named:
 | Aetherium forge | Open furniture. The staff and the plate made there are master recipes |
 
 A forge or a skyforge burns one charcoal, cheapest grade in the pack
-first. No charcoal, nothing is made. A hafted weapon also takes one
-tool handle. Swords, greatswords, daggers, bows and staves do not.
-Both of those are [Charburner](professions/woodworker/charburner.md)
-goods, and neither is written into the recipe's ingredient list, so
-the rank of a hafted weapon was worked out as if the handle were free.
+first. No charcoal, nothing is made. A war axe, a battleaxe, a
+warhammer, and a mace also take 1 Tool Handle. Swords, greatswords,
+daggers, bows, and staves do not. The handle is novice
+[Charburner](professions/woodworker/charburner.md) work, so listing it
+does not move the rank. The plugin rows still omit it. The server
+already removes one when the craft goes through.
 
 ## The book on K
 

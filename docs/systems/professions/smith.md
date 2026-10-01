@@ -24,11 +24,19 @@ Smelting an ingot is smith work, not anybody's. One row per ingot
 stays. Leather is the Platewright's. The duplicate rows, and the
 dragon and Daedric ingots, are in [Cut items](../cut-items.md).
 
-Hafted weapons also take one tool handle: war axes, battleaxes,
-warhammers, maces, and the other-weapon rows. Swords, greatswords
-and daggers do not. The handle is not in the ingredient list, so
-those rows were ranked as if it were free. Both the charcoal and the
-handle come from a [Charburner](woodworker/charburner.md).
+A war axe, a battleaxe, a warhammer, and a mace are a metal head on a
+wooden haft. Each of those recipes takes 1 Tool Handle, on top of the
+ingots. The handle is novice Charburner work, 1 firewood, so it does
+not raise the rank: the metal was already the dearest ingredient.
+Swords, greatswords, and daggers are a tang and a grip. Bows and
+staves are wood all the way through. None of those take a handle.
+
+The pickaxe, the woodcutter's axe, and the shovel already name a
+handle in their own records. They do not take a second one.
+
+A drum, a flute, and a lute are filed in the same family as the odd
+weapons, so the server currently asks them for a handle too. They
+should not. An instrument is not a haft.
 
 Repair is a kit, not a temper. See [Durability](../durability.md).
 
@@ -48,5 +56,8 @@ half places one more.
 ## Where this is
 
 The recipe gates, the skyforge's advanced line, the charcoal, and
-the handle are in the server. Mastercraft is not applied to a
-temper, because the temper never arrives.
+the taking of one handle are in the server. The ingredient column on
+the recipe pages still omits the handle, because the plugin record
+does. A drum, a flute, and a lute are asked for a handle by that same
+check. Mastercraft is not applied to a temper, because the temper
+never arrives.
