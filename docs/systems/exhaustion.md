@@ -38,7 +38,7 @@ does not count.
 | --- | --- |
 | Sitting | 20 |
 | A campfire, or a bedroll on the road | 35 |
-| An inn room you have paid for | 50 |
+| An inn room, once you have paid the holder's price | 50 |
 | A bed you own, rent, or have been allowed | 80 |
 
 Someone who has said `/bard` in the same cell within the last 5 minutes

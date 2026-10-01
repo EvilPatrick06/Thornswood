@@ -1,6 +1,6 @@
 # Unranked world plants
 
-Generated from `game/data/harvests.json` by `scripts/dev/Write-SystemLists.js`. 45 rows, 52 placed records. In the harvest table and not on a class ladder.
+Generated from `game/data/harvests.json` by `scripts/dev/Write-SystemLists.js`. 45 rows, 52 placed records. In the harvest file with no rank. The plan's ranks, and which of these are the farmer's, are on the gatherer page.
 
 | Name | Rank | Records | You receive |
 | --- | --- | --- | --- |

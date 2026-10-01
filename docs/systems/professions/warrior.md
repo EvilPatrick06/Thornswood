@@ -32,7 +32,7 @@ A chicken and a dragon are not the same fight. The piece count follows
 how hard the thing was. A person killed by a person is still nothing.
 
 When the body is on the hunter list, the piece count is that body's
-own hunter rank, the gold of its best part, on
+own hunter rank, on
 [Hunter](../classes/hunter.md). A named body uses its own row. Karhu
 is master on that list, so Karhu is 8, even though a bear is 4.
 
@@ -64,6 +64,26 @@ The profession places 1 in Vitality (+10 health) and 1 in Might
 (+0.05 melee damage). The half places one more, on its own page.
 A class places one on top of those. See [Skill tree](../skill-tree.md).
 
+## Maneuvers
+
+The half you picked. A sister half at novice does not have them until
+a Warlord has taken you on, and then only the novice row. An outside
+trade is the same: the novice row, and no further.
+
+| Half | Rank | Maneuver | What it does | Stamina | Cooldown |
+| --- | --- | --- | --- | --- | --- |
+| Bulwark | Novice | Set | Block costs half stamina for 8 seconds | 15 | 45 seconds |
+| Bulwark | Advanced | Plant | You are not staggered for 8 seconds | 20 | 60 seconds |
+| Bulwark | Expert | Cover | One person within 3 metres takes 20% less damage while you block, for 8 seconds | 25 | 90 seconds |
+| Bulwark | Master | Wall | You and your party within 3 metres take 20% less damage for 10 seconds | 40 | 3 minutes |
+| Berserker | Novice | Rush | +4 speed for 5 seconds | 15 | 30 seconds |
+| Berserker | Advanced | Heavy | The next power attack within 8 seconds deals 25% more | 20 | 45 seconds |
+| Berserker | Expert | Break | The next hit staggers | 25 | 60 seconds |
+| Berserker | Master | Wreck | The next power attack deals 50% more and staggers | 40 | 2 minutes |
+
+You have the rows at your rank and below, on your half. Stamina is
+spent when the maneuver starts. If you do not have it, nothing happens.
+
 ## Warlord
 
 At master. Master-tier combat maneuvers, and you can teach novice
@@ -71,13 +91,13 @@ combat to people who are not warriors. That teaching is one of their
 two outside apprenticeships. It never goes past novice, and it does
 not make them a warrior.
 
-The maneuvers are not a list of animations yet. Until they are, master
-is the rank, the teaching, and the placed points, and nothing else.
+The maneuvers are the table above. They are not in the server. Until
+they are, master is the rank, the teaching, and the placed points.
 
 ## Where this is
 
 The profession, the two halves, the placed points, and a kill that
 counts as one piece are in the server. A kill between people already
 counts for nothing. The strength table above is not applied: a
-chicken and a dragon are both one piece. The maneuvers are not a
-mechanic.
+chicken and a dragon are both one piece. The maneuver table is not
+applied.

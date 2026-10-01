@@ -52,7 +52,6 @@ const harvests = JSON.parse(fs.readFileSync(HARVESTS, 'utf8'));
 const ores = JSON.parse(fs.readFileSync(ORES, 'utf8'));
 const hunts = JSON.parse(fs.readFileSync(HUNTS, 'utf8'));
 const races = JSON.parse(fs.readFileSync(RACES, 'utf8'));
-const food = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'food.json'), 'utf8'));
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -85,8 +84,8 @@ Object.keys(recipes.refused || {}).forEach(function (id) {
 });
 
 function recipeTable(rows) {
-  const lines = ['| Item | Makes | Rank | Kind | Bench | Asks for | Gold | Race | Server asked | Id |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |'];
+  const lines = ['| Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- |'];
   rows.sort(function (a, b) {
     const ar = ranks.indexOf(a.rank);
     const br = ranks.indexOf(b.rank);
@@ -107,7 +106,6 @@ function recipeTable(rows) {
       clean(row.family),
       benchShort(row.benchName),
       inputsOf(row),
-      row.worth == null ? '' : row.worth,
       clean(row.race),
       row.fires === false ? 'no' : 'yes',
       '`' + clean(row._id) + '`'
@@ -200,7 +198,7 @@ function distinctWork(title, from, bag, extra, opts) {
     if (!groups[key]) {
       groups[key] = {
         name: name, rank: rank, n: 0, gives: {}, world: {},
-        yield: row.yield, gold: {}, grow: {}
+        yield: row.yield, grow: {}
       };
     }
     const g = groups[key];
@@ -214,10 +212,6 @@ function distinctWork(title, from, bag, extra, opts) {
     }
     if (row.from) { g.world[clean(row.from)] = true; }
     if (row.growMinutes != null) { g.grow[String(row.growMinutes)] = true; }
-    if (opts.gold) {
-      const gold = opts.gold(id, row);
-      if (gold !== '' && gold != null) { g.gold[String(gold)] = true; }
-    }
     if (opts.world) {
       const world = opts.world(id, row);
       if (world) { g.world[clean(world)] = true; }
@@ -231,12 +225,10 @@ function distinctWork(title, from, bag, extra, opts) {
     return a.name < b.name ? -1 : 1;
   });
   const showWorld = rows.some(function (row) { return Object.keys(row.world).length; });
-  const showGold = rows.some(function (row) { return Object.keys(row.gold).length; });
   const showGrow = rows.some(function (row) { return Object.keys(row.grow).length; });
   const showYield = rows.some(function (row) { return row.yield; });
   const heads = ['Name', 'Rank', 'Records', 'You receive'];
   if (showWorld) { heads.push('In the world'); }
-  if (showGold) { heads.push('Gold'); }
   if (showGrow) { heads.push('Grow minutes'); }
   if (showYield) { heads.push('Yield novice, advanced, expert, master'); }
   let table = '| ' + heads.join(' | ') + ' |\n| ' + heads.map(function () { return '---'; }).join(' | ') + ' |\n';
@@ -248,7 +240,6 @@ function distinctWork(title, from, bag, extra, opts) {
       Object.keys(row.gives).sort().join(', ')
     ];
     if (showWorld) { cells.push(Object.keys(row.world).sort().join(', ')); }
-    if (showGold) { cells.push(Object.keys(row.gold).sort(function (a, b) { return Number(a) - Number(b); }).join('-')); }
     if (showGrow) { cells.push(Object.keys(row.grow).sort(function (a, b) { return Number(a) - Number(b); }).join(', ')); }
     if (showYield) {
       cells.push(row.yield ? row.yield.map(function (pair) { return pair[0] + '-' + pair[1]; }).join(', ') : '');
@@ -260,49 +251,27 @@ function distinctWork(title, from, bag, extra, opts) {
   return { body: body, names: rows.length, records: Object.keys(bag).length, table: table };
 }
 
-function foodGold(produce) {
-  const item = food.items && food.items[produce];
-  return item && item.gold != null ? item.gold : '';
-}
-
-function harvestGold(id) {
-  const detail = harvests.detail && harvests.detail[id];
-  if (detail && detail.produceValue != null) { return detail.produceValue; }
-  const row = harvests.harvests[id] || harvests.crops[id] || harvests.fish[id] || (harvests.game && harvests.game[id]);
-  return row ? foodGold(row.produce) : '';
-}
-
 function harvestWorld(id) {
   const detail = harvests.detail && harvests.detail[id];
   return detail && detail.name ? detail.name : '';
 }
 
-function oreGold(id) {
-  const detail = ores.detail && ores.detail[id];
-  return detail && detail.oreValue != null ? detail.oreValue : '';
-}
-
-function huntGold(id) {
-  const detail = hunts.detail && hunts.detail[id];
-  return detail && detail.bestValue != null ? detail.bestValue : '';
-}
-
 const classFiles = [
   ['miner.md', 'Miner', 'game/data/ores.json', ores.ores,
-    'A pair of zeroes means that rank cannot work the seam. Yield is least-most per swing. Gold is the ore\'s sell price. Heart stone is 100 gold and is advanced anyway.',
-    { gold: oreGold }],
+    'A pair of zeroes means that rank cannot work the seam. Yield is least-most per swing. An ore has no gold price. Heart stone is advanced in this file. The plan ranks it master.',
+    {}],
   ['gatherer.md', 'Gatherer', 'game/data/harvests.json', harvests.harvests,
-    'Reagents. One pick is one of the produce. Gold is the produce\'s sell price, which is also the rank. Wheat is in this table and is a crop: the server treats it as the farmer\'s.',
-    { gold: harvestGold, world: harvestWorld }],
+    'Reagents. One pick is one of the produce. The rank is the rank on the row. A plant has no gold price. Wheat is in this table and is a crop: the server treats it as the farmer\'s.',
+    { world: harvestWorld }],
   ['farmer.md', 'Farmer', 'game/data/harvests.json', harvests.crops,
-    'Ranked by how hard the crop is to grow, not by what it sells for. Grow minutes are the novice wait, before the rank multiplier.',
-    { gold: harvestGold }],
+    'Ranked by how hard the crop is to grow. A crop has no gold price. Grow minutes are the novice wait, before the rank multiplier.',
+    {}],
   ['fisher.md', 'Fisher', 'game/data/harvests.json', harvests.fish,
-    'Pressed at the water. No rod. Gold is the produce\'s sell price where the food table has it.',
-    { gold: function (id, row) { return foodGold(row.produce); } }],
+    'Pressed at the water. No rod. A fish has no gold price.',
+    {}],
   ['hunter.md', 'Hunter', 'game/data/hunts.json', hunts.hunts,
-    'Only a hunter loots the body. Yield is least-most of each part. Gold is the best part, and that gold is the rank.',
-    { gold: huntGold }]
+    'Only a hunter loots the body. Yield is least-most of each part. The rank is the rank on the row. A part has no gold price.',
+    {}]
 ];
 
 const classGot = {};
@@ -321,7 +290,7 @@ if (harvests.game) {
 }
 if (harvests.unranked) {
   const got = distinctWork('Unranked world plants', 'game/data/harvests.json', harvests.unranked,
-    'In the harvest table and not on a class ladder.');
+    'In the harvest file with no rank. The plan\'s ranks, and which of these are the farmer\'s, are on the gatherer page.');
   write('unranked.md', got.body);
   index.push('- [Unranked](unranked.md) (' + got.names + ')');
 }
@@ -424,7 +393,7 @@ Object.keys(byHalf).sort().forEach(function (key) {
     rows.length + ' recipes. ' + asked.length + ' reach the server. ' +
     temperSentence + ' The same rows, with ids, are in [' +
     file.replace('.md', '') + '](' + link + ').\n\n' +
-    'A rank is the dearest ingredient a class produces. If an ingredient is produced by nobody, the rank stays at what the finished piece sells for, and it is not allowed to drop below that. The sell price alone is not the rank when something in the row is produced.\n\n' +
+    'The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.\n\n' +
     '### Names that reach the server\n\n' +
     namesByRank(rows, true) + '\n\n';
   if (key === 'Enchanter/Bladebinder') {
@@ -440,8 +409,8 @@ Object.keys(byHalf).sort().forEach(function (key) {
       'In the college book means that editor id is one of the spells on the mage pages. ' +
       inBookCount + ' of ' + spellRows + ' staves ask for a spell that is in that book. ' +
       'The rest name a mod spell. A staff whose spell is not in the book can sit at novice in this table and still be unmakeable, because the menu will not list it for someone who was never granted the spell.\n\n';
-    const lines = ['| Item | Rank | Bench | Asks for | Spell the menu asks for | In the college book | Gold |',
-      '| --- | --- | --- | --- | --- | --- | --- |'];
+    const lines = ['| Item | Rank | Bench | Asks for | Spell the menu asks for | In the college book |',
+      '| --- | --- | --- | --- | --- | --- |'];
     rows.slice().sort(function (a, b) {
       const ar = ranks.indexOf(a.rank);
       const br = ranks.indexOf(b.rank);
@@ -455,8 +424,7 @@ Object.keys(byHalf).sort().forEach(function (key) {
         benchShort(row.benchName),
         inputsOf(row),
         spell,
-        inBook(spells.flat, spell),
-        row.worth == null ? '' : row.worth
+        inBook(spells.flat, spell)
       ].join(' | ') + ' |');
     });
     body += lines.join('\n') + '\n';

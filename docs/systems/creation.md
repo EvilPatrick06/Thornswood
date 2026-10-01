@@ -23,7 +23,7 @@ panel behind K opens on its own. On it:
 They are handed 40 gold once, and nothing else, except a tool at the
 moment a pick that needs one is made: a pickaxe for a Miner, a
 woodcutter's axe for a Woodworker, a shovel and seed for a Farmer, a
-crude fishing pole for a Fisher. The tool has 100 uses.
+crude fishing pole for a Fisher. The tool has 50 uses.
 
 The towns are Whiterun, Riften, Solitude, Windhelm, Markarth, Falkreath,
 Morthal, Dawnstar, Winterhold and Raven Rock. The arrival is that town's

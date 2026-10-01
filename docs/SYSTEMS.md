@@ -116,7 +116,7 @@ are on the school pages above.
 Patrols on the roads. No coin from them.
 
 [The Imperial Embassy](systems/embassy.md). One house in Solitude.
-40 on the roll, 12 of them armed, and only inside the walls.
+20 on the roll, 6 of them armed, and only inside the walls.
 
 [People beside you](systems/people.md). The index. Each of these is
 its own system.

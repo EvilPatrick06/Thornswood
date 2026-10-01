@@ -9,12 +9,12 @@ The text of the Accord is on the site. This page is the numbers.
 
 ## The roll
 
-40 persons in service, no more. Of those, 12 may be marked armed, and
-those 12 bear arms inside the walls only.
+20 persons in service, no more. Of those, 6 may be marked armed, and
+those 6 bear arms inside the walls only.
 
 The Ambassador keeps the roll. The Ambassador is a title, not a class.
-See [Offices](offices.md). Naming a 41st person is refused. Marking a
-13th as armed is refused.
+See [Offices](offices.md). Naming a 21st person is refused. Marking a
+7th as armed is refused.
 
 Armed means the roll says so. The server does not strip a sword at
 the gate by looking at the pack. Outside the gate, a person the roll
@@ -23,7 +23,7 @@ the Jarl of Haafingar rather than shelter them. That handoff is a
 scene. It is not a teleport.
 
 A veteran who served decades ago and settled in a hold is not on this
-roll and is not limited by the 12.
+roll and is not limited by the 6.
 
 ## The law at the door
 
@@ -61,7 +61,7 @@ fare. See [Carriages and ferries](carriages.md).
 ## Who may play it
 
 Imperial citizens, merchants, embassy staff, the Ambassador's people.
-A Legion soldier under arms is one of the 12, inside the walls. Walk
+A Legion soldier under arms is one of the 6, inside the walls. Walk
 out the gate carrying and you have broken the Accord.
 
 You are watched, and you are one bad night from being told to leave.
@@ -82,6 +82,6 @@ captain variants are not made. Their references are in
 
 The Accord is on the site. The building is in the world as a place
 that can be claimed like any other door, and nothing yet reserves it
-for an office, caps a roll at 40, or counts the 12. Solitude's box
+for an office, caps a roll at 20, or counts the 6. Solitude's box
 and board already exist and are the hold's. Imperial gear is still
 in the crafting lists and still in the world.
