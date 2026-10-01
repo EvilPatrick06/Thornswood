@@ -33,25 +33,37 @@ The rare mine is this second kind. Ebony, the gems, stalhrim, and
 heart stone are one place each. See [Miner](classes/miner.md). The
 rank on the seam still applies.
 
-A scene quest is for the evening. It is not stock for the shop and
-it does not open a mine. The trader asks you to do a thing in the
-world: carry a letter, repeat what you were told, walk to a place,
-sit an hour, stand a watch, bring meals to a sitting. The gold is
-the amount written on that quest. It is created when you finish.
-It does not come out of the trader's 250, and it does not run out.
-The same cooldown rules apply. These six are open to anyone.
+A scene quest is a deed, not a purchase. The trader does not buy
+food, cooked meals, ore, or anything a person made. Those prices
+stay with the people who sell them. A supply quest is the purchase.
+A scene quest pays you for something the server can already see:
+a death, or a quest item that is not a good.
 
-| Quest | What you do | Gold | Cooldown |
+The gold is the amount written on that quest. It is created when
+you finish. It does not come out of the trader's 250, and it does
+not run out. The same cooldown rules apply. These are open to
+anyone. What a body drops stays in your pack. You sell that to a
+person, at their price. The quest does not take it.
+
+A letter is not one of these. Letters are posted on the notice
+board, and the sender pays the courier. See
+[Notice boards](noticeboards.md).
+
+| Quest | What the server checks | Gold | Cooldown |
 | --- | --- | --- | --- |
-| The letter | Carry their letter, sealed, to the trader in a hold they name. You do not open it. | 15 | 2 hours |
-| The telling | Hear what they tell you about this hold, and say it in your own words to the trader in another hold. | 15 | 4 hours |
-| The road | Go to a place they name in this hold, then come back and say what is there. | 20 | 4 hours |
-| The sitting | Spend an hour at the inn they name, then come back. | 20 | 6 hours |
-| The table | Hand them three meals from your pack, for a sitting. The meals leave your pack. | 25 | 6 hours |
-| The watch | Stand at a door they name for an hour, in the world, then come back. | 25 | 8 hours |
+| A wolf | You kill a wolf in the place they name in this hold. | 25 | 3 hours |
+| A sabre cat | You kill a sabre cat in the place they name. | 40 | 6 hours |
+| A bear | You kill a bear in the place they name. | 50 | 8 hours |
+| The camp | You kill three bandits in the camp they name. | 45 | 6 hours |
+| The barrow | You kill a draugr in the barrow they name. | 60 | 10 hours |
+| A giant | You kill a giant in this hold. | 100 | 18 hours |
+| The signet | A ring in a chest they name. It is not a craft and it is not sold. You bring it back and it is taken. | 40 | 8 hours |
 
-A richer one waits longer. Another scene can be added the same way:
-a set amount of gold, and its own cooldown.
+The place is a cell. A kill outside it does not count. The ring is
+one item, put back if you walk away before the turn-in. A dragon is
+not on this list. A richer deed waits longer. Another scene can be
+added the same way: a deed the server can check, a set amount of
+gold, and its own cooldown. It still does not buy goods.
 
 ## Who may take one
 

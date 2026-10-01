@@ -155,7 +155,8 @@ on that quest's cooldown. A company sale can take some coin out of
 the world. It does not buy a rank.
 
 [Notice boards](systems/noticeboards.md). One board a hold. 20 gold for a
-notice, 30 for a job. The newest ten show.
+notice, 30 for a job. A letter costs the board fee plus 15 for the
+courier, paid by the sender. The newest ten show.
 
 [Merchant's Guild](systems/merchants-guild.md). The shops of a hold. Dues
 and ledgers go to the hold's box. Traders start with 250 and buy and
@@ -165,7 +166,9 @@ mint coin after that purse, and it is not a profession.
 [Custom quests](systems/quests.md). Guild traders ask for goods. A supply
 quest pays from the trader's purse. A scarce quest opens a place that
 holds more than the turn-in, for a class, a profession, or a race. A
-scene quest pays a set amount, and that gold does not run out.
+scene quest pays a set amount for a bounty or a retrieval, and that
+gold does not run out. It does not buy goods. A letter is on the
+notice board, and the sender pays.
 
 [Free Skyrim Trading Company](systems/trading-company.md). Hauls between
 holds. The hauler is paid out of the box. The company keeps 10%. It is not
