@@ -8,6 +8,7 @@ None of these is a class or a profession. Each one is its own system.
 | Party | [Party](party.md) |
 | Trade | [Trade](trade.md) |
 | Journals | [Journals](journal.md) |
+| Factions and businesses | [Factions and businesses](factions.md) |
 | Voice | [Voice](voice.md) |
 | Emotes | [Emotes](emotes.md) |
 | Text chat | [Text chat](chat.md) |
@@ -15,14 +16,18 @@ None of these is a class or a profession. Each one is its own system.
 A friend is not a party. A party is who is in the cell with you this
 evening, and it is what pays the work bonus. The person who opened
 it leads it. A trade is two people and what they are holding. A
-journal is yours until you share a page with a friend. Voice is how
-far a spoken word carries, and a colored mark above the head while
-the microphone is open. The wheel is animations. Text is what you
-type. A plain line, a `/me`, and an `/ooc` also sit above the head
-for whoever is close enough to read them. Out of character stays in
-brackets, including there, so a scene can see that it stepped out.
-You can stop hearing one person, stop reading them, or hide their
-name, and only for yourself.
+journal is yours until you share a page with a friend. A faction or
+a business is a second tab on that same panel, and most people never
+see it. Voice is how far a spoken word carries, and a colored mark
+above the head while the microphone is open. The wheel is
+animations, and playing one puts its name on the same line as typed
+speech. Text is what you type. A plain line, a `/me`, a `/do`, a
+whisper, a shout, and an `/ooc` also sit above the head for whoever
+is close enough to read them. Out of character stays in brackets,
+including there, so a scene can see that it stepped out. You can
+stop hearing one person, stop reading them, or hide their name, and
+only for yourself. `/hidename all` hides every name. A staff silence
+is everybody's, and the person cannot lift it.
 
 ## Bard
 
@@ -35,13 +40,16 @@ running.
 
 Bard is not a profession. The lute, flute, and drum on the
 [emote wheel](emotes.md) are animations. They do not count as `/bard`
-unless you also say the word.
+unless you also say the word. `/bard` stays in the box. It does not
+float.
 
 ## Where this is
 
-The seven systems are in the server, with the gaps named at the
-bottom of each page. `/bard` for 5 minutes is in the server. The
-party cap of 6 is in the server. Plain text chat still goes to
+The systems in the table are in the server, with the gaps named at
+the bottom of each page, except factions and businesses, which are
+not in the server at all. `/bard` for 5 minutes is in the server.
+The party cap of 6 is in the server. Plain text chat still goes to
 everybody, because the local switch ships off. The mark above the
-head, the words above the head, the text and name switches, and the
+head, the words above the head, an emote's name above the head, the
+text and name switches, hiding every name, staff silence, and the
 leader's kick, lead, and disband are not in the server.
