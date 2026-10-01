@@ -1,5 +1,9 @@
 # The body
 
+Optional, and later. It is not part of going live. After the server
+is fully live, it is added only if a vote says yes. Until that vote,
+nobody builds it.
+
 A slow meter, 0 to 100. It starts at 0. It fills as you eat and drink.
 It is not hunger and it is not thirst.
 
@@ -35,5 +39,7 @@ high.
 
 ## Where this is
 
-Not in the server. Hunger, thirst and rest do not stand in for it.
-Outhouses and pots are not furniture the server knows.
+Not in the server, and not work to do before the vote. Hunger, thirst
+and rest do not stand in for it. Outhouses and pots are not furniture
+the server knows. Leave them that way until a vote after the server
+is fully live says to add this meter.

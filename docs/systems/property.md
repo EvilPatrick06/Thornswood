@@ -116,9 +116,10 @@ Chests and barrels in the building are storage. A claim does not add
 slots. The server already owns containers. When a claim ends, the
 containers stay as they are for the next holder.
 
-An outhouse or a pot, in a home you may use, is the relief on
-[The body](body.md). You may use it when you hold the place, you rent
-it, or the holder allowed you.
+An outhouse or a pot would be relief for the optional meter on
+[The body](body.md). That meter is not built unless a vote after the
+server is fully live says to add it. Until then the server does not
+treat an outhouse or a pot as furniture.
 
 ## A shop
 
@@ -146,6 +147,7 @@ is `private/property.json`.
 
 `/rest bed` still believes the word. It does not look for a bed.
 A holder cannot set a price for a night. `/bed` does not exist.
-Outhouses and pots are not known furniture. The company payout that
+Outhouses and pots stay unknown until the vote on
+[The body](body.md). The company payout that
 withdraws from the ledger is not built. The four house parts are
 already refused. The drop box does not accept a price list.

@@ -16,8 +16,9 @@ warmth back to fine, or 2 hours clears it.
 
 **Food sickness.** Raw meat or fish catches it 40% of the time. Eating
 at 90 hunger or above catches it. Lasts 30 minutes. Weakness: the
-weary hunger penalties, and the body meter fills at double if that
-meter is in. See [Food](food.md) and [The body](body.md).
+weary hunger penalties. The optional meter on [The body](body.md)
+is not part of this sickness unless a later vote adds that meter.
+See [Food](food.md).
 
 **Fouled water.** Marsh, a puddle, or standing water you did not boil
 catches it 80% of the time. The sea catches it 40%. A river, unboiled,

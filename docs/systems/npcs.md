@@ -44,7 +44,7 @@ so a province would look full. They are to be taken out or remade.
 Until they are, they behave as the limit above says, and they are
 not a system to build on.
 
-The embassy's 40 are people on a roll, not actors. See
+The embassy's 20 are people on a roll, not actors. See
 [The Imperial Embassy](embassy.md).
 
 Guards of a hold, when they are remade, are the hold's. A Thalmor
