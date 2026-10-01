@@ -338,8 +338,8 @@
     /*
       auto is true for every line thornswood-front.js sends through
       tellServer: /place, /ate, /face done, /pick refresh, and the K panel's
-      picks and the look keys too, whose answer comes back on the panel or in
-      chat when they land. Patrick, 24 September, over a tester in the
+      picks, whose answer comes back on the panel or in chat when they land.
+      Deliberate look-key actions keep the same feedback as typed commands. Patrick, 24 September, over a tester in the
       creation hall: "it says mulitple trimes he wasnt connected yet". Nobody
       there had typed a word. So the notice is for the chat box and the
       journal, party and trade buttons, and an automatic line is queued and
