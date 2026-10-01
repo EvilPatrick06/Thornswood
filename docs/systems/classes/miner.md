@@ -61,8 +61,8 @@ Heart stone is master, by its price. The staves that still ask for it
 are the ones left in the college book. See
 [Bladebinder](../professions/enchanter/bladebinder.md).
 
-The price bands, for anything added later: up to 14 gold novice, up
-to 29 advanced, up to 59 expert, otherwise master.
+A new ore is given a rank when it is added. The rank is not a gold
+price. An ore has no gold price.
 
 ## The seam
 
@@ -78,7 +78,7 @@ The seam comes back for everybody at once, not per person.
 | Gold | 20 minutes |
 | Corundum, silver | 10 minutes |
 | Clay, quarried stone, orichalcum, quicksilver, moonstone, malachite, shellbug | 30 minutes |
-| Ebony, the gems, stalhrim, heart stone | One place. A scarce quest opens it. The trader asks for a count, the place holds more than that count, and the extra is what you keep. See [Custom quests](../quests.md). The quest may require Miner. The rank on the seam still applies. A steward does not grant it. |
+| Ebony, the gems, stalhrim, heart stone | One place each. A scarce quest opens it. The counts and the cooldown are on [Custom quests](../quests.md). The rank on the seam still applies. A steward does not grant it. |
 
 Clicking again while the pick is still in the air is not a second
 swing. Nothing is said. The ore is not given twice.
@@ -121,26 +121,26 @@ the smith's Might.
 
 Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same rows are in [miner](../lists/miner.md).
 
-| Name | Rank | Records | You receive | Gold | Yield novice, advanced, expert, master |
-| --- | --- | --- | --- | --- | --- |
-| Clay | novice | 5 | Clay | 1 | 1-2, 1-3, 1-4, 1-5 |
-| Iron Ore | novice | 82 | Iron Ore | 2 | 1-2, 1-3, 1-4, 1-5 |
-| Quarried Stone | novice | 1 | Quarried Stone | 2 | 1-2, 1-3, 1-4, 1-5 |
-| Corundum Ore | advanced | 81 | Corundum Ore | 20 | 0-0, 1-3, 1-4, 1-5 |
-| Heart Stone | advanced | 4 | Heart Stone | 100 | 0-0, 1-3, 1-4, 1-5 |
-| Orichalcum Ore | advanced | 76 | Orichalcum Ore | 20 | 0-0, 1-3, 1-4, 1-5 |
-| Quicksilver Ore | advanced | 76 | Quicksilver Ore | 25 | 0-0, 1-3, 1-4, 1-5 |
-| Shellbug Chitin | advanced | 1 | Shellbug Chitin | 25 | 0-0, 1-3, 1-4, 1-5 |
-| Silver Ore | advanced | 76 | Silver Ore | 25 | 0-0, 1-3, 1-4, 1-5 |
-| Gold Ore | expert | 76 | Gold Ore | 50 | 0-0, 0-0, 1-4, 1-5 |
-| Malachite Ore | expert | 7 | Malachite Ore | 30 | 0-0, 0-0, 1-4, 1-5 |
-| Moonstone Ore | expert | 76 | Moonstone Ore | 30 | 0-0, 0-0, 1-4, 1-5 |
-| Amethyst | master | 3 | Amethyst | 120 | 0-0, 0-0, 0-0, 1-5 |
-| Ebony Ore | master | 6 | Ebony Ore | 60 | 0-0, 0-0, 0-0, 1-5 |
-| Emerald | master | 3 | Emerald | 600 | 0-0, 0-0, 0-0, 1-5 |
-| Ruby | master | 3 | Ruby | 200 | 0-0, 0-0, 0-0, 1-5 |
-| Sapphire | master | 3 | Sapphire | 400 | 0-0, 0-0, 0-0, 1-5 |
-| Stalhrim | master | 2 | Stalhrim | 200 | 0-0, 0-0, 0-0, 1-5 |
+| Name | Rank | Records | You receive | Yield novice, advanced, expert, master |
+| --- | --- | --- | --- | --- |
+| Clay | novice | 5 | Clay | 1-2, 1-3, 1-4, 1-5 |
+| Iron Ore | novice | 82 | Iron Ore | 1-2, 1-3, 1-4, 1-5 |
+| Quarried Stone | novice | 1 | Quarried Stone | 1-2, 1-3, 1-4, 1-5 |
+| Corundum Ore | advanced | 81 | Corundum Ore | 0-0, 1-3, 1-4, 1-5 |
+| Heart Stone | advanced | 4 | Heart Stone | 0-0, 1-3, 1-4, 1-5 |
+| Orichalcum Ore | advanced | 76 | Orichalcum Ore | 0-0, 1-3, 1-4, 1-5 |
+| Quicksilver Ore | advanced | 76 | Quicksilver Ore | 0-0, 1-3, 1-4, 1-5 |
+| Shellbug Chitin | advanced | 1 | Shellbug Chitin | 0-0, 1-3, 1-4, 1-5 |
+| Silver Ore | advanced | 76 | Silver Ore | 0-0, 1-3, 1-4, 1-5 |
+| Gold Ore | expert | 76 | Gold Ore | 0-0, 0-0, 1-4, 1-5 |
+| Malachite Ore | expert | 7 | Malachite Ore | 0-0, 0-0, 1-4, 1-5 |
+| Moonstone Ore | expert | 76 | Moonstone Ore | 0-0, 0-0, 1-4, 1-5 |
+| Amethyst | master | 3 | Amethyst | 0-0, 0-0, 0-0, 1-5 |
+| Ebony Ore | master | 6 | Ebony Ore | 0-0, 0-0, 0-0, 1-5 |
+| Emerald | master | 3 | Emerald | 0-0, 0-0, 0-0, 1-5 |
+| Ruby | master | 3 | Ruby | 0-0, 0-0, 0-0, 1-5 |
+| Sapphire | master | 3 | Sapphire | 0-0, 0-0, 0-0, 1-5 |
+| Stalhrim | master | 2 | Stalhrim | 0-0, 0-0, 0-0, 1-5 |
 
 <!-- detail:end -->
 

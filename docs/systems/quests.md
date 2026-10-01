@@ -13,9 +13,11 @@ not run.
 ## What they are for
 
 A supply quest moves goods. The trader asks for a count of an item
-that hold already buys. You bring it. The trader pays that hold's
+that hold already buys. The item is one on the price lists submitted
+to that hold's box. There is no second list. The count is 5. The
+cooldown is 6 hours. You bring it. The trader pays that hold's
 buy price for the count, out of the trader's own purse. If the purse
-cannot cover it, the trader does not offer the quest. If no trader
+cannot cover 5, the trader does not offer the quest. If no trader
 buys the item, there is no supply quest for it. Prices are on
 [Merchant's Guild](merchants-guild.md).
 
@@ -31,7 +33,22 @@ You cannot take more from the place while the quest is unfinished.
 
 The rare mine is this second kind. Ebony, the gems, stalhrim, and
 heart stone are one place each. See [Miner](classes/miner.md). The
-rank on the seam still applies.
+rank on the seam still applies. These are the rest. A place holds
+more than the asked count. You keep the extra. The rank on the work
+still applies.
+
+| Quest | Who | Ask | The place holds | Cooldown |
+| --- | --- | --- | --- | --- |
+| The ebony | Miner, master | 4 ebony ore | 12 | 24 hours |
+| A gem | Miner, master | 2 of the gem they name | 6 | 24 hours |
+| The stalhrim | Miner, master | 3 stalhrim | 8 | 24 hours |
+| The heart stone | Miner, master | 3 heart stone | 8 | 24 hours |
+| The longfin | Fisher | 2 Abecean longfin | 8 spots | 12 hours |
+| The pearl bed | Fisher, expert | 1 pearl | 3 spots | 8 hours |
+| The crimson | Gatherer | 3 crimson nirnroot | 8 | 12 hours |
+| The mammoth ground | Hunter, master | Dress 1 mammoth | 3 mammoths | 24 hours |
+| The orchard | Farmer, expert | 4 apples | 10 | 12 hours |
+| The geode | Enchanter | 2 petty soul gems | 6 | 12 hours |
 
 A scene quest is a deed, not a purchase. The trader does not buy
 food, cooked meals, ore, or anything a person made. Those prices

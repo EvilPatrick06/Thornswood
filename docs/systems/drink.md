@@ -34,9 +34,9 @@ night's drinking, not the next real day.
 | Source | Thirst | Risk |
 | --- | --- | --- |
 | Well, inn, a filled skin | 20 | None |
-| River, unboiled | 20 | Low. Boiled, none |
-| Marsh, puddle, standing water | 15 | Fouled water. See [Disease](disease.md) |
-| The sea | 10 | Salt. Can sicken |
+| River, unboiled | 20 | 15% fouled water. Boiled, none |
+| Marsh, puddle, standing water | 15 | 80% fouled water. See [Disease](disease.md) |
+| The sea | 10 | Salt. 40% fouled water |
 
 Boiling is a cook fire, a minute at it, and it clears the risk. It is
 not a new station.

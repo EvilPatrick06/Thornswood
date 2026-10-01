@@ -102,10 +102,11 @@ Sometimes there is an event where someone sells a thing out of
 Skyrim. The thing leaves the game. That is the point: it is gone, and
 it does not come back into a chest.
 
-When the company buys, the worker who handled the sale takes a cut.
-Some of the gold leaves the server entirely, on top of that cut, so
-coin does not only move from pack to pack. The size of either cut is
-not set. See [Gold](gold.md).
+When the company buys, the worker who handled the sale takes 10% of
+the price, rounded down to a whole gold. Another 10% leaves the
+server. The seller receives what is left. A price under 10 gold pays
+the seller the whole price, and neither cut is taken. See
+[Gold](gold.md).
 
 ## What is not a haul
 

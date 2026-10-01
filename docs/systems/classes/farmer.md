@@ -76,8 +76,20 @@ kind of place, the same meters as
 [Temperature and weather](../temperature.md). The hold's name does
 not decide it. Whiterun is not the wheat hold.
 
-Seasons apply on top of that. How many seasons, and whether winter
-stops a crop, is not set.
+Four seasons, 7 real days each, the same week as rent. The province
+shares one season. It starts in spring the first time the server
+counts one. The hold's name does not pick it.
+
+| Season | What grows |
+| --- | --- |
+| Spring | Every rank. The grow clock runs. |
+| Summer | Every rank. |
+| Autumn | Novice and advanced. An expert crop waits. |
+| Winter | No rank. A sown plot stays sown. The clock does not run. |
+
+Winter stops a crop even on a warm day. Spring, summer, and autumn
+still need the temperature and the weather. A plot that waited
+through winter finishes in spring from where the clock stopped.
 
 ## Butter, milk, and the nest
 
@@ -91,8 +103,9 @@ you and that object. A restart clears it.
 | Butter churn | `bc0:HearthFires.esm` | 1 Butter (`353c:HearthFires.esm`) | Told it is farm work |
 | Living cow | Six bases: `6681e`, `c39f1`, `9da4b`, `23a90` in Skyrim.esm, `f9a9:Dawnguard.esm`, `ea867:ZIA_Complete Pack.esp` | 1 Jug of Milk (`3534:HearthFires.esm`) | The press does nothing. A dead cow is a hunter carcass, not a milking |
 | Chicken nest | `1062d1:Skyrim.esm` | 1 Chicken's Egg (`23d77:Skyrim.esm`) | Told it is farm work, so the engine cannot hand the egg to anyone else |
+| Beehive | The placed hive `dbf8b3:Thornswood-Content.esp`, and a world beehive on the harvest list | 1 Honeycomb | Told it is farm work |
 
-Goats are not milked. A mammoth cheese bowl is not a farmer verb.
+Goats are not milked. A beehive is. A mammoth cheese bowl is not a farmer verb.
 Whoever presses it gets the bowl, because no class answers it.
 
 Wild eggs are not this nest. Pine thrush, rock warbler, and hawk
@@ -137,18 +150,18 @@ The emote of sweeping is not farm work.
 
 Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same rows are in [farmer](../lists/farmer.md).
 
-| Name | Rank | Records | You receive | Gold | Grow minutes |
-| --- | --- | --- | --- | --- | --- |
-| Cabbage | novice | 1 | Cabbage | 1 | 75 |
-| Carrot | novice | 2 | Carrot | 1 | 75 |
-| Gourd | novice | 1 | Gourd | 1 | 75 |
-| Leek | novice | 2 | Leek | 1 | 75 |
-| Potato | novice | 1 | Potato | 1 | 75 |
-| Ash Yam | advanced | 1 | Ash Yam | 1 | 75 |
-| Tomato | advanced | 1 | Tomato | 1 | 75 |
-| Wheat | advanced | 1 | Wheat | 5 | 135 |
-| Green Apple | expert | 2 | Green Apple | 1 | 75 |
-| Red Apple | expert | 2 | Red Apple | 1 | 75 |
+| Name | Rank | Records | You receive | Grow minutes |
+| --- | --- | --- | --- | --- |
+| Cabbage | novice | 1 | Cabbage | 75 |
+| Carrot | novice | 2 | Carrot | 75 |
+| Gourd | novice | 1 | Gourd | 75 |
+| Leek | novice | 2 | Leek | 75 |
+| Potato | novice | 1 | Potato | 75 |
+| Ash Yam | advanced | 1 | Ash Yam | 75 |
+| Tomato | advanced | 1 | Tomato | 75 |
+| Wheat | advanced | 1 | Wheat | 135 |
+| Green Apple | expert | 2 | Green Apple | 75 |
+| Red Apple | expert | 2 | Red Apple | 75 |
 
 <!-- detail:end -->
 
@@ -159,4 +172,4 @@ and a shovel of 100 uses are in the server. The plan's shovel is 50.
 A farmer is handed 3 cabbage, 3 leek and 3 potato as seed. A cook
 is not handed a pack, in the plan or on the server. Nothing reads
 the weather before a crop grows,
-and there is no season.
+and there is no season. A beehive is not a farmer verb on the server.

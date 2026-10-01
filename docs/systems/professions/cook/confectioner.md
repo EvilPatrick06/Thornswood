@@ -58,7 +58,7 @@ the farmer's.
 
 Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 28 recipes. 28 reach the server. None of them are tempering. The same rows, with ids, are in [cook-confectioner](../../lists/cook-confectioner.md).
 
-A rank is the dearest ingredient a class produces. If an ingredient is produced by nobody, the rank stays at what the finished piece sells for, and it is not allowed to drop below that. The sell price alone is not the rank when something in the row is produced.
+The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.
 
 ### Names that reach the server
 
@@ -70,36 +70,36 @@ A rank is the dearest ingredient a class produces. If an ingredient is produced 
 
 **Master.** None.
 
-| Item | Makes | Rank | Kind | Bench | Asks for | Gold | Race | Server asked | Id |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Boiled Creme Treat | 1 | novice | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 1 Sack of Flour, 1 Butter | 6 |  | yes | `8a4:Gourmet.esp` |
-| Boiled Creme Treat | 2 | novice | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 1 Sack of Flour, 1 Butter | 6 |  | yes | `99f:Gourmet.esp` |
-| Honey Nut Treat | 1 | novice | Desserts | BYOHCraftingOven | 1 Honey, 1 Sack of Flour, 1 Butter | 6 |  | yes | `8a6:Gourmet.esp` |
-| Jazbay Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Jazbay Grapes, 1 Sack of Flour, 1 Butter | 6 |  | yes | `11800:HearthFires.esm` |
-| Jelly Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Netch Jelly | 6 |  | yes | `98b:Gourmet.esp` |
-| Juniper Berry Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Juniper Berries, 1 Sack of Flour, 1 Butter | 6 |  | yes | `80f:Gourmet.esp` |
-| Snowberry Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Snowberries, 1 Sack of Flour, 1 Butter | 6 |  | yes | `11802:HearthFires.esm` |
-| Sweet Roll | 1 | novice | Desserts | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Jug of Milk | 6 |  | yes | `117fb:HearthFires.esm` |
-| Honey Nut Treat | 2 | advanced | Desserts | BYOHCraftingOven | 1 Honey, 1 Sack of Flour, 1 Butter | 6 |  | yes | `9b4:Gourmet.esp` |
-| Jazbay Crostata | 1 | advanced | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Jazbay Grapes, 1 Sack of Flour, 1 Butter | 14 |  | yes | `117fa:HearthFires.esm` |
-| Jazbay Crostata | 2 | advanced | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Jazbay Grapes, 1 Sack of Flour, 1 Butter | 14 |  | yes | `9b6:Gourmet.esp` |
-| Jazbay Dumpling | 2 | advanced | Desserts | BYOHCraftingOven | 1 Jazbay Grapes, 1 Sack of Flour, 1 Butter | 6 |  | yes | `9b7:Gourmet.esp` |
-| Jelly Dumpling | 2 | advanced | Desserts | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Netch Jelly | 6 |  | yes | `9b8:Gourmet.esp` |
-| Juniper Berry Crostata | 1 | advanced | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Juniper Berries, 1 Sack of Flour, 1 Butter | 14 |  | yes | `117fc:HearthFires.esm` |
-| Juniper Berry Crostata | 2 | advanced | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Juniper Berries, 1 Sack of Flour, 1 Butter | 14 |  | yes | `9b9:Gourmet.esp` |
-| Juniper Berry Dumpling | 2 | advanced | Desserts | BYOHCraftingOven | 1 Juniper Berries, 1 Sack of Flour, 1 Butter | 6 |  | yes | `9ba:Gourmet.esp` |
-| Snowberry Crostata | 1 | advanced | Desserts | BYOHCraftingOven | 2 Snowberries, 1 Chicken's Egg, 1 Sack of Flour, 1 Butter | 14 |  | yes | `117fd:HearthFires.esm` |
-| Snowberry Crostata | 2 | advanced | Desserts | BYOHCraftingOven | 2 Snowberries, 1 Chicken's Egg, 1 Sack of Flour, 1 Butter | 14 |  | yes | `9d0:Gourmet.esp` |
-| Snowberry Dumpling | 2 | advanced | Desserts | BYOHCraftingOven | 1 Snowberries, 1 Sack of Flour, 1 Butter | 6 |  | yes | `9d1:Gourmet.esp` |
-| Sweet Roll | 2 | advanced | Desserts | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Jug of Milk | 6 |  | yes | `9d2:Gourmet.esp` |
-| Apple Dumpling | 1 | expert | Desserts | BYOHCraftingOven | 1 Red Apple, 1 Sack of Flour, 1 Butter | 6 |  | yes | `117f9:HearthFires.esm` |
-| Apple Dumpling | 1 | expert | Desserts | BYOHCraftingOven | 1 Green Apple, 1 Sack of Flour, 1 Butter | 6 |  | yes | `80e:Gourmet.esp` |
-| Apple Dumpling | 2 | expert | Desserts | BYOHCraftingOven | 1 Red Apple, 1 Sack of Flour, 1 Butter | 6 |  | yes | `994:Gourmet.esp` |
-| Apple Dumpling | 2 | expert | Desserts | BYOHCraftingOven | 1 Green Apple, 1 Sack of Flour, 1 Butter | 6 |  | yes | `995:Gourmet.esp` |
-| Apple Pie | 1 | expert | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Red Apple, 1 Sack of Flour, 1 Butter | 14 |  | yes | `117fe:HearthFires.esm` |
-| Apple Pie | 1 | expert | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Green Apple, 1 Sack of Flour, 1 Butter | 14 |  | yes | `820:Gourmet.esp` |
-| Apple Pie | 2 | expert | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Red Apple, 1 Sack of Flour, 1 Butter | 14 |  | yes | `996:Gourmet.esp` |
-| Apple Pie | 2 | expert | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Green Apple, 1 Sack of Flour, 1 Butter | 14 |  | yes | `997:Gourmet.esp` |
+| Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Boiled Creme Treat | 1 | novice | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 1 Sack of Flour, 1 Butter |  | yes | `8a4:Gourmet.esp` |
+| Boiled Creme Treat | 2 | novice | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 1 Sack of Flour, 1 Butter |  | yes | `99f:Gourmet.esp` |
+| Honey Nut Treat | 1 | novice | Desserts | BYOHCraftingOven | 1 Honey, 1 Sack of Flour, 1 Butter |  | yes | `8a6:Gourmet.esp` |
+| Jazbay Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Jazbay Grapes, 1 Sack of Flour, 1 Butter |  | yes | `11800:HearthFires.esm` |
+| Jelly Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Netch Jelly |  | yes | `98b:Gourmet.esp` |
+| Juniper Berry Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Juniper Berries, 1 Sack of Flour, 1 Butter |  | yes | `80f:Gourmet.esp` |
+| Snowberry Dumpling | 1 | novice | Desserts | BYOHCraftingOven | 1 Snowberries, 1 Sack of Flour, 1 Butter |  | yes | `11802:HearthFires.esm` |
+| Sweet Roll | 1 | novice | Desserts | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Jug of Milk |  | yes | `117fb:HearthFires.esm` |
+| Honey Nut Treat | 2 | advanced | Desserts | BYOHCraftingOven | 1 Honey, 1 Sack of Flour, 1 Butter |  | yes | `9b4:Gourmet.esp` |
+| Jazbay Crostata | 1 | advanced | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Jazbay Grapes, 1 Sack of Flour, 1 Butter |  | yes | `117fa:HearthFires.esm` |
+| Jazbay Crostata | 2 | advanced | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Jazbay Grapes, 1 Sack of Flour, 1 Butter |  | yes | `9b6:Gourmet.esp` |
+| Jazbay Dumpling | 2 | advanced | Desserts | BYOHCraftingOven | 1 Jazbay Grapes, 1 Sack of Flour, 1 Butter |  | yes | `9b7:Gourmet.esp` |
+| Jelly Dumpling | 2 | advanced | Desserts | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Netch Jelly |  | yes | `9b8:Gourmet.esp` |
+| Juniper Berry Crostata | 1 | advanced | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Juniper Berries, 1 Sack of Flour, 1 Butter |  | yes | `117fc:HearthFires.esm` |
+| Juniper Berry Crostata | 2 | advanced | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Juniper Berries, 1 Sack of Flour, 1 Butter |  | yes | `9b9:Gourmet.esp` |
+| Juniper Berry Dumpling | 2 | advanced | Desserts | BYOHCraftingOven | 1 Juniper Berries, 1 Sack of Flour, 1 Butter |  | yes | `9ba:Gourmet.esp` |
+| Snowberry Crostata | 1 | advanced | Desserts | BYOHCraftingOven | 2 Snowberries, 1 Chicken's Egg, 1 Sack of Flour, 1 Butter |  | yes | `117fd:HearthFires.esm` |
+| Snowberry Crostata | 2 | advanced | Desserts | BYOHCraftingOven | 2 Snowberries, 1 Chicken's Egg, 1 Sack of Flour, 1 Butter |  | yes | `9d0:Gourmet.esp` |
+| Snowberry Dumpling | 2 | advanced | Desserts | BYOHCraftingOven | 1 Snowberries, 1 Sack of Flour, 1 Butter |  | yes | `9d1:Gourmet.esp` |
+| Sweet Roll | 2 | advanced | Desserts | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Jug of Milk |  | yes | `9d2:Gourmet.esp` |
+| Apple Dumpling | 1 | expert | Desserts | BYOHCraftingOven | 1 Red Apple, 1 Sack of Flour, 1 Butter |  | yes | `117f9:HearthFires.esm` |
+| Apple Dumpling | 1 | expert | Desserts | BYOHCraftingOven | 1 Green Apple, 1 Sack of Flour, 1 Butter |  | yes | `80e:Gourmet.esp` |
+| Apple Dumpling | 2 | expert | Desserts | BYOHCraftingOven | 1 Red Apple, 1 Sack of Flour, 1 Butter |  | yes | `994:Gourmet.esp` |
+| Apple Dumpling | 2 | expert | Desserts | BYOHCraftingOven | 1 Green Apple, 1 Sack of Flour, 1 Butter |  | yes | `995:Gourmet.esp` |
+| Apple Pie | 1 | expert | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Red Apple, 1 Sack of Flour, 1 Butter |  | yes | `117fe:HearthFires.esm` |
+| Apple Pie | 1 | expert | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Green Apple, 1 Sack of Flour, 1 Butter |  | yes | `820:Gourmet.esp` |
+| Apple Pie | 2 | expert | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Red Apple, 1 Sack of Flour, 1 Butter |  | yes | `996:Gourmet.esp` |
+| Apple Pie | 2 | expert | Desserts | BYOHCraftingOven | 1 Chicken's Egg, 2 Green Apple, 1 Sack of Flour, 1 Butter |  | yes | `997:Gourmet.esp` |
 
 <!-- detail:end -->
 
