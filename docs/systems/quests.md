@@ -36,33 +36,43 @@ rank on the seam still applies.
 A scene quest is a deed, not a purchase. The trader does not buy
 food, cooked meals, ore, or anything a person made. Those prices
 stay with the people who sell them. A supply quest is the purchase.
-A scene quest pays you for something the server can already see:
-a death, or a quest item that is not a good.
+Most scene quests are a retrieval, the same kind as the signet. A
+few are a kill. The server can already see both: the quest item in
+your pack, or the death.
 
 The gold is the amount written on that quest. It is created when
 you finish. It does not come out of the trader's 250, and it does
 not run out. The same cooldown rules apply. These are open to
-anyone. What a body drops stays in your pack. You sell that to a
-person, at their price. The quest does not take it.
+anyone. On a kill, what the body drops stays in your pack. You sell
+that to a person, at their price. The quest does not take it.
 
 A letter is not one of these. Letters are posted on the notice
 board, and the sender pays the courier. See
-[Notice boards](noticeboards.md).
+[Notice boards](noticeboards.md). The dispatch below is the guild's
+case, not a letter a person wrote.
 
 | Quest | What the server checks | Gold | Cooldown |
 | --- | --- | --- | --- |
+| The satchel | A satchel in a sack they name, by a road in this hold. | 20 | 3 hours |
+| The ledger | A book on a shelf they name. It grants no skill. | 30 | 6 hours |
+| The signet | A ring in a chest they name. | 40 | 8 hours |
+| The locket | A locket in an urn they name. | 45 | 10 hours |
+| The case | A sealed case in a strongbox they name. It does not open. | 50 | 8 hours |
+| The dispatch | That same kind of case, in a chest in this hold, handed to the trader in a hold they name. | 60 | 12 hours |
+| The seal | A stamp in a chest in a ruin they name. | 70 | 14 hours |
 | A wolf | You kill a wolf in the place they name in this hold. | 25 | 3 hours |
-| A sabre cat | You kill a sabre cat in the place they name. | 40 | 6 hours |
-| A bear | You kill a bear in the place they name. | 50 | 8 hours |
 | The camp | You kill three bandits in the camp they name. | 45 | 6 hours |
-| The barrow | You kill a draugr in the barrow they name. | 60 | 10 hours |
 | A giant | You kill a giant in this hold. | 100 | 18 hours |
-| The signet | A ring in a chest they name. It is not a craft and it is not sold. You bring it back and it is taken. | 40 | 8 hours |
 
-The place is a cell. A kill outside it does not count. The ring is
-one item, put back if you walk away before the turn-in. A dragon is
-not on this list. A richer deed waits longer. Another scene can be
-added the same way: a deed the server can check, a set amount of
+A retrieval is one item. It is not a craft, not food, not ore, and
+it is not sold. You bring it back and it is taken. Walk away before
+the turn-in and it goes back into that container. The cooldown does
+not start. You do not keep a second one.
+
+The place is a cell. A kill outside it does not count. A retrieval
+from anywhere else is not the item. A dragon is not on this list.
+A richer deed waits longer. Another scene can be added the same
+way: a retrieval, or a kill the server can check, a set amount of
 gold, and its own cooldown. It still does not buy goods.
 
 ## Who may take one
@@ -78,9 +88,9 @@ Another person can hold the same quest.
 
 ## The cooldown
 
-Each quest has its own cooldown. It starts when you turn the goods
-in. A richer reward waits longer. The hours are written on that
-quest. There is not one wait for every quest.
+Each quest has its own cooldown. It starts when you finish. A richer
+reward waits longer. The hours are written on that quest. There is
+not one wait for every quest.
 
 ## Where this is
 

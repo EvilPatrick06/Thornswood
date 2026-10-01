@@ -166,7 +166,7 @@ mint coin after that purse, and it is not a profession.
 [Custom quests](systems/quests.md). Guild traders ask for goods. A supply
 quest pays from the trader's purse. A scarce quest opens a place that
 holds more than the turn-in, for a class, a profession, or a race. A
-scene quest pays a set amount for a bounty or a retrieval, and that
+scene quest pays a set amount, usually for a retrieval, and that
 gold does not run out. It does not buy goods. A letter is on the
 notice board, and the sender pays.
 
