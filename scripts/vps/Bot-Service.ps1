@@ -11,6 +11,10 @@
                                      its account what the bot reads and
                                      writes, start it by name
       Restart-ThornswoodBotService   stop by name, sweep, start by name
+      Repair-ThornswoodBotData       the folder the service writes its log
+                                     and records in, there and writable by
+                                     its account, for a restart on a box
+                                     where it has gone
       Get-ThornswoodServiceSid       NT SERVICE\<name>'s SID, before the
                                      service exists (sc.exe showsid agrees)
 
@@ -135,6 +139,33 @@ function Get-ThornswoodBotLog([string]$Root) {
   $old = Join-Path $Root 'bot.log'
   if (-not (Test-Path -LiteralPath $new) -and (Test-Path -LiteralPath $old)) { return $old }
   return $new
+}
+
+# The one folder the service's account writes (issue #1104), there and
+# writable by that account, before anything is started. A full run makes it
+# and grants it with all the other rights (Grant-ThornswoodBotAccess below);
+# -CodeOnly does not, and on a box where the folder had gone the service could
+# not open bot.log at all, so it did not start, nothing was written anywhere
+# to say why, and the swap put the old code back a minute and a half later.
+# The grant goes on only when this made the folder, because the rules on one
+# that is already there are the full run's and are not second-guessed from
+# here. A line for each thing it had to put right, and nothing when there was
+# nothing to do.
+function Repair-ThornswoodBotData([string]$Root, [string]$Name = 'ThornswoodBot') {
+  $data = Join-Path $Root 'data'
+  if (Test-Path -LiteralPath $data) { return }
+  try { $null = New-Item -ItemType Directory -Force -Path $data -ErrorAction Stop; 'made ' + $data + ', the one folder the bot''s account writes' }
+  catch { 'COULD NOT MAKE ' + $data + ': ' + $_.Exception.Message; return }
+  $account = 'NT SERVICE\' + $Name
+  try {
+    $acl = Get-Acl -LiteralPath $data
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+      (New-Object Security.Principal.SecurityIdentifier((Get-ThornswoodServiceSid $Name))), 'Modify',
+      [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
+      [Security.AccessControl.PropagationFlags]::None, 'Allow')))
+    Set-ThornswoodAclAccess $data $acl
+    'granted ' + $account + ' Modify on it, as a full run does'
+  } catch { 'COULD NOT GRANT ' + $account + ' Modify on ' + $data + ': ' + $_.Exception.Message + '. The service cannot write its log until a full Install-Bot.ps1 run grants it.' }
 }
 
 # The bot's records and logs, moved out of its code folder into data (issue
