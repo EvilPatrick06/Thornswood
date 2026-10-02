@@ -152,6 +152,39 @@ namespace Thornswood
                 "what is missing.");
         }
 
+        /// <summary>
+        /// The collection card for the Diagnostics page (Djinn, 2 Oct): the
+        /// same card and button as the Mods page's, saying what the launcher
+        /// found. Since #599 took the Mods page off the rail, its card was the
+        /// only way to the collection and nobody could reach it.
+        /// </summary>
+        static UIElement CollectionStatusCard()
+        {
+            int have = 0;
+            try { have = Checks.CollectionRevision(cfg); }
+            catch (Exception ex) { Swallow.Note("Shell.CollectionStatusCard", ex); }
+            int wants = Updater.FeedCollectionRevision;
+            if (have <= 0)
+                return CollectionCard("Your mods: not confirmed",
+                    "The launcher could not read which revision of the Thornswood collection " +
+                    "Vortex has installed, so it cannot confirm your mods. If you have not " +
+                    "installed the collection, or are not sure, open it and let Vortex install " +
+                    "or update it.");
+            if (wants > 0 && have < wants)
+                return CollectionCard("Your mods need updating",
+                    "Vortex has collection revision " + have + " and the server was built against " +
+                    "revision " + wants + ". Open the collection and let Vortex bring it up to date.");
+            if (wants > 0 && have > wants)
+                return CollectionCard("Your mods are ahead of the server",
+                    "Vortex has collection revision " + have + " and the server was built against " +
+                    "revision " + wants + ". Nothing is wrong with your install; the server has " +
+                    "not caught up yet.");
+            return CollectionCard("Your mods: collection revision " + have,
+                "Vortex has the Thornswood collection installed" +
+                (wants > 0 ? ", the same revision the server was built against."
+                           : ". The server's revision was not known just now, so it was not compared."));
+        }
+
         static UIElement CollectionCard(string title, string body)
         {
             var g = new Grid();
