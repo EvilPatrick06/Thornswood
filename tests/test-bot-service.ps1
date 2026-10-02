@@ -177,6 +177,16 @@ foreach ($b in $blocks) {
         Yes 'the full run installs the service by name from the source it sent' ($sent -match [regex]::Escape("Install-ThornswoodBotService -Name 'ThornswoodBot' -Root 'C:\Thornswood-Bot' -Source 'C:\Thornswood-Bot\service\BotService.cs' -Task 'Thornswood Bot'"))
     } else {
         Yes '-CodeOnly restarts it by name, and says so when there is no service yet' ($sent -match [regex]::Escape("Restart-ThornswoodBotService -Name 'ThornswoodBot' -Root 'C:\Thornswood-Bot'") -and $sent -match 'NOT INSTALLED')
+        # A box with no bot.log is not a failed swap: the folder and the file
+        # are put right before the start, so the health check has something to
+        # read and the service has somewhere to write.
+        $make = [regex]::Match($sent, '(?s)function MakeLog \{.*?\r?\n\}').Value
+        Yes '-CodeOnly makes the log before the start, at the path Get-ThornswoodBotLog names' (
+            $make -and $make -match [regex]::Escape("Repair-ThornswoodBotData -Root 'C:\Thornswood-Bot' -Name 'ThornswoodBot'") -and
+            $make -match 'WriteAllText' -and $make -match 'if \(Test-Path -LiteralPath \$log\) \{ return \}' -and
+            $sent -match '(?s)function StartIt \{\s+MakeLog')
+        Yes 'and Why says the log is not there rather than reading nothing from it' (
+            $sent -match [regex]::Escape('there is no '' + $log + '' to read'))
     }
 }
 
@@ -538,6 +548,24 @@ $old = Join-Path $g 'old-layout'
 $null = New-Item -ItemType Directory -Force -Path $old
 [IO.File]::WriteAllText((Join-Path $old 'bot.log'), 'x')
 Yes 'and from beside the code on a box whose install is older' ((Get-ThornswoodBotLog $old) -eq (Join-Path $old 'bot.log'))
+
+# -- the data folder put right for a restart, where it has gone ------------------
+# The service opens its log before it starts python, so no data folder is no
+# service: -CodeOnly's restart makes it and grants the account Modify, as a
+# full run would, rather than stopping the bot and waiting out -Wait on a log
+# nothing could write.
+$gone = Join-Path $g 'no-data'
+$null = New-Item -ItemType Directory -Force -Path $gone
+$said = @(Repair-ThornswoodBotData -Root $gone -Name 'ThornswoodBot')
+$x = @(Rules (Join-Path $gone 'data'))
+Yes 'a bot folder with no data folder: it is made, and the bot''s account may write it' (
+    (Test-Path -LiteralPath (Join-Path $gone 'data')) -and ($said -join ' ') -match 'made .*data' -and
+    @($x | Where-Object { "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
+Yes 'and a file made in it is writable by the account too, which is what bot.log is' (
+    @(& { [IO.File]::WriteAllText((Join-Path $gone 'data\bot.log'), ''); Rules (Join-Path $gone 'data\bot.log') } |
+      Where-Object { "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
+Yes 'and with the folder there it says nothing and leaves its rules alone, since they are the full run''s' (
+    @(Repair-ThornswoodBotData -Root $gone -Name 'ThornswoodBot').Count -eq 0 -and (Own (Join-Path $gone 'data')) -eq 1)
 $said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot (Join-Path $g 'no-watch-yet') -DocsData '' -ModLogs @())
 Yes 'no watchdog folder yet: said, with what to run' (($said -join ' ') -match 'no-watch-yet\. Run Install-Bot\.ps1 again after Watch-Services\.ps1 -Install')
 
