@@ -558,6 +558,7 @@ function goldDescriptors(text) {
   const ADD_FROM = {
     'tool.give': 'a starting tool, TOOLS',
     'ITEMS.saltPile': 'a salt pile, ITEMS',
+    'ITEMS.fishTrap': 'a fish trap refund, ITEMS',
     'rare': 'fire, frost or void salts, ITEMS',
     'seam.ore': 'ore, ORES_BY_BASE',
     'ITEMS.firewood': 'firewood, ITEMS',
