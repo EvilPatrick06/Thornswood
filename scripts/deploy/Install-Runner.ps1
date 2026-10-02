@@ -253,7 +253,7 @@ if (-not (Test-Path `$root)) { New-Item -ItemType Directory -Path `$root -Force 
 
 # The runner itself, checked before it is unpacked.
 if (-not (Test-Path (Join-Path `$root 'bin\Runner.Listener.exe')) -or -not (Test-Path (Join-Path `$root 'version-$version.txt'))) {
-  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
   `$zip = Join-Path `$env:TEMP '$zipName'
   Invoke-WebRequest -UseBasicParsing -Uri '$zipUrl' -OutFile `$zip
   `$got = (Get-FileHash -LiteralPath `$zip -Algorithm SHA256).Hash

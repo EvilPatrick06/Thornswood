@@ -264,7 +264,7 @@ if ("$py" -match 'MISSING') {
   Head 'Installing Python 3.12 on the VPS'
   Remote @"
 `$ErrorActionPreference = 'Continue'
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 `$url = 'https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe'
 `$exe = Join-Path `$env:TEMP 'python-3.12.8-amd64.exe'
 'downloading ' + `$url

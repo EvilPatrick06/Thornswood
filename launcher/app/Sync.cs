@@ -231,7 +231,7 @@ namespace Thornswood
             // plus 64 hex characters, so it cannot be anywhere else.
             CheckUrl(r.url);
             string at = AssetFolder(r);
-            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
             if (Sync(cfg, at, r, v, log)) return;
 
             List<Pack> packs = Pending(v);
@@ -262,7 +262,7 @@ namespace Thornswood
             if (r == null) return false;
             CheckUrl(r.url);
             string at = AssetFolder(r);
-            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
             return Sync(cfg, at, r, v, log);
         }
 
