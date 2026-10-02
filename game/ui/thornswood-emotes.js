@@ -20,6 +20,7 @@
   var slots = [];
   var pin = 0;
   var query = '';
+  var standChar = 'n';
 
   var css = [
     '#thornswood-wheel{position:fixed;inset:0;z-index:2147483000;pointer-events:auto;',
@@ -247,6 +248,11 @@
       try { find.focus(); } catch (err) { }
       return;
     }
+    if (!searching() && standChar && k.toLowerCase() === standChar) {
+      e.preventDefault();
+      say('__stand');
+      return;
+    }
     if (closeChar && k.toLowerCase() === closeChar) {
       e.preventDefault();
       return;
@@ -257,7 +263,7 @@
     }
   }, true);
 
-  window.thornswoodSetWheel = function (list, slotNames, closeKeyChar) {
+  window.thornswoodSetWheel = function (list, slotNames, closeKeyChar, stopKeyChar) {
     items = (list || []).slice().sort(function (a, b) {
       return String(a.name).toLowerCase() < String(b.name).toLowerCase() ? -1 : 1;
     });
@@ -265,6 +271,9 @@
     while (slots.length < 8) { slots.push(''); }
     if (typeof closeKeyChar === 'string' && closeKeyChar) {
       closeChar = closeKeyChar.toLowerCase();
+    }
+    if (typeof stopKeyChar === 'string' && stopKeyChar) {
+      standChar = stopKeyChar.toLowerCase();
     }
     host.className = '';
     query = '';

@@ -32,12 +32,11 @@ leave, it waits until you are back.
 
 J has a second tab for a group book: prices, members, and a chat for
 when the group is not standing together. The tab is absent until the
-Discord account holds Business Owner or Faction Owner, or this
-character has accepted an invite, or the account is staff. The book
-itself is on [Factions and businesses](factions.md). It does not use
-one of the 12 journals. A price list from that book can be submitted
-at a hold's drop box, and that hold's traders then buy and sell from
-the average. See [Merchant's Guild](merchants-guild.md).
+Discord account holds Business Owner or Faction Owner, or the role
+named Dev, or this character has accepted an invite, or the account
+is staff. The book itself is on [Factions and businesses](factions.md).
+It does not use one of the 12 journals. A price list from that book
+is not submitted at a hold drop box. That box is not there.
 
 ## Where this is
 
@@ -45,4 +44,5 @@ The caps, the panel, typing in the title and the page, the commands,
 and sharing with a friend are in the server. A friend who is offline
 can be named, and the share is kept. The page still only appears
 while the person who wrote it is online. A journal survives a
-restart. It is not a quest. The group tab is not on the panel.
+restart. It is not a quest. The group tab is on the same panel. A
+hold drop box is not there, so a price list stays in the book.
