@@ -187,9 +187,10 @@ namespace Thornswood
             int[] a = Parts(remote), b = Parts(local);
             if (a == null || b == null)
             {
-                // Unparseable on either side: fall back to the old behaviour
-                // rather than refusing an update nobody can then install.
-                return !string.Equals(remote, local, StringComparison.OrdinalIgnoreCase);
+                // Either side did not parse as dotted integers. A different
+                // string is not proof that the remote is newer, so an older
+                // unreadable version is not an update.
+                return false;
             }
             int n = Math.Max(a.Length, b.Length);
             for (int i = 0; i < n; i++)
