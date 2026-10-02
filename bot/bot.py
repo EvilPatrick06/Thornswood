@@ -301,6 +301,25 @@ def log(*a):
     print('[thornswood-bot]', *a, flush=True)
 
 
+def as_typed(v, n=1000):
+    """
+    Words somebody else typed, as Discord will show them and no more.
+
+    Everything a stranger writes goes through this before it is posted: an
+    @everyone in it is text rather than a ping, a role id is text, and
+    markdown in it is shown as it was typed instead of being read as
+    formatting. It trims the ends and cuts at n characters first, so one long
+    answer cannot take a post over Discord's limit on its own.
+
+    The send that carries the text still switches mentions off (see the ticket
+    thread and report_say). This is the first of the two, not the only one: a
+    mention Discord learns to write differently tomorrow would get past the
+    escaping and still not ping anybody.
+    """
+    v = str(v or '').strip()[:n]
+    return discord.utils.escape_mentions(discord.utils.escape_markdown(v))
+
+
 # ------------------------------------------------------------------ site --
 def push(kind, title, detail, by, discord_id, rules=None):
     """Send a ticket to the site. Runs off the event loop, and a failure here
@@ -919,42 +938,58 @@ class TicketModal(discord.ui.Modal):
         guild = interaction.guild
         who = interaction.user
 
-        lines = []
-        for item, (q, _, _) in zip(self.fields, QUESTIONS[self.kind]):
-            lines.append('**%s**\n%s' % (q, (item.value or '').strip() or 'nothing said'))
-        detail = '\n\n'.join(lines)
-
         asking = ROLE_FOR.get(self.kind)
-        if asking:
-            detail = '**Asking for:** ' + asking + '\n\n' + detail
 
-        # Anything that does not read as a yes says so at the top, in words, on
-        # the line staff read first. It never stops the ticket: losing somebody's
-        # application over how they phrased one answer would be worse than a
-        # person spending two seconds reading it.
-        if self.kind in AGE_KINDS:
-            gave = ''
+        def answered(want):
+            """What they typed in the question that reads exactly like this."""
             for item, (q, _, _) in zip(self.fields, QUESTIONS[self.kind]):
-                if q == AGE_Q[0]:
-                    gave = (item.value or '').strip()
-                    break
-            if not said_yes(gave):
-                detail = ('**CHECK THIS ONE.** Asked if they are 18 or over they '
-                          'said "%s".\n\n' % (gave or 'nothing')) + detail
+                if q == want:
+                    return (item.value or '').strip()
+            return ''
 
-        # The rules answer, flagged the same way, and kept for the site's
-        # record of who accepted them.
+        age_said = answered(AGE_Q[0]) if self.kind in AGE_KINDS else ''
+
+        # The rules answer, kept for the site's record of who accepted them.
         rules = None
+        rules_said = ''
         if self.kind in RULES_KINDS:
-            said = ''
+            rules_said = answered(RULES_Q[0])
+            rules = {'said': rules_said[:200], 'yes': accepted_rules(rules_said)}
+
+        def written(clean):
+            lines = []
             for item, (q, _, _) in zip(self.fields, QUESTIONS[self.kind]):
-                if q == RULES_Q[0]:
-                    said = (item.value or '').strip()
-                    break
-            rules = {'said': said[:200], 'yes': accepted_rules(said)}
-            if not rules['yes']:
-                detail = ('**CHECK THIS ONE.** Asked if they accept the rules they '
-                          'said "%s".\n\n' % (said or 'nothing')) + detail
+                lines.append('**%s**\n%s'
+                             % (q, clean((item.value or '').strip()) or 'nothing said'))
+            out = '\n\n'.join(lines)
+            if asking:
+                out = '**Asking for:** ' + asking + '\n\n' + out
+            # Anything that does not read as a yes says so at the top, in words,
+            # on the line staff read first. It never stops the ticket: losing
+            # somebody's application over how they phrased one answer would be
+            # worse than a person spending two seconds reading it.
+            if self.kind in AGE_KINDS and not said_yes(age_said):
+                out = ('**CHECK THIS ONE.** Asked if they are 18 or over they '
+                       'said "%s".\n\n' % (clean(age_said) or 'nothing')) + out
+            if rules is not None and not rules['yes']:
+                out = ('**CHECK THIS ONE.** Asked if they accept the rules they '
+                       'said "%s".\n\n' % (clean(rules_said) or 'nothing')) + out
+            return out
+
+        # Two copies of the same ticket, because the two places that take it
+        # protect themselves differently (#1354).
+        #
+        # detail is as they typed it, for the site, which escapes its own
+        # output and whose inbox is the record of what they really wrote.
+        #
+        # shown is what goes into Discord, where their words would otherwise be
+        # read as formatting and as mentions. Before this, an answer of
+        # "@everyone" pinged the server from inside a staff thread, a role
+        # mention pulled a role into it, and a few asterisks could hide the
+        # rest of the application behind a heading. The questions and the
+        # CHECK THIS ONE line are ours and stay bold; nothing of theirs does.
+        detail = written(lambda v: v)
+        shown = written(as_typed)
 
         title =('%s, %s' % (self.label_text, who.display_name))[:96]
 
@@ -1028,9 +1063,18 @@ class TicketModal(discord.ui.Modal):
                     % ([r.name for r in staff_roles], ch.name))
 
             try:
-                await opened.send(head[:1900], view=TicketTools())
-                for chunk in _chunks(detail, 1900):
-                    await opened.send(chunk)
+                # The head is ours and is the one post meant to ping: the
+                # person who opened the ticket, and each staff role, by id.
+                # Not @everyone, which nothing this bot writes ever says.
+                await opened.send(head[:1900], view=TicketTools(),
+                                  allowed_mentions=discord.AllowedMentions(
+                                      everyone=False, users=True, roles=True))
+                # Their words. Escaped above, and with every mention switched
+                # off here as well, so anything the escaping misses still
+                # pings nobody.
+                for chunk in _chunks(shown, 1900):
+                    await opened.send(chunk,
+                                      allowed_mentions=discord.AllowedMentions.none())
                 posted = True
             except Exception as e:
                 why = 'the thread opened but nothing could be written in it (%s)' % e
@@ -1072,9 +1116,16 @@ class TicketModal(discord.ui.Modal):
                 if why:
                     note = '\n_No private thread for this one: %s._' % why
                 try:
-                    await book.send(('**%s**\n%s%s' % (title, head, note))[:1900])
-                    for chunk in _chunks(detail, 1900):
-                        await book.send(chunk)
+                    # The display name in the title is theirs as well, so it
+                    # is escaped here the way the answers are. The thread name
+                    # above is a name rather than a post and keeps it as it is.
+                    await book.send(
+                        ('**%s**\n%s%s' % (as_typed(title, 96), head, note))[:1900],
+                        allowed_mentions=discord.AllowedMentions(
+                            everyone=False, users=True, roles=True))
+                    for chunk in _chunks(shown, 1900):
+                        await book.send(chunk,
+                                        allowed_mentions=discord.AllowedMentions.none())
                     fell_back = True
                 except Exception:
                     log('the ticket could not be posted in #%s either:\n'
@@ -3117,11 +3168,10 @@ def report_text(row):
 
     Every word of it was typed by a stranger with no account, so it is escaped
     before it goes anywhere near Discord: an @everyone in a title is text, not
-    a ping, and a masked link is shown as what it is.
+    a ping, and a masked link is shown as what it is. as_typed is the same
+    escaping the ticket threads use.
     """
-    def clean(v, n):
-        v = str(v or '').strip()[:n]
-        return discord.utils.escape_mentions(discord.utils.escape_markdown(v))
+    clean = as_typed
 
     by = clean(row.get('by'), 40)
     detail = clean(row.get('detail'), 400)
@@ -3302,9 +3352,7 @@ def moderation_text(where, row):
     if not isinstance(row, dict) or row.get('did') not in _MOD_DID:
         return None
 
-    def clean(v, n):
-        v = str(v or '').strip()[:n]
-        return discord.utils.escape_mentions(discord.utils.escape_markdown(v))
+    clean = as_typed
 
     def person(name, pid):
         try:
