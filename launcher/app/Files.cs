@@ -35,58 +35,6 @@ namespace Thornswood
         }
 
         /// <summary>Crash logs newest first, then the launcher's own log.</summary>
-        /// <summary>
-        /// The class list in game is built from the file names in the presets
-        /// folder, with the ".json" cut off, so the file name is the name
-        /// people read. One of them came out lower case, and Windows will not
-        /// change a name's capitalisation on an ordinary write: creating
-        /// "Hunter.json" over an existing "hunter.json" keeps the old spelling,
-        /// and a directory listing can still report the name we asked for. The
-        /// only thing that actually settles it is a rename through a temporary
-        /// name, which is cheap enough to do on every launch.
-        ///
-        /// Returns how many it had to put right.
-        /// </summary>
-        public static int FixPresetNames()
-        {
-            int fixedUp = 0;
-            try
-            {
-                string dir = Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\SkyrimUnbound\\Presets");
-                if (!Directory.Exists(dir)) return 0;
-
-                foreach (string full in Directory.GetFiles(dir, "*.json"))
-                {
-                    string name = Path.GetFileNameWithoutExtension(full);
-                    if (name.Length == 0) continue;
-
-                    // Single words, first letter up and the rest down. Server
-                    // is the game's own saved preset and is not in the list,
-                    // but it follows the same shape so it costs nothing.
-                    string want = char.ToUpperInvariant(name[0]) + name.Substring(1).ToLowerInvariant();
-                    if (string.Equals(name, want, StringComparison.Ordinal)) continue;
-
-                    string target = Path.Combine(dir, want + ".json");
-                    string temp = Path.Combine(dir, want + ".casefix");
-                    try
-                    {
-                        if (File.Exists(temp)) File.Delete(temp);
-                        File.Move(full, temp);
-                        File.Move(temp, target);
-                        fixedUp++;
-                    }
-                    catch
-                    {
-                        // Put it back rather than leave a preset stranded under
-                        // a name the game will not read.
-                        try { if (File.Exists(temp)) File.Move(temp, full); } catch (Exception ex) { Swallow.Note("Files.FixPresetNames, putting a preset back", ex); }
-                    }
-                }
-            }
-            catch (Exception ex) { Swallow.Note("Files.FixPresetNames", ex); }
-            return fixedUp;
-        }
-
         public static List<Entry> Logs()
         {
             var l = new List<Entry>();
