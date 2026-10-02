@@ -321,11 +321,19 @@ function saveSlots() {
   try { fsm.writeFileSync(SLOT_FILE, JSON.stringify(slots)); } catch (e) { }
 }
 
+/* The name on the one line above the head. Not a chat line, and not
+   for standing up, which never calls this. */
+function sayEmote(name) {
+  js('try{window.thornswoodNet&&window.thornswoodNet.post({t:"emote",name:' +
+     JSON.stringify(String(name || '')) + '});}catch(e){}');
+}
+
 function playNamed(name) {
   const item = emoteByName(name);
   if (!item) { return; }
   log('picked', item.name);
   setOpen(false);
+  sayEmote(item.name);
   play(item.event);
 }
 
@@ -334,6 +342,7 @@ function playSlot(n) {
   if (!item) { return; }
   log('slot', n, item.name);
   setOpen(false);
+  sayEmote(item.name);
   play(item.event);
 }
 

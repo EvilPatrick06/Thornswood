@@ -759,8 +759,8 @@
       // The whole view on the first tick after a join, then only what moved
       // and who left it (issue #482; the note over the tick in
       // voice/voice-server.js). The party strip reads the same table.
-      if (m.t === 'pos') { lastWho = m.who || {}; place(); return; }
-      if (m.t === 'moved') { applyMoved(lastWho, m); place(); return; }
+      if (m.t === 'pos') { lastWho = m.who || {}; place(); publishMarks(); return; }
+      if (m.t === 'moved') { applyMoved(lastWho, m); place(); publishMarks(); return; }
       if (m.t === 'vmode') {
         var rec = conns.get(Number(m.from));
         if (rec) {
@@ -1006,6 +1006,41 @@
     for (var i = 0; i < gone.length; i++) { delete table[gone[i]]; }
   }
 
+  /*
+    The speaking mark. Not words: a mark above the head while the
+    microphone is open, only inside that person's own distance, and
+    never on your own head. A voice mute hides it. Hiding a name does
+    not, and neither does turning their text off, so neither is read
+    here. Staff silence arrives as the microphone being closed.
+  */
+  var markSig = '';
+  function publishMarks() {
+    var me = lastWho[cfg.profileId];
+    var list = [];
+    if (me && me.pos) {
+      for (var k in lastWho) {
+        if (!Object.prototype.hasOwnProperty.call(lastWho, k)) continue;
+        var row = lastWho[k];
+        if (!row || !row.talk || !row.actor || !row.pos) continue;
+        if (Number(k) === Number(cfg.profileId)) continue;
+        if (muted[k]) continue;
+        if (String(row.cell) !== String(me.cell)) continue;
+        var dx = (Number(row.pos[0]) - Number(me.pos[0])) / UNITS_PER_METRE;
+        var dy = (Number(row.pos[1]) - Number(me.pos[1])) / UNITS_PER_METRE;
+        var dz = (Number(row.pos[2]) - Number(me.pos[2])) / UNITS_PER_METRE;
+        var metres = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        var mode = MODES[row.mode] ? row.mode : 'local';
+        if (metres > MODES[mode].max) continue;
+        list.push({ a: Number(row.actor), m: mode });
+      }
+    }
+    list.sort(function (p, q) { return p.a - q.a; });
+    var sig = JSON.stringify(list);
+    if (sig === markSig) return;
+    markSig = sig;
+    try { window.skyrimPlatform.sendMessage('thornswood-front', 'marks:' + sig); } catch (e) { }
+  }
+
   function place() {
     var me = lastWho[cfg.profileId];
     if (!me || !ctx) { draw(); return; }
@@ -1132,11 +1167,13 @@
         // when the key is down, and read back what the launcher makes of it.
         // The plugin also writes the key into a file the launcher watches, so
         // this call is the second of two routes and may fail without loss.
+        // The launcher is the one that tells the room the microphone is open.
         relayAsk('/ptt?on=' + (v ? '1' : '0'));
         draw();
         return;
       }
 
+      post({ t: 'talk', on: v });
       resume();
       applyMic();
     },
@@ -1249,6 +1286,7 @@
       }
       try { window.skyrimPlatform.sendMessage('thornswood-voice-muted', ids.join(' ')); } catch (e) { }
       try { place(); } catch (e) { }
+      try { publishMarks(); } catch (e) { }
       return true;
     },
     isMuted: function (profileId) { return !!muted[profileId]; },

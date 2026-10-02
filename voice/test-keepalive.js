@@ -35,7 +35,7 @@ function check(what, got, want) {
 }
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-keepalive-'));
-for (const f of ['voice-server.js']) {
+for (const f of ['voice-server.js', 'headlines.js']) {
   fs.copyFileSync(path.join(__dirname, f), path.join(dir, f));
 }
 const pub = path.join(dir, 'public');

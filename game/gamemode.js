@@ -26320,6 +26320,7 @@ log('gamemode loaded:',
           var look = mp.get(id, 'appearance');
           who.push({
             profileId: pid,
+            actor: id,
             pos: pos,
             angleZ: angle[2],
             // Two people in the same room share this string. Two people either

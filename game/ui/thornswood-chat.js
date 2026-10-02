@@ -80,12 +80,10 @@
   /*
     How one chat line is drawn, by what kind of line it is.
 
-    kind only arrives while the voice service has THORNSWOOD_CHAT_RANGE on. A
-    line without one, which is every line while it is off and every line from
-    a service older than it, is drawn exactly as it always was: the name, then
-    the words. /me and /do are actions and read as one, the way text roleplay
-    has written them for decades; a whisper is dimmer; a shout says so. A kind
-    this page has never heard of is drawn as a plain line rather than dropped.
+    A plain line arrives as say. /me and /do are actions and read as one.
+    A whisper is dimmer. A shout says so. An /ooc is in brackets. A line
+    with no kind, from an older service, is the name and then the words.
+    A kind this page has never heard of is drawn as a plain line.
   */
   function partsFor(msg) {
     var who = String(msg.name || '').trim() || 'Someone';
@@ -105,7 +103,24 @@
     if (kind === 'shout') {
       return [{ text: who + ' shouts: ', color: nc }, { text: said, color: C_TEXT }];
     }
+    if (kind === 'ooc') {
+      return [{ text: '(( ' + who + ': ', color: nc }, { text: said + ' ))', color: C_TEXT }];
+    }
     return [{ text: who + ': ', color: nc }, { text: said, color: C_TEXT }];
+  }
+
+  /* The one line above a head. Your own uses the local character, because
+     the form id the server has may not be the one this machine is playing. */
+  function showHead(msg) {
+    if (!msg || !msg.head) return;
+    var mine = ME && Number(msg.profileId) === ME;
+    var who = mine ? 'self' : String(Number(msg.actor) || 0);
+    if (who === '0') return;
+    try {
+      window.skyrimPlatform.sendMessage('thornswood-front', 'head:' + JSON.stringify({
+        who: who, text: String(msg.head), profile: Number(msg.profileId) || 0
+      }));
+    } catch (e) { }
   }
 
   function note(text, color) {
@@ -172,6 +187,21 @@
         return;
       }
 
+      // A line above a head, with nothing in the box. An emote uses this.
+      // Staff silence uses headclear so a line already up does not sit
+      // out its six seconds.
+      if (msg.t === 'head') {
+        showHead({ head: msg.text, profileId: msg.profileId, actor: msg.actor });
+        return;
+      }
+      if (msg.t === 'headclear') {
+        try {
+          window.skyrimPlatform.sendMessage('thornswood-front',
+            'headclear:' + (Number(msg.profileId) || 0));
+        } catch (e) { }
+        return;
+      }
+
       // Anything that is not chat belongs to whoever else is on this socket.
       if (msg.t !== 'chat') { fanout(msg); return; }
 
@@ -201,6 +231,7 @@
       // There was a second `if (msg.t === 'chat')` wrapped round all of this,
       // which could never be false.
       {
+        showHead(msg);
         var c = chat();
         if (!c) return;
         c.add(partsFor(msg), 'plain');

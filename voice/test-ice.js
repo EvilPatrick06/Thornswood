@@ -11,6 +11,7 @@ function check(what, got, want) {
 function run(env, then) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ice-'));
   fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
+  fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
   fs.writeFileSync(path.join(dir, 'secret.txt'), 'test');
   const srv = spawn(process.execPath, ['voice-server.js'], { cwd: dir,
     env: Object.assign({}, process.env, { THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_SITE: '' }, env) });

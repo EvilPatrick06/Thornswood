@@ -446,6 +446,7 @@ Put (Join-Path $repo 'site\public\home.html') 'home one'
 Put (Join-Path $repo 'site\public\robots.txt') 'robots'
 Put (Join-Path $repo 'site\data\help.md') 'help'
 Put (Join-Path $repo 'site\data\site\about.md') 'about'
+Put (Join-Path $repo 'voice\headlines.js') "module.exports = {};`n"
 Put (Join-Path $repo 'voice\public\index.html') 'voice page'
 Put (Join-Path $repo 'voice\public\voice.js') 'voice script'
 Put (Join-Path $repo 'bot\card.py') 'CARD = 1'
