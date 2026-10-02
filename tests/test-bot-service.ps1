@@ -196,6 +196,56 @@ foreach ($b in $blocks) {
     }
 }
 
+# ============================================ what the box has, after the swap ===
+# The block Install-Bot sends once the swap has answered, run here against a
+# scratch folder the way the box runs it. A -CodeOnly run said artifact,
+# STAGE OK, SWAP OK and the bot watching, and the live smoke's export and
+# data\bot.log were then reported missing from C:\Thornswood-Bot, with
+# nothing in the run itself saying what that folder on the box holds. These
+# prove the run says it now, by full path, and goes red when a file is not
+# there.
+$a = $ibText.IndexOf('# ==== what the box has ====')
+$b = $ibText.IndexOf('# ==== end what the box has ====')
+Yes 'Install-Bot keeps the check that runs on the box between its markers' ($a -ge 0 -and $b -gt $a)
+$thereBlock = ''
+if ($a -ge 0 -and $b -gt $a) {
+    $m = [regex]::Match($ibText.Substring($a, $b - $a), "(?s)@'\r?\n(.*?)\r?\n'@")
+    if ($m.Success) { $thereBlock = $m.Groups[1].Value }
+}
+Yes 'and it is single quoted, so what goes up is plain PowerShell a person can read' ($thereBlock -ne '')
+if ($thereBlock) {
+    $run = [scriptblock]::Create("param(`$Root, `$Service, `$Must)`r`n" + $thereBlock)
+    $there = Join-Path $tmp 'there'
+    $null = New-Item -ItemType Directory -Force -Path (Join-Path $there 'assets')
+    foreach ($f in 'bot.py', 'card.py', 'live-smoke-discord-export.json') { [IO.File]::WriteAllText((Join-Path $there $f), 'x') }
+    [IO.File]::WriteAllText((Join-Path $there 'assets\join-card.png'), 'x')
+    $must = @('bot.py', 'card.py', 'live-smoke-discord-export.json', 'assets/join-card.png')
+    $thereLog = Join-Path $there 'data\bot.log'
+    $said = @(& $run $there 'ThornswoodBot' $must | ForEach-Object { "$_" })
+    $all = ($said -join "`n")
+    Yes 'with every file at the root it says so, and names the machine it asked and the root it asked about' (
+        $said -contains 'FILES ON THE BOX' -and
+        $all -match ('asked of \S.*, where the bot runs from ' + [regex]::Escape($there)))
+    Yes 'and it makes data\bot.log at that root and says Test-Path True for it' (
+        (Test-Path -LiteralPath $thereLog) -and $all -match ([regex]::Escape('Test-Path ' + $thereLog) + '\s+True'))
+    Yes 'and every file the run sent is True by its full path under that root, the export included' (
+        @($said | Where-Object { $_ -match '\s+True$' }).Count -eq 5 -and
+        $all -match ([regex]::Escape('Test-Path ' + (Join-Path $there 'live-smoke-discord-export.json')) + '\s+True'))
+    # The two that were reported missing after a green run.
+    Remove-Item -LiteralPath (Join-Path $there 'live-smoke-discord-export.json') -Force
+    Remove-Item -LiteralPath $thereLog -Force
+    $said = @(& $run $there 'ThornswoodBot' $must | ForEach-Object { "$_" })
+    $all = ($said -join "`n")
+    Yes 'an export that is not at the root is FILES MISSING, named by its full path on the box' (
+        $said -contains 'FILES MISSING' -and
+        $all -match ([regex]::Escape('Test-Path ' + (Join-Path $there 'live-smoke-discord-export.json')) + '\s+False'))
+    Yes 'and data\bot.log is made again rather than reported missing' ((Test-Path -LiteralPath $thereLog) -and $all -notmatch 'bot\.log  False')
+}
+Yes 'and a run whose files are not on the box stops, in -CodeOnly and in a full run' (
+    ([regex]::Matches($ibText, 'Confirm-BotFiles')).Count -eq 3 -and
+    $ibText -match [regex]::Escape('if (-not $PutBack -and -not (Confirm-BotFiles @($send.Keys))) {') -and
+    $ibText -match [regex]::Escape('if (-not (Confirm-BotFiles @($send.Keys))) {'))
+
 # ========================================================== the program ===
 $build = Join-Path $tmp 'build'
 $null = New-Item -ItemType Directory -Force -Path $build

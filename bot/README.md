@@ -263,6 +263,25 @@ Those paths are on the VPS, not on the machine you run the deploy from, so
 machine does not have. `Show-BotLog.ps1` and `.\scripts\vps\Get-Logs.ps1` are
 how to look at them.
 
+You do not have to check by hand at all. Once the swap has answered, every
+run asks the box itself and prints one line per file, under the heading
+"What the box has, at the folder the swap moved them to":
+
+```text
+asked of THORNSWOOD-VPS, where the bot runs from C:\Thornswood-Bot
+Test-Path C:\Thornswood-Bot\bot.py  True
+Test-Path C:\Thornswood-Bot\live-smoke-discord-export.json  True
+Test-Path C:\Thornswood-Bot\data\bot.log  True
+```
+
+A run that ends green has printed True for every file it sent and for
+`data\bot.log`. A file that is not there turns the run red and names it by
+its full path on the box, so a swap that says SWAP OK while something is
+missing from the install root cannot pass for a good deploy. If a line says
+False, that is the box talking and it is worth looking at; a False you typed
+yourself on the deploy machine is only that machine saying it has no such
+folder.
+
 ## Release notes posting themselves
 
 The build makes a webhook in `#news` and saves it to `news-webhook.txt` beside
