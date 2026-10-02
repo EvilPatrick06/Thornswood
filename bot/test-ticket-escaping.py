@@ -11,9 +11,11 @@ pulled a role in, and a line of asterisks hid the rest of the application
 behind a heading. The same words went into the staff only channel when the
 thread would not open.
 
-Two things stop it now, and this checks both: the words are escaped on the way
-into Discord (as_typed), and every post that carries them is sent with mentions
-switched off, so a mention the escaping does not know about still pings nobody.
+Three things stop it now, and this checks all of them: the words are escaped on
+the way into Discord (as_typed), every post that carries them is sent with
+mentions switched off, so a mention the escaping does not know about still
+pings nobody, and every ticket post suppresses embeds, so a bare link in an
+answer cannot draw its preview.
 The site copy is checked as well, because it keeps the answers as typed and
 the page escapes its own output.
 
@@ -235,6 +237,11 @@ def quiet_everyone(kw):
     return isinstance(am, discord.AllowedMentions) and not am.everyone
 
 
+def no_preview(kw):
+    """Whether a post was sent with Discord link previews switched off."""
+    return kw.get('suppress_embeds') is True
+
+
 TMP = tempfile.mkdtemp(prefix='thornswood-escaping-')
 bot.OPEN_TICKETS = os.path.join(TMP, 'open-tickets.json')
 
@@ -286,6 +293,8 @@ try:
         '<@&Moderator>' in T.texts()[0])
     yes('T1 and it never says @everyone, whatever a name holds',
         quiet_everyone(T.sent[0][1]))
+    yes('T1 every post of it suppresses link previews',
+        T.sent and all(no_preview(kw) for _, kw in T.sent))
 
     yes('T1 and the person was told where their ticket is',
         len(sent.followup.said) == 1 and T.mention in sent.followup.said[0][0])
@@ -311,6 +320,8 @@ try:
         and PULL not in flagged)
     yes('T2 with every post of it still sent with mentions off',
         all(off(kw) for _, kw in CH.made[1].sent[1:]))
+    yes('T2 and every post of it suppresses link previews',
+        CH.made[1].sent and all(no_preview(kw) for _, kw in CH.made[1].sent))
 
     # ------------------------------------------- when no thread will open
     #
@@ -334,6 +345,8 @@ try:
         all(off(kw) for _, kw in BOOK.sent[1:]))
     yes('T3 and the first post never says @everyone',
         quiet_everyone(BOOK.sent[0][1]))
+    yes('T3 every post of it suppresses link previews',
+        BOOK.sent and all(no_preview(kw) for _, kw in BOOK.sent))
     yes('T3 while the person is told it reached staff',
         len(out.followup.said) == 1
         and 'staff' in out.followup.said[0][0].lower())

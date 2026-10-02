@@ -1107,13 +1107,16 @@ class TicketModal(discord.ui.Modal):
                 # person who opened the ticket, and each staff role, by id.
                 # Not @everyone, which nothing this bot writes ever says.
                 await opened.send(head[:1900], view=TicketTools(),
+                                  suppress_embeds=True,
                                   allowed_mentions=discord.AllowedMentions(
                                       everyone=False, users=True, roles=True))
-                # Their words. Escaped above, and with every mention switched
-                # off here as well, so anything the escaping misses still
-                # pings nobody.
+                # Their words. Escaped above, with every mention switched
+                # off here as well, and embeds suppressed so a bare link
+                # cannot draw its preview. Anything the escaping misses
+                # still pings nobody.
                 for chunk in _chunks(shown, 1900):
                     await opened.send(chunk,
+                                      suppress_embeds=True,
                                       allowed_mentions=discord.AllowedMentions.none())
                 posted = True
             except Exception as e:
@@ -1161,10 +1164,12 @@ class TicketModal(discord.ui.Modal):
                     # above is a name rather than a post and keeps it as it is.
                     await book.send(
                         ('**%s**\n%s%s' % (as_typed(title, 96), head, note))[:1900],
+                        suppress_embeds=True,
                         allowed_mentions=discord.AllowedMentions(
                             everyone=False, users=True, roles=True))
                     for chunk in _chunks(shown, 1900):
                         await book.send(chunk,
+                                        suppress_embeds=True,
                                         allowed_mentions=discord.AllowedMentions.none())
                     fell_back = True
                 except Exception:
