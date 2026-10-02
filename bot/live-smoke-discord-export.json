@@ -1,0 +1,154 @@
+{
+  "schema": "thornswood.live-smoke.v1",
+  "source": "wiki/quality/playtest-acceptance.md",
+  "slice": "In smoke: Live",
+  "updated": "2026-10-01",
+  "owner": "Cynthia",
+  "surface": "Discord Test-Tasks",
+  "rules": {
+    "vault_is_source_of_truth": true,
+    "discord_is_session_checkoff_only": true,
+    "one_way": "vault_to_discord",
+    "no_build_floor_in_criteria": true,
+    "agents_do_not_tick": true,
+    "admin_only_start_reset": true,
+    "named_public_fails": false,
+    "off_discord_id_logging": false,
+    "role_gate_testers_staff_only": true,
+    "no_everyone_or_public": true,
+    "bot_must_not_export_marks_or_discord_ids_off_discord": true,
+    "no_named_fails_outside_session_thread": true,
+    "privacy_deploy_ok_if_must_holds": true,
+    "owner_call_named_pass_fail_visible_in_thread": true,
+    "hold_discord_posts_until_admin_role_set": false,
+    "discord_hold_lifted": true
+  },
+  "session": {
+    "title_format": "Live smoke {YYYY-MM-DD} {settings_version}",
+    "required_fields": [
+      "date",
+      "live_channel",
+      "settings_version"
+    ],
+    "admin_roles_default": [
+      "Owner",
+      "Dev",
+      "Lead GM",
+      "Lead Gamemaster"
+    ],
+    "admin_roles_note": "Patrick locked: Owner + Dev + Lead GM. Mosby bot default also matches Lead Gamemaster. LIVE_SMOKE_ADMIN_ROLES env overrides. Map to current names after scrub.",
+    "pathfind_current_roles_only": true,
+    "admin_locked": true
+  },
+  "marks": [
+    "Pass",
+    "Fail",
+    "Skip",
+    "Fail-known"
+  ],
+  "items": [
+    {
+      "id": "live-1",
+      "order": 1,
+      "label": "Chat fade / needs Settings",
+      "tickets": [
+        381
+      ],
+      "skip_rule": null,
+      "discord_line": "Chat fades or you can turn that on in Settings."
+    },
+    {
+      "id": "live-2",
+      "order": 2,
+      "label": "Double craft after respawn",
+      "tickets": [
+        517
+      ],
+      "skip_rule": "Skip if no forge on the live channel under test.",
+      "discord_line": "After respawn, craft the same recipe twice when you have materials for two. Both outputs stay and both crafts show in server log. Skip if this live channel has no forge."
+    },
+    {
+      "id": "live-3",
+      "order": 3,
+      "label": "Door Discord apply wording",
+      "tickets": [
+        999,
+        428
+      ],
+      "skip_rule": null,
+      "discord_line": "Unaccepted Discord account gets the apply message and a usable Discord invite open action."
+    },
+    {
+      "id": "live-4",
+      "order": 4,
+      "label": "Interim launcher speaking light",
+      "tickets": [
+        1396
+      ],
+      "skip_rule": null,
+      "discord_line": "Launcher shows the interim speaking light (not the voice head mark)."
+    },
+    {
+      "id": "live-5",
+      "order": 5,
+      "label": "Purse once, player trade, fail-loud mint",
+      "tickets": [
+        505,
+        517
+      ],
+      "skip_rule": null,
+      "discord_line": "Starting purse is 40 gold once per character. Player trade moves pack gold. Second mint or phantom craft gold fails loud. Do not test trader stock."
+    },
+    {
+      "id": "live-6",
+      "order": 6,
+      "label": "Server craft gate refuse reason",
+      "tickets": [
+        1402
+      ],
+      "skip_rule": null,
+      "discord_line": "A refused craft keeps materials and shows a clear server reason. Do not Pass recipe visibility without the perk."
+    },
+    {
+      "id": "live-7",
+      "order": 7,
+      "label": "K panel profession / half main path",
+      "tickets": [
+        509
+      ],
+      "skip_rule": null,
+      "discord_line": "K panel shows profession and half for a current-rulebook character on the main path."
+    }
+  ],
+  "keep_off": [
+    "1264",
+    "1267",
+    "959",
+    "test-one-mint",
+    "1395",
+    "1396-overlay",
+    "traders",
+    "1402-client-visibility",
+    "504-pass",
+    "1157"
+  ],
+  "privacy": {
+    "harlan_2026_10_01": "Discord-only session check-offs OK for deploy; no Privacy update if must-holds hold.",
+    "must_hold": [
+      "Role-gate Test-Tasks (testers/staff), not @everyone/public.",
+      "Bot must not copy Discord IDs or Pass/Fail/Skip/Fail-known into site/DB/files/off-Discord stores.",
+      "No named fail posts outside the session thread."
+    ],
+    "nice_to_have": [
+      "Pin that check-offs are visible to thread viewers.",
+      "Optional Privacy one-liner later."
+    ],
+    "owner_call_not_legal_block": "Whether peers see named Pass/Fail in-thread."
+  },
+  "channel": {
+    "name": "Test-Tasks",
+    "create_new": true,
+    "do_not_rename": "test-these",
+    "note": "test-these was deleted in cleanup script; create new Test-Tasks. Pathfind against current roles after role/perms churn."
+  }
+}

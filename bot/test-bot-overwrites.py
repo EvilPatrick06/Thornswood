@@ -431,6 +431,104 @@ try:
         yes('a channel open to everybody is never touched',
             g.calls == [] and me not in ch.ow)
 
+        # ------------------------------- one channel's own extra roles --
+        #
+        # Patrick locked the Live smoke session on 1 October to Owner, Dev
+        # and Lead GM. pathfind grants STAFF and Playtester, and the lead
+        # gamemaster role is in neither, so somebody holding only that one
+        # passed bot.py's admin check and could not see #test-tasks. It is
+        # on that channel's own line in PLAN rather than in the mode,
+        # because the mode is what every pathfind channel uses.
+        tasks = [s for _c, specs in B.PLAN for s in specs
+                 if s.get('key') == 'TESTS'][0]
+        others = [s for _c, specs in B.PLAN for s in specs
+                  if s.get('mode') == 'pathfind' and s.get('key') != 'TESTS']
+        yes('the Live smoke channel names the lead gamemaster role on its own '
+            'line, both ways it has been spelled',
+            tuple(tasks.get('extra_roles') or ()) == ('Lead Gamemaster', 'Lead GM'))
+        yes('  and no other pathfind channel was quietly widened with it',
+            others and not any(s.get('extra_roles') for s in others))
+
+        # The role is not in ROLES, so it is found on the server by name, the
+        # way the hold staff are.
+        lead = Role('Lead Gamemaster', 8, 59)
+        g.roles.append(lead)
+        boss = Member(8, [lead])
+        named = dict(roles)
+
+        ch = Channel(g, 'test-tasks', 'text',
+                     ow=B.overwrites(bare, 'pathfind', named, None, B.BOT_NEEDS,
+                                     tasks.get('extra_roles')))
+        yes('a new Live smoke channel lets a Lead Gamemaster in',
+            gets_in(resolve(g, boss, ch)))
+        yes('  and still shuts out somebody who is only a Member',
+            not resolve(g, somebody, ch).view_channel)
+        yes('  and somebody not yet approved',
+            not resolve(g, newcomer, ch).view_channel)
+        yes('  and testers and staff are in it as they always were',
+            gets_in(resolve(g, Member(9, [named['Playtester']]), ch))
+            and gets_in(resolve(g, Member(10, [named['Moderator']]), ch)))
+
+        plain = Channel(g, 'test-results', 'text',
+                        ow=B.overwrites(bare, 'pathfind', named))
+        yes('and the other pathfind channel is unchanged: a Lead Gamemaster '
+            'who is nothing else does not see it',
+            not resolve(g, boss, plain).view_channel)
+
+        # The channel made before the role existed, or made by hand. Same
+        # reason keep_bot exists.
+        extra = getattr(B, 'keep_extra', None)
+        yes('there is a way to let them into a channel that already exists',
+            extra is not None)
+        if extra is not None:
+            was = Channel(g, 'test-tasks', 'text',
+                          ow=B.overwrites(bare, 'pathfind', named))
+            g.calls = []
+            quiet(extra(was, tasks, named))
+            yes('a Live smoke channel already there is written once, for the '
+                'one role it was missing',
+                [c[0] for c in g.calls] == ['set_permissions']
+                and g.calls[0][2] is lead)
+            yes('  and a Lead Gamemaster sees, posts and reads there afterwards',
+                gets_in(resolve(g, boss, was)))
+            yes('  and nobody else gained anything',
+                not resolve(g, somebody, was).view_channel
+                and not resolve(g, newcomer, was).view_channel)
+
+            g.calls = []
+            quiet(extra(was, tasks, named))
+            yes('the same channel again is not written to at all', g.calls == [])
+
+            g.calls = []
+            quiet(extra(Channel(g, 'test-results', 'text',
+                                ow=B.overwrites(bare, 'pathfind', named)),
+                        {'name': 'test-results'}, named))
+            yes('a channel with no extra roles is never touched by it',
+                g.calls == [])
+
+            # Only the spelling the server carries. The other one is passed
+            # over rather than created or guessed at.
+            g.calls = []
+            quiet(extra(Channel(g, 'test-tasks', 'text',
+                                ow=B.overwrites(bare, 'pathfind', named)),
+                        tasks, named))
+            yes('a role name the server has not got is passed over, not made',
+                len(g.calls) == 1
+                and not [c for c in g.calls if c[0] == 'create_role'])
+
+            B.CHECK = True
+            g.calls = []
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                asyncio.run(extra(Channel(g, 'test-tasks', 'text',
+                                          ow=B.overwrites(bare, 'pathfind', named)),
+                                  tasks, named))
+            B.CHECK = False
+            yes('-Check says it would let them in and changes nothing',
+                g.calls == [] and 'would change' in buf.getvalue())
+
+        g.roles.remove(lead)
+
         ch = Channel(g, 'say-hello', 'text', ow={g.default_role:
                      discord.PermissionOverwrite(add_reactions=False)})
         g.calls = []
@@ -552,6 +650,51 @@ try:
     said = run(g, False)
     yes('a second run writes nothing, so it asks nothing of Discord once '
         'Administrator is gone',
+        not [c for c in g.calls if c[0] == 'set_permissions'])
+
+    # ------------------------- the whole build, with a Lead Gamemaster --
+    #
+    # The role is not in ROLES, so a server that carries it is the only place
+    # the extra roles do anything. Everything else about the run must be the
+    # same as above: one more write, on one channel, for one role.
+    g, roles, people, news, loose = live_server()
+    me = g.me
+    lead = Role('Lead Gamemaster', 8, 59)
+    g.roles.append(lead)
+    boss = Member(8, [lead])
+    by_name = dict((c.name, c) for c in g.categories + g.channels if c is not news)
+    tasks = by_name['test-tasks']
+    everything = g.categories + g.channels
+    before_them = dict(((p, c), resolve(g, p, c).value)
+                       for p in people for c in everything)
+
+    yes('before the run, a Lead Gamemaster cannot see #test-tasks (the gap, '
+        'measured)', not resolve(g, boss, tasks).view_channel)
+
+    said = run(g, False)
+    writes = [c for c in g.calls if c[0] == 'set_permissions']
+    theirs = [c for c in writes if c[2] is lead]
+    yes('the build did not stop part way', 'stopped:' not in said)
+    yes('after it, a Lead Gamemaster sees, posts and reads in #test-tasks',
+        gets_in(resolve(g, boss, tasks)))
+    yes('  written once, on that channel and no other',
+        len(theirs) == 1 and theirs[0][1] is tasks)
+    yes('  and #test-results is not one of them, so pathfind is not widened '
+        'everywhere', not resolve(g, boss, by_name['test-results']).view_channel)
+    yes('  nor is any staff channel, a hold or the one made by hand',
+        not resolve(g, boss, by_name['staff-general']).view_channel
+        and not resolve(g, boss, by_name['whiterun']).view_channel
+        and not resolve(g, boss, news).view_channel)
+    yes('  and every other write was still the bot\'s own overwrite',
+        all(c[2] is me for c in writes if c[2] is not lead))
+    yes('  and nobody else gained a thing: not a Member, not somebody not yet '
+        'approved, in any channel (%d)' % len(everything),
+        all(resolve(g, p, c).value == before_them[(p, c)]
+            for p in people for c in everything))
+    yes('nothing failed', not B.failed)
+
+    said = run(g, False)
+    yes('and a second run with that role there writes nothing either',
         not [c for c in g.calls if c[0] == 'set_permissions'])
 
     # ---------------------------------- the invite a finished build ends on --

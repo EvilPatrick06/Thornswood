@@ -95,8 +95,44 @@ The support voice channel sits in Help, because that is what it is for.
 
 ### Testing
 
-`#test-these` and `#test-results`, visible to Pathfinders and staff. This is
-the Discord end of what the site already does at `thornswood.net/testthese`.
+`#test-tasks` and `#test-results`, visible to testers and staff and to nobody
+else. `#test-tasks` also lets in the lead gamemaster role, because that role
+may open a Live smoke session and the rest of that gate does not include it.
+It is on that channel's own line in the builder's plan, so no other channel
+moved.
+
+`#test-tasks` replaces `#test-these`, which was deleted in the channel cleanup.
+It is a new channel rather than that one renamed, and `#test-these` is in the
+builder's retired list so a re-run does not bring it back.
+
+It carries the living Live smoke checklist. The rows are not written in
+Discord: they are the Live slice of the acceptance criteria in the vault,
+exported to `live-smoke-discord-export.json`, which is deployed beside
+`bot.py`. Staff open a dated session and the bot posts one message per row,
+each with Pass, Fail, Skip and Fail-known on it, in a thread off the opener:
+
+    /live-smoke start    settings version and live channel, opens a session
+    /live-smoke reset    closes the session open now and opens a fresh one
+    /live-smoke refresh  reads the export again and updates the checklist post
+
+Those three are **Owner, Dev and Lead Gamemaster**, which is wider than Owner
+and Dev and narrower than the staff roles: a Moderator alone does not open or
+reset a session. They are matched by role name, never by id, so a renamed role
+is fixed by setting `LIVE_SMOKE_ADMIN_ROLES` in `bot.env.json` rather than by a
+deploy. Testers and staff mark their own rows. Agents do not.
+
+A mark is an edit to the Discord message it was pressed on. Nothing writes a
+mark, a name or an account id to the site, to a database, to a file or to the
+bot's log, and nothing posts a named fail anywhere outside the session thread.
+Everybody who can read the thread can read the marks in it, and the opener
+says so. Going further than that, keeping marks anywhere off Discord, needs
+the Privacy page changed first.
+
+When the Live set moves, the export changes in the vault and the copy in `bot`
+changes with it in the same pull request. Then
+`.\scripts\deploy\Install-Bot.ps1 -CodeOnly` puts it on the VPS, and
+`/live-smoke refresh` updates the post people read. A session already open
+keeps the rows it was opened with; the next `start` uses the new set.
 
 ### Staff
 
