@@ -18,14 +18,21 @@
       .\Get-Logs.ps1 -Lines 40000   pull a lot more
       .\Get-Logs.ps1 -All           pull the whole thing, however big it is
 
-  Three files come back:
+  What comes back:
 
       site.log      the website, the Discord door and the launcher check in
       bot.log       the Discord bot, the panel and the site watcher
       server.log    the game server, which is where character creation,
                     connections, item handouts and gamemode errors are
+      thornswood.log the gamemode lines without the engine noise
+      door.log      the door: who it let in and what the site said
       voice.log     the voice and register service
       health.json   what the voice service says about itself right now
+
+  For every log that rolls (server, thornswood, voice, site, bot), the
+  rolled generations .1 through .5 come down too when they exist on the
+  VPS, under the same names. door.log does not roll, so only the current
+  file is fetched. A missing rolled file is skipped quietly.
 
   Nothing on the VPS is changed. Everything here is a read.
 #>
@@ -85,11 +92,13 @@ $botRoot   = 'C:\Thornswood-Bot'
 Say ("  reading the {0} server at {1}" -f $(if ($Dev) { 'DEV' } else { 'live' }), $srvRoot) 'DarkGray'
 
 $logs = @(
-    @{ Name = 'server.log'; Path = (Join-Path $srvRoot 'server.log'); What = 'the game server' }
+    # Keep = 5: also fetch Name.1 through Name.5 when they exist (Roll-Log /
+    # site in-process roll). door.log has no Keep: it does not roll.
+    @{ Name = 'server.log'; Path = (Join-Path $srvRoot 'server.log'); What = 'the game server'; Keep = 5 }
     # Thornswood's own lines and nothing else. server.log is about four fifths
     # engine noise on a normal day, so this is the one to read first and
     # server.log is where you go when the answer is not in it.
-    @{ Name = 'thornswood.log'; Path = (Join-Path $srvRoot 'thornswood.log'); What = 'the gamemode, without the engine noise' }
+    @{ Name = 'thornswood.log'; Path = (Join-Path $srvRoot 'thornswood.log'); What = 'the gamemode, without the engine noise'; Keep = 5 }
     <#
       THE DOOR'S OWN LOG, WHICH HAS NEVER COME DOWN WITH THE REST.
 
@@ -104,7 +113,7 @@ $logs = @(
       private, and nothing fetched private.
     #>
     @{ Name = 'door.log'; Path = (Join-Path $srvRoot 'private\door.log'); What = 'the door: who it let in and what the site said' }
-    @{ Name = 'voice.log';  Path = (Join-Path $voiceRoot 'voice.log');   What = 'voice and the character register' }
+    @{ Name = 'voice.log';  Path = (Join-Path $voiceRoot 'voice.log');   What = 'voice and the character register'; Keep = 5 }
     <#
       The site, added 23 September. It printed everything it worked out into
       a handle nobody held: no redirect on the task and no file anywhere on
@@ -115,16 +124,38 @@ $logs = @(
       keeping five, so site.log.1 to .5 are the older ones if the answer is
       not in the current one.
     #>
-    @{ Name = 'site.log';   Path = (Join-Path $docsRoot 'site.log');     What = 'the website and the Discord door' }
+    @{ Name = 'site.log';   Path = (Join-Path $docsRoot 'site.log');     What = 'the website and the Discord door'; Keep = 5 }
     # The bot has written this all along and nothing ever fetched it, which
     # is why the site watcher's startup line had to be read over ssh by hand.
     # In the bot's data folder since #1104, the one folder its account writes.
-    @{ Name = 'bot.log';    Path = (Join-Path $botRoot 'data\bot.log');  What = 'the Discord bot, the panel and the site watcher' }
+    @{ Name = 'bot.log';    Path = (Join-Path $botRoot 'data\bot.log');  What = 'the Discord bot, the panel and the site watcher'; Keep = 5 }
 )
+
+# Current file plus rolled .1-.5 for every log that sets Keep. Missing rolled
+# files are optional: one dark-gray MISSING line, no local file, pull goes on.
+$fetch = New-Object System.Collections.Generic.List[object]
+foreach ($base in $logs) {
+    [void]$fetch.Add(@{
+        Name = $base.Name
+        Path = $base.Path
+        What = $base.What
+        Optional = $false
+    })
+    $keep = 0
+    if ($base.ContainsKey('Keep') -and $base.Keep) { $keep = [int]$base.Keep }
+    for ($i = 1; $i -le $keep; $i++) {
+        [void]$fetch.Add(@{
+            Name = ($base.Name + '.' + $i)
+            Path = ($base.Path + '.' + $i)
+            What = ('older ' + $base.Name)
+            Optional = $true
+        })
+    }
+}
 
 Head 'Pulling'
 
-foreach ($l in $logs) {
+foreach ($l in $fetch) {
     $dest = Join-Path $Out $l.Name
 
     <#
@@ -145,14 +176,23 @@ foreach ($l in $logs) {
     $text = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes $target "powershell -NoProfile -EncodedCommand $enc" } 2>&1
 
     if ($LASTEXITCODE -ne 0 -and -not $text) {
-        Say ("  {0,-12} could not be read. ssh exit {1}" -f $l.Name, $LASTEXITCODE) 'Red'
+        Say ("  {0,-14} could not be read. ssh exit {1}" -f $l.Name, $LASTEXITCODE) 'Red'
+        continue
+    }
+
+    # Rolled generations that are not on the box: skip quietly. Do not write a
+    # local MISSING file and do not fail the rest of the pull.
+    $lines = @($text)
+    $missing = ($lines.Count -eq 1 -and ("$($lines[0])" -like 'MISSING:*'))
+    if ($l.Optional -and $missing) {
+        Say ("  {0,-14} MISSING" -f $l.Name) 'DarkGray'
         continue
     }
 
     $text | Set-Content -LiteralPath $dest -Encoding UTF8
     $size = if (Test-Path -LiteralPath $dest) { (Get-Item -LiteralPath $dest).Length } else { 0 }
-    $count = @($text).Count
-    Say ("  {0,-12} {1,7:n0} lines  {2,9:n0} bytes   {3}" -f $l.Name, $count, $size, $l.What) 'Gray'
+    $count = $lines.Count
+    Say ("  {0,-14} {1,7:n0} lines  {2,9:n0} bytes   {3}" -f $l.Name, $count, $size, $l.What) 'Gray'
 }
 
 <#
