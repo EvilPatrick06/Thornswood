@@ -431,7 +431,7 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   const oldRun = runRouter('/rules', false, { '/api/page/rules': { md: '# Rules <b>' } });
   await tick();
   yes('from a server too old to draw it, the words come as escaped text',
-      oldRun.body.innerHTML === '<pre style="white-space:pre-wrap"># Rules &lt;b&gt;</pre>');
+      oldRun.body.innerHTML === '<pre class="pre-wrap"># Rules &lt;b&gt;</pre>');
   const roadRun = runRouter('/roadmap', false,
     { '/api/roadmap': { intro: '**x**', introHtml: '<p><strong>x</strong></p>', sections: [] } });
   await tick();
@@ -575,7 +575,7 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   const bare = await get(two.port, '/rules');
   yes('and /rules still carries its words, as escaped plain text',
       bare.status === 200 &&
-      bare.text.indexOf('<div class="wrap" id="pagebody"><pre style="white-space:pre-wrap"># Rules') >= 0);
+      bare.text.indexOf('<div class="wrap" id="pagebody"><pre class="pre-wrap"># Rules') >= 0);
 
   done();
 })().catch(function (e) {
