@@ -7,12 +7,13 @@
   every socket on the server, /ooc was the only local line, and there was no
   /me.
 
-  The fix is behind THORNSWOOD_CHAT_RANGE and ships off, so this proves both
-  halves against the real service rather than a copy of its logic:
+  The fix is behind THORNSWOOD_CHAT_RANGE. Left unset it is off, which is
+  how the live voice service is left. The dev voice service is installed
+  with it on. This proves both halves against the real service:
 
-    OFF, which is what ships. A plain line still reaches every socket in
-    the box. The line above the head is local either way. /me, /s, /w and
-    /ooc are local speech, not commands for the game server.
+    OFF. A plain line still reaches every socket in the box. The line
+    above the head is local either way. /me, /s, /w and /ooc are local
+    speech, not commands for the game server.
 
     ON. The entry's own test: three sockets, positions posted to /positions
     with two close together in one cell and one far off, one plain line from
@@ -190,7 +191,7 @@ function rows(include) {
 // ------------------------------------------------------------------ off ----
 async function off() {
   console.log('');
-  console.log('THORNSWOOD_CHAT_RANGE unset, which is what ships:');
+  console.log('THORNSWOOD_CHAT_RANGE unset, which is how live is left:');
   const svc = await service(null);
   try {
     yes('OFF health says the range is off', svc.health.chatRange === 0);
