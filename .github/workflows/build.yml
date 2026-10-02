@@ -228,6 +228,10 @@ jobs:
           # on later takes Thornswood's files back out of it. It runs the real
           # Setup-Thornswood.ps1 and the whole launcher on a pretend Steam in a
           # temp folder, about twenty seconds.
+          # Issue #1361 added one: Secrets.Protect logs and throws when DPAPI
+          # refuses, instead of handing the plain secret back to be written to
+          # disk, and Unprotect is left as it was. It reads the launcher's
+          # source, a moment, and goes red on the fail-open it replaced.
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1',
@@ -238,7 +242,8 @@ jobs:
                  'test-npc-death-policy.js', 'test-vortex-profile-state.ps1',
                  'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js',
                  'test-npc-merchant-purses.js', 'test-merchant-ledger-storage.js', 'test-npc-merchant-startup.js',
-                 'test-dungeon-loot.js', 'test-dungeon-reward-safety.js', 'test-dungeon-reward-storage.js', 'test-one-mint.js'
+                 'test-dungeon-loot.js', 'test-dungeon-reward-safety.js', 'test-dungeon-reward-storage.js', 'test-one-mint.js',
+                 'test-secrets-fail-closed.js'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
