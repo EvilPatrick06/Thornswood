@@ -40,12 +40,17 @@ function rig() {
   let clock = 1000000000000;
   const ids = {};
   let nextId = 0x200;
+  let saved={version:1,entries:{}};
+  const storage={load:()=>JSON.parse(JSON.stringify(saved)),save:next=>{saved=JSON.parse(JSON.stringify(next));}};
 
   function idOf(desc) {
     if (!ids[desc]) { ids[desc] = nextId++; }
     return ids[desc];
   }
   const mp = {
+    getServerSettings:()=>({thornswoodServer:'dev'}),
+    getNpcAIState:()=>({isHuman:true,profileId:1,isDead:false,isDisabled:false}),
+    getDescFromId:id=>id.toString(16)+':Skyrim.esm',
     get: function (id, key) {
       const row = store[id] || {};
       return row[key];
@@ -62,16 +67,22 @@ function rig() {
     given.push({ actorId: actorId, desc: desc, count: count });
     return true;
   }
+  function addItemsAtomic(actorId,goods) {
+    for(const good of goods) given.push({actorId,desc:good.item,count:good.count});
+    return true;
+  }
   function say(actorId, text) { said.push(String(text)); }
   const FakeDate = { now: function () { return clock; } };
   const fn = new Function(
     'globalThis', 'mp', 'console', 'idOf', 'addItem', 'say',
     'Math', 'Date', 'Number', 'String', 'Object', 'Array', 'RegExp',
+    'require','createPrivateEconomyLedger','withinResourceReach','addItemsAtomic',
     block + '\nreturn globalThis.__thornswoodDungeonLoot;');
   const g = {};
   const api = fn(
     g, mp, { log: function () { } }, idOf, addItem, say,
-    Math, FakeDate, Number, String, Object, Array, RegExp);
+    Math, FakeDate, Number, String, Object, Array, RegExp,
+    require,()=>storage,()=>true,addItemsAtomic);
   api.given = given;
   api.said = said;
   api.idOf = idOf;
