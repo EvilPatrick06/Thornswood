@@ -3785,10 +3785,11 @@
     ['Dawnguard.esm', 0xf812],   // DLC1DawnguardCraftingBlackSmithForge
     ['Dragonborn.esm', 0x3cf6e],   // DLC2CraftingBlackSmithForge
     ['Dragonborn.esm', 0x2b074],   // DLC2CraftingBlackSmithSkaalForge
+    ['Dragonborn.esm', 0x18cae],   // testPhilCraftingSmelterMarker1
     ['Thornswood-Content.esp', 0x1547e],   // ThornswoodCraftingCharcoalKilnMarker
   ];
   // The plugins the list spans, for the log line when they are resolved.
-  const FIRE_FILES = ["Skyrim.esm","Dawnguard.esm","Dragonborn.esm","Embers XD.esm","Embers XD.esp","North Keep.esp","Thornswood-Content.esp"];;
+  const FIRE_FILES = ["Skyrim.esm","Dawnguard.esm","Dragonborn.esm","Embers XD.esm","Embers XD.esp","North Keep.esp","Thornswood-Content.esp"];
 
   // Standing at a fire, and standing IN one. A campfire is about a hundred
   // units across, so 300 is warming your hands and 90 is in the coals.

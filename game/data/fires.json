@@ -104,13 +104,13 @@
     "Playable Rieklings.esp"
   ],
   "notInstalled": [],
-  "builtAt": "2026-10-02T22:07:08.339Z",
+  "builtAt": "2026-10-02T22:07:51.178Z",
   "reach": {
     "flame": 300,
     "craft": 260
   },
   "inside": 90,
-  "rule": "flame: the model is one of the fire effects or wood fires. craft: the editor id begins one of CraftingBlackSmithForge, CraftingSmelterMarker, CraftingBlacksmithForgeSTATIC, CraftingCookingFireSpit, DLC1DawnguardCraftingBlackSmithForge, DLC2CraftingBlackSmithForge, DLC2CraftingBlackSmithSkaalForge, CraftingNKPBlackSmithForge, ThornswoodCraftingCharcoalKilnMarker. Anything whose editor id or model ends Off or Out is dropped.",
+  "rule": "flame: the model is one of the fire effects or wood fires. craft: the editor id contains one of CraftingBlackSmithForge, CraftingSmelterMarker, CraftingBlacksmithForgeSTATIC, CraftingCookingFireSpit, DLC1DawnguardCraftingBlackSmithForge, DLC2CraftingBlackSmithForge, DLC2CraftingBlackSmithSkaalForge, CraftingNKPBlackSmithForge, ThornswoodCraftingCharcoalKilnMarker. Anything whose editor id or model ends Off or Out is dropped.",
   "fires": [
     {
       "file": "Skyrim.esm",
@@ -362,7 +362,7 @@
       "kind": "craft",
       "edid": "CraftingBlackSmithForge",
       "modl": "Furniture\\BlacksmithForgeMarker.nif",
-      "why": "editor id begins CraftingBlackSmithForge"
+      "why": "editor id contains CraftingBlackSmithForge"
     },
     {
       "file": "Skyrim.esm",
@@ -371,7 +371,7 @@
       "kind": "craft",
       "edid": "CraftingBlackSmithForgeSkyforge",
       "modl": "Furniture\\BlackSmithingSkyforgeMarker.nif",
-      "why": "editor id begins CraftingBlackSmithForge"
+      "why": "editor id contains CraftingBlackSmithForge"
     },
     {
       "file": "Skyrim.esm",
@@ -380,7 +380,7 @@
       "kind": "craft",
       "edid": "CraftingBlacksmithForgeSTATIC",
       "modl": "Clutter\\Blacksmith\\BlacksmithForge01\\BlacksmithForge01.nif",
-      "why": "editor id begins CraftingBlackSmithForge"
+      "why": "editor id contains CraftingBlackSmithForge"
     },
     {
       "file": "Skyrim.esm",
@@ -389,7 +389,7 @@
       "kind": "craft",
       "edid": "CraftingBlackSmithForgeWR",
       "modl": "Furniture\\BlacksmithForgeMarkerWR.nif",
-      "why": "editor id begins CraftingBlackSmithForge"
+      "why": "editor id contains CraftingBlackSmithForge"
     },
     {
       "file": "Skyrim.esm",
@@ -398,7 +398,7 @@
       "kind": "craft",
       "edid": "CraftingCookingFireSpit",
       "modl": "Furniture\\FireSpitCooking.nif",
-      "why": "editor id begins CraftingCookingFireSpit"
+      "why": "editor id contains CraftingCookingFireSpit"
     },
     {
       "file": "North Keep.esp",
@@ -407,7 +407,7 @@
       "kind": "craft",
       "edid": "CraftingNKPBlackSmithForge",
       "modl": "Furniture\\BlacksmithForgeMarker.nif",
-      "why": "editor id begins CraftingNKPBlackSmithForge"
+      "why": "editor id contains CraftingNKPBlackSmithForge"
     },
     {
       "file": "Skyrim.esm",
@@ -416,7 +416,7 @@
       "kind": "craft",
       "edid": "CraftingSmelterMarker1",
       "modl": "Furniture\\SmelterMarker.nif",
-      "why": "editor id begins CraftingSmelterMarker"
+      "why": "editor id contains CraftingSmelterMarker"
     },
     {
       "file": "Dawnguard.esm",
@@ -425,7 +425,7 @@
       "kind": "craft",
       "edid": "DLC1DawnguardCraftingBlackSmithForge",
       "modl": "Furniture\\BlacksmithForgeMarker.nif",
-      "why": "editor id begins DLC1DawnguardCraftingBlackSmithForge"
+      "why": "editor id contains CraftingBlackSmithForge"
     },
     {
       "file": "Dawnguard.esm",
@@ -443,7 +443,7 @@
       "kind": "craft",
       "edid": "DLC2CraftingBlackSmithForge",
       "modl": "DLC02\\Architecture\\RavenRock\\DLC2BlacksmithForge01RR.nif",
-      "why": "editor id begins DLC2CraftingBlackSmithForge"
+      "why": "editor id contains CraftingBlackSmithForge"
     },
     {
       "file": "Dragonborn.esm",
@@ -452,7 +452,7 @@
       "kind": "craft",
       "edid": "DLC2CraftingBlackSmithSkaalForge",
       "modl": "Furniture\\BlacksmithForgeMarker.nif",
-      "why": "editor id begins DLC2CraftingBlackSmithSkaalForge"
+      "why": "editor id contains DLC2CraftingBlackSmithSkaalForge"
     },
     {
       "file": "Skyrim.esm",
@@ -707,13 +707,22 @@
       "why": "model Clutter\\Giant\\GiantCampfire01Burning.nif"
     },
     {
+      "file": "Dragonborn.esm",
+      "local": "0x18cae",
+      "type": "FURN",
+      "kind": "craft",
+      "edid": "testPhilCraftingSmelterMarker1",
+      "modl": "Furniture\\SmelterMarker.nif",
+      "why": "editor id contains CraftingSmelterMarker"
+    },
+    {
       "file": "Thornswood-Content.esp",
       "local": "0x1547e",
       "type": "FURN",
       "kind": "craft",
       "edid": "ThornswoodCraftingCharcoalKilnMarker",
       "modl": "Furniture\\SmelterMarker.nif",
-      "why": "editor id begins ThornswoodCraftingCharcoalKilnMarker"
+      "why": "editor id contains ThornswoodCraftingCharcoalKilnMarker"
     }
   ],
   "droppedForBeingOut": 3
