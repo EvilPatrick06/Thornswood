@@ -103,6 +103,7 @@ Fees of 20 and 30, the reach of 400, the newest 10, the gaps, `/unpin`,
 in the server. The fee lands on the hold's ledger. Letters are not.
 `/letter` and `/deliver` do not exist. A courier is not paid.
 
-Nine boards are seeded. Raven Rock is not among them. Solitude's spot
+Nine boards are seeded, and each one is that hold's drop box.
+Raven Rock is not among them. Solitude's spot
 was corrected from a walked coordinate and still wants somebody to
 stand on it. Half fees for the guild are not in the posting fee.

@@ -36,7 +36,8 @@ Discord account holds Business Owner or Faction Owner, or the role
 named Dev, or this character has accepted an invite, or the account
 is staff. The book itself is on [Factions and businesses](factions.md).
 It does not use one of the 12 journals. Someone with Prices stands
-at the hold's drop box and submits a copy. The list stays in the book.
+at that hold's notice board, which is the drop box, and submits a
+copy. The list stays in the book.
 
 ## Where this is
 
@@ -45,4 +46,4 @@ and sharing with a friend are in the server. A friend who is offline
 can be named, and the share is kept. The page still only appears
 while the person who wrote it is online. A journal survives a
 restart. It is not a quest. The group tab is on the same panel. A price list is submitted at
-the hold's drop box, and the list stays in the book.
+that hold's notice board, and the list stays in the book.
