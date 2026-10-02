@@ -344,6 +344,24 @@ function points(actor) { const s = srv.C.stateOf(actor); return (s.spells && s.s
   yes('F  and nothing is said', srv.said.length === 0);
 }
 
+// ---------------------------------------------- G. a master spell needs the tome --
+{
+  const state = Object.assign(P.fresh(), {
+    prof: 'mage',
+    schools: ['destruction'],
+    ranks: { destruction: 'master' },
+    spells: { points: 1, known: ['Wall of Flames'] }
+  });
+  const refused = P.pickSpell(state, 'Fire Storm');
+  yes('G a master spell chosen off the book without its tome is refused (' + (refused.why || '') + ')',
+      refused.ok === false && /tome/.test(refused.why || ''));
+  const learned = P.pickSpell(state, 'Fire Storm', true);
+  yes('G the same mage with the tome, master rank, and a point learns Fire Storm',
+      learned.ok === true && learned.state.spells.known.indexOf('Fire Storm') !== -1);
+  yes('G Fire Storm\'s tome is the book',
+      P.masterTomeDesc('Fire Storm') === 'a270c:Skyrim.esm');
+}
+
 // ------------------------------------------------------- the handler itself --
 {
   const lines = src.split('\n').filter(function (l) { return /^mp\.onReadBook\s*=/.test(l); });

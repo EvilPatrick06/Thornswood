@@ -418,7 +418,7 @@ for (const at of Object.keys(WRITERS)) {
       callers.join(',') === 'dungeon loot/give,outer/fish,outer/game,outer/loot');
   const reward=bodyOf('dungeon loot/give') || '';
   yes('the dungeon reward bundles its fixed gold and rolled goods into one inventory write',
-      /goods=\[\{item:GOLD_DESC,count:rolled.gold\}\]/.test(reward) &&
+      /if\(rolled\.gold>0\) goods\.push\(\{item:GOLD_DESC,count:rolled\.gold\}\)/.test(reward) &&
       /addItemsAtomic\(actorId,goods\)/.test(reward) &&
       /var GOLD_SPAN = \{ 1: \[5, 15\], 2: \[12, 35\], 3: \[25, 70\], 4: \[50, 120\] \};/.test(code));
 }

@@ -62,7 +62,8 @@ crops. Those are the classes, not this cast.
 Caves and dungeons have a fixed tier assigned to the place. Entering with
 a stronger character does not silently raise it. The location list names
 the tier, enemy families, population cap and return interval. A chest in
-that place pays from the same tier. See [Dungeon loot](dungeon-loot.md).
+that place pays from the same tier. A camp enemy carries a little on the
+body. Any other dead body rarely carries anything good. See [Dungeon loot](dungeon-loot.md).
 Some places have more enemies and stronger ones. Ordinary routes and
 beginner places remain usable; higher tiers are a choice, not the whole map.
 
