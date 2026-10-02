@@ -71,6 +71,8 @@ foreach ($dir in 'scripts', 'tests', 'launcher', 'installer', 'site', '.github')
     if (-not (Test-Path -LiteralPath $root)) { continue }
     foreach ($f in Get-ChildItem -LiteralPath $root -Recurse -File -Include *.ps1, *.psm1, *.cmd, *.bat, *.js, *.cs, *.md, *.yml, *.txt) {
         if ($f.FullName -eq $PSCommandPath) { continue }
+        # The #1179 retired harness names it on purpose to assert it is gone.
+        if ($f.Name -eq 'test-hand-install-retired.ps1') { continue }
         if ([IO.File]::ReadAllText($f.FullName).Contains('Install-SkyMPClient')) { $named += $f.FullName.Substring($Repo.Length + 1) }
     }
 }
