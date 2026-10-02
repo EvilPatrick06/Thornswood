@@ -4,7 +4,7 @@
 #
 #   security  the secret scan of the tree and of the built launcher
 #   files     every PowerShell, game and bot file parses; the writing rules
-#   code      all ~190 test harnesses, the bot and voice harnesses, the
+#   code      all ~380 test harnesses in tests/, plus the bot and voice harnesses, the
 #             launcher window check and the launcher build
 #   GitHub    pull requests open more than two days and branches other than
 #             main, which CONTRIBUTING.md says are merged or closed
