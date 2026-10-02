@@ -118,7 +118,7 @@ class Thread(object):
         await asyncio.sleep(0)
         self.added.append(m)
 
-    async def send(self, text, view=None):
+    async def send(self, text, view=None, **kw):
         await asyncio.sleep(0)
         self.sent.append(text)
         self.events.append('written in the thread')
@@ -146,7 +146,7 @@ class Channel(object):
         self.thread = Thread(self.events)
         return self.thread
 
-    async def send(self, text):
+    async def send(self, text, **kw):
         await asyncio.sleep(0)
         self.sent.append(text)
         self.events.append(self.said)
