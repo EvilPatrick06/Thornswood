@@ -347,7 +347,7 @@ the team before code; nobody settles it alone, and a Claude never does.
   Framework csc). Red means the branch would stop Ship at the build step;
   fix that, and merge once it is green and you have said so in
   #staff-general. Run the test harnesses your change touches yourself. All
-  ~190 of them, the bot and voice ones, and a look for stray pull requests
+  ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on the VPS (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
   checks failed", and whoever broke it fixes it next. It runs on the VPS, on a runner
