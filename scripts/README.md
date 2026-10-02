@@ -68,10 +68,10 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Nightly-Issue.ps1](dev/Nightly-Issue.ps1) | Keeps one issue on the board for a failing nightly, and closes it the night the checks pass. |
 | [dev/Start-Thornswood.ps1](dev/Start-Thornswood.ps1) | Launches the game the way the launcher's Play() does, without the launcher. |
 | [dev/Watch-Foreground.ps1](dev/Watch-Foreground.ps1) | Which window Windows is giving the keyboard to, sampled from outside the game. |
-| [mods/Add-Accuracy.ps1](mods/Add-Accuracy.ps1) | Localised combat damage. Where you hit somebody starts to matter, on top of what Precision already does for where your weapon actually is. |
+| [mods/Add-Accuracy.ps1](mods/Add-Accuracy.ps1) | RETIRED. DO NOT RUN. Collection installs Accuracy / Core Impact now (#1179). |
 | [mods/Add-Bodies.ps1](mods/Add-Bodies.ps1) | RETIRED. DO NOT RUN. Issue #405: every run poured the nude CBBE and 3BA female body (femalebody_0.nif and _1.nif, shapes 3BA, 3BA_Vagina and 3BA_Anus, no Bra or Panty) back over Game\Data, whatever body had been put there since. |
-| [mods/Add-CartTravel.ps1](mods/Add-CartTravel.ps1) | Carriages and ferries between the holds, so turning fast travel off leaves people with a way to get about. |
-| [mods/Add-McmShortcut.ps1](mods/Add-McmShortcut.ps1) | Installs MCM Shortcut NG, which is what lets Skyrim Unbound open its own config menu. |
+| [mods/Add-CartTravel.ps1](mods/Add-CartTravel.ps1) | RETIRED. DO NOT RUN. Collection installs CFTO now (#1179). |
+| [mods/Add-McmShortcut.ps1](mods/Add-McmShortcut.ps1) | RETIRED. DO NOT RUN. Collection installs MCM Shortcut NG now (#1179). |
 | [mods/Align-LoadOrder.ps1](mods/Align-LoadOrder.ps1) | The client counts its own plugins with Game.GetModCount, which skips every ESL-flagged one because Skyrim gives those no normal index. |
 | [mods/Audit-Leftovers.ps1](mods/Audit-Leftovers.ps1) | Measures. Deletes nothing, moves nothing, renames nothing. |
 | [mods/Audit-Mods.ps1](mods/Audit-Mods.ps1) | Measures the build and says which parts carry a plugin and which are pure assets, because only the second kind can ever be optional. |
@@ -83,16 +83,16 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [mods/Check-Plugins.ps1](mods/Check-Plugins.ps1) | What is enabled that should not be, and what is missing that should be there. |
 | [mods/Clean-Everything.ps1](mods/Clean-Everything.ps1) | Finds the old installers, build leftovers, temp files, stale backups and old GitHub release assets across this machine, the server and the source repository, adds up what they are costing, and prints it. |
 | [mods/Clean-Leftovers.ps1](mods/Clean-Leftovers.ps1) | The other half of Audit-Leftovers.ps1. That one measures and never touches anything; this one removes what it found. |
-| [mods/Enable-MCM.ps1](mods/Enable-MCM.ps1) | Make MCM Helper work, on both sides, properly. |
+| [mods/Enable-MCM.ps1](mods/Enable-MCM.ps1) | RETIRED. DO NOT RUN. Collection load order settles SkyUI / MCM Helper (#1179). |
 | [mods/Find-MissingMasters.ps1](mods/Find-MissingMasters.ps1) | Reads the TES4 header of every plugin in Data and reports any master that is no longer present. |
 | [mods/Fix-Icons.ps1](mods/Fix-Icons.ps1) | Windows keeps the picture it once drew for a shortcut in a cache, and goes on showing it long after the icon inside the exe changed. |
-| [mods/Fix-MaleBody.ps1](mods/Fix-MaleBody.ps1) | The male body mesh in the game folder is a genital-slotted one, left behind when The New Gentleman was taken out. |
-| [mods/Fix-QuickLoot.ps1](mods/Fix-QuickLoot.ps1) | Turn MCMHelper.esp on, on both sides, in one go. |
+| [mods/Fix-MaleBody.ps1](mods/Fix-MaleBody.ps1) | RETIRED. DO NOT RUN. Collection owns male body meshes (#1179). |
+| [mods/Fix-QuickLoot.ps1](mods/Fix-QuickLoot.ps1) | RETIRED. DO NOT RUN. Collection has MCMHelper.esp on (#1179). |
 | [mods/LoadOrder.ps1](mods/LoadOrder.ps1) | The load order as the game counts it, and how to put a plugin list into the server's order. |
 | [mods/Remove-DeadRecords.ps1](mods/Remove-DeadRecords.ps1) | Deletes records from Thornswood-Content.esp that nothing uses any more, and refuses to delete one that anything still points at. |
-| [mods/Remove-Plugin.ps1](mods/Remove-Plugin.ps1) | Takes one plugin out of the Thornswood build, reversibly. |
+| [mods/Remove-Plugin.ps1](mods/Remove-Plugin.ps1) | RETIRED. DO NOT RUN. Plugins leave via collection revision (#1179). |
 | [mods/Rename-ContentRecords.ps1](mods/Rename-ContentRecords.ps1) | Renames the editor ids in Thornswood-Content.esp that still carry the naming of the server the content came from, and changes nothing else about the file. |
-| [mods/Set-UnboundMenu.ps1](mods/Set-UnboundMenu.ps1) | Switches Skyrim Unbound's config menu between the locked version and the full one. |
+| [mods/Set-UnboundMenu.ps1](mods/Set-UnboundMenu.ps1) | RETIRED. DO NOT RUN. Locked Unbound MCM ships with the collection (#1179). |
 | [mods/Show-EslCascade.ps1](mods/Show-EslCascade.ps1) | Answers one question: if the server load order drops every ESL-flagged plugin, how much else has to go with it? |
 | [mods/Sync-LoadOrder.ps1](mods/Sync-LoadOrder.ps1) | Build the server's load order from the client's. |
 | [ops/Chargen-Log.ps1](ops/Chargen-Log.ps1) | What the server thinks is happening to your character. |

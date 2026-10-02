@@ -1,6 +1,10 @@
 <#
   Fix-QuickLoot.ps1 - turn MCMHelper.esp on, on both sides, in one go.
 
+  RETIRED. DO NOT RUN. Issue #1179: switched on MCMHelper.esp in server-settings.json and plugins.txt by hand. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
+
+  What it used to do, and what is left of it:
+
   QuickLoot's settings quest is registered through MCM Helper, and MCM Helper
   needs its own plugin active. It is a hundred byte stub with no records worth
   the name, so on its own it is nothing. The catch is what it does to the
@@ -44,6 +48,13 @@ param(
   [string] $Settings = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerSettings),
   [string] $After    = 'SkyUI_SE.esp'
 )
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Fix-QuickLoot.ps1 is retired and installs nothing (issue #1179). ' +
+       'MCMHelper.esp is on in the collection load order on both sides now. Switching it in plugins.txt and server-settings.json by hand desyncs form ids. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'hand installs are meant again, and read the header first.')
+
 
 Set-StrictMode -Off
 $ErrorActionPreference = 'Stop'

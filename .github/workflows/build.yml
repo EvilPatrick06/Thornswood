@@ -242,7 +242,8 @@ jobs:
           # exist on main — site-auth already drives the refresh() path.
           # $six is a historical name: the gate list grew well past six (#1368).
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
-'test-docs-index.js',
+                 'test-docs-index.js',
+                 'test-hand-install-retired.ps1',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1',
                  'test-vps-defaults.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',

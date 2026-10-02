@@ -1,6 +1,10 @@
 <#
   Enable-MCM.ps1 - make MCM Helper work, on both sides, properly.
 
+  RETIRED. DO NOT RUN. Issue #1179: patched SkyUI_SE.esp's light flag by hand. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
+
+  What it used to do, and what is left of it:
+
   The chain that was blocking it:
 
     QuickLootIE.esp    light,     masters Skyrim.esm      - a 527 byte stub
@@ -34,6 +38,13 @@ param(
   [string] $Game = 'C:\Thornswood',
   [switch] $Undo
 )
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Enable-MCM.ps1 is retired and installs nothing (issue #1179). ' +
+       'SkyUI_SE.esp''s light flag and MCM Helper are settled in the collection load order now. Patching the esp by hand writes through Vortex hard links into staging. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'hand installs are meant again, and read the header first.')
+
 
 Set-StrictMode -Off
 $ErrorActionPreference = 'Stop'
