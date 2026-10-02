@@ -2,9 +2,10 @@
 /*
   The emote wheel, as an overlay inside the front rather than a page of its own.
 
-  The middle of the wheel is eight quick slots. Click one to play it. The same
-  eight are the number keys 1 to 8, and those play with the wheel shut. On the
-  right is a search and every emote, in alphabetical order. Click a name to
+  The wheel stays in the dead middle of the screen. The middle of it is
+  eight quick slots. Click one to play it. The same eight are the number
+  keys 1 to 8, and those play with the wheel shut. On the right, beside
+  it, is a search and every emote, in alphabetical order. Click a name to
   play it. Click a slot number under the search, then a name, to put that
   emote on the slot.
 
@@ -21,50 +22,42 @@
   var query = '';
 
   var css = [
-    '#thornswood-wheel{position:fixed;inset:0;z-index:2147483000;display:flex;',
-    'align-items:center;justify-content:center;pointer-events:auto;',
+    '#thornswood-wheel{position:fixed;inset:0;z-index:2147483000;pointer-events:auto;',
     'background:radial-gradient(ellipse at center,rgba(0,0,0,.28) 0%,rgba(0,0,0,.55) 100%);',
     'font-family:"Palatino Linotype",Palatino,Georgia,serif;color:#d9cfb4;user-select:none}',
     '#thornswood-wheel.gone{display:none}',
-    '#thornswood-wheel .frame{display:flex;align-items:stretch;gap:0;',
-    'background:rgba(11,10,8,.94);border:1px solid rgba(198,170,109,.42);',
-    'outline:1px solid rgba(198,170,109,.14);outline-offset:4px;',
-    'box-shadow:0 24px 80px rgba(0,0,0,.7);overflow:hidden}',
-    '#thornswood-wheel .wheelwrap{width:520px;height:560px;display:flex;align-items:center;justify-content:center;',
-    'border-right:1px solid rgba(198,170,109,.22)}',
-    '#thornswood-wheel svg{overflow:visible}',
+    '#thornswood-wheel .wheelwrap{position:absolute;left:50%;top:50%;width:520px;height:520px;',
+    'margin:0;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center}',
+    '#thornswood-wheel svg{overflow:visible;font-family:"Palatino Linotype",Palatino,Georgia,serif}',
     '#thornswood-wheel .seg{fill:rgba(14,13,11,.72);stroke:rgba(198,170,109,.28);stroke-width:1}',
     '#thornswood-wheel .seg.hot{fill:rgba(120,94,44,.88);stroke:rgba(233,209,155,.9)}',
-    '#thornswood-wheel .label{fill:#f6e9c8;font-size:15px;text-anchor:middle;',
-    'dominant-baseline:middle;pointer-events:none}',
-    '#thornswood-wheel .num{fill:rgba(198,170,109,.85);font-size:13px;text-anchor:middle;',
-    'dominant-baseline:middle;pointer-events:none;letter-spacing:.12em}',
+    '#thornswood-wheel .label{fill:#f6e9c8;font-family:"Palatino Linotype",Palatino,Georgia,serif;',
+    'font-size:13px;text-anchor:middle;dominant-baseline:middle;pointer-events:none}',
+    '#thornswood-wheel .num{fill:rgba(198,170,109,.85);font-family:"Palatino Linotype",Palatino,Georgia,serif;',
+    'font-size:11px;text-anchor:middle;dominant-baseline:middle;pointer-events:none}',
     '#thornswood-hub{fill:rgba(14,13,11,.86);stroke:rgba(198,170,109,.45);stroke-width:1.5}',
     '#thornswood-hub.hot{fill:rgba(120,44,44,.9);stroke:rgba(233,170,155,.9)}',
-    '#thornswood-hubtext{fill:#c6aa6d;font-size:15px;text-anchor:middle;dominant-baseline:middle;',
-    'pointer-events:none;letter-spacing:.12em}',
-    '#thornswood-ringname{fill:#c6aa6d;font-size:13px;text-anchor:middle;letter-spacing:.22em;',
-    'text-transform:uppercase;pointer-events:none}',
-    '#thornswood-hint{fill:rgba(217,207,180,.7);font-size:13px;text-anchor:middle;pointer-events:none}',
-    '#thornswood-wheel .side{width:420px;display:flex;flex-direction:column;padding:22px 22px 16px;',
-    'background:rgba(0,0,0,.20)}',
-    '#thornswood-wheel .side h2{margin:0 0 12px;font-size:26px;font-weight:normal;color:#f6e9c8;',
-    'letter-spacing:.04em}',
-    '#thornswood-wheel .side input{font-family:inherit;font-size:18px;line-height:24px;color:#f6e9c8;',
-    'background:rgba(0,0,0,.35);border:1px solid rgba(198,170,109,.42);padding:10px 12px;width:100%}',
+    '#thornswood-hubtext{fill:#c6aa6d;font-family:"Palatino Linotype",Palatino,Georgia,serif;',
+    'font-size:13px;text-anchor:middle;dominant-baseline:middle;pointer-events:none;letter-spacing:.12em}',
+    '#thornswood-wheel .side{position:absolute;top:50%;right:36px;transform:translateY(-50%);',
+    'width:300px;height:520px;max-height:calc(100% - 48px);box-sizing:border-box;',
+    'display:flex;flex-direction:column;padding:16px 16px 12px;overflow:hidden;',
+    'background:rgba(11,10,8,.94);border:1px solid rgba(198,170,109,.42);',
+    'outline:1px solid rgba(198,170,109,.14);outline-offset:4px;box-shadow:0 24px 80px rgba(0,0,0,.7)}',
+    '#thornswood-wheel .side input{box-sizing:border-box;font-family:inherit;font-size:16px;line-height:22px;',
+    'color:#f6e9c8;background:rgba(0,0,0,.35);border:1px solid rgba(198,170,109,.42);',
+    'padding:8px 10px;width:100%;margin:0 0 10px}',
     '#thornswood-wheel .side input:focus{border-color:rgba(198,170,109,.55)}',
-    '#thornswood-wheel .mode{margin:10px 0;font-size:14px;font-style:italic;color:rgba(217,207,180,.7);',
-    'min-height:20px}',
-    '#thornswood-wheel .pins{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}',
-    '#thornswood-wheel .pins button,#thornswood-wheel .row button{font-family:inherit;cursor:pointer;',
+    '#thornswood-wheel .pins{display:flex;gap:4px;margin-bottom:10px}',
+    '#thornswood-wheel .pins button,#thornswood-wheel .row button{box-sizing:border-box;font-family:inherit;cursor:pointer;',
     'border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
-    'padding:7px 12px;font-size:15px;letter-spacing:.1em;text-transform:uppercase}',
+    'padding:0;width:28px;height:28px;font-size:14px}',
     '#thornswood-wheel .pins button.on,#thornswood-wheel button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
-    '#thornswood-wheel .rows{overflow:auto;flex:1;border-top:1px solid rgba(198,170,109,.22);padding-top:8px}',
-    '#thornswood-wheel .row{display:flex;align-items:center;gap:8px;margin-bottom:6px;',
-    'padding:2px 0;border-bottom:1px solid rgba(198,170,109,.14)}',
-    '#thornswood-wheel .row .nm{flex:1;text-align:left;font-size:17px;letter-spacing:.02em;',
-    'text-transform:none;color:#f6e9c8;padding:8px 10px}',
+    '#thornswood-wheel .rows{overflow:auto;flex:1;min-height:0;border-top:1px solid rgba(198,170,109,.22);padding-top:8px}',
+    '#thornswood-wheel .row{display:flex;align-items:center;margin-bottom:4px;',
+    'border-bottom:1px solid rgba(198,170,109,.14)}',
+    '#thornswood-wheel .row .nm{flex:1;width:auto;height:auto;text-align:left;font-size:16px;',
+    'text-transform:none;color:#f6e9c8;padding:7px 8px}',
     '#thornswood-wheel .none{color:rgba(217,207,180,.6);font-style:italic;padding:8px 2px}',
     '#thornswood-wheel ::-webkit-scrollbar{width:10px;height:10px}',
     '#thornswood-wheel ::-webkit-scrollbar-track{background:rgba(0,0,0,.25)}',
@@ -87,29 +80,23 @@
   host.id = 'thornswood-wheel';
   host.className = 'gone';
   host.innerHTML =
-    '<div class="frame">' +
     '<div class="wheelwrap">' +
-    '<svg width="500" height="540" viewBox="-250 -270 500 540" aria-label="Emote wheel">' +
-    '<text id="thornswood-ringname" x="0" y="-236">Quick slots</text>' +
+    '<svg width="500" height="500" viewBox="-250 -250 500 500" aria-label="Emote wheel">' +
     '<g id="thornswood-segments"></g>' +
     '<circle id="thornswood-hub" cx="0" cy="0" r="46"></circle>' +
-    '<text id="thornswood-hubtext" x="0" y="1">STOP</text>' +
-    '<text id="thornswood-hint" x="0" y="248">click a slot, or 1 to 8 with the wheel shut</text>' +
+    '<text id="thornswood-hubtext" x="0" y="1" font-family="Palatino Linotype, Palatino, Georgia, serif" font-size="13">STOP</text>' +
     '</svg></div>' +
     '<div class="side">' +
-    '<h2>Emotes</h2>' +
-    '<input id="thornswood-emote-find" placeholder="Search emotes" autocomplete="off">' +
+    '<input id="thornswood-emote-find" placeholder="Search" autocomplete="off">' +
     '<div class="pins" id="thornswood-emote-pins"></div>' +
-    '<div class="mode" id="thornswood-emote-mode"></div>' +
     '<div class="rows" id="thornswood-emote-rows"></div>' +
-    '</div></div>';
+    '</div>';
   document.body.appendChild(host);
 
   var segs = document.getElementById('thornswood-segments');
   var hub = document.getElementById('thornswood-hub');
   var find = document.getElementById('thornswood-emote-find');
   var pins = document.getElementById('thornswood-emote-pins');
-  var mode = document.getElementById('thornswood-emote-mode');
   var rows = document.getElementById('thornswood-emote-rows');
 
   var R_IN = 78, R_OUT = 210, R_LABEL = 148;
@@ -161,10 +148,13 @@
         label.setAttribute('class', 'label');
         label.setAttribute('x', mid[0]);
         label.setAttribute('y', mid[1] - 8);
-        var name = slots[i] || 'Empty';
-        label.textContent = name.length > 14 ? name.slice(0, 13) + '.' : name;
+        label.textContent = slots[i] || '';
+        label.setAttribute('font-family', 'Palatino Linotype, Palatino, Georgia, serif');
+        label.setAttribute('font-size', '13');
         var num = document.createElementNS(SVGNS, 'text');
         num.setAttribute('class', 'num');
+        num.setAttribute('font-family', 'Palatino Linotype, Palatino, Georgia, serif');
+        num.setAttribute('font-size', '11');
         num.setAttribute('x', mid[0]);
         num.setAttribute('y', mid[1] + 14);
         num.textContent = String(i + 1);
@@ -194,18 +184,8 @@
         var n = Number(this.getAttribute('data-pin'));
         pin = pin === n ? 0 : n;
         drawPins();
-        drawMode();
       };
     }
-  }
-
-  function drawMode() {
-    if (!pin) {
-      mode.textContent = 'Click a name to play it. Click a number to assign that slot.';
-      return;
-    }
-    mode.textContent = 'Slot ' + pin + ' is ' + (slots[pin - 1] || 'empty') +
-      '. Click a name to put it there.';
   }
 
   function drawRows() {
@@ -231,7 +211,6 @@
           slots[pin - 1] = name;
           say('__assign ' + pin + ' ' + name);
           drawSlots();
-          drawMode();
           return;
         }
         say('__play ' + name);
@@ -293,7 +272,6 @@
     pin = 0;
     drawSlots();
     drawPins();
-    drawMode();
     drawRows();
   };
 
@@ -301,17 +279,9 @@
   // this way is the emote list and the slots stay as they are.
   window.thornswoodSetRing = function (list, title, hubWord, hint, closeKeyChar) {
     window.thornswoodSetWheel(list, slots.length ? slots : [], closeKeyChar);
-    if (title) {
-      var ring = document.getElementById('thornswood-ringname');
-      if (ring) { ring.textContent = title; }
-    }
     if (hubWord) {
       var word = document.getElementById('thornswood-hubtext');
       if (word) { word.textContent = hubWord; }
-    }
-    if (hint) {
-      var line = document.getElementById('thornswood-hint');
-      if (line) { line.textContent = hint; }
     }
   };
 
