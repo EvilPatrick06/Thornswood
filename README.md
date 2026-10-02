@@ -36,6 +36,7 @@ a README of their own, which says what the folder is and how to change it.
 
 ## Before changing anything
 
+- [DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md): how to get the code onto your computer, reach the server, and open a pull request.
 - [CONTRIBUTING.md](CONTRIBUTING.md): the rules for everybody, with AI or
   without. Who is on the team, the words we use, the settled design, how work
   moves and what to run after a merge. Read it before your first change.
