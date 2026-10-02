@@ -6729,25 +6729,100 @@
   }
 
   /*
-    THE NOTICE BOARD HAS NO MESH. A click is the Activate key while you are
-    at the spot and aimed at it. A crosshair on something else, a door or a
-    person, is left alone. The spot comes from the server, so a steward move
-    is the spot. The nine seeds cover the moment before the first view arrives.
+    THE MESSAGE BOARD OBJECT. Thornswood-Content.esp already has the
+    activator (local id 0x593B, ThornswoodMessageBoard). The four copies it
+    places start disabled, and they are not the nine spots. Each client puts
+    one enabled copy at each spot. A form is asked for in the frame it is
+    used, because a kept form wrapper dies. What is kept is the reference id.
+    A steward move updates that spot, and the object is moved with it.
+    A click is the use key on that object, while you are standing at it.
   */
   const BOARD_REACH = 400;
+  const BOARD_LOCAL = 0x593B;
+  const BOARD_FILE = 'Thornswood-Content.esp';
   const BOARD_SEEDS = [
-    { x: -64867, y: 104407.2, z: -8405.9 },
-    { x: 23139.4, y: -7891.7, z: -3494.4 },
-    { x: 174559.5, y: -94337, z: 11130.2 },
-    { x: 134265.1, y: 35842.3, z: -12397.5 },
-    { x: -173494.7, y: 5049.1, z: -3447.6 },
-    { x: -30342.2, y: -87022.7, z: -3119.1 },
-    { x: -38766.1, y: 64411.9, z: -13920.9 },
-    { x: 32216.4, y: 102314, z: -13263 },
-    { x: 109969.6, y: 100594.4, z: -9033 }
+    { hold: 'solitude', x: -64867, y: 104407.2, z: -8405.9, face: 9.9 },
+    { hold: 'whiterun', x: 23139.4, y: -7891.7, z: -3494.4, face: 188.4 },
+    { hold: 'riften', x: 174559.5, y: -94337, z: 11130.2, face: 38 },
+    { hold: 'windhelm', x: 134265.1, y: 35842.3, z: -12397.5, face: 85.8 },
+    { hold: 'markarth', x: -173494.7, y: 5049.1, z: -3447.6, face: 72 },
+    { hold: 'falkreath', x: -30342.2, y: -87022.7, z: -3119.1, face: 56.6 },
+    { hold: 'morthal', x: -38766.1, y: 64411.9, z: -13920.9, face: 251.2 },
+    { hold: 'dawnstar', x: 32216.4, y: 102314, z: -13263, face: 110 },
+    { hold: 'winterhold', x: 109969.6, y: 100594.4, z: -9033, face: 241.4 }
   ];
+  const boardRefIds = {};
+  const boardFailSaid = {};
   let boardNear = null;
   let boardWatchAt = 0;
+  let boardPlaceAt = 0;
+
+  function boardLive(id) {
+    if (!id) { return false; }
+    try {
+      const ref = sp.ObjectReference.from(sp.Game.getFormEx(id >>> 0));
+      return !!(ref && (ref.getFormID() >>> 0) === (id >>> 0));
+    } catch (e) { return false; }
+  }
+
+  function boardObjectHere(ref) {
+    if (!ref) { return false; }
+    let id = 0;
+    try { id = ref.getFormID() >>> 0; } catch (e) { return false; }
+    for (const hold in boardRefIds) {
+      if ((boardRefIds[hold] >>> 0) === id) { return true; }
+    }
+    return false;
+  }
+
+  function boardMoveRef(hold, x, y, z, face) {
+    const id = boardRefIds[hold];
+    if (!boardLive(id)) { return; }
+    try {
+      const ref = sp.ObjectReference.from(sp.Game.getFormEx(id >>> 0));
+      if (!ref) { return; }
+      const moved = ref.setPosition(x, y, z);
+      if (moved && typeof moved.then === 'function') { moved.then(function () { }, function () { }); }
+      if (face != null) {
+        const turned = ref.setAngle(0, 0, face);
+        if (turned && typeof turned.then === 'function') { turned.then(function () { }, function () { }); }
+      }
+    } catch (e) { }
+  }
+
+  function ensureBoards() {
+    const now = Date.now();
+    if (now - boardPlaceAt < 2000) { return; }
+    boardPlaceAt = now;
+    if (!T.ready) { return; }
+    let base = null;
+    let pc = null;
+    try { base = sp.Game.getFormFromFile(BOARD_LOCAL, BOARD_FILE); } catch (e) { base = null; }
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!base || !pc) { return; }
+    for (let i = 0; i < BOARD_SEEDS.length; i++) {
+      const spot = BOARD_SEEDS[i];
+      if (boardLive(boardRefIds[spot.hold])) { continue; }
+      let ref = null;
+      try { ref = pc.placeAtMe(base, 1, false, false); } catch (e) { ref = null; }
+      if (!ref) { continue; }
+      try {
+        const moved = ref.setPosition(spot.x, spot.y, spot.z);
+        if (moved && typeof moved.then === 'function') { moved.then(function () { }, function () { }); }
+        const turned = ref.setAngle(0, 0, spot.face || 0);
+        if (turned && typeof turned.then === 'function') { turned.then(function () { }, function () { }); }
+        const on = ref.enable(false);
+        if (on && typeof on.then === 'function') { on.then(function () { }, function () { }); }
+        boardRefIds[spot.hold] = ref.getFormID() >>> 0;
+        say('put the notice board down in ' + spot.hold);
+      } catch (e) {
+        if (!boardFailSaid[spot.hold]) {
+          boardFailSaid[spot.hold] = true;
+          say('could not put the notice board down in ' + spot.hold + ': ' + e);
+        }
+      }
+    }
+  }
 
   function boardDist(px, py, pz, spot) {
     const dx = px - spot.x, dy = py - spot.y, dz = pz - spot.z;
@@ -6792,7 +6867,9 @@
     if (dist > BOARD_REACH) { return false; }
     let ref = null;
     try { ref = sp.Game.getCurrentCrosshairRef(); } catch (err) { ref = null; }
-    if (ref) {
+    if (ref && boardObjectHere(ref)) {
+      /* The object itself. Standing at it is the only other rule. */
+    } else if (ref) {
       let rd = 99999;
       try {
         rd = boardDist(ref.getPositionX(), ref.getPositionY(), ref.getPositionZ(), spot);
@@ -6804,6 +6881,8 @@
     T.js('try{window.thornswoodBoard&&window.thornswoodBoard.open();}catch(e){}');
     return true;
   }
+
+  sp.on('update', guard('board object', () => { ensureBoards(); }));
 
   sp.on('update', guard('board distance', () => {
     if (!T.hasFocus('board')) { return; }
@@ -7791,8 +7870,26 @@
     if (what.indexOf('board:near ') === 0) {
       const bits = what.slice('board:near '.length).trim().split(/\s+/);
       if (bits[0] === 'none' || bits.length < 3) { boardNear = null; return; }
-      const bx = Number(bits[0]), by = Number(bits[1]), bz = Number(bits[2]);
-      boardNear = (isFinite(bx) && isFinite(by) && isFinite(bz)) ? { x: bx, y: by, z: bz } : null;
+      let hold = '';
+      let bx, by, bz;
+      if (bits.length >= 4 && !isFinite(Number(bits[0]))) {
+        hold = bits[0];
+        bx = Number(bits[1]); by = Number(bits[2]); bz = Number(bits[3]);
+      } else {
+        bx = Number(bits[0]); by = Number(bits[1]); bz = Number(bits[2]);
+      }
+      if (!isFinite(bx) || !isFinite(by) || !isFinite(bz)) { boardNear = null; return; }
+      boardNear = { hold: hold, x: bx, y: by, z: bz };
+      if (hold) {
+        for (let i = 0; i < BOARD_SEEDS.length; i++) {
+          if (BOARD_SEEDS[i].hold !== hold) { continue; }
+          BOARD_SEEDS[i].x = bx;
+          BOARD_SEEDS[i].y = by;
+          BOARD_SEEDS[i].z = bz;
+          boardMoveRef(hold, bx, by, bz, BOARD_SEEDS[i].face);
+          break;
+        }
+      }
       return;
     }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
