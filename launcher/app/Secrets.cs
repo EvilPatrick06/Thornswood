@@ -23,6 +23,12 @@ namespace Thornswood
     /// hands back anything without the tag unchanged, which is what makes this
     /// safe to drop into an install that already exists: the next Save writes
     /// it back encrypted and the plaintext is gone.
+    ///
+    /// Protect never hands a secret back unencrypted. When DPAPI refuses it
+    /// logs the refusal and throws, so the caller writes nothing rather than
+    /// a secret in the clear. Unprotect still gives back an empty string on
+    /// failure, because there is nothing to recover and the launcher asks
+    /// for it again.
     /// </summary>
     public static class Secrets
     {
@@ -39,12 +45,20 @@ namespace Thornswood
                                                  Extra, DataProtectionScope.CurrentUser);
                 return Tag + Convert.ToBase64String(b);
             }
-            catch
+            catch (Exception ex)
             {
-                // Better a working launcher holding a plaintext password than a
-                // launcher that will not start. It still gets the locked-down
-                // file permissions below.
-                return plain;
+                // This used to hand the plain string back, so a machine where
+                // DPAPI refused wrote the password or the Discord ticket into
+                // its file in the clear, and nothing anywhere said so. A
+                // secret this cannot encrypt is not stored at all: the line
+                // below says why and the throw stops the caller writing it.
+                // Both callers already catch and log (Config.Save,
+                // Discord.Save), so the launcher still starts and asks for
+                // the secret again. The line reads "Swallowed in" because
+                // that is Swallow's own wording; the exception goes on up.
+                Swallow.Note("Secrets.Protect, Windows would not encrypt a secret for this " +
+                             "account, so it was not stored and never in the clear", ex);
+                throw;
             }
         }
 
