@@ -338,6 +338,7 @@
     prompt is up.
   */
   const MOLD_KEY    = iniNumber(ini, 'MoldKey', 22);       // U
+  const LOCK_KEY    = iniNumber(ini, 'LockKey', 45);       // X
   /* What the prompt calls them. Read off the scan code so a rebind in the ini
      changes the letter on the screen as well as the key that works. */
   function keyName(code) {
@@ -354,6 +355,7 @@
   const TRADE_NAME = keyName(TRADE_KEY);
   const MUTE_NAME = keyName(MUTE_KEY);
   const MOLD_NAME = keyName(MOLD_KEY);
+  const LOCK_NAME = keyName(LOCK_KEY);
 
   const ESC = 1;
 
@@ -4814,6 +4816,21 @@
     return true;
   }
 
+
+  /*
+    Lock the door you last opened. Patrick on #615: /lock should be a key
+    press that is logged to the server as /lock when pressed. The server
+    keeps every rule /lock already has (stand at the door, be the holder or
+    carry the deed). Unlock stays the typed /unlock.
+  */
+  function lockPress() {
+    if (!T.ready) { return false; }
+    if (claims.chat) { return false; }
+    if (busyMenuOpenNow()) { return false; }
+    tellServer('/lock');
+    say('pressed ' + LOCK_NAME + ' for /lock');
+    return true;
+  }
   sp.on('update', guard('mold', () => {
     const now = Date.now();
     if (now - moldAt < MOLD_EVERY) { return; }
@@ -6959,6 +6976,7 @@
     // The mold key, and only while a door is under the crosshair and a Key
     // Mold is in the pack. Otherwise it is not used and goes on down the list.
     if (e.code === MOLD_KEY && moldPress()) { return; }
+    if (e.code === LOCK_KEY && lockPress()) { return; }
     /*
       The five social keys work in the open world, and P and J can always
       close their own panel. Djinn on dev, 24 September: "The party menu
