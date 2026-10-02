@@ -80,7 +80,8 @@ $Documented = @{
 # are what put each one here; the builder's comment above RUN_BITS says which.
 $Intended = @('MANAGE_CHANNELS', 'VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES',
               'READ_MESSAGE_HISTORY', 'MANAGE_ROLES', 'MANAGE_THREADS',
-              'CREATE_PRIVATE_THREADS', 'SEND_MESSAGES_IN_THREADS')
+              'CREATE_PUBLIC_THREADS', 'CREATE_PRIVATE_THREADS',
+              'SEND_MESSAGES_IN_THREADS')
 
 $py = (Get-Command python -EA SilentlyContinue).Source
 if (-not $py) { $py = (Get-Command py -EA SilentlyContinue).Source }
@@ -144,7 +145,12 @@ try {
     Yes '  Administrator is not in it' ($got -notcontains 'ADMINISTRATOR')
     $sum = [UInt64]0
     foreach ($b in $Documented.Keys) { if ($Intended -contains $Documented[$b]) { $sum += ([UInt64]1 -shl $b) } }
-    Yes ('  and it is the sum of those bits, {0}' -f $sum) ($n -eq $sum -and $n -eq [UInt64]361045789712)
+    # CREATE_PUBLIC_THREADS joined the set on 2 October, for the Live smoke
+    # session thread under #test-tasks (bot.py, the live smoke section). It
+    # took the number from 361045789712 to this one. PIN_MESSAGES and
+    # MANAGE_MESSAGES deliberately stayed out: the checklist pin is tried and
+    # shrugged off when Discord refuses it.
+    Yes ('  and it is the sum of those bits, {0}' -f $sum) ($n -eq $sum -and $n -eq [UInt64]395405528080)
 
     # ---- 4. the builder's names are the page's names ------------------------
     $src = Get-Content -LiteralPath $Builder -Raw

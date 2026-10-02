@@ -75,12 +75,17 @@ import sys
 #   Manage Threads            a ticket thread is private and not invitable, so
 #                             only a moderator can add people to it, and Close
 #                             locks it
+#   Create Public Threads     the Live smoke session thread under #test-tasks,
+#                             which the marks live in and nothing else reads
 #   Create Private Threads    one per ticket
-#   Send Messages in Threads  writes the ticket into its thread
+#   Send Messages in Threads  writes the ticket into its thread, and the Live
+#                             smoke items into the session thread
 #
 # Left out on purpose: Administrator, Manage Server, Manage Webhooks, Manage
 # Messages, Pin Messages and Embed Links, which only the build uses or
 # nothing uses. Interaction replies and direct messages need no permission.
+# The Live smoke template pin is tried and shrugged off when Discord refuses
+# it, rather than asking for Manage Messages to get it.
 RUN_BITS = (
     ('Manage Channels',           4),
     ('View Channel',             10),
@@ -89,6 +94,7 @@ RUN_BITS = (
     ('Read Message History',     16),
     ('Manage Roles',             28),
     ('Manage Threads',           34),
+    ('Create Public Threads',    35),
     ('Create Private Threads',   36),
     ('Send Messages in Threads', 38),
 )
@@ -347,9 +353,15 @@ PLAN = [
  ('Voice', [
    dict(kind='voice', name='AFK',               key='AFK', mode='open'),
  ]),
+ # #test-these was deleted in the channel cleanup and is NOT renamed into this
+ # one: it is in RETIRED below so a re-run does not bring it back. Test-Tasks
+ # is a new channel, decided on 1 October, and the bot keeps the living Live
+ # smoke checklist in it (bot.py, the live smoke section). Discord lower cases
+ # a text channel name itself, so this is #test-tasks on the server.
  ('Testing', [
-   dict(kind='text',  name='test-these',   key='TESTS',   mode='pathfind',
-        topic='What needs trying on the current build.'),
+   dict(kind='text',  name='Test-Tasks',   key='TESTS',   mode='pathfind',
+        topic='The living Live smoke checklist. Staff start a dated session '
+              'and you mark your own rows in its thread.'),
    dict(kind='text',  name='test-results', key='RESULTS', mode='pathfind',
         topic='Pass, fail, and what went wrong.'),
  ]),
@@ -384,6 +396,10 @@ RETIRED = [
     # #media does the job of both of these, and the bot channel was never used.
     'screenshots', 'clips', 'bot-commands',
     'The Bannered Mare', 'The Road',
+    # Deleted in the channel cleanup and replaced by #test-tasks, which is a
+    # new channel rather than this one renamed. Here so a re-run of this
+    # script does not make it again.
+    'test-these',
 ]
 
 
