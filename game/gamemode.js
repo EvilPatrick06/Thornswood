@@ -1616,8 +1616,14 @@ function addItemsAtomic(actorId,goods) {
   Tamriel, and the locationalData set moves it here, the way PlaceAtMe does.
   Anything that is not an NPC record is refused before it is placed, since a
   placed object cannot be moved and would stay at the middle of Tamriel.
+
+  A fifth argument, commanded, is true for /spawn and /spawnat. Those are a
+  person asking for a creature where they stand. The habitat cap is for the
+  world's own births: admit refuses a dynamic actor that is not inside an
+  authored habitat with a free slot, then this destroys the one just placed.
+  That is why /spawn put nothing in front of you after #1413 (#959).
 */
-function placeActors(baseId, where, count, away) {
+function placeActors(baseId, where, count, away, commanded) {
   let rec = null;
   try { rec = (mp.lookupEspmRecordById(baseId) || {}).record || null; } catch (e) { rec = null; }
   if (rec && rec.type && rec.type !== 'NPC_') {
@@ -1637,11 +1643,16 @@ function placeActors(baseId, where, count, away) {
         // Turned to face the person who asked for it.
         rot: [0, 0, (facing + 180) % 360]
       });
-      const population=globalThis.__thornswoodNpcPopulation;
-      if(population && !population.admit(ref,mp.getNpcAIState(ref))) {
-        throw new Error('This species has no available population slot in this habitat');
+      // Commanded skips the cap. Calling admit on a miss also sets isDisabled
+      // before it returns false, so the creature would be invisible even if it
+      // were left standing.
+      if (!commanded) {
+        const population=globalThis.__thornswoodNpcPopulation;
+        if(population && !population.admit(ref,mp.getNpcAIState(ref))) {
+          throw new Error('This species has no available population slot in this habitat');
+        }
+        if(globalThis.__thornswoodNpcRuntime) globalThis.__thornswoodNpcRuntime.enroll(ref);
       }
-      if(globalThis.__thornswoodNpcRuntime) globalThis.__thornswoodNpcRuntime.enroll(ref);
       made++;
     } catch (e) {
       why = String(e && e.message ? e.message : e);
@@ -40997,7 +41008,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         toProfile(profileId, 'The server cannot tell where you are standing.');
         return;
       }
-      var put = placeActors(baseId, { desc: inCell, pos: at, rot: facing || [0, 0, 0] }, count, 150);
+      var put = placeActors(baseId, { desc: inCell, pos: at, rot: facing || [0, 0, 0] }, count, 150, true);
       var made = put.made;
       if (!made) {
         log('/spawn failed on', hit.name + ':', put.why);
@@ -47727,7 +47738,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
      argument is the id the NEW actor gets, not the record to make it from. */
   function spawnBeside(baseId, where, count) {
     // The one placing /spawn uses too, so a fix to it reaches both (#959).
-    return placeActors(baseId, where, count, SPAWN_AWAY);
+    return placeActors(baseId, where, count, SPAWN_AWAY, true);
   }
 
   function doAimed(a, pid, actorId, me, look) {
