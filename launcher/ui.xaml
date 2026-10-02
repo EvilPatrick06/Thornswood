@@ -652,6 +652,14 @@
               <Grid>
                 <Rectangle Fill="{StaticResource Hatch}" Opacity="0.85"/>
                 <!-- The landscape behind the title, filled in from Art.Header().
+                     The band's height is the title row's, 100 and no taller, and
+                     the art never sets it: both layers are brushes on a Border,
+                     so neither can push the row open. Both fill the band and crop
+                     what does not fit (UniformToFill, centred), and both take the
+                     same part of the art, Art.HeaderCrop, so the still and the
+                     moving strip line up and the overlook keeps its approved
+                     framing at any window width. Nothing on this band zooms,
+                     drifts or runs fast.
                      Collapsed when the build carries no picture, which leaves the
                      pattern above exactly as it was. Every veil is the theme's own
                      panel colour, so a light theme washes the picture light and a
