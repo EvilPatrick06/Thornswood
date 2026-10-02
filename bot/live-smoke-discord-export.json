@@ -2,7 +2,7 @@
   "schema": "thornswood.live-smoke.v1",
   "source": "wiki/quality/playtest-acceptance.md",
   "slice": "In smoke: Live",
-  "updated": "2026-10-01",
+  "updated": "2026-10-01r3",
   "owner": "Cynthia",
   "surface": "Discord Test-Tasks",
   "rules": {
@@ -27,7 +27,14 @@
     "tickets_are_dev_staff_only": true,
     "discord_post_checklist_items_only": true,
     "discord_no_top_bottom_blocks": true,
-    "discord_keep_updated_versioning": true
+    "discord_keep_updated_versioning": true,
+    "no_forge_skip_without_verify": true,
+    "forges_exist_on_live": true,
+    "main_build_and_launcher_only": true,
+    "omit_dev_only_entirely": true,
+    "no_skip_rule_as_dev_placeholder": true,
+    "every_item_must_be_live_main_verified": true,
+    "forges_exist_on_live_main": true
   },
   "session": {
     "title_format": "Live smoke {YYYY-MM-DD} {settings_version}",
@@ -64,69 +71,100 @@
         381
       ],
       "skip_rule": null,
-      "discord_line": "Do: open Settings and find the chat fade option. Turn it on if it is off, send a few chat lines, then wait. Pass: chat text fades after a short time, or you can clearly turn that fade on and off. If stuck: ask staff which Settings screen holds chat fade on this build."
+      "discord_line": "On the main launcher build, open Settings and find the chat fade control. If fade is off, turn it on. Send a few chat lines and wait. Pass when the text fades after a short time, or when you can clearly turn fade on and off (try Never and a timed option such as 5 or 15 seconds if those choices are there). If you cannot find chat fade, ask staff which Settings screen holds it on this main build."
     },
     {
       "id": "live-2",
       "order": 2,
-      "label": "Craft the same thing twice after you respawn",
+      "label": "Needs bars and the needs command",
       "tickets": [
-        517
+        381
       ],
-      "skip_rule": "Skip if this live world has no forge you can use.",
-      "discord_line": "Do: after you respawn, stand at a forge with enough materials for two of the same craft. Craft that recipe once, then craft it again. Pass: you keep both finished items in your inventory (nothing silently vanishes). If stuck: ask staff which simple recipe to use. Skip: use Skip if this live world has no forge."
+      "skip_rule": null,
+      "discord_line": "On main, find the needs bars on the HUD. Hide them the way Settings allows, then bring them back. Type /needs in chat (or the needs command staff names if this build differs). Pass when the bars follow Settings and the command shows useful needs info instead of doing nothing. If bars or the command are missing, ask staff what main uses right now."
     },
     {
       "id": "live-3",
       "order": 3,
-      "label": "Door tells you to apply on Discord",
+      "label": "Discord connect before Play",
       "tickets": [
         999,
         428
       ],
       "skip_rule": null,
-      "discord_line": "Do: try to join with a Discord account that is not accepted yet (staff can hand you a test account if you do not have one). Pass: you see the apply message, and there is a working action that opens the Discord invite. If stuck: ask staff for an unaccepted test login; do not invent accounts."
+      "discord_line": "On the main launcher, try Play when Discord is not connected, or when your Discord account is not accepted yet (staff can hand you a test login if you need one). Pass when you get a clear apply message and a working control that opens the Discord invite, and you do not get into the game. With an accepted Discord account connected, Pass when Play starts the normal way on main. If stuck, ask staff for an unaccepted test login; do not invent accounts."
     },
     {
       "id": "live-4",
       "order": 4,
-      "label": "Speaking light on the launcher",
+      "label": "Craft the same thing twice after you respawn",
       "tickets": [
-        1396
+        517
       ],
       "skip_rule": null,
-      "discord_line": "Do: join voice the normal way through the launcher, then speak. Pass: the launcher shows a speaking light while you talk. This row is only that light, not any mark over your character's head. If stuck: confirm voice is connected in the launcher before you mark Fail."
+      "discord_line": "On main, respawn, then go to a forge. Bring enough materials for two of the same craft. Craft that recipe once, then craft it again. Pass when both finished items stay in your pack. Forges are on main live; do not Skip this row. If you cannot find a forge or materials, ask staff where to go and which simple recipe to use."
     },
     {
       "id": "live-5",
       "order": 5,
-      "label": "Starting gold, player trade, no free extra gold",
+      "label": "Starting gold is 40 once",
+      "tickets": [
+        505
+      ],
+      "skip_rule": null,
+      "discord_line": "On a brand-new character on main, check your gold the first time you enter the world. Pass when starting gold is exactly 40. Quit to the main launcher, come back on the same character, and check again: you must not get another free 40. If your first entry shows a different amount, ask staff whether you used a leftover character before marking Fail."
+    },
+    {
+      "id": "live-6",
+      "order": 6,
+      "label": "Trade gold with someone else",
+      "tickets": [
+        505
+      ],
+      "skip_rule": null,
+      "discord_line": "On main, with a second person online, open trade and move some of your pack gold to them (and back if you like). Pass when both packs update to match the trade, and any fee takes gold away instead of leaving totals wrong. Do not test buying from traders on this row. If you have no second person, ask staff to join you for the trade."
+    },
+    {
+      "id": "live-7",
+      "order": 7,
+      "label": "No free extra gold",
       "tickets": [
         505,
         517
       ],
       "skip_rule": null,
-      "discord_line": "Do three checks on a character: (1) starting gold is 40 the first time only; (2) trade gold with another player and both packs update; (3) trying to grab a second free starter purse, or gold from a craft that should not pay gold, fails with a clear error you can see. Pass: all three behave that way. Do not test buying from traders on this row. If stuck: ask staff for a second player or a safe craft that must not pay gold."
+      "discord_line": "On main, try the usual ways people grab more free gold: a second starter purse, or a craft that should spend or ignore gold rather than hand you more. Pass when the game refuses with a clear error you can see, and your gold does not silently jump up. Ask staff which safe refuse case to try if you are unsure. Do not test trader shops here."
     },
     {
-      "id": "live-6",
-      "order": 6,
+      "id": "live-8",
+      "order": 8,
+      "label": "Quit and relaunch keeps your pack",
+      "tickets": [
+        505,
+        517
+      ],
+      "skip_rule": null,
+      "discord_line": "On main, note your inventory and gold, quit to the main launcher on purpose, then launch again on the same character. Pass when your pack and gold match what you had, with no extra starting gold added. If something is missing or gold went up, say what changed and ask staff before you guess."
+    },
+    {
+      "id": "live-9",
+      "order": 9,
       "label": "Refused craft keeps your materials",
       "tickets": [
         1402
       ],
       "skip_rule": null,
-      "discord_line": "Do: try a craft the game should refuse (staff will name one if you are unsure). Pass: your materials stay, and you see a clear reason it was refused. Do not mark Pass only because a recipe is hidden without a perk. If stuck: ask staff which refuse case to try on this live world."
+      "discord_line": "On main, try a craft the game should refuse (staff will name one if you need it). Pass when your materials stay in the pack and you see a clear reason it was refused. Do not mark Pass only because a recipe is hidden without a perk. If you cannot trigger a refuse, ask staff which case to use on main live."
     },
     {
-      "id": "live-7",
-      "order": 7,
+      "id": "live-10",
+      "order": 10,
       "label": "K panel shows profession and half",
       "tickets": [
         509
       ],
       "skip_rule": null,
-      "discord_line": "Do: open the K panel on a normal character made under the current rules (not an old leftover character unless staff says it is fine). Pass: you can see your profession and your half. If stuck: ask staff which character to use on this live world."
+      "discord_line": "On main, open the K panel on a normal character made under the current rules. Pass when you can see both your profession and your half. If the panel is blank or wrong, ask staff which character to use before marking Fail on an old leftover."
     }
   ],
   "keep_off": [
@@ -135,11 +173,16 @@
     "959",
     "test-one-mint",
     "1395",
+    "1396",
     "1396-overlay",
+    "1396-speaking-light",
     "traders",
     "1402-client-visibility",
     "504-pass",
-    "1157"
+    "1157",
+    "378-pending-main",
+    "1275-pending-main",
+    "1399-pending-main"
   ],
   "privacy": {
     "harlan_2026_10_01": "Discord-only session check-offs OK for deploy; no Privacy update if must-holds hold.",
@@ -160,10 +203,42 @@
     "do_not_rename": "test-these",
     "note": "test-these was deleted in cleanup script; create new Test-Tasks. Pathfind against current roles after role/perms churn."
   },
-  "rules_note": "Djinn 2026-10-01: (1) playtesters have no GitHub - never append Tickets/#/PR to #test-tasks. (2) Discord post/body = checklist items only; remove previous top and bottom blocks. (3) Keep date-changed / last-updated versioning (export.updated + session title). Bot posts one message per items[] (label + discord_line + skip_rule when set). tickets[] stay in JSON for Dev/harness only.",
+  "rules_note": "Patrick hard gates 2026-10-01: main build+launcher only; omit Dev-only entirely; verify each entry on live main before listing. Prior reject: forges on main, expand coverage, plain language, gold 40 if SoT, human tone, no speaking-light. Djinn: zero GitHub on live set; checklist-only; tickets Dev-only. r3 drops unverified expansion rows into pending_main_verify.",
   "versioning": {
     "export_updated": "updated",
     "session_title_has_date_and_settings": true,
-    "note": "Djinn layout 2026-10-01: Discord post/body is checklist items only. No previous top or bottom instruction blocks. Keep date-changed / last-updated for versioning via export.updated and session title (Live smoke YYYY-MM-DD Settings version). Do not put GitHub refs on live set."
-  }
+    "note": "Discord body = checklist items only. Version via updated + session title. Speaking light removed from Live. Forge row has no skip_rule."
+  },
+  "build": {
+    "launcher": "main",
+    "server": "main",
+    "note": "Patrick hard gate: MAIN build + MAIN launcher only. Dev-server-only checks are omitted entirely (no skip_rule stand-in)."
+  },
+  "pending_main_verify": [
+    {
+      "id": "pending-378",
+      "label": "Character creation finishes cleanly",
+      "tickets": [
+        378
+      ],
+      "why": "In Common checklist but never on In smoke: Live slice; needs Patrick main confirm before list."
+    },
+    {
+      "id": "pending-clothed",
+      "label": "Arrive clothed after creation",
+      "tickets": [
+        517
+      ],
+      "why": "Common inventory row; not on prior Live smoke slice; needs main confirm."
+    },
+    {
+      "id": "pending-friend-trade",
+      "label": "Friend and Trade give a clear result",
+      "tickets": [
+        1275,
+        1399
+      ],
+      "why": "Common two-client row; not on prior Live smoke slice; needs main confirm."
+    }
+  ]
 }

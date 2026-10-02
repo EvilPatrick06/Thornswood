@@ -1907,10 +1907,10 @@ def live_smoke_items(export):
             'label': str(raw.get('label') or '').strip(),
             'tickets': [str(t).strip() for t in (raw.get('tickets') or [])
                         if str(t).strip()],
-            # null in the export for most rows, and the one that has it is the
-            # forge rule on the double craft row. Shown on the message, so a
-            # tester knows when Skip is the right mark without opening the
-            # vault.
+            # null on every row of the Live set as it stands, and read anyway,
+            # because the export is what decides. When one does carry a rule it
+            # is shown on the message, so a tester knows Skip is the right mark
+            # without opening the vault.
             'skip_rule': str(skip).strip() if skip else '',
             'discord_line': line,
         })
@@ -2023,9 +2023,9 @@ def live_smoke_opener(title, live_channel, settings_version, stamp=''):
     to record, and nothing else.
 
     Djinn's layout call of 1 October. This used to carry a how to mark block
-    and a paragraph about where the marks go, above seven rows that each say
-    what to do. Testers read the rows and scrolled past the rest, so the rest
-    is gone and what is left is the session's own name.
+    and a paragraph about where the marks go, above rows that each say what to
+    do. Testers read the rows and scrolled past the rest, so the rest is gone
+    and what is left is the session's own name.
     """
     out = ('**%s**\n'
            'Live channel: %s\n'
@@ -2212,8 +2212,8 @@ class LiveSmokeMark(discord.ui.Button):
 class LiveSmokeItem(discord.ui.View):
     """
     The four buttons on one row. One view per row and not one view carrying
-    every row: seven rows is twenty eight buttons, and Discord takes five to a
-    line and twenty five to a message.
+    every row: the Live set runs to ten rows and forty buttons, and Discord
+    takes five to a line and twenty five to a message.
 
     Persistent, like the ticket and hold panels, so a session outlives a
     restart. setup_hook registers one of these per item in the export.

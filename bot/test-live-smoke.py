@@ -8,11 +8,15 @@ that a mark never leaves it.
 What is worth pinning here, in the order the locks were given on 1 October:
 
   the export        the bot reads live-smoke-discord-export.json and nothing
-                    else, by schema and not by hope, and the Live set in it is
-                    the seven rows the vault carries
-  the skip rule     the forge rule on the double craft row is on the message a
-                    tester reads, so Skip is an informed mark rather than a
-                    guess
+                    else, by schema and not by hope, and how many rows the
+                    Live set carries is read off that file rather than written
+                    down here, because Cynthia refreshes the set
+  main only         Patrick's hard gate of 1 October: the main build and the
+                    main launcher. A check that only the dev server can answer
+                    is left off the list rather than listed with a Skip
+  no skip rule      and so no row carries one. Forges are on main, so the
+                    double craft row says not to Skip it instead of handing
+                    a tester a standing excuse
   the layout        the rows and nothing wrapped around them, with the day the
                     set last changed kept as the version, which is Djinn's
                     call of 1 October
@@ -105,16 +109,41 @@ yes('the export is deployed beside bot.py, where the bot looks for it',
 
 live = bot.live_smoke_load()
 items = bot.live_smoke_items(live)
+# How many rows the Live set carries is the export's business, not this
+# file's: Cynthia refreshes the set and the count moves with it. So it is
+# read here once and everything below counts against it, and the only thing
+# that has to be edited by hand when the set changes is TICKETS, which is the
+# one claim a count cannot make.
+N = len(items)
+
+# The ticket behind each row, in the order the export gives them. Written out
+# rather than read off the export, because this is the check that the file
+# deployed beside bot.py is the Live set the vault meant and not a stale copy
+# with the right shape. Update it with the export, in the same commit.
+TICKETS = [
+    ['381'],            # 1  Chat fade in Settings
+    ['381'],            # 2  Needs bars and the needs command
+    ['999', '428'],     # 3  Discord connect before Play
+    ['517'],            # 4  Craft the same thing twice after you respawn
+    ['505'],            # 5  Starting gold is 40 once
+    ['505'],            # 6  Trade gold with someone else
+    ['505', '517'],     # 7  No free extra gold
+    ['505', '517'],     # 8  Quit and relaunch keeps your pack
+    ['1402'],           # 9  Refused craft keeps your materials
+    ['509'],            # 10 K panel shows profession and half
+]
 
 yes('it is the schema this bot reads', live['schema'] == 'thornswood.live-smoke.v1')
-yes('and it carries the Live 7', len(items) == 7)
-yes('in the order the vault gives them',
-    [i['order'] for i in items] == [1, 2, 3, 4, 5, 6, 7])
+yes('the Live set is as long as the export says, with no row dropped on the '
+    'way in', N == len(live['items']) and N == len(TICKETS))
+yes('in the order the vault gives them, numbered from one with no gap',
+    [i['order'] for i in items] == list(range(1, N + 1)))
+yes('and the rows are named live-1 upwards, which is what a button is keyed by',
+    [i['id'] for i in items] == ['live-%d' % n for n in range(1, N + 1)])
 yes('each row has an id, a label and the line a tester reads',
     all(i['id'] and i['label'] and i['discord_line'] for i in items))
 yes('the rows are the ones the vault names, by their tickets',
-    [i['tickets'] for i in items] ==
-    [['381'], ['517'], ['999', '428'], ['1396'], ['505', '517'], ['1402'], ['509']])
+    [i['tickets'] for i in items] == TICKETS)
 yes('the marks are Pass, Fail, Skip and Fail-known, in that order',
     list(bot.LIVE_SMOKE_MARKS) == ['Pass', 'Fail', 'Skip', 'Fail-known']
     and list(live['marks']) == list(bot.LIVE_SMOKE_MARKS))
@@ -122,6 +151,35 @@ yes('and the export says the channel is Test-Tasks, created new rather than '
     'test-these renamed',
     live['channel']['name'] == 'Test-Tasks' and live['channel']['create_new'] is True
     and live['channel']['do_not_rename'] == 'test-these')
+
+# ------------------------------------------------- the main build, and only it --
+#
+# Patrick's hard gate of 1 October, through Tophet: the list is the main
+# build and the main launcher. A check only the dev server can answer is left
+# off the list. It is not listed with a Skip beside it, because a row a
+# tester cannot run is a row that collects Skips and teaches everybody to
+# reach for that button.
+yes('THE SET IS THE MAIN BUILD AND THE MAIN LAUNCHER, which is the gate',
+    live['rules']['main_build_and_launcher_only'] is True
+    and live['build']['launcher'] == 'main' and live['build']['server'] == 'main')
+yes('  and a check only the dev server can answer is left off rather than '
+    'listed with a Skip beside it',
+    live['rules']['omit_dev_only_entirely'] is True
+    and live['rules']['no_skip_rule_as_dev_placeholder'] is True)
+yes('  and every row on the list was seen working on main before it was listed',
+    live['rules']['every_item_must_be_live_main_verified'] is True)
+yes('the rows held back for a main check are named where they were held, so '
+    'they are waiting rather than lost',
+    [p['id'] for p in live['pending_main_verify']] ==
+    ['pending-378', 'pending-clothed', 'pending-friend-trade']
+    and all(p['why'] for p in live['pending_main_verify']))
+yes('  and none of them is on the list a tester reads',
+    not set(p['id'] for p in live['pending_main_verify'])
+    & set(i['id'] for i in items))
+yes('the launcher speaking light is off the Live set and stays off it',
+    '1396-speaking-light' in live['keep_off'] and '1396' in live['keep_off']
+    and not any('speaking light' in (i['label'] + ' ' + i['discord_line']).lower()
+                for i in items))
 
 # ------------------------------------------------------- loading it wrong --
 def refused(what):
@@ -169,22 +227,35 @@ jumbled = bot.live_smoke_items({'items': [
 yes('rows are posted in the order the export gives, not the order it lists them',
     [i['id'] for i in jumbled] == ['a', 'b'])
 
-# ---------------------------------------------------------- the skip rule --
-double = [i for i in items if i['id'] == 'live-2'][0]
-chat = [i for i in items if i['id'] == 'live-1'][0]
-said = bot.live_smoke_item_text(double, len(items))
+# -------------------------------------------------------- and no skip rule --
+#
+# There used to be one, on the double craft row: Skip if this live world has
+# no forge. Patrick took it off, because forges are on main, and a standing
+# Skip on a row that can be run is a row nobody runs. The row says so itself
+# now, in the line the vault wrote, which is where a tester will read it.
+forge = [i for i in items if 'forge' in i['discord_line'].lower()][0]
+chat = items[0]
+said = bot.live_smoke_item_text(forge, N)
 
-yes('the double craft row carries its skip rule, so nobody guesses at Skip',
-    ('Skip rule: ' + double['skip_rule']) in said and 'forge' in double['skip_rule'])
-yes('  and names its place in the set and the row as the vault labels it',
-    said.startswith('**Live 2 of 7: %s**' % double['label']))
-yes('  and still carries the line the vault wrote', double['discord_line'] in said)
-yes('a row with no skip rule in the export says nothing about one',
-    'Skip rule' not in bot.live_smoke_item_text(chat, len(items)))
-yes('the export keeps a skip rule on exactly the one row that has one',
-    [i['id'] for i in items if i['skip_rule']] == ['live-2'])
+yes('NO ROW IN THE SET CARRIES A SKIP RULE, which is the call',
+    [i['id'] for i in items if i['skip_rule']] == [])
+yes('  so nothing a tester reads offers them one',
+    not any('Skip rule' in bot.live_smoke_item_text(i, N) for i in items))
+yes('the double craft row tells a tester not to Skip it, rather than leaving '
+    'the forge question open',
+    'do not Skip this row' in forge['discord_line']
+    and 'do not Skip this row' in said)
+yes('  and the export says why, which is that forges are on main',
+    live['rules']['forges_exist_on_live_main'] is True
+    and live['rules']['no_forge_skip_without_verify'] is True)
+yes('  and the row names its place in the set and the words the vault labels '
+    'it with',
+    said.startswith('**Live %d of %d: %s**' % (forge['order'], N, forge['label'])))
+yes('  and still carries the line the vault wrote', forge['discord_line'] in said)
+yes('a row the export gives no skip rule says nothing about one',
+    'Skip rule' not in bot.live_smoke_item_text(chat, N))
 yes('an item message fits in a Discord message',
-    all(len(bot.live_smoke_item_text(i, len(items))) < 2000 for i in items))
+    all(len(bot.live_smoke_item_text(i, N)) < 2000 for i in items))
 
 # ----------------------------------------- and the tickets stay off Discord --
 #
@@ -197,11 +268,13 @@ yes('the export says tickets are not posted to Discord',
     and live['rules']['tickets_are_dev_staff_only'] is True
     and bot.live_smoke_show_tickets(live) is False)
 yes('NO ROW CARRIES A TICKET NUMBER, which is the rule',
-    not any(re.search(r'#\d+', bot.live_smoke_item_text(i, len(items)))
+    not any(re.search(r'#\d+', bot.live_smoke_item_text(i, N))
             for i in items))
+yes('  nor a Tickets line, which is the other way one used to reach a row',
+    not any('Tickets' in bot.live_smoke_item_text(i, N) for i in items))
 yes('  nor anything else that reads as a GitHub reference',
-    not any(('github.com' in bot.live_smoke_item_text(i, len(items)).lower()
-             or 'issue #' in bot.live_smoke_item_text(i, len(items)).lower())
+    not any(('github.com' in bot.live_smoke_item_text(i, N).lower()
+             or 'issue #' in bot.live_smoke_item_text(i, N).lower())
             for i in items))
 yes('  and the labels and lines the vault wrote carry none either',
     not any(re.search(r'#\d+', i['label'] + ' ' + i['discord_line'])
@@ -213,7 +286,7 @@ yes('an export with no word on it still posts no tickets, because the '
 yes('and an export that asks for them in so many words gets them',
     bot.live_smoke_show_tickets(
         dict(live, rules=dict(live['rules'], discord_show_tickets=True))) is True
-    and '#517' in bot.live_smoke_item_text(double, len(items), True))
+    and '#517' in bot.live_smoke_item_text(forge, N, True))
 
 # --------------------------------------------------------------- the ids --
 yes('a button is keyed by its row and its mark',
@@ -222,7 +295,8 @@ yes('and read back the same way',
     bot.live_smoke_read_id('ls:live-2:Fail-known') == ('live-2', 'Fail-known'))
 yes('every button in the set has a different id, and Discord takes all of them',
     len(set(bot.live_smoke_custom_id(i['id'], m)
-            for i in items for m in bot.LIVE_SMOKE_MARKS)) == 28
+            for i in items for m in bot.LIVE_SMOKE_MARKS))
+    == N * len(bot.LIVE_SMOKE_MARKS)
     and all(len(bot.live_smoke_custom_id(i['id'], m)) <= 100
             for i in items for m in bot.LIVE_SMOKE_MARKS))
 yes('somebody else\u2019s button is not one of ours',
@@ -343,13 +417,14 @@ yes('the channel this looks for is the new one, not the deleted test-these',
     bot.LIVE_SMOKE_CHANNEL == ['test-tasks'])
 
 # ------------------------------------------------------------- the marks --
-row = bot.live_smoke_item_text(double, len(items))
+row = bot.live_smoke_item_text(forge, N)
 
 one = bot.live_smoke_mark(row, 'Ataxayk', 'Pass')
 yes('a mark goes on the row under a heading of its own',
     one.startswith(row) and one.endswith('Ataxayk: Pass'))
-yes('  and the line the vault wrote is still there', double['discord_line'] in one)
-yes('  and so is the skip rule', 'Skip rule:' in one)
+yes('  and the line the vault wrote is still there', forge['discord_line'] in one)
+yes('  and so is what it says about not Skipping it',
+    'do not Skip this row' in one)
 
 two = bot.live_smoke_mark(one, 'Djinn', 'Skip')
 yes('a second person gets their own line, and the first is left alone',
@@ -414,9 +489,9 @@ yes('  and no ticket number reaches it', not re.search(r'#\d+', opener))
 
 card = bot.live_smoke_template(live, items)
 yes('the checklist post carries every row in the set',
-    all((i['label'] in card) for i in items))
-yes('  and the skip rule, so it reads without the vault open',
-    ('Skip rule: ' + double['skip_rule']) in card)
+    all((i['label'] in card) for i in items) and card.count('\n%d. ' % N) == 1)
+yes('  and offers nobody a standing Skip, because no row has one',
+    'Skip rule' not in card)
 yes('  and the day the set last changed, which is how a tester tells one '
     'set from the next', stamp in card)
 yes('  and fits in a Discord message', len(card) < 2000)
@@ -450,7 +525,7 @@ yes('a Live set too big for one message is cut, not thrown away by Discord',
 # written for people. Check-Words.ps1 does not read bot.py, so it is read here.
 WORDS = [opener, card, bot.live_smoke_admin_refusal(here), gone,
          bot.live_smoke_tick_refusal(Who([], bot=True))]
-WORDS += [bot.live_smoke_item_text(i, len(items)) for i in items]
+WORDS += [bot.live_smoke_item_text(i, N) for i in items]
 yes('nothing this says to anybody has an em dash in it',
     not any('\u2014' in w for w in WORDS))
 
@@ -624,13 +699,16 @@ yes('  named for the date and the version', thread.name.startswith('Live smoke '
     and thread.name.endswith('1.1.101.17'))
 yes('  with the live channel in the opener', 'thornswood-one' in opened.content)
 yes('  and the rows in the thread, not in the channel',
-    len(thread.sent) == 7 and len(tasks.sent) == 1)
-yes('  one message per row, so no message carries twenty eight buttons',
-    all(len(v.children) == 4 for _, v in thread.sent))
+    len(thread.sent) == N and len(tasks.sent) == 1)
+yes('  one message per row, so no message carries every button in the set',
+    all(len(v.children) == len(bot.LIVE_SMOKE_MARKS) for _, v in thread.sent))
 yes('  each row carrying the four marks',
     [c.label for c in thread.sent[0][1].children] == list(bot.LIVE_SMOKE_MARKS))
-yes('  and the forge skip rule where the export puts it',
-    ('Skip rule: ' + double['skip_rule']) in thread.sent[1][0].content)
+yes('  the rows in the order the export gives them',
+    [m.content.split('\n')[0] for m, _ in thread.sent] ==
+    [bot.live_smoke_item_text(i, N).split('\n')[0] for i in items])
+yes('  and not one of them offering a Skip rule',
+    not any('Skip rule' in m.content for m, _ in thread.sent))
 yes('  and not one ticket number on any row a tester reads',
     not any(re.search(r'#\d+', m.content) for m, _ in thread.sent)
     and not re.search(r'#\d+', opened.content))
@@ -649,7 +727,7 @@ ran(press.callback(ask))
 yes('a tester marks a row and the row itself says so',
     ask.response.edited and 'Ataxayk: Pass' in ask.response.edited[0])
 yes('  and nothing is posted anywhere else about it',
-    len(tasks.sent) == 1 and len(thread.sent) == 7)
+    len(tasks.sent) == 1 and len(thread.sent) == N)
 
 # An agent presses the same button.
 item.content = ask.response.edited[0]
@@ -725,7 +803,7 @@ finally:
     os.unlink(wrong)
 
 yes('startup registers one view per row, so a session outlives a restart',
-    len(bot.live_smoke_views()) == 7)
+    len(bot.live_smoke_views()) == N)
 yes('and the slash commands are one group of three',
     sorted(c.name for c in bot.live_smoke.commands) == ['refresh', 'reset', 'start']
     and bot.live_smoke.name == 'live-smoke'
