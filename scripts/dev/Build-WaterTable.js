@@ -270,7 +270,10 @@ function install() {
   const next = re.test(src)
     ? src.replace(re, line)
     : src.replace(/^(const ITEMS = .*;)$/m, '$1\n' + line);
-  if (next === src) { fail('could not find anywhere in gamemode.js to put the table'); return; }
+  if (next === src) {
+    if (re.test(src)) { console.log('installed water table already matches this load order'); return; }
+    fail('could not find anywhere in gamemode.js to put the table'); return;
+  }
   fs.writeFileSync(gm, next);
   console.log('installed ' + Object.keys(thin).length +
               ' places into game\\gamemode.js (deep is the default and is left out)');
