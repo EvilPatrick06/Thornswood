@@ -286,10 +286,11 @@ STAFF = ('Owner', 'Lead Gamemaster', 'Dev', 'Moderator', 'Gamemaster')
 #
 # THE GATE, set up by hand on 23 and 24 September. Somebody who joins sees the
 # Start Here category (#rules, #welcome, #start-here, #say-hello) and the
-# Applications category, and nothing else until staff give them Member. A hold's channel opens to its own
-# Citizen and Jarl roles, picked in #choose-your-hold. These modes only apply
-# to a channel this makes, never to one already there, so they are what keeps
-# a channel made by a later run behind that gate instead of in front of it.
+# Applications category, and nothing else until staff give them Member. A
+# hold's channel opens to its own Citizen and Jarl roles, picked in
+# #choose-your-hold. These modes only apply to a channel this makes, never to
+# one already there, so they are what keeps a channel made by a later run
+# behind that gate instead of in front of it.
 #
 # key is what the words in content.py point at, so a channel can be renamed
 # without every mention of it going stale.
