@@ -35,6 +35,12 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 - `lore/`: the world.
 - `out/` and `local/`: build output and machine-local files that never go to
   GitHub (both gitignored).
+- `config.example.json`: example launcher `config.json` kept in lockstep with
+  the defaults in `launcher/app/Config.cs` (empty `UpdateToken`, current
+  address and feed URL). Copy it beside a built launcher when you need a
+  known-good starter. `tests/test-repo-docs.js` and `tests/test-vps-defaults.ps1`
+  hold it to those defaults. The site's own example is `site/config.example.json`
+  (see `site/README.md`).
 
 `bot`, `game`, `installer`, `records`, `scripts`, `site`, `tests`, `launcher`,
 `installer/setup`, `records/signing`, `game/plugins`, `game/ui` and `voice`
