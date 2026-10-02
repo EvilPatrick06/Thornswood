@@ -321,6 +321,7 @@ if (first !== null) {
 */
 const WRITERS = {
   'outer/addItem': [1, 'adds by descriptor, and section 3 says no descriptor in this file is gold'],
+  'outer/addItemsAtomic': [1, 'adds verified fish, hanging-game and carcass descriptor bundles; the caller audit below pins those paths'],
   'outer/takeItem': [1, 'only takes things away'],
   'outer/takeItemById': [1, 'only takes things away'],
   'outer/giveShift': [1, 'the shift, out of CHARGEN.shift'],
@@ -400,6 +401,19 @@ for (const at of Object.keys(WRITERS)) {
   // today; the day something does, what it is handed has to be read.
   const calls = (code.match(/\bgiveItems\(/g) || []).length;
   yes('nothing calls giveItems', calls === 1);
+}
+
+{
+  const re = /\baddItemsAtomic\(/g;
+  const callers = [];
+  let match;
+  while ((match = re.exec(code)) !== null) {
+    if (/function\s+$/.test(code.slice(Math.max(0, match.index - 20), match.index))) { continue; }
+    callers.push(where(match.index));
+  }
+  callers.sort();
+  yes('atomic item bundles are only paid by fish, hanging game and carcass harvests',
+      callers.join(',') === 'outer/fish,outer/game,outer/loot');
 }
 
 {
