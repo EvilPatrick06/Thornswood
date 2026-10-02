@@ -155,6 +155,15 @@ namespace Thornswood
             if (u.Scheme != Uri.UriSchemeHttps || !u.IsDefaultPort || u.UserInfo.Length > 0) return builtIn;
             string host = u.Host.ToLowerInvariant();
             if (host != "thornswood.net" && !host.EndsWith(".thornswood.net", StringComparison.Ordinal)) return builtIn;
+            // A feed may move within its own channel, never across it (Djinn,
+            // 2 Oct). The dev feed shipped updateFeedUrl = the main feed on
+            // 1 Oct, every dev launcher saved it, and from then on read the
+            // main feed: no dev launcher update, no dev client, and Play shut
+            // for good on a Client row nothing could put right. A dev build
+            // reads a feed-dev address or its built-in one, and a main build
+            // never reads feed-dev.
+            bool saysDev = u.AbsolutePath.IndexOf("/feed-dev/", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (saysDev != dev) return builtIn;
             return said;
         }
 

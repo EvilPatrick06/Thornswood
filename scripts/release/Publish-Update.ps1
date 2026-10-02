@@ -1697,6 +1697,17 @@ if (Test-Path $cfgPath) {
         $feedUrl = ''
         if ($cfg.PSObject.Properties.Name -contains 'UpdateFeedUrl') { $feedUrl = [string]$cfg.UpdateFeedUrl }
         if (-not $feedUrl) { $feedUrl = Get-HostFeedVersionUrl -Dev:$Dev }
+        # The feed names its own channel's feed, whatever the shipping
+        # machine's config.json says (Djinn, 2 Oct). On 1 Oct the dev feed
+        # went out naming the main feed, because this machine's UpdateFeedUrl
+        # is the main one, and every dev launcher that read it moved itself
+        # onto the main feed. Same rule as voiceUrl above.
+        $isDevUrl = $feedUrl -match '/feed-dev/'
+        if ([bool]$Dev -ne $isDevUrl) {
+            $was = $feedUrl
+            $feedUrl = Get-HostFeedVersionUrl -Dev:$Dev
+            Say "  updateFeedUrl $feedUrl (config.json said $was, which is the other channel's feed)" 'Yellow'
+        }
         Set-Prop $doc 'updateFeedUrl' $feedUrl
 
         # How many the room holds. A number, not a string, because the launcher
