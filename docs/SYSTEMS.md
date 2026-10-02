@@ -164,6 +164,10 @@ starts with 250, once. A scene quest creates the gold written on it,
 on that quest's cooldown. A company sale can take some coin out of
 the world. It does not buy a rank.
 
+[Dungeon loot](systems/dungeon-loot.md). A chest in a dungeon, a cave,
+or a sewer pays gold, ordinary goods, and sometimes a spell tome, from
+the tier of that place. A few burial goods are found only this way.
+
 [Notice boards](systems/noticeboards.md). One board a hold. 20 gold for a
 notice, 30 for a job. A letter costs the board fee plus 15 for the
 courier, paid by the sender. The newest ten show.
