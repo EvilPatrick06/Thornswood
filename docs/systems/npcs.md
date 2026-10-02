@@ -35,7 +35,8 @@ a city is its own habitat, not permission to spawn its enemies above it.
 The rule also applies to towns without a separate city worldspace.
 
 Traders you buy from and sell to. They are the merchant's guild of
-the hold they stand in. Their prices are the average of the price
+the hold they stand in. The guild is these NPCs; people cannot join it.
+Their prices are the average of the price
 lists submitted to that hold's drop box. Their purse starts once,
 and after that they buy and sell the way a person does. An empty
 purse does not pay. An empty shelf does not sell. Stock is what
