@@ -525,7 +525,7 @@ function Get-PublishedLauncher([string]$dir, [string]$branch) {
         if (-not $dir -or -not (Test-Path -LiteralPath $dir)) { return $null }
         $f = Join-Path $dir 'version.json'
         if (-not (Test-Path -LiteralPath $f)) { return $null }
-        try { $doc = ([IO.File]::ReadAllText($f) -replace '^﻿', '') | ConvertFrom-Json } catch { return $null }
+        try { $doc = ([IO.File]::ReadAllText($f) -replace ('^' + [char]0xFEFF), '') | ConvertFrom-Json } catch { return $null }
     }
     if ($null -eq $doc) { return $null }
     function Field($o, [string]$k) { if ($o -and $o.PSObject.Properties[$k] -and $null -ne $o.$k) { return ([string]$o.$k).Trim() } return '' }

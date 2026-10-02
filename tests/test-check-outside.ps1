@@ -13,8 +13,8 @@
   Thornswood-Releases, which lists every one of them across two pages of 100.
   The launcher's asset answered 302 to release-assets.githubusercontent.com
   and the first byte came back 206 of 3,292,160. api.steamcmd.net gave public
-  build 24914197 for app 489830. The Nexus collection page answers a bare
-  request with 403.
+  build 24914197 for app 489830. The Nexus collection page answered a bare
+  request with 403; from #1064 the check asks Nexus GraphQL instead.
 
   These drive the real walk, dot-sourced out of the shipped script, with the
   one function that touches the network (Probe) replaced by answers from a
@@ -59,8 +59,8 @@ function Serve([string]$url, [int]$code, [string]$body = '', [hashtable]$more) {
   if ($more) { foreach ($k in $more.Keys) { $r[$k] = $more[$k] } }
   $script:Served[$url] = $r
 }
-function Probe([string]$url, [string]$accept = '', [switch]$Body, [switch]$FirstByte) {
-  $script:Asked.Add([pscustomobject]@{ Url = $url; Accept = $accept; FirstByte = [bool]$FirstByte })
+function Probe([string]$url, [string]$accept = '', [switch]$Body, [switch]$FirstByte, [string]$Method = 'GET', [string]$PostBody = '') {
+  $script:Asked.Add([pscustomobject]@{ Url = $url; Accept = $accept; FirstByte = [bool]$FirstByte; Method = $(if ($Method) { $Method } else { 'GET' }); PostBody = [string]$PostBody })
   $script:Ever.Add($url)
   if ($script:Served.ContainsKey($url)) { return $script:Served[$url].Clone() }
   return @{ code = 0; body = ''; location = ''; range = ''; left = ''; reset = ''; link = ''; error = 'unreachable' }
@@ -75,6 +75,11 @@ $ListA2 = 'https://api.github.com/repositories/42/releases?per_page=100&page=2'
 $ListB  = 'https://api.github.com/repos/Owner/Private/releases?per_page=100'
 $Steam  = 'https://api.steamcmd.net/v1/info/489830'
 $Nexus  = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/abc123'
+$Gql    = 'https://api.nexusmods.com/v2/graphql'
+function NexusJson([string]$name, $rev) {
+  if (-not $name) { return '{"data":{"collection":null}}' }
+  return ('{"data":{"collection":{"name":"' + $name + '","latestPublishedRevision":{"revisionNumber":' + $rev + '}}}}')
+}
 $Signed = '?sp=r&sv=2018&jwt=SECRETJWTSIGNATURE'
 function Cdn([string]$id) { return ('https://release-assets.githubusercontent.com/github-production-release-asset/1/' + $id + $Signed) }
 
@@ -113,7 +118,7 @@ function Clean {
     Serve (Cdn $pair[0]) 206 '' @{ range = ('bytes 0-0/' + $pair[1]) }
   }
   Serve $Steam 200 (SteamJson '100')
-  Serve $Nexus 200 '<html></html>'
+  Serve $Gql 200 (NexusJson 'Thornswood' 1)
 }
 
 $root = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-outside-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -163,7 +168,9 @@ try {
   Yes 'the client runtime and the newest pack are fetched too' ((AskedFor $r (Api $A '901')) -and (AskedFor $r (Api $A '3')))
   Yes 'an older pack is not fetched, the listing already covers it' (-not (AskedFor $r (Api $A '1')))
   Yes 'the Steam build matches the record' (Has $r.Ok "Steam's public build is still 100, as recorded 2026-09-24.")
-  Yes 'a 200 from Nexus is called weak evidence' (Has $r.Ok '*weak evidence*')
+  Yes 'Nexus GraphQL found reports name and revision' (Has $r.Ok 'the collection "Thornswood" is there, revision 1.')
+  Yes 'Nexus is asked by anonymous GraphQL POST, not the collection page' (@($r.Asked | Where-Object { $_.Url -eq $Gql -and $_.Method -eq 'POST' -and $_.PostBody -like '*abc123*skyrimspecialedition*' }).Count -eq 1)
+  Yes 'the collection page itself is not requested' (-not (AskedFor $r $Nexus))
   Yes 'the depot pins are said to be unchecked, not passed' (Has $r.Skip '*depot manifests*check by hand.')
   Yes 'the signed download address is never printed' (($r.Text + ($r.Ok -join ' ')) -notmatch 'SECRETJWT|jwt=')
   Yes 'only its host is' ($r.Text -match 'release-assets\.githubusercontent\.com')
@@ -309,16 +316,25 @@ try {
   $r = Run '' $Allowed (Join-Path $root 'no-such-record.json')
   Yes 'no record to compare with is red' (Has $r.Bad 'no Steam build is recorded in*')
 
-  # ---- Nexus -------------------------------------------------------------------
+  # ---- Nexus (GraphQL: found / gone / no answer) --------------------------------
   Clean
-  Serve $Nexus 403 'Just a moment...'
+  Serve $Gql 200 (NexusJson 'Thornswood' 1)
   $r = Run
-  Yes 'a 403 from Nexus is unchecked, not red and not green' ($r.N -eq 0 -and (Has $r.Skip 'the collection: Nexus answered 403*'))
+  Yes 'a GraphQL answer with name and revision is green' ($r.N -eq 0 -and (Has $r.Ok 'the collection "Thornswood" is there, revision 1.'))
   Clean
-  Serve $Nexus 404 ''
+  Serve $Gql 200 (NexusJson '' $null)
   $r = Run
-  Yes 'a collection that is gone is red' ($r.N -eq 1 -and (Has $r.Bad 'the collection page answers 404*'))
+  Yes 'Nexus saying there is no such collection is red' ($r.N -eq 1 -and (Has $r.Bad 'Nexus says there is no collection abc123*'))
+  Clean
+  $script:Served.Remove($Gql)
+  $r = Run
+  Yes 'Nexus not answering at all is unchecked, not red' ($r.N -eq 0 -and (Has $r.Skip 'the collection: Nexus did not answer*unchecked.'))
+  Clean
+  Serve $Gql 403 'Just a moment...'
+  $r = Run
+  Yes 'a non-answer HTTP code from GraphQL is unchecked, not red' ($r.N -eq 0 -and (Has $r.Skip 'the collection: Nexus answered 403*unchecked.'))
 
+  # ---- over every run above --------------------------------------------------
   # ---- over every run above --------------------------------------------------
   $toServer = @($script:Ever | Where-Object { $_ -match '^https?://([^/]+\.)?thornswood\.net(/|:|$)' -or $_ -match '192\.0\.2\.10|192\.0\.2\.99' })
   Yes ('not one request in ' + $script:Ever.Count + ' went to the server') ($toServer.Count -eq 0)
@@ -328,7 +344,7 @@ try {
   $code = [regex]::Replace($src, '(?s)<#.*?#>', '')
   $code = [regex]::Replace($code, '(?m)^\s*#.*$', '')
   Yes 'no token, key or launcher config is touched' ($code -notmatch 'Authorization|Bearer|UpdateToken|GITHUB_TOKEN|GH_TOKEN|config\.json|bot\.env')
-  Yes 'GET is the only method it ever sends' (([regex]::Matches($code, '\.Method\s*=')).Count -eq 1 -and $code -match "\.Method\s*=\s*'GET'")
+  Yes 'Method is set once from the caller (GET by default, POST for Nexus GraphQL)' (([regex]::Matches($code, '\.Method\s*=')).Count -eq 1 -and $code -match '-Method ''POST''' -and $code -match '\$r\.Method = \$\(if \(\$Method\)')
   Yes 'no other web cmdlet is used that could send something else' ($code -notmatch 'Invoke-WebRequest|Invoke-RestMethod|WebClient|HttpClient')
 }
 finally {
