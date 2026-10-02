@@ -165,8 +165,10 @@ on that quest's cooldown. A company sale can take some coin out of
 the world. It does not buy a rank.
 
 [Dungeon loot](systems/dungeon-loot.md). A chest in a dungeon, a cave,
-or a sewer pays gold, ordinary goods, and sometimes a spell tome, from
-the tier of that place. A few burial goods are found only this way.
+or a sewer pays gold, ordinary goods, and sometimes a novice or master
+spell tome, from the tier of that place. A few burial goods are found
+only this way. A dead body can be searched too, and anything good on
+it is rare.
 
 [Notice boards](systems/noticeboards.md). One board a hold. 20 gold for a
 notice, 30 for a job. A letter costs the board fee plus 15 for the

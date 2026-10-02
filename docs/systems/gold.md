@@ -27,7 +27,8 @@ A chest in a dungeon, a cave, or a sewer is a different door. Opening
 one creates a small sum, on that place's tier, and the same chest
 does not pay again until the place has rested. That is the same kind
 of mint as a scene quest's reward. The coin that was sitting in the
-chest is still stripped. See [Dungeon loot](dungeon-loot.md).
+chest is still stripped. A dead body can also create a little coin,
+much less than a chest, and most bodies create none. See [Dungeon loot](dungeon-loot.md).
 
 ## What counts as gold
 
