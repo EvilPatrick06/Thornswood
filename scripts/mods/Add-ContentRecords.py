@@ -187,6 +187,37 @@ MOLD = 0x5015495
 RECIPE_MOLD = 0x5015496
 RECIPE_KEY = 0x5015497
 
+# Poles, the trap, and the pressable catches. fisher.md ingredients.
+# The master pole does not take dragon bone. A trap is not a pole.
+# The catches are one FLOR base each, cloned from Clam01 so they carry a
+# PFIG. Spots in the world are somebody else's job. FISH_BY_BASE is not
+# written here.
+POLE_CRUDE = 0x5015498
+POLE_FINE = 0x5015499
+POLE_MASTER = 0x501549A
+FISH_TRAP = 0x501549B
+RECIPE_POLE_CRUDE = 0x501549C
+RECIPE_POLE_FINE = 0x501549D
+RECIPE_POLE_MASTER = 0x501549E
+RECIPE_TRAP = 0x501549F
+CATCH_HISTCARP = 0x50154A0
+CATCH_RIVER_BETTY = 0x50154A1
+CATCH_SCALES = 0x50154A2
+CATCH_PERCH = 0x50154A3
+CATCH_SPADETAIL = 0x50154A4
+CATCH_LONGFIN = 0x50154A5
+
+LEATHER_STRIPS = 0x000800E4
+TUNDRA_COTTON = 0x0003F7F8
+STEEL_INGOT = 0x0005ACE5
+REFINED_MOONSTONE = 0x0005AD9F
+HISTCARP = 0x000106E18
+RIVER_BETTY = 0x000106E1A
+SLAUGHTERFISH_SCALES = 0x00003AD70
+SILVERSIDE_PERCH = 0x000106E1C
+CYRODILIC_SPADETAIL = 0x000106E19
+ABECEAN_LONGFIN = 0x000106E1B
+
 DEED_WORDS = (
     '<p align="center"><font size="30">Deed</font></p>'
     '<br><br>'
@@ -320,6 +351,39 @@ def clone(src, fid, editor_id, sets=None, after=None, drop=None):
     return Rec(src.tag, src.flags, fid, src.extra, pack_subrecords(out))
 
 
+def set_inputs(rec, items):
+    """Replace every CNTO and set COCT to match. items is (formid, count)."""
+    pairs = subrecords(rec.data)
+    out = []
+    placed = False
+    for t, b in pairs:
+        if t == b'COCT':
+            out.append((t, struct.pack('<I', len(items))))
+            continue
+        if t == b'CNTO':
+            if not placed:
+                for base, count in items:
+                    out.append((b'CNTO', cnto(base, count)))
+                placed = True
+            continue
+        out.append((t, b))
+    if not placed:
+        raise SystemExit('recipe had no CNTO to replace')
+    rec.data = pack_subrecords(out)
+
+
+def ensure_top_group(tree, tag):
+    """The top GRUP for tag, made if this plugin has never had one."""
+    for k in tree:
+        if isinstance(k, Grup) and k.label[:4] == tag:
+            return k
+    sample = next(k for k in tree if isinstance(k, Grup))
+    stamp = sample.label[12:16] if len(sample.label) >= 16 else b'\x00' * 4
+    g = Grup(tag + b'\x00' * 8 + stamp, [])
+    tree.append(g)
+    return g
+
+
 def wants_handle(rec):
     """One more input on a recipe that already has one, and the count bumped."""
     pairs = subrecords(rec.data)
@@ -447,7 +511,21 @@ def main():
                       ('ThornswoodMiscKey', KEY),
                       ('ThornswoodMiscKeyMold', MOLD),
                       ('ThornswoodRecipeKeyMold', RECIPE_MOLD),
-                      ('ThornswoodRecipeKey', RECIPE_KEY)):
+                      ('ThornswoodRecipeKey', RECIPE_KEY),
+                      ('ThornswoodMiscPoleCrude', POLE_CRUDE),
+                      ('ThornswoodMiscPoleFine', POLE_FINE),
+                      ('ThornswoodMiscPoleMaster', POLE_MASTER),
+                      ('ThornswoodMiscFishTrap', FISH_TRAP),
+                      ('ThornswoodRecipePoleCrude', RECIPE_POLE_CRUDE),
+                      ('ThornswoodRecipePoleFine', RECIPE_POLE_FINE),
+                      ('ThornswoodRecipePoleMaster', RECIPE_POLE_MASTER),
+                      ('ThornswoodRecipeFishTrap', RECIPE_TRAP),
+                      ('ThornswoodCatchHistcarp', CATCH_HISTCARP),
+                      ('ThornswoodCatchRiverBetty', CATCH_RIVER_BETTY),
+                      ('ThornswoodCatchSlaughterfishScales', CATCH_SCALES),
+                      ('ThornswoodCatchSilversidePerch', CATCH_PERCH),
+                      ('ThornswoodCatchCyrodilicSpadetail', CATCH_SPADETAIL),
+                      ('ThornswoodCatchAbeceanLongfin', CATCH_LONGFIN)):
         here_already = name in by_edid
         if here_already and by_edid[name].fid != fid:
             print('')
@@ -574,6 +652,69 @@ def main():
         [(t, struct.pack('<I', 2)) if t == b'COCT' else (t, b)
          for t, b in subrecords(make_shovel.data)])
 
+
+    # Clam01 from Skyrim.esm, uncompressed, PFIG present. Kept here so this
+    # script does not need the master open. FULL is replaced with a plain name.
+    clam_raw = bytes.fromhex(
+        '464c4f52bd00000000000000805f08002f301e002c000b00454449440700436c616d303100'
+        '4f424e440c00eeffe8fffeff12001800210046554c4c04001fdc00004d4f444c1200506c61'
+        '6e74735c436c616d30312e6e6966004d4f44543c00020000000400000000000000aa2dbb27'
+        '64647300f64c4bb969221e8664647300f64c4bb9b807509764647300262c333bd373171f64'
+        '647300f64c4bb9504e414d040000000000524e414d0400dc070100464e414d020000005046'
+        '4947040003ba0e00534e414d04002605100050465043040064646464')
+    clam = Rec(b'FLOR', 0, 0x85F80, clam_raw[16:24], clam_raw[24:])
+
+    pole_crude = clone(misc_src, POLE_CRUDE, 'ThornswoodMiscPoleCrude', sets={
+        b'FULL': zstr('Crude Fishing Pole'),
+        b'DATA': struct.pack('<If', 25, 1.0),
+    })
+    pole_fine = clone(misc_src, POLE_FINE, 'ThornswoodMiscPoleFine', sets={
+        b'FULL': zstr('Fine Fishing Pole'),
+        b'DATA': struct.pack('<If', 80, 1.0),
+    })
+    pole_master = clone(misc_src, POLE_MASTER, 'ThornswoodMiscPoleMaster', sets={
+        b'FULL': zstr('Master Fishing Pole'),
+        b'DATA': struct.pack('<If', 200, 1.0),
+    })
+    fish_trap = clone(misc_src, FISH_TRAP, 'ThornswoodMiscFishTrap', sets={
+        b'FULL': zstr('Fish Trap'),
+        b'DATA': struct.pack('<If', 10, 0.5),
+    })
+    make_pole_crude = clone(cobj_charcoal, RECIPE_POLE_CRUDE, 'ThornswoodRecipePoleCrude', sets={
+        b'CNAM': struct.pack('<I', POLE_CRUDE),
+        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
+    })
+    set_inputs(make_pole_crude, [(FIREWOOD, 2), (LEATHER_STRIPS, 1), (TUNDRA_COTTON, 2)])
+    make_pole_fine = clone(cobj_charcoal, RECIPE_POLE_FINE, 'ThornswoodRecipePoleFine', sets={
+        b'CNAM': struct.pack('<I', POLE_FINE),
+        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
+    })
+    set_inputs(make_pole_fine, [(FIREWOOD, 2), (LEATHER_STRIPS, 1), (STEEL_INGOT, 1), (TUNDRA_COTTON, 3)])
+    make_pole_master = clone(cobj_charcoal, RECIPE_POLE_MASTER, 'ThornswoodRecipePoleMaster', sets={
+        b'CNAM': struct.pack('<I', POLE_MASTER),
+        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
+    })
+    set_inputs(make_pole_master, [
+        (FIREWOOD, 3), (LEATHER_STRIPS, 2), (STEEL_INGOT, 1), (REFINED_MOONSTONE, 1)])
+    make_trap = clone(cobj_charcoal, RECIPE_TRAP, 'ThornswoodRecipeFishTrap', sets={
+        b'CNAM': struct.pack('<I', FISH_TRAP),
+        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
+    })
+    set_inputs(make_trap, [(FIREWOOD, 3), (LEATHER_STRIPS, 2), (IRON_INGOT, 1)])
+
+    def catch(fid, edid, name, produce):
+        return clone(clam, fid, edid, sets={
+            b'FULL': zstr(name),
+            b'PFIG': struct.pack('<I', produce),
+        })
+
+    catch_histcarp = catch(CATCH_HISTCARP, 'ThornswoodCatchHistcarp', 'Histcarp', HISTCARP)
+    catch_betty = catch(CATCH_RIVER_BETTY, 'ThornswoodCatchRiverBetty', 'River Betty', RIVER_BETTY)
+    catch_scales = catch(CATCH_SCALES, 'ThornswoodCatchSlaughterfishScales', 'Slaughterfish Scales', SLAUGHTERFISH_SCALES)
+    catch_perch = catch(CATCH_PERCH, 'ThornswoodCatchSilversidePerch', 'Silverside Perch', SILVERSIDE_PERCH)
+    catch_spadetail = catch(CATCH_SPADETAIL, 'ThornswoodCatchCyrodilicSpadetail', 'Cyrodilic Spadetail', CYRODILIC_SPADETAIL)
+    catch_longfin = catch(CATCH_LONGFIN, 'ThornswoodCatchAbeceanLongfin', 'Abecean Longfin', ABECEAN_LONGFIN)
+
     print('')
     print('What goes in')
     print('  MISC 0x%07X ThornswoodMiscToolHandle      Tool Handle, %d gold, %s weight'
@@ -593,6 +734,13 @@ def main():
     print('  COBJ 0x%07X ThornswoodRecipeKey           1 iron ingot -> 1 key, at a forge, named '
           'by the stamped mold in the pack'
           % RECIPE_KEY)
+    print('  MISC/COBJ poles and fish trap, fisher.md ingredients, no dragon bone')
+    print('  FLOR ThornswoodCatchHistcarp')
+    print('  FLOR ThornswoodCatchRiverBetty')
+    print('  FLOR ThornswoodCatchSlaughterfishScales')
+    print('  FLOR ThornswoodCatchSilversidePerch')
+    print('  FLOR ThornswoodCatchCyrodilicSpadetail')
+    print('  FLOR ThornswoodCatchAbeceanLongfin')
     print('')
     print('What changes')
     print('  COBJ 0x%07X ThornswoodRecipeWeaponPickaxe now wants a handle as well as the ingot'
@@ -620,7 +768,11 @@ def main():
         return 0
 
     built = [r for r in (handle, make_handle, make_shovel, deed, key, mold,
-                         make_mold, make_key)
+                         make_mold, make_key,
+                         pole_crude, pole_fine, pole_master, fish_trap,
+                         make_pole_crude, make_pole_fine, make_pole_master, make_trap,
+                         catch_histcarp, catch_betty, catch_scales, catch_perch,
+                         catch_spadetail, catch_longfin)
              if r.editor_id() not in already]
     # An edit that has already been made is not made twice. A recipe that already
     # asks for a handle would otherwise gain a second one on every run.
@@ -640,7 +792,7 @@ def main():
         return 0
     tree = take_out(tree, removing)
     for r in built:
-        top_group(tree, r.tag).kids.append(r)
+        ensure_top_group(tree, r.tag).kids.append(r)
     kept = [r for r in records if r.fid not in removing]
 
     # The header's record count, which sits in HEDR after the version float.
