@@ -1171,9 +1171,16 @@ namespace Thornswood
                 var frame = new VideoDrawing();
                 frame.Player = player;
                 var brush = new DrawingBrush(frame);
+                // One crop for the band, the still picture's and this one, so
+                // the two line up and the overlook sits where the approved
+                // picture has it (Art.HeaderCrop says why that is not the
+                // middle of the picture). The video is painted at its own size
+                // and its own timing: no scale, no drift, no speed-up.
                 brush.Stretch = Stretch.UniformToFill;
                 brush.AlignmentX = AlignmentX.Center;
                 brush.AlignmentY = AlignmentY.Center;
+                brush.ViewboxUnits = BrushMappingMode.RelativeToBoundingBox;
+                brush.Viewbox = Art.HeaderCrop;
 
                 player.MediaOpened += delegate
                 {
