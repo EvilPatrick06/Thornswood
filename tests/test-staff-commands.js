@@ -391,6 +391,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-staff-'));
 const KEY = crypto.randomBytes(32).toString('hex');
 fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
 fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
+fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
 const srv = spawn(process.execPath, ['voice-server.js'], {
   cwd: dir,
   env: Object.assign({}, process.env, {
@@ -420,12 +421,25 @@ function join(pid, name, tok) {
   return new Promise((done, bad) => {
     const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/');
     const heard = [];
+    const hush = [];
+    const who = {};
     sockets.push(ws);
     ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: pid, name: name, token: tok || '' }));
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-      if (m.t === 'welcome') { done({ heard: heard, say: (text) => ws.send(JSON.stringify({ t: 'chat', text: text })) }); }
+      if (m.t === 'welcome') {
+        done({ heard: heard, hush: hush, who: who, say: (text) => ws.send(JSON.stringify({ t: 'chat', text: text })) });
+      }
       if (m.t === 'chat') { heard.push(m); }
+      if (m.t === 'hush') { hush.push(m); }
+      if (m.t === 'pos') {
+        for (const k of Object.keys(who)) delete who[k];
+        Object.assign(who, m.who || {});
+      }
+      if (m.t === 'moved') {
+        Object.assign(who, m.who || {});
+        for (const id of (m.gone || [])) delete who[id];
+      }
     };
     ws.onerror = () => bad(new Error('could not join'));
     setTimeout(() => bad(new Error('no welcome')), 4000);
@@ -477,6 +491,17 @@ function python(args) {
   const r = await fetch(base + '/silenced', { method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ profiles: { [BJORN]: Date.now() + 120000 } }) });
   yes('POST /silenced from loopback is taken', r.ok && (await r.json()).silenced === 1);
+  yes('silence tells every connection to close that microphone',
+      await until(() => bjorn.hush.some((m) => m.profileId === BJORN && m.on === true) &&
+                        sera.hush.some((m) => m.profileId === BJORN && m.on === true), 3000));
+  await fetch(base + '/positions', { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ who: [
+      { profileId: BJORN, pos: [0, 0, 0], angleZ: 0, cell: 'Whiterun', name: 'Bjorn', actor: 1 },
+      { profileId: SERA, pos: [100, 0, 0], angleZ: 0, cell: 'Whiterun', name: 'Sera', actor: 2 }
+    ] }) });
+  yes('a silenced row carries hush and the speaking mark is closed',
+      await until(() => sera.who[BJORN] && sera.who[BJORN].hush === 1 && sera.who[BJORN].talk === 0, 3000));
+  yes('and somebody who is not silenced has no hush on their row', !sera.who[SERA] || sera.who[SERA].hush !== 1);
   const seraBefore = sera.heard.length;
   bjorn.say('hello everybody');
   yes('a line from somebody silenced is answered to them alone',
@@ -496,6 +521,11 @@ function python(args) {
   bjorn.say('back again');
   yes('an empty list lets them speak again',
       await until(() => sera.heard.slice(before).some((m) => m.text === 'back again'), 3000));
+  yes('and tells every connection the microphone is open again',
+      bjorn.hush.some((m) => m.profileId === BJORN && m.on === false) &&
+      sera.hush.some((m) => m.profileId === BJORN && m.on === false));
+  yes('and the next row drops hush',
+      await until(() => sera.who[BJORN] && sera.who[BJORN].hush !== 1, 3000));
 
   // ---------------------------------------------------------------- C --
   console.log('\nthe bot:');

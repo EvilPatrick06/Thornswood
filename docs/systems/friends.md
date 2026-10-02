@@ -6,9 +6,10 @@ friend does not grant the work bonus. That bonus is
 
 ## How it is made
 
-Look at them and press Y, or `/friend` and their name. They have to
-accept. The offer stands for 45 seconds. Both sides are written. A
-list with one name in it is not a friendship.
+Look at them and press Y, or `/friend` and their name. A prompt
+appears on their screen with Accept and Refuse. They do not type a
+command to answer. The offer stands for 45 seconds. Both sides are
+written. A list with one name in it is not a friendship.
 
 `/friend` with nothing after it lists them, and says who is away.
 `/friend remove` and the name takes one off. P opens the same list.
@@ -36,5 +37,6 @@ see your name.
 
 ## Where this is
 
-Y, `/friend`, the accept, the 45 seconds, the list, the remove, and
-the cap of 120 are in the server. The list survives a restart.
+Y, `/friend`, the prompt, the 45 seconds, the list, the remove, and
+the cap of 120 are in the server. Accept and Refuse on that prompt
+are what a person presses. The list survives a restart.

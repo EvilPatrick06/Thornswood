@@ -4871,11 +4871,13 @@
   // uses for a meter that is fine, so the two read as one game.
   const PARTY_COLOUR = [0.56, 0.72, 0.37, 0.95];
   const PLAIN_COLOUR = [1, 1, 1, 0.8];   // what the client itself uses
+  const HIDDEN_COLOUR = [1, 1, 1, 0];    // the tag stays, the letters do not
 
   let partyAt = 0;
   let partySaid = '';
   const partyMarks = {};      // form id hex -> the marker reference
   const partyTinted = {};     // form id hex -> true while its text is green
+  const nameHidden = {};      // form id hex -> true while its text is clear
 
   function partyList() {
     try {
@@ -4925,6 +4927,56 @@
       const textId = tags[id];
       if (textId === undefined || textId === null) { continue; }
       try { sp.setTextColor(textId, PLAIN_COLOUR); } catch (e) { }
+    }
+  }
+
+  /*
+    A hidden name is the same tag with no ink. Hide every name blanks the
+    whole table. One person is the near list's h flag, or the party row's,
+    for somebody who is in the party and not standing close enough to be
+    near. The marker and the compass strip are left alone. Applied after
+    the green, so a hidden party name stays blank rather than green.
+  */
+  function hideNames(want) {
+    const tags = nameTags();
+    if (!tags) { return; }
+    let hideAll = false;
+    try { hideAll = !!globalThis.thornswoodHideAllNames; } catch (e) { hideAll = false; }
+    const near = nearList() || {};
+    const hide = {};
+    if (hideAll) {
+      for (const key in tags) {
+        if (!Object.prototype.hasOwnProperty.call(tags, key)) { continue; }
+        hide[Number(key).toString(16)] = true;
+      }
+    }
+    for (const hex in near) {
+      if (!Object.prototype.hasOwnProperty.call(near, hex)) { continue; }
+      if (near[hex] && near[hex].h) { hide[String(hex)] = true; }
+    }
+    for (const hex in want) {
+      if (!Object.prototype.hasOwnProperty.call(want, hex)) { continue; }
+      if (want[hex] && want[hex].h) { hide[String(hex)] = true; }
+    }
+    for (const hex in hide) {
+      if (!Object.prototype.hasOwnProperty.call(hide, hex)) { continue; }
+      const id = parseInt(hex, 16);
+      const textId = tags[id];
+      if (textId === undefined || textId === null) { continue; }
+      try { sp.setTextColor(textId, HIDDEN_COLOUR); nameHidden[hex] = true; }
+      catch (e) { }
+    }
+    for (const hex in nameHidden) {
+      if (!Object.prototype.hasOwnProperty.call(nameHidden, hex)) { continue; }
+      if (hide[hex]) { continue; }
+      delete nameHidden[hex];
+      const id = parseInt(hex, 16);
+      const textId = tags[id];
+      if (textId === undefined || textId === null) { continue; }
+      const colour = want[hex] ? PARTY_COLOUR : PLAIN_COLOUR;
+      if (want[hex]) { partyTinted[hex] = true; }
+      else { delete partyTinted[hex]; }
+      try { sp.setTextColor(textId, colour); } catch (e) { }
     }
   }
 
@@ -4979,6 +5031,7 @@
     }
 
     colourNames(want);
+    hideNames(want);
 
     // A marker for everybody in the party, moved to where the server last
     // said they were.
@@ -5013,6 +5066,196 @@
       partySaid = sig;
       T.js('try{window.thornswoodParty&&window.thornswoodParty.setWhere&&' +
            'window.thornswoodParty.setWhere(' + JSON.stringify(list) + ');}catch(e){}');
+    }
+  }));
+
+  /*
+    Words above a head, an emote's name on that same line, and the
+    speaking mark. The name tag is the client's, and this does not
+    touch it: hiding a name leaves the words and the mark where they
+    are. One line at a time, for six seconds. The mark is not words.
+  */
+  const HEAD_MS = 6000;
+  const HEAD_COLOUR = [0.95, 0.91, 0.82, 0.95];
+  const MARK_COLOUR = {
+    whisper: [0.62, 0.78, 0.95, 0.95],
+    local: [1, 1, 1, 0.95],
+    yell: [0.93, 0.68, 0.22, 0.95]
+  };
+  const overheadHeads = {};
+  const overheadMarks = {};
+  let overheadScreen = [1920, 1080];
+  let overheadScreenAt = 0;
+
+  function overheadDrop(rec) {
+    if (!rec || !rec.id) { return; }
+    try {
+      if (sp.getTextString(rec.id) === rec.said) { sp.destroyText(rec.id); }
+    } catch (e) { }
+    rec.id = 0;
+    rec.said = '';
+  }
+
+  function overheadPut(rec, x, y, text, colour) {
+    if (rec.id) {
+      let ours = false;
+      try { ours = sp.getTextString(rec.id) === rec.said; } catch (e) { ours = false; }
+      if (ours) {
+        try {
+          if (text !== rec.said) { sp.setTextString(rec.id, text); rec.said = text; }
+          sp.setTextPos(rec.id, x, y);
+          return;
+        } catch (e) { }
+      }
+      rec.id = 0;
+    }
+    try {
+      rec.id = sp.createText(x, y, text, colour);
+      rec.said = text;
+      try { sp.setTextSize(rec.id, 0.5); } catch (e2) { }
+    } catch (e) {
+      rec.id = 0;
+      rec.said = '';
+    }
+  }
+
+  /* The head, in screen pixels, or null when it is behind the camera
+     or not loaded. Your own line uses the character you are playing. */
+  function overheadPoint(key) {
+    let refr = null;
+    try {
+      if (key === 'self') { refr = sp.Game.getPlayer(); }
+      else { refr = sp.ObjectReference.from(sp.Game.getFormEx(Number(key) || 0)); }
+    } catch (e) { refr = null; }
+    if (!refr) { return null; }
+    let x = 0, y = 0, z = 0, node = false;
+    try {
+      x = sp.NetImmerse.getNodeWorldPositionX(refr, 'NPC Head [Head]', false);
+      y = sp.NetImmerse.getNodeWorldPositionY(refr, 'NPC Head [Head]', false);
+      z = sp.NetImmerse.getNodeWorldPositionZ(refr, 'NPC Head [Head]', false);
+      node = !(x === 0 && y === 0 && z === 0);
+    } catch (e) { node = false; }
+    if (!node) {
+      try {
+        x = refr.getPositionX();
+        y = refr.getPositionY();
+        z = refr.getPositionZ() + 128;
+      } catch (e2) { return null; }
+    } else {
+      z += 32;
+    }
+    let p = null;
+    try { p = sp.worldPointToScreenPoint([x, y, z]); } catch (e) { return null; }
+    const head = p && p[0];
+    if (!head || !(head[2] > 0)) { return null; }
+    const w = overheadScreen[0], h = overheadScreen[1];
+    return {
+      x: Math.round(head[0] * w),
+      y: Math.round((1 - head[1]) * h)
+    };
+  }
+
+  sp.on('browserMessage', guard('overhead', (event) => {
+    const a = event.arguments;
+    if (!a || a[0] !== 'thornswood-front') { return; }
+    const what = String(a[1] || '');
+    if (what.indexOf('headclear:') === 0) {
+      const pid = Number(what.slice(10)) || 0;
+      for (const k in overheadHeads) {
+        if (!Object.prototype.hasOwnProperty.call(overheadHeads, k)) { continue; }
+        if (Number(overheadHeads[k].profile) !== pid) { continue; }
+        overheadDrop(overheadHeads[k]);
+        delete overheadHeads[k];
+      }
+      return;
+    }
+    if (what.indexOf('head:') === 0) {
+      let doc = null;
+      try { doc = JSON.parse(what.slice(5)); } catch (e) { doc = null; }
+      if (!doc || !doc.who || !doc.text) { return; }
+      const key = String(doc.who);
+      const had = overheadHeads[key];
+      if (had && had.text !== String(doc.text)) { overheadDrop(had); }
+      overheadHeads[key] = {
+        text: String(doc.text),
+        profile: Number(doc.profile) || 0,
+        until: Date.now() + HEAD_MS,
+        id: had && had.text === String(doc.text) ? had.id : 0,
+        said: had && had.text === String(doc.text) ? had.said : ''
+      };
+      return;
+    }
+    if (what.indexOf('marks:') === 0) {
+      let list = null;
+      try { list = JSON.parse(what.slice(6)); } catch (e) { list = null; }
+      if (!Array.isArray(list)) { return; }
+      const want = {};
+      for (let i = 0; i < list.length; i++) {
+        const row = list[i];
+        if (!row || !row.a) { continue; }
+        want[String(row.a)] = row.m === 'whisper' || row.m === 'yell' ? row.m : 'local';
+      }
+      for (const k in overheadMarks) {
+        if (!Object.prototype.hasOwnProperty.call(overheadMarks, k)) { continue; }
+        if (want[k]) { overheadMarks[k].mode = want[k]; continue; }
+        overheadDrop(overheadMarks[k]);
+        delete overheadMarks[k];
+      }
+      for (const k in want) {
+        if (!Object.prototype.hasOwnProperty.call(want, k)) { continue; }
+        if (!overheadMarks[k]) { overheadMarks[k] = { mode: want[k], id: 0, said: '' }; }
+      }
+    }
+  }));
+
+  sp.on('update', guard('overhead', () => {
+    const now = Date.now();
+    let any = false;
+    for (const k in overheadHeads) {
+      if (!Object.prototype.hasOwnProperty.call(overheadHeads, k)) { continue; }
+      if (now >= overheadHeads[k].until) {
+        overheadDrop(overheadHeads[k]);
+        delete overheadHeads[k];
+        continue;
+      }
+      any = true;
+    }
+    for (const k in overheadMarks) {
+      if (Object.prototype.hasOwnProperty.call(overheadMarks, k)) { any = true; break; }
+    }
+    if (!any) { return; }
+    if (now - overheadScreenAt > 2000) {
+      overheadScreenAt = now;
+      let w = 0, h = 0;
+      try {
+        w = Number(sp.Utility.getINIInt('iSize W:Display')) || 0;
+        h = Number(sp.Utility.getINIInt('iSize H:Display')) || 0;
+      } catch (e) { }
+      if (w && h) { overheadScreen = [w, h]; }
+    }
+    const seen = {};
+    function drawOne(key) {
+      if (seen[key]) { return; }
+      seen[key] = true;
+      const words = overheadHeads[key];
+      const mark = overheadMarks[key];
+      const at = overheadPoint(key);
+      if (!at) {
+        if (words) { overheadDrop(words); }
+        if (mark) { overheadDrop(mark); }
+        return;
+      }
+      if (words) { overheadPut(words, at.x, at.y - 28, words.text, HEAD_COLOUR); }
+      if (mark) {
+        const colour = MARK_COLOUR[mark.mode] || MARK_COLOUR.local;
+        overheadPut(mark, at.x, at.y - (words ? 46 : 28), '*', colour);
+      }
+    }
+    for (const k in overheadHeads) {
+      if (Object.prototype.hasOwnProperty.call(overheadHeads, k)) { drawOne(k); }
+    }
+    for (const k in overheadMarks) {
+      if (Object.prototype.hasOwnProperty.call(overheadMarks, k)) { drawOne(k); }
     }
   }));
 
@@ -6924,6 +7167,19 @@
       somebody looking at a bare number.
     */
     if (leaving && now - leaving >= 0 && now - leaving <= 5000) {
+      /* Close the game connection on the first second, not after the quit.
+         skymp5-client reconnects the moment a connection drops and then
+         moves you to the last place the server had, which is a few feet
+         behind where you were walking, and that move wins over the menu.
+         The idle kick already closes it first for the same reason. */
+      if (!leftClosed) {
+        leftClosed = true;
+        try {
+          if (sp.mpClientPlugin && sp.mpClientPlugin.destroyClient) {
+            sp.mpClientPlugin.destroyClient();
+          }
+        } catch (e) { log('could not close the connection to the game server:', e); }
+      }
       const left = Math.max(1, Math.ceil((5000 - (now - leaving)) / 1000));
       if (left !== leavingSaid) {
         note((leavingSaid ? '' : 'the connection to the server was lost, ') +
@@ -6936,6 +7192,11 @@
       // No longer in the world, and said so before the quit rather than after,
       // because after it there is no tick to say it in.
       try { globalThis.__thornswoodInWorld = false; } catch (e) { }
+      try {
+        if (sp.mpClientPlugin && sp.mpClientPlugin.destroyClient) {
+          sp.mpClientPlugin.destroyClient();
+        }
+      } catch (e) { log('could not close the connection to the game server:', e); }
       try {
         sp.Game.quitToMainMenu();
       } catch (e) {
@@ -7081,6 +7342,9 @@
   let probeStartedAt = 0;
   let probeSeq = 0;
   let leaving = 0;
+  /* The game connection was closed for this outage, so a reconnect cannot
+     put them back where they were standing. See the countdown above. */
+  let leftClosed = false;
   /* The last whole second the way-out countdown put on screen, 0 before the
      first. See the quit in the tick above, the only place that can draw it. */
   let leavingSaid = 0;

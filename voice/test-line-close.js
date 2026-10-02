@@ -34,6 +34,7 @@ function yes(what, cond) {
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-lineclose-'));
 fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
+fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
 
 let srv = null;
 let log = '';

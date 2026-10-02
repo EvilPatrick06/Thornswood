@@ -134,6 +134,10 @@ its own system.
 | Emotes | [Emotes](systems/emotes.md) |
 | Text chat | [Text chat](systems/chat.md) |
 
+A friend request, a party invite, and a trade offer are answered on a
+prompt, with Accept and Refuse. The offer stands for 45 seconds. The
+emote wheel is eight quick slots and a searchable list.
+
 [Mixtures](systems/mixtures.md). The potions and poisons a lab may
 brew, by rank. Anything else is refused.
 

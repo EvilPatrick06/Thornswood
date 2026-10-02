@@ -376,6 +376,14 @@ if ($checkOut -notcontains 'STAGE OK') { Die 'the stage did not check out, so th
 # the roles, and not merely when the service says Running: a bot.py that fails
 # on import is running for a second at a time. A box with no service yet, on a
 # full run that is about to install it, has nothing to start or check here.
+#
+# StartIt is the only thing that starts the bot, and the swap block calls it
+# twice: once on the new files, and again on the old ones when the new ones
+# did not come up. Both go through Restart-ThornswoodBotService, which is
+# Stop-Service, the sweep, Start-Service, each said in a line of its own
+# (scripts\vps\Bot-Service.ps1). So a -CodeOnly run that ends either way
+# leaves the service started, and a run that could not start it says
+# 'THE SERVICE DID NOT START' with the reason.
 $botHooks = @"
 `$log = Get-ThornswoodBotLog '$rootWin'
 `$before = 0
@@ -392,7 +400,37 @@ function StopIt {
   }
   Stop-ThornswoodBotStrays '$rootWin'
 }
+# NOTHING HERE MAY NEED THE LOG TO BE THERE ALREADY. A box can have no
+# bot.log on it: one taken off by hand to get a clean read, a data folder that
+# went with a restore, or a bot that has never run here. Fresh opens it with
+# FileMode.Open, which finds nothing to open and hands back no lines, so with
+# nothing writing it Healthy waits out the whole of `$Wait, the swap puts the
+# old code back, waits `$Wait again, and Why says 'nothing yet' about a file
+# nobody had been told was missing. That is a -CodeOnly run that stops the bot
+# and ends red with no reason given, which is what this is here for.
+#
+# The folder is put right first: the service opens its log before it starts
+# python, so a data folder that is not there, or that its account cannot
+# write, is a service that does not start at all (Repair-ThornswoodBotData,
+# scripts\vps\Bot-Service.ps1). Then an empty log at the path the service
+# writes, which is data\bot.log since #1104 by Get-ThornswoodBotLog's rule, so
+# a box whose service program is older keeps the one beside the code and
+# nothing is made. The service opens its log with FileMode.Append and writes
+# into an empty file as it is (BotService.cs), and the file takes the data
+# folder's rules, so this changes nothing about what the bot may write.
+#
+# Where the log is already there this does nothing at all, and the byte-offset
+# read below is the same as it has been.
+function MakeLog {
+  if (Test-Path -LiteralPath `$log) { return }
+  Repair-ThornswoodBotData -Root '$rootWin' -Name '$Service'
+  `$dir = Split-Path -Parent `$log
+  if (`$dir -and -not (Test-Path -LiteralPath `$dir)) { 'COULD NOT MAKE ' + `$dir + ', so this start has nowhere to write its log'; return }
+  try { [IO.File]::WriteAllText(`$log, ''); 'there was no bot.log here, so an empty one is made for this start to write into: ' + `$log }
+  catch { 'COULD NOT MAKE ' + `$log + ': ' + `$_.Exception.Message }
+}
 function StartIt {
+  MakeLog
   `$script:before = 0
   if (Test-Path -LiteralPath `$log) { `$script:before = (Get-Item -LiteralPath `$log).Length }
   if (`$hasService) { Restart-ThornswoodBotService -Name '$Service' -Root '$rootWin' }
@@ -434,6 +472,10 @@ function Answer {
 }
 function Why {
   '--- what the bot said this time ---'
+  if (-not (Test-Path -LiteralPath `$log)) {
+    'there is no ' + `$log + ' to read, so nothing was written at all. Since #1104 the bot''s log is in the data folder under its own folder, not beside the code.'
+    return
+  }
   `$said = @(Fresh | Where-Object { `$_ -match '^\s*\[(thornswood-bot|run|service)\]' -or `$_ -match 'Error|Traceback' })
   if (`$said.Count) { `$said | Select-Object -Last 25 } else { 'nothing yet' }
 }

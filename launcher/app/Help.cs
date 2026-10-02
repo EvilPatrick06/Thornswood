@@ -113,20 +113,20 @@ namespace Thornswood
                 "Hold V to talk, or press O to keep the microphone open until you press O again, for a song or a long speech. Voice runs in the launcher rather than in the game, so leave the launcher open while you play; it minimises by itself. B steps your voice between a whisper, which carries about 7 metres, your normal voice, about 30 metres, and a yell, about 85 metres. The further away somebody is standing, the quieter you are to them. If nobody can hear you, check that the launcher is still open and that Windows has not given your microphone to something else."),
 
             new HelpItem("Chat and commands", "Friends and trading",
-                "Look at somebody and press Y to ask them to be friends, H to offer a trade, or L to stop hearing them. Those three only work with somebody under your crosshair. /yes and /no answer whatever somebody has asked you. Your friends are on the P panel, and friends are kept."),
+                "Look at somebody and press Y to ask them to be friends, H to offer a trade, or L to stop hearing them. Those three only work with somebody under your crosshair. A request shows on their screen with Accept and Refuse, and it stands for forty five seconds. Your friends are on the P panel, and friends are kept. On that panel, Mute stops their voice, Text stops their lines in the chat, and Name hides the name above their head. Hide every name does that for everyone."),
 
             // The two party items came from main (entry 336, #281).
             // tests\test-help-parties.js finds them by what they are about
             // and holds every number, key and command in them to the gamemode,
             // the plugin and the P panel.
             new HelpItem("Chat and commands", "Parties",
-                "P, unless you have moved it on the Controls page, opens your friends and your party. To bring somebody in, press Enter and type /party and their name, or press Ask to party beside a friend who is online. They have forty five seconds to say /yes or /no, or to press Yes or No on their own P panel. A party holds up to six. /party on its own says who is in yours, and /party leave takes you out. Logging out takes you out too, and every party ends when the server restarts."),
+                "P, unless you have moved it on the Controls page, opens your friends and your party. To bring somebody in, press Enter and type /party and their name, or press Ask to party beside a friend who is online. They have forty five seconds to press Accept or Refuse on the prompt. A party holds up to six. /party on its own says who is in yours, and /party leave takes you out. Logging out takes you out too, and every party ends when the server restarts. The leader sees Kick and Lead beside each other person, and Disband. Everyone else sees Leave."),
 
             new HelpItem("Chat and commands", "Finding your party",
                 "Everybody in your party has their name in green above their head, a marker on your map, and an arrow on a strip under your compass with how far away they are. Green on the strip means the same place as you, gold means somewhere else. You cannot fast travel to the marker. Work done with somebody from your party in the same place counts 15 per cent more."),
 
             new HelpItem("Chat and commands", "Journals",
-                "J opens your journals and their pages. You can share a whole journal, or one page of it, with a friend."),
+                "J opens your journals and their pages. You can type a title and a page. You can share a whole journal, or one page of it, with a friend, including one who is not online. They see a shared page while you are in the world."),
 
             // Issue #414: the asking staff block at the end of gamemode.js.
             new HelpItem("Chat and commands", "Getting staff: /helpme and /report",
@@ -140,10 +140,10 @@ namespace Thornswood
 
             // ====================================================== emotes
             new HelpItem("Emotes", "The wheel",
-                "G opens a wheel of six groups: Greeting, Praise, Gesture, Devotion, Labour and Revelry, 34 emotes between them. Click a group or press its number, then click an emote or press its number. Tab moves to the next group, and Escape or the middle of the wheel steps back out. Everybody else sees what you play."),
+                "G opens a wheel of 59 emotes. Eight quick slots sit in the middle: click one, or press 1 to 8 with the wheel shut. The rest of the list is on the right, in alphabetical order, with a search. Tab moves to that search. The middle stands you up, and Escape closes the wheel. Everybody else sees what you play."),
 
             new HelpItem("Emotes", "Getting out of one",
-                "Some have no natural end, particularly the kneeling and leaning ones. N stands you up out of whatever you are stuck in, with the wheel shut. With the wheel open on its groups, the middle of it stands you up as well."),
+                "Some have no natural end, particularly the kneeling and leaning ones. N stands you up out of whatever you are stuck in, with the wheel shut. With the wheel open, the middle of it stands you up as well."),
 
             // ================================================== the mods
             new HelpItem("The mods", "Where they come from",

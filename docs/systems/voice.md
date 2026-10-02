@@ -27,7 +27,8 @@ blue. Ordinary is white. Yell is amber. A party name stays green, on
 [Party](party.md).
 
 The mark is its own mark, above the name. It does not recolor the
-name.
+name. A friend request, a party invite, or a trade offer is a
+different prompt, with Accept and Refuse. It is not this mark.
 
 You see it only when you are inside that person's range. A whisper
 is gone at 7 metres, ordinary speech at 30, a yell at 85. Outside
@@ -94,12 +95,27 @@ does not lift a silence.
 ## Where this is
 
 The three distances, V, O, B, and the voice mute are in the server.
-The microphone is the launcher's. The voice mute sets the level to
-nothing on your machine. It is not a mute the server enforces on the
-sound, and it does not touch text.
+The microphone is the launcher's. A voice mute sets the level to
+nothing on your machine. The sound goes from machine to machine, so
+the server cannot stop it for you alone without also stopping it for
+them, and a personal mute does not tell the other person. Staff
+silence is the moderation tool: the service tells every client to
+close that microphone and to hear nothing from them.
 
-The mark above the head is not in the world. The launcher draws its
-own speaking light, and that light is not above a head and is not
-colored by the distance. Text mute, hiding a name, hiding every
-name, and saving those are not in the server. `/mute` is voice only.
-P has one Mute button, on friends. `/silence` is not a command.
+Text mute is remembered on the character, and the chat service drops
+those lines for the person who turned them off. Hiding a name, and
+hiding every name, are remembered too, and the name tag is drawn
+clear. P lists Mute, Text, and Name for each friend, and Hide every
+name for the whole list.
+
+The mark above the head is drawn while the microphone is open. It
+sits above the name, and it does not recolor the name. Whisper is
+pale blue and gone at 7 metres, ordinary speech is white and gone at
+30, and a yell is amber and gone at 85. Same cell first. You do not
+see it on your own head. A voice mute hides it. Hiding a name does
+not, and neither does turning their text off. The launcher still
+draws its own speaking light.
+
+Staff `/silence` stops their voice, what they type, the words above
+the head, and the speaking mark for everybody. It does not hide
+their name.

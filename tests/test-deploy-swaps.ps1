@@ -35,6 +35,11 @@
   and the old version answering again; and -PutBack puts the previous version
   back and keeps what it took out in .undone.
 
+  For the bot it also proves that a box with no bot.log on it is not a failed
+  swap: the log the health check reads is made in front of the start, the
+  service is started, and the new code stays in, rather than being put back
+  after two waits on a file nothing could write.
+
   And issue #1121, Patrick, 29 Sep: a deploy sends a commit or nothing. Each
   of Deploy-Docs, Install-Voice, Install-Bot, Deploy-DevGamemode,
   Deploy-Server and Publish-Server, run with a file it would send changed,
@@ -446,6 +451,7 @@ Put (Join-Path $repo 'site\public\home.html') 'home one'
 Put (Join-Path $repo 'site\public\robots.txt') 'robots'
 Put (Join-Path $repo 'site\data\help.md') 'help'
 Put (Join-Path $repo 'site\data\site\about.md') 'about'
+Put (Join-Path $repo 'voice\headlines.js') "module.exports = {};`n"
 Put (Join-Path $repo 'voice\public\index.html') 'voice page'
 Put (Join-Path $repo 'voice\public\voice.js') 'voice script'
 Put (Join-Path $repo 'bot\card.py') 'CARD = 1'
@@ -704,10 +710,14 @@ try {
     foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') { Copy-Item -LiteralPath (Join-Path $repo "bot\$f") -Destination (Join-Path $botRoot $f) -Force }
     Put (Join-Path $botRoot 'bot.env.json') '{ "DISCORD_TOKEN": "not a token" }'
     $bq = $botRoot.Replace("'", "''")
-    Put (Join-Path $botRoot 'run.ps1') ("Set-Location -LiteralPath '" + $bq + "'`r`nwhile (`$true) {`r`n  & cmd /c ""python """"" + $botRoot + "\bot.py"""" >> """"" + $botRoot + "\bot.log"""" 2>&1""`r`n  Start-Sleep -Seconds 2`r`n}`r`n")
+    # bot.log in the data folder under the bot's, where the service writes it
+    # since #1104 and where Get-ThornswoodBotLog looks for it first.
+    $botLog = Join-Path $botRoot 'data\bot.log'
+    $null = [IO.Directory]::CreateDirectory((Join-Path $botRoot 'data'))
+    Put (Join-Path $botRoot 'run.ps1') ("Set-Location -LiteralPath '" + $bq + "'`r`nwhile (`$true) {`r`n  & cmd /c ""python """"" + $botRoot + "\bot.py"""" >> """"" + $botLog + """"" 2>&1""`r`n  Start-Sleep -Seconds 2`r`n}`r`n")
     # The service ThornswoodTestBot, standing in for ThornswoodBot (#465).
     Task 'ThornswoodTestBot' 'powershell.exe' ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $botRoot + '\run.ps1"') $botRoot
-    function BotSays([string]$v) { return ((Get (Join-Path $botRoot 'bot.log')) -match [regex]::Escape($v + ' watching')) }
+    function BotSays([string]$v) { return ((Get $botLog) -match [regex]::Escape($v + ' watching')) }
     # The site's data\for-bot, which Install-Bot waits for before it sends the
     # bot (#1102): a site that has not made it yet is refused below.
     $siteForBot = Join-Path $box 'Thornswood-Docs'
@@ -760,6 +770,26 @@ try {
     $failed = $script:fail
     Yes 'Install-Bot -PutBack puts the previous code back, and it comes up' ($r.Ok -and (Get (Join-Path $botRoot 'bot.py')) -match 'bot v1' -and $r.Said -match 'SWAP OK')
     Yes '  and the store no longer names the code it took out' ((Current 'thornswood-bot').name -eq 'an older copy kept before deploys were recorded')
+    if ($script:fail -gt $failed) { Show }
+
+    # The bot down and no bot.log on the box: one taken off by hand to get a
+    # clean read, or a data folder that went with a restore. The health check
+    # reads the log from a byte offset, so with no file to open it used to
+    # wait out the whole of -Wait, put the code back, wait it out again and
+    # end red, which is a -CodeOnly run that stops the bot and never says
+    # why. The log is made in front of the start now.
+    $null = RunWrapped "Stop-Service -Name 'ThornswoodTestBot'`r`n"
+    foreach ($p in @(Get-CimInstance Win32_Process -EA SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($botRoot) })) {
+        if ($p.ProcessId -ne $PID) { Stop-Process -Id $p.ProcessId -Force -EA SilentlyContinue }
+    }
+    $gone = WaitFor { Remove-Item -LiteralPath $botLog -Force -EA SilentlyContinue; -not (Test-Path -LiteralPath $botLog) }
+    Bot 'bot v5'
+    $r = Deploy 'Install-Bot.ps1' $bot.Clone()
+    $failed = $script:fail
+    Yes 'Install-Bot -CodeOnly: with the bot stopped and no bot.log anywhere, an empty one is made and the new code is swapped in' (
+        $gone -and $r.Ok -and $r.Said -match 'SWAP OK' -and $r.Said -match 'there was no bot\.log here')
+    Yes '  and the service was started, and the new bot says it is watching' (
+        $r.Said -match 'started the service ThornswoodTestBot' -and (WaitFor { BotSays 'bot v5' }))
     if ($script:fail -gt $failed) { Show }
 
     # ======================================================= the dev server
