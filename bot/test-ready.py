@@ -51,6 +51,28 @@ class Guild(object):
         self.name = name
 
 
+class Cmd(object):
+    """
+    One command in the tree.
+
+    A group is a Cmd given children, and it holds them in `commands`, the
+    name discord.py's Group uses. A plain command has no such attribute at
+    all, the same as a real Command, so the walk is proved against both.
+    """
+
+    def __init__(self, name, children=()):
+        self.name = name
+        if children:
+            self.commands = [command(c) for c in children]
+
+
+def command(spec):
+    """A name is a plain command; (name, [children]) is a group."""
+    if isinstance(spec, tuple):
+        return Cmd(spec[0], spec[1])
+    return Cmd(spec)
+
+
 class Tree(object):
     """
     The command tree, counting instead of calling Discord.
@@ -61,13 +83,13 @@ class Tree(object):
     """
 
     def __init__(self, names):
-        self._names = names
+        self._commands = [command(n) for n in names]
         self.copied = 0
         self.synced = 0
         self.cleared = 0
 
     def get_commands(self):
-        return [type('C', (object,), {'name': n})() for n in self._names]
+        return list(self._commands)
 
     def copy_global_to(self, guild=None):
         self.copied += 1
@@ -94,6 +116,16 @@ def run(names, guilds, force=0):
     finally:
         bot.tree, bot.client, bot.FORCE_SYNC = was_tree, was_client, was_force
     return tree
+
+
+def fingerprint(names):
+    """What the stamp would hold for that tree, without registering anything."""
+    was_tree = bot.tree
+    bot.tree = Tree(names)
+    try:
+        return bot._command_names()
+    finally:
+        bot.tree = was_tree
 
 
 TMP = tempfile.mkdtemp(prefix='thornswood-ready-')
@@ -124,6 +156,59 @@ try:
     fifth = run(['roll', 'close'], HOME)
     yes('the same commands in a different order are the same commands',
         fifth.synced == 0)
+
+    # ------------------------------------- a subcommand under a group --
+    #
+    # /live-smoke report was merged, deployed with Install-Bot.ps1 -CodeOnly,
+    # and never reached the picker: the stamp held top level names only, so a
+    # new child of a group that was already registered left it identical and
+    # the start skipped the sync. It took FORCE_COMMAND_SYNC to put the
+    # subcommand there, which is not something a deploy should need.
+    GROUP = ('live-smoke', ['start', 'reset', 'refresh'])
+    GROUP_PLUS = ('live-smoke', ['start', 'reset', 'refresh', 'report'])
+
+    yes('a group is named with each of its children under it',
+        fingerprint(['close', GROUP])
+        == ['close', 'live-smoke', 'live-smoke refresh', 'live-smoke reset',
+            'live-smoke start'])
+
+    yes('A CHILD ADDED TO A GROUP CHANGES THE LIST, which is the bug this is '
+        'for', fingerprint([GROUP]) != fingerprint([GROUP_PLUS]))
+
+    yes('and the child it gained is the difference',
+        sorted(set(fingerprint([GROUP_PLUS])) - set(fingerprint([GROUP])))
+        == ['live-smoke report'])
+
+    yes('a group inside a group is named the whole way down',
+        'live-smoke rows show'
+        in fingerprint([('live-smoke', [('rows', ['show'])])]))
+
+    # The stamp is read back as whatever json held, so every name in it has to
+    # be a string and the list has to be in one order whatever the tree's is.
+    jumbled = fingerprint([GROUP_PLUS, 'close'])
+    yes('the list is sorted and the same however the tree hands them over',
+        jumbled == sorted(jumbled) and fingerprint(['close', GROUP_PLUS]) == jumbled)
+    yes('and every name in it is a string, so the stamp is json it can read',
+        all(isinstance(n, str) for n in jumbled))
+
+    grouped = run(['close', GROUP], HOME)
+    yes('a group registers like anything else', grouped.synced == 2)
+    again = run(['close', GROUP], HOME)
+    yes('and a restart with the same group registers nothing', again.synced == 0)
+    gained = run(['close', GROUP_PLUS], HOME)
+    yes('ADDING A SUBCOMMAND REGISTERS AGAIN, with no FORCE_COMMAND_SYNC and '
+        'no deleting the stamp by hand', gained.synced == 2)
+    settled = run(['close', GROUP_PLUS], HOME)
+    yes('and then stops again', settled.synced == 0)
+
+    lost = run(['close', GROUP], HOME)
+    yes('a subcommand taken away registers again too', lost.synced == 2)
+
+    # What goes in the file and what comes back out of it have to be the same
+    # list, or every start after this one registers again.
+    wrote, _ = bot._stamp_read()
+    yes('the stamp holds what was registered, children and all',
+        wrote == fingerprint(['close', GROUP]))
 
     # ---------------------------------------------------- a second server
     both = [Guild(1, 'Thornswood'), Guild(2, 'Thornswood dev')]
@@ -214,6 +299,19 @@ try:
     broken = Message(bot.PANEL, live)
     broken.components = None
     yes('and so is one with nothing there at all', not bot.panel_is_current(broken))
+
+    # ------------------------------------------- the tree this bot has --
+    #
+    # Nothing above touches the real tree, so read it here: the names the next
+    # start will write down are the ones a person sees in the picker.
+    real = bot._command_names()
+    yes('the real tree names /close', 'close' in real)
+    yes('and the live smoke group', 'live-smoke' in real)
+    yes('AND EACH OF ITS SUBCOMMANDS, report among them, so the deploy that '
+        'added one would have synced',
+        [n for n in real if n.startswith('live-smoke ')]
+        == ['live-smoke refresh', 'live-smoke report', 'live-smoke reset',
+            'live-smoke start'])
 
     # ------------------------------------- the views are not in on_ready --
     src = open(os.path.join(HERE, 'bot.py'), encoding='utf-8').read()
