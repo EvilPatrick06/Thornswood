@@ -104,7 +104,9 @@ yes as a death.
 ## Where this is
 
 The book, the points, the tomes, and the three gates are in the
-server. `collegeSemester` is 2 and `outsiderSemester` is 1, and
+server. A dungeon chest can put a tome in the pack. Reading it still
+has to pass the three gates. See [Dungeon loot](dungeon-loot.md).
+`collegeSemester` is 2 and `outsiderSemester` is 1, and
 neither is applied: there is no `/study` and no test that you are
 in the College.
 
