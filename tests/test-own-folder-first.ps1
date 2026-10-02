@@ -22,7 +22,7 @@
        Setup-Thornswood.ps1 puts the payload in Profile\Payload and writes
        nothing into the Steam copy and no installed-into-game list; the
        launcher's first start (Leaks, Thornswood.ini, Keep, the client
-       settings, the preset names, the checks, a pack, Fix's plugin restore,
+       settings, the checks, a pack, Fix's plugin restore,
        Scan) writes into Payload and never into the Steam copy; Steam's Updates
        setting is looked at; Make builds Root\Game with the game, Vortex's files
        and everything from Payload, and removes Payload; after the restart the
@@ -511,7 +511,6 @@ namespace Thornswood
             Keep.Unpark();
             Keep.Seed();
             AutoJoin.Ensure(say);
-            Files.FixPresetNames();
             if (pack != null)
             {
                 var p = new Pack();
