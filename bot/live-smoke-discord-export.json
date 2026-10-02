@@ -21,7 +21,13 @@
     "privacy_deploy_ok_if_must_holds": true,
     "owner_call_named_pass_fail_visible_in_thread": true,
     "hold_discord_posts_until_admin_role_set": false,
-    "discord_hold_lifted": true
+    "discord_hold_lifted": true,
+    "player_facing_no_github_refs": true,
+    "discord_show_tickets": false,
+    "tickets_are_dev_staff_only": true,
+    "discord_post_checklist_items_only": true,
+    "discord_no_top_bottom_blocks": true,
+    "discord_keep_updated_versioning": true
   },
   "session": {
     "title_format": "Live smoke {YYYY-MM-DD} {settings_version}",
@@ -33,12 +39,15 @@
     "admin_roles_default": [
       "Owner",
       "Dev",
-      "Lead GM",
-      "Lead Gamemaster"
+      "Lead Gamemaster",
+      "Lead GM"
     ],
-    "admin_roles_note": "Patrick locked: Owner + Dev + Lead GM. Mosby bot default also matches Lead Gamemaster. LIVE_SMOKE_ADMIN_ROLES env overrides. Map to current names after scrub.",
+    "admin_roles_note": "Patrick canonical Discord: Owner + Dev + Lead Gamemaster. Bot also matches alias Lead GM. LIVE_SMOKE_ADMIN_ROLES env overrides.",
     "pathfind_current_roles_only": true,
-    "admin_locked": true
+    "admin_locked": true,
+    "discord_body": "checklist_items_only",
+    "version_stamp": "Checklist updated: {updated}",
+    "version_stamp_note": "Prefer stamp in thread/session title or as a single short line above items if the bot needs a version anchor. Never restore old how-to / marks / out-of-scope top or bottom blocks."
   },
   "marks": [
     "Pass",
@@ -50,74 +59,74 @@
     {
       "id": "live-1",
       "order": 1,
-      "label": "Chat fade / needs Settings",
+      "label": "Chat fade in Settings",
       "tickets": [
         381
       ],
       "skip_rule": null,
-      "discord_line": "Chat fades or you can turn that on in Settings."
+      "discord_line": "Do: open Settings and find the chat fade option. Turn it on if it is off, send a few chat lines, then wait. Pass: chat text fades after a short time, or you can clearly turn that fade on and off. If stuck: ask staff which Settings screen holds chat fade on this build."
     },
     {
       "id": "live-2",
       "order": 2,
-      "label": "Double craft after respawn",
+      "label": "Craft the same thing twice after you respawn",
       "tickets": [
         517
       ],
-      "skip_rule": "Skip if no forge on the live channel under test.",
-      "discord_line": "After respawn, craft the same recipe twice when you have materials for two. Both outputs stay and both crafts show in server log. Skip if this live channel has no forge."
+      "skip_rule": "Skip if this live world has no forge you can use.",
+      "discord_line": "Do: after you respawn, stand at a forge with enough materials for two of the same craft. Craft that recipe once, then craft it again. Pass: you keep both finished items in your inventory (nothing silently vanishes). If stuck: ask staff which simple recipe to use. Skip: use Skip if this live world has no forge."
     },
     {
       "id": "live-3",
       "order": 3,
-      "label": "Door Discord apply wording",
+      "label": "Door tells you to apply on Discord",
       "tickets": [
         999,
         428
       ],
       "skip_rule": null,
-      "discord_line": "Unaccepted Discord account gets the apply message and a usable Discord invite open action."
+      "discord_line": "Do: try to join with a Discord account that is not accepted yet (staff can hand you a test account if you do not have one). Pass: you see the apply message, and there is a working action that opens the Discord invite. If stuck: ask staff for an unaccepted test login; do not invent accounts."
     },
     {
       "id": "live-4",
       "order": 4,
-      "label": "Interim launcher speaking light",
+      "label": "Speaking light on the launcher",
       "tickets": [
         1396
       ],
       "skip_rule": null,
-      "discord_line": "Launcher shows the interim speaking light (not the voice head mark)."
+      "discord_line": "Do: join voice the normal way through the launcher, then speak. Pass: the launcher shows a speaking light while you talk. This row is only that light, not any mark over your character's head. If stuck: confirm voice is connected in the launcher before you mark Fail."
     },
     {
       "id": "live-5",
       "order": 5,
-      "label": "Purse once, player trade, fail-loud mint",
+      "label": "Starting gold, player trade, no free extra gold",
       "tickets": [
         505,
         517
       ],
       "skip_rule": null,
-      "discord_line": "Starting purse is 40 gold once per character. Player trade moves pack gold. Second mint or phantom craft gold fails loud. Do not test trader stock."
+      "discord_line": "Do three checks on a character: (1) starting gold is 40 the first time only; (2) trade gold with another player and both packs update; (3) trying to grab a second free starter purse, or gold from a craft that should not pay gold, fails with a clear error you can see. Pass: all three behave that way. Do not test buying from traders on this row. If stuck: ask staff for a second player or a safe craft that must not pay gold."
     },
     {
       "id": "live-6",
       "order": 6,
-      "label": "Server craft gate refuse reason",
+      "label": "Refused craft keeps your materials",
       "tickets": [
         1402
       ],
       "skip_rule": null,
-      "discord_line": "A refused craft keeps materials and shows a clear server reason. Do not Pass recipe visibility without the perk."
+      "discord_line": "Do: try a craft the game should refuse (staff will name one if you are unsure). Pass: your materials stay, and you see a clear reason it was refused. Do not mark Pass only because a recipe is hidden without a perk. If stuck: ask staff which refuse case to try on this live world."
     },
     {
       "id": "live-7",
       "order": 7,
-      "label": "K panel profession / half main path",
+      "label": "K panel shows profession and half",
       "tickets": [
         509
       ],
       "skip_rule": null,
-      "discord_line": "K panel shows profession and half for a current-rulebook character on the main path."
+      "discord_line": "Do: open the K panel on a normal character made under the current rules (not an old leftover character unless staff says it is fine). Pass: you can see your profession and your half. If stuck: ask staff which character to use on this live world."
     }
   ],
   "keep_off": [
@@ -150,5 +159,11 @@
     "create_new": true,
     "do_not_rename": "test-these",
     "note": "test-these was deleted in cleanup script; create new Test-Tasks. Pathfind against current roles after role/perms churn."
+  },
+  "rules_note": "Djinn 2026-10-01: (1) playtesters have no GitHub - never append Tickets/#/PR to #test-tasks. (2) Discord post/body = checklist items only; remove previous top and bottom blocks. (3) Keep date-changed / last-updated versioning (export.updated + session title). Bot posts one message per items[] (label + discord_line + skip_rule when set). tickets[] stay in JSON for Dev/harness only.",
+  "versioning": {
+    "export_updated": "updated",
+    "session_title_has_date_and_settings": true,
+    "note": "Djinn layout 2026-10-01: Discord post/body is checklist items only. No previous top or bottom instruction blocks. Keep date-changed / last-updated for versioning via export.updated and session title (Live smoke YYYY-MM-DD Settings version). Do not put GitHub refs on live set."
   }
 }
