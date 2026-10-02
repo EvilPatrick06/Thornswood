@@ -85,8 +85,12 @@ It is not this text.
 `/w`, and `/s` are local too, whether or not the plain-line switch is
 on. They are not sent on to the game server.
 
-Plain speech in the box still goes to everybody while that switch is
-off. The line above the head is local either way: 4000 units for a
+Plain speech in the box is local on the dev voice service: the same
+cell, 4000 units, the same reach as the line above the head. The
+switch still exists. Left unset, a plain line still goes to
+everybody, which is how the live voice service is left.
+
+The line above the head is local either way: 4000 units for a
 plain line, a `/me`, a `/do`, and an `/ooc`, 1000 for a whisper, and
 12000 for a shout. Same cell first. One line, 6 seconds, cut at 80
 characters. You see your own. Text mute hides it in the box and
