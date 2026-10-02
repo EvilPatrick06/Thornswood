@@ -167,6 +167,11 @@ function Invoke-Setup($fx, [bool]$own) {
 
 $made = New-Fixture 'made' $true
 Yes 'the content plugin starts as one file with the Steam copy' ([TsLinkProbe]::Same((Join-Path $made.Game 'Data\Thornswood-Content.esp'), (Join-Path $made.Steam 'Data\Thornswood-Content.esp')))
+# Same size and the same timestamp is the case robocopy leaves alone. The
+# repair still has to put the payload's bytes down.
+$frontThere = Join-Path $made.Game 'Data\Platform\Plugins\thornswood-front.js'
+$frontPay = Join-Path (Split-Path -Parent $made.Setup) 'payload\Data\Platform\Plugins\thornswood-front.js'
+(Get-Item -LiteralPath $frontThere).LastWriteTimeUtc = (Get-Item -LiteralPath $frontPay).LastWriteTimeUtc
 $r = Invoke-Setup $made $false
 $misses = @($r.Out | Where-Object { $_ -match '\[MISS\]' })
 $onlyLauncher = ($misses.Count -eq 1 -and $misses[0] -match 'Launcher')

@@ -649,16 +649,21 @@ public static class TsLinkCount {
 }
 '@
     }
+    # Every name the payload is about to replace comes off first. A hard link
+    # would take the write through to its other name. A normal file of the
+    # same size and timestamp is one robocopy would leave alone, so the old
+    # bytes would stay. Either way the name is gone and the copy that follows
+    # is this folder's own file.
     $pfx = $from.TrimEnd('\') + '\'
     $n = 0
     foreach ($f in @(Get-ChildItem -LiteralPath $from -Recurse -File -Force -ErrorAction SilentlyContinue)) {
         $rel = $f.FullName.Substring($pfx.Length)
         $dest = Join-Path $to $rel
         if (-not (Test-Path -LiteralPath $dest -PathType Leaf)) { continue }
-        if ([TsLinkCount]::Count($dest) -le 1) { continue }
+        $linked = [TsLinkCount]::Count($dest) -gt 1
         [IO.File]::SetAttributes($dest, [IO.FileAttributes]::Normal)
         [IO.File]::Delete($dest)
-        $n++
+        if ($linked) { $n++ }
     }
     if ($n) { Say ("  {0} linked file(s) separated, so the copy does not write through them" -f $n) 'DarkGray' }
 }

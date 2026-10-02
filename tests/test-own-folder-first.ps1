@@ -929,7 +929,7 @@ Yes 'a sync keeps the release''s file list before it says it is on that release,
     ($syncSrc -match '(?s)WriteReleaseFiles\(r, listed\);\s*state = ReadSyncState\(\);\s*state\.Synced = r\.sha256;') -and
     ($syncSrc -match 'if \(\(s\.Synced == r\.sha256 && ReleaseFilesSha\(\) == r\.sha256\) \|\| s\.PacksOnly == r\.sha256\) return null;'))
 $setup = [IO.File]::ReadAllText($SetupScript)
-Yes 'Setup-Thornswood.ps1 writes the installed-into-game list only when the Steam copy is used' ($setup -match 'if \(\$Collection -and -not \$OwnFirst\) \{\s*\$listed')
+Yes 'Setup-Thornswood.ps1 writes the installed-into-game list only when the Steam copy is used' ($setup -match 'if \(\$Collection -and -not \$OwnFirst -and -not \$MadeOwn\) \{\s*\$listed')
 
 try { Remove-Item -LiteralPath $T -Recurse -Force } catch { Write-Host "      (scratch left at $T)" }
 Done
