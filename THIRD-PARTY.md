@@ -94,7 +94,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `663686af` (in full, `663686af61140cb8fca068c1d269e7ecbeec0427`). That
+commit `6725fc77` (in full, `6725fc778a99b2cf344426afb8158df500b7ad6f`). That
 is upstream skyrim-multiplayer/skymp at `f926944b` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -103,7 +103,7 @@ recorded build.
 For this pin, MpClientPlugin was relinked against the canonical native archive.
 The other five runtime files are verified unchanged artifacts whose source and
 build inputs are identical to the previous pin. Their hashes and validation
-are recorded in `records\client-provenance-663686af.md`.
+are recorded in `records\client-provenance-6725fc77.md`.
 
 | File | Built from, in the fork | Licence |
 |---|---|---|
@@ -393,10 +393,10 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`. That record names `skymp5-server` in the fork at
-  `663686af61140cb8fca068c1d269e7ecbeec0427`, the same commit
+  `6725fc778a99b2cf344426afb8158df500b7ad6f`, the same commit
   `records\client-build.json` names and the repository pins (issue #1200), and
   it is AGPL-3.0. The record hashes the build of that commit as
-  `41f3a8d5acf587b2b134076602785a960b5aece978021fd11c676650a4c42a4c`, built 2026-10-01T05:24:52Z, and `Deploy-Server.ps1` refuses any module
+  `37d5bc5de33de11086b1180dcb1e8b64638398bf18c502541025133548ecd8a9`, built 2026-10-02T01:39:16Z, and `Deploy-Server.ps1` refuses any module
   whose sha256 the record does not name. It goes to the dev server first. Until
   a live server release sends it, the live server runs the build of the
   earlier commit `d00063515242e0ad1a9affb690c83194acf2c937` on the same branch,
@@ -411,7 +411,7 @@ For the six client files and for the game server module running on the VPS, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, both built from one commit:
 
-https://github.com/EvilPatrick06/skymp/tree/663686af61140cb8fca068c1d269e7ecbeec0427
+https://github.com/EvilPatrick06/skymp/tree/6725fc778a99b2cf344426afb8158df500b7ad6f
 
 The game server module the live server runs until its next server release:
 

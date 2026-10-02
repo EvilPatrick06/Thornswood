@@ -230,15 +230,32 @@ if (social && trade) {
     // The page is where the silence actually happens.
     const voice = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-voice.js'), 'utf8');
     yes('the voice page takes a mute list', /setMuted: function/.test(voice));
-    /*
-      Matched on the mute and not on what the other branch happens to be. The
-      first version of this pinned the whole expression, `muted[...] ? 0 : 1`,
-      and broke the moment the distance work replaced the 1 with a level: the
-      mute was still correct and the check still failed. Pin the thing being
-      tested.
-    */
+    const placeSource = voice.match(/  function place\(\) \{[\s\S]*?\n  \}/);
+    if (!placeSource) { throw new Error('voice placement function missing'); }
+    const rec = { profileId: 102, gain: {}, panner: {}, mode: 'local' };
+    const muted = { 102: true }, hushed = {};
+    const who = {
+      101: { pos: [0, 0, 0], cell: 'Whiterun', angleZ: 0 },
+      102: { pos: [100, 0, 0], cell: 'Whiterun' }
+    };
+    const place = new Function('lastWho', 'cfg', 'ctx', 'conns', 'muted', 'hushed',
+      'setGain', 'hear', 'setPos', 'levelFor', 'draw', 'UNITS_PER_METRE',
+      placeSource[0] + '\nreturn place;')(
+        who, { profileId: 101 }, {}, new Map([[102, rec]]), muted, hushed,
+        (node, value) => { node.value = value; },
+        (connection, value) => { connection.hearing = value; },
+        () => {}, () => 0.75, () => {}, 70);
+    place();
     yes('and applies it to the gain node it already had',
-        /setGain\(rec\.gain, muted\[rec\.profileId\] \? 0 :/.test(voice));
+        rec.gain.value === 0 && rec.hearing === false);
+    delete muted[102];
+    place();
+    yes('unmuting restores the existing connection volume',
+        rec.gain.value === 0.75 && rec.hearing === true);
+    hushed[102] = true;
+    place();
+    yes('staff silence also closes that connection',
+        rec.gain.value === 0 && rec.hearing === false);
   }
 
   // --------------------------------------------------------------- parties

@@ -60,6 +60,29 @@ let ws = null, ctx = null, mic = null, myPeer = 0;
 /* Why the server last refused this page, '' when it has not. See onclose. */
 let deniedWhy = '';
 let muted = false;
+/* Staff silence, by profile id. It closes this page's microphone when it
+   is us, and it sets their level to nothing when it is somebody else. */
+let hushed = {};
+function noteHush(pid, on) {
+  pid = Number(pid) || 0;
+  if (!pid) return;
+  if (on) hushed[pid] = true;
+  else delete hushed[pid];
+}
+function noteRows(who) {
+  for (const k of Object.keys(who || {})) noteHush(k, !!(who[k] && who[k].hush));
+}
+function applyOwnMic() {
+  const live = !muted && !hushed[MY_PROFILE];
+  if (mic) mic.getAudioTracks().forEach(t => { t.enabled = live; });
+}
+function hear(rec, on) {
+  try {
+    rec.pc.getReceivers().forEach(r => {
+      if (r.track && r.track.kind === 'audio') r.track.enabled = !!on;
+    });
+  } catch (e) { }
+}
 let lastWho = {};
 const conns = new Map();   // peerId -> {pc, panner, gain, el, profileId, name, analyser, data}
 
@@ -98,7 +121,7 @@ el('join').onclick = async () => {
 
 el('mute').onclick = () => {
   muted = !muted;
-  if (mic) mic.getAudioTracks().forEach(t => { t.enabled = !muted; });
+  applyOwnMic();
   el('mute').textContent = muted ? 'Unmute' : 'Mute';
 };
 
@@ -152,10 +175,13 @@ function connect() {
     if (m.t === 'peers') { reconcile(m.peers); return; }
     // The whole view first, then only what moved and who left it (issue
     // #482; the note over the tick in voice-server.js).
-    if (m.t === 'pos') { lastWho = m.who || {}; place(); return; }
+    if (m.t === 'hush') { noteHush(m.profileId, m.on); applyOwnMic(); place(); return; }
+    if (m.t === 'pos') { lastWho = m.who || {}; noteRows(lastWho); applyOwnMic(); place(); return; }
     if (m.t === 'moved') {
       for (const k of Object.keys(m.who || {})) lastWho[k] = m.who[k];
       for (const id of (m.gone || [])) delete lastWho[id];
+      noteRows(m.who || {});
+      applyOwnMic();
       place();
       return;
     }
@@ -426,6 +452,10 @@ function place() {
 
   for (const [, rec] of conns) {
     const them = lastWho[rec.profileId];
+    if (hushed[rec.profileId] || (them && them.hush)) {
+      setGain(rec.gain, 0); hear(rec, false); rec.dist = null; continue;
+    }
+    hear(rec, true);
     if (!them || !them.pos || !me.pos) { setGain(rec.gain, 0); rec.dist = null; continue; }
 
     // A wall is not a distance. Different cell, no sound, whatever the maths says.

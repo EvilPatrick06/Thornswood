@@ -59,7 +59,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -266,8 +266,10 @@ function lineClosed(me) {
   Who staff have silenced, profile -> until (ms), set whole by the gamemode's
   /silence over loopback (POST /silenced, #412). Their plain lines, /me, /do,
   /w and /s reach nobody until then; their slash commands still go to the game
-  server, which refuses /ooc and /roll from them itself. Kept in this process
-  only: the gamemode sends the whole list again every thirty seconds.
+  server, which refuses /ooc and /roll from them itself. The same list closes
+  the microphone: every connection is told {t:'hush'}, and the position row
+  carries hush so a client that joins later still hears nothing. Kept in this
+  process only: the gamemode sends the whole list again every thirty seconds.
 */
 const silenced = new Map();
 /* Personal text mutes: listener profile -> set of speaker profiles. The
@@ -283,9 +285,28 @@ const SILENCED_TOLD_EVERY_MS = 10000;
 function silencedLeft(profileId, now) {
   const pid = Number(profileId) || 0;
   const until = silenced.get(pid);
-  if (!until) return 0;
-  if (now >= until) { silenced.delete(pid); return 0; }
+  if (!until || now >= until) return 0;
   return until - now;
+}
+
+/* Staff silence is a moderation tool, so every connection is told, including
+   people who are not in earshot: a connection opened earlier still carries
+   sound until the microphone is closed and the listener's level is nothing. */
+function tellHush(profileId, on) {
+  const msg = { t: 'hush', profileId: Number(profileId) || 0, on: !!on };
+  if (!msg.profileId) return;
+  for (const [, p] of peers) {
+    try { p.ws.send(msg); } catch (e) { }
+  }
+}
+
+function sweepSilenced(now) {
+  for (const [pid, until] of Array.from(silenced.entries())) {
+    if (now >= until) {
+      silenced.delete(pid);
+      tellHush(pid, false);
+    }
+  }
 }
 
 /* ------------------------------------------------------------- chat log ---
@@ -370,24 +391,22 @@ chatPrune();
  * went to every socket on the server, and /ooc, the one line that is meant to
  * step out of the scene, was the only one kept to the people near it.
  *
- * THORNSWOOD_CHAT_RANGE decides, and it ships OFF:
+ * THORNSWOOD_CHAT_RANGE decides who a PLAIN line in the box reaches:
  *
- *   unset, off, 0   every line to everybody, exactly as before. /me, /do, /w
- *                   and /s are not caught here and go on to the game server
- *                   like any other slash
- *   on              the same cell and 4000 units, the range /ooc already
- *                   uses (OOC_RANGE in gamemode.js)
+ *   unset, off, 0   a plain line goes to every socket. The dev voice service
+ *                   is installed with on. Live is left unset, so a later
+ *                   install of live does not make plain speech local there.
+ *   on              the same cell and 4000 units
  *   a number        the same cell and that many units
  *
- * Off by default because whether plain text is local is Patrick's call and
- * has not been made, and a setting that ships off can go out in any release
- * without changing anybody's evening. Anything that is not on or a positive
- * number counts as off, so a typo leaves the room as it was rather than
- * silencing it. /health says which it is.
+ * Anything that is not on or a positive number counts as off, so a typo
+ * leaves a plain line reaching everybody rather than silencing the room.
+ * /health says which it is.
  *
- * /ooc and /roll are the same either way. They are slash commands, they are
- * queued for the game server as before, and the game server works out who is
- * near from its own positions.
+ * /me, /do, /w, /s and /ooc are local either way. They are not queued for
+ * the game server. The line above the head uses those same distances even
+ * while a plain line in the box still goes to everybody. Other slashes,
+ * including /roll, are still queued.
  */
 function chatRangeOf(v) {
   const s = String(v == null ? '' : v).trim().toLowerCase();
@@ -398,12 +417,12 @@ function chatRangeOf(v) {
 const CHAT_RANGE = chatRangeOf(process.env.THORNSWOOD_CHAT_RANGE);
 
 /*
- * The verbs, which only exist while the range is on, because a whisper and a
- * shout are ranges. /me and /do are how an attempt gets said as an attempt:
- * "/me swings at the guard" leaves whether it lands to the other person,
- * which a plain line cannot. A quarter of the range for a whisper and three
- * times it for a shout, near enough the same proportions as the voice modes
- * (7, 30 and 85 metres in thornswood-voice.js).
+ * /me and /do are how an attempt gets said as an attempt: "/me swings at
+ * the guard" leaves whether it lands to the other person, which a plain
+ * line cannot. Whisper and shout are their own distances in headlines.js
+ * (1000 and 12000). chatReach below is only the box while the range is on,
+ * and it is a quarter and three times that range, near the voice modes
+ * (7, 30 and 85 metres in thornswood-voice.js). The head does not use it.
  */
 const CHAT_VERBS = {
   '/me': 'me', '/do': 'do',
@@ -968,6 +987,9 @@ function onJoin(ws, msg) {
                   chatTokens: CHAT_BURST, chatAt: Date.now(), chatSlowed: false });
 
   ws.send({ t: 'welcome', peer: id, profileId: profileId });
+  if (profileId && silencedLeft(profileId, Date.now())) {
+    try { ws.send({ t: 'hush', profileId: profileId, on: true }); } catch (e) { }
+  }
   announce();
   return id;
 }
@@ -1022,6 +1044,9 @@ function snapshot() {
       pos: pos, angleZ: whole(v.angleZ), cell: v.cell, name: v.name,
       actor: v.actor || 0, talk: voice.talk ? 1 : 0, mode: voice.mode
     };
+    /* Only while silenced, so a room where nobody is silenced does not grow
+       the position tick. Clients close that microphone and hear nothing. */
+    if (silencedLeft(Number(pid), now)) out[pid].hush = 1;
   }
   return out;
 }
@@ -1147,6 +1172,7 @@ function viewsOf(snap) {
   why the pages keep their own ping (SILENT_AFTER, above).
 */
 setInterval(() => {
+  sweepSilenced(Date.now());
   if (peers.size === 0) return;
   const snap = snapshot();
   const viewOf = viewsOf(snap);
@@ -1603,6 +1629,7 @@ const server = http.createServer((req, res) => {
     readBody(req, res, 20000, (doc) => {
       const list = (doc && doc.profiles && typeof doc.profiles === 'object') ? doc.profiles : {};
       const now = Date.now();
+      const before = new Set(silenced.keys());
       silenced.clear();
       for (const k of Object.keys(list)) {
         const pid = Number(k) || 0;
@@ -1611,9 +1638,13 @@ const server = http.createServer((req, res) => {
       }
       for (const pid of silenced.keys()) {
         const clear = { t: 'headclear', profileId: pid };
+        const hush = { t: 'hush', profileId: Number(pid), on: true };
         for (const [, p] of peers) {
-          try { p.ws.send(clear); } catch (e) { }
+          try { p.ws.send(clear); p.ws.send(hush); } catch (e) { }
         }
+      }
+      for (const pid of before) {
+        if (!silenced.has(pid)) tellHush(pid, false);
       }
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ silenced: silenced.size }));

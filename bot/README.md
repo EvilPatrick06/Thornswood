@@ -106,10 +106,43 @@ The support voice channel sits in Help, because that is what it is for.
 ### Testing
 
 `test-results` (a forum), `#test-tasks` and **play-testing** (voice), visible
-to Playtesters and staff. Lead Gamemaster has `#test-tasks` as well, because
-the list of what to try is theirs to write. This is the Discord end of what
-the site already does at `thornswood.net/testthese`. `#test-tasks` was
-`#test-these`; the old name is retired and no run makes it again.
+to Playtesters and staff and to nobody else. `#test-tasks` also lets in the
+lead gamemaster role, because that role may open a Live smoke session and the
+rest of that gate does not include it. It is on that channel's own line in the
+builder's plan, so no other channel moved.
+
+`#test-tasks` replaces `#test-these`, which was deleted in the channel cleanup.
+It is a new channel rather than that one renamed, and `#test-these` is in the
+builder's retired list so a re-run does not bring it back.
+
+It carries the living Live smoke checklist. The rows are not written in
+Discord: they are the Live slice of the acceptance criteria in the vault,
+exported to `live-smoke-discord-export.json`, which is deployed beside
+`bot.py`. Staff open a dated session and the bot posts one message per row,
+each with Pass, Fail, Skip and Fail-known on it, in a thread off the opener:
+
+    /live-smoke start    settings version and live channel, opens a session
+    /live-smoke reset    closes the session open now and opens a fresh one
+    /live-smoke refresh  reads the export again and updates the checklist post
+
+Those three are **Owner, Dev and Lead Gamemaster**, which is wider than Owner
+and Dev and narrower than the staff roles: a Moderator alone does not open or
+reset a session. They are matched by role name, never by id, so a renamed role
+is fixed by setting `LIVE_SMOKE_ADMIN_ROLES` in `bot.env.json` rather than by a
+deploy. Testers and staff mark their own rows. Agents do not.
+
+A mark is an edit to the Discord message it was pressed on. Nothing writes a
+mark, a name or an account id to the site, to a database, to a file or to the
+bot's log, and nothing posts a named fail anywhere outside the session thread.
+Everybody who can read the thread can read the marks in it, and the opener
+says so. Going further than that, keeping marks anywhere off Discord, needs
+the Privacy page changed first.
+
+When the Live set moves, the export changes in the vault and the copy in `bot`
+changes with it in the same pull request. Then
+`.\scripts\deploy\Install-Bot.ps1 -CodeOnly` puts it on the VPS, and
+`/live-smoke refresh` updates the post people read. A session already open
+keeps the rows it was opened with; the next `start` uses the new set.
 
 ### Staff
 
@@ -129,7 +162,7 @@ different servers stitched together.
 | Role | Colour | What it means |
 |---|---|---|
 | Owner | gold | Runs the place. You |
-| Lead Gamemaster | deep blue | Runs the gamemasters, and the place when you are not on it |
+| Lead Gamemaster | deep blue | Runs the gamemasters, and opens a Live smoke session |
 | Dev | violet | Builds and deploys it |
 | Gamemaster | blue | Runs things in world |
 | Loremaster | teal | Writes the world |
@@ -145,10 +178,12 @@ different servers stitched together.
 | Banned | grey | What the site keys a ban off. No permissions, not hoisted |
 | Patreon, News Pings, Updates Pings | | Made by Patreon and by the bot, never here. They are in the builder's list for their place in the order and nothing else |
 
-Owner, Lead Gamemaster, Dev, Moderator and Gamemaster are staff as far as the
-channels are concerned: they see the staff channels and can post in the read
-only ones. Lead Gamemaster, Trial Gamemaster and Loremaster see every hold as
-well.
+Owner, Dev, Moderator and Gamemaster are staff as far as the channels are
+concerned: they see the staff channels and can post in the read only ones.
+Lead Gamemaster and Trial Gamemaster are not in that list, so neither opens
+`#reports`; both see every hold, and the lead gamemaster role is named on
+`#test-tasks` by that channel's own line in the plan. Loremaster sees every
+hold as well.
 
 Staff roles are job titles on purpose. Thane, Steward, Warden and Housecarl are
 all things somebody should be able to play, and a moderator wearing one makes
@@ -188,6 +223,33 @@ way in, then picks a hold.
 `content.py` holds every read only post. Edit it, run `Setup-Discord.ps1`
 again, and the posts are rewritten in place. It deletes what the bot wrote last
 time rather than adding a second copy, so the rules never end up posted twice.
+
+## Putting a bot change on the VPS
+
+From a checkout of main that has just been pulled, never from a copy of the
+repository that was downloaded earlier:
+
+    git checkout main
+    git pull
+    .\scripts\deploy\Install-Bot.ps1 -CodeOnly
+
+The pull comes first because a deploy sends what the commit holds. A stale
+folder sends the bot as it was before the change and says nothing about it,
+and the same folder builds the Discord as it was before the change if
+`Setup-Discord.ps1` is run from it. That is how a live smoke went out of a
+folder in Downloads that had not been pulled for days.
+
+`-CodeOnly` stages the code beside the running bot and checks it there, then
+stops the service, renames the new files in, starts it again by its name and
+waits for it to say it is watching the server. If it does not, the old files
+go back and it is started on those. Python, the libraries, the token and the
+service itself are left alone.
+
+The bot's log is `C:\Thornswood-Bot\data\bot.log`: in the data folder under
+the bot's folder, the one folder its account writes, rather than beside the
+code where it used to be. `.\scripts\vps\Show-BotLog.ps1` reads it without a
+deploy, and a box that has no log yet gets an empty one made for it at the
+next restart.
 
 ## Release notes posting themselves
 

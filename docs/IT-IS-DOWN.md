@@ -103,11 +103,20 @@ rather than before.
 `up as Thornswood#...` near the end means it is running. If not:
 
 ```powershell
+git checkout main
+git pull
 .\scripts\deploy\Install-Bot.ps1 -CodeOnly
 ```
 
 **Changes the box.** Sends the code and restarts it. It leaves Python, the
-libraries, the token and the task alone.
+libraries, the token and the service alone. The pull comes first because the
+deploy sends what the commit holds, so a folder that has not been pulled
+sends the bot as it was before whatever you are putting out.
+
+The log it reads to tell whether the bot came up is
+`C:\Thornswood-Bot\data\bot.log`, in the data folder under the bot's folder.
+A box with no log there gets an empty one made for it before the restart, so
+a missing log is not a failed deploy.
 
 ## The voice service
 
