@@ -232,7 +232,10 @@ jobs:
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1',
                  'test-vps-defaults.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
-                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-npc-runtime.js'
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-npc-runtime.js',
+                 'test-npc-shared-runtime.js', 'test-npc-population-runtime.js',
+                 'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
+                 'test-npc-death-policy.js'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
@@ -245,6 +248,12 @@ jobs:
           }
           if ($failed.Count) { Write-Host ("{0} harness(es) failed: {1}" -f $failed.Count, ($failed -join ', ')); exit 1 }
           Write-Host ('all {0} passed' -f $six.Count)
+
+      - name: Check NPC population policy
+        shell: pwsh
+        run: |
+          & python tests/test-npc-population.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Check the launcher window
         shell: powershell

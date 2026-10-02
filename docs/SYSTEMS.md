@@ -144,8 +144,12 @@ brew, by rank. Anything else is refused.
 [Enchantments](systems/enchantments.md). What may be put on a weapon
 or on clothing, and which soul gem a rank may use.
 
-[People who are not people](systems/npcs.md). Traders, drivers, and
-Thalmor patrols stay. The rest of the cast is thinned. No bounty.
+[People who are not people](systems/npcs.md). Guild traders and limited
+animals inside cities; transport workers outside their walls. Camps,
+ambushes, dungeon enemies and wildlife stay in suitable habitats under
+server authority. Caves and dungeons have fixed location tiers. Town
+fillers are cut. Hunting and fishing use shared, persistent stock. Exact
+guild relocation is deferred. No bounty.
 
 [Offices](systems/offices.md). Jarl, steward, and the titles that are
 not a recipe and not a mint.
