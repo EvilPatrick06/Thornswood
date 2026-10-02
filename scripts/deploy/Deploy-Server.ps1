@@ -385,9 +385,9 @@ if ($notLive.Count) {
 # The build stamp Deploy-Gamemode.ps1 left beside gamemode.js goes up with it,
 # so the box can say which gamemode it runs. It is made again here when it does
 # not describe the gamemode about to be sent, which is what happens when the
-# copy above took the one in tools, because a stamp naming a different
-# gamemode is worse than none. From tools when that is the same file, so git
-# can say whether the commit holds it. See BuildStamp.ps1.
+# copy above came from the artifact's game\gamemode.js ($src), because a
+# stamp naming a different gamemode is worse than none. When it is the same
+# file, use it so git can say whether the commit holds it. See BuildStamp.ps1.
 . (Join-Path $Here '..\release\BuildStamp.ps1')
 $stampPath = Join-Path $Dist 'thornswood-build.json'
 if (-not (Test-ThornswoodBuildStamp -Path $stampPath -Gamemode $built)) {
