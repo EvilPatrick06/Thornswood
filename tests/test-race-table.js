@@ -226,6 +226,33 @@ yes('A8 and races.json has the same seven',
       run2.status === 0 && before === after);
 }
 
+/*
+  --plugins <file> (#1140). Same flag as the warmth / water / fire / weather
+  builders. The default path still works above; this proves another list is
+  read when the flag is passed, and that Profile\\Default is ignored then.
+*/
+{
+  const alt = path.join(TMP, 'elsewhere', 'plugins.txt');
+  fs.mkdirSync(path.dirname(alt), { recursive: true });
+  // Only LowerCase.esp: no RaceMod.esp, so Falmer stays unplayable and
+  // SnowElfRace is never made.
+  fs.writeFileSync(alt, ['*LowerCase.esp', ''].join(String.fromCharCode(13, 10)));
+  fs.writeFileSync(path.join(TMP, 'game', 'gamemode.js'),
+    ['const FOODS = {"items":{}};', 'const RACES = {"items":{}};', ''].join(String.fromCharCode(10)));
+  const runAlt = spawnSync(process.execPath,
+    [path.join(TMP, 'scripts', 'dev', 'Build-RaceTable.js'), '--data', DATA, '--plugins', alt],
+    { encoding: 'utf8' });
+  if (runAlt.status !== 0) { console.log(runAlt.stdout + runAlt.stderr); }
+  yes('A10 --plugins reads an alternate list and exits 0', runAlt.status === 0);
+  const gotAlt = installed() || {};
+  yes('A10 without RaceMod.esp, SnowElfRace is absent',
+      !gotAlt['800:RaceMod.esp']);
+  yes('A10 without RaceMod.esp, FalmerRace stays unplayable',
+      !!gotAlt['131f4:Skyrim.esm'] && gotAlt['131f4:Skyrim.esm'].p === false);
+  yes('A10 LowerCase.esp still lands ArgonianRace on Skyrim.esm',
+      !!gotAlt['13740:Skyrim.esm'] && gotAlt['13740:Skyrim.esm'].e === 'ArgonianRace');
+}
+
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { }
 
 // ------------------------------------------------------------------ B --

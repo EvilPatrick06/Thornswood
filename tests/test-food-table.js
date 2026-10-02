@@ -217,6 +217,30 @@ yes('A8 twenty one versions of eleven records make eleven lines (' + Object.keys
       run2.status === 0 && before === after);
 }
 
+/*
+  --plugins <file> (#1140). Same flag as the warmth / water / fire / weather
+  builders. Without Gourmet.esp the drink words never land, so Ale reads food.
+*/
+{
+  const alt = path.join(TMP, 'elsewhere', 'plugins.txt');
+  fs.mkdirSync(path.dirname(alt), { recursive: true });
+  fs.writeFileSync(alt, ['*LowerCase.esp', ''].join(String.fromCharCode(13, 10)));
+  fs.writeFileSync(path.join(TMP, 'game', 'gamemode.js'),
+    ['const WARMTH = {"items":{}};', 'const FOODS = {"items":{}};', ''].join(String.fromCharCode(10)));
+  const runAlt = spawnSync(process.execPath,
+    [path.join(TMP, 'scripts', 'dev', 'Build-FoodTable.js'), '--data', DATA, '--plugins', alt],
+    { encoding: 'utf8' });
+  if (runAlt.status !== 0) { console.log(runAlt.stdout + runAlt.stderr); }
+  yes('A10 --plugins reads an alternate list and exits 0', runAlt.status === 0);
+  const gotAlt = installed() || {};
+  yes('A10 without Gourmet.esp, Ale reads food (Skyrim.esm name is a strings id)',
+      !!gotAlt['34c5e:Skyrim.esm'] && gotAlt['34c5e:Skyrim.esm'].k === 'food');
+  yes('A10 Gourmet-only drinks are absent (919 Honningbrew Limited)',
+      !gotAlt['919:Gourmet.esp']);
+  yes('A10 LowerCase.esp still lands the potato on Skyrim.esm',
+      !!gotAlt['64b41:Skyrim.esm'] && gotAlt['64b41:Skyrim.esm'].k === 'food');
+}
+
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { }
 
 // ------------------------------------------------------------------ B --
