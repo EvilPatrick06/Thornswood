@@ -561,7 +561,7 @@ namespace Thornswood
         {
             try
             {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; // added, never replaced (#1360)
                 using (var q = new Quick())
                 {
                     q.Ms = ms;

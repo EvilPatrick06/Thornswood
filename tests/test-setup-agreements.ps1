@@ -261,7 +261,7 @@ Yes 'no em dash anywhere in the setup program' ($bs.IndexOf([char]0x2014) -lt 0)
 
 # ---- 7. the live site, when asked -------------------------------------------
 if ($Live) {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     foreach ($k in $pages.Keys) {
         $code = 0
         try { $code = (Invoke-WebRequest -UseBasicParsing -Uri ('https://thornswood.net/' + $k)).StatusCode } catch { }
