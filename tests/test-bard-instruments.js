@@ -134,6 +134,10 @@ yes('those three ask for the made instrument before they play',
     /You need /.test(emotes));
 yes('an emote idle this character did not just ask for is dropped',
     /ctx\.animEventName = ''/.test(emotes));
+yes('standing up still works while the wheel is open, and not while a name is being typed',
+    /__stand/.test(emotes) &&
+    /function standUp\(/.test(emotes) &&
+    /k\.toLowerCase\(\) === standChar/.test(read(path.join(REPO_DIR, 'game', 'ui', 'thornswood-emotes.js'))));
 
 /*
   The instruments a person can actually hold are the three this plugin adds,
