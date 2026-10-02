@@ -1020,7 +1020,7 @@ namespace Thornswood
             reply = "";
             try
             {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; // added, never replaced (#1360)
                 var req = (HttpWebRequest)WebRequest.Create(url);
                 req.Method = method;
                 req.Timeout = 15000;
@@ -1074,7 +1074,7 @@ namespace Thornswood
             if (data == null) data = new byte[0];
             try
             {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; // added, never replaced (#1360)
                 var req = (HttpWebRequest)WebRequest.Create(url);
                 req.Method = "POST";
                 req.ContentType = string.IsNullOrEmpty(contentType) ? "application/octet-stream" : contentType;

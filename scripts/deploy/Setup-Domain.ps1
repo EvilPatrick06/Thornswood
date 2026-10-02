@@ -123,7 +123,7 @@ if (-not (Test-Path `$dir)) { New-Item -ItemType Directory -Path `$dir -Force | 
 
 if (-not (Test-Path (Join-Path `$dir 'caddy.exe'))) {
   'downloading caddy $CaddyVersion'
-  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
   `$zip = Join-Path `$dir 'caddy_${CaddyVersion}_windows_amd64.zip'
   Invoke-WebRequest -UseBasicParsing ``
     -Uri 'https://github.com/caddyserver/caddy/releases/download/v$CaddyVersion/caddy_${CaddyVersion}_windows_amd64.zip' ``
