@@ -72,15 +72,21 @@ box pays rent owed by that person first. What is left is the hold's.
 
 ## The hold's box
 
-Each hold has one box. A steward opens the container and says
-`/box whiterun` (or whichever hold). After that, only gold goes in.
-Anything else is handed back, still in the hand.
+Each hold has one box, and it is that hold's notice board. The nine
+mainland towns already have a spot each, the coordinates given for
+the boards. You are at the box when you are within 400 of that spot.
+A steward who moves the board moves the box with it. See
+[Notice boards](noticeboards.md).
 
 A price list is not dropped in as an item. Someone with the Prices
-permission on a faction or business book stands at the box and
+permission on a faction or business book stands at the board and
 submits the list. The guild of that hold keeps the copy. The rules
 are on [Factions and businesses](factions.md) and
 [Merchant's Guild](merchants-guild.md).
+
+A steward can still mark a container with `/box whiterun`. Only gold
+goes in that chest. Anything else is handed back, still in the hand.
+The board itself is enough to submit a list.
 
 The number `/box` reports is a ledger of what has been paid in. Gold
 dropped in the chest is also in the chest. A fee taken for a notice is
@@ -150,6 +156,7 @@ A holder cannot set a price for a night. `/bed` does not exist.
 Outhouses and pots stay unknown until the vote on
 [The body](body.md). The company payout that
 withdraws from the ledger is not built. The four house parts are
-already refused. A price list is not an item in the chest. Someone
-with Prices stands at the box and submits a copy. The book stays in
-the journal. The guild average of those copies is kept.
+already refused. The drop box is the notice board. Standing at the
+board is standing at the box. A price list is not an item in the
+chest. Someone with Prices stands there and submits a copy. The book
+stays in the journal. The guild average of those copies is kept.

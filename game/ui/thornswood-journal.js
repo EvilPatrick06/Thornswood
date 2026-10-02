@@ -376,7 +376,7 @@
         out += '<div class="none">Submitted to ' + esc(book.submitted.join(', ')) + '.</div>';
       }
       if (book.canPrices) {
-        out += '<div class="none">Stand at the hold\'s drop box, then submit. The list stays in the book.</div>';
+        out += '<div class="none">Stand at the hold\'s notice board, then submit. The list stays in the book.</div>';
         out += '<div class="bar"><button data-g="submit">Submit at the box</button></div>';
       }
       var list = book.priceList || [];

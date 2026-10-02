@@ -33503,12 +33503,11 @@ log('gamemode loaded:',
     and can refuse anything that should not be in there. Nothing here needs a
     new record or a client change.
 
-    WHICH CONTAINER IS A HOLD'S BOX is set in the world by a steward standing
-    at it, not by a coordinate in this file. The design asks for boards and
-    boxes at our own locations with placeholder coordinates until Patrick gives
-    exact ones; a steward pointing at a chest is better than a placeholder,
-    because it is right the moment it is done and it needs no records, no
-    placement pass and no release.
+    THE BOX IS THE NOTICE BOARD. The nine mainland towns already have a spot
+    each, the coordinates given for the boards, and standing within reach of
+    that spot is standing at the hold's box. A steward who moves the board
+    moves the box with it. A container a steward has also marked still takes
+    gold, and it is not required to submit a list.
 
     ONLY GOLD GOES IN. Everything else is handed back, because a box that
     accepts a sword is a box somebody loses a sword in: the server has no way
@@ -33560,8 +33559,10 @@ log('gamemode loaded:',
     return null;
   }
 
-  /** The hold whose box this character just opened, or nothing. */
+  /** The hold whose notice board this character is standing at, or a marked chest. */
   function holdStanding(actorId) {
+    var atBoard = boardHere(actorId);
+    if (atBoard) { return atBoard; }
     var at = boxAt(actorId);
     if (!at) { return ''; }
     return holdOfBox(at) || '';
@@ -33578,7 +33579,13 @@ log('gamemode loaded:',
     var arg = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : '';
 
     if (!arg) {
-      var hold = at ? holdOfBox(at) : null;
+      var atBoard = boardHere(actorId);
+      var hold = atBoard || (at ? holdOfBox(at) : null);
+      if (hold && atBoard) {
+        toProfile(profileId, 'This is ' + hold + '\'s notice board, and its drop box. ' +
+          (Number(funds[hold]) || 0) + ' gold has been paid into it.');
+        return true;
+      }
       toProfile(profileId, hold
         /*
           WHAT THIS NUMBER IS, said accurately rather than conveniently.
@@ -33600,7 +33607,7 @@ log('gamemode loaded:',
         ? 'This is ' + hold + '\'s box. ' + (Number(funds[hold]) || 0) +
           ' gold has been paid into it. Open it to see what is actually in there.'
         : (at ? 'That container is nobody\'s box.'
-              : 'Open a container first, then say that again.'));
+              : 'Stand at the hold\'s notice board.'));
       return true;
     }
 
@@ -37703,7 +37710,7 @@ function thornswoodBooks(env) {
     if (!taken.book) { return taken.why; }
     if (!hasPerm(taken.book, pid, 'Prices')) { return 'You cannot set prices in that book.'; }
     var hold = standingHold(actorId).toLowerCase();
-    if (!hold) { return 'Stand at the hold\'s drop box, then submit the list.'; }
+    if (!hold) { return 'Stand at the hold\'s notice board, then submit the list.'; }
     if (!ledgers[hold]) { ledgers[hold] = {}; }
     ledgers[hold][taken.book.id] = {
       book: taken.book.id,
