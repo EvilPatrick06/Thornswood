@@ -126,6 +126,14 @@ yes('the wheel lists Lute, Flute and Drum, played by Skyrim\'s own idles',
     /name: 'Lute',\s*event: 'IdleLuteStart'/.test(list) &&
     /name: 'Flute',\s*event: 'IdleFluteStart'/.test(list) &&
     /name: 'Drum',\s*event: 'IdleDrumStart'/.test(list));
+yes('those three ask for the made instrument before they play',
+    /lute:\s*\{\s*id:\s*0x1d9b/.test(emotes) &&
+    /flute:\s*\{\s*id:\s*0xd62/.test(emotes) &&
+    /drum:\s*\{\s*id:\s*0x287f/.test(emotes) &&
+    /getItemCount/.test(emotes) &&
+    /You need /.test(emotes));
+yes('an emote idle this character did not just ask for is dropped',
+    /ctx\.animEventName = ''/.test(emotes));
 
 /*
   The instruments a person can actually hold are the three this plugin adds,
