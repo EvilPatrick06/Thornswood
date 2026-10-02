@@ -26852,6 +26852,15 @@ log('gamemode loaded:',
           if (fid) factionIds[fid] = true;
         }
       }
+      // The Discord role named Dev, not every staff seat. A Dev may found
+      // one business and one faction. The other seats only open a book.
+      var devRoleIds = {};
+      if (Array.isArray(doc.devRoleProfiles)) {
+        for (var dv = 0; dv < doc.devRoleProfiles.length; dv++) {
+          var dvid = Number(doc.devRoleProfiles[dv]);
+          if (dvid) devRoleIds[dvid] = true;
+        }
+      }
       var accounts = {};
       if (Array.isArray(doc.people)) {
         for (var pe = 0; pe < doc.people.length; pe++) {
@@ -26863,7 +26872,7 @@ log('gamemode loaded:',
           }
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, businessIds: businessIds, factionIds: factionIds, accounts: accounts, count: Object.keys(ids).length };
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, accounts: accounts, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -26911,6 +26920,7 @@ log('gamemode loaded:',
     var proved = passProved(n);
     return {
       staff: proved && !!(l && l.staffRoleIds && l.staffRoleIds[n]),
+      dev: proved && !!(l && l.devRoleIds && l.devRoleIds[n]),
       business: proved && !!(l && l.businessIds && l.businessIds[n]),
       faction: proved && !!(l && l.factionIds && l.factionIds[n]),
       account: (l && l.accounts && l.accounts[n]) ? String(l.accounts[n]) : ('p:' + n)
@@ -27164,6 +27174,7 @@ log('gamemode loaded:',
       staffRoleProfiles: merged(doc.staffRoleProfiles, had.staffRoleProfiles),
       businessOwnerProfiles: merged(doc.businessOwnerProfiles, had.businessOwnerProfiles),
       factionOwnerProfiles: merged(doc.factionOwnerProfiles, had.factionOwnerProfiles),
+      devRoleProfiles: merged(doc.devRoleProfiles, had.devRoleProfiles),
       people: people
     };
   }
@@ -27275,6 +27286,7 @@ log('gamemode loaded:',
             doc.staffRoleProfiles = kept.staffRoleProfiles;
             doc.businessOwnerProfiles = kept.businessOwnerProfiles;
             doc.factionOwnerProfiles = kept.factionOwnerProfiles;
+            doc.devRoleProfiles = kept.devRoleProfiles;
             doc.people = kept.people;
             note(doc.failedProfiles.length + ' profiles could not be checked with Discord ' +
                  'and keep the standing they had' +
@@ -27292,6 +27304,7 @@ log('gamemode loaded:',
               staffRoleProfiles: Array.isArray(doc.staffRoleProfiles) ? doc.staffRoleProfiles : [],
               businessOwnerProfiles: Array.isArray(doc.businessOwnerProfiles) ? doc.businessOwnerProfiles : [],
               factionOwnerProfiles: Array.isArray(doc.factionOwnerProfiles) ? doc.factionOwnerProfiles : [],
+              devRoleProfiles: Array.isArray(doc.devRoleProfiles) ? doc.devRoleProfiles : [],
               people: doc.people || [],
               // Staff bans with why and until (#412), from the site's own
               // file rather than Discord, so they are fresh even when the
@@ -37042,6 +37055,7 @@ function thornswoodBooks(env) {
     row = row || {};
     return {
       staff: !!row.staff,
+      dev: !!row.dev,
       business: !!row.business,
       faction: !!row.faction,
       account: row.account ? String(row.account) : ('p:' + Number(pid))
@@ -37222,10 +37236,11 @@ function thornswoodBooks(env) {
     var named = clipName(name);
     if (!named.name) { return named.why; }
     var r = rolesOf(pid);
-    if (kind === 'business' && !r.business) {
+    // A Dev may found one of each. Any other account needs the matching role.
+    if (kind === 'business' && !r.business && !r.dev) {
       return 'Your Discord account does not hold Business Owner.';
     }
-    if (kind === 'faction' && !r.faction) {
+    if (kind === 'faction' && !r.faction && !r.dev) {
       return 'Your Discord account does not hold Faction Owner.';
     }
     if (ownsKind(r.account, kind)) {
@@ -37687,8 +37702,8 @@ function thornswoodBooks(env) {
     }
     return {
       show: true,
-      canBusiness: !!(r.business && !ownsKind(r.account, 'business')),
-      canFaction: !!(r.faction && !ownsKind(r.account, 'faction')),
+      canBusiness: !!((r.business || r.dev) && !ownsKind(r.account, 'business')),
+      canFaction: !!((r.faction || r.dev) && !ownsKind(r.account, 'faction')),
       books: books
     };
   }
@@ -39802,8 +39817,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           'Look at somebody and press Y to ask them to be friends, H to offer a ' +
           'trade, L to stop hearing them. P opens your friends and your party; ' +
           'J opens your journals, and a group book beside them when this character ' +
-          'is in one or the Discord account may found one. /book new business <name> ' +
-          'and /book new faction <name> start one. /book leave drops this character. ' +
+          'is in one or the Discord account may found one. A Dev may found one of each. ' +
+          '/book new business <name> and /book new faction <name> start one. ' +
+          '/book leave drops this character. ' +
           'Work done with your party in the same place ' +
           'counts for more. /yes and /no answer whatever somebody has asked you.');
         return;

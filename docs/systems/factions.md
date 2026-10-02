@@ -45,9 +45,10 @@ On the tab, or typed the same way `/journal` matches J:
 
 `/book new faction The North Gate`
 
-The rest of the line is the name. Staff can found one only when they
-also hold the Discord role. They do not need the role to open a book
-that already exists.
+The rest of the line is the name. A Dev may found one business and
+one faction without holding Business Owner or Faction Owner. Any
+other staff seat can found one only when they also hold that Discord
+role. They do not need the role to open a book that already exists.
 
 ## Roles
 
@@ -158,5 +159,6 @@ one is refused, and the list stays in the book.
 
 Staff seats read Owner, Gamemaster, Dev, Loremaster, and Moderator
 off the Discord account. Business Owner and Faction Owner are read
-the same way, and founding one book of each kind is capped on the
-account.
+the same way. A Dev may found one of each. Any other staff seat
+founds only when the account also holds the matching role. Founding
+one book of each kind is capped on the account.
