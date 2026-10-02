@@ -17,11 +17,17 @@ It is not a wage, and it is not paid again on a later login.
 
 The record is the base game's gold, form `0xF`.
 
-The world does not mint the rest. A sack, a chest, a draugr, a purse growing in the
+The world does not mint the rest by leaving coin where it grew. A sack, a chest, a draugr, a purse growing in the
 world: the gold in those is stripped. The six coin purses the world
 can hand you are refused and put back. Weapons and armour left by the
 world are stripped the same way. What a person made, traded, or was
 given by another person stays.
+
+A chest in a dungeon, a cave, or a sewer is a different door. Opening
+one creates a small sum, on that place's tier, and the same chest
+does not pay again until the place has rested. That is the same kind
+of mint as a scene quest's reward. The coin that was sitting in the
+chest is still stripped. See [Dungeon loot](dungeon-loot.md).
 
 ## What counts as gold
 
@@ -100,7 +106,8 @@ See [Property](property.md) for the box, and
 
 The 40, the mark that stops a second purse, the stripping of spawned
 gold, the six refused purses, and trade between two people are in the
-server. A guild trader's 250 is not. A scene quest does not create
+server. A dungeon chest pays its tier's gold on that place's rest.
+A guild trader's 250 is not. A scene quest does not create
 its gold. Rank is not for sale. Nothing loses 5% a day for sitting
 in a chest. The ledger only goes up: notice fees,
 job fees and rent are counted, and nothing pays back out.
