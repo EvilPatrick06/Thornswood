@@ -94,7 +94,7 @@ counted on the ledger and is not sitting in the chest. Nothing
 withdraws from the ledger except the payouts named on
 [Free Skyrim Trading Company](trading-company.md).
 
-Notice fees, job fees, rent, Merchant's Guild payments and company
+Notice fees, job fees, rent and company
 payment all use this box. There is no second treasury.
 See [Notice boards](noticeboards.md), [Gold](gold.md),
 [Merchant's Guild](merchants-guild.md).

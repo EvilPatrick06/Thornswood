@@ -30,8 +30,8 @@ Both fees are taken from the pack before the words go up. If the gold
 is not there, nothing is posted. The fee is counted on that hold's
 ledger. See [Gold](gold.md) and [Property](property.md).
 
-A member of that hold's guild in good standing pays half: 10 and 15.
-See [Merchant's Guild](merchants-guild.md).
+The fees are the same for everybody. The [Merchant's Guild](merchants-guild.md)
+is the NPC traders; people cannot join it for a discount.
 
 A haul is a job with a pay and a destination. The posting fee is still
 this fee. The pay is extra. See
@@ -41,9 +41,8 @@ A letter is a job with a named person at the other end. You post it
 from the board. `/letter <name> <words>`. The words are the letter,
 up to 300 characters, the same cap as `/ooc`.
 
-It costs 35 gold up front, or 25 if you are a member of that hold's
-guild in good standing. 20 of that is the board fee, 10 for a member,
-and it stays with the hold. 15 is the courier's pay, and it is held
+It costs 35 gold up front. 20 is the board fee and stays with the hold.
+15 is the courier's pay, and it is held
 the way a haul's pay is held. If the gold is not there, nothing is
 posted.
 
@@ -110,4 +109,4 @@ in the server. The fee lands on the hold's ledger. Letters are not.
 Nine boards are seeded, and each one is that hold's drop box.
 Raven Rock is not among them. Solitude's spot
 was corrected from a walked coordinate and still wants somebody to
-stand on it. Half fees for the guild are not in the posting fee.
+stand on it. There is no guild membership discount.

@@ -168,8 +168,8 @@ the world. It does not buy a rank.
 notice, 30 for a job. A letter costs the board fee plus 15 for the
 courier, paid by the sender. The newest ten show.
 
-[Merchant's Guild](systems/merchants-guild.md). The shops of a hold. Dues
-and ledgers go to the hold's box. Traders start with 250 and buy and
+[Merchant's Guild](systems/merchants-guild.md). The merchant NPCs of a hold.
+People cannot join it. Traders start with 250 and buy and
 sell at the average of the price lists submitted there. It does not
 mint coin after that purse, and it is not a profession.
 
