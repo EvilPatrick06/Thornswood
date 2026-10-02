@@ -228,6 +228,11 @@ jobs:
           # on later takes Thornswood's files back out of it. It runs the real
           # Setup-Thornswood.ps1 and the whole launcher on a pretend Steam in a
           # temp folder, about twenty seconds.
+          # Issue #1233 added one: a second setup over a folder the launcher
+          # already made updates Thornswood's own files in it, does not park
+          # it, and does not write through a hard link. It runs
+          # Setup-Thornswood.ps1 on a pretend Steam in a temp folder, a few
+          # seconds. A Game folder with no files.txt is still parked.
           # Issue #1359 widened test-deploy-records.js rather than adding a
           # harness: it now starts a copy of the site in a temp folder on a
           # spare port and asks /api/deploys as nobody, as a hub member and
@@ -247,7 +252,7 @@ jobs:
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1',
                  'test-vps-defaults.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
-                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-npc-runtime.js',
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-npc-runtime.js',
                  'test-npc-shared-runtime.js', 'test-npc-population-runtime.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
                  'test-npc-death-policy.js', 'test-vortex-profile-state.ps1',
