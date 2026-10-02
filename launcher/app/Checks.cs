@@ -117,7 +117,7 @@ namespace Thornswood
         /// 27 September. The first version read the revision out of the name
         /// Vortex gave the mod folder:
         ///
-        ///     %APPDATA%\Vortex\skyrimse\mods\collection_ombo2a_2_2026-09-15T21-08-00Z
+        ///     %APPDATA%\Vortex\skyrimse\mods\collection_7essxf_2_2026-09-15T21-08-00Z
         ///                                               slug  ^ revision
         ///
         /// Current Vortex does not name the folder that way any more. It names
@@ -155,17 +155,17 @@ namespace Thornswood
         /// ###, the same shape Get-CollectionNewest reads. For an installed
         /// collection the two keys that matter, under the mod's own id, are:
         ///
-        ///     persistent###mods###skyrimse###&lt;modId&gt;###attributes###collectionSlug -> "ombo2a"
+        ///     persistent###mods###skyrimse###&lt;modId&gt;###attributes###collectionSlug -> "7essxf"
         ///     persistent###mods###skyrimse###&lt;modId&gt;###attributes###revisionNumber -> 5
         ///
         /// LevelDB writes the key, a length byte (a control character), then
-        /// that many bytes of the value's JSON, so a string is "ombo2a" and a
+        /// that many bytes of the value's JSON, so a string is "7essxf" and a
         /// number is a bare 5. The slug and the number are separate keys tied
         /// together only by the &lt;modId&gt; both carry, so this reads both,
         /// matches the slug to its mod id, and takes the highest revision
         /// recorded against a mod id whose slug is the one asked for. A machine
-        /// can have two collections installed at once (ombo2a on main, 7essxf
-        /// on dev), and the numbers must not be mixed up between them.
+        /// can have two collections installed at once (an older slug beside 7essxf;
+        /// both tips have used 7essxf since 27 September), and the numbers must not be mixed up between them.
         ///
         /// When those two attributes are missing (ship PC after Set-Collection:
         /// a locally authored vortex_collection_* with no subscriber install
