@@ -47936,8 +47936,118 @@ function createSharedResourceStock(api, now) {
 try { globalThis.__thornswoodResourceStock=createSharedResourceStock(mp,()=>Date.now()); }
 catch(error) { log('Shared resource stock could not start: '+error); }
 
+// NPC MERCHANT PURSES BEGIN
+function createPrivateMerchantLedger(fs,path,settings,references) {
+  const dir=path.resolve(settings.privDir || 'private'),served=path.resolve(settings.dataDir || 'data');
+  function realPath(input) {
+    let existing=input;const tail=[];
+    while(!fs.existsSync(existing)) {
+      const parent=path.dirname(existing);
+      if(parent===existing) throw new Error('Merchant ledger path cannot be verified');
+      tail.unshift(path.basename(existing));existing=parent;
+    }
+    return path.resolve(fs.realpathSync(existing),...tail);
+  }
+  function checkPrivate() {
+    const relative=path.relative(realPath(served),realPath(dir));
+    if(!relative || (!relative.startsWith('..'+path.sep) && relative!=='..' && !path.isAbsolute(relative)))
+      throw new Error('Merchant ledger must be outside served resources');
+  }
+  checkPrivate();
+  const file=path.join(dir,'merchant-ledger.json'),marker=path.join(dir,'merchant-ledger.initialized');
+  const checksum=doc=>require('crypto').createHash('sha256').update(JSON.stringify([doc.version,doc.entries])).digest('hex');
+  function save(doc) {
+    checkPrivate();
+    fs.mkdirSync(dir,{recursive:true});
+    const tmp=file+'.tmp';
+    fs.writeFileSync(tmp,JSON.stringify({version:doc.version,entries:doc.entries,sha256:checksum(doc)}));
+    const fd=fs.openSync(tmp,'r+');
+    try {fs.fsyncSync(fd);} finally {fs.closeSync(fd);}
+    fs.renameSync(tmp,file);
+  }
+  function load() {
+    checkPrivate();
+    if(!fs.existsSync(file)) {
+      if(fs.existsSync(marker)) throw new Error('Saved merchant ledger is missing');
+      if(!Array.isArray(references) || !references.length || new Set(references).size!==references.length)
+        throw new Error('Merchant initialization manifest is required');
+      const entries=Object.create(null);
+      for(const reference of references) entries[reference]=null;
+      save({version:1,entries});
+    }
+    const doc=JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));
+    if(!doc || typeof doc.sha256!=='string' || doc.sha256!==checksum(doc))
+      throw new Error('Saved merchant ledger integrity cannot be verified');
+    // This marker distinguishes a first deployment from a deleted ledger.
+    if(!fs.existsSync(marker)) {
+      fs.writeFileSync(marker,'1');
+      const fd=fs.openSync(marker,'r+');
+      try {fs.fsyncSync(fd);} finally {fs.closeSync(fd);}
+    }
+    return doc;
+  }
+  return {load,save};
+}
+function createNpcMerchantPurses(api,data,storage) {
+  const property='thornswoodMerchant',catalogue=new Map(),verified=new Set();
+  let initialized=0,active=true;
+  api.makeProperty(property,{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
+  for(const row of data.keep) {
+    if(row[6]!=='trader') continue;
+    const id=api.getIdFromDesc(row[0]);
+    if(!Number.isInteger(id) || id<=0 || catalogue.has(id)) throw new Error('Invalid merchant catalogue identity');
+    catalogue.set(id,{reference:row[0],base:row[1]});
+  }
+  if(!storage || !storage.load || !storage.save) throw new Error('A durable merchant ledger is required');
+  let ledger=storage.load();
+  function valid(state,identity) {
+    return state && state.version===1 && state.reference===identity.reference && state.base===identity.base &&
+      Number.isInteger(state.purse) && state.purse>=0 && state.purse<=2147483647 &&
+      Array.isArray(state.stock) && state.stock.every(row=>row && Number.isInteger(row.baseId) &&
+        row.baseId>0 && row.baseId<=0xffffffff && row.baseId!==15 &&
+      Number.isInteger(row.count) && row.count>0 && row.count<=2147483647);
+  }
+  if(!ledger || ledger.version!==1 || !ledger.entries || typeof ledger.entries!=='object' || Array.isArray(ledger.entries))
+    throw new Error('Saved merchant ledger cannot be verified');
+  const references=new Map(Array.from(catalogue.values()).map(identity=>[identity.reference,identity]));
+  if(Object.keys(ledger.entries).length!==references.size) throw new Error('Saved merchant ledger manifest cannot be verified');
+  for(const reference of Object.keys(ledger.entries)) {
+    if(!references.has(reference) || (ledger.entries[reference]!==null && !valid(ledger.entries[reference],references.get(reference))))
+      throw new Error('Saved merchant ledger entry cannot be verified');
+  }
+  function prepare(id) {
+    if(!active) throw new Error('Merchant purse service is unavailable');
+    const identity=catalogue.get(id);
+    if(!identity) return null;
+    const actor=api.getNpcAIState(id);
+    if(!actor || actor.isHuman || actor.profileId>0) throw new Error('A human cannot receive an NPC merchant purse');
+    if(api.get(id,'baseDesc')!==identity.base) throw new Error('Merchant base does not match its authored reference');
+    const projection=api.get(id,property);
+    if(projection!==undefined && projection!==null && !valid(projection,identity))
+      throw new Error('Saved merchant state cannot be verified');
+    let state=ledger.entries[identity.reference];
+    if(state===null) {
+      if(projection!==undefined && projection!==null) throw new Error('Merchant initialization record is missing');
+      state={version:1,reference:identity.reference,base:identity.base,purse:250,stock:[]};
+      const next=JSON.parse(JSON.stringify(ledger));
+      next.entries[identity.reference]=state;
+      // Initialization and balance commit together before the native mirror.
+      storage.save(next);
+      ledger=next;
+      initialized++;
+    }
+    // Native saves are asynchronous. A lost or older mirror uses the ledger's
+    // current balance, including zero; it never creates another grant.
+    if(JSON.stringify(projection)!==JSON.stringify(state)) api.set(id,property,JSON.parse(JSON.stringify(state)));
+    verified.add(id);
+    return JSON.parse(JSON.stringify(state));
+  }
+  return {prepare,shutdown:()=>{active=false;},stats:()=>({catalogue:catalogue.size,verified:verified.size,initialized})};
+}
+// NPC MERCHANT PURSES END
+
 // NPC POPULATION POLICY BEGIN
-function createNpcPopulation(api,data,plugins) {
+function createNpcPopulation(api,data,plugins,merchants) {
   if(data.version!==1 || JSON.stringify(data.plugins)!==JSON.stringify(plugins))
     throw new Error('NPC population catalogue does not match the installed load order');
   const allowed=new Map(),byBase=new Map(),configured=new Map(),counts=new Map();
@@ -47997,6 +48107,7 @@ function createNpcPopulation(api,data,plugins) {
   function afterOwnership(id) {
     const entry=configured.get(id);
     if(entry && api.setNpcDifficultyTier) api.setNpcDifficultyTier(id,entry.rule.row[8] || 0);
+    if(entry && merchants) merchants.prepare(id);
   }
   function release(id) {
     const entry=configured.get(id);
@@ -48005,7 +48116,7 @@ function createNpcPopulation(api,data,plugins) {
       configured.delete(id);
     }
   }
-  return {configure,afterOwnership,release,reconcile:ids=>{
+  return {configure,afterOwnership,release,merchantStats:()=>merchants && merchants.stats(),reconcile:ids=>{
     const live=new Set(ids);
     for(const id of configured.keys()) if(id>=0xff000000 && !live.has(id)) release(id);
   },admit:(id,state)=>{
@@ -48748,6 +48859,9 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
       report('Shared NPC activity: '+owned.size+' server owned, '+actors.size+' active, '+loaded+' loaded, '+failed+' stationary; '+
         moved+' movement steps, '+attacks+' accepted attacks, '+meshWork.length+' mesh jobs pending; '+
         'background work continues without connections');
+      const merchantStatus=population && population.merchantStats && population.merchantStats();
+      if(merchantStatus) report('NPC merchant purses: '+merchantStatus.verified+'/'+merchantStatus.catalogue+
+        ' verified; '+merchantStatus.initialized+' first-time purses; trading disabled');
       moved=0;attacks=0;lastReport=now();
     }
     schedule(backgroundTick,20);
@@ -48773,11 +48887,25 @@ try {
   const cfgNpc = mp.getServerSettings();
   if (String(cfgNpc.thornswoodServer || '').toLowerCase() === 'dev') {
     if (globalThis.__thornswoodNpcRuntime) globalThis.__thornswoodNpcRuntime.stop();
+    if (globalThis.__thornswoodNpcMerchants) globalThis.__thornswoodNpcMerchants.shutdown();
+    globalThis.__thornswoodNpcMerchants=null;
     // Build the winning-record indexes during startup, before scheduled work.
     mp.prepareNpcLoad();
     const plugins=(cfgNpc.loadOrder || []).map(p=>String(p).split(/[\\/]/).pop());
-    globalThis.__thornswoodNpcPopulation=createNpcPopulation(mp,NPC_POPULATION_DATA,plugins);
+    if(JSON.stringify(NPC_POPULATION_DATA.plugins)!==JSON.stringify(plugins))
+      throw new Error('Merchant catalogue does not match the installed load order');
+    globalThis.__thornswoodNpcMerchants=createNpcMerchantPurses(mp,NPC_POPULATION_DATA,
+      createPrivateMerchantLedger(require('fs'),require('path'),cfgNpc,
+        NPC_POPULATION_DATA.keep.filter(row=>row[6]==='trader').map(row=>row[0])));
+    globalThis.__thornswoodNpcPopulation=createNpcPopulation(mp,NPC_POPULATION_DATA,plugins,globalThis.__thornswoodNpcMerchants);
     globalThis.__thornswoodNpcRuntime = startSharedNpcServerRuntime(
       mp, {setTimeout, clearTimeout}, Date.now, text=>log(text),globalThis.__thornswoodNpcPopulation);
   }
-} catch (e) { log('NPC server runtime failed to start: ' + e); }
+} catch (e) {
+  if(globalThis.__thornswoodNpcMerchants) globalThis.__thornswoodNpcMerchants.shutdown();
+  if(globalThis.__thornswoodNpcRuntime) globalThis.__thornswoodNpcRuntime.stop();
+  globalThis.__thornswoodNpcMerchants=null;
+  globalThis.__thornswoodNpcPopulation=null;
+  globalThis.__thornswoodNpcRuntime=null;
+  log('NPC server runtime failed to start: ' + e);
+}
