@@ -3646,8 +3646,47 @@ STAMP = os.path.join(DATA_DIR, 'commands-synced.json')
 FORCE_SYNC = _int_env('FORCE_COMMAND_SYNC', 0)
 
 
+def _children_of(command):
+    """
+    A group's subcommands, and nothing at all for a plain command.
+
+    Read by attribute rather than by type, because the ready harness stands a
+    counting object in for the tree and never imports a real Group.
+    """
+    got = getattr(command, 'commands', None)
+    return list(got) if got else []
+
+
 def _command_names():
-    return sorted(c.name for c in tree.get_commands())
+    """
+    Every name Discord has to be told about, sorted: the groups, and their
+    children under them.
+
+    THE SCHEME. A child is written under its parent with a space between
+    them, the way a person types it in the picker: `live-smoke` is in the
+    list, and so are `live-smoke report` and the rest. Nested groups go on the
+    same way, `parent child grandchild`. The stamp still holds a sorted list
+    of plain strings, so a stamp written before this reads back fine; it is
+    missing every child, which is exactly why the next start syncs.
+
+    WHY IT IS NOT THE TOP LEVEL ALONE. It was, and adding a subcommand to a
+    group that was already registered left this list identical. `/live-smoke
+    report` was merged and deployed, the start said "slash commands already
+    registered", no sync went to Discord, and the picker kept offering the
+    three subcommands it had. It took FORCE_COMMAND_SYNC to put it there. A
+    child is a command as far as the picker is concerned, so it is a name
+    here.
+    """
+    out = []
+
+    def walk(commands, prefix):
+        for c in commands:
+            name = (prefix + ' ' + c.name) if prefix else c.name
+            out.append(name)
+            walk(_children_of(c), name)
+
+    walk(tree.get_commands(), '')
+    return sorted(out)
 
 
 def _stamp_read():
