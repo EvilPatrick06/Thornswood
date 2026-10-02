@@ -105,9 +105,14 @@ hiding every name, are remembered too, and the name tag is drawn
 clear. P lists Mute, Text, and Name for each friend, and Hide every
 name for the whole list.
 
-The mark above the head is not in the world. The launcher draws its
-own speaking light, and that light is not above a head and is not
-colored by the distance. Words above the head are not drawn. Staff
-`/silence` is a staff command. It stops what they type through the
-game server. It does not hide a name, and it cannot stop words above
-a head, because those words are not drawn.
+The mark above the head is drawn while the microphone is open. It
+sits above the name, and it does not recolor the name. Whisper is
+pale blue and gone at 7 metres, ordinary speech is white and gone at
+30, and a yell is amber and gone at 85. Same cell first. You do not
+see it on your own head. A voice mute hides it. Hiding a name does
+not, and neither does turning their text off. The launcher still
+draws its own speaking light.
+
+Staff `/silence` stops their voice, what they type, the words above
+the head, and the speaking mark for everybody. It does not hide
+their name.

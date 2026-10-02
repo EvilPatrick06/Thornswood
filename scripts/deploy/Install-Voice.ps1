@@ -115,7 +115,7 @@ if ($Remove) {
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack -and -not $Remove -and -not $Restart) {
-    $artifact = New-ThornswoodArtifact -Component voice -RepoDir (Join-Path $Here '..\..') -Paths 'voice/voice-server.js', 'voice/public' `
+    $artifact = New-ThornswoodArtifact -Component voice -RepoDir (Join-Path $Here '..\..') -Paths 'voice/voice-server.js', 'voice/headlines.js', 'voice/public' `
         -AlsoSends 'scripts/vps/Roll-Log.ps1'
     Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
 }
@@ -187,7 +187,7 @@ if (-not $PutBack) {
 Send-ThornswoodArtifact -Artifact $artifact -Target $target -SshArgs $ssh
 $src = Join-Path $artifact.Folder 'voice'
 }
-foreach ($f in 'voice-server.js', 'public\index.html', 'public\voice.js') {
+foreach ($f in 'voice-server.js', 'headlines.js', 'public\index.html', 'public\voice.js') {
     if (-not (Test-Path -LiteralPath (Join-Path $src $f))) { Die "not found: $(Join-Path $src $f)" }
 }
 
@@ -199,7 +199,7 @@ foreach ($f in 'voice-server.js', 'public\index.html', 'public\voice.js') {
   come up" with nothing put back and an exit code of 0. The page changed under
   everybody the moment it was copied, whatever the service did next.
 
-  Now the four files go into $Root\.stage-<stamp> while the service runs, the
+  Now the files go into $Root\.stage-<stamp> while the service runs, the
   box checks them there (each by its hash, voice-server.js through
   node --check), and nothing is stopped if that fails. Then Swap.ps1's service
   swap stops it, renames them in (what they replace goes to
@@ -247,6 +247,7 @@ if (-not $PutBack) {
     Head 'Staging'
     $send = [ordered]@{}
     $send['voice-server.js'] = Join-Path $src 'voice-server.js'
+    $send['headlines.js'] = Join-Path $src 'headlines.js'
     # The roller the task runs in front of the service. See Roll-Log.ps1 for
     # why a log cmd holds open can only be rolled at start.
     $send['roll-log.ps1'] = Join-Path $Here '..\vps\Roll-Log.ps1'

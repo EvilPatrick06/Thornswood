@@ -73,6 +73,7 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 async function run(env, files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'turnkey-'));
   fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
+  fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
   fs.writeFileSync(path.join(dir, 'token-key.txt'), 'a join token key for this test only');
   for (const name of Object.keys(files || {})) {
     if (files[name] === null) fs.mkdirSync(path.join(dir, name));

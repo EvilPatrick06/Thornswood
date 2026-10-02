@@ -330,7 +330,11 @@ function connect() {
     var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
     if (m.t === 'pong') { return; }
     // In, so the next loss starts again from two seconds.
-    if (m.t === 'welcome') { myPeer = m.peer; myProfile = cfg.profileId; tries = 0; deniedWhy = ''; return; }
+    if (m.t === 'welcome') {
+      myPeer = m.peer; myProfile = cfg.profileId; tries = 0; deniedWhy = '';
+      send({ t: 'talk', on: talking });
+      return;
+    }
     // Refused, and the service closes the socket next. The launcher fetches
     // a fresh token; see the note over RETRY_FIRST.
     if (m.t === 'denied') { deniedWhy = String(m.why || 'it did not say why'); host('denied', deniedWhy); return; }
@@ -576,6 +580,7 @@ window.chrome.webview.addEventListener('message', function (e) {
     talking = !!m.on;
     if (micTrack) micTrack.enabled = talking;
     host('talking', talking ? '1' : '0');
+    send({ t: 'talk', on: talking });
     return;
   }
 

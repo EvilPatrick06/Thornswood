@@ -36,6 +36,7 @@ function yes(what, cond) {
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-chatlimit-'));
 fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
+fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
 const CHAT_DIR = path.join(dir, 'chat');
 
 const srv = spawn(process.execPath, ['voice-server.js'], {

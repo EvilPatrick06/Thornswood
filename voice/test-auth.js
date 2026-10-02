@@ -23,6 +23,7 @@ const AUTH = process.argv[2] || 'on';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'voiceauth-'));
 fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
+fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
 fs.writeFileSync(path.join(dir, 'secret.txt'), 'a test secret, not the real one');
 const KEY = crypto.randomBytes(32).toString('hex');
 fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);

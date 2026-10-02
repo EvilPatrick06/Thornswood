@@ -75,6 +75,5 @@ The leader is stored. Kick, handing the lead across, and disband are
 commands, and P shows Kick, Lead, and Disband to the leader. Everyone
 else sees Leave. If the leader leaves, the lead already passes, and
 a party of one already ends. The green name, the map marker, and the
-strip are in the server.
-
-The speaking mark above the green name is not in the world.
+strip are in the server. The speaking mark sits above that green
+name while the microphone is open, and it does not recolor it.

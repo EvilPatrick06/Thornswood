@@ -255,6 +255,7 @@ function StartVoice([int]$port, [hashtable]$vars, [string]$key) {
     $dir = Join-Path $script:temp ('voice-' + $port)
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     Copy-Item -LiteralPath (Join-Path $RepoPath 'voice\voice-server.js') -Destination (Join-Path $dir 'voice-server.js')
+    Copy-Item -LiteralPath (Join-Path $RepoPath 'voice\headlines.js') -Destination (Join-Path $dir 'headlines.js')
     Set-Content -LiteralPath (Join-Path $dir 'token-key.txt') -Value 'a join token key for this test only' -Encoding ASCII
     if ($key) { Set-Content -LiteralPath (Join-Path $dir 'turn-key.txt') -Value $key -Encoding ASCII }
     $psi = New-Object System.Diagnostics.ProcessStartInfo

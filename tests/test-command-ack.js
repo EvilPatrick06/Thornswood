@@ -69,6 +69,7 @@ async function until(cond, ms) {
 // ------------------------------------------------------- the real service ---
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-command-ack-'));
 fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
+fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
 const srv = spawn(process.execPath, ['voice-server.js'], {
   cwd: dir,
   env: Object.assign({}, process.env, {
