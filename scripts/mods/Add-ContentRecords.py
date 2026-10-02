@@ -520,12 +520,12 @@ def main():
                       ('ThornswoodRecipePoleFine', RECIPE_POLE_FINE),
                       ('ThornswoodRecipePoleMaster', RECIPE_POLE_MASTER),
                       ('ThornswoodRecipeFishTrap', RECIPE_TRAP),
-                      ('ThornswoodCatchHistcarp', CATCH_HISTCARP),
-                      ('ThornswoodCatchRiverBetty', CATCH_RIVER_BETTY),
-                      ('ThornswoodCatchSlaughterfishScales', CATCH_SCALES),
-                      ('ThornswoodCatchSilversidePerch', CATCH_PERCH),
-                      ('ThornswoodCatchCyrodilicSpadetail', CATCH_SPADETAIL),
-                      ('ThornswoodCatchAbeceanLongfin', CATCH_LONGFIN)):
+                      ('ThornswoodFishHistcarp', CATCH_HISTCARP),
+                      ('ThornswoodFishRiverBetty', CATCH_RIVER_BETTY),
+                      ('ThornswoodFishSlaughterfishScales', CATCH_SCALES),
+                      ('ThornswoodFishSilversidePerch', CATCH_PERCH),
+                      ('ThornswoodFishCyrodilicSpadetail', CATCH_SPADETAIL),
+                      ('ThornswoodFishAbeceanLongfin', CATCH_LONGFIN)):
         here_already = name in by_edid
         if here_already and by_edid[name].fid != fid:
             print('')
@@ -708,12 +708,12 @@ def main():
             b'PFIG': struct.pack('<I', produce),
         })
 
-    catch_histcarp = catch(CATCH_HISTCARP, 'ThornswoodCatchHistcarp', 'Histcarp', HISTCARP)
-    catch_betty = catch(CATCH_RIVER_BETTY, 'ThornswoodCatchRiverBetty', 'River Betty', RIVER_BETTY)
-    catch_scales = catch(CATCH_SCALES, 'ThornswoodCatchSlaughterfishScales', 'Slaughterfish Scales', SLAUGHTERFISH_SCALES)
-    catch_perch = catch(CATCH_PERCH, 'ThornswoodCatchSilversidePerch', 'Silverside Perch', SILVERSIDE_PERCH)
-    catch_spadetail = catch(CATCH_SPADETAIL, 'ThornswoodCatchCyrodilicSpadetail', 'Cyrodilic Spadetail', CYRODILIC_SPADETAIL)
-    catch_longfin = catch(CATCH_LONGFIN, 'ThornswoodCatchAbeceanLongfin', 'Abecean Longfin', ABECEAN_LONGFIN)
+    catch_histcarp = catch(CATCH_HISTCARP, 'ThornswoodFishHistcarp', 'Histcarp', HISTCARP)
+    catch_betty = catch(CATCH_RIVER_BETTY, 'ThornswoodFishRiverBetty', 'River Betty', RIVER_BETTY)
+    catch_scales = catch(CATCH_SCALES, 'ThornswoodFishSlaughterfishScales', 'Slaughterfish Scales', SLAUGHTERFISH_SCALES)
+    catch_perch = catch(CATCH_PERCH, 'ThornswoodFishSilversidePerch', 'Silverside Perch', SILVERSIDE_PERCH)
+    catch_spadetail = catch(CATCH_SPADETAIL, 'ThornswoodFishCyrodilicSpadetail', 'Cyrodilic Spadetail', CYRODILIC_SPADETAIL)
+    catch_longfin = catch(CATCH_LONGFIN, 'ThornswoodFishAbeceanLongfin', 'Abecean Longfin', ABECEAN_LONGFIN)
 
     print('')
     print('What goes in')
@@ -735,12 +735,12 @@ def main():
           'by the stamped mold in the pack'
           % RECIPE_KEY)
     print('  MISC/COBJ poles and fish trap, fisher.md ingredients, no dragon bone')
-    print('  FLOR ThornswoodCatchHistcarp')
-    print('  FLOR ThornswoodCatchRiverBetty')
-    print('  FLOR ThornswoodCatchSlaughterfishScales')
-    print('  FLOR ThornswoodCatchSilversidePerch')
-    print('  FLOR ThornswoodCatchCyrodilicSpadetail')
-    print('  FLOR ThornswoodCatchAbeceanLongfin')
+    print('  FLOR ThornswoodFishHistcarp')
+    print('  FLOR ThornswoodFishRiverBetty')
+    print('  FLOR ThornswoodFishSlaughterfishScales')
+    print('  FLOR ThornswoodFishSilversidePerch')
+    print('  FLOR ThornswoodFishCyrodilicSpadetail')
+    print('  FLOR ThornswoodFishAbeceanLongfin')
     print('')
     print('What changes')
     print('  COBJ 0x%07X ThornswoodRecipeWeaponPickaxe now wants a handle as well as the ingot'
