@@ -235,7 +235,7 @@ jobs:
                  'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-npc-runtime.js',
                  'test-npc-shared-runtime.js', 'test-npc-population-runtime.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
-                 'test-npc-death-policy.js'
+                 'test-npc-death-policy.js', 'test-vortex-profile-state.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n

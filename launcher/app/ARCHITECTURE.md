@@ -297,6 +297,13 @@ live one, a plugin fetched from the server (the old one kept in
 `Profile\Replaced`), and other servers' files moved into `Profile\Isolated`.
 `Verify.cs:750 DeployPersonal()` copies `<Root>\Your Mods` into `Game\Data`.
 
+**Vortex profile state** (VortexProfileState.cs). Checks and the PowerShell
+load-order scripts share this reader for the named Skyrim profile. It reads
+the current LevelDB manifest, compressed tables and sequenced log records
+without opening or writing the database. Deleted, ambiguous, corrupt or
+incomplete profile metadata is refused. Finish deployment and close Vortex
+before a bake or Ship so its exclusively held database can be read.
+
 **Checks** (Checks.cs). The rows on the Play page (`Checks.cs:668 All()`):
 game build, script extender, Address Library, multiplayer, client, mods, mod
 list, other servers, auto load, Steam. A failed row shuts Play unless it is
