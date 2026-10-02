@@ -313,7 +313,8 @@ function pushWheel() {
   js('window.thornswoodSetWheel && window.thornswoodSetWheel(' +
      JSON.stringify(EMOTES) + ',' +
      JSON.stringify(slots) + ',' +
-     JSON.stringify(LETTERS[OPEN_KEY] || '') + ')');
+     JSON.stringify(LETTERS[OPEN_KEY] || '') + ',' +
+     JSON.stringify(LETTERS[STOP_KEY] || 'n') + ')');
 }
 
 function saveSlots() {
@@ -579,9 +580,9 @@ sp.on('browserMessage', guard('browserMessage', (event) => {
   if (what === '__back') { setOpen(false); return; }
 
   // The middle stands you up. It does not change which list is showing.
-  if (what === '__hub') {
+  if (what === '__hub' || what === '__stand') {
     setOpen(false);
-    play(STOP);
+    standUp();
     return;
   }
 
@@ -651,38 +652,40 @@ sp.on('buttonEvent', guard('keys', (e) => {
 
 // A way out of an idle that has no natural end. Works whether or not the wheel
 // is open, because the usual reason you want it is that you are stuck in one.
-sp.on('buttonEvent', guard('stopKey', (e) => {
-  if (e.isDown && !e.isUp && e.code === STOP_KEY && !open &&
-      !(T.isTyping && T.isTyping()) &&
-      !gameIsBusy() && !inCreationRoom()) {
-    play(STOP);
-
-    /*
-     * The same key also takes off a stuck weapon-drawn pin, because the two
-     * problems feel identical from the chair: you are locked into something
-     * and want out.
-     *
-     * skymp5-client turns any animation event with "equip" in its name into
-     * SkympFakeEquip, and whoever receives that calls
-     * TESModPlatform.setWeaponDrawnMode(actor, 1). That value is stored and
-     * never expires, and while it is 1 a Frida hook rewrites every sheathe
-     * into a draw, so the hands cannot go down again by any means the game
-     * offers. Putting clothes on is enough to trigger it.
-     *
-     * -1 is WEAP_DRAWN_MODE_DEFAULT, which means stop overriding rather than
-     * sheathe, so the sheathe below is what actually lowers the hands.
-     */
-    const pc = player();
-    if (pc) {
-      try {
-        sp.TESModPlatform.setWeaponDrawnMode(pc, -1);
-        if (pc.isWeaponDrawn && pc.isWeaponDrawn()) { pc.sheatheWeapon(); }
-        log('cleared the weapon-drawn pin');
-      } catch (err) {
-        log('could not clear the weapon-drawn pin:', err);
-      }
+// With the wheel open the page sends __stand, so a letter typed into the
+// search is not also a stand-up. With the wheel shut this key is the way.
+function standUp() {
+  if ((T.isTyping && T.isTyping()) || gameIsBusy() || inCreationRoom()) { return; }
+  play(STOP);
+  /*
+   * The same key also takes off a stuck weapon-drawn pin, because the two
+   * problems feel identical from the chair: you are locked into something
+   * and want out.
+   *
+   * skymp5-client turns any animation event with "equip" in its name into
+   * SkympFakeEquip, and whoever receives that calls
+   * TESModPlatform.setWeaponDrawnMode(actor, 1). That value is stored and
+   * never expires, and while it is 1 a Frida hook rewrites every sheathe
+   * into a draw, so the hands cannot go down again by any means the game
+   * offers. Putting clothes on is enough to trigger it.
+   *
+   * -1 is WEAP_DRAWN_MODE_DEFAULT, which means stop overriding rather than
+   * sheathe, so the sheathe below is what actually lowers the hands.
+   */
+  const pc = player();
+  if (pc) {
+    try {
+      sp.TESModPlatform.setWeaponDrawnMode(pc, -1);
+      if (pc.isWeaponDrawn && pc.isWeaponDrawn()) { pc.sheatheWeapon(); }
+      log('cleared the weapon-drawn pin');
+    } catch (err) {
+      log('could not clear the weapon-drawn pin:', err);
     }
   }
+}
+
+sp.on('buttonEvent', guard('stopKey', (e) => {
+  if (e.isDown && !e.isUp && e.code === STOP_KEY && !open) { standUp(); }
 }));
 
 log('plugin loaded,', EMOTES.length, 'emotes,', SLOT_COUNT, 'quick slots -',

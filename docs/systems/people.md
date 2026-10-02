@@ -51,8 +51,8 @@ float.
 ## Where this is
 
 The systems in the table are in the server, with the gaps named at
-the bottom of each page, except factions and businesses, which are
-not in the server at all. `/bard` for 5 minutes is in the server.
+the bottom of each page. A faction or a business is the group book
+on J. `/bard` for 5 minutes is in the server.
 The party cap of 6 is in the server. A friend request, a party
 invite, and a trade offer are answered on the prompt. The wheel's
 eight quick slots, the search, and the fifty nine emotes are in the
