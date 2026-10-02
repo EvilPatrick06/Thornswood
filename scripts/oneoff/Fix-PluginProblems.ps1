@@ -1,6 +1,10 @@
 <#
   Fix-PluginProblems.ps1
 
+  RETIRED. DO NOT RUN. Issue #1179: removed CFTO-JK-Patch.esp and RaceMenuPlugin.esp; do not run, the JK patch belongs now. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
+
+  What it used to do, and what is left of it:
+
   Removes two plugins that are actively breaking things.
 
   CFTO-JK-Patch.esp lists four masters: Skyrim.esm, Update.esm, CFTO.esp and
@@ -25,6 +29,13 @@ param(
     [string]$Root = 'C:\Thornswood',
     [switch]$NoPause
 )
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Fix-PluginProblems.ps1 is retired and installs nothing (issue #1179). ' +
+       'The JK''s patch went into the collection on 15 September. Running this would take out a plugin that belongs. Do not run it. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'hand installs are meant again, and read the header first.')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

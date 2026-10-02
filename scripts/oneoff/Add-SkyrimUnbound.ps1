@@ -1,5 +1,9 @@
-﻿<#
+<#
   Add-SkyrimUnbound.ps1
+
+  RETIRED. DO NOT RUN. Issue #1179: installed Skyrim Unbound Reborn into the old build and published. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
+
+  What it used to do, and what is left of it:
 
   Installs Skyrim Unbound Reborn and PapyrusUtil into the isolated build, so
   nobody has to sit through the Helgen cart ride. Five people triggering that
@@ -28,6 +32,13 @@ param(
     [switch]$NoShip,
     [switch]$NoPause
 )
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Add-SkyrimUnbound.ps1 is retired and installs nothing (issue #1179). ' +
+       'Skyrim Unbound Reborn comes from the Nexus collection now, not a one-off hand install that Ships into Game\Data. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'hand installs are meant again, and read the header first.')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
