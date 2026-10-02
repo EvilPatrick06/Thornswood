@@ -150,7 +150,7 @@ A mage sees the spell book there instead.
 
 Bard, merchant, priest, scholar and thief are not picked on K. They
 grant no recipe, no verb and no rank. Bardic rest is on
-[People beside you](people.md). A merchant's institution is the
+[People beside you](people.md). The merchant NPCs belong to the
 [Merchant's Guild](merchants-guild.md).
 
 ## Where this is
