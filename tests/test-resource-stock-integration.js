@@ -61,8 +61,11 @@ function fixture() {
   const ranks = new Map(),credits = [];
   function reload() {
     const stableMath = Object.create(Math); stableMath.random = () => 0;
+    // Pole ownership is covered by test-1379-poles-trap.js; this harness isolates
+    // shared stock ordering, so provide the same harmless gate stub as the
+    // other resource-gate fixtures.
     context = {mp:api,Math:stableMath,Date:{now:() => time},Number,Map,Set,JSON,
-      log() {},randInt:(min,max) => min};
+      log() {},toolGate() { return null; },wearTool() { return null; },randInt:(min,max) => min};
     vm.createContext(context); vm.runInContext(code,context);
     context.__thornswoodCharacter = {
       gate(id,verb) { return classes.get(id) === (verb === 'fish' ? 'fisher' : 'hunter') ? null : 'This work belongs to another class.'; },
