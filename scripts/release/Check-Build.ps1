@@ -155,7 +155,7 @@ else {
   $url = "http://${Vps}:$Port/api/servers/thornswood/manifest.json"
   Say "  manifest    $url" 'DarkGray'
   try {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     $doc = Invoke-RestMethod -Uri $url -TimeoutSec 20
   }
   catch {
