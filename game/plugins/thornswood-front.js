@@ -5069,6 +5069,196 @@
     }
   }));
 
+  /*
+    Words above a head, an emote's name on that same line, and the
+    speaking mark. The name tag is the client's, and this does not
+    touch it: hiding a name leaves the words and the mark where they
+    are. One line at a time, for six seconds. The mark is not words.
+  */
+  const HEAD_MS = 6000;
+  const HEAD_COLOUR = [0.95, 0.91, 0.82, 0.95];
+  const MARK_COLOUR = {
+    whisper: [0.62, 0.78, 0.95, 0.95],
+    local: [1, 1, 1, 0.95],
+    yell: [0.93, 0.68, 0.22, 0.95]
+  };
+  const overheadHeads = {};
+  const overheadMarks = {};
+  let overheadScreen = [1920, 1080];
+  let overheadScreenAt = 0;
+
+  function overheadDrop(rec) {
+    if (!rec || !rec.id) { return; }
+    try {
+      if (sp.getTextString(rec.id) === rec.said) { sp.destroyText(rec.id); }
+    } catch (e) { }
+    rec.id = 0;
+    rec.said = '';
+  }
+
+  function overheadPut(rec, x, y, text, colour) {
+    if (rec.id) {
+      let ours = false;
+      try { ours = sp.getTextString(rec.id) === rec.said; } catch (e) { ours = false; }
+      if (ours) {
+        try {
+          if (text !== rec.said) { sp.setTextString(rec.id, text); rec.said = text; }
+          sp.setTextPos(rec.id, x, y);
+          return;
+        } catch (e) { }
+      }
+      rec.id = 0;
+    }
+    try {
+      rec.id = sp.createText(x, y, text, colour);
+      rec.said = text;
+      try { sp.setTextSize(rec.id, 0.5); } catch (e2) { }
+    } catch (e) {
+      rec.id = 0;
+      rec.said = '';
+    }
+  }
+
+  /* The head, in screen pixels, or null when it is behind the camera
+     or not loaded. Your own line uses the character you are playing. */
+  function overheadPoint(key) {
+    let refr = null;
+    try {
+      if (key === 'self') { refr = sp.Game.getPlayer(); }
+      else { refr = sp.ObjectReference.from(sp.Game.getFormEx(Number(key) || 0)); }
+    } catch (e) { refr = null; }
+    if (!refr) { return null; }
+    let x = 0, y = 0, z = 0, node = false;
+    try {
+      x = sp.NetImmerse.getNodeWorldPositionX(refr, 'NPC Head [Head]', false);
+      y = sp.NetImmerse.getNodeWorldPositionY(refr, 'NPC Head [Head]', false);
+      z = sp.NetImmerse.getNodeWorldPositionZ(refr, 'NPC Head [Head]', false);
+      node = !(x === 0 && y === 0 && z === 0);
+    } catch (e) { node = false; }
+    if (!node) {
+      try {
+        x = refr.getPositionX();
+        y = refr.getPositionY();
+        z = refr.getPositionZ() + 128;
+      } catch (e2) { return null; }
+    } else {
+      z += 32;
+    }
+    let p = null;
+    try { p = sp.worldPointToScreenPoint([x, y, z]); } catch (e) { return null; }
+    const head = p && p[0];
+    if (!head || !(head[2] > 0)) { return null; }
+    const w = overheadScreen[0], h = overheadScreen[1];
+    return {
+      x: Math.round(head[0] * w),
+      y: Math.round((1 - head[1]) * h)
+    };
+  }
+
+  sp.on('browserMessage', guard('overhead', (event) => {
+    const a = event.arguments;
+    if (!a || a[0] !== 'thornswood-front') { return; }
+    const what = String(a[1] || '');
+    if (what.indexOf('headclear:') === 0) {
+      const pid = Number(what.slice(10)) || 0;
+      for (const k in overheadHeads) {
+        if (!Object.prototype.hasOwnProperty.call(overheadHeads, k)) { continue; }
+        if (Number(overheadHeads[k].profile) !== pid) { continue; }
+        overheadDrop(overheadHeads[k]);
+        delete overheadHeads[k];
+      }
+      return;
+    }
+    if (what.indexOf('head:') === 0) {
+      let doc = null;
+      try { doc = JSON.parse(what.slice(5)); } catch (e) { doc = null; }
+      if (!doc || !doc.who || !doc.text) { return; }
+      const key = String(doc.who);
+      const had = overheadHeads[key];
+      if (had && had.text !== String(doc.text)) { overheadDrop(had); }
+      overheadHeads[key] = {
+        text: String(doc.text),
+        profile: Number(doc.profile) || 0,
+        until: Date.now() + HEAD_MS,
+        id: had && had.text === String(doc.text) ? had.id : 0,
+        said: had && had.text === String(doc.text) ? had.said : ''
+      };
+      return;
+    }
+    if (what.indexOf('marks:') === 0) {
+      let list = null;
+      try { list = JSON.parse(what.slice(6)); } catch (e) { list = null; }
+      if (!Array.isArray(list)) { return; }
+      const want = {};
+      for (let i = 0; i < list.length; i++) {
+        const row = list[i];
+        if (!row || !row.a) { continue; }
+        want[String(row.a)] = row.m === 'whisper' || row.m === 'yell' ? row.m : 'local';
+      }
+      for (const k in overheadMarks) {
+        if (!Object.prototype.hasOwnProperty.call(overheadMarks, k)) { continue; }
+        if (want[k]) { overheadMarks[k].mode = want[k]; continue; }
+        overheadDrop(overheadMarks[k]);
+        delete overheadMarks[k];
+      }
+      for (const k in want) {
+        if (!Object.prototype.hasOwnProperty.call(want, k)) { continue; }
+        if (!overheadMarks[k]) { overheadMarks[k] = { mode: want[k], id: 0, said: '' }; }
+      }
+    }
+  }));
+
+  sp.on('update', guard('overhead', () => {
+    const now = Date.now();
+    let any = false;
+    for (const k in overheadHeads) {
+      if (!Object.prototype.hasOwnProperty.call(overheadHeads, k)) { continue; }
+      if (now >= overheadHeads[k].until) {
+        overheadDrop(overheadHeads[k]);
+        delete overheadHeads[k];
+        continue;
+      }
+      any = true;
+    }
+    for (const k in overheadMarks) {
+      if (Object.prototype.hasOwnProperty.call(overheadMarks, k)) { any = true; break; }
+    }
+    if (!any) { return; }
+    if (now - overheadScreenAt > 2000) {
+      overheadScreenAt = now;
+      let w = 0, h = 0;
+      try {
+        w = Number(sp.Utility.getINIInt('iSize W:Display')) || 0;
+        h = Number(sp.Utility.getINIInt('iSize H:Display')) || 0;
+      } catch (e) { }
+      if (w && h) { overheadScreen = [w, h]; }
+    }
+    const seen = {};
+    function drawOne(key) {
+      if (seen[key]) { return; }
+      seen[key] = true;
+      const words = overheadHeads[key];
+      const mark = overheadMarks[key];
+      const at = overheadPoint(key);
+      if (!at) {
+        if (words) { overheadDrop(words); }
+        if (mark) { overheadDrop(mark); }
+        return;
+      }
+      if (words) { overheadPut(words, at.x, at.y - 28, words.text, HEAD_COLOUR); }
+      if (mark) {
+        const colour = MARK_COLOUR[mark.mode] || MARK_COLOUR.local;
+        overheadPut(mark, at.x, at.y - (words ? 46 : 28), '*', colour);
+      }
+    }
+    for (const k in overheadHeads) {
+      if (Object.prototype.hasOwnProperty.call(overheadHeads, k)) { drawOne(k); }
+    }
+    for (const k in overheadMarks) {
+      if (Object.prototype.hasOwnProperty.call(overheadMarks, k)) { drawOne(k); }
+    }
+  }));
+
 
   let stuckKeys = 0;
   let stuckMoveKeys = 0;

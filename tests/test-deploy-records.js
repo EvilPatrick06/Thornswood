@@ -83,6 +83,7 @@ async function main() {
   async function health(withRecord) {
     const d = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-voice-deploy-'));
     fs.copyFileSync(path.join(REPO, 'voice', 'voice-server.js'), path.join(d, 'voice-server.js'));
+    fs.copyFileSync(path.join(REPO, 'voice', 'headlines.js'), path.join(d, 'headlines.js'));
     if (withRecord) fs.writeFileSync(path.join(d, 'thornswood-deploy.json'), JSON.stringify(Object.assign({}, record, { component: 'voice' })));
     const srv = spawn(process.execPath, ['voice-server.js'], { cwd: d,
       env: Object.assign({}, process.env, { THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_SITE: '', THORNSWOOD_VOICE_BIND: '127.0.0.1' }) });

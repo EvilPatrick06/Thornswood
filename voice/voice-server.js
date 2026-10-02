@@ -24,6 +24,7 @@ const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const headlines = require('./headlines');
 
 const PORT = Number(process.env.THORNSWOOD_VOICE_PORT || 7778);
 /*
@@ -58,7 +59,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -981,13 +982,46 @@ function onJoin(ws, msg) {
 */
 function whole(n) { return Math.round(Number(n) || 0); }
 
+function voiceOf(profileId) {
+  let talk = false;
+  let mode = 'local';
+  const pid = Number(profileId) || 0;
+  for (const [, p] of peers) {
+    if (Number(p.profileId) !== pid) continue;
+    if (p.talking) talk = true;
+    if (p.mode) mode = p.mode;
+  }
+  if (silencedLeft(pid, Date.now())) talk = false;
+  return { talk: talk, mode: mode };
+}
+
+function actorOf(profileId) {
+  const v = positions.get(Number(profileId) || 0);
+  return v && v.actor ? v.actor : 0;
+}
+
+/* Same cell, then a straight line. The speaker is always inside their own
+   reach, so they see the line above their own head. */
+function inSpeech(aPid, bPid, reach) {
+  if (Number(aPid) && Number(aPid) === Number(bPid)) return true;
+  const now = Date.now();
+  const a = positions.get(Number(aPid) || 0);
+  const b = positions.get(Number(bPid) || 0);
+  if (!a || !b || now - a.at > STALE_MS || now - b.at > STALE_MS) return false;
+  return headlines.sameCellWithin(a, b, reach);
+}
+
 function snapshot() {
   const now = Date.now();
   const out = {};
   for (const [pid, v] of positions) {
     if (now - v.at > STALE_MS) continue;
     const pos = Array.isArray(v.pos) ? [whole(v.pos[0]), whole(v.pos[1]), whole(v.pos[2])] : v.pos;
-    out[pid] = { pos: pos, angleZ: whole(v.angleZ), cell: v.cell, name: v.name };
+    const voice = voiceOf(Number(pid));
+    out[pid] = {
+      pos: pos, angleZ: whole(v.angleZ), cell: v.cell, name: v.name,
+      actor: v.actor || 0, talk: voice.talk ? 1 : 0, mode: voice.mode
+    };
   }
   return out;
 }
@@ -1457,6 +1491,7 @@ const server = http.createServer((req, res) => {
           positions.set(pid, {
             pos: row.pos, angleZ: Number(row.angleZ) || 0,
             cell: String(row.cell || ''), name: String(row.name || ''),
+            actor: Number(row.actor) || 0,
             // Kept here and never sent on: it only decides who is told about
             // whom. See WHO IS TOLD ABOUT WHOM.
             party: String(row.party || ''), at: now
@@ -1573,6 +1608,12 @@ const server = http.createServer((req, res) => {
         const pid = Number(k) || 0;
         const until = Number(list[k]) || 0;
         if (pid && until > now) silenced.set(pid, until);
+      }
+      for (const pid of silenced.keys()) {
+        const clear = { t: 'headclear', profileId: pid };
+        for (const [, p] of peers) {
+          try { p.ws.send(clear); } catch (e) { }
+        }
       }
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ silenced: silenced.size }));
@@ -1754,7 +1795,57 @@ server.on('upgrade', (req, socket, head) => {
       if (me.mode === mode) return;
       me.mode = mode;
       const out = { t: 'vmode', from: myId, profileId: me.profileId, mode: mode };
-      for (const [, p] of peers) p.ws.send(out);
+      for (const [, p] of peers) {
+        if (Number(p.profileId) === Number(me.profileId)) p.mode = mode;
+        p.ws.send(out);
+      }
+      return;
+    }
+
+    // The microphone opened or closed. Kept on every connection for this
+    // profile, because the launcher and the game can each hold one. The
+    // position tick is what the game reads, so a person who walks into
+    // range still sees the mark.
+    if (msg.t === 'talk') {
+      const me = peers.get(myId);
+      if (!me) return;
+      const on = !!msg.on;
+      for (const [, p] of peers) {
+        if (Number(p.profileId) === Number(me.profileId)) p.talking = on;
+      }
+      return;
+    }
+
+    // An emote's name, on the same one line as typed speech. It does not
+    // also print in the box. The reach is a plain line's reach.
+    if (msg.t === 'emote') {
+      const me = peers.get(myId);
+      const name = headlines.emoteHead(msg.name);
+      if (!name) return;
+      const hush = me ? silencedLeft(me.profileId, Date.now()) : 0;
+      if (hush) {
+        if (me && (!me.hushTold || Date.now() - me.hushTold >= SILENCED_TOLD_EVERY_MS)) {
+          me.hushTold = Date.now();
+          const mins = Math.max(1, Math.ceil(hush / 60000));
+          ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', at: Date.now(),
+                    text: 'Staff have silenced you for another ' + mins +
+                          (mins === 1 ? ' minute' : ' minutes') + ', so that did not reach anybody.' });
+        }
+        return;
+      }
+      chatWrite('emote', myId, me, name);
+      const actor = actorOf(me && me.profileId);
+      const line = {
+        t: 'head', kind: 'emote', text: name,
+        profileId: me ? me.profileId : 0, actor: actor, at: Date.now()
+      };
+      const heard = hearers(myId, me, headlines.SPEECH);
+      const targets = heard ? heard.to : [me].filter(Boolean);
+      for (const p of targets) {
+        if (!p || !p.ws) continue;
+        if (p !== me && textBlocked(p.profileId, line.profileId)) continue;
+        p.ws.send(line);
+      }
       return;
     }
 
@@ -1771,13 +1862,50 @@ server.on('upgrade', (req, socket, head) => {
       const text = String(msg.text == null ? '' : msg.text).slice(0, 400);
       if (!text) return;
 
-      // /me, /do, /w and /s are caught here rather than queued, and only
-      // while the range is on. With it off they go on to the game server
-      // exactly as they did before. See the note over CHAT_RANGE.
-      const verb = CHAT_RANGE ? chatVerb(text) : null;
-      if (verb && !verb.text) {
+      // /me, /do, /w, /s and /ooc are speech. They float, and the box for
+      // them is local, whether or not the plain-line switch is on. Every
+      // other slash is still a command for the game server.
+      const floated = headlines.floatLine(text);
+      if (floated && floated.empty) {
         ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood',
-                  text: CHAT_USAGE[verb.kind], at: Date.now() });
+                  text: floated.usage, at: Date.now() });
+        return;
+      }
+      if (floated && floated.local) {
+        const hush = me ? silencedLeft(me.profileId, Date.now()) : 0;
+        if (hush) {
+          chatWrite('silenced', myId, me, text);
+          if (!me.hushTold || Date.now() - me.hushTold >= SILENCED_TOLD_EVERY_MS) {
+            me.hushTold = Date.now();
+            const mins = Math.max(1, Math.ceil(hush / 60000));
+            ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', at: Date.now(),
+                      text: 'Staff have silenced you for another ' + mins +
+                            (mins === 1 ? ' minute' : ' minutes') + ', so that did not reach anybody.' });
+          }
+          return;
+        }
+        if (!chatAllow(me, myId, Date.now())) return;
+        chatWrite('say', myId, me, text);
+        const actor = actorOf(me && me.profileId);
+        const out = {
+          t: 'chat', from: myId, profileId: me ? me.profileId : 0, name: peerName(me),
+          text: floated.words, kind: floated.kind, head: floated.head, actor: actor,
+          at: Date.now()
+        };
+        const heard = hearers(myId, me, floated.reach);
+        const targets = heard ? heard.to : [me].filter(Boolean);
+        let sent = 0;
+        for (const p of targets) {
+          if (!p || !p.ws) continue;
+          if (p !== me && textBlocked(p.profileId, out.profileId)) continue;
+          p.ws.send(out);
+          sent++;
+        }
+        if (sent <= 1) {
+          ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', at: Date.now(),
+                    text: heard && heard.placed ? 'Nobody near enough to hear that.'
+                                                : 'Your character is not in the world yet, so nobody heard that.' });
+        }
         return;
       }
 
@@ -1794,7 +1922,7 @@ server.on('upgrade', (req, socket, head) => {
       // exactly five console commands to the server (additem, equipitem,
       // placeatme, disable, mp) and coc is not one of them, so a coc moves you
       // in your own game and the server puts you straight back.
-      if (!verb && text.charAt(0) === '/') {
+      if (text.charAt(0) === '/') {
         // A join pass is good for ten minutes to whoever holds it, so the
         // chat log keeps that one was sent and never the pass itself (#937).
         chatWrite('command', myId, me, /^\/joinpass\b/i.test(text) ? '/joinpass [pass]' : text);
@@ -1851,26 +1979,35 @@ server.on('upgrade', (req, socket, head) => {
          turns on. */
       chatWrite('say', myId, me, text);
 
+      const profileId = me ? me.profileId : 0;
+      const actor = actorOf(profileId);
+      const head = floated && floated.head;
       const out = {
         t: 'chat',
         from: myId,
-        profileId: me ? me.profileId : 0,
+        profileId: profileId,
         name: peerName(me),
         text: text,
+        kind: 'say',
         at: Date.now()
       };
-      // With the range off nothing here runs and the line goes to everybody
-      // below, the same object as always. The log above keeps what was typed,
-      // verb and all, so a moderator reads "/me swings at him" as it was sent.
+      // The box stays worldwide while the range switch is off, and local
+      // while it is on. The line above the head is local either way, and
+      // you always get your own.
+      function deliver(p) {
+        if (!p || !p.ws) return;
+        if (p !== me && textBlocked(p.profileId, profileId)) return;
+        const copy = Object.assign({}, out);
+        if (head && inSpeech(profileId, p.profileId, headlines.SPEECH)) {
+          copy.head = head;
+          copy.actor = actor;
+        }
+        p.ws.send(copy);
+      }
       if (CHAT_RANGE) {
-        out.kind = verb ? verb.kind : 'say';
-        if (verb) out.text = verb.text;
-        const heard = hearers(myId, me, chatReach(out.kind));
+        const heard = hearers(myId, me, chatReach('say'));
         if (heard) {
-          for (const p of heard.to) {
-            if (textBlocked(p.profileId, out.profileId)) continue;
-            p.ws.send(out);
-          }
+          for (const p of heard.to) deliver(p);
           if (heard.to.length <= 1) {
             ws.send({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', at: Date.now(),
                       text: heard.placed ? 'Nobody near enough to hear that.'
@@ -1879,10 +2016,7 @@ server.on('upgrade', (req, socket, head) => {
           return;
         }
       }
-      for (const [, p] of peers) {
-        if (textBlocked(p.profileId, out.profileId)) continue;
-        p.ws.send(out);
-      }
+      for (const [, p] of peers) deliver(p);
       return;
     }
   };
