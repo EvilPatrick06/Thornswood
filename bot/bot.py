@@ -19,9 +19,10 @@ What it does:
   Live smoke the living checklist in #test-tasks: /live-smoke start opens a
            dated session thread with one message per row of the Live set, and
            testers mark their own rows on it. /live-smoke refresh keeps the
-           same rows standing in the channel between sessions. The rows come
-           out of live-smoke-discord-export.json beside this file, and a mark
-           is an edit to a Discord message and nothing else
+           same rows standing in the channel between sessions, and
+           /live-smoke report counts a session's marks back to staff. The
+           rows come out of live-smoke-discord-export.json beside this file,
+           and a mark is an edit to a Discord message and nothing else
   Heartbeat writes heartbeat.json beside this file every minute, so the
            watchdog can tell a bot that is running from one that is on
            Discord (issue #449)
@@ -1811,6 +1812,14 @@ async def ensure_hold_panel(guild):
 # handler logs no traceback, because a Discord error carries the message it
 # refused and that message holds names and marks.
 #
+# WHAT A REPORT IS. The same marks read back, not a second record of them.
+# /live-smoke report counts the rows in one session thread and says the total
+# to whoever ran it as an ephemeral, so a Fail is not missed halfway down a
+# session of twenty eight rows. It reads the messages Discord already holds,
+# names people by the display names those messages already carry, and posts
+# nothing in the thread. Keeping marks anywhere off Discord is a different
+# thing and needs the Privacy page changed first.
+#
 # Marks are visible to everybody who can read the session thread. That is the
 # Owner's call rather than an accident. The channel itself is pathfind in
 # Build-Discord.py: testers and staff, never @everyone, plus the lead
@@ -1828,10 +1837,10 @@ async def ensure_hold_panel(guild):
 #
 # WHO MAY START ONE. Owner, Dev and Lead Gamemaster, which is wider than
 # Owner and Dev and narrower than STAFF: a Moderator alone does not start,
-# reset or refresh a session. Roles were deleted and renamed in the cleanup,
-# so these are matched by name against whatever the server carries today, and
-# LIVE_SMOKE_ADMIN_ROLES in bot.env.json moves them without a deploy. No
-# snowflake is written down anywhere here.
+# reset, refresh or report on a session. Roles were deleted and renamed in
+# the cleanup, so these are matched by name against whatever the server
+# carries today, and LIVE_SMOKE_ADMIN_ROLES in bot.env.json moves them
+# without a deploy. No snowflake is written down anywhere here.
 #
 # The default is in this file and not read out of the export, so content that
 # moves when Cynthia refreshes the Live set can never widen who may start a
@@ -2096,6 +2105,163 @@ def live_smoke_mark(content, who, mark):
     return body + LIVE_SMOKE_MARKS_HEAD + '\n'.join(lines)
 
 
+def live_smoke_read_marks(content):
+    """
+    Who marked this row what, in the order they marked it, off the message's
+    own words.
+
+    The other half of live_smoke_mark, and pure for the same reason: a report
+    is the rows in the thread counted up, so the harness can prove what a
+    session of marks reads as without a Discord to press buttons in.
+
+    A line under the heading that is not a name against one of the four marks
+    is left out rather than counted as something. Split off the end, the way
+    live_smoke_mark writes it, because a name in Discord may carry a colon.
+    """
+    text = str(content or '')
+    at = text.find(LIVE_SMOKE_MARKS_HEAD)
+    if at < 0:
+        return []
+    out = []
+    for line in text[at + len(LIVE_SMOKE_MARKS_HEAD):].split('\n'):
+        if ': ' not in line:
+            continue
+        who, mark = line.rsplit(': ', 1)
+        who, mark = who.strip(), mark.strip()
+        if not who or mark not in LIVE_SMOKE_MARKS:
+            continue
+        out.append((who, mark))
+    return out
+
+
+# The words a row's heading starts with, which is how a message in a session
+# thread is told from the opener above it and from anything anybody else
+# posted in it. live_smoke_item_text writes the heading.
+LIVE_SMOKE_ROW_HEAD = re.compile(r'^\*\*(Live \d+)')
+
+
+def live_smoke_row_name(content):
+    """
+    Live 13, off a row's own heading, or '' when this message is not a row.
+
+    Short on purpose: a report names every row of the set, and the number is
+    what a row is called in the thread, in the standing checklist and in the
+    export, so it is the one word that reaches all three.
+    """
+    got = LIVE_SMOKE_ROW_HEAD.match(str(content or '').lstrip())
+    return got.group(1) if got else ''
+
+
+def live_smoke_opener_stamp(content):
+    """
+    The stamp line off a session's opener, or ''.
+
+    Which Live set a session was opened against is the one thing a report has
+    to say that the thread's name does not. The opener's other lines are known,
+    because live_smoke_opener writes them, so the stamp is whatever is left and
+    this holds whatever wording the export's version_stamp gives it.
+    """
+    lines = [l.strip() for l in str(content or '').split('\n') if l.strip()]
+    for line in lines[1:]:
+        if line.startswith('Live channel:') or line.startswith('Settings version:'):
+            continue
+        return line
+    return ''
+
+
+def live_smoke_row_line(name, marks):
+    """
+    One row in a report: its name, then each mark somebody gave it with how
+    many gave it, and for a Fail or a Fail-known who they were.
+
+    Named for the two marks Dev acts on and counted for the other two. Eleven
+    names on a Pass are eleven names between whoever is reading and the one
+    Fail under it, and the thread itself still has them.
+    """
+    said = []
+    for mark in LIVE_SMOKE_MARKS:
+        who = [w for w, k in marks if k == mark]
+        if not who:
+            continue
+        if mark in ('Fail', 'Fail-known'):
+            said.append('%s %d (%s)' % (mark, len(who), ', '.join(who)))
+        else:
+            said.append('%s %d' % (mark, len(who)))
+    return '%s: %s' % (name, ', '.join(said))
+
+
+def live_smoke_report_text(title, stamp, rows):
+    """
+    What an admin reads instead of scrolling the whole session: the session's
+    own name, how many rows it has, which of them carry a Fail, which nobody
+    has marked, and then a line for each row that somebody marked.
+
+    rows is (name, marks) for every row in the thread, in the order the
+    session posted them, as live_smoke_row_name and live_smoke_read_marks read
+    them off each message.
+
+    Display names only, the same ones the rows themselves carry, and no
+    account id: this is the thread's own words counted up and said back to one
+    person. Pure, so the harness can read a session of marks without Discord.
+    """
+    head = ['**%s**' % (str(title or '').strip() or LIVE_SMOKE_TITLE)]
+    if stamp:
+        head.append(stamp)
+    if not rows:
+        head.append('There are no checklist rows in this thread to read.')
+        return '\n'.join(head)
+    marked = [(n, m) for n, m in rows if m]
+    blank = [n for n, m in rows if not m]
+    if not marked:
+        head.append('%d row(s), none of them marked yet.' % len(rows))
+    elif blank:
+        head.append('%d row(s). %d marked, %d not marked yet.'
+                    % (len(rows), len(marked), len(blank)))
+    else:
+        head.append('%d row(s), every one of them marked.' % len(rows))
+    for mark in ('Fail', 'Fail-known'):
+        named = [n for n, m in rows if any(k == mark for _w, k in m)]
+        if named:
+            head.append('%s on: %s.' % (mark, ', '.join(named)))
+    if blank:
+        head.append('Not marked: %s.' % ', '.join(blank))
+    body = [live_smoke_row_line(n, m) for n, m in marked]
+    said = '\n'.join(head + [''] + body) if body else '\n'.join(head)
+    # A Discord message holds what it holds, and the lines above the list name
+    # every Fail, so the list is what gives way when a session runs long.
+    while len(said) > LIVE_SMOKE_ROOM and body:
+        body.pop()
+        said = '\n'.join(head + [''] + body
+                         + ['(%d more marked row(s) are in the thread. Every '
+                            'Fail is named above.)' % (len(marked) - len(body))])
+    if len(said) > LIVE_SMOKE_ROOM:
+        said = said[:LIVE_SMOKE_ROOM].rstrip() + '\n(the rest is in the thread)'
+    return said
+
+
+def live_smoke_report_refusal(channel):
+    """
+    Why the marks cannot be counted here, or None.
+
+    A report is of one dated session, so it is read in that session's own
+    thread, while that session is the one open. The channel itself holds no
+    marks, and neither does the thread the standing checklist stands in: those
+    rows carry no buttons, because a mark belongs to a dated session.
+    """
+    if not live_smoke_in_session(channel):
+        return ('Run this in the session thread whose marks you want, under '
+                '#%s.' % LIVE_SMOKE_CHANNEL[0])
+    if not str(getattr(channel, 'name', '') or '').startswith(LIVE_SMOKE_TITLE):
+        return ('This is not a Live smoke session thread, so there are no '
+                'marks in it: the rows in %s carry no buttons. Run this in '
+                'the thread of the session you want.' % LIVE_SMOKE_ROWS)
+    if getattr(channel, 'archived', False) or getattr(channel, 'locked', False):
+        return ('That session is closed, so this reports on the session that '
+                'is open. Its rows are still in the thread, marks and all, '
+                'for anybody who can read it.')
+    return None
+
+
 def live_smoke_head(export):
     """
     The post the standing rows hang off: the heading refresh finds it by
@@ -2132,7 +2298,8 @@ def live_smoke_checklist(export, items):
 
 def is_live_smoke_admin(who):
     """Owner, Dev or Lead Gamemaster, by the names LIVE_SMOKE_ADMIN_ROLES
-       carries. A Moderator alone is not one of them."""
+       carries. A Moderator alone is not one of them. The one list behind
+       start, reset, refresh and report."""
     try:
         names = set(r.name.lower() for r in getattr(who, 'roles', None) or [])
     except Exception:
@@ -2153,8 +2320,8 @@ def live_smoke_admin_missing(guild):
 
 def live_smoke_admin_refusal(guild):
     """
-    Why this person cannot start, reset or refresh, in words they can do
-    something about.
+    Why this person cannot start, reset, refresh or report, in words they can
+    do something about.
 
     Only a server carrying none of the names at all is told about missing
     roles. Lead GM and Lead Gamemaster are two spellings of one role, so one
@@ -2167,8 +2334,8 @@ def live_smoke_admin_refusal(guild):
                 'LIVE_SMOKE_ADMIN_ROLES in bot.env.json to the names those '
                 'roles carry now, and run Install-Bot.ps1 again.'
                 % ', '.join(missing))
-    return ('%s start, reset and refresh a Live smoke session. Ask one of them.'
-            % _live_smoke_or(LIVE_SMOKE_ADMIN_NAMES))
+    return ('%s start, reset, refresh and report on a Live smoke session. Ask '
+            'one of them.' % _live_smoke_or(LIVE_SMOKE_ADMIN_NAMES))
 
 
 def live_smoke_tick_refusal(who):
@@ -2295,7 +2462,7 @@ tree.add_command(live_smoke)
 async def _live_smoke_ready(interaction):
     """
     The channel and the export, or None once the person has been told what is
-    wrong. The one gate on all three commands.
+    wrong. The one gate on all four commands.
     """
     guild = interaction.guild
     if guild is None:
@@ -2508,6 +2675,88 @@ async def live_smoke_refresh(interaction: discord.Interaction):
         'with the whole of what a tester does. A session already open keeps '
         'the rows it started with, so open a new one with /live-smoke reset '
         'when testers need these.' % (ch.name, len(items)), ephemeral=True)
+
+
+async def live_smoke_rows_marked(thread):
+    """
+    Every checklist row in a session thread with who marked it what, in the
+    order the session posted them.
+
+    The bot's own messages only, and of those the ones whose heading says they
+    are a row, so the opener and anything anybody else said in the thread are
+    not counted as rows with nobody on them.
+    """
+    out = []
+    async for m in thread.history(limit=None, oldest_first=True):
+        if m.author.id != client.user.id:
+            continue
+        said = str(m.content or '')
+        name = live_smoke_row_name(said)
+        if name:
+            out.append((name, live_smoke_read_marks(said)))
+    return out
+
+
+async def live_smoke_session_stamp(thread):
+    """
+    The stamp off the message a session thread hangs off, or ''.
+
+    Asked of the thread first and fetched after that, the way the standing
+    rows thread is found: Discord drops the starter message out of the cache,
+    and a session opened before the last restart is the ordinary case. A
+    report without the stamp is still a report, so a refusal here is '' rather
+    than a failure.
+    """
+    got = getattr(thread, 'starter_message', None)
+    if got is None:
+        try:
+            got = await thread.parent.fetch_message(thread.id)
+        except Exception:
+            return ''
+    return live_smoke_opener_stamp(getattr(got, 'content', ''))
+
+
+@live_smoke.command(name='report',
+                    description='Count the marks on the session thread this '
+                                'is run in. Owner, Dev and Lead Gamemaster '
+                                'only.')
+async def live_smoke_report(interaction: discord.Interaction):
+    """
+    What Dev reads after a session instead of scrolling every row: the counts,
+    who failed what, and the rows nobody has marked.
+
+    Run in the session thread itself, because that is where the marks are, and
+    answered only to whoever ran it. Nothing is posted in the thread and
+    nothing is written anywhere off Discord: this reads the messages Discord
+    already holds, counts them, and says the total back once.
+    """
+    ready = await _live_smoke_ready(interaction)
+    if ready is None:
+        return
+    no = live_smoke_report_refusal(interaction.channel)
+    if no:
+        await _say(interaction, no)
+        return
+    # Reading a session's worth of rows is more than the three seconds Discord
+    # gives a command to answer in.
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    thread = interaction.channel
+    try:
+        rows = await live_smoke_rows_marked(thread)
+        stamp = await live_smoke_session_stamp(thread)
+    except Exception:
+        # No traceback and no count. What Discord hands back when it refuses
+        # to read a thread carries the messages it did read, and those are
+        # names against marks.
+        log('live smoke: a report could not be read')
+        await interaction.followup.send(
+            'That did not go through. In #%s the bot needs View Channel, Read '
+            'Message History and Send Messages in Threads.'
+            % LIVE_SMOKE_CHANNEL[0], ephemeral=True)
+        return
+    await interaction.followup.send(
+        live_smoke_report_text(getattr(thread, 'name', ''), stamp, rows),
+        ephemeral=True)
 
 
 # ----------------------------------------------------- the staff channel --
