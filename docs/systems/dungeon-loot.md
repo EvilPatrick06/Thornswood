@@ -68,3 +68,19 @@ The roll, the rest, and the pay into the pack on opening the
 container are in the server. The places are the interiors whose names
 match a dungeon, a cave, or a sewer in the population catalogue. A
 place the catalogue has not named does not pay. A camp does not pay.
+
+This reward service is enabled on Dev. A living human must be within 400
+units of the same container in the same known cell. Its return reservation
+is saved in the private ledger before the complete gold and goods bundle
+is queued into one inventory write. The return belongs to that container,
+shared by everyone, and survives reload or loss of the native cooldown.
+Missing or damaged private state refuses rewards.
+On the first update, an existing valid native cooldown is saved into the
+private ledger before another reward is considered. It is never replaced
+over an existing private reservation.
+
+The native inventory save is asynchronous. If that write fails or is lost
+in a crash after reservation, the reward can be missing. The reservation
+is retained and is not automatically replayed; its exact reward is saved
+for diagnosis. This prevents another payout from an uncertain write but
+does not claim a durable inventory acknowledgement.
