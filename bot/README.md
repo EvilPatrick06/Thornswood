@@ -124,9 +124,17 @@ deploy. Testers and staff mark their own rows. Agents do not.
 A mark is an edit to the Discord message it was pressed on. Nothing writes a
 mark, a name or an account id to the site, to a database, to a file or to the
 bot's log, and nothing posts a named fail anywhere outside the session thread.
-Everybody who can read the thread can read the marks in it, and the opener
-says so. Going further than that, keeping marks anywhere off Discord, needs
-the Privacy page changed first.
+Everybody who can read the thread can read the marks in it. Going further than
+that, keeping marks anywhere off Discord, needs the Privacy page changed first.
+
+What a session puts in the channel is the checklist rows and nothing wrapped
+around them, which is Djinn's layout call of 1 October. The opener is the
+session's name, the live channel, the Settings version and one line saying
+when the set last changed; the blocks of instructions that used to sit above
+and below the rows are gone. Ticket numbers are not posted either: testers do
+not have GitHub, so `tickets` in the export is for the staff map and the
+harness, and a row carries one only where the export sets
+`rules.discord_show_tickets` to true.
 
 When the Live set moves, the export changes in the vault and the copy in `bot`
 changes with it in the same pull request. Then
