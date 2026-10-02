@@ -328,9 +328,46 @@ function sayEmote(name) {
      JSON.stringify(String(name || '')) + '});}catch(e){}');
 }
 
+/*
+  The three a Woodwright can make. Skyrim's own lute, flute and drum are
+  clutter and cannot be held, so the wheel asks for these weapons. Local ids
+  in PlayFluteLuteDrum.esp.
+*/
+const INSTRUMENT_FILE = 'PlayFluteLuteDrum.esp';
+const INSTRUMENTS = {
+  lute: { id: 0x1d9b, word: 'a lute' },
+  flute: { id: 0xd62, word: 'a flute' },
+  drum: { id: 0x287f, word: 'a drum' }
+};
+
+function instrumentOf(name) {
+  return INSTRUMENTS[String(name || '').toLowerCase()] || null;
+}
+
+function carryingInstrument(need) {
+  const pc = player();
+  if (!pc || !need) { return false; }
+  try {
+    const form = sp.Game.getFormFromFile(need.id, INSTRUMENT_FILE);
+    if (!form) { return false; }
+    return pc.getItemCount(form) > 0;
+  } catch (e) { return false; }
+}
+
+/* True when this name is an instrument the person does not have. */
+function refuseInstrument(name) {
+  const need = instrumentOf(name);
+  if (!need) { return false; }
+  if (carryingInstrument(need)) { return false; }
+  try { sp.Debug.notification('You need ' + need.word + '.'); } catch (e) { }
+  log('refused', name, 'without', need.word);
+  return true;
+}
+
 function playNamed(name) {
   const item = emoteByName(name);
   if (!item) { return; }
+  if (refuseInstrument(item.name)) { setOpen(false); return; }
   log('picked', item.name);
   setOpen(false);
   sayEmote(item.name);
@@ -340,6 +377,7 @@ function playNamed(name) {
 function playSlot(n) {
   const item = emoteByName(slots[n - 1]);
   if (!item) { return; }
+  if (refuseInstrument(item.name)) { setOpen(false); return; }
   log('slot', n, item.name);
   setOpen(false);
   sayEmote(item.name);
@@ -425,6 +463,9 @@ function setOpen(v) {
  * where the VM is. The wait is at most one frame.
  */
 const queued = [];
+/* The one idle drain() is about to send. Anything else from this list, on
+   this character, is the game or a load or a door, and is dropped. */
+let permit = '';
 
 function play(event) {
   if (typeof event !== 'string' || !event.length) { return; }
@@ -475,11 +516,49 @@ function drain() {
   }
 
   try {
+    permit = event === STOP ? '' : event;
     sp.Debug.sendAnimationEvent(pc, event);
     log('played', event);
   } catch (e) {
     log('sendAnimationEvent threw on', event + ':', e);
   }
+  permit = '';
+}
+
+/*
+  A load and a door both play the last idle again, and the behaviour graph
+  will start a lute or a mug on its own. Those are the wheel's idles. On this
+  character they are kept only for the one drain() just asked for.
+
+  A potion, a meal, a chop and a hoe use the same names as four of the wheel's
+  rows, and the game sends those for the real action, so they are left alone.
+*/
+const emoteEvent = {};
+for (let i = 0; i < EMOTES.length; i++) {
+  emoteEvent[EMOTES[i].event.toLowerCase()] = true;
+}
+const gameplayEvent = {
+  idledrinkpotion: true,
+  idleeatingstandingstart: true,
+  idlewoodchopstart: true,
+  idlehoe: true
+};
+try {
+  sp.hooks.sendAnimationEvent.add({
+    enter: (ctx) => {
+      try {
+        const pc = player();
+        if (!pc || ctx.selfId !== pc.getFormID()) { return; }
+        const low = String(ctx.animEventName || '').toLowerCase();
+        if (!emoteEvent[low] || gameplayEvent[low]) { return; }
+        if (permit && permit.toLowerCase() === low) { return; }
+        ctx.animEventName = '';
+      } catch (e) { }
+    },
+    leave: () => {}
+  });
+} catch (e) {
+  log('could not watch emote idles:', e);
 }
 
 // The front closes the wheel for us in a menu, but only for focus. The overlay
