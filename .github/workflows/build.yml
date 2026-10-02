@@ -236,7 +236,8 @@ jobs:
                  'test-npc-shared-runtime.js', 'test-npc-population-runtime.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
                  'test-npc-death-policy.js', 'test-vortex-profile-state.ps1',
-                 'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js'
+                 'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js',
+                 'test-npc-merchant-purses.js', 'test-merchant-ledger-storage.js', 'test-npc-merchant-startup.js'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
