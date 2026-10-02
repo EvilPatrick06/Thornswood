@@ -228,6 +228,11 @@ jobs:
           # on later takes Thornswood's files back out of it. It runs the real
           # Setup-Thornswood.ps1 and the whole launcher on a pretend Steam in a
           # temp folder, about twenty seconds.
+          # Issue #1359 widened test-deploy-records.js rather than adding a
+          # harness: it now starts a copy of the site in a temp folder on a
+          # spare port and asks /api/deploys as nobody, as a hub member and
+          # as an admin, so the door going back to open fails here. About a
+          # second on top of what it already took.
           # Issue #1361 added one: Secrets.Protect logs and throws when DPAPI
           # refuses, instead of handing the plain secret back to be written to
           # disk, and Unprotect is left as it was. It reads the launcher's
