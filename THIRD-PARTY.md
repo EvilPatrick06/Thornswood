@@ -94,16 +94,16 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `df1a6c39` (in full, `df1a6c39491c64aa1781e6c393c3351ed73883f7`). That
+commit `d6c99400` (in full, `d6c99400f680784da6b6f0a14851b0f0aa35524d`). That
 is upstream skyrim-multiplayer/skymp at `f926944b` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
 recorded build.
 
-For this pin, MpClientPlugin was relinked against the canonical native archive.
-The other five runtime files are verified unchanged artifacts whose source and
-build inputs are identical to the previous pin. Their hashes and validation
-are recorded in `records\client-provenance-df1a6c39.md`.
+For this pin, only `skymp5-client.js` was rebuilt (skymp #10 / Thornswood #1268:
+when the server never answers, say so; do not shout LOAD ORDER WARNING). The
+other five runtime files keep the `df1a6c39` hashes. Evidence is in
+`records\client-provenance-d6c99400.md`.
 
 | File | Built from, in the fork | Licence |
 |---|---|---|
@@ -393,7 +393,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`. That record names `skymp5-server` in the fork at
-  `df1a6c39491c64aa1781e6c393c3351ed73883f7`, the same commit
+  `d6c99400f680784da6b6f0a14851b0f0aa35524d`, the same commit
   `records\client-build.json` names and the repository pins (issue #1200), and
   it is AGPL-3.0. The record hashes the build of that commit as
   `37d5bc5de33de11086b1180dcb1e8b64638398bf18c502541025133548ecd8a9`, built 2026-10-02T01:39:16Z, and `Deploy-Server.ps1` refuses any module
@@ -429,7 +429,7 @@ For the six client files and for the game server module running on the VPS, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, both built from one commit:
 
-https://github.com/EvilPatrick06/skymp/tree/df1a6c39491c64aa1781e6c393c3351ed73883f7
+https://github.com/EvilPatrick06/skymp/tree/d6c99400f680784da6b6f0a14851b0f0aa35524d
 
 The game server module the live server runs until its next server release:
 
