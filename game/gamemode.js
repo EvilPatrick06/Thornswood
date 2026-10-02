@@ -26836,7 +26836,34 @@ log('gamemode loaded:',
           if (sid) staffRoleIds[sid] = true;
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, count: Object.keys(ids).length };
+      // Business Owner and Faction Owner, the Discord roles a book is founded
+      // from. Same answer as the staff seats. Absent until the site sends them.
+      var businessIds = {};
+      if (Array.isArray(doc.businessOwnerProfiles)) {
+        for (var bo = 0; bo < doc.businessOwnerProfiles.length; bo++) {
+          var bid = Number(doc.businessOwnerProfiles[bo]);
+          if (bid) businessIds[bid] = true;
+        }
+      }
+      var factionIds = {};
+      if (Array.isArray(doc.factionOwnerProfiles)) {
+        for (var fo = 0; fo < doc.factionOwnerProfiles.length; fo++) {
+          var fid = Number(doc.factionOwnerProfiles[fo]);
+          if (fid) factionIds[fid] = true;
+        }
+      }
+      var accounts = {};
+      if (Array.isArray(doc.people)) {
+        for (var pe = 0; pe < doc.people.length; pe++) {
+          var person = doc.people[pe];
+          if (!person || !Array.isArray(person.profiles)) continue;
+          for (var pf = 0; pf < person.profiles.length; pf++) {
+            var pp = Number(person.profiles[pf]);
+            if (pp) accounts[pp] = String(person.id);
+          }
+        }
+      }
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, businessIds: businessIds, factionIds: factionIds, accounts: accounts, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -26876,6 +26903,18 @@ log('gamemode loaded:',
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodHoldsStaffRole = function (profileId) {
     var l = load();
     return passProved(profileId) && !!(l && l.staffRoleIds && l.staffRoleIds[Number(profileId)]);
+  };
+  // Business Owner, Faction Owner, and the Discord account a book is founded on.
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBookRoles = function (profileId) {
+    var l = load();
+    var n = Number(profileId);
+    var proved = passProved(n);
+    return {
+      staff: proved && !!(l && l.staffRoleIds && l.staffRoleIds[n]),
+      business: proved && !!(l && l.businessIds && l.businessIds[n]),
+      faction: proved && !!(l && l.factionIds && l.factionIds[n]),
+      account: (l && l.accounts && l.accounts[n]) ? String(l.accounts[n]) : ('p:' + n)
+    };
   };
 
   /*
@@ -27123,6 +27162,8 @@ log('gamemode loaded:',
       adminProfiles: merged(doc.adminProfiles, had.adminProfiles),
       jarlProfiles: merged(doc.jarlProfiles, had.jarlProfiles),
       staffRoleProfiles: merged(doc.staffRoleProfiles, had.staffRoleProfiles),
+      businessOwnerProfiles: merged(doc.businessOwnerProfiles, had.businessOwnerProfiles),
+      factionOwnerProfiles: merged(doc.factionOwnerProfiles, had.factionOwnerProfiles),
       people: people
     };
   }
@@ -27232,6 +27273,8 @@ log('gamemode loaded:',
             doc.adminProfiles = kept.adminProfiles;
             doc.jarlProfiles = kept.jarlProfiles;
             doc.staffRoleProfiles = kept.staffRoleProfiles;
+            doc.businessOwnerProfiles = kept.businessOwnerProfiles;
+            doc.factionOwnerProfiles = kept.factionOwnerProfiles;
             doc.people = kept.people;
             note(doc.failedProfiles.length + ' profiles could not be checked with Discord ' +
                  'and keep the standing they had' +
@@ -27247,6 +27290,8 @@ log('gamemode loaded:',
               jarlProfiles: Array.isArray(doc.jarlProfiles) ? doc.jarlProfiles : [],
               // The Discord staff roles themselves, for the staff seats (#481).
               staffRoleProfiles: Array.isArray(doc.staffRoleProfiles) ? doc.staffRoleProfiles : [],
+              businessOwnerProfiles: Array.isArray(doc.businessOwnerProfiles) ? doc.businessOwnerProfiles : [],
+              factionOwnerProfiles: Array.isArray(doc.factionOwnerProfiles) ? doc.factionOwnerProfiles : [],
               people: doc.people || [],
               // Staff bans with why and until (#412), from the site's own
               // file rather than Discord, so they are fresh even when the
@@ -36959,6 +37004,753 @@ mp.onReadBook = guard('onReadBook', function (actorId, bookBaseId) {
 });
 // ==== end thornswood staff spells ====
 
+/* BOOKS-START */
+/*
+  A faction or a business book, kept here for the group. Not a page in a
+  personal journal, and not stored on one character. docs/systems/factions.md.
+*/
+function thornswoodBooks(env) {
+  env = env || {};
+  var fs = env.fs;
+  var path = env.path;
+  if (!fs) { fs = require('fs'); }
+  if (!path) { path = require('path'); }
+  var dataDir = env.dataDir || 'data';
+  var OFFER_MS = 45000;
+  var MAX_MEMBERS = 40;
+  var MAX_PRICES = 100;
+  var MAX_CHAT = 50;
+  var MAX_LINE = 300;
+  var MAX_NAME = 60;
+  var PERMS = ['Read', 'Prices', 'Invite', 'Roles', 'Speak'];
+  var store = [];
+  var leftAt = {};
+  var seen = {};
+  var seeded = false;
+  var pending = {};
+  var seq = 1;
+
+  function now() { return env.now ? env.now() : Date.now(); }
+
+  function rolesOf(pid) {
+    var row;
+    if (env.roles) { row = env.roles(pid); }
+    else {
+      var f = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBookRoles;
+      row = (typeof f === 'function') ? f(pid) : null;
+    }
+    row = row || {};
+    return {
+      staff: !!row.staff,
+      business: !!row.business,
+      faction: !!row.faction,
+      account: row.account ? String(row.account) : ('p:' + Number(pid))
+    };
+  }
+
+  function silenced(pid) {
+    if (env.silenced && env.silenced(pid)) { return true; }
+    var st = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodStaff;
+    if (st && typeof st.silencedFor === 'function' && st.silencedFor(pid)) { return true; }
+    return false;
+  }
+
+  function myName(actorId, pid) {
+    if (env.nameOf) { return env.nameOf(actorId, pid) || 'somebody'; }
+    var soc = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodSocial;
+    if (soc && actorId && soc.nameOfPerson) { return soc.nameOfPerson(actorId) || 'somebody'; }
+    return 'somebody';
+  }
+
+  function findWho(actorId, who) {
+    if (env.find) { return env.find(actorId, who); }
+    var soc = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodSocial;
+    if (!soc || !soc.findPerson) {
+      return { actorId: 0, pid: 0, name: '', why: 'Nobody here by that name.' };
+    }
+    var hit = soc.findPerson(who);
+    if (!hit || !hit.actorId) {
+      return { actorId: 0, pid: 0, name: '', why: (hit && hit.why) || 'Nobody here by that name.' };
+    }
+    return {
+      actorId: hit.actorId,
+      pid: soc.profileOf(hit.actorId),
+      name: soc.nameOfPerson(hit.actorId),
+      why: ''
+    };
+  }
+
+  function onlineMap() {
+    if (env.online) { return env.online() || {}; }
+    var out = {};
+    var soc = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodSocial;
+    var mp = (typeof globalThis !== 'undefined' ? globalThis : this).mp;
+    try {
+      var ids = (mp && mp.get) ? (mp.get(0, 'onlinePlayers') || []) : [];
+      for (var i = 0; i < ids.length; i++) {
+        var pid = soc ? soc.profileOf(ids[i]) : 0;
+        if (!pid && mp && mp.get) { pid = Number(mp.get(ids[i], 'profileId')) || 0; }
+        if (!pid) { continue; }
+        var name = (soc && soc.nameOfPerson) ? soc.nameOfPerson(ids[i]) : '';
+        out[pid] = name || 'somebody';
+      }
+    } catch (e) { }
+    return out;
+  }
+
+  function refresh() {
+    if (env.refresh) { env.refresh(); return; }
+    var soc = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodSocial;
+    var mp = (typeof globalThis !== 'undefined' ? globalThis : this).mp;
+    if (!soc || !soc.push || !mp || !mp.get) { return; }
+    try {
+      var ids = mp.get(0, 'onlinePlayers') || [];
+      for (var i = 0; i < ids.length; i++) { soc.push(ids[i]); }
+    } catch (e) { }
+  }
+
+  function readJson(file, fallback) {
+    try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); }
+    catch (e) { return fallback; }
+  }
+
+  function writeJson(file, obj) {
+    try { fs.mkdirSync(path.dirname(file), { recursive: true }); } catch (e) { }
+    var body = JSON.stringify(obj);
+    var tmp = file + '.tmp';
+    fs.writeFileSync(tmp, body);
+    try { if (fs.existsSync(file)) { fs.unlinkSync(file); } } catch (e) { }
+    try { fs.renameSync(tmp, file); }
+    catch (e2) { fs.writeFileSync(file, body); }
+  }
+
+  function booksFile() { return path.join(dataDir, 'books.json'); }
+  function leftFile() { return path.join(dataDir, 'last-left.json'); }
+
+  function loadStore() {
+    var doc = readJson(booksFile(), null);
+    store = (doc && Array.isArray(doc.books)) ? doc.books : [];
+    var left = readJson(leftFile(), null);
+    leftAt = (left && typeof left === 'object' && !Array.isArray(left)) ? left : {};
+  }
+
+  function save() { writeJson(booksFile(), { books: store }); }
+  function saveLeft() { writeJson(leftFile(), leftAt); }
+
+  loadStore();
+
+  function byId(id) {
+    var want = String(id || '');
+    for (var i = 0; i < store.length; i++) {
+      if (store[i].id === want) { return store[i]; }
+    }
+    return null;
+  }
+
+  function memberOf(book, pid) {
+    var n = Number(pid);
+    var rows = (book && book.members) || [];
+    for (var i = 0; i < rows.length; i++) {
+      if (Number(rows[i].pid) === n) { return rows[i]; }
+    }
+    return null;
+  }
+
+  function roleByName(book, name) {
+    var low = String(name || '').toLowerCase();
+    var rows = (book && book.roles) || [];
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i].name || '').toLowerCase() === low) { return rows[i]; }
+    }
+    return null;
+  }
+
+  function ownsKind(account, kind) {
+    for (var i = 0; i < store.length; i++) {
+      if (store[i].account === account && store[i].kind === kind) { return store[i]; }
+    }
+    return null;
+  }
+
+  function isOwner(book, pid) {
+    var r = rolesOf(pid);
+    if (r.staff) { return true; }
+    if (r.account && book.account === r.account) { return true; }
+    return Number(book.owner) === Number(pid);
+  }
+
+  function hasPerm(book, pid, perm) {
+    if (isOwner(book, pid)) { return true; }
+    var m = memberOf(book, pid);
+    if (!m) { return false; }
+    var role = roleByName(book, m.role);
+    return !!(role && role.perms && role.perms.indexOf(perm) !== -1);
+  }
+
+  function canSee(book, pid) {
+    var r = rolesOf(pid);
+    if (r.staff) { return true; }
+    if (memberOf(book, pid)) { return true; }
+    return !!(r.account && book.account === r.account);
+  }
+
+  function visible(pid) {
+    var out = [];
+    for (var i = 0; i < store.length; i++) {
+      if (canSee(store[i], pid)) { out.push(store[i]); }
+    }
+    return out;
+  }
+
+  function showTab(pid) {
+    var r = rolesOf(pid);
+    if (r.staff || r.business || r.faction) { return true; }
+    return visible(pid).length > 0;
+  }
+
+  function clipName(name) {
+    var n = String(name || '').replace(/\s+/g, ' ').trim();
+    if (!n) { return { name: '', why: 'A name is needed.' }; }
+    if (n.length > MAX_NAME) { return { name: '', why: 'A name is at most 60 characters.' }; }
+    return { name: n, why: '' };
+  }
+
+  function found(actorId, pid, kind, name) {
+    if (kind !== 'business' && kind !== 'faction') {
+      return 'That kind is business or faction.';
+    }
+    var named = clipName(name);
+    if (!named.name) { return named.why; }
+    var r = rolesOf(pid);
+    if (kind === 'business' && !r.business) {
+      return 'Your Discord account does not hold Business Owner.';
+    }
+    if (kind === 'faction' && !r.faction) {
+      return 'Your Discord account does not hold Faction Owner.';
+    }
+    if (ownsKind(r.account, kind)) {
+      return kind === 'business'
+        ? 'This account already has a business.'
+        : 'This account already has a faction.';
+    }
+    seq += 1;
+    var book = {
+      id: 'b' + seq.toString(36) + now().toString(36),
+      kind: kind,
+      name: named.name,
+      account: r.account,
+      owner: Number(pid),
+      roles: [{ name: 'Member', perms: ['Read', 'Speak'] }],
+      members: [{ pid: Number(pid), name: myName(actorId, pid), role: 'Member' }],
+      prices: [],
+      chat: []
+    };
+    store.push(book);
+    save();
+    refresh();
+    return 'Founded ' + book.name + '.';
+  }
+
+  function booksWhere(pid, pred) {
+    var all = visible(pid);
+    var out = [];
+    for (var i = 0; i < all.length; i++) {
+      if (!pred || pred(all[i], pid)) { out.push(all[i]); }
+    }
+    return out;
+  }
+
+  function splitBook(pid, words, pred) {
+    words = words || [];
+    var candidates = booksWhere(pid, pred);
+    if (words.length) {
+      var idHit = byId(words[0]);
+      /* An id they can see is that book, even when this command is one their
+         role cannot run. The command then says which permission is missing,
+         instead of pretending they are not in it. */
+      if (idHit && canSee(idHit, pid)) {
+        return { book: idHit, rest: words.slice(1).join(' '), why: '' };
+      }
+    }
+    var joined = words.join(' ');
+    var best = null;
+    for (var i = 0; i < candidates.length; i++) {
+      var n = String(candidates[i].name || '');
+      var low = joined.toLowerCase();
+      var nl = n.toLowerCase();
+      if (low === nl || low.indexOf(nl + ' ') === 0) {
+        if (!best || n.length > best.name.length) { best = candidates[i]; }
+      }
+    }
+    if (best) {
+      return { book: best, rest: joined.slice(best.name.length).trim(), why: '' };
+    }
+    if (candidates.length === 1) {
+      return { book: candidates[0], rest: joined, why: '' };
+    }
+    if (!candidates.length) { return { book: null, rest: '', why: 'You are not in a book.' }; }
+    return { book: null, rest: '', why: 'Which book? Name it.' };
+  }
+
+  function memberByName(book, who) {
+    var low = String(who || '').trim().toLowerCase();
+    if (!low) { return { member: null, why: 'Who?' }; }
+    var exact = [], part = [];
+    var rows = book.members || [];
+    for (var i = 0; i < rows.length; i++) {
+      var n = String(rows[i].name || '').toLowerCase();
+      if (n === low) { exact.push(rows[i]); }
+      else if (n.indexOf(low) === 0) { part.push(rows[i]); }
+    }
+    var hit = exact.length ? exact : part;
+    if (hit.length === 1) { return { member: hit[0], why: '' }; }
+    if (hit.length > 1) { return { member: null, why: 'More than one person in the book by that name.' }; }
+    return { member: null, why: 'They are not in that book.' };
+  }
+
+  function ownsAccount(book, pid) {
+    var r = rolesOf(pid);
+    return Number(book.owner) === Number(pid) || (!!r.account && book.account === r.account);
+  }
+
+  function leave(pid, words) {
+    var taken = splitBook(pid, words, function (b, p) { return !!memberOf(b, p); });
+    if (!taken.book) { return taken.why; }
+    if (ownsAccount(taken.book, pid)) {
+      return 'The owner disbands a book. A member can leave.';
+    }
+    if (!memberOf(taken.book, pid)) { return 'You are not in that book.'; }
+    var name = taken.book.name;
+    var keep = [];
+    for (var i = 0; i < taken.book.members.length; i++) {
+      if (Number(taken.book.members[i].pid) !== Number(pid)) { keep.push(taken.book.members[i]); }
+    }
+    taken.book.members = keep;
+    save();
+    refresh();
+    return 'You left ' + name + '.';
+  }
+
+  function invite(actorId, pid, words) {
+    var taken = splitBook(pid, words, function (b, p) { return hasPerm(b, p, 'Invite'); });
+    if (!taken.book) { return taken.why; }
+    if (!hasPerm(taken.book, pid, 'Invite')) { return 'You cannot invite someone to that book.'; }
+    var who = String(taken.rest || '').trim();
+    if (!who) { return 'Invite whom?'; }
+    if (taken.book.members.length >= MAX_MEMBERS) { return taken.book.name + ' is full.'; }
+    var hit = findWho(actorId, who);
+    if (!hit.pid) { return hit.why || 'Nobody here by that name.'; }
+    if (Number(hit.pid) === Number(pid)) { return 'That is you.'; }
+    if (memberOf(taken.book, hit.pid)) { return 'They are already in it.'; }
+    pending[hit.pid] = { bookId: taken.book.id, from: Number(pid), at: now() };
+    var asked = '';
+    if (env.offer) { asked = env.offer(actorId, hit.actorId) || ''; }
+    else {
+      var soc = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodSocial;
+      if (soc && soc.offer && hit.actorId) { asked = soc.offer('book', actorId, hit.actorId) || ''; }
+    }
+    if (asked) { delete pending[hit.pid]; return asked; }
+    refresh();
+    return 'You asked ' + (hit.name || 'them') + '. They have 45 seconds.';
+  }
+
+  function accept(pid, name) {
+    var p = pending[Number(pid)] || pending[pid];
+    if (!p || now() - p.at > OFFER_MS) {
+      delete pending[pid];
+      return { ok: false, text: 'That offer has gone.' };
+    }
+    var book = byId(p.bookId);
+    delete pending[pid];
+    if (!book) { return { ok: false, text: 'That book is gone.' }; }
+    if (memberOf(book, pid)) { return { ok: false, text: 'You are already in ' + book.name + '.' }; }
+    if (book.members.length >= MAX_MEMBERS) {
+      return { ok: false, text: book.name + ' is full.' };
+    }
+    book.members.push({ pid: Number(pid), name: name || 'somebody', role: 'Member' });
+    save();
+    refresh();
+    return { ok: true, text: 'You joined ' + book.name + '.' };
+  }
+
+  function decline(pid) { delete pending[pid]; }
+
+  function sayLine(pid, actorId, words) {
+    var taken = splitBook(pid, words, function (b, p) { return hasPerm(b, p, 'Speak'); });
+    if (!taken.book) { return taken.why; }
+    if (!hasPerm(taken.book, pid, 'Speak')) { return 'You cannot write in that book.'; }
+    if (silenced(pid)) { return 'You are silenced, so this book takes no line.'; }
+    var text = String(taken.rest || '').replace(/\s+/g, ' ').trim();
+    if (!text) { return 'Say what?'; }
+    if (text.length > MAX_LINE) { text = text.slice(0, MAX_LINE); }
+    taken.book.chat = taken.book.chat || [];
+    taken.book.chat.push({
+      at: now(), pid: Number(pid), name: myName(actorId, pid), text: text
+    });
+    if (taken.book.chat.length > MAX_CHAT) {
+      taken.book.chat = taken.book.chat.slice(taken.book.chat.length - MAX_CHAT);
+    }
+    save();
+    refresh();
+    return 'Said in ' + taken.book.name + '.';
+  }
+
+  function parseGold(raw) {
+    var s = String(raw == null ? '' : raw).trim();
+    if (!s || s === '-') { return { ok: true, n: null }; }
+    if (!/^\d+$/.test(s)) { return { ok: false }; }
+    return { ok: true, n: Number(s) };
+  }
+
+  function setPrice(book, item, buyRaw, sellRaw) {
+    var named = clipName(item);
+    if (!named.name) { return named.why; }
+    var buy = parseGold(buyRaw);
+    var sell = parseGold(sellRaw);
+    if (!buy.ok || !sell.ok) { return 'A price is a whole number of gold, or a blank.'; }
+    book.prices = book.prices || [];
+    var low = named.name.toLowerCase();
+    for (var i = 0; i < book.prices.length; i++) {
+      if (String(book.prices[i].name || '').toLowerCase() === low) {
+        book.prices[i] = { name: named.name, buy: buy.n, sell: sell.n };
+        save();
+        refresh();
+        return 'Set ' + named.name + ' in ' + book.name + '.';
+      }
+    }
+    if (book.prices.length >= MAX_PRICES) { return 'The list is full. 100 lines.'; }
+    book.prices.push({ name: named.name, buy: buy.n, sell: sell.n });
+    save();
+    refresh();
+    return 'Set ' + named.name + ' in ' + book.name + '.';
+  }
+
+  function dropPrice(book, item) {
+    var low = String(item || '').trim().toLowerCase();
+    if (!low) { return 'Which line?'; }
+    var keep = [];
+    var gone = false;
+    var rows = book.prices || [];
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i].name || '').toLowerCase() === low) { gone = true; }
+      else { keep.push(rows[i]); }
+    }
+    if (!gone) { return 'No line by that name.'; }
+    book.prices = keep;
+    save();
+    refresh();
+    return 'Removed ' + item.trim() + '.';
+  }
+
+  function pipes(rest) {
+    var bits = String(rest || '').split('|');
+    var out = [];
+    for (var i = 0; i < bits.length; i++) {
+      var t = bits[i].trim();
+      if (t) { out.push(t); }
+    }
+    return out;
+  }
+
+  function knownPerms(text) {
+    var want = String(text || '').split(/[\s,]+/);
+    var out = [];
+    for (var i = 0; i < want.length; i++) {
+      for (var j = 0; j < PERMS.length; j++) {
+        if (want[i].toLowerCase() === PERMS[j].toLowerCase() && out.indexOf(PERMS[j]) < 0) {
+          out.push(PERMS[j]);
+        }
+      }
+    }
+    return out;
+  }
+
+  function editRoles(book, rest) {
+    var bits = pipes(rest);
+    var verb = String(bits[0] || '').toLowerCase();
+    if (verb === 'new') {
+      var title = clipName(bits[1] || '');
+      if (!title.name) { return title.why; }
+      if (roleByName(book, title.name)) { return 'That role is already there.'; }
+      book.roles.push({ name: title.name, perms: [] });
+      save();
+      refresh();
+      return 'Made the role ' + title.name + '.';
+    }
+    if (verb === 'rename') {
+      var role = roleByName(book, bits[1] || '');
+      if (!role) { return 'No role by that name.'; }
+      if (role.name === 'Member') { return 'Member stays, so a new person has a role to land on.'; }
+      var next = clipName(bits[2] || '');
+      if (!next.name) { return next.why; }
+      if (roleByName(book, next.name) && roleByName(book, next.name) !== role) {
+        return 'That role is already there.';
+      }
+      var old = role.name;
+      role.name = next.name;
+      var members = book.members || [];
+      for (var i = 0; i < members.length; i++) {
+        if (members[i].role === old) { members[i].role = next.name; }
+      }
+      save();
+      refresh();
+      return 'Renamed ' + old + ' to ' + next.name + '.';
+    }
+    if (verb === 'perm') {
+      var held = roleByName(book, bits[1] || '');
+      if (!held) { return 'No role by that name.'; }
+      held.perms = knownPerms(bits[2] || '');
+      save();
+      refresh();
+      return 'Set ' + held.name + '.';
+    }
+    return 'A role is new, rename, or perm.';
+  }
+
+  function editMember(book, pid, rest) {
+    var bits = pipes(rest);
+    var verb = String(bits[0] || '').toLowerCase();
+    if (verb === 'remove') {
+      if (!hasPerm(book, pid, 'Invite') && !rolesOf(pid).staff) {
+        return 'You cannot remove someone from that book.';
+      }
+      var who = memberByName(book, bits.slice(1).join(' '));
+      if (!who.member) { return who.why; }
+      if (Number(who.member.pid) === Number(book.owner)) {
+        return 'The owner stays until the book is disbanded or handed on.';
+      }
+      var keep = [];
+      for (var i = 0; i < book.members.length; i++) {
+        if (book.members[i] !== who.member) { keep.push(book.members[i]); }
+      }
+      book.members = keep;
+      save();
+      refresh();
+      return 'Removed ' + who.member.name + '.';
+    }
+    if (verb === 'role') {
+      if (!hasPerm(book, pid, 'Roles')) { return 'You cannot set roles in that book.'; }
+      var person = memberByName(book, bits[1] || '');
+      if (!person.member) { return person.why; }
+      if (Number(person.member.pid) === Number(book.owner)) {
+        return 'The owner is not put on a role.';
+      }
+      var role = roleByName(book, bits[2] || '');
+      if (!role) { return 'No role by that name.'; }
+      person.member.role = role.name;
+      save();
+      refresh();
+      return person.member.name + ' is ' + role.name + '.';
+    }
+    return 'Say role or remove.';
+  }
+
+  function hand(book, pid, rest) {
+    if (!rolesOf(pid).staff) { return 'Staff hand a book on.'; }
+    var who = memberByName(book, pipes(rest).join(' '));
+    if (!who.member) { return who.why; }
+    if (Number(who.member.pid) === Number(book.owner)) { return 'They already own it.'; }
+    book.owner = Number(who.member.pid);
+    book.account = rolesOf(book.owner).account;
+    save();
+    refresh();
+    return who.member.name + ' owns ' + book.name + ' now.';
+  }
+
+  function rename(book, pid, rest) {
+    if (!isOwner(book, pid)) { return 'The owner renames a book.'; }
+    var named = clipName(rest);
+    if (!named.name) { return named.why; }
+    book.name = named.name;
+    save();
+    refresh();
+    return 'Renamed to ' + book.name + '.';
+  }
+
+  function disband(book, pid) {
+    if (!isOwner(book, pid)) { return 'The owner disbands a book.'; }
+    var name = book.name;
+    var keep = [];
+    for (var i = 0; i < store.length; i++) {
+      if (store[i] !== book) { keep.push(store[i]); }
+    }
+    store = keep;
+    save();
+    refresh();
+    return 'Disbanded ' + name + '.';
+  }
+
+  function command(ctx) {
+    var parts = (ctx && ctx.parts) || [];
+    var sub = String(parts[1] || '').toLowerCase();
+    var pid = Number(ctx && ctx.profileId) || 0;
+    var actorId = ctx && ctx.actorId;
+    var words = parts.slice(2);
+    if (!pid) { return 'You are not in the world yet.'; }
+    if (sub === 'new') {
+      return found(actorId, pid, String(parts[2] || '').toLowerCase(), parts.slice(3).join(' '));
+    }
+    if (sub === 'submit') {
+      return 'The hold drop box is not there, so the list stays in the book.';
+    }
+    if (sub === 'leave') { return leave(pid, words); }
+    if (sub === 'invite') { return invite(actorId, pid, words); }
+    if (sub === 'say') { return sayLine(pid, actorId, words); }
+    if (sub === 'rename' || sub === 'disband' || sub === 'price' || sub === 'role' ||
+        sub === 'member' || sub === 'give') {
+      var pred = null;
+      if (sub === 'price') { pred = function (b, p) { return hasPerm(b, p, 'Prices'); }; }
+      if (sub === 'role' || sub === 'member') { pred = function (b, p) { return hasPerm(b, p, 'Roles') || hasPerm(b, p, 'Invite'); }; }
+      if (sub === 'give' || sub === 'rename' || sub === 'disband') {
+        pred = function (b, p) { return isOwner(b, p); };
+      }
+      var taken = splitBook(pid, words, pred);
+      if (!taken.book) { return taken.why; }
+      if (sub === 'rename') { return rename(taken.book, pid, taken.rest); }
+      if (sub === 'disband') { return disband(taken.book, pid); }
+      if (sub === 'give') { return hand(taken.book, pid, taken.rest); }
+      if (sub === 'role') {
+        if (!hasPerm(taken.book, pid, 'Roles')) { return 'You cannot set roles in that book.'; }
+        return editRoles(taken.book, taken.rest);
+      }
+      if (sub === 'member') { return editMember(taken.book, pid, taken.rest); }
+      if (!hasPerm(taken.book, pid, 'Prices')) { return 'You cannot set prices in that book.'; }
+      var bits = pipes(taken.rest);
+      if (String(bits[0] || '').toLowerCase() === 'drop' && bits.length < 3) {
+        return dropPrice(taken.book, bits.slice(1).join(' '));
+      }
+      if (bits.length < 1) { return 'Name the line, then the buy and the sell. A blank is -.'; }
+      return setPrice(taken.book, bits[0], bits[1], bits[2]);
+    }
+    return 'book: new business <name>, new faction <name>, invite, leave. The rest is on J.';
+  }
+
+  function view(pid, textOff) {
+    var off = textOff || {};
+    var r = rolesOf(pid);
+    if (!showTab(pid)) { return { show: false }; }
+    var here = onlineMap();
+    var books = [];
+    var rows = visible(pid);
+    for (var i = 0; i < rows.length; i++) {
+      var b = rows[i];
+      var read = hasPerm(b, pid, 'Read');
+      var people = [];
+      var chat = [];
+      var prices = [];
+      if (read) {
+        var members = b.members || [];
+        for (var m = 0; m < members.length; m++) {
+          var row = members[m];
+          var on = !!here[row.pid] || !!here[String(row.pid)];
+          var when = Number(leftAt[row.pid] || leftAt[String(row.pid)] || 0);
+          people.push({
+            name: row.name,
+            role: Number(row.pid) === Number(b.owner) ? 'Owner' : row.role,
+            on: on,
+            left: on ? 0 : when
+          });
+        }
+        var lines = b.chat || [];
+        for (var c = 0; c < lines.length; c++) {
+          var line = lines[c];
+          if (off[line.pid] || off[String(line.pid)]) { continue; }
+          chat.push({ name: line.name, text: line.text, at: line.at });
+        }
+        var list = b.prices || [];
+        for (var p = 0; p < list.length; p++) {
+          prices.push({ name: list[p].name, buy: list[p].buy, sell: list[p].sell });
+        }
+      }
+      var roleNames = [];
+      if (hasPerm(b, pid, 'Roles')) {
+        var roles = b.roles || [];
+        for (var rr = 0; rr < roles.length; rr++) { roleNames.push(roles[rr].name); }
+      }
+      books.push({
+        id: b.id,
+        kind: b.kind,
+        name: b.name,
+        read: read,
+        speak: hasPerm(b, pid, 'Speak'),
+        canPrices: hasPerm(b, pid, 'Prices'),
+        invite: hasPerm(b, pid, 'Invite'),
+        canRoles: hasPerm(b, pid, 'Roles'),
+        owner: isOwner(b, pid),
+        staff: !!r.staff,
+        leave: !!(memberOf(b, pid) && !ownsAccount(b, pid)),
+        people: people,
+        chat: chat,
+        priceList: prices,
+        roleNames: roleNames
+      });
+    }
+    return {
+      show: true,
+      canBusiness: !!(r.business && !ownsKind(r.account, 'business')),
+      canFaction: !!(r.faction && !ownsKind(r.account, 'faction')),
+      books: books
+    };
+  }
+
+  function noteTick() {
+    var here = onlineMap();
+    if (!seeded) {
+      for (var id in here) {
+        if (Object.prototype.hasOwnProperty.call(here, id)) { seen[id] = true; }
+      }
+      seeded = true;
+      return;
+    }
+    var changed = false;
+    for (var was in seen) {
+      if (!Object.prototype.hasOwnProperty.call(seen, was)) { continue; }
+      if (!here[was]) {
+        leftAt[was] = now();
+        delete seen[was];
+        changed = true;
+      }
+    }
+    for (var on in here) {
+      if (Object.prototype.hasOwnProperty.call(here, on)) { seen[on] = true; }
+    }
+    if (changed) { saveLeft(); }
+  }
+
+  return {
+    command: command,
+    accept: accept,
+    decline: decline,
+    view: view,
+    noteTick: noteTick,
+    books: function () { return store; }
+  };
+}
+/* BOOKS-END */
+
+(function () {
+  var g = (typeof globalThis !== 'undefined' ? globalThis : this);
+  try {
+    var fs = require('fs');
+    var path = require('path');
+    var dataDir = 'data';
+    try {
+      var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
+    } catch (e) { }
+    var api = thornswoodBooks({ fs: fs, path: path, dataDir: dataDir });
+    g.__thornswoodBooks = api;
+    if (g.__thornswoodBooksTimer) {
+      try { clearInterval(g.__thornswoodBooksTimer); } catch (e2) { }
+    }
+    g.__thornswoodBooksTimer = setInterval(function () {
+      try { api.noteTick(); } catch (e3) { }
+    }, 5000);
+  } catch (e) {
+    try { log('books: ' + ((e && e.message) || e)); } catch (e4) { }
+  }
+})();
+
 // ==== thornswood chat commands ====
 /*
   EVERY WORD THIS SERVER ANSWERS, WRITTEN DOWN ONCE.
@@ -37038,7 +37830,7 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/loadorder',
                // Friends, parties, mutes, trade and journals. See the
                // social block at the end of this file.
-               '/friend', '/party', '/mute', '/trade', '/journal',
+               '/friend', '/party', '/mute', '/trade', '/journal', '/book',
                '/yes', '/no',
                // The dice. Rolled here now rather than on the roller's own
                // machine; see the branch for why that matters.
@@ -37074,7 +37866,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       '/helpme', '/report', '/stuck',
                       // Everybody's, and they have to be findable: a key
                       // prompt nobody sees is a feature nobody has.
-                      '/friend', '/party', '/mute', '/hidename', '/trade', '/journal',
+                      '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book',
                       '/yes', '/no', '/roll'];
 
 // ---------------------------------------------------------------------------
@@ -38118,6 +38910,15 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       They are in PLAYER_WORDS on purpose, unlike /place and /burn: a key
       prompt nobody has been told about is a feature nobody has.
     */
+    if (word === '/book') {
+      var booksApi = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBooks;
+      if (!booksApi) { toProfile(profileId, 'That is not running on this server.'); return true; }
+      if (!actorId) { toProfile(profileId, 'You are not in the world yet.'); return true; }
+      var bookAnswer = booksApi.command({ actorId: actorId, profileId: profileId, parts: parts });
+      if (bookAnswer) { toProfile(profileId, bookAnswer); }
+      return true;
+    }
+
     if (word === '/friend' || word === '/party' || word === '/mute' ||
         word === '/hidename' || word === '/trade' || word === '/journal' ||
         word === '/yes' || word === '/no') {
@@ -38135,8 +38936,25 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         delete soc.offers[mine];
         var themActor = soc.actorForProfile(o.from);
         if (word === '/no') {
+          if (o.kind === 'book') {
+            var booksNo = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBooks;
+            if (booksNo) { booksNo.decline(mine); }
+          }
           toProfile(profileId, 'You turned ' + o.fromName + ' down.');
           if (themActor) { say(themActor, soc.nameOfPerson(actorId) + ' said no.'); }
+          return true;
+        }
+        /* A book invite stands for 45 seconds even if the person who asked
+           has walked off. The book is the group's, not theirs. */
+        if (o.kind === 'book') {
+          var booksYes = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBooks;
+          if (!booksYes) { toProfile(profileId, 'That is not running on this server.'); return true; }
+          var joinedBook = booksYes.accept(mine, soc.nameOfPerson(actorId));
+          toProfile(profileId, (joinedBook && joinedBook.text) || 'That offer has gone.');
+          if (joinedBook && joinedBook.ok && themActor) {
+            say(themActor, soc.nameOfPerson(actorId) + ' joined your book.');
+          }
+          soc.push(actorId);
           return true;
         }
         if (!themActor) { toProfile(profileId, o.fromName + ' has gone.'); return true; }
@@ -38983,7 +39801,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         toProfile(profileId,
           'Look at somebody and press Y to ask them to be friends, H to offer a ' +
           'trade, L to stop hearing them. P opens your friends and your party; ' +
-          'J opens your journals. Work done with your party in the same place ' +
+          'J opens your journals, and a group book beside them when this character ' +
+          'is in one or the Discord account may found one. /book new business <name> ' +
+          'and /book new faction <name> start one. /book leave drops this character. ' +
+          'Work done with your party in the same place ' +
           'counts for more. /yes and /no answer whatever somebody has asked you.');
         return;
       }
@@ -43107,7 +43928,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       offer: offerNow ? { kind: offerNow.kind, from: offerNow.from, name: offerNow.fromName } : null,
       journals: s.journals,
       shared: sharedWithMe(actorId),
-      muted: s.muted
+      muted: s.muted,
+      group: (function () {
+        try {
+          var booksView = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBooks;
+          if (!booksView || !booksView.view) { return { show: false }; }
+          return booksView.view(mine, (s && s.textOff) || {});
+        } catch (e) { return { show: false }; }
+      })()
     };
   }
 
