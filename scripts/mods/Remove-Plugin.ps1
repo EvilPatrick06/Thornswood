@@ -1,6 +1,10 @@
 <#
   Remove-Plugin.ps1
 
+  RETIRED. DO NOT RUN. Issue #1179: took one plugin out of the build by hand. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
+
+  What it used to do, and what is left of it:
+
       .\scripts\mods\Remove-Plugin.ps1
 
   Takes one plugin out of the Thornswood build, reversibly.
@@ -25,6 +29,13 @@ param(
   [string]$Root = 'C:\Thornswood',
   [switch]$NoPause
 )
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Remove-Plugin.ps1 is retired and installs nothing (issue #1179). ' +
+       'Plugins leave through the Nexus collection revision, not a hand removal that rewrites plugin lists and Vortex staging. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'hand installs are meant again, and read the header first.')
+
 
 $ErrorActionPreference = 'Stop'
 
