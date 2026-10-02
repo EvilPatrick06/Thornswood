@@ -800,6 +800,11 @@ if (block) {
           swimIn('nowhere:X.esm', 'shallow') > swimIn('nowhere:X.esm', 'water'));
       yes('the client has a word for wading',
           /wading = /.test(FRONT) && /kind = 'shallow'/.test(FRONT));
+      // #608: actor root Z can sit a few units above a real cell plane.
+      yes('and feet slack covers temple near-misses (#608)',
+          /FEET_SLACK/.test(FRONT) && /deep > -FEET_SLACK/.test(FRONT));
+      yes('and the heartbeat names when slack decided wading',
+          /wading via feet slack/.test(FRONT));
       // And the water class only ever applies to somebody in the water.
       {
         const icy2 = Object.keys(WATERS.items).filter(function (d) { return WATERS.items[d] === 'ice'; })[0];

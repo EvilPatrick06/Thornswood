@@ -3803,6 +3803,15 @@
   // How far the water can be over your feet and still be wading. A character
   // is about 128 units tall, so this is roughly waist deep.
   const WADE_DEEP = 70;
+  /*
+    #608 temple / shallow: getPositionZ is the actor root, not a true feet
+    probe. A real cell water plane can sit a few units under that root while
+    the person is clearly standing in the pool, so deep reads slightly
+    negative and wading never fires (heartbeat then says indoors). Slack
+    covers that near-miss only. A no-water cell still answers a huge
+    negative level, far below -FEET_SLACK, so it stays dry.
+  */
+  const FEET_SLACK = 24;
   // FireFXShader, 0001b212 in Skyrim.esm, read out of the EFSH records. This
   // is the engine's own "this thing is burning", the one fire damage uses.
   const FIRE_SHADER = 0x1b212;
@@ -4196,19 +4205,25 @@
           Standing knee deep in a river in the Pale reads as dry land to it,
           which is the wrong answer in the one situation people are actually
           in most of the time. The cell's water level against where they are
-          standing is the rest of it: above their feet and below swimming is
-          wading.
+          standing is the rest of it: near or above their feet (see
+          FEET_SLACK) and below swimming is wading.
 
           A cell with no water answers a level far below anywhere anybody
-          stands, so the subtraction comes out negative and this is false
-          without needing to ask whether there is water at all.
+          stands, so the subtraction comes out far more negative than
+          FEET_SLACK and this stays false without needing to ask whether
+          there is water at all.
         */
         const level = cell.getWaterLevel();
         if (isFinite(level)) {
+          // pz is Actor.getPositionZ (root), not a true feet height (#608).
           const deep = level - pz;
-          wading = deep > 0 && deep < WADE_DEEP;
+          wading = deep > -FEET_SLACK && deep < WADE_DEEP;
+          const slackBit = (wading && deep <= 0)
+            ? ', wading via feet slack'
+            : (wading ? ', wading' : ', dry');
           waterSaid = 'water level ' + Math.round(level) + ', feet at ' +
-                      Math.round(pz) + ', so ' + Math.round(deep) + ' deep';
+                      Math.round(pz) + ', so ' + Math.round(deep) + ' deep' +
+                      slackBit;
         } else {
           waterSaid = 'the cell has no readable water level';
         }
