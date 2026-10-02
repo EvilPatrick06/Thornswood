@@ -83,16 +83,12 @@
     'font-family:"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;color:#e4d9bf;user-select:none;pointer-events:auto}',
     '#ts-select.gone{display:none}',
     '#ts-select *{box-sizing:border-box}',
-    // the painting behind everything. Issue #609: one zoomed animated
-    // backdrop from the first paint, not a still then a darker still then
-    // the loop. The loop starts already scaled (same drift as the site's
-    // hero), so there is no wide-then-zoom, and the still is only used when
-    // the loop is missing.
-    '#ts-select .bg{position:absolute;inset:0;z-index:0;overflow:hidden;background:#0b0907}',
-    '#ts-select .bg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 25%;',
-    'transform-origin:center 25%;will-change:transform;',
-    'animation:tsPaintDrift 36s ease-in-out infinite alternate}',
-    '@keyframes tsPaintDrift{from{transform:scale(1.08) translateY(0)}to{transform:scale(1.14) translateY(-10px)}}',
+    // the painting behind everything: the loop when it plays, the still under it.
+    // Djinn, 1 October: shown at its own size and centred, no zoom or drift,
+    // so the art is never cropped or rescaled and the scroll on the ledge
+    // lines up with the painting (undoes the zoom added for #609).
+    '#ts-select .bg{position:absolute;inset:0;z-index:0;background:#0b0907 center/cover no-repeat}',
+    '#ts-select .bg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}',
     '#ts-select .shade{position:absolute;inset:0;z-index:0;',
     'background:radial-gradient(ellipse at center,rgba(0,0,0,.40) 0%,rgba(0,0,0,.76) 100%)}',
     '#ts-select .panel{position:relative;z-index:1;width:960px;max-height:92vh;display:flex;flex-direction:column;transform-origin:center center;',
@@ -210,11 +206,14 @@
     '#ts-select .intro .flash{position:absolute;left:29.881%;top:79.632%;width:3%;height:0;padding-bottom:3%;border-radius:50%;opacity:0;',
     'transform:translate(-50%,-50%) scale(0);pointer-events:none;',
     'background:radial-gradient(circle,#fff8e0 0%,rgba(243,211,143,.95) 22%,rgba(158,111,201,.55) 52%,transparent 72%)}',
-    '#ts-select .intro .open{position:absolute;left:50%;top:58%;width:44%;opacity:0;transform:translate(-50%,-50%) scale(.04,.12);pointer-events:none}',
+    // The open scroll, Djinn, 1 October: smaller than the painted
+    // THORNSWOOD title and sitting under it, with its lettering scaled to
+    // match so it still reads easily.
+    '#ts-select .intro .open{position:absolute;left:50%;top:62%;width:34%;opacity:0;transform:translate(-50%,-50%) scale(.04,.12);pointer-events:none}',
     '#ts-select .intro .open img{display:block;width:100%;height:auto}',
     '#ts-select .intro .words{position:absolute;left:17%;right:17%;top:20%;bottom:18%;display:flex;flex-direction:column;',
     'align-items:center;justify-content:center;text-align:center;opacity:0}',
-    '#ts-select .intro .said{font-style:italic;font-size:1.6vw;line-height:1.45;color:#2c1e10}',
+    '#ts-select .intro .said{font-style:italic;font-size:1.28vw;line-height:1.45;color:#2c1e10}',
     /*
       What is written on the open scroll, Djinn, 25 September: it has to read
       as ink on the parchment, not as a page's form. The tick box is a small
@@ -222,15 +221,15 @@
       Continue is lettered between two ink flourishes instead of sitting in a
       dark button. Still no hover, cursor or transition rules, as above.
     */
-    '#ts-select .intro .skip{margin-top:1.3vw;font-size:1.05vw;font-style:italic;color:#3a2714;display:flex;align-items:center;gap:.6vw;',
+    '#ts-select .intro .skip{margin-top:1.05vw;font-size:.88vw;font-style:italic;color:#3a2714;display:flex;align-items:center;gap:.6vw;',
     'text-shadow:0 1px 0 rgba(255,236,190,.35)}',
-    '#ts-select .intro .skip input{-webkit-appearance:none;appearance:none;flex:none;width:1.15vw;height:1.15vw;margin:0;position:relative;',
+    '#ts-select .intro .skip input{-webkit-appearance:none;appearance:none;flex:none;width:.95vw;height:.95vw;margin:0;position:relative;',
     'border:.13vw solid rgba(44,30,16,.78);border-radius:.12vw .22vw .1vw .25vw;background:rgba(255,238,196,.18);',
     'box-shadow:inset 0 0 .25vw rgba(90,60,25,.35),0 1px 0 rgba(255,236,190,.35)}',
     '#ts-select .intro .skip input:checked{background:rgba(255,238,196,.18) url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 20 20\'><path d=\'M3.5 10.5 C5.5 11.5 7 13.5 8.2 16 C10.5 10.5 13.5 6 17.5 2.5\' fill=\'none\' stroke=\'%232c1e10\' stroke-width=\'2.4\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/></svg>") center/135% no-repeat}',
-    '#ts-select .intro .go{margin-top:1.3vw;padding:.35vw 0;border:0;background:none;display:flex;align-items:center;gap:.9vw;',
-    'font-size:1.2vw;letter-spacing:.32em;text-transform:uppercase;color:#2c1e10;text-shadow:0 1px 0 rgba(255,236,190,.4)}',
-    '#ts-select .intro .go::before,#ts-select .intro .go::after{content:"";width:3.2vw;height:.12vw;',
+    '#ts-select .intro .go{margin-top:1.05vw;padding:.3vw 0;border:0;background:none;display:flex;align-items:center;gap:.9vw;',
+    'font-size:1vw;letter-spacing:.32em;text-transform:uppercase;color:#2c1e10;text-shadow:0 1px 0 rgba(255,236,190,.4)}',
+    '#ts-select .intro .go::before,#ts-select .intro .go::after{content:"";width:2.6vw;height:.12vw;',
     'background:linear-gradient(90deg,transparent,rgba(44,30,16,.8))}',
     '#ts-select .intro .go::after{background:linear-gradient(270deg,transparent,rgba(44,30,16,.8))}',
     '#ts-select .intro.opening .flash{animation:tsFlash .7s ease-out forwards}',
@@ -241,7 +240,7 @@
     '@keyframes tsFade{to{opacity:0}}',
     '@keyframes tsShow{to{opacity:1}}',
     '@keyframes tsRise{0%{opacity:0;left:29.5%;top:81%;transform:translate(-50%,-50%) scale(.04,.12)}30%{opacity:1}',
-    '60%{transform:translate(-50%,-50%) scale(.3,1)}100%{opacity:1;left:50%;top:58%;transform:translate(-50%,-50%) scale(1,1)}}'
+    '60%{transform:translate(-50%,-50%) scale(.3,1)}100%{opacity:1;left:50%;top:62%;transform:translate(-50%,-50%) scale(1,1)}}'
   ].join('');
   var style = document.createElement('style');
   style.id = 'ts-select-css';
@@ -291,38 +290,29 @@
   var elList = root.querySelector('.list');
 
   /*
-    The painting. Issue #609: when the loop is here, it is the only backdrop
-    from the first paint, already zoomed by tsPaintDrift, and the still is
-    not put behind it. A still under a late-starting loop was the lighter
-    then darker flash people saw before the animation arrived. The still is
-    kept only as the fallback when this browser cannot play the loop, so
-    what is behind the panel is the painting either way and never a black
-    box. Muted, because the music is its own element.
+    The painting. The still goes on as the background at once; the loop is
+    laid over it and plays if this browser decodes it, and is taken away
+    again if it cannot, so what is behind the panel is the painting either
+    way and never a black box. Muted, because the music is its own element.
+    Djinn, 1 October: the still stays under the loop on purpose. Skyrim and
+    the mods are still loading when the page comes up, so the still is what
+    shows until the loop can play. The loop plays at its own speed (not
+    sped up), the timing the animation was approved at.
   */
+  if (LIST.still) { try { elBg.style.backgroundImage = 'url("' + String(LIST.still) + '")'; } catch (e) { } }
   if (LIST.video) {
     try {
       var vid = document.createElement('video');
       vid.muted = true; vid.loop = true; vid.autoplay = true;
       vid.setAttribute('muted', ''); vid.setAttribute('playsinline', '');
       vid.preload = 'auto';
-      // A touch faster than the 24 s source loop so the motion reads smooth
-      // rather than sticky, without leaving the painting's own timing.
-      try { vid.playbackRate = 1.2; } catch (eRate) { }
-      vid.onerror = function () {
-        try { vid.remove(); } catch (e) { }
-        if (LIST.still) {
-          try { elBg.style.backgroundImage = 'url("' + String(LIST.still) + '")'; } catch (e2) { }
-        }
-        tell('painting: the loop would not play here, the still stays');
-      };
+      vid.onerror = function () { try { vid.remove(); } catch (e) { } tell('painting: the loop would not play here, the still stays'); };
       vid.onplaying = function () { tell('painting: the loop is playing'); };
       vid.src = String(LIST.video);
       elBg.appendChild(vid);
       var vp = vid.play();
       if (vp && typeof vp.catch === 'function') { vp.catch(function () { }); }
     } catch (e) { tell('painting: ' + e); }
-  } else if (LIST.still) {
-    try { elBg.style.backgroundImage = 'url("' + String(LIST.still) + '")'; } catch (e) { }
   }
   var elCount = root.querySelector('.count');
   var elStatus = root.querySelector('.status');
