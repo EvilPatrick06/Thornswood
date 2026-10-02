@@ -231,6 +231,10 @@ param(
     [string] $PluginList = 'C:\Thornswood\Profile\OwnGame\plugins.txt',
     [string] $Out        = '',
     [string] $JsOut      = '',
+    # Archives may be stored separately from a verified server plugin snapshot.
+    [string] $StringsData = '',
+    # Restrict dressing to the animal bases retained by the population policy.
+    [string] $Population = '',
     # Print the table and leave game\gamemode.js alone.
     [switch] $NoInstall
 )
@@ -610,11 +614,12 @@ Write-Host 'names' -ForegroundColor Cyan
 $tables    = @{}
 $bsaCache  = @{}
 $localised = @{}
-$looseDir  = Join-Path $Data 'Strings'
+$stringsRoot = if ($StringsData) { $StringsData } else { $Data }
+$looseDir  = Join-Path $stringsRoot 'Strings'
 
 function Get-BsaCached([string]$name) {
     if ($bsaCache.ContainsKey($name)) { return $bsaCache[$name] }
-    $p = Join-Path $Data $name
+    $p = Join-Path $stringsRoot $name
     if (-not (Test-Path -LiteralPath $p)) { $bsaCache[$name] = $null; return $null }
     $got = $null
     try { $got = Get-BsaStringFiles $p } catch { Note ("could not read {0}: {1}" -f $name, $_.Exception.Message); $got = $null }
@@ -1460,6 +1465,20 @@ if ($moved.Count -gt 0) {
     Ok ("the game folder is untouched: {0} entries, same names, sizes and timestamps before and after" -f $fingerAfter.Count)
 }
 
+if ($Population) {
+    $populationData = Get-Content -LiteralPath $Population -Raw | ConvertFrom-Json
+    $retainedBases = @{}
+    foreach ($row in $populationData.npcs) {
+        if ($row.keep -and $row.role -eq 'animal') { $retainedBases[[string]$row.base] = $true }
+    }
+    foreach ($base in @($table.Keys)) {
+        if (-not $retainedBases.ContainsKey([string]$base)) { $table.Remove($base) }
+    }
+    if ($table.Count -eq 0) { throw 'The population policy retained no dressable animal bases' }
+    $noviceAnimals = @($table.Keys | Where-Object { $table[$_].Rank -eq 'novice' })
+    if ($noviceAnimals.Count -eq 0) { throw 'The retained population has no novice hunting source' }
+}
+
 # ------------------------------------------------------------- the writing -
 
 Write-Host ''
@@ -1480,7 +1499,7 @@ function Gives-Json($gives) {
 $docLines = New-Object 'System.Collections.Generic.List[string]'
 $docLines.Add('{')
 $docLines.Add('  "builtBy": ' + (JsonStr 'scripts\dev\Build-HuntTable.ps1') + ',')
-$docLines.Add('  "source": ' + (JsonStr ('the NPC_ records of ' + $order.Count + ' plugins, the 5 masters and what ' + $PluginList + ' enables')) + ',')
+$docLines.Add('  "source": ' + (JsonStr ('the winning NPC_ records of ' + $order.Count + ' plugins in the recorded load order')) + ',')
 $docLines.Add('  "language": ' + (JsonStr $LANGUAGE) + ',')
 $docLines.Add('  "animalsAre": ' + (JsonStr ('an NPC whose race, followed through the template while the Use Traits bit is set, carries the keyword ' +
     $ANIMAL_KEYWORD + '. No race in this build carries that and ' + $PERSON_KEYWORD + ' both. Reading RNAM straight off the record instead would call ' +

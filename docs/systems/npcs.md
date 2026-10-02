@@ -5,16 +5,34 @@ a temple, they do not hold a profession, and a kill of one can be a
 warrior's work. A kill of a person cannot. See
 [Death](death.md) and [Warrior](professions/warrior.md).
 
-Most mod scripts do not run. An actor is simulated by a nearby
-machine, or not at all. When nobody is near, they stand. The machine
-that is simulating them can change every 2 seconds, so two people
-watching the same fight can see it resolve differently. That limit
-stays until the server owns the actors it cares about. It is not
-something a page can wish away.
+The server must load the surviving cast and own its position, activity,
+combat, death and return. The same identity is shown to everyone. Work
+continues when nobody is nearby. An actor without safe navigation waits
+under server authority instead of walking through a wall.
 
 ## Who stays
 
-The plan's cast is small.
+Bandit camps, bandit ambushes, giant camps, dungeon enemies and wildlife
+stay. Skeletons, draugr, wolves, bears and other hostile creatures belong
+in suitable places: wilderness, caves, dungeons, sewers and encounters
+beside roads. Camps are not removed to make towns smaller.
+
+Specially named animals and enemies are cut too. Their generic species and
+enemy families remain. Named traders and transport workers stay as services.
+This includes named pets and dungeon bosses whose records lack the Unique flag.
+
+An actor stays in its habitat and home region. Wolves do not roam a city
+market. Bears do not populate a farmyard. Horkers belong on suitable
+coasts, fish in suitable water, livestock on farms, and sewer creatures
+below the streets. A road encounter stays beside its road. Returning
+after death uses its home, not the nearest person or a temple.
+
+Only Merchant's Guild traders and a small, suitable animal population
+belong inside city walls. Vanilla courts, priests, guards, soldiers and
+other town fillers are cut. Wildlife or enemies that vanilla did not
+place in the city do not belong on its streets. A dungeon or sewer under
+a city is its own habitat, not permission to spawn its enemies above it.
+The rule also applies to towns without a separate city worldspace.
 
 Traders you buy from and sell to. They are the merchant's guild of
 the hold they stand in. Their prices are the average of the price
@@ -22,12 +40,14 @@ lists submitted to that hold's drop box. Their purse starts once,
 and after that they buy and sell the way a person does. An empty
 purse does not pay. An empty shelf does not sell. Stock is what
 they have bought. See [Merchant's Guild](merchants-guild.md) and
-[Custom quests](quests.md). Coin still enters the world only as the
-starting 40. A guild trader is handed 250 when they are first stood
-up, once, and not again. See [Gold](gold.md).
+[Custom quests](quests.md). A guild trader is handed 250 when they are
+first stood up, once, and not again. Supply rewards debit this purse.
+Scene rewards create the amount named on the quest, subject to its
+cooldown. See [Gold](gold.md). Traders may wander within their hold for
+now. Exact guild relocation in each hold is deferred.
 
-Carriage and ferry drivers. They are the workers of the hold the stop
-sits in. The fare is that hold's. See
+Carriage and ferry drivers stay at stops outside city walls. They are
+the workers of the hold the stop sits in. The fare is that hold's. See
 [Carriages and ferries](carriages.md).
 
 Thalmor patrols. 2 to 4, on the roads, at most 3 patrols, no coin.
@@ -36,13 +56,39 @@ See [The Thalmor](thalmor.md).
 Animals in the hunt table, the fish, the seams, the plants, the
 crops. Those are the classes, not this cast.
 
+## Difficulty and population
+
+Caves and dungeons have a fixed tier assigned to the place. Entering with
+a stronger character does not silently raise it. The location list names
+the tier, enemy families, population cap and return interval. Some places
+have more enemies and stronger ones. Ordinary routes and beginner places
+remain usable; higher tiers are a choice, not the whole map.
+
+Bandit camps share one bandit-camp baseline. Giant camps share one
+giant-camp baseline. A giant camp can be harder than a bandit camp, but
+neither kind has a ladder of tiers between its camps. Road ambushes have
+small limits and a shared wait before another can pay out.
+
+The caps count living actors and bodies waiting to return. They do not
+grow with each connection or create a second wave for each person. A
+return replaces a dead identity at its home; it does not stack another
+copy on its body. Return times and shared stock survive a restart.
+
+Hunting and fishing locations list the hold, habitat, species, population
+or stock, and replenishment rate. Cold coasts, rivers, lakes, forests,
+marshes, farms and caves do not all supply the same animals or fish.
+Some locations supply only their named species. See [Hunter](classes/hunter.md)
+and [Fisher](classes/fisher.md). Enough common supplies must circulate for
+food and trades; rare goods remain limited. There is no fixed gold price
+on an animal, fish or item, and increasing density does not mint coin.
+
 ## Who does not stay
 
-Bandit camps, wandering dogs, the jarl's court as the game wrote it,
-priests who are not a person, and every other actor the game placed
-so a province would look full. They are to be taken out or remade.
-Until they are, they behave as the limit above says, and they are
-not a system to build on.
+The jarl's court as the game wrote it, priests who are not a person,
+Bethesda guards and soldiers, and other ambient town fillers are cut.
+Animals are limited by suitable habitat and a shared cap; they are not
+removed as a whole. Bandits and other enemies outside the city surface
+stay in their proper encounters.
 
 The embassy's 20 are people on a roll, not actors. See
 [The Imperial Embassy](embassy.md).
@@ -55,9 +101,16 @@ something, take a good thing, leave the rest.
 
 ## Where this is
 
-Traders and drivers are in the world as the game placed them, with
-the carriage mod on top. The known-issues page says those two groups
-stay and the rest is thinned, and that thinning is not done. Thalmor
-patrols are not spawned. No actor is remade yet. The hosting limit
-is the engine's, and it is live. A trader does not buy and sell from
-a purse the server tracks, and does not read a submitted price list.
+Patrick changed this policy on 1 October: preserve hostile camps,
+encounters and wildlife in natural habitats, cut town fillers, limit city
+animals, and implement merchant quests. The earlier instruction to remove
+bandit camps is superseded. Exact Merchant's Guild relocation is deferred.
+
+Dev currently runs the first authored inn routine. The broader shared
+controller, population catalogue, habitat limits, difficulty tiers, stock
+controls and merchant quests are being implemented and verified. They
+are not described as shipped until a complete dev release contains them.
+See [Shared NPC activity](../NPC-SERVER-ACTIVITY.md) for verification.
+The [population catalogue](../NPC-POPULATION.md) lists authored counts, locations,
+caps and return times. Its coordinate files and the server policy come from the
+same winning-record inventory.
