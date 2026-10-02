@@ -65,6 +65,13 @@ const FILES = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-range-files-'));
 const PUBLIC = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-range-public-'));
 const TYPES = { '.mp4': 'video/mp4' };
 
+// The guard headers send() puts on every answer (#1366) come out of server.js
+// with it, so this serves exactly what the site serves. Read as a value
+// rather than eval'd as a declaration, which a sloppy eval keeps to itself.
+const guardSrc = grab('const GUARD = {');
+yes('server.js still has the guard headers send() writes', !!guardSrc);
+const GUARD = guardSrc ? eval('(' + guardSrc.slice(guardSrc.indexOf('{')) + ')') : {};
+
 const sendSrc = grab('function send(');
 yes('server.js still has send()', !!sendSrc);
 eval(sendSrc);
