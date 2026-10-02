@@ -238,6 +238,7 @@ jobs:
           # disk, and Unprotect is left as it was. It reads the launcher's
           # source, a moment, and goes red on the fail-open it replaced.
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
+'test-docs-index.js',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1',
                  'test-vps-defaults.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
