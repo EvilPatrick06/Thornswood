@@ -132,12 +132,25 @@ function Remove-ThornswoodBotLoop([string]$Root, [string]$Task) {
 
 # The bot's log, where the running service writes it: data\bot.log once the
 # install has moved the records (issue #1104), bot.log beside the code on a
-# box whose service program is from before. Install-Bot, Show-BotLog,
-# Get-Logs and Write-BotToken all read it by this rule.
+# box whose service program is from before, and when both files are there the
+# one that was written last, because that is the one the running program is
+# writing. Install-Bot, Show-BotLog, Get-Logs and Write-BotToken all read it
+# by this rule.
+#
+# The last clause is why this is not just a test for which files exist.
+# Install-Bot leaves an empty data\bot.log on the box on every -CodeOnly run,
+# so that the path the docs and Show-BotLog name is always a file; on a box
+# whose service program still writes the old place, both are then there, and a
+# rule that preferred the newer place would have every reader on an empty file
+# while the bot talked to the other one.
 function Get-ThornswoodBotLog([string]$Root) {
   $new = Join-Path (Join-Path $Root 'data') 'bot.log'
   $old = Join-Path $Root 'bot.log'
-  if (-not (Test-Path -LiteralPath $new) -and (Test-Path -LiteralPath $old)) { return $old }
+  $o = Get-Item -LiteralPath $old -EA SilentlyContinue
+  if (-not $o) { return $new }
+  $n = Get-Item -LiteralPath $new -EA SilentlyContinue
+  if (-not $n) { return $old }
+  if ($o.LastWriteTimeUtc -gt $n.LastWriteTimeUtc) { return $old }
   return $new
 }
 

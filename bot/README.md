@@ -245,11 +245,23 @@ waits for it to say it is watching the server. If it does not, the old files
 go back and it is started on those. Python, the libraries, the token and the
 service itself are left alone.
 
+What goes up with it: `bot.py`, `card.py`, the channel ids, the card artwork,
+`requirements.txt`, and `live-smoke-discord-export.json`, which `bot.py` reads
+from beside itself for the live smoke. A file the bot reads and this list does
+not name is a file that is only ever on main, never on the box.
+
 The bot's log is `C:\Thornswood-Bot\data\bot.log`: in the data folder under
 the bot's folder, the one folder its account writes, rather than beside the
-code where it used to be. `.\scripts\vps\Show-BotLog.ps1` reads it without a
-deploy, and a box that has no log yet gets an empty one made for it at the
-next restart.
+code where it used to be. Every `-CodeOnly` run leaves that file on the box,
+empty if the bot has not written to it yet, so the path is always something to
+look at. `.\scripts\vps\Show-BotLog.ps1` reads whichever of the two files the
+bot is really writing, which on a box whose service program is older is still
+the one beside the code.
+
+Those paths are on the VPS, not on the machine you run the deploy from, so
+`Test-Path C:\Thornswood-Bot\data\bot.log` there answers for a folder that
+machine does not have. `Show-BotLog.ps1` and `.\scripts\vps\Get-Logs.ps1` are
+how to look at them.
 
 ## Release notes posting themselves
 

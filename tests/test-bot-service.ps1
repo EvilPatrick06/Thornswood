@@ -181,10 +181,16 @@ foreach ($b in $blocks) {
         # are put right before the start, so the health check has something to
         # read and the service has somewhere to write.
         $make = [regex]::Match($sent, '(?s)function MakeLog \{.*?\r?\n\}').Value
-        Yes '-CodeOnly makes the log before the start, at the path Get-ThornswoodBotLog names' (
+        Yes '-CodeOnly makes the log before the start, and the folder the service writes it in' (
             $make -and $make -match [regex]::Escape("Repair-ThornswoodBotData -Root 'C:\Thornswood-Bot' -Name 'ThornswoodBot'") -and
-            $make -match 'WriteAllText' -and $make -match 'if \(Test-Path -LiteralPath \$log\) \{ return \}' -and
-            $sent -match '(?s)function StartIt \{\s+MakeLog')
+            $make -match 'WriteAllText' -and $sent -match '(?s)function StartIt \{\s+MakeLog')
+        # data\bot.log on every run, whichever of the two files the run reads,
+        # so the path the docs and Show-BotLog name is always there. Nothing
+        # may return out of the function in front of that.
+        $newAt = $make.IndexOf('WriteAllText($new')
+        Yes 'and data\bot.log by name, in front of anything that can return' (
+            $make -match [regex]::Escape("`$new = Join-Path `$data 'bot.log'") -and
+            $newAt -gt 0 -and $make.IndexOf('return') -gt $newAt)
         Yes 'and Why says the log is not there rather than reading nothing from it' (
             $sent -match [regex]::Escape('there is no '' + $log + '' to read'))
     }
@@ -548,6 +554,17 @@ $old = Join-Path $g 'old-layout'
 $null = New-Item -ItemType Directory -Force -Path $old
 [IO.File]::WriteAllText((Join-Path $old 'bot.log'), 'x')
 Yes 'and from beside the code on a box whose install is older' ((Get-ThornswoodBotLog $old) -eq (Join-Path $old 'bot.log'))
+# With both there, the one written last, because -CodeOnly leaves an empty
+# data\bot.log on every run so the path the docs name is always a file: a rule
+# that went by which files exist would put every reader on that empty one
+# while the bot wrote the other.
+$null = New-Item -ItemType Directory -Force -Path (Join-Path $old 'data')
+[IO.File]::WriteAllText((Join-Path $old 'data\bot.log'), '')
+(Get-Item -LiteralPath (Join-Path $old 'data\bot.log')).LastWriteTimeUtc = [DateTime]::UtcNow.AddMinutes(-5)
+Yes 'with both there, the one the bot is writing: the older place when that is the one written last' (
+    (Get-ThornswoodBotLog $old) -eq (Join-Path $old 'bot.log'))
+(Get-Item -LiteralPath (Join-Path $old 'data\bot.log')).LastWriteTimeUtc = [DateTime]::UtcNow.AddMinutes(5)
+Yes 'and data once the program writing it is the newer one' ((Get-ThornswoodBotLog $old) -eq (Join-Path $old 'data\bot.log'))
 
 # -- the data folder put right for a restart, where it has gone ------------------
 # The service opens its log before it starts python, so no data folder is no
