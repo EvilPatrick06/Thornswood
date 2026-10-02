@@ -51,7 +51,7 @@
   Steam, not Vortex, not C:\Thornswood, and nothing goes over the network.
 #>
 [CmdletBinding()]
-param([string]$AppPath)
+param([string]$AppPath, [string]$Scratch)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -59,6 +59,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
 if (-not $AppPath) { $AppPath = Join-Path $Here 'launcher\app' }
+if (-not $Scratch) { $Scratch = [IO.Path]::GetTempPath() }
 
 $script:pass = 0
 $script:fail = 0
@@ -985,7 +986,7 @@ namespace Thornswood
 }
 '@
 
-$work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-vortex-folder-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$work = Join-Path $Scratch ('thornswood-vortex-folder-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
 try {
     $utf8 = New-Object System.Text.UTF8Encoding($false)
