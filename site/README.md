@@ -95,6 +95,18 @@ A `config.json` there that will not read as JSON, an empty one included, is
 left exactly as it is and the password is not changed.
 `tests\test-docs-password.ps1` runs that part of the script against copies.
 
+`GET /api/deploys` says which commit, zip and hash each part on the box runs
+and when each last went out, read from the records the deploy scripts leave
+in `C:\Thornswood-Deploys\current` (`scripts\deploy\Artifact.ps1`;
+`THORNSWOOD_DEPLOYS_DIR` points a copy somewhere else). It is staff's, by the
+same `w.dev` the other staff doors ask (#1359): a caller with no cookie gets
+`401 sign in first` and a hub member who is not staff `403 staff only`, and
+no record is read before either refusal. It used to answer anybody, which
+told a stranger which source is live to the hour and when each part was last
+touched. Nothing in the repo fetches it and no page draws it, so the caller is
+a person asking what is deployed; sign into the hub first.
+`tests\test-deploy-records.js` asks a scratch copy as all three callers.
+
 The pages, the downloads, the hub and every route in the table above are one
 node process. A route that throws is answered 500 and the rest carry on, and a
 throw in a timer is logged and carried on from, so a broken page does not take

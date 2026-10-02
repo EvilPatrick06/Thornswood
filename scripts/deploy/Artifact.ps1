@@ -44,8 +44,9 @@
     history.log                               one line per deploy
   and a copy of the part's record beside what it runs, as
   thornswood-deploy.json (Set-ThornswoodArtifactCurrent). Those are read over
-  HTTP: the site's /api/deploys lists every part, the voice service's /health
-  carries its own, and a game server serves its own from its data folder, so
+  HTTP: the site's /api/deploys lists every part for staff signed into the
+  hub (#1359), the voice service's /health carries its own, and a game
+  server serves its own from its data folder, so
   http://<box>:3000/thornswood-deploy.json for live and :7788 for dev.
 
   Nothing here stops, starts or swaps anything. Building needs git; sending
