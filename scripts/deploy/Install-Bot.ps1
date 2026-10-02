@@ -377,6 +377,12 @@ if ($checkOut -notcontains 'STAGE OK') { Die 'the stage did not check out, so th
 # on import is running for a second at a time. A box with no service yet, on a
 # full run that is about to install it, has nothing to start or check here.
 #
+# The one case where the service saying Running is taken as the answer is a
+# start that wrote no line at all, to either place the log can be. That is a
+# log that could not be read, not a bot that failed, and it is never grounds
+# for putting the old code back over a bot that is up. Said in the PASS line
+# when it happens, with Show-BotLog.ps1 to read the bot itself.
+#
 # StartIt is the only thing that starts the bot, and the swap block calls it
 # twice: once on the new files, and again on the old ones when the new ones
 # did not come up. Both go through Restart-ThornswoodBotService, which is
@@ -387,6 +393,13 @@ if ($checkOut -notcontains 'STAGE OK') { Die 'the stage did not check out, so th
 $botHooks = @"
 `$log = Get-ThornswoodBotLog '$rootWin'
 `$before = 0
+# The other place the bot's log can be, for FollowLog below: data\bot.log
+# since #1104, bot.log beside the code before it.
+`$otherLog = Join-Path '$rootWin' 'bot.log'
+if (`$log -eq `$otherLog) { `$otherLog = Join-Path (Join-Path '$rootWin' 'data') 'bot.log' }
+`$otherBefore = 0
+`$saidNothing = `$false
+`$followed = ''
 `$hasService = [bool](Get-Service -Name '$Service' -EA SilentlyContinue)
 if (-not `$hasService -and -not `$NoServiceOk) {
   'THE BOT SERVICE IS NOT INSTALLED HERE. Run Install-Bot.ps1 once without -CodeOnly: it puts the service in place of the old loop.'
@@ -433,7 +446,34 @@ function StartIt {
   MakeLog
   `$script:before = 0
   if (Test-Path -LiteralPath `$log) { `$script:before = (Get-Item -LiteralPath `$log).Length }
+  # The other place's length as well, so FollowLog can tell a file this start
+  # wrote from one that has been sitting there since before it.
+  `$script:otherBefore = 0
+  if (Test-Path -LiteralPath `$otherLog) { `$script:otherBefore = (Get-Item -LiteralPath `$otherLog).Length }
   if (`$hasService) { Restart-ThornswoodBotService -Name '$Service' -Root '$rootWin' }
+}
+# Which of the two files this start is really writing. With no log on the box
+# at all, Get-ThornswoodBotLog can only name the newer place, data\bot.log,
+# and a box whose service program is older writes the one beside the code: the
+# health check would then read an empty file it had just made while the bot
+# talked to the other one. So when the file being watched has not been written
+# and the other one has grown since the start, the other one is the log, read
+# from its beginning. A file that was already long before the start is not a
+# file this start wrote, which is why both lengths are taken above.
+#
+# NOT ONE LINE GOES TO THE OUTPUT STREAM HERE. Healthy calls this and hands
+# back one true or false, and a line of its own in that stream would make the
+# caller's 'if (Healthy)' an array, which is true whatever the check found, so
+# nothing would ever roll back. Which file it read is said by Answer and by
+# Why, which are written to be read.
+function FollowLog {
+  `$f = Get-Item -LiteralPath `$log -EA SilentlyContinue
+  if (`$f -and `$f.Length -gt `$before) { return }
+  `$o = Get-Item -LiteralPath `$otherLog -EA SilentlyContinue
+  if (-not `$o -or `$o.Length -le `$otherBefore) { return }
+  `$script:followed = `$otherLog
+  `$script:log = `$otherLog
+  `$script:before = 0
 }
 # Only what this start wrote. The file is held open by the service, so it is
 # read with FileShare ReadWrite or not at all. Shorter than before means it
@@ -459,19 +499,37 @@ function Healthy {
   if (-not `$hasService) { return `$true }
   `$until = (Get-Date).AddSeconds(`$Wait)
   while (`$true) {
+    FollowLog
     `$said = @(Fresh)
     if (@(`$said -match 'watching \d+ server').Count -and (Get-Service -Name '$Service').Status -eq 'Running') { return `$true }
     if (@(`$said -match 'stopped within').Count) { return `$false }
-    if ((Get-Date) -gt `$until) { return `$false }
+    if ((Get-Date) -gt `$until) {
+      # NOT A FAILURE: a start that wrote no line at all, to either place the
+      # log can be, while the service is Running. The log is how this tells a
+      # bot that came up from one restarting on a broken import, and it is
+      # the better answer whenever there are lines to read. With none there
+      # is nothing to read rather than something bad to read, and putting the
+      # old code back over a bot that is up is the worse of the two mistakes.
+      # Said in the PASS line, so nobody takes it for the full check.
+      if (-not `$said.Count -and (Get-Service -Name '$Service').Status -eq 'Running') {
+        `$script:saidNothing = `$true
+        return `$true
+      }
+      return `$false
+    }
     Start-Sleep -Seconds 2
   }
 }
 function Answer {
   if (-not `$hasService) { return 'the files are in; the service is installed below' }
-  'service $Service is ' + (Get-Service -Name '$Service').Status + ', and the bot says it is watching its server'
+  `$s = 'service $Service is ' + (Get-Service -Name '$Service').Status
+  if (`$followed) { `$s += ', writing its log to ' + `$followed }
+  if (`$saidNothing) { return `$s + ', and the code is in, but this start wrote nothing to ' + `$log + '. Read the bot''s own lines with Show-BotLog.ps1.' }
+  return `$s + ', and the bot says it is watching its server'
 }
 function Why {
   '--- what the bot said this time ---'
+  if (`$followed) { 'read from ' + `$followed + ', which is the file this start wrote' }
   if (-not (Test-Path -LiteralPath `$log)) {
     'there is no ' + `$log + ' to read, so nothing was written at all. Since #1104 the bot''s log is in the data folder under its own folder, not beside the code.'
     return
@@ -525,6 +583,16 @@ if ($CodeOnly -or $PutBack) {
     elseif ($restart -contains 'SWAP OK') {
         if ("$restart" -match ('service ' + $Service + ' is Running')) { Save-BotRecord }
         else { Say '  The service is not running, so the box does not record this code as the bot''s.' 'Yellow' }
+    }
+
+    # The swap went by the service alone, because the bot wrote no line to
+    # either place its log can be. The code is in and the service is up; what
+    # is missing is the bot's own word for it, which this says where to read.
+    if ("$restart" -match 'wrote nothing to') {
+        Write-Host ''
+        Say '  The code is in and the service is up, but the bot wrote nothing to its log this' 'Yellow'
+        Say '  start, so this went by the service alone. Read what it is saying with:' 'Yellow'
+        Say '    .\scripts\vps\Show-BotLog.ps1' 'Green'
     }
 
     Write-Host ''
