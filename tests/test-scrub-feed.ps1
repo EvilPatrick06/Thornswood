@@ -28,7 +28,7 @@
        once no feed names them; a second run does nothing
     4. installs AFTER it: a fresh one replaying every main pack, the one that
        already applied them (nothing fetched again), the one synced to the dev
-       record (checks, fetches nothing, removes nothing), a fresh dev install
+       record (checks, fetches nothing, removes a matching other-author copy #1261), a fresh dev install
        and an old launcher replaying the dev feed's packs
     5. the real Rollback-Feed.ps1 going back a release on the scrubbed dev feed
     6. the delete refuses when a feed moved, and keeps what a feed still names
@@ -470,10 +470,12 @@ $b = $dd.baseline
 $nR3 = Read-BaselineFile (Join-Path $da $b.sha256)
 $goneR3 = @('Data\Scripts\Source\IED.psc') + $machineKeys + $notOursKeys
 Yes 'the dev baseline is the record again without IED.psc, the join pass, the mod menu settings or the face tint as gone, at a new sha256, with its entry count' (
-    $b.id -eq $IR3 -and $b.sha256 -ne $rec['R3'].Sha -and @($goneR3 | Where-Object { $nR3.ContainsKey($_) }).Count -eq 0 -and $b.entries -eq $nR3.Count -and $nR3.Count -eq ($rec['R3'].Map.Count - 5))
+    $b.id -eq $IR3 -and $b.sha256 -ne $rec['R3'].Sha -and @($goneR3 | Where-Object { $nR3.ContainsKey($_) }).Count -eq 0 -and $b.entries -eq $nR3.Count -and $nR3.Count -eq ($rec['R3'].Map.Count - 4))
 Yes '  every other key as it was, the voice token every release deletes still listed as gone' (
     @($rec['R3'].Map.Keys | Where-Object { $goneR3 -notcontains $_ -and $nR3[$_] -ne $rec['R3'].Map[$_] }).Count -eq 0 -and $nR3[':gone:Data\Platform\voice-token.txt'] -eq 'always' -and $nR3[':gone:Data\meshes\LostArk\KamenSword.nif'] -eq 'removed')
 Yes '  and the files are not listed as gone either' (-not $nR3.ContainsKey(':gone:Data\Scripts\Source\IED.psc') -and -not $nR3.ContainsKey(':gone:Data\Platform\thornswood-pass.txt'))
+Yes '  while another author''s file we shipped is gone with its sha256 (#1261)' (
+    $nR3.ContainsKey(':gone:Data\Interface\racesex_menu.swf') -and $nR3[':gone:Data\Interface\racesex_menu.swf'] -eq (Sha-Text $raceText))
 $rels = @($dd.releases)
 $nR1 = Read-BaselineFile (Join-Path $da $rels[2].sha256)
 Yes 'the release list names the three records again, same ids and order, new sha256s' (
@@ -538,7 +540,11 @@ Use-Install $synced
 $pend = @(Pending-Of (Parse-Feed 'feed-dev'))
 Yes 'an install synced to the old dev record is offered the new one' ($pend.Count -eq 1 -and $null -ne $pend[0].Record -and $pend[0].Record.sha256 -eq $dd.baseline.sha256)
 [void](Update $synced 'feed-dev')
-Yes '  checks every file, downloads nothing and removes nothing' ((Fetched) -eq 0 -and @($script:said | Where-Object { $_ -like 'removed *' }).Count -eq 0 -and (Same-Files (Get-Game $synced) $syncedBefore))
+$after = Get-Game $synced
+$wantAfter = @{}; foreach ($k in $syncedBefore.Keys) { if ($k -ne 'Data\Interface\racesex_menu.swf') { $wantAfter[$k] = $syncedBefore[$k] } }
+Yes '  checks every file, downloads nothing, and removes the matching RaceMenu copy (#1261)' (
+    (Fetched) -eq 0 -and @($script:said | Where-Object { $_ -like 'removed Data\Interface\racesex_menu.swf' }).Count -eq 1 -and (Same-Files $after $wantAfter) -and
+    -not (Test-Path -LiteralPath (Join-Path $synced 'Game\Data\Interface\racesex_menu.swf')))
 Yes '  and writes the new record down, so it is not offered again' ((Synced $synced) -match $dd.baseline.sha256 -and (Pending-Of (Parse-Feed 'feed-dev')).Count -eq 0)
 $freshDev = New-Install 'fresh-dev'
 [void](Update $freshDev 'feed-dev')

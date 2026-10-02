@@ -501,6 +501,40 @@ Put (Join-Path $vx 'Game\Data\vortex.deployment.json') '{"files":[{"relPath":"Pl
 Yes 'a file of ours a release dropped stays when Vortex deploys that path now' (
     (Test-Lands $vx $records[$R3] @('Data\Platform\UI\old.esp', 'Data\vortex.deployment.json')) -and (Test-Path -LiteralPath (Join-Path $vx 'Game\Data\Platform\UI\old.esp')) -and (Said 'collection''s now and stayed'))
 
+
+# ---- other authors' files we shipped leave only when the bytes match (#1261) ----
+Write-Host ''; Write-Host 'other authors files we shipped (#1261)'
+$shipped = 'racemenu bytes we once shipped'
+$own = 'a person put their own RaceMenu here'
+$ms = New-Object IO.MemoryStream (,$ascii.GetBytes($shipped))
+$shippedSha = (Get-FileHash -InputStream $ms -Algorithm SHA256).Hash.ToLowerInvariant()
+$ms.Dispose()
+$hashGone = @{}
+foreach ($k in $records[$R3].Keys) { $hashGone[$k] = $records[$R3][$k] }
+$hashGone[':gone:Data\Interface\racesex_menu.swf'] = $shippedSha
+$hashFile = Join-Path $T 'hash-gone.json'
+$hashSha = Write-BaselineFile $hashGone $hashFile
+Copy-Item -LiteralPath $hashFile -Destination (Join-Path $feedDir ("assets\" + $hashSha))
+$saveFeed2 = [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))
+$doc = Feed
+$doc.baseline = [pscustomobject]@{ id = 'hash-gone'; sha256 = $hashSha; url = ("https://thornswood.net/feed/assets/" + $hashSha); entries = $hashGone.Count }
+[IO.File]::WriteAllText((Join-Path $feedDir 'version.json'), ($doc | ConvertTo-Json -Depth 6), $utf8)
+$matchFiles = @{} + $installerFiles
+$matchFiles['Data\Interface\racesex_menu.swf'] = $shipped
+$hm = New-Install 'hash-match' $matchFiles $ids
+[void](Update-New $hm)
+Yes 'a copy whose bytes still match what we shipped is removed' (
+    -not (Test-Path -LiteralPath (Join-Path $hm 'Game\Data\Interface\racesex_menu.swf')) -and (Said '^removed Data\\Interface\\racesex_menu\.swf'))
+$ownFiles = @{} + $installerFiles
+$ownFiles['Data\Interface\racesex_menu.swf'] = $own
+$ho = New-Install 'hash-own' $ownFiles $ids
+[void](Update-New $ho)
+Yes 'a person''s own copy of the same path is left alone' (
+    (Test-Path -LiteralPath (Join-Path $ho 'Game\Data\Interface\racesex_menu.swf')) -and
+    ((Get-Content -LiteralPath (Join-Path $ho 'Game\Data\Interface\racesex_menu.swf') -Raw) -eq $own) -and
+    -not (Said '^removed Data\\Interface\\racesex_menu\.swf'))
+[IO.File]::WriteAllBytes((Join-Path $feedDir 'version.json'), $saveFeed2)
+
 # ---- the old launcher beside it -----------------------------------------------
 Write-Host ''; Write-Host 'an old launcher on the same feed'
 $oldL = New-Install 'old-launcher' $installerFiles $ids
