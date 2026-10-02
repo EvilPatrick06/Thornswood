@@ -16,6 +16,11 @@ What it does:
            staff channel, the day it arrives
   Holds    a panel in #choose-your-hold where a Member picks their hold
            and which announcements ping them
+  Live smoke the living checklist in #test-tasks: /live-smoke start opens a
+           dated session thread with one message per row of the Live set, and
+           testers mark their own rows on it. The rows come out of
+           live-smoke-discord-export.json beside this file, and a mark is an
+           edit to a Discord message and nothing else
   Heartbeat writes heartbeat.json beside this file every minute, so the
            watchdog can tell a bot that is running from one that is on
            Discord (issue #449)
@@ -42,6 +47,13 @@ Everything it needs is in env:
   WATCH_READ_EVERY seconds between reads of its outbox, default 60
   HOLD_CHANNEL     channel the hold panel lives in, default choose-your-hold
   MEMBER_ROLE      role that may pick a hold, default Member
+  LIVE_SMOKE_EXPORT       the Live set, default live-smoke-discord-export.json
+                          beside this file
+  LIVE_SMOKE_CHANNEL      channel the sessions live in, default test-tasks
+  LIVE_SMOKE_ADMIN_ROLES  comma separated, who may start, reset and refresh a
+                          session, default Owner,Dev,Lead GM,Lead Gamemaster
+  LIVE_SMOKE_DENY_USER_IDS comma separated account ids that may not mark a
+                          row, empty by default and set only on the VPS
   HEARTBEAT_FILE   where the heartbeat goes, default heartbeat.json beside this
                    file, which is where the watchdog reads it
   HEARTBEAT_EVERY  seconds between heartbeats, default 60
@@ -271,6 +283,12 @@ class Thornswood(discord.Client):
         self.add_view(TicketPanel())          # so it keeps working after a restart
         self.add_view(TicketTools())          # and so does Close on every old ticket
         self.add_view(HoldPanel())            # and the hold and ping buttons
+        # One per row in the Live smoke export, so a session opened before the
+        # last restart can still be marked. A row dropped from the export is a
+        # row whose buttons go quiet, which is why a changed set gets a new
+        # session rather than the old one carried on.
+        for view in live_smoke_views():
+            self.add_view(view)
 
 
 client = Thornswood(intents=intents)
@@ -1774,6 +1792,614 @@ async def ensure_hold_panel(guild):
         log('hold panel failed:\n' + traceback.format_exc())
 
 
+# ------------------------------------------------------------ live smoke --
+#
+# The living Live smoke checklist in #test-tasks, decided on 1 October.
+#
+# The criteria are not written here. They live in the vault, in
+# wiki/quality/playtest-acceptance.md, and Cynthia exports the Live slice of
+# them to live-smoke-discord-export.json, a copy of which is deployed beside
+# this file. The bot reads that file and nothing else: no request to the
+# vault, no request to the site, and nothing written back anywhere.
+#
+# IT RUNS ONE WAY. Vault to Discord. A mark pressed here is an edit to the
+# Discord message the button sits on, and that is the whole of where it is
+# kept. Nothing in this section writes a mark, a name or a Discord id to the
+# site, to the bot's own records, to a database or to the log, and the two
+# places that would have done it by accident say so where they are: the mark
+# handler logs no traceback, because a Discord error carries the message it
+# refused and that message holds names and marks.
+#
+# Marks are visible to everybody who can read the session thread. That is the
+# Owner's call rather than an accident, and the opener says so, so nobody
+# marks a row thinking it is private. The channel itself is pathfind in
+# Build-Discord.py: testers and staff, never @everyone, plus the lead
+# gamemaster role on that channel's own line, because the admin list below is
+# not the same list as pathfind and somebody holding only that role could
+# otherwise run a session in a channel they cannot see.
+#
+# WHO MAY START ONE. Owner, Dev and Lead Gamemaster, which is wider than
+# Owner and Dev and narrower than STAFF: a Moderator alone does not start,
+# reset or refresh a session. Roles were deleted and renamed in the cleanup,
+# so these are matched by name against whatever the server carries today, and
+# LIVE_SMOKE_ADMIN_ROLES in bot.env.json moves them without a deploy. No
+# snowflake is written down anywhere here.
+#
+# The default is in this file and not read out of the export, so content that
+# moves when Cynthia refreshes the Live set can never widen who may start a
+# session.
+LIVE_SMOKE_EXPORT = (os.environ.get('LIVE_SMOKE_EXPORT', '').strip() or
+                     os.path.join(HERE, 'live-smoke-discord-export.json'))
+LIVE_SMOKE_SCHEMA = 'thornswood.live-smoke.v1'
+LIVE_SMOKE_CHANNEL = [n.strip().lower() for n in
+                      os.environ.get('LIVE_SMOKE_CHANNEL', 'test-tasks').split(',')
+                      if n.strip()]
+# Lead GM and Lead Gamemaster are both here because the role has been written
+# both ways and the scrub is not finished. Matching is by name and ignores
+# case, the way STAFF_ROLES already works.
+LIVE_SMOKE_ADMIN_NAMES = [r.strip() for r in
+                          os.environ.get('LIVE_SMOKE_ADMIN_ROLES',
+                                         'Owner,Dev,Lead GM,Lead Gamemaster').split(',')
+                          if r.strip()]
+LIVE_SMOKE_ADMIN = [r.lower() for r in LIVE_SMOKE_ADMIN_NAMES]
+# The second lock on agents, after interaction.user.bot. Empty here on
+# purpose: an account that has to be named is named in bot.env.json on the
+# VPS, never in the repository.
+LIVE_SMOKE_DENY = set(int(i) for i in
+                      os.environ.get('LIVE_SMOKE_DENY_USER_IDS', '').split(',')
+                      if i.strip().isdigit())
+
+LIVE_SMOKE_MARKS = ('Pass', 'Fail', 'Skip', 'Fail-known')
+LIVE_SMOKE_TITLE = 'Live smoke'
+LIVE_SMOKE_TEMPLATE_HEAD = '**Live smoke checklist**'
+# What the marks on an item message sit under, so they can be found again and
+# one person's line replaced rather than a second one added.
+LIVE_SMOKE_MARKS_HEAD = '\n\nMarks:\n'
+# A Discord message holds 2000 characters. Well under it, so an item message
+# that is nearly full says so instead of being refused by Discord.
+LIVE_SMOKE_ROOM = 1900
+
+
+def _live_smoke_or(names):
+    """a, b or c, for a refusal that names the roles."""
+    names = [n for n in names if n]
+    if not names:
+        return 'nobody'
+    if len(names) == 1:
+        return names[0]
+    return ', '.join(names[:-1]) + ' or ' + names[-1]
+
+
+def live_smoke_items(export):
+    """
+    Every item in the export, in the order it gives, each one a dict.
+
+    An item with no id or no line for Discord is dropped rather than posted
+    half built: the id is what its buttons are keyed by, and the line is the
+    whole of what a tester reads. An order that is not a number keeps the
+    place the file put it in.
+    """
+    out = []
+    for n, raw in enumerate((export or {}).get('items') or []):
+        if not isinstance(raw, dict):
+            continue
+        ident = str(raw.get('id') or '').strip()
+        line = str(raw.get('discord_line') or '').strip()
+        if not ident or not line:
+            continue
+        try:
+            order = int(raw.get('order'))
+        except (TypeError, ValueError):
+            order = n + 1
+        skip = raw.get('skip_rule')
+        out.append({
+            'id': ident,
+            'order': order,
+            'label': str(raw.get('label') or '').strip(),
+            'tickets': [str(t).strip() for t in (raw.get('tickets') or [])
+                        if str(t).strip()],
+            # null in the export for most rows, and the one that has it is the
+            # forge rule on the double craft row. Shown on the message, so a
+            # tester knows when Skip is the right mark without opening the
+            # vault.
+            'skip_rule': str(skip).strip() if skip else '',
+            'discord_line': line,
+        })
+    out.sort(key=lambda i: i['order'])
+    return out
+
+
+def live_smoke_load(path=None):
+    """
+    The export, read off the file beside this one.
+
+    Anything wrong with it raises ValueError carrying words a person can act
+    on, because every one of these is said back to whoever ran the command as
+    an ephemeral rather than left in a log nobody is reading at the time.
+
+    The schema is checked and not guessed. A later export shape with the same
+    file name would otherwise be posted as an empty session.
+    """
+    where = path or LIVE_SMOKE_EXPORT
+    try:
+        with open(where, encoding='utf-8') as f:
+            got = json.load(f)
+    except (IOError, OSError):
+        raise ValueError('There is no Live smoke export at %s. It is deployed '
+                         'beside bot.py by Install-Bot.ps1 -CodeOnly.' % where)
+    except ValueError:
+        raise ValueError('The Live smoke export at %s is not readable JSON.' % where)
+    if not isinstance(got, dict):
+        raise ValueError('The Live smoke export at %s is not what this reads.' % where)
+    if got.get('schema') != LIVE_SMOKE_SCHEMA:
+        raise ValueError('The Live smoke export at %s says schema %s, and this '
+                         'bot reads %s. Deploy the export that matches.'
+                         % (where, got.get('schema') or 'nothing',
+                            LIVE_SMOKE_SCHEMA))
+    items = live_smoke_items(got)
+    if not items:
+        raise ValueError('The Live smoke export at %s has no items in it.' % where)
+    # A custom_id is 100 characters, and an id too long for one is a session
+    # whose buttons Discord refuses halfway through posting it.
+    wide = [i['id'] for i in items
+            if len(live_smoke_custom_id(i['id'], 'Fail-known')) > 100]
+    if wide:
+        raise ValueError('These Live smoke item ids are too long to put on a '
+                         'button: %s.' % ', '.join(wide))
+    return got
+
+
+def live_smoke_custom_id(item_id, mark):
+    return 'ls:%s:%s' % (item_id, mark)
+
+
+def live_smoke_read_id(custom_id):
+    """
+    The item and the mark a button carries, or None when it is not one of
+    ours. Split from the right, so an item id with a colon in it still reads.
+    """
+    s = str(custom_id or '')
+    if not s.startswith('ls:') or ':' not in s[3:]:
+        return None
+    item_id, mark = s[3:].rsplit(':', 1)
+    if not item_id or mark not in LIVE_SMOKE_MARKS:
+        return None
+    return item_id, mark
+
+
+def live_smoke_title_of(export, settings_version, day=None):
+    """The session title: the format the export asks for, the date and the
+       version off the launcher's Settings window."""
+    fmt = str(((export or {}).get('session') or {}).get('title_format')
+              or 'Live smoke {YYYY-MM-DD} {settings_version}')
+    when = (day or datetime.date.today()).strftime('%Y-%m-%d')
+    return (fmt.replace('{YYYY-MM-DD}', when)
+               .replace('{settings_version}', str(settings_version or '').strip())
+               .strip())
+
+
+def live_smoke_opener(title, live_channel, settings_version, total):
+    """
+    The message the session thread hangs off.
+
+    It names the three things a session has to record, and it says out loud
+    that the marks are visible in the thread and go nowhere else, so nobody
+    marks a row believing otherwise.
+    """
+    return ('**%s**\n'
+            'Live channel: %s\n'
+            'Settings version: %s\n'
+            '%d row%s to mark, from the Live set the vault keeps.\n\n'
+            'Mark your own rows in the thread under this message: Pass, Fail, '
+            'Skip or Fail-known. On a Fail or a Fail-known, say the issue '
+            'number in a reply in the thread.\n'
+            'Everybody who can read the thread can read the marks in it, and '
+            'they stay in Discord: nothing here is written to the site, to a '
+            'database or to a file. Agents do not mark rows.'
+            % (title, str(live_channel).strip(),
+               str(settings_version).strip(), total,
+               '' if total == 1 else 's'))
+
+
+def live_smoke_item_text(item, total=None):
+    """One row, as it is posted. The skip rule is on it when the export gives
+       one, which is what tells a tester that Skip is the honest mark."""
+    head = 'Live %d' % item['order']
+    if total:
+        head += ' of %d' % total
+    if item['label']:
+        head += ': ' + item['label']
+    out = '**%s**' % head
+    if item['tickets']:
+        out += '  ' + ' '.join('#' + t for t in item['tickets'])
+    out += '\n' + item['discord_line']
+    if item['skip_rule']:
+        out += '\nSkip rule: ' + item['skip_rule']
+    return out
+
+
+def live_smoke_mark(content, who, mark):
+    """
+    The item message with this person's mark on it, as words.
+
+    One line per person, keyed by the name shown in Discord, so marking twice
+    corrects the mark instead of adding a second one. Two people marking the
+    same row at the same moment is last write wins on the whole message, which
+    is worth less than it sounds: the loser presses it again.
+
+    A pure function of the message's own text, so the harness can check the
+    wording of it without a Discord to press buttons in.
+    """
+    text = str(content or '')
+    at = text.find(LIVE_SMOKE_MARKS_HEAD)
+    if at < 0:
+        body, lines = text.rstrip(), []
+    else:
+        body = text[:at].rstrip()
+        lines = [l for l in text[at + len(LIVE_SMOKE_MARKS_HEAD):].split('\n')
+                 if l.strip()]
+    name = str(who or '').strip() or 'Somebody'
+    line = '%s: %s' % (name, mark)
+    for i, had in enumerate(lines):
+        # Split off the end, not the front: a mark carries no colon and a name
+        # in Discord may.
+        if had.rsplit(': ', 1)[0].strip() == name:
+            lines[i] = line
+            break
+    else:
+        lines.append(line)
+    return body + LIVE_SMOKE_MARKS_HEAD + '\n'.join(lines)
+
+
+def live_smoke_template(export, items):
+    """
+    The post that sits in the channel between sessions, so somebody reading
+    #test-tasks on a Tuesday can see what a session covers without one being
+    open. Humans only: it carries no buttons and nobody is marked on it.
+    """
+    out = [LIVE_SMOKE_TEMPLATE_HEAD, '',
+           'This is what a session checks. Staff open one with /live-smoke '
+           'start, and the rows are marked in the thread under its opener.']
+    updated = str((export or {}).get('updated') or '').strip()
+    if updated:
+        out.append('The set last changed on %s.' % updated)
+    out.append('')
+    for item in items:
+        line = '%d. %s' % (item['order'], item['label'] or item['discord_line'])
+        if item['tickets']:
+            line += '  ' + ' '.join('#' + t for t in item['tickets'])
+        out.append(line)
+        if item['skip_rule']:
+            out.append('    Skip rule: ' + item['skip_rule'])
+    out.append('')
+    out.append('The marks are Pass, Fail, Skip and Fail-known. They stay in '
+               'Discord, in the session thread, and are read by everybody who '
+               'can read it. Agents do not mark rows.')
+    said = '\n'.join(out)
+    if len(said) > LIVE_SMOKE_ROOM:
+        said = said[:LIVE_SMOKE_ROOM].rstrip() + '\n(the rest is in the export)'
+    return said
+
+
+def is_live_smoke_admin(who):
+    """Owner, Dev or Lead Gamemaster, by the names LIVE_SMOKE_ADMIN_ROLES
+       carries. A Moderator alone is not one of them."""
+    try:
+        names = set(r.name.lower() for r in getattr(who, 'roles', None) or [])
+    except Exception:
+        return False
+    return bool(names & set(LIVE_SMOKE_ADMIN))
+
+
+def live_smoke_admin_missing(guild):
+    """Which of those role names this server has not got, by name. The scrub
+       renamed roles, so this is the difference between nobody being allowed
+       and nobody being able to be."""
+    try:
+        have = set(str(r.name).lower() for r in getattr(guild, 'roles', None) or [])
+    except Exception:
+        return list(LIVE_SMOKE_ADMIN_NAMES)
+    return [n for n in LIVE_SMOKE_ADMIN_NAMES if n.lower() not in have]
+
+
+def live_smoke_admin_refusal(guild):
+    """
+    Why this person cannot start, reset or refresh, in words they can do
+    something about.
+
+    Only a server carrying none of the names at all is told about missing
+    roles. Lead GM and Lead Gamemaster are two spellings of one role, so one
+    of them is always missing and saying so every time would send somebody
+    looking for a role that was never meant to be there.
+    """
+    missing = live_smoke_admin_missing(guild)
+    if len(missing) == len(LIVE_SMOKE_ADMIN_NAMES):
+        return ('No role that may run this is on this server: %s. Set '
+                'LIVE_SMOKE_ADMIN_ROLES in bot.env.json to the names those '
+                'roles carry now, and run Install-Bot.ps1 again.'
+                % ', '.join(missing))
+    return ('%s start, reset and refresh a Live smoke session. Ask one of them.'
+            % _live_smoke_or(LIVE_SMOKE_ADMIN_NAMES))
+
+
+def live_smoke_tick_refusal(who):
+    """
+    Why this one cannot mark a row, or None.
+
+    Agents do not tick. The lock is what Discord itself says about the
+    account, so it holds for an agent nobody has heard of yet, and the id
+    list after it is only for an account that has to be named by hand.
+    """
+    if getattr(who, 'bot', False) or getattr(who, 'system', False):
+        return ('Agents do not mark these rows. A person marks their own, '
+                'from what they saw in the world.')
+    try:
+        if int(getattr(who, 'id', 0)) in LIVE_SMOKE_DENY:
+            return 'This account is not marking Live smoke rows. Ask staff.'
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
+def live_smoke_in_session(channel):
+    """
+    True when this is a thread under the Live smoke channel.
+
+    Read off the channel rather than remembered in this process, so the
+    buttons on a session opened before the last restart still work, and a
+    button reached from anywhere else does nothing.
+    """
+    parent = getattr(channel, 'parent', None)
+    name = str(getattr(parent, 'name', '') or '').lower()
+    return bool(name) and name in LIVE_SMOKE_CHANNEL
+
+
+LIVE_SMOKE_STYLES = {
+    'Pass': discord.ButtonStyle.success,
+    'Fail': discord.ButtonStyle.danger,
+    'Skip': discord.ButtonStyle.secondary,
+    'Fail-known': discord.ButtonStyle.secondary,
+}
+
+
+class LiveSmokeMark(discord.ui.Button):
+    def __init__(self, item_id, mark):
+        super().__init__(label=mark,
+                         style=LIVE_SMOKE_STYLES.get(mark,
+                                                     discord.ButtonStyle.secondary),
+                         custom_id=live_smoke_custom_id(item_id, mark))
+        self.mark = mark
+
+    async def callback(self, interaction):
+        await live_smoke_tick(interaction, self.mark)
+
+
+class LiveSmokeItem(discord.ui.View):
+    """
+    The four buttons on one row. One view per row and not one view carrying
+    every row: seven rows is twenty eight buttons, and Discord takes five to a
+    line and twenty five to a message.
+
+    Persistent, like the ticket and hold panels, so a session outlives a
+    restart. setup_hook registers one of these per item in the export.
+    """
+    def __init__(self, item_id):
+        super().__init__(timeout=None)
+        for mark in LIVE_SMOKE_MARKS:
+            self.add_item(LiveSmokeMark(item_id, mark))
+
+
+def live_smoke_views():
+    """One view per item in the export, for setup_hook. An export that will
+       not load leaves the buttons to the commands to complain about, rather
+       than stopping the whole bot from starting."""
+    try:
+        items = live_smoke_items(live_smoke_load())
+    except ValueError as e:
+        log('live smoke: %s' % e)
+        return []
+    return [LiveSmokeItem(i['id']) for i in items]
+
+
+async def live_smoke_tick(interaction, mark):
+    """
+    Somebody pressed Pass, Fail, Skip or Fail-known.
+
+    The mark is an edit to the message the button is on, in the thread it was
+    posted in, and that is all of it. Nothing is written down anywhere else,
+    and nothing about who pressed what reaches this bot's log.
+    """
+    no = live_smoke_tick_refusal(interaction.user)
+    if no:
+        await _say(interaction, no)
+        return
+    if not live_smoke_in_session(interaction.channel):
+        await _say(interaction, 'Marks go on the rows in a session thread '
+                                'under #%s.' % LIVE_SMOKE_CHANNEL[0])
+        return
+    who = (getattr(interaction.user, 'display_name', None)
+           or getattr(interaction.user, 'name', ''))
+    said = live_smoke_mark(getattr(interaction.message, 'content', ''), who, mark)
+    if len(said) > LIVE_SMOKE_ROOM:
+        await _say(interaction, 'This row holds as many marks as a Discord '
+                                'message takes. Staff can open a fresh session '
+                                'with /live-smoke reset.')
+        return
+    try:
+        await interaction.response.edit_message(content=said)
+    except Exception:
+        # No traceback, and not a word of the message. Discord hands back what
+        # it refused, and what it refused is a list of names against marks.
+        log('live smoke: a mark did not go through')
+        try:
+            await _say(interaction, 'That did not go through. Press it again.')
+        except Exception:
+            pass
+
+
+live_smoke = discord.app_commands.Group(
+    name='live-smoke',
+    description='The living Live smoke checklist in #test-tasks.')
+tree.add_command(live_smoke)
+
+
+async def _live_smoke_ready(interaction):
+    """
+    The channel and the export, or None once the person has been told what is
+    wrong. The one gate on all three commands.
+    """
+    guild = interaction.guild
+    if guild is None:
+        await _say(interaction, 'This one works in the server, not in a '
+                                'message to the bot.')
+        return None
+    if not is_live_smoke_admin(interaction.user):
+        await _say(interaction, live_smoke_admin_refusal(guild))
+        return None
+    ch = by_name(guild, LIVE_SMOKE_CHANNEL)
+    if ch is None:
+        await _say(interaction, 'There is no #%s in this server. Build-Discord.py '
+                                'makes it, in Testing.' % LIVE_SMOKE_CHANNEL[0])
+        return None
+    try:
+        export = live_smoke_load()
+    except ValueError as e:
+        await _say(interaction, str(e))
+        return None
+    return ch, export
+
+
+async def live_smoke_close_old(ch):
+    """
+    Archive and lock any session thread still open under the channel, and say
+    how many. A reset is a new dated session rather than last week's ticks
+    rewritten, so the old one is closed where it stands and stays readable.
+    """
+    done = 0
+    for t in list(getattr(ch, 'threads', None) or []):
+        if getattr(t, 'archived', False) or getattr(t, 'locked', False):
+            continue
+        if not str(getattr(t, 'name', '')).startswith(LIVE_SMOKE_TITLE):
+            continue
+        try:
+            await t.edit(archived=True, locked=True)
+            done += 1
+        except Exception:
+            log('live smoke: a session thread could not be closed')
+    return done
+
+
+async def live_smoke_open(interaction, settings_version, live_channel, close_old):
+    """Start a session: the opener in the channel, a thread off it, and one
+       message per row in the thread. What start and reset both do."""
+    ready = await _live_smoke_ready(interaction)
+    if ready is None:
+        return
+    ch, export = ready
+    items = live_smoke_items(export)
+    title = live_smoke_title_of(export, settings_version)
+    # An opener, a thread and one message per row is more than the three
+    # seconds Discord gives a command to answer in.
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    closed = await live_smoke_close_old(ch) if close_old else 0
+    try:
+        opener = await ch.send(live_smoke_opener(title, live_channel,
+                                                 settings_version, len(items)))
+        thread = await opener.create_thread(name=title[:100],
+                                            auto_archive_duration=10080)
+        for item in items:
+            await thread.send(live_smoke_item_text(item, len(items)),
+                              view=LiveSmokeItem(item['id']))
+    except Exception:
+        # Nothing is marked yet, so there is nothing here to keep off the log.
+        log('live smoke: the session could not be posted:\n'
+            + traceback.format_exc())
+        await interaction.followup.send(
+            'That did not go through. In #%s the bot needs View Channel, Send '
+            'Messages, Create Public Threads and Send Messages in Threads.'
+            % ch.name, ephemeral=True)
+        return
+    log('live smoke: a session is open in #%s, %d row(s)' % (ch.name, len(items)))
+    said = 'Session open: %s' % thread.mention
+    if closed:
+        said += ' The session before it is closed and locked.'
+    await interaction.followup.send(said, ephemeral=True)
+
+
+@live_smoke.command(name='start',
+                    description='Open a dated Live smoke session. Owner, Dev '
+                                'and Lead Gamemaster only.')
+@discord.app_commands.describe(
+    settings_version='The version in the launcher\u2019s Settings window.',
+    live_channel='The live channel being tested, named in the opener.')
+async def live_smoke_start(interaction: discord.Interaction,
+                           settings_version: str, live_channel: str):
+    await live_smoke_open(interaction, settings_version, live_channel, False)
+
+
+@live_smoke.command(name='reset',
+                    description='Close the session open now and start a fresh '
+                                'one. Owner, Dev and Lead Gamemaster only.')
+@discord.app_commands.describe(
+    settings_version='The version in the launcher\u2019s Settings window.',
+    live_channel='The live channel being tested, named in the opener.')
+async def live_smoke_reset(interaction: discord.Interaction,
+                           settings_version: str, live_channel: str):
+    await live_smoke_open(interaction, settings_version, live_channel, True)
+
+
+@live_smoke.command(name='refresh',
+                    description='Read the export again and update the '
+                                'checklist post. Owner, Dev and Lead '
+                                'Gamemaster only.')
+async def live_smoke_refresh(interaction: discord.Interaction):
+    """
+    What is run after Cynthia moves the Live set and the new export is
+    deployed. It rewrites the post humans read in the channel; a session that
+    is already open keeps the rows it was opened with, because rewriting rows
+    underneath somebody's ticks loses what they meant. The next start uses the
+    new set.
+    """
+    ready = await _live_smoke_ready(interaction)
+    if ready is None:
+        return
+    ch, export = ready
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    items = live_smoke_items(export)
+    said = live_smoke_template(export, items)
+    try:
+        async for m in ch.history(limit=50):
+            if m.author.id != client.user.id:
+                continue
+            if not str(m.content or '').startswith(LIVE_SMOKE_TEMPLATE_HEAD):
+                continue
+            if m.content != said:
+                await m.edit(content=said)
+            await interaction.followup.send(
+                'The checklist in #%s now says what the export says: %d row(s).'
+                % (ch.name, len(items)), ephemeral=True)
+            return
+        posted = await ch.send(said)
+        try:
+            await posted.pin()
+        except Exception:
+            # The running bot asks for neither Manage Messages nor Pin
+            # Messages (Build-Discord.py, RUN_BITS), so Discord refusing this
+            # is ordinary. The post is found again by reading the channel,
+            # which is how the ticket and hold panels find themselves too.
+            pass
+        await interaction.followup.send(
+            'The checklist is posted in #%s: %d row(s).' % (ch.name, len(items)),
+            ephemeral=True)
+    except Exception:
+        log('live smoke: the checklist post could not be written:\n'
+            + traceback.format_exc())
+        await interaction.followup.send(
+            'That did not go through. The bot needs View Channel, Send '
+            'Messages and Read Message History in #%s.' % ch.name,
+            ephemeral=True)
+
+
 # ----------------------------------------------------- the staff channel --
 #
 # Where the watchdog's messages are said. There used to be a site watcher here
@@ -2723,16 +3349,20 @@ async def register_commands():
             await tree.sync(guild=g)
             if g.id not in synced:
                 synced.append(g.id)
-            log('/close is registered in "%s"' % g.name)
+            log('registered in "%s": %s'
+                % (g.name, ', '.join('/' + n for n in want) or 'nothing'))
         except Exception:
-            log('could not register /close in "%s", the Close button still '
-                'works:\n' % g.name + traceback.format_exc())
+            # Named rather than said as "the commands", because which ones
+            # they are is the first thing anybody asks when none appear.
+            log('could not register %s in "%s", the buttons still work:\n'
+                % (', '.join('/' + n for n in want), g.name)
+                + traceback.format_exc())
     try:
         tree.clear_commands(guild=None)
         await tree.sync()
     except Exception:
-        log('could not clear the global commands, so /close may appear twice '
-            'in the picker:\n' + traceback.format_exc())
+        log('could not clear the global commands, so a command may appear '
+            'twice in the picker:\n' + traceback.format_exc())
 
     _stamp_write(want, synced)
 
