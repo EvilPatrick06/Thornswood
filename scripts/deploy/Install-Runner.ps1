@@ -1,4 +1,4 @@
-<#
+﻿<#
   Install-Runner.ps1
 
   Puts a GitHub Actions runner on the VPS, so the build check runs on every
@@ -25,8 +25,8 @@
     3. Denies that account every C:\Thornswood-* folder but its own, so a job
        cannot read the site's config, the bot's token or the backups, and
        cannot write into anything live.
-    4. Downloads the runner release GitHub calls latest, checked against the
-       SHA-256 GitHub publishes in that release's notes, and registers it as a
+    4. Downloads a pinned actions/runner win-x64 zip (version + SHA-256
+       hardcoded below, #1372), checked against that pin, and registers it as a
        service that runs as that account.
     5. Registers a task that keeps the runner at normal priority, never
        above it, so a build shares the five cores with the game server, the
@@ -158,15 +158,16 @@ if (Test-Path '$Root') { 'the folder is still there, something holds a file in i
 
 # ----------------------------------------------------------------- install --
 Head 'The runner release'
-$rel = (Invoke-Gh api repos/actions/runner/releases/latest | Out-String) | ConvertFrom-Json
-$version = ([string]$rel.tag_name).TrimStart('v')
-if ($version -notmatch '^\d+\.\d+\.\d+$') { Die "GitHub's latest actions/runner release has a tag this does not understand: $($rel.tag_name)" }
-$m = [regex]::Match([string]$rel.body, '<!--\s*BEGIN SHA win-x64\s*-->\s*([0-9a-fA-F]{64})\s*<!--\s*END SHA win-x64\s*-->')
-if (-not $m.Success) { Die "The notes of actions/runner $version carry no SHA-256 for win-x64, so there is nothing to check the download against. Nothing was sent." }
-$sha = $m.Groups[1].Value.ToUpperInvariant()
+# Pin (#1372): do not follow releases/latest. Bump these two together after
+# checking https://github.com/actions/runner/releases and the win-x64 SHA in
+# that release's notes (<!-- BEGIN SHA win-x64 --> ... <!-- END SHA win-x64 -->).
+$version = '2.337.0'
+$sha = '1150692AFA94E71F872017E254EA55B6EECE1EECE3FE7E3A6D4C93D0A1B85CFC'
+if ($version -notmatch '^\d+\.\d+\.\d+$') { Die "Pinned actions/runner version is nonsense: $version" }
+if ($sha -notmatch '^[0-9A-F]{64}$') { Die "Pinned actions/runner SHA-256 is nonsense: $sha" }
 $zipName = "actions-runner-win-x64-$version.zip"
 $zipUrl = "https://github.com/actions/runner/releases/download/v$version/$zipName"
-Say "  actions/runner $version, SHA-256 $sha" 'Green'
+Say "  actions/runner $version (pinned), SHA-256 $sha" 'Green'
 
 Head 'What the build check needs, on the VPS'
 $need = Remote @"
