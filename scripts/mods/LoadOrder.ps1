@@ -542,6 +542,17 @@ function Get-VortexProfileDir([string]$Name = 'Thornswood') {
     $profilesRoot = Join-Path $env:APPDATA 'Vortex\skyrimse\profiles'
     if (-not (Test-Path -LiteralPath $profilesRoot)) { return $null }
     $st = Get-VortexStateDir
+    if (Test-Path -LiteralPath (Join-Path $st 'CURRENT')) {
+        # The current LevelDB metadata survives compaction; transition text does not.
+        if (-not ('Thornswood.VortexProfileState' -as [type])) {
+            $source = Join-Path $PSScriptRoot '..\..\launcher\app\VortexProfileState.cs'
+            if ($PSVersionTable.PSVersion.Major -le 5) {
+                Add-Type -Path $source -ReferencedAssemblies System.dll,System.Core.dll,System.Xml.dll,System.Runtime.Serialization.dll
+            } else { Add-Type -Path $source }
+        }
+        try { return [Thornswood.VortexProfileState]::Find($st, $profilesRoot, $Name) }
+        catch { throw 'Vortex profile metadata cannot be verified. Finish its deployment, close Vortex, then retry. Do not create another profile to work around unreadable state.' }
+    }
     $ids = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     if (Test-Path -LiteralPath $st) {
         $pairRe = '"profileId"\s*:\s*"([^"]+)"\s*,\s*"profileName"\s*:\s*"' + [regex]::Escape($Name) + '"'
