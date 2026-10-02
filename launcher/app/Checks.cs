@@ -577,6 +577,8 @@ namespace Thornswood
                     "Vortex\\skyrimse\\profiles");
                 if (!Directory.Exists(profilesRoot)) return null;
                 string stateDir = VortexStateDir();
+                if (File.Exists(Path.Combine(stateDir, "CURRENT")))
+                    return VortexProfileState.Find(stateDir, profilesRoot, name);
                 var ids = new HashSet<string>(StringComparer.Ordinal);
                 if (Directory.Exists(stateDir))
                 {
