@@ -108,6 +108,7 @@ Object.keys(template).forEach(function (k) {
 }
 
 yes('the key mold has a Controls row, so the clash check knows U is taken', rows.MoldKey === 22);
+yes('the lock key has a Controls row, so the clash check knows X is taken', rows.LockKey === 45);
 yes('the emote wheel is G everywhere', template.WheelKey === 34 && rows.WheelKey === 34);
 yes('and the friend key is not', template.FriendKey !== 34);
 yes('no row writes MuteKey, which nothing reads', !Object.prototype.hasOwnProperty.call(rows, 'MuteKey'));
