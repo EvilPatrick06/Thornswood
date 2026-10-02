@@ -123,7 +123,7 @@ each with Pass, Fail, Skip and Fail-known on it, in a thread off the opener:
 
     /live-smoke start    settings version and live channel, opens a session
     /live-smoke reset    closes the session open now and opens a fresh one
-    /live-smoke refresh  reads the export again and updates the checklist post
+    /live-smoke refresh  reads the export again and rewrites the checklist
 
 Those three are **Owner, Dev and Lead Gamemaster**, which is wider than Owner
 and Dev and narrower than the staff roles: a Moderator alone does not open or
@@ -146,11 +146,19 @@ not have GitHub, so `tickets` in the export is for the staff map and the
 harness, and a row carries one only where the export sets
 `rules.discord_show_tickets` to true.
 
+Between sessions the channel carries the standing checklist: one post with the
+heading and the day the set last changed, and under it, in a thread, one
+message for each row saying the whole of what a tester does. It is worded the
+way a session words it, because a list of row names tells somebody what the set
+covers and nothing about how to run any of it. Those rows carry no buttons: a
+mark belongs to a dated session.
+
 When the Live set moves, the export changes in the vault and the copy in `bot`
 changes with it in the same pull request. Then
 `.\scripts\deploy\Install-Bot.ps1 -CodeOnly` puts it on the VPS, and
-`/live-smoke refresh` updates the post people read. A session already open
-keeps the rows it was opened with; the next `start` uses the new set.
+`/live-smoke refresh` rewrites that checklist, editing the rows that are there
+and taking down any the set has dropped. A session already open keeps the rows
+it was opened with; the next `start` uses the new set.
 
 ### Staff
 

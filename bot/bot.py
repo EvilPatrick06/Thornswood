@@ -18,9 +18,10 @@ What it does:
            and which announcements ping them
   Live smoke the living checklist in #test-tasks: /live-smoke start opens a
            dated session thread with one message per row of the Live set, and
-           testers mark their own rows on it. The rows come out of
-           live-smoke-discord-export.json beside this file, and a mark is an
-           edit to a Discord message and nothing else
+           testers mark their own rows on it. /live-smoke refresh keeps the
+           same rows standing in the channel between sessions. The rows come
+           out of live-smoke-discord-export.json beside this file, and a mark
+           is an edit to a Discord message and nothing else
   Heartbeat writes heartbeat.json beside this file every minute, so the
            watchdog can tell a bot that is running from one that is on
            Discord (issue #449)
@@ -1860,7 +1861,12 @@ LIVE_SMOKE_DENY = set(int(i) for i in
 
 LIVE_SMOKE_MARKS = ('Pass', 'Fail', 'Skip', 'Fail-known')
 LIVE_SMOKE_TITLE = 'Live smoke'
-LIVE_SMOKE_TEMPLATE_HEAD = '**Live smoke checklist**'
+# The post the standing checklist hangs off, found again by these words.
+LIVE_SMOKE_CHECKLIST_HEAD = '**Live smoke checklist**'
+# The thread the standing rows sit in, off that post. The name must not start
+# with LIVE_SMOKE_TITLE: a reset archives and locks every thread under the
+# channel that does, and those are the session threads, never this one.
+LIVE_SMOKE_ROWS = 'Checklist rows'
 # What the marks on an item message sit under, so they can be found again and
 # one person's line replaced rather than a second one added.
 LIVE_SMOKE_MARKS_HEAD = '\n\nMarks:\n'
@@ -2051,6 +2057,9 @@ def live_smoke_item_text(item, total=None, tickets=False):
     out += '\n' + item['discord_line']
     if item['skip_rule']:
         out += '\nSkip rule: ' + item['skip_rule']
+    if len(out) > LIVE_SMOKE_ROOM:
+        out = (out[:LIVE_SMOKE_ROOM].rstrip()
+               + '\n(the rest of this row is in the export)')
     return out
 
 
@@ -2087,33 +2096,38 @@ def live_smoke_mark(content, who, mark):
     return body + LIVE_SMOKE_MARKS_HEAD + '\n'.join(lines)
 
 
-def live_smoke_template(export, items):
+def live_smoke_head(export):
     """
-    The post that sits in the channel between sessions, so somebody reading
-    #test-tasks on a Tuesday can see what a session covers without one being
-    open. Humans only: it carries no buttons and nobody is marked on it.
+    The post the standing rows hang off: the heading refresh finds it by
+    again, and the day the set last changed, which is the versioning Djinn
+    asked to keep.
 
-    The rows and the day the set last changed. The heading is what refresh
-    finds the post by again, and the stamp is the versioning Djinn asked to
-    keep; the blocks that used to sit above and below the rows are gone.
+    Nothing else. The rows are messages of their own in the thread off this
+    one, so each of them carries the whole of what a tester does.
     """
-    out = [LIVE_SMOKE_TEMPLATE_HEAD]
+    out = LIVE_SMOKE_CHECKLIST_HEAD
     stamp = live_smoke_stamp(export)
     if stamp:
-        out.append(stamp)
-    out.append('')
+        out += '\n' + stamp
+    return out
+
+
+def live_smoke_checklist(export, items):
+    """
+    Every message the standing checklist is made of: the post above, then one
+    message for each row, worded the way a session words it.
+
+    This is what somebody reading #test-tasks between sessions has in front of
+    them, so it is the line the vault wrote and not the label off the top of
+    it. Up to 2 October the post was one numbered list of labels, which named
+    every check in the set and said how to run none of them.
+
+    Humans only. No row here carries a button: a mark belongs to a dated
+    session, not to the copy that stands in the channel between them.
+    """
     tickets = live_smoke_show_tickets(export)
-    for item in items:
-        line = '%d. %s' % (item['order'], item['label'] or item['discord_line'])
-        if tickets and item['tickets']:
-            line += '  ' + ' '.join('#' + t for t in item['tickets'])
-        out.append(line)
-        if item['skip_rule']:
-            out.append('    Skip rule: ' + item['skip_rule'])
-    said = '\n'.join(out)
-    if len(said) > LIVE_SMOKE_ROOM:
-        said = said[:LIVE_SMOKE_ROOM].rstrip() + '\n(the rest is in the export)'
-    return said
+    return ([live_smoke_head(export)]
+            + [live_smoke_item_text(i, len(items), tickets) for i in items])
 
 
 def is_live_smoke_admin(who):
@@ -2385,17 +2399,72 @@ async def live_smoke_reset(interaction: discord.Interaction,
     await live_smoke_open(interaction, settings_version, live_channel, True)
 
 
+async def live_smoke_rows_thread(head):
+    """
+    The thread the standing rows sit in, made off the checklist post when it
+    is not there and woken when Discord has archived it.
+
+    A public thread wakes for anybody who may post in it, so this asks for no
+    permission the bot has not got already, and a refusal is said in the log
+    rather than stopping the refresh.
+
+    It is asked for twice before one is made. Discord drops an archived thread
+    out of the cache the message carries, and refreshes are weeks apart, so the
+    thread this wants is usually the one the message says it has not got; a
+    second thread on the same message is refused rather than made.
+    """
+    thread = getattr(head, 'thread', None)
+    if thread is None:
+        try:
+            thread = await head.fetch_thread()
+        except Exception:
+            thread = None
+    if thread is None:
+        return await head.create_thread(name=LIVE_SMOKE_ROWS,
+                                        auto_archive_duration=10080)
+    if getattr(thread, 'archived', False):
+        try:
+            await thread.edit(archived=False)
+        except Exception:
+            log('live smoke: the checklist rows thread would not wake')
+    return thread
+
+
+async def live_smoke_write_rows(thread, rows):
+    """
+    The rows in the thread, in the export's order: what is there already is
+    edited where the export moved it, what is missing is posted, and a row the
+    set no longer carries is taken down.
+
+    Edited rather than posted again, so a thread does not collect a copy of
+    the whole set every time Cynthia refreshes it. A message the bot posted is
+    its own to take down, which Discord allows without Manage Messages.
+    """
+    had = [m async for m in thread.history(limit=None, oldest_first=True)
+           if m.author.id == client.user.id]
+    for n, said in enumerate(rows):
+        if n >= len(had):
+            await thread.send(said)
+        elif had[n].content != said:
+            await had[n].edit(content=said)
+    for old in had[len(rows):]:
+        await old.delete()
+
+
 @live_smoke.command(name='refresh',
-                    description='Read the export again and update the '
-                                'checklist post. Owner, Dev and Lead '
+                    description='Read the export again and rewrite the '
+                                'checklist. Owner, Dev and Lead '
                                 'Gamemaster only.')
 async def live_smoke_refresh(interaction: discord.Interaction):
     """
     What is run after Cynthia moves the Live set and the new export is
-    deployed. It rewrites the post humans read in the channel; a session that
-    is already open keeps the rows it was opened with, because rewriting rows
-    underneath somebody's ticks loses what they meant. The next start uses the
-    new set.
+    deployed. It rewrites the standing checklist humans read in the channel:
+    the post, and under it one message for each row carrying the whole of what
+    a tester does.
+
+    A session already open keeps the rows it was opened with, because
+    rewriting rows underneath somebody's ticks loses what they meant, so the
+    reply says where the new rows to mark come from, which is a reset.
     """
     ready = await _live_smoke_ready(interaction)
     if ready is None:
@@ -2403,38 +2472,42 @@ async def live_smoke_refresh(interaction: discord.Interaction):
     ch, export = ready
     await interaction.response.defer(ephemeral=True, thinking=True)
     items = live_smoke_items(export)
-    said = live_smoke_template(export, items)
+    said = live_smoke_checklist(export, items)
     try:
+        head = None
         async for m in ch.history(limit=50):
             if m.author.id != client.user.id:
                 continue
-            if not str(m.content or '').startswith(LIVE_SMOKE_TEMPLATE_HEAD):
-                continue
-            if m.content != said:
-                await m.edit(content=said)
-            await interaction.followup.send(
-                'The checklist in #%s now says what the export says: %d row(s).'
-                % (ch.name, len(items)), ephemeral=True)
-            return
-        posted = await ch.send(said)
-        try:
-            await posted.pin()
-        except Exception:
-            # The running bot asks for neither Manage Messages nor Pin
-            # Messages (Build-Discord.py, RUN_BITS), so Discord refusing this
-            # is ordinary. The post is found again by reading the channel,
-            # which is how the ticket and hold panels find themselves too.
-            pass
-        await interaction.followup.send(
-            'The checklist is posted in #%s: %d row(s).' % (ch.name, len(items)),
-            ephemeral=True)
+            if str(m.content or '').startswith(LIVE_SMOKE_CHECKLIST_HEAD):
+                head = m
+                break
+        if head is None:
+            head = await ch.send(said[0])
+            try:
+                await head.pin()
+            except Exception:
+                # The running bot asks for neither Manage Messages nor Pin
+                # Messages (Build-Discord.py, RUN_BITS), so Discord refusing
+                # this is ordinary. The post is found again by reading the
+                # channel, which is how the ticket and hold panels find
+                # themselves too.
+                pass
+        elif head.content != said[0]:
+            await head.edit(content=said[0])
+        await live_smoke_write_rows(await live_smoke_rows_thread(head), said[1:])
     except Exception:
-        log('live smoke: the checklist post could not be written:\n'
+        log('live smoke: the checklist could not be written:\n'
             + traceback.format_exc())
         await interaction.followup.send(
-            'That did not go through. The bot needs View Channel, Send '
-            'Messages and Read Message History in #%s.' % ch.name,
-            ephemeral=True)
+            'That did not go through. In #%s the bot needs View Channel, Send '
+            'Messages, Read Message History, Create Public Threads and Send '
+            'Messages in Threads.' % ch.name, ephemeral=True)
+        return
+    await interaction.followup.send(
+        'The checklist in #%s now says what the export says: %d row(s), each '
+        'with the whole of what a tester does. A session already open keeps '
+        'the rows it started with, so open a new one with /live-smoke reset '
+        'when testers need these.' % (ch.name, len(items)), ephemeral=True)
 
 
 # ----------------------------------------------------- the staff channel --
