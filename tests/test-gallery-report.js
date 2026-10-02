@@ -100,8 +100,9 @@ yes('and a launcher ticket out of the query, the way the report door reads one',
     /readTicket\(url\.searchParams\.get\('ticket'\)\)/.test(gate));
 yes('a ticket has to be staff: st.dev, not the st.play the report door asks',
     /if \(!st\.dev\) return \{ ok: false, code: 403/.test(gate) && !/st\.play/.test(gate));
-yes('it re-asks Discord rather than trusting the ticket on its own',
-    /await standing\(t\.d\)/.test(gate) && /standCache\.delete\(String\(t\.d\)\)/.test(gate));
+yes('it re-asks Discord rather than trusting the ticket on its own, inside Play\'s deadline',
+    /within\(standing\(t\.d\), PLAY_ANSWER_MS, \(\) => standingLate\(t\.d\)\)/.test(gate) &&
+    /standCache\.delete\(String\(t\.d\)\)/.test(gate));
 yes('an account that left, is banned, or could not be looked up is refused',
     /!st\.inGuild/.test(gate) && /st\.banned/.test(gate) && /st\.lookupFailed/.test(gate));
 yes('neither cookie nor ticket is the 403 staff only these doors always sent',
