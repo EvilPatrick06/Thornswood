@@ -64,7 +64,7 @@ yes('TOOLS table is in the gamemode', !!TOOLS_BLOCK);
 let TOOLS = null;
 try {
   TOOLS = TOOLS_BLOCK
-    ? new Function('return (' + TOOLS_BLOCK.replace(/^const TOOLS = /, '') + ')')()
+    ? new Function('return (' + TOOLS_BLOCK.replace(/^const TOOLS = /, '').replace(/;\s*$/, '') + ')')()
     : null;
 } catch (e) { TOOLS = null; }
 
