@@ -41,13 +41,15 @@
   THE APP IS STAGED, CHECKED, THEN SWAPPED (issue #446). server.js and the
   public files that changed go into $Root\.stage-<stamp> while the site runs,
   the box checks them there (each file by its hash, server.js through
-  node --check), and nothing else happens if that fails. The task is set up,
-  and only then is the site stopped, the files renamed in (what they replace
-  goes to $Root\.prev-<stamp>, the newest two kept), started, and asked for
-  its front page. If it does not answer, the old files go back and are
-  started again, and this exits 1. It used to copy server.js and public\ over
-  the running site, restart it, and print DOCS DID NOT START with nothing put
-  back. The documents and the public pages under data are content, not the
+  node --check), and nothing else happens if that fails. server.js is compared
+  by hash the same way the public files are (issue #1118): when the app is
+  unchanged the stage is cleared and the site is not stopped. The task is set
+  up, and only then is the site stopped, the files renamed in (what they
+  replace goes to $Root\.prev-<stamp>, the newest two kept), started, and
+  asked for its front page. If it does not answer, the old files go back and
+  are started again, and this exits 1. It used to copy server.js and public\
+  over the running site, restart it, and print DOCS DID NOT START with nothing
+  put back. The documents and the public pages under data are content, not the
   app, and go up as they always did.
 
   The password crosses the wire in clear, because this is plain HTTP on an IP.
@@ -175,6 +177,7 @@ $stageName = '.stage-' + $stamp
 $prevName  = '.prev-' + $stamp
 $stageFar  = ($Root -replace '\\', '/') + '/' + $stageName
 $hashes    = [ordered]@{}
+$appUnchanged = $false
 
 if (-not $PutBack) {
 Write-Host 'Making room...'
@@ -196,9 +199,26 @@ Write-Host "Staging the site in $rootWin\$stageName..."
 # Into the stage, never over the running site. What goes is listed in $send
 # so the box can hold every file to its hash before anything is swapped.
 $send = [ordered]@{}
-Push (Join-Path $App 'server.js') "$stageFar/server.js"
-$send['server.js'] = Join-Path $App 'server.js'
-Write-Host '  server.js'
+# server.js by hash, the same way public files are (issue #1118). A document
+# update used to stop the site every time because this always went up.
+$serverLocal = Join-Path $App 'server.js'
+$serverHash = (Get-FileHash -LiteralPath $serverLocal -Algorithm SHA256).Hash
+$serverThere = ''
+$hashedServer = Remote @"
+if (Test-Path -LiteralPath '$rootWin\server.js') {
+  (Get-FileHash -LiteralPath '$rootWin\server.js' -Algorithm SHA256 -EA SilentlyContinue).Hash
+}
+"@
+foreach ($l in @($hashedServer)) {
+  if ($l -is [string] -and $l.Trim() -match '^[0-9A-Fa-f]{64}$') { $serverThere = $l.Trim().ToUpper() }
+}
+if ($serverThere -eq $serverHash) {
+  Write-Host '  server.js already the same up there, not sent'
+} else {
+  Push $serverLocal "$stageFar/server.js"
+  $send['server.js'] = $serverLocal
+  Write-Host '  server.js'
+}
 # Everything in public\, by listing the folder rather than by a list kept here.
 # robots.txt was added and did not go up, because this was six named files and
 # a seventh is invisible to it.
@@ -230,17 +250,28 @@ Get-ChildItem (Join-Path $App 'public') -File -EA SilentlyContinue | ForEach-Obj
 if ($sentPublic.Count) { Write-Host ('  ' + ($sentPublic -join ', ')) }
 Write-Host ('  ' + $samePublic + ' public file(s) already the same up there, not sent')
 
+# When nothing in the app changed, skip the stage, the stop and the swap
+# (issue #1118). Documents and the task step still run below.
+$appUnchanged = ($send.Count -eq 0)
+if ($appUnchanged) {
+  Remote "Remove-Item -LiteralPath '$rootWin\$stageName' -Recurse -Force -EA SilentlyContinue" | Out-Null
+  Write-Host '  nothing in the app changed, so the site will not be stopped'
+} else {
 # The box checks the stage while the old site still runs: every file as it
-# left here, and server.js through node --check. A refusal clears the stage
-# and this stops, with the documents, the password and the task untouched.
+# left here, and server.js through node --check when it was sent. A refusal
+# clears the stage and this stops, with the documents, the password and the
+# task untouched.
 $hashes = Get-SwapHashes $send
-$checkOut = @(Remote ((ServiceSwapVars $Root $stageName $prevName $Wait $hashes @('server.js')) + $serviceCheckBlock) |
+$parse = @()
+if ($send.Contains('server.js')) { $parse = @('server.js') }
+$checkOut = @(Remote ((ServiceSwapVars $Root $stageName $prevName $Wait $hashes $parse) + $serviceCheckBlock) |
               ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 if ($checkOut -notcontains 'STAGE OK') {
   Write-Host ''
   Write-Host '  THE STAGE DID NOT CHECK OUT, so nothing was stopped or changed.' -ForegroundColor Red
   Write-Host '  The site is still running exactly as it was. The lines above say why.' -ForegroundColor Red
   exit 1
+}
 }
 
 # The public pages are markdown like everything else, so they can be edited
@@ -693,7 +724,9 @@ function Why {
 
 Write-Host ''
 if ($PutBack) { Write-Host "Putting back the newest .prev folder in $rootWin..." }
+elseif ($appUnchanged) { Write-Host 'Nothing in the app to swap; site left running.' }
 else { Write-Host 'Stopping, swapping in and starting...' }
+if ($PutBack -or -not $appUnchanged) {
 $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) +
         ("`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n")
 $pick = ''
@@ -714,6 +747,7 @@ if ($PutBack) { Restore-SwapRecord "$User@$Vps" $ssh $Root $swapOut '' 'site' }
 else {
   Save-SwapPreviousRecord "$User@$Vps" $ssh $Root $prevName
   $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root
+}
 }
 
 Write-Host ''

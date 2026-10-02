@@ -647,6 +647,22 @@ try {
         (Get (Join-Path $prev[0] 'server.js')) -match 'docs v6' -and (Get (Join-Path $prev[1] 'server.js')) -match 'docs v7')
     if ($script:fail -gt $failed) { Show }
 
+    # Issue #1118: unchanged server.js and public files skip the stop and swap.
+    $pidBefore = Listener $docsPort
+    $prevBefore = @(Kept $docsRoot '.prev-*').Count
+    $live = Live $docsRoot
+    $r = Deploy 'Deploy-Docs.ps1' $docs.Clone()
+    $failed = $script:fail
+    Yes 'Deploy-Docs: when server.js and public are unchanged, the deploy succeeds without a swap' (
+        $r.Ok -and $r.Said -match 'server\.js already the same up there, not sent' -and
+        $r.Said -match 'nothing in the app changed, so the site will not be stopped' -and
+        $r.Said -match 'Nothing in the app to swap' -and $r.Said -notmatch 'SWAP OK')
+    Yes '  and the same process is still answering the same version' (
+        ((Listener $docsPort) -eq $pidBefore) -and ((Http $docsPort '/') -eq 'docs v8'))
+    Yes '  and no new .prev was made, and the live files are untouched' (
+        ((@(Kept $docsRoot '.prev-*').Count) -eq $prevBefore) -and ((Live $docsRoot) -eq $live))
+    if ($script:fail -gt $failed) { Show }
+
     # ==================================================== the voice service
     $voiceRoot = Join-Path $box 'Thornswood-Voice'
     $voicePort = PickPort
