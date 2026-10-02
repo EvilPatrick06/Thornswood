@@ -102,6 +102,21 @@ if (block) {
       /does not hold Business Owner/.test(noRole.command({
         actorId: 1, profileId: 9, parts: parts('/book new business The Bee')
       })));
+  const asDev = make(fs.mkdtempSync(path.join(os.tmpdir(), 'tw-books-')), {
+    roles: function () { return { staff: true, dev: true, business: false, faction: false, account: 'discord-dev' }; }
+  });
+  const devBefore = asDev.view(9, {});
+  yes('a Dev may start one business and one faction',
+      devBefore.show === true && devBefore.canBusiness === true && devBefore.canFaction === true);
+  yes('a Dev founds a business without Business Owner',
+      asDev.command({ actorId: 1, profileId: 9, parts: parts('/book new business The Bee') }) === 'Founded The Bee.');
+  yes('a Dev founds a faction as well',
+      asDev.command({ actorId: 1, profileId: 9, parts: parts('/book new faction The North Gate') }) === 'Founded The North Gate.');
+  const devAfter = asDev.view(9, {});
+  yes('a Dev who already has both cannot found another',
+      devAfter.canBusiness === false && devAfter.canFaction === false);
+  yes('a second business from a Dev is refused',
+      asDev.command({ actorId: 1, profileId: 9, parts: parts('/book new business Another Bee') }) === 'This account already has a business.');
 
   const founded = api.command({
     actorId: 1, profileId: 1, parts: parts('/book new business The Bee')

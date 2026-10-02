@@ -2827,6 +2827,7 @@ async function standing(discordId) {
         out.staffRole = holdsStaffRole(out.roles);
         out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
         out.factionOwner = holdsNamedRole(out.roles, 'Faction Owner');
+        out.devRole = holdsNamedRole(out.roles, 'Dev');
       } else if (r.status !== 404) {
         out.lookupFailed = r.why;
       }
@@ -2868,6 +2869,7 @@ async function standing(discordId) {
   out.staffRole = holdsStaffRole(out.roles);
   out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
   out.factionOwner = holdsNamedRole(out.roles, 'Faction Owner');
+  out.devRole = holdsNamedRole(out.roles, 'Dev');
   return out;
 }
 
@@ -4987,7 +4989,7 @@ async function handle(req, res) {
                   'September. The address form goes once no door says this.');
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], jarlProfiles: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionOwnerProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], jarlProfiles: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionOwnerProfiles: [], devRoleProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
@@ -4995,6 +4997,7 @@ async function handle(req, res) {
     const seenStaffRole = new Set();
     const seenBusiness = new Set();
     const seenFaction = new Set();
+    const seenDevRole = new Set();
     const seenFailed = new Set();
     const hasProfiles = (d) => (Array.isArray((linked[d] || {}).profiles) ? linked[d].profiles : [])
       .map(Number).some((n) => n > 0);
@@ -5052,6 +5055,9 @@ async function handle(req, res) {
       if (st.factionOwner) {
         for (const n of profiles) if (!seenFaction.has(n)) { seenFaction.add(n); out.factionOwnerProfiles.push(n); }
       }
+      if (st.devRole) {
+        for (const n of profiles) if (!seenDevRole.has(n)) { seenDevRole.add(n); out.devRoleProfiles.push(n); }
+      }
       out.people.push({ id: String(d), name: st.name || row.name || '', profiles });
     }
     /* STAFF BANS (#412), which are this site's own file and need no Discord.
@@ -5070,7 +5076,7 @@ async function handle(req, res) {
       for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'staffRoleProfiles', 'failedProfiles']) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
       }
-      for (const k of ['businessOwnerProfiles', 'factionOwnerProfiles']) {
+      for (const k of ['businessOwnerProfiles', 'factionOwnerProfiles', 'devRoleProfiles']) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
       }
       out.people = out.people.map((p) => Object.assign({}, p, { profiles: p.profiles.filter((n) => !barred.has(Number(n))) }))
