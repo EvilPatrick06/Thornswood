@@ -3,7 +3,7 @@
 
       node .\tests\test-site-hangs.js [path\to\server.js]
 
-  Nothing the site is asked may hang (#1094, #1095, #1096, #1097).
+  Nothing the site is asked may hang (#1094, #1095, #1096, #1097, #1164).
 
   #1094: discordGet only listened for 'data' and 'end'. When Discord sent its
   headers and then stalled, the ten second socket timeout destroyed the
@@ -33,7 +33,7 @@
   at once, three seconds late, with headers and then nothing (stall), with
   half an answer and a dropped connection (drop), or not at all (silent).
 
-  Takes about seventy seconds: the last answer is only used once the site's
+  Takes about ninety seconds: the last answer is only used once the site's
   own minute of memory has run out, and that minute is waited out.
 
   Nothing here touches the repository's data folder or the network. Scratch
@@ -48,7 +48,8 @@ const os = require('os');
 const path = require('path');
 
 const SITE = process.argv[2] || path.join(__dirname, '..', 'site', 'server.js');
-const HOME = fs.readFileSync(path.join(__dirname, '..', 'site', 'public', 'home.html'), 'utf8')
+// The gallery and report pages live in home.js since the scripts left home.html (#1474).
+const HOME = fs.readFileSync(path.join(__dirname, '..', 'site', 'public', 'home.js'), 'utf8')
   .split(String.fromCharCode(13)).join('');
 
 let pass = 0, fail = 0;
@@ -71,8 +72,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const MEMBERS = {};
 const MODE = {};
 const held = new Set();
+// When set, every Discord question sends headers and then nothing, so one
+// lookup is the member list, then the member, then the role names (#1164).
+let stallDiscord = false;
 const discord = http.createServer((req, res) => {
   const u = req.url;
+  if (stallDiscord) {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.write('{"user":');
+    held.add(res);
+    return;
+  }
   const out = (code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
   if (/\/roles$/.test(u)) return out(200, [{ id: 'r1', name: 'Playtester' }, { id: 'r2', name: 'Banned' }, { id: 'r3', name: 'Owner' }]);
   // The bulk list is refused, as with the members intent off, so every
@@ -228,7 +238,7 @@ function pageChecks() {
   const ga = HOME.indexOf("} else if (here === '/gallery') {");
   const gb = HOME.indexOf("} else if (here === '/downloads') {");
   const gal = (ga >= 0 && gb > ga) ? HOME.slice(ga, gb) : '';
-  yes('home.html has the gallery page', !!gal);
+  yes('home.js has the gallery page', !!gal);
   yes('the gallery does not wait on who is asking before drawing the pictures (#1096)',
       !/Promise\.all\(/.test(gal) &&
       /fetch\('\/api\/public'\)[\s\S]{0,200}galData = d[\s\S]{0,40}drawGallery\(\)/.test(gal) &&
@@ -242,7 +252,7 @@ function pageChecks() {
   const ra = HOME.indexOf("} else if (here === '/report') {");
   const rb = ra < 0 ? -1 : HOME.indexOf('\n}\n', ra);
   const rep = (ra >= 0 && rb > ra) ? HOME.slice(ra, rb) : '';
-  yes('home.html has the report page', !!rep);
+  yes('home.js has the report page', !!rep);
   yes('the report page reads personWhy and personSays, not canSubmit (#1097)',
       /d\.personWhy/.test(rep) && /d\.personSays/.test(rep) && !/canSubmit/.test(rep));
   yes('  the sign in line shows only when not signed in',
@@ -271,6 +281,35 @@ function pageChecks() {
   try {
     yes('the scratch site starts', await waitUp(port));
     let r;
+
+    // ----------------------------------------------- #1164 launcher doors --
+    // Discord stalls on every question, caches still cold, so a lookup that
+    // is not given up on is the member list and then the member, about
+    // twenty seconds, and the role names after that when the member answers.
+    // Each door has to answer inside Play's ten seconds with the same words
+    // /api/play/join uses.
+    stallDiscord = true;
+    const q = (id) => encodeURIComponent(ticketFor(id));
+    const unasked = (got) => got.status === 503 && got.ms < PLAY_BOUND && got.j.why === 'could not ask Discord' &&
+      /could not ask Discord about your account/.test(got.j.message || '') && fair(got.j.message || '');
+    const [gSub, gRep, gApp, gDel, gDis, whoAll, staffBan] = await Promise.all([
+      ask('POST', '/api/gallery/submit?ticket=' + q('801') + '&name=shot.png', 'not-a-picture'),
+      ask('POST', '/api/gallery/report?ticket=' + q('802'), { name: 'shot.png', why: 'stall' }),
+      ask('POST', '/api/gallery/approve?ticket=' + q('803'), { name: 'shot.png' }),
+      ask('DELETE', '/api/gallery/approved?ticket=' + q('804'), { name: 'shot.png' }),
+      ask('POST', '/api/gallery/report/dismiss?ticket=' + q('805'), { id: 'none' }),
+      ask('POST', '/api/play/who', { ticket: ticketFor('806') }),
+      ask('POST', '/api/staff/ban', { id: '1', why: 'stall', minutes: 1 }, { as: '807' })
+    ]);
+    stallDiscord = false;
+    yes('gallery submit with a ticket, Discord stalled: 503 inside the launcher\'s time (' + gSub.ms + ' ms)', unasked(gSub));
+    yes('gallery report with a ticket, Discord stalled: 503 inside the launcher\'s time (' + gRep.ms + ' ms)', unasked(gRep));
+    yes('staff gallery approve, Discord stalled: 503 inside the launcher\'s time (' + gApp.ms + ' ms)', unasked(gApp));
+    yes('staff gallery delete, Discord stalled: 503 inside the launcher\'s time (' + gDel.ms + ' ms)', unasked(gDel));
+    yes('staff gallery dismiss, Discord stalled: 503 inside the launcher\'s time (' + gDis.ms + ' ms)', unasked(gDis));
+    yes('play/who, every Discord question stalled: 503 inside the launcher\'s time (' + whoAll.ms + ' ms)', unasked(whoAll));
+    yes('a staff POST from the hub, Discord stalled: 503 inside the launcher\'s time (' + staffBan.ms + ' ms)', unasked(staffBan));
+
 
     // The account whose last answer is used later: asked once while Discord
     // is fast, so the site has an answer for it, then Discord goes silent.
@@ -312,10 +351,12 @@ function pageChecks() {
         ask('POST', '/api/play/join', { ticket: ticketFor('615'), profileId: 6015 })
       ]);
 
-    yes('Discord sends headers and stalls: /api/play/who still answers, inside eleven seconds (' + who601.ms + ' ms)',
-        who601.status === 403 && who601.j.ok === false && who601.ms < 11000);
-    yes('Discord drops the connection halfway through its answer: /api/play/who answers inside a second (' + who602.ms + ' ms)',
-        who602.status === 403 && who602.j.ok === false && who602.ms < QUICK);
+    yes('Discord sends headers and stalls: /api/play/who answers 503 inside the launcher\'s time (' + who601.ms + ' ms)',
+        who601.status === 503 && who601.ms < PLAY_BOUND && who601.j.why === 'could not ask Discord' &&
+        /could not ask Discord about your account/.test(who601.j.message) && fair(who601.j.message));
+    yes('Discord drops the connection halfway through its answer: /api/play/who answers 503 inside a second (' + who602.ms + ' ms)',
+        who602.status === 503 && who602.ms < QUICK && who602.j.why === 'could not ask Discord' &&
+        /could not ask Discord about your account/.test(who602.j.message));
     yes('Play, Discord stalls: /api/play/join answers 503 inside the launcher\'s time (' + join603.ms + ' ms)',
         join603.status === 503 && join603.ms < PLAY_BOUND && join603.j.why === 'could not ask Discord');
     yes('  saying Discord could not be asked, in words',

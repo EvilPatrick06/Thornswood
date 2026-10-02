@@ -1228,6 +1228,13 @@ function standingLate(id) {
   return { id: String(id), inGuild: listed, banned: false, admin: listed, play: listed, dev: listed,
            roles: [], name: '', lookupFailed: 'Discord did not answer in time' };
 }
+/* The 503 /api/play/join sends when Discord did not answer (#1094). Every
+   other launcher door sends this same object (#1164). error is what the
+   gallery launcher reads; message is what Play reads. */
+function discordUnasked() {
+  const message = 'Thornswood could not ask Discord about your account just now. Try again in a minute.';
+  return { ok: false, why: 'could not ask Discord', message: message, error: message };
+}
 // p's answer, or late()'s once ms has passed without one.
 function within(p, ms, late) {
   let timer = null;
@@ -1261,8 +1268,10 @@ function standingSoon(id, waitMs, staleOk) {
   with Discord slow the gallery, the report page's sign in check and the hub
   took ten to twenty seconds to show. They get SUBMIT_WAIT_MS too, and then
   the last answer Discord gave for that account (up to STAND_STALE_MS old)
-  or, with none, signed in with the lookup failed. Anything else that is not
-  a Submit door still waits for Discord, inside DISCORD_ASK_MS a question.
+  or, with none, signed in with the lookup failed. Anything else waits at
+  most PLAY_ANSWER_MS (#1164), the same deadline Play uses, and then counts
+  as signed in with the lookup failed. One lookup can be three Discord
+  questions, and the launcher gives up at fifteen seconds.
 */
 async function who(req, waitMs, staleOk) {
   const me = identity(req);
@@ -1333,12 +1342,14 @@ const allowed = (key, w) =>
 */
 async function galleryStaff(url, w) {
   if (w.dev) return { ok: true, from: 'web', discordId: w.id || '' };
+  // Signed in, and Discord did not answer in time (#1164): say that, rather
+  // than 'staff only', which would tell a Gamemaster they are not staff.
+  if (w.id && w.lookupFailed && !w.admin) return { ok: false, code: 503, body: discordUnasked() };
   const t = readTicket(url.searchParams.get('ticket'));
   if (!t) return { ok: false, code: 403, body: { error: 'staff only' } };
-  const st = await standing(t.d);
+  const st = await within(standing(t.d), PLAY_ANSWER_MS, () => standingLate(t.d));
   standCache.delete(String(t.d));
-  if (st.lookupFailed && !st.admin) return { ok: false, code: 503, body: { ok: false, why: 'could not ask Discord', error:
-    'Thornswood could not ask Discord about that account just now. Try again in a minute.' } };
+  if (st.lookupFailed && !st.admin) return { ok: false, code: 503, body: discordUnasked() };
   if (!st.inGuild) return { ok: false, code: 403, body: { ok: false, why: 'guild', error:
     'That Discord account is not in the Thornswood Discord.' } };
   if (st.banned) return { ok: false, code: 403, body: { ok: false, why: 'banned', error:
@@ -3329,10 +3340,13 @@ async function handle(req, res) {
     return send(res, 301, '', 'text/plain', { Location: url.pathname.replace(/\/{2,}/g, '/') + url.search });
   }
 
-  // A page load (GET, HEAD was made GET above) waits as long as a Submit and
-  // may use the last answer Discord gave (#1096).
+  // A page load (GET, HEAD was made GET above) waits SUBMIT_WAIT_MS and may
+  // use the last answer Discord gave (#1096). A Submit waits that same short
+  // time (#467). Every other request that is signed in, including a staff
+  // POST from the hub, waits no longer than Play (#1164).
   const pageLoad = req.method === 'GET';
-  const w = await who(req, pageLoad || (req.method === 'POST' && SUBMIT_DOORS.has(route)) ? SUBMIT_WAIT_MS : 0, pageLoad);
+  const submitDoor = req.method === 'POST' && SUBMIT_DOORS.has(route);
+  const w = await who(req, (pageLoad || submitDoor) ? SUBMIT_WAIT_MS : PLAY_ANSWER_MS, pageLoad);
 
   // ---------------------------------------------------------- member login
   if (p === '/api/login' && req.method === 'POST') {
@@ -4281,10 +4295,9 @@ async function handle(req, res) {
         'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
       if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
         'Sign in to the hub, or send a valid launcher ticket.' });
-      const st = await standing(t.d);
+      const st = await within(standing(t.d), PLAY_ANSWER_MS, () => standingLate(t.d));
       standCache.delete(String(t.d));
-      if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
-        'Thornswood could not ask Discord about that account just now. Try again in a minute.' });
+      if (st.lookupFailed && !st.admin) return sendJson(res, 503, discordUnasked());
       if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
         'That Discord account is not in the Thornswood Discord.' });
       if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', error:
@@ -4443,10 +4456,9 @@ async function handle(req, res) {
         'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
       if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
         'Sign in, or send a valid launcher ticket.' });
-      const st = await standing(t.d);
+      const st = await within(standing(t.d), PLAY_ANSWER_MS, () => standingLate(t.d));
       standCache.delete(String(t.d));
-      if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
-        'Thornswood could not ask Discord about that account just now. Try again in a minute.' });
+      if (st.lookupFailed && !st.admin) return sendJson(res, 503, discordUnasked());
       if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
         'That Discord account is not in the Thornswood Discord.' });
       if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', error:
@@ -4541,8 +4553,7 @@ async function handle(req, res) {
       of this, because standing() already let them in and it is the way back
       in on exactly this kind of morning.
     */
-    if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok:false, why:'could not ask Discord', message:
-      'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
+    if (st.lookupFailed && !st.admin) return sendJson(res, 503, discordUnasked());
     // Banned before the guild (#1010): a staff ban answers from the file and
     // says nothing about the guild, so asked the other way round a banned
     // account was told it was not in the Discord.
@@ -5262,8 +5273,7 @@ async function handle(req, res) {
     }
 
     const st = await within(standingCached(t.d), by - Date.now(), () => standingLate(t.d));
-    if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', message:
-      'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
+    if (st.lookupFailed && !st.admin) return sendJson(res, 503, discordUnasked());
     // Banned before the guild, as at /api/play/join (#1010).
     if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', message: accountBanned(st) });
     if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', message:
@@ -5307,11 +5317,13 @@ async function handle(req, res) {
   // The same question without asking for the password, for the launcher to
   // show who it is linked as without pretending it is about to connect.
   if (p === '/api/play/who' && req.method === 'POST') {
+    const by = Date.now() + PLAY_ANSWER_MS;
     let o = {};
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 401, { ok:false, why:'link' });
-    const st = await standingCached(t.d);
+    const st = await within(standingCached(t.d), by - Date.now(), () => standingLate(t.d));
+    if (st.lookupFailed && !st.admin) return sendJson(res, 503, discordUnasked());
     return sendJson(res, st.play && !st.banned ? 200 : 403, {
       ok: st.play && !st.banned, id: st.id, name: st.name || t.n,
       admin: st.admin, dev: !!st.dev, banned: st.banned, inGuild: st.inGuild, roles: st.roles
@@ -5323,6 +5335,9 @@ async function handle(req, res) {
     // Staff as well as hub members, so the Gallery page can boot (#742). What
     // they get is still decided by LEVEL below: for staff who are not admins
     // that is the pages marked 'staff' and nothing else.
+    // A staff POST from the hub already stopped waiting on Discord (#1164).
+    // Not being staff because Discord did not answer is not 'sign in first'.
+    if (req.method !== 'GET' && w.id && w.lookupFailed && !w.admin) return sendJson(res, 503, discordUnasked());
     if (!w.member && !w.dev) return sendJson(res, 401, { error: 'sign in first' });
 
     if (p === '/api/all' && req.method === 'GET') {
