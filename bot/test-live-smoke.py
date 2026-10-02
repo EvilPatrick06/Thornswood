@@ -13,6 +13,11 @@ What is worth pinning here, in the order the locks were given on 1 October:
   the skip rule     the forge rule on the double craft row is on the message a
                     tester reads, so Skip is an informed mark rather than a
                     guess
+  the layout        the rows and nothing wrapped around them, with the day the
+                    set last changed kept as the version, which is Djinn's
+                    call of 1 October
+  the tickets       in the export for Dev and for this file, and on none of
+                    the words a tester reads, because testers have no GitHub
   who may start     Owner, Dev and Lead Gamemaster, by name, both spellings of
                     the last one, and a Moderator alone is not one of them
   who may mark      a person, never an agent
@@ -170,9 +175,9 @@ chat = [i for i in items if i['id'] == 'live-1'][0]
 said = bot.live_smoke_item_text(double, len(items))
 
 yes('the double craft row carries its skip rule, so nobody guesses at Skip',
-    'Skip rule: Skip if no forge on the live channel under test.' in said)
-yes('  and names its ticket and its place in the set',
-    said.startswith('**Live 2 of 7: Double craft after respawn**') and '#517' in said)
+    ('Skip rule: ' + double['skip_rule']) in said and 'forge' in double['skip_rule'])
+yes('  and names its place in the set and the row as the vault labels it',
+    said.startswith('**Live 2 of 7: %s**' % double['label']))
 yes('  and still carries the line the vault wrote', double['discord_line'] in said)
 yes('a row with no skip rule in the export says nothing about one',
     'Skip rule' not in bot.live_smoke_item_text(chat, len(items)))
@@ -180,6 +185,35 @@ yes('the export keeps a skip rule on exactly the one row that has one',
     [i['id'] for i in items if i['skip_rule']] == ['live-2'])
 yes('an item message fits in a Discord message',
     all(len(bot.live_smoke_item_text(i, len(items))) < 2000 for i in items))
+
+# ----------------------------------------- and the tickets stay off Discord --
+#
+# Djinn's rule of 1 October: testers do not have GitHub. The tickets are in
+# the export, because Dev maps a Fail back to one and this file checks them,
+# and they are on none of the words a tester reads.
+yes('the export says tickets are not posted to Discord',
+    live['rules']['discord_show_tickets'] is False
+    and live['rules']['player_facing_no_github_refs'] is True
+    and live['rules']['tickets_are_dev_staff_only'] is True
+    and bot.live_smoke_show_tickets(live) is False)
+yes('NO ROW CARRIES A TICKET NUMBER, which is the rule',
+    not any(re.search(r'#\d+', bot.live_smoke_item_text(i, len(items)))
+            for i in items))
+yes('  nor anything else that reads as a GitHub reference',
+    not any(('github.com' in bot.live_smoke_item_text(i, len(items)).lower()
+             or 'issue #' in bot.live_smoke_item_text(i, len(items)).lower())
+            for i in items))
+yes('  and the labels and lines the vault wrote carry none either',
+    not any(re.search(r'#\d+', i['label'] + ' ' + i['discord_line'])
+            for i in items))
+yes('an export with no word on it still posts no tickets, because the '
+    'default is off',
+    bot.live_smoke_show_tickets({}) is False
+    and bot.live_smoke_show_tickets(dict(live, rules={})) is False)
+yes('and an export that asks for them in so many words gets them',
+    bot.live_smoke_show_tickets(
+        dict(live, rules=dict(live['rules'], discord_show_tickets=True))) is True
+    and '#517' in bot.live_smoke_item_text(double, len(items), True))
 
 # --------------------------------------------------------------- the ids --
 yes('a button is keyed by its row and its mark',
@@ -207,7 +241,7 @@ yes('an id with a colon in it still reads, because the mark is taken off the end
 # alone, and not the whole of STAFF.
 yes('the default is Owner, Dev and Lead Gamemaster, both spellings of the last',
     [n.lower() for n in bot.LIVE_SMOKE_ADMIN_NAMES] ==
-    ['owner', 'dev', 'lead gm', 'lead gamemaster'])
+    ['owner', 'dev', 'lead gamemaster', 'lead gm'])
 yes('and the export asks for the same four names',
     [n.lower() for n in live['session']['admin_roles_default']] ==
     [n.lower() for n in bot.LIVE_SMOKE_ADMIN_NAMES])
@@ -259,7 +293,7 @@ yes('  and does not send somebody chasing a role that is on the server',
 
 scrubbed = Guild(['Owner', 'Dev', 'Moderator'])
 yes('the roles a scrub took away can be named, for the refusal to use',
-    bot.live_smoke_admin_missing(scrubbed) == ['Lead GM', 'Lead Gamemaster'])
+    bot.live_smoke_admin_missing(scrubbed) == ['Lead Gamemaster', 'Lead GM'])
 yes('and a server carrying one spelling of Lead Gamemaster is not told the '
     'other one is missing, because the two are one role',
     bot.live_smoke_admin_missing(here) == ['Lead GM']
@@ -349,28 +383,58 @@ yes('the title format is the one the export asks for',
 yes('a session thread is found again by the words it starts with',
     title.startswith(bot.LIVE_SMOKE_TITLE))
 
-opener = bot.live_smoke_opener(title, 'thornswood-one', '1.1.101.17', len(items))
+stamp = bot.live_smoke_stamp(live)
+yes('the version stamp is the one the export asks for, off its own date',
+    live['session']['version_stamp'] == 'Checklist updated: {updated}'
+    and stamp == 'Checklist updated: ' + live['updated'])
+yes('and an export with no date on it has no stamp rather than an empty one',
+    bot.live_smoke_stamp({}) == '' and bot.live_smoke_stamp(dict(live, updated='')) == '')
+
+opener = bot.live_smoke_opener(title, 'thornswood-one', '1.1.101.17', stamp)
 yes('the opener names the live channel, which is the thing a session is of',
     'thornswood-one' in opener)
 yes('  and the date and the version, through the title', title in opener)
+yes('  and the Settings version in a line of its own',
+    'Settings version: 1.1.101.17' in opener)
 yes('  and the three required fields are the three the export asks for',
     [f for f in live['session']['required_fields']] ==
     ['date', 'live_channel', 'settings_version'])
-yes('  and it says the marks are read by everybody in the thread, so nobody '
-    'marks a row thinking it is private',
-    'can read the marks' in opener)
-yes('  and that they go nowhere else', 'stay in Discord' in opener)
-yes('  and that agents do not mark rows', 'Agents do not mark rows' in opener)
+yes('  and it keeps the versioning Djinn asked to keep', stamp in opener)
 yes('  and it fits in a Discord message', len(opener) < 2000)
+
+# Djinn's layout call of 1 October: the Discord body is the checklist rows.
+# The opener is the session's own name and nothing wrapped around it.
+yes('THE OPENER CARRIES NO BLOCK OF INSTRUCTIONS ABOVE OR BELOW THE ROWS, '
+    'which is the layout call',
+    not any(w in opener for w in ('Mark your own rows', 'can read the marks',
+                                  'stay in Discord', 'Agents do not mark rows',
+                                  'row to mark', 'rows to mark')))
+yes('  and it is four lines at the most', len(opener.split('\n')) <= 4)
+yes('  and no ticket number reaches it', not re.search(r'#\d+', opener))
 
 card = bot.live_smoke_template(live, items)
 yes('the checklist post carries every row in the set',
     all((i['label'] in card) for i in items))
 yes('  and the skip rule, so it reads without the vault open',
-    'Skip rule: Skip if no forge' in card)
+    ('Skip rule: ' + double['skip_rule']) in card)
+yes('  and the day the set last changed, which is how a tester tells one '
+    'set from the next', stamp in card)
 yes('  and fits in a Discord message', len(card) < 2000)
 yes('  and is found again by the words it starts with',
     card.startswith(bot.LIVE_SMOKE_TEMPLATE_HEAD))
+yes('  and carries no ticket number', not re.search(r'#\d+', card))
+yes('  and no block of prose around the rows',
+    not any(w in card for w in ('This is what a session checks',
+                                'The marks are Pass',
+                                'Agents do not mark rows')))
+want = [bot.LIVE_SMOKE_TEMPLATE_HEAD, stamp]
+for i in items:
+    want.append('%d. %s' % (i['order'], i['label']))
+    if i['skip_rule']:
+        want.append('    Skip rule: ' + i['skip_rule'])
+yes('  so what is in it is the heading, the stamp and the rows, in that order '
+    'and with nothing else',
+    [l for l in card.split('\n') if l.strip()] == want)
 
 # A set big enough to overflow a message is cut rather than refused by Discord.
 big = bot.live_smoke_items({'items': [
@@ -566,7 +630,14 @@ yes('  one message per row, so no message carries twenty eight buttons',
 yes('  each row carrying the four marks',
     [c.label for c in thread.sent[0][1].children] == list(bot.LIVE_SMOKE_MARKS))
 yes('  and the forge skip rule where the export puts it',
-    'Skip rule: Skip if no forge' in thread.sent[1][0].content)
+    ('Skip rule: ' + double['skip_rule']) in thread.sent[1][0].content)
+yes('  and not one ticket number on any row a tester reads',
+    not any(re.search(r'#\d+', m.content) for m, _ in thread.sent)
+    and not re.search(r'#\d+', opened.content))
+yes('  and the opener is the session name and the stamp, with no block of '
+    'instructions wrapped round the rows',
+    len([l for l in opened.content.split('\n') if l.strip()]) == 4
+    and bot.live_smoke_stamp(live) in opened.content)
 yes('  and whoever ran it is told where it is, and only them',
     ask.response.deferred == 1 and 'Session open' in ask.response.said[0])
 
