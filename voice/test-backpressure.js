@@ -72,6 +72,7 @@ const MB = (n) => (n / 1048576).toFixed(2) + ' MB';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-backpressure-'));
 fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
+fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
 try { fs.mkdirSync(path.join(dir, 'public')); } catch (e) { }
 
 /*

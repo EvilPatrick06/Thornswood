@@ -55,4 +55,6 @@ a drink, or a meal.
 The wheel, the fifty nine emotes, the eight quick slots, the search,
 the alphabetical list, and the number keys are in the server. The
 slots are remembered on the machine. Chop wood on the wheel is not a
-chop. Nothing from the wheel is drawn above a head.
+chop. Playing an emote puts its name on the one line above the head,
+the same reach and the same 6 seconds as a plain line. It does not
+also print in the box. Standing up does not put a name there.

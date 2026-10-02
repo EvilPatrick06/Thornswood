@@ -83,6 +83,7 @@ function body() {
 // ---------------------------------------------------------------- service
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-moved-'));
 fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
+fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
 const srv = spawn(process.execPath, ['voice-server.js'], {
   cwd: dir,
   env: Object.assign({}, process.env, {

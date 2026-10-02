@@ -59,5 +59,6 @@ eight quick slots, the search, and the fifty nine emotes are in the
 server. Plain text chat still goes to everybody, because the local
 switch ships off. Text mute, hiding a name, hiding every name, and
 the leader's kick, lead, and disband are in the server. Staff
-silence is a staff command. The mark above the head, the words above
-the head, and an emote's name above the head are not in the server.
+silence is a staff command. It stops their voice, what they type, the
+words above the head, and the speaking mark. It does not hide a name.
+The mark, the words, and an emote's name are drawn above the head.

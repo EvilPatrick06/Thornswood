@@ -81,13 +81,16 @@ It is not this text.
 
 ## Where this is
 
-`/ooc` is local, 4000 units, same cell, in the server.
+`/ooc` is local, 4000 units, same cell, in the server. `/me`, `/do`,
+`/w`, and `/s` are local too, whether or not the plain-line switch is
+on. They are not sent on to the game server.
 
-Plain speech is not. The switch that would make it local ships off,
-so today a plain line goes to everybody who has the game open.
-`/me`, `/do`, `/w`, and `/s` are only caught while that switch is on.
-While it is off they go to the game server like any other slash.
+Plain speech in the box still goes to everybody while that switch is
+off. The line above the head is local either way: 4000 units for a
+plain line, a `/me`, a `/do`, and an `/ooc`, 1000 for a whisper, and
+12000 for a shout. Same cell first. One line, 6 seconds, cut at 80
+characters. You see your own. Text mute hides it in the box and
+above the head.
 
-Nothing floats above a head. There is no 6 second line and no 80
-character cut above a head. When the float is built, it uses the 57
-metres in the table. It does not follow the worldwide box.
+Staff silence stops the words above the head as well as the box. It
+does not hide a name.
