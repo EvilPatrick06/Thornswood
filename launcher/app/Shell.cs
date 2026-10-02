@@ -440,12 +440,6 @@ namespace Thornswood
             // wants the server secret and the launcher never sent one. The
             // list lives in Profile\Characters\profiles.txt and the person
             // picks at the game's main menu now.
-            try
-            {
-                int named = Files.FixPresetNames();
-                if (named > 0) Log("Put " + named + " class name" + (named == 1 ? "" : "s") + " back to the right spelling.");
-            }
-            catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             // Off the window's thread. Ending a stuck game waits on it, and at
             // this point the window has not even been shown yet.
             ThreadPool.QueueUserWorkItem(delegate
@@ -2454,13 +2448,6 @@ namespace Thornswood
                     {
                         int rules = Enforce.Apply();
                         if (rules > 0) did.Add(rules + " mod setting" + (rules == 1 ? "" : "s"));
-                    }
-                    catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
-
-                    try
-                    {
-                        int names = Files.FixPresetNames();
-                        if (names > 0) did.Add(names + " class preset name" + (names == 1 ? "" : "s"));
                     }
                     catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
 
