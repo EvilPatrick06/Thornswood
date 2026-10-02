@@ -1324,10 +1324,17 @@ async function galleryStaff(url, w) {
 
 // ----------------------------------------------------------------- plumb --
 function send(res, code, payload, type, extra) {
+  // Defense in depth (#1366): conservative CSP (this page and the hub load
+  // nothing from other sites; inline script and style stay, because home.html
+  // still draws itself that way), frame-ancestors self so the hub cannot be
+  // iframed for clickjacking, and a referrer policy that does not leak path
+  // on cross-origin navigations.
   res.writeHead(code, Object.assign({
     'Content-Type': type || 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff'
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'",
+    'Referrer-Policy': 'strict-origin-when-cross-origin'
   }, extra || {}));
   res.end(payload);
 }
@@ -1374,20 +1381,24 @@ function rangeReply(req, res, file, size, headers, head) {
       'content-range': 'bytes */' + size,
       'accept-ranges': 'bytes',
       'cache-control': 'no-store',
-      'x-content-type-options': 'nosniff'
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'",
+      'referrer-policy': 'strict-origin-when-cross-origin'
     });
     res.end();
     return true;
   }
   end = Math.min(end, size - 1);
-  // send() puts the last two on every other answer; a range must not be the
-  // one reply that quietly goes out without them.
+  // send() puts the security headers on every other answer; a range must not
+  // be the one reply that quietly goes out without them.
   res.writeHead(206, Object.assign({}, headers, {
     'content-range': 'bytes ' + start + '-' + end + '/' + size,
     'content-length': (end - start) + 1,
     'accept-ranges': 'bytes',
     'cache-control': headers['cache-control'] || 'no-store',
-    'x-content-type-options': 'nosniff'
+    'x-content-type-options': 'nosniff',
+    'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'",
+    'referrer-policy': 'strict-origin-when-cross-origin'
   }));
   if (head) { res.end(); return true; }
   fs.createReadStream(file, { start: start, end: end }).pipe(res);
@@ -3206,21 +3217,22 @@ function failed(req, res, e) {
   The last net, under everything rather than around one handler.
 
   A throw inside a setTimeout, or a promise nobody waited for, never reaches
-  the catch above and would end the process exactly the way a bad URL used to.
-  Logged and carried on with instead. A site answering most requests is worth
-  more than a site that is gone, and the log line is the thing that says
-  something here needs fixing.
+  the catch above. After an uncaught exception Node says the process is in an
+  unknown state, so carrying on can hand out corrupt answers or half-written
+  files (#1358). Log it, then exit, and let the process manager start a clean
+  one. How the process is hosted and the three restarts an hour are entry 105.
 
-  How the process is hosted and the three restarts an hour are entry 105; this
-  is only about not needing them.
+  An unhandled rejection is different: the process is still defined, so it is
+  logged and the site keeps answering.
 */
 process.on('unhandledRejection', (e) => {
   console.error('[thornswood-docs] unhandled rejection, carrying on: ' +
                 (e && e.stack ? e.stack : e));
 });
 process.on('uncaughtException', (e) => {
-  console.error('[thornswood-docs] uncaught exception, carrying on: ' +
+  console.error('[thornswood-docs] uncaught exception, exiting: ' +
                 (e && e.stack ? e.stack : e));
+  process.exit(1);
 });
 
 async function handle(req, res) {
@@ -3256,10 +3268,19 @@ async function handle(req, res) {
      write their own headers and never go through it. Node keeps a setHeader
      value through a later writeHead, so one line covers every route.
 
+     CSP and Referrer-Policy (#1366) ride the same path so a Range answer or a
+     piped file is not the one reply without them. send() also sets them for
+     the ordinary answers.
+
      Only on an answer that came in over the certificate. Caddy holds 443 and
      the plain to secure redirect already works, so this is the part that stops
      a browser trying the plain one again. On plain HTTP it means nothing and
      is left off. */
+  try {
+    res.setHeader('Content-Security-Policy',
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'");
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  } catch (e) { }
   if (secureHere(req)) {
     try { res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains'); } catch (e) { }
   }
