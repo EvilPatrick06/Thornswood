@@ -30,9 +30,11 @@
     copy's own secret gets a yes, because with no bot token every account is
     allowed in.
 
-    With a page made to throw, and a timer behind a page made to throw, the
-    door still answers. With a page made to hold the event loop for 1.5
-    seconds, the door waits for it. Measured on 24 September, four runs:
+    With a page made to throw, the door still answers (that throw is caught).
+    With a timer behind a page made to throw, the process exits after logging
+    so the process manager can start a clean one (#1358). With a page made to
+    hold the event loop for 1.5 seconds, the door waits for it. Measured on
+    24 September, four runs:
     1,478 to 1,491 ms for /api/play/who while the loop was held, against 3 or
     4 ms with nothing held. That is the half only a separate process fixes.
     When the door is split out of server.js this check fails, and the
@@ -329,7 +331,7 @@ function ask(port, method, route, body) {
       res.on('end', function () {
         let json = null;
         try { json = JSON.parse(buf); } catch (e) { json = null; }
-        ok({ status: res.statusCode, type: String(res.headers['content-type'] || ''), json: json, ms: Date.now() - t0 });
+        ok({ status: res.statusCode, type: String(res.headers['content-type'] || ''), headers: res.headers, json: json, ms: Date.now() - t0 });
       });
     });
     req.on('error', function (e) { ok({ status: 0, error: e.message, json: null, ms: Date.now() - t0 }); });
@@ -453,15 +455,11 @@ function breakPages(src) {
       const afterThrow = await ask(c.port, 'POST', '/api/play/who', '{}');
       yes('and the door still answers its 401 after it', linkOnly(afterThrow));
 
-      const world = await ask(c.port, 'GET', '/world');
-      await wait(300);
-      const afterTimer = await ask(c.port, 'POST', '/api/play/who', '{}');
-      yes('a timer behind a page that throws is carried on from, and the door still answers',
-          world.status === 200 && linkOnly(afterTimer) && !c.exited);
-      let log = '';
-      try { log = fs.readFileSync(path.join(dC, 'site.log'), 'utf8'); } catch (e) { log = ''; }
-      yes("the copy's site.log says what threw, both times",
-          log.indexOf('handler threw on "/rules"') >= 0 && log.indexOf('uncaught exception, carrying on') >= 0);
+      const home = await ask(c.port, 'GET', '/');
+      yes('the home page sent Content-Security-Policy with frame-ancestors self',
+          home.status === 200 && String((home.headers && home.headers['content-security-policy']) || '').indexOf("frame-ancestors 'self'") >= 0);
+      yes('the home page sent Referrer-Policy strict-origin-when-cross-origin',
+          String((home.headers && home.headers['referrer-policy']) || '') === 'strict-origin-when-cross-origin');
 
       const quick = await ask(c.port, 'POST', '/api/play/who', '{}');
       const holding = path.join(dC, 'holding');
@@ -474,6 +472,16 @@ function breakPages(src) {
           ' ms with nothing held. One process cannot keep these apart; a door of its own would',
           linkOnly(held) && linkOnly(quick) && quick.ms < 500 && held.ms >= HOLD - 500);
       yes('and the process that started is the one still answering', !c.exited);
+
+      // After the hold proof, an uncaught timer throw must exit (#1358).
+      const world = await ask(c.port, 'GET', '/world');
+      yes('the page that arms a timer throw still answers 200 first', world.status === 200);
+      await until(function () { return c.exited; }, 5000);
+      yes('a timer behind a page that throws exits so the manager can restart', c.exited);
+      let log = '';
+      try { log = fs.readFileSync(path.join(dC, 'site.log'), 'utf8'); } catch (e) { log = ''; }
+      yes("the copy's site.log says the handler threw and the uncaught exit",
+          log.indexOf('handler threw on "/rules"') >= 0 && log.indexOf('uncaught exception, exiting') >= 0);
       await stop(c);
     }
 
