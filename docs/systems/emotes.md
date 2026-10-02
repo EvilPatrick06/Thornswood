@@ -36,7 +36,10 @@ are the words and the presses. The wheel is the animation.
 The lute, the flute, and the drum do not count as `/bard`. Bardic
 rest is the word, on [People beside you](people.md). `/bard` does
 not float above the head. A line that should be seen does, and it
-is typed.
+is typed. Each of those three plays only when that instrument is in
+your inventory. The wheel will not start one you do not have, and
+none of the wheel's idles start on their own when you load in or
+walk through a door.
 
 ## Above the head
 
@@ -54,7 +57,9 @@ a drink, or a meal.
 
 The wheel, the fifty nine emotes, the eight quick slots, the search,
 the alphabetical list, and the number keys are in the server. The
-slots are remembered on the machine. Chop wood on the wheel is not a
+lute, the flute, and the drum play only with that instrument in the
+inventory. A wheel idle does not start on its own on a load or a door.
+The slots are remembered on the machine. Chop wood on the wheel is not a
 chop. Playing an emote puts its name on the one line above the head,
 the same reach and the same 6 seconds as a plain line. It does not
 also print in the box. Standing up does not put a name there.
