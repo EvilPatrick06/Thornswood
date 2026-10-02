@@ -456,6 +456,10 @@ Put (Join-Path $repo 'voice\public\index.html') 'voice page'
 Put (Join-Path $repo 'voice\public\voice.js') 'voice script'
 Put (Join-Path $repo 'bot\card.py') 'CARD = 1'
 Put (Join-Path $repo 'bot\dev-channel.txt') '0'
+# What bot.py reads from beside itself for the live smoke (LIVE_SMOKE_EXPORT).
+# Written without a byte order mark by Put, as the real one is, because the
+# stage check parses every .json it sends and refuses one that has a mark.
+Put (Join-Path $repo 'bot\live-smoke-discord-export.json') '{ "channels": [] }'
 Put (Join-Path $repo 'bot\requirements.txt') ''
 Put (Join-Path $repo 'bot\staff-channel.txt') '0'
 Put (Join-Path $repo 'bot\assets\join-card.png') 'not really a picture'
@@ -737,6 +741,10 @@ try {
     $failed = $script:fail
     Yes 'Install-Bot -CodeOnly: good code is SWAP OK and the new bot says it is watching' ($r.Ok -and $r.Said -match 'SWAP OK' -and (BotSays 'bot v2'))
     Yes '  and only then the box records the bot artifact' ((Current 'thornswood-bot').name -like 'bot-*')
+    # bot.py reads this from beside itself, so it goes up with the code
+    # (LIVE_SMOKE_EXPORT). It was on main and never on the box.
+    Yes '  and the live smoke''s export went up beside bot.py' (
+        (Get (Join-Path $botRoot 'live-smoke-discord-export.json')) -eq '{ "channels": [] }')
     $prev = @(Kept $botRoot '.prev-*')
     Yes '  and the old bot.py is kept in .prev' ($prev.Count -eq 1 -and (Get (Join-Path $prev[0] 'bot.py')) -match 'bot v1')
     if ($script:fail -gt $failed) { Show }
@@ -787,9 +795,30 @@ try {
     $r = Deploy 'Install-Bot.ps1' $bot.Clone()
     $failed = $script:fail
     Yes 'Install-Bot -CodeOnly: with the bot stopped and no bot.log anywhere, an empty one is made and the new code is swapped in' (
-        $gone -and $r.Ok -and $r.Said -match 'SWAP OK' -and $r.Said -match 'there was no bot\.log here')
+        $gone -and $r.Ok -and $r.Said -match 'SWAP OK' -and $r.Said -match 'made an empty .*data.bot\.log')
     Yes '  and the service was started, and the new bot says it is watching' (
         $r.Said -match 'started the service ThornswoodTestBot' -and (WaitFor { BotSays 'bot v5' }))
+    Yes '  and data\bot.log is on the box afterwards, which is the path the docs name' (Test-Path -LiteralPath $botLog)
+    if ($script:fail -gt $failed) { Show }
+
+    # A bot.log beside the code and none in data, which is the layout of a box
+    # that has had only -CodeOnly runs since #1104, since those leave the
+    # service program as it is. Get-ThornswoodBotLog names the old place then,
+    # and that used to be enough to skip making data\bot.log, so the path
+    # everybody is told to look at did not exist. The run must leave it there,
+    # and must still read the file this start really wrote.
+    $besideCode = Join-Path $botRoot 'bot.log'
+    Put $besideCode "[thornswood-bot] bot v5 watching 1 server, from the old place`r`n"
+    $gone = WaitFor { Remove-Item -LiteralPath $botLog -Force -EA SilentlyContinue; -not (Test-Path -LiteralPath $botLog) }
+    Bot 'bot v6'
+    $r = Deploy 'Install-Bot.ps1' $bot.Clone()
+    $failed = $script:fail
+    Yes 'Install-Bot -CodeOnly: with a bot.log beside the code and none in data, data\bot.log is still made' (
+        $gone -and $r.Ok -and $r.Said -match 'SWAP OK' -and (Test-Path -LiteralPath $botLog) -and
+        $r.Said -match 'made an empty .*data.bot\.log')
+    Yes '  and it followed the file this start wrote rather than the empty one it made' (
+        $r.Said -match 'writing its log to ' -and (WaitFor { BotSays 'bot v6' }))
+    Remove-Item -LiteralPath $besideCode -Force -EA SilentlyContinue
     if ($script:fail -gt $failed) { Show }
 
     # ======================================================= the dev server
