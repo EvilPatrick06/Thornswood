@@ -3780,9 +3780,15 @@
     ['Embers XD.esp', 0x17c026],   // FXfireWithEmbersLightSilent
     ['Embers XD.esp', 0x19f73f],   // FXfireWithEmbersLight02
     ['Embers XD.esp', 0x19f741],   // FXfireWithEmbers01_brazier
+    // #608 near a forge: these editor ids do not begin with the old craft prefixes.
+    ['North Keep.esp', 0x21152],   // CraftingNKPBlackSmithForge
+    ['Dawnguard.esm', 0xf812],   // DLC1DawnguardCraftingBlackSmithForge
+    ['Dragonborn.esm', 0x3cf6e],   // DLC2CraftingBlackSmithForge
+    ['Dragonborn.esm', 0x2b074],   // DLC2CraftingBlackSmithSkaalForge
+    ['Thornswood-Content.esp', 0x1547e],   // ThornswoodCraftingCharcoalKilnMarker
   ];
   // The plugins the list spans, for the log line when they are resolved.
-  const FIRE_FILES = ["Skyrim.esm","Dawnguard.esm","Dragonborn.esm","Embers XD.esm","Embers XD.esp"];
+  const FIRE_FILES = ["Skyrim.esm","Dawnguard.esm","Dragonborn.esm","Embers XD.esm","Embers XD.esp","North Keep.esp","Thornswood-Content.esp"];;
 
   // Standing at a fire, and standing IN one. A campfire is about a hundred
   // units across, so 300 is warming your hands and 90 is in the coals.
