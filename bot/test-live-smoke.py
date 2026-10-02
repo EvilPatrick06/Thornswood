@@ -121,16 +121,34 @@ N = len(items)
 # deployed beside bot.py is the Live set the vault meant and not a stale copy
 # with the right shape. Update it with the export, in the same commit.
 TICKETS = [
-    ['381'],            # 1  Chat fade in Settings
-    ['381'],            # 2  Needs bars and the needs command
-    ['999', '428'],     # 3  Discord connect before Play
-    ['517'],            # 4  Craft the same thing twice after you respawn
-    ['505'],            # 5  Starting gold is 40 once
-    ['505'],            # 6  Trade gold with someone else
-    ['505', '517'],     # 7  No free extra gold
-    ['505', '517'],     # 8  Quit and relaunch keeps your pack
-    ['1402'],           # 9  Refused craft keeps your materials
-    ['509'],            # 10 K panel shows profession and half
+    ['486'],            # 1  Install lands in the Thornswood Game folder
+    ['810'],            # 2  Bring it up to date stays quiet
+    ['814'],            # 3  Shortcuts keep the right icons after update
+    ['533'],            # 4  Undeployed collection shows one Diagnostics message
+    ['1268'],           # 5  Offline Play is not called a load-order problem
+    ['381'],            # 6  Chat fade in Settings
+    ['381'],            # 7  Needs bars and the needs command
+    ['999', '428'],     # 8  Discord connect before Play
+    ['1264'],           # 9  Wrong or missing join pass is refused clearly
+    ['378'],            # 10 Character creation finishes cleanly
+    ['517'],            # 11 You arrive clothed after creation
+    ['504'],            # 12 Crowded town NPCs settle without a lasting pileup
+    ['517'],            # 13 Craft the same thing twice after you respawn
+    ['505'],            # 14 Starting gold is 40 once
+    ['505'],            # 15 Trade gold with someone else
+    ['505'],            # 16 No free extra gold
+    ['506', '1394'],    # 17 Paid carriage or ferry takes your fare
+    ['505', '517'],     # 18 Quit and relaunch keeps your pack
+    ['1402'],           # 19 Refused craft keeps your materials
+    ['509'],            # 20 K panel shows profession and half
+    ['1275'],           # 21 Friend request gives a clear result
+    ['1275'],           # 22 Trade offer gives a clear result
+    ['531'],            # 23 Party menu shows a real state
+    ['519'],            # 24 Voice stays connected in range
+    ['1396'],           # 25 Voice mute works
+    ['407', '408'],     # 26 A client crash leaves a log you can find
+    ['1157'],           # 27 Kick or refuse does not reconnect every few seconds
+    ['486', '999'],     # 28 Install and join copy talks about your own Game folder
 ]
 
 yes('it is the schema this bot reads', live['schema'] == 'thornswood.live-smoke.v1')
@@ -171,15 +189,37 @@ yes('  and every row on the list was seen working on main before it was listed',
 yes('the rows held back for a main check are named where they were held, so '
     'they are waiting rather than lost',
     [p['id'] for p in live['pending_main_verify']] ==
-    ['pending-378', 'pending-clothed', 'pending-friend-trade']
+    ['pending-hunt', 'pending-fish', 'pending-hang', 'pending-resource',
+     'pending-ownership', 'pending-traders', 'pending-recipe-vis',
+     'pending-speaking-light', 'pending-checklist-meta']
     and all(p['why'] for p in live['pending_main_verify']))
 yes('  and none of them is on the list a tester reads',
     not set(p['id'] for p in live['pending_main_verify'])
     & set(i['id'] for i in items))
 yes('the launcher speaking light is off the Live set and stays off it',
-    '1396-speaking-light' in live['keep_off'] and '1396' in live['keep_off']
-    and not any('speaking light' in (i['label'] + ' ' + i['discord_line']).lower()
-                for i in items))
+    '1396-speaking-light' in live['keep_off']
+    and '1396-overlay' in live['keep_off']
+    and 'pending-speaking-light' in [p['id'] for p in live['pending_main_verify']]
+    and not any('speaking light' in i['label'].lower() for i in items))
+# The voice mute row is the one place a tester reads those words, and it reads
+# them as something that does not count: a launcher light is not the game
+# following /mute, and Pass on this row is the game following it.
+light = [i for i in items if 'speaking light' in i['discord_line'].lower()]
+yes('  and the one row that names it tells a tester it is not what they are '
+    'marking, rather than handing the row back to them',
+    [i['id'] for i in light] == ['live-25']
+    and 'Do not mark Pass' in light[0]['discord_line'])
+
+# The hold Patrick and Djinn lifted. The bot does not read any of this, and
+# the harness does, because an export that lands still holding is the one
+# shape of stale copy that looks published and is not.
+yes('THE SET IS PUBLISHED AND NOTHING IS STILL HOLDING IT BACK, which is what '
+    'lets an admin refresh it',
+    live['status'] == 'published'
+    and live['rules']['hold_publish_lifted'] is True
+    and live['rules']['discord_hold_lifted'] is True
+    and not any(v for k, v in live['rules'].items() if k.startswith('hold_')
+                and k != 'hold_publish_lifted'))
 
 # ------------------------------------------------------- loading it wrong --
 def refused(what):
@@ -234,7 +274,7 @@ yes('rows are posted in the order the export gives, not the order it lists them'
 # Skip on a row that can be run is a row nobody runs. The row says so itself
 # now, in the line the vault wrote, which is where a tester will read it.
 forge = [i for i in items if 'forge' in i['discord_line'].lower()][0]
-chat = items[0]
+plain = items[0]
 said = bot.live_smoke_item_text(forge, N)
 
 yes('NO ROW IN THE SET CARRIES A SKIP RULE, which is the call',
@@ -253,7 +293,7 @@ yes('  and the row names its place in the set and the words the vault labels '
     said.startswith('**Live %d of %d: %s**' % (forge['order'], N, forge['label'])))
 yes('  and still carries the line the vault wrote', forge['discord_line'] in said)
 yes('a row the export gives no skip rule says nothing about one',
-    'Skip rule' not in bot.live_smoke_item_text(chat, N))
+    'Skip rule' not in bot.live_smoke_item_text(plain, N))
 yes('an item message fits in a Discord message',
     all(len(bot.live_smoke_item_text(i, N)) < 2000 for i in items))
 
