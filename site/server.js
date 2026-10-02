@@ -1349,17 +1349,21 @@ async function galleryStaff(url, w) {
 }
 
 // ----------------------------------------------------------------- plumb --
+/* One CSP for every answer (#1474). home.html and the hub load CSS/JS as
+   same-origin files, so script-src and style-src need only 'self'. Keep this
+   string in one place so send(), Range replies, and the request-level
+   setHeader cannot drift. */
+const CSP_HEADER = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'";
 function send(res, code, payload, type, extra) {
-  // Defense in depth (#1366): conservative CSP (this page and the hub load
-  // nothing from other sites; inline script and style stay, because home.html
-  // still draws itself that way), frame-ancestors self so the hub cannot be
-  // iframed for clickjacking, and a referrer policy that does not leak path
-  // on cross-origin navigations.
+  // Defense in depth (#1366 / #1474): conservative CSP (this page and the hub
+  // load nothing from other sites; CSS and JS are external same-origin files),
+  // frame-ancestors self so the hub cannot be iframed for clickjacking, and a
+  // referrer policy that does not leak path on cross-origin navigations.
   res.writeHead(code, Object.assign({
     'Content-Type': type || 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
-    'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'",
+    'Content-Security-Policy': CSP_HEADER,
     'Referrer-Policy': 'strict-origin-when-cross-origin'
   }, extra || {}));
   res.end(payload);
@@ -1408,7 +1412,7 @@ function rangeReply(req, res, file, size, headers, head) {
       'accept-ranges': 'bytes',
       'cache-control': 'no-store',
       'x-content-type-options': 'nosniff',
-      'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'",
+      'content-security-policy': CSP_HEADER,
       'referrer-policy': 'strict-origin-when-cross-origin'
     });
     res.end();
@@ -1423,7 +1427,7 @@ function rangeReply(req, res, file, size, headers, head) {
     'accept-ranges': 'bytes',
     'cache-control': headers['cache-control'] || 'no-store',
     'x-content-type-options': 'nosniff',
-    'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'",
+    'content-security-policy': CSP_HEADER,
     'referrer-policy': 'strict-origin-when-cross-origin'
   }));
   if (head) { res.end(); return true; }
@@ -3303,8 +3307,7 @@ async function handle(req, res) {
      a browser trying the plain one again. On plain HTTP it means nothing and
      is left off. */
   try {
-    res.setHeader('Content-Security-Policy',
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'");
+    res.setHeader('Content-Security-Policy', CSP_HEADER);
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   } catch (e) { }
   if (secureHere(req)) {
