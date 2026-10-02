@@ -33565,7 +33565,17 @@ log('gamemode loaded:',
     if (atBoard) { return atBoard; }
     var at = boxAt(actorId);
     if (!at) { return ''; }
-    return holdOfBox(at) || '';
+    var hold = holdOfBox(at);
+    if (!hold) { return ''; }
+    try {
+      var cell = mp.get(actorId, 'worldOrCellDesc');
+      if (typeof cell !== 'string' || !cell || cell !== mp.get(at, 'worldOrCellDesc')) { return ''; }
+      var a = mp.get(actorId, 'pos'), b = mp.get(at, 'pos');
+      if (!Array.isArray(a) || !Array.isArray(b) || a.length !== 3 || b.length !== 3 ||
+          !a.every(Number.isFinite) || !b.every(Number.isFinite)) { return ''; }
+      var dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+      return dx * dx + dy * dy + dz * dz <= 400 * 400 ? hold : '';
+    } catch (e) { return ''; }
   }
 
   /*
@@ -37148,6 +37158,7 @@ function thornswoodBooks(env) {
   var seeded = false;
   var pending = {};
   var seq = 1;
+  var active = true;
 
   function now() { return env.now ? env.now() : Date.now(); }
 
@@ -37239,23 +37250,99 @@ function thornswoodBooks(env) {
     var body = JSON.stringify(obj);
     var tmp = file + '.tmp';
     fs.writeFileSync(tmp, body);
-    try { if (fs.existsSync(file)) { fs.unlinkSync(file); } } catch (e) { }
-    try { fs.renameSync(tmp, file); }
-    catch (e2) { fs.writeFileSync(file, body); }
+    var fd = fs.openSync(tmp, 'r+');
+    try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    fs.renameSync(tmp, file);
   }
 
   function booksFile() { return path.join(dataDir, 'books.json'); }
   function leftFile() { return path.join(dataDir, 'last-left.json'); }
 
   function loadStore() {
-    var doc = readJson(booksFile(), null);
+    var doc = null;
+    if (fs.existsSync(booksFile())) {
+      try {
+        doc = JSON.parse(fs.readFileSync(booksFile(), 'utf8').replace(/^\uFEFF/, ''));
+        if (!doc || !Array.isArray(doc.books)) { throw new Error('invalid saved books'); }
+      } catch (e) { throw new Error('Saved books cannot be verified: ' + e.message); }
+    }
     store = (doc && Array.isArray(doc.books)) ? doc.books : [];
+    var bookIds = Object.create(null);
+    for (var bi = 0; bi < store.length; bi++) {
+      var book = store[bi];
+      if (!book || typeof book !== 'object' || typeof book.id !== 'string' ||
+          !/^[a-zA-Z0-9_-]{1,100}$/.test(book.id) || book.id === '__proto__' || bookIds[book.id] ||
+          (book.kind !== 'business' && book.kind !== 'faction') ||
+          typeof book.name !== 'string' || !book.name.trim() || book.name.length > MAX_NAME ||
+          typeof book.account !== 'string' || !book.account || !Number.isInteger(book.owner) || book.owner <= 0 ||
+          !Array.isArray(book.members) || book.members.length > MAX_MEMBERS ||
+          !Array.isArray(book.roles) || !Array.isArray(book.chat) || book.chat.length > MAX_CHAT ||
+          !validPrices(book.prices)) { throw new Error('Saved book entries cannot be verified'); }
+      bookIds[book.id] = book;
+      var members = Object.create(null);
+      for (var mi = 0; mi < book.members.length; mi++) {
+        var member = book.members[mi];
+        if (!member || !Number.isInteger(member.pid) || member.pid <= 0 || members[member.pid] ||
+            typeof member.name !== 'string' || typeof member.role !== 'string') {
+          throw new Error('Saved book members cannot be verified');
+        }
+        members[member.pid] = true;
+      }
+      var roleNames = Object.create(null);
+      for (var ri = 0; ri < book.roles.length; ri++) {
+        var role = book.roles[ri];
+        if (!role || typeof role.name !== 'string' || !role.name.trim() || role.name.length > MAX_NAME ||
+            roleNames[role.name.toLowerCase()] || !Array.isArray(role.perms) ||
+            !role.perms.every(function (p) { return PERMS.indexOf(p) >= 0; })) {
+          throw new Error('Saved book roles cannot be verified');
+        }
+        roleNames[role.name.toLowerCase()] = true;
+      }
+      if (!roleNames.member || !members[book.owner] || book.members.some(function (m) {
+        return !roleNames[m.role.toLowerCase()];
+      })) {
+        throw new Error('Saved book role references cannot be verified');
+      }
+      for (var ci = 0; ci < book.chat.length; ci++) {
+        var line = book.chat[ci];
+        if (!line || !Number.isInteger(line.pid) || line.pid <= 0 || typeof line.name !== 'string' ||
+            typeof line.text !== 'string' || line.text.length > MAX_LINE || !Number.isFinite(line.at) || line.at < 0) {
+          throw new Error('Saved book chat cannot be verified');
+        }
+      }
+    }
     ledgers = (doc && doc.ledgers && typeof doc.ledgers === 'object' && !Array.isArray(doc.ledgers)) ? doc.ledgers : {};
+    if (doc && doc.ledgers !== undefined && doc.ledgers !== ledgers) { throw new Error('Saved book ledgers cannot be verified'); }
+    for (var hold in ledgers) {
+      if (!Object.prototype.hasOwnProperty.call(ledgers, hold)) { continue; }
+      if (!validHold(hold) || !ledgers[hold] || typeof ledgers[hold] !== 'object' || Array.isArray(ledgers[hold])) {
+        throw new Error('Saved book ledger hold cannot be verified');
+      }
+      for (var id in ledgers[hold]) {
+        if (!Object.prototype.hasOwnProperty.call(ledgers[hold], id)) { continue; }
+        if (id === '__proto__' || !ledgers[hold][id] || !validPrices(ledgers[hold][id].prices)) {
+          throw new Error('Saved book ledger prices cannot be verified');
+        }
+        var entry = ledgers[hold][id];
+        if (!bookIds[id] || entry.book !== id || entry.kind !== bookIds[id].kind ||
+            typeof entry.name !== 'string' || !entry.name.trim() || entry.name.length > MAX_NAME ||
+            !Number.isFinite(entry.at) || entry.at < 0) {
+          throw new Error('Saved book ledger references cannot be verified');
+        }
+      }
+    }
     var left = readJson(leftFile(), null);
     leftAt = (left && typeof left === 'object' && !Array.isArray(left)) ? left : {};
   }
 
-  function save() { writeJson(booksFile(), { books: store, ledgers: ledgers }); }
+  function save() {
+    try { writeJson(booksFile(), { books: store, ledgers: ledgers }); }
+    catch (e) {
+      var failure = new Error('The server could not save the book. Nothing changed.');
+      failure.bookSaveFailed = true;
+      throw failure;
+    }
+  }
   function saveLeft() { writeJson(leftFile(), leftAt); }
 
   loadStore();
@@ -37521,7 +37608,8 @@ function thornswoodBooks(env) {
     var s = String(raw == null ? '' : raw).trim();
     if (!s || s === '-') { return { ok: true, n: null }; }
     if (!/^\d+$/.test(s)) { return { ok: false }; }
-    return { ok: true, n: Number(s) };
+    var n = Number(s);
+    return validGold(n) ? { ok: true, n: n } : { ok: false };
   }
 
   function setPrice(book, item, buyRaw, sellRaw) {
@@ -37712,6 +37800,29 @@ function thornswoodBooks(env) {
     return '';
   }
 
+  function validHold(hold) {
+    return ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm', 'falkreath',
+      'morthal', 'dawnstar', 'winterhold', 'ravenrock'].indexOf(hold) >= 0;
+  }
+
+  function validGold(n) {
+    return n === null || (typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 2147483647);
+  }
+
+  function validPrices(rows) {
+    if (!Array.isArray(rows) || rows.length > MAX_PRICES) { return false; }
+    var names = Object.create(null);
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row || typeof row.name !== 'string' || !row.name.trim() || row.name.length > MAX_NAME ||
+          !validGold(row.buy) || !validGold(row.sell)) { return false; }
+      var key = row.name.trim().toLowerCase();
+      if (names[key]) { return false; }
+      names[key] = true;
+    }
+    return true;
+  }
+
   function copyPrices(book) {
     var out = [];
     var rows = (book && book.prices) || [];
@@ -37789,6 +37900,7 @@ function thornswoodBooks(env) {
 
   function guildPrice(hold, item) {
     var name = String(hold || '').toLowerCase();
+    if (!active || !validHold(name)) { return { buy: null, sell: null }; }
     return {
       buy: sidePrice(name, item, 'buy'),
       sell: sidePrice(name, item, 'sell')
@@ -37799,17 +37911,26 @@ function thornswoodBooks(env) {
     var taken = splitBook(pid, words, function (b, p) { return hasPerm(b, p, 'Prices'); });
     if (!taken.book) { return taken.why; }
     if (!hasPerm(taken.book, pid, 'Prices')) { return 'You cannot set prices in that book.'; }
+    if (taken.rest) { return 'Name the book to submit at the hold box.'; }
     var hold = standingHold(actorId).toLowerCase();
-    if (!hold) { return 'Stand at the hold\'s notice board, then submit the list.'; }
-    if (!ledgers[hold]) { ledgers[hold] = {}; }
-    ledgers[hold][taken.book.id] = {
+    if (!validHold(hold)) { return 'Stand at the hold\'s notice board, then submit the list.'; }
+    if (!validPrices(taken.book.prices)) { return 'That price list cannot be verified.'; }
+    var previous = ledgers;
+    var next = JSON.parse(JSON.stringify(ledgers));
+    if (!Object.prototype.hasOwnProperty.call(next, hold)) { next[hold] = {}; }
+    next[hold][taken.book.id] = {
       book: taken.book.id,
       name: taken.book.name,
       kind: taken.book.kind,
       at: now(),
       prices: copyPrices(taken.book)
     };
-    save();
+    ledgers = next;
+    try { save(); }
+    catch (e) {
+      ledgers = previous;
+      return 'The server could not save the list. Nothing was submitted.';
+    }
     refresh();
     return 'Submitted ' + taken.book.name + ' to ' + hold + '\'s box. The list stays in the book.';
   }
@@ -37860,13 +37981,17 @@ function thornswoodBooks(env) {
       if (String(bits[0] || '').toLowerCase() === 'drop' && bits.length < 3) {
         return dropPrice(taken.book, bits.slice(1).join(' '));
       }
-      if (bits.length < 1) { return 'Name the line, then the buy and the sell. A blank is -.'; }
+      // Prices are positional. The shared role parser removes blank fields.
+      bits = String(taken.rest || '').split('|').map(function (s) { return s.trim(); });
+      if (!bits[0] && bits.length > 1) { bits.shift(); }
+      if (!bits[0] || bits.length > 3) { return 'Name the line, then the buy and the sell. A blank is -.'; }
       return setPrice(taken.book, bits[0], bits[1], bits[2]);
     }
     return 'book: new business <name>, new faction <name>, invite, leave. The rest is on J.';
   }
 
   function view(pid, textOff) {
+    if (!active) { return { show: false }; }
     var off = textOff || {};
     var r = rolesOf(pid);
     if (!showTab(pid)) { return { show: false }; }
@@ -37936,6 +38061,7 @@ function thornswoodBooks(env) {
   }
 
   function noteTick() {
+    if (!active) { return; }
     var here = onlineMap();
     if (!seeded) {
       for (var id in here) {
@@ -37959,21 +38085,45 @@ function thornswoodBooks(env) {
     if (changed) { saveLeft(); }
   }
 
+  function mutate(action, structured) {
+    var unavailable = 'The books are unavailable while their saved state is checked.';
+    if (!active) { return structured ? { ok: false, text: unavailable } : unavailable; }
+    var before = JSON.parse(JSON.stringify({ store: store, ledgers: ledgers, pending: pending, seq: seq }));
+    try { return action(); }
+    catch (e) {
+      if (!e || !e.bookSaveFailed) { throw e; }
+      store = before.store;
+      ledgers = before.ledgers;
+      pending = before.pending;
+      seq = before.seq;
+      return structured ? { ok: false, text: e.message } : e.message;
+    }
+  }
+
   return {
-    command: command,
-    accept: accept,
-    decline: decline,
+    command: function (ctx) { return mutate(function () { return command(ctx); }, false); },
+    accept: function (pid, name) { return mutate(function () { return accept(pid, name); }, true); },
+    decline: function (pid) { if (active) { decline(pid); } },
     view: view,
     noteTick: noteTick,
-    books: function () { return store; },
+    shutdown: function () { active = false; pending = {}; },
+    books: function () { return active ? JSON.parse(JSON.stringify(store)) : []; },
     guildPrice: guildPrice,
-    ledgers: function () { return ledgers; }
+    ledgers: function () { return active ? JSON.parse(JSON.stringify(ledgers)) : {}; }
   };
 }
 /* BOOKS-END */
 
 (function () {
   var g = (typeof globalThis !== 'undefined' ? globalThis : this);
+  if (g.__thornswoodBooks && typeof g.__thornswoodBooks.shutdown === 'function') {
+    g.__thornswoodBooks.shutdown();
+  }
+  g.__thornswoodBooks = null;
+  if (g.__thornswoodBooksTimer) {
+    try { clearInterval(g.__thornswoodBooksTimer); } catch (eClear) { }
+  }
+  g.__thornswoodBooksTimer = null;
   try {
     var fs = require('fs');
     var path = require('path');
@@ -37984,9 +38134,6 @@ function thornswoodBooks(env) {
     } catch (e) { }
     var api = thornswoodBooks({ fs: fs, path: path, dataDir: dataDir });
     g.__thornswoodBooks = api;
-    if (g.__thornswoodBooksTimer) {
-      try { clearInterval(g.__thornswoodBooksTimer); } catch (e2) { }
-    }
     g.__thornswoodBooksTimer = setInterval(function () {
       try { api.noteTick(); } catch (e3) { }
     }, 5000);
