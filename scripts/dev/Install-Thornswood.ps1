@@ -89,7 +89,7 @@ $Skip = @($Skip | ForEach-Object { $_ -split ',' } | Where-Object { $_ } | ForEa
 if ($SkipBody) { $Skip += 'body' }
 
 # ---------------------------------------------------------------- the steps --
-$launcherBuild = Join-Path ([IO.Path]::GetTempPath()) ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
+$launcherBuild = & (Join-Path $Here '..\release\Get-ScratchDir.ps1') ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
 $steps = @(
     @{
         Key = 'content'; Name = 'ThornsWood content plugin'
