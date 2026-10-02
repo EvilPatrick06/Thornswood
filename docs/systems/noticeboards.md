@@ -98,6 +98,12 @@ somebody has taken stays up until they hand it back.
 
 ## Where this is
 
+The board is a panel. Stand at the spot and click it. Notices, jobs,
+taking one, taking your own down, handing a job back, and leaving a
+price list are on that panel. Walking away closes it. The panel sends
+the same words the server already answers. A steward still moves a
+board with `/board move` or `/board here`.
+
 Fees of 20 and 30, the reach of 400, the newest 10, the gaps, `/unpin`,
 `/take`, `/dropjob`, and steward `/board move` and `/board here` are
 in the server. The fee lands on the hold's ledger. Letters are not.
