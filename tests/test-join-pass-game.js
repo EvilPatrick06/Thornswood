@@ -222,10 +222,12 @@ refusedCase('a pass for the right profile sent under the wrong one', function (r
   r.sweep(T0);
   r.sweep(T0 + 181000);
   r.fire();
-  yes('watching only (thornswoodRequirePass not true): nobody is ended or told',
-      r.kicked.length === 0 && r.told.length === 0);
-  yes('and the log says WOULD REFUSE with the reason',
-      r.logged.some(function (s) { return /WOULD REFUSE profile 700: no valid join pass in 181s online/.test(s); }));
+  yes('no thornswoodRequirePass: the session is still refused',
+      r.kicked.length === 1 && r.kicked[0] === 7);
+  yes('and told to update, with no WOULD REFUSE that lets them stay',
+      r.told.length === 1 && r.told[0].indexOf('700: ') === 0 && /Thornswood launcher/.test(r.told[0]) && /update/.test(r.told[0]) &&
+      r.logged.some(function (s) { return /refusing profile 700: no valid join pass in 181s online/.test(s); }) &&
+      !r.logged.some(function (s) { return /WOULD REFUSE/.test(s); }));
 }
 
 {
@@ -234,7 +236,7 @@ refusedCase('a pass for the right profile sent under the wrong one', function (r
   r.sweep(T0);
   r.sweep(T0 + 181000);
   r.fire();
-  yes('only true switches it on, not "yes"', r.kicked.length === 0);
+  yes('a value other than true does not let them stay', r.kicked.length === 1 && r.kicked[0] === 7);
 }
 
 {

@@ -90,6 +90,23 @@ function New-Zip([string]$path, [hashtable]$entries) {
     } finally { $z.Dispose() }
 }
 
+function New-Sfx([string]$path, [hashtable]$entries) {
+    # A program with a zip concatenated after it, the shape of the Setup
+    # (copy /b stub+zip). The zip's offsets count from the zip, not from the
+    # first byte, which is what Check-Secrets used to miss.
+    $part = $path + '.zippart'
+    New-Zip $part $entries
+    $stub = New-Object byte[] 48
+    $stub[0] = 0x4D
+    $stub[1] = 0x5A
+    $zipBytes = [IO.File]::ReadAllBytes($part)
+    $all = New-Object byte[] ($stub.Length + $zipBytes.Length)
+    [System.Buffer]::BlockCopy($stub, 0, $all, 0, $stub.Length)
+    [System.Buffer]::BlockCopy($zipBytes, 0, $all, $stub.Length, $zipBytes.Length)
+    [IO.File]::WriteAllBytes($path, $all)
+    Remove-Item -LiteralPath $part -Force
+}
+
 function Get-Bytes([string]$text) { return ,([Text.Encoding]::UTF8.GetBytes($text)) }
 
 function Invoke-Git([string]$dir, [string[]]$argv) {
@@ -237,6 +254,25 @@ try {
     Write-Utf8 $notzip 'not a zip'
     $r = Invoke-Scan @{ Zip = @($notzip); Allow = $noAllow }
     yes 'a zip that does not open is exit 2, not a pass' ($r.Code -eq 2)
+
+    # The Setup program: a small program with a zip appended. .NET reports no
+    # entries for that file. Reading it must see the planted token, and a clean
+    # one must pass with its real entry count, not "0 entries".
+    $sfx = Join-Path $work 'Thornswood-Setup.exe'
+    New-Sfx $sfx @{
+        'payload/Data/Platform/voice-token.txt' = (Get-Bytes ($fake['voice-join-token']))
+        'payload/Data/Platform/Plugins/thornswood-front.js' = (Get-Bytes "var a = 1;`n")
+    }
+    $r = Invoke-Scan @{ Zip = @($sfx); Allow = $noAllow }
+    yes 'a Setup program with an appended zip is read, not passed as empty' ($r.Code -eq 1 -and $r.Out -match 'Thornswood-Setup\.exe: 2 entries' -and $r.Out.Contains('voice-token.txt:1  voice-join-token'))
+    yes 'and that token is not in the output' (-not (Test-Leaks $r.Out))
+    $sfxClean = Join-Path $work 'Thornswood-Setup-clean.exe'
+    New-Sfx $sfxClean @{
+        'payload/Data/Platform/Plugins/thornswood-front.js' = (Get-Bytes "var a = 1;`n")
+    }
+    $r = Invoke-Scan @{ Zip = @($sfxClean); Allow = $noAllow }
+    yes 'a clean Setup program with an appended zip passes, and not as 0 entries' ($r.Code -eq 0 -and $r.Out -match 'Thornswood-Setup-clean\.exe: 1 entries' -and $r.Out -notmatch '0 entries')
+
 
     # ---------------------------------------------------------------- programs
     # A built program keeps its strings as UTF-16, at any alignment.
