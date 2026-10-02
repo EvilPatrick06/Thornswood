@@ -689,13 +689,39 @@ function mostOnlineFallback() {
 }
 
 const jsonFile = (p, fallback) => {
-  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fallback; }
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')); }
+  catch (e) {
+    // A missing file is the normal empty case. A file that exists but will
+    // not parse usually means a crash mid-write left truncated JSON; shout
+    // so bans / linked / inbox do not silently become the empty fallback.
+    try {
+      if (fs.existsSync(p)) {
+        console.error('[thornswood-docs] JSON will not parse, using fallback for ' + p + ': ' + (e && e.message || e));
+      }
+    } catch (e2) { }
+    return fallback;
+  }
 };
 const putJson = (p, o) => {
-  try { fs.writeFileSync(p, JSON.stringify(o, null, 2), 'utf8'); return true; }
-  catch (e) { return false; }
+  // Same-folder temp + rename so a crash mid-write cannot leave truncated
+  // JSON that jsonFile would then quietly replace with the empty fallback
+  // (bans, linked accounts, inbox, and the rest of putJson callers).
+  try {
+    const body = JSON.stringify(o, null, 2);
+    const dir = path.dirname(p);
+    const tmp = path.join(dir, '.' + path.basename(p) + '.' + process.pid + '.tmp');
+    fs.writeFileSync(tmp, body, 'utf8');
+    try { fs.renameSync(tmp, p); }
+    catch (e) {
+      // Windows: rename onto an existing file can fail; replace then drop tmp.
+      try { fs.copyFileSync(tmp, p); } finally { try { fs.unlinkSync(tmp); } catch (e2) { } }
+    }
+    return true;
+  } catch (e) {
+    try { fs.unlinkSync(path.join(path.dirname(p), '.' + path.basename(p) + '.' + process.pid + '.tmp')); } catch (e2) { }
+    return false;
+  }
 };
-
 const docPath = (n) => Object.prototype.hasOwnProperty.call(DOCS, n)
   ? path.join(DATA, n + '.md') : null;
 
